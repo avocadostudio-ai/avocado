@@ -1,0 +1,14 @@
+{
+  "name": "ai-site-editor-poc",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @ai-site-editor/site --filter @ai-site-editor/editor --filter @ai-site-editor/orchestrator dev",
+    "dev:site": "pnpm --filter @ai-site-editor/site dev",
+    "dev:editor": "pnpm --filter @ai-site-editor/editor dev",
+    "dev:orchestrator": "pnpm --filter @ai-site-editor/orchestrator dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
