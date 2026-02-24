@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-site-editor/shared": "workspace:*",
     "@fastify/cors": "^10.0.2",
+    "dotenv": "^17.3.1",
     "fastify": "^5.2.1",
     "openai": "^4.87.1",
     "zod": "^3.24.2"

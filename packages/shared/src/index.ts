@@ -38,6 +38,25 @@ export const blockSchemas = {
     description: z.string().min(1),
     ctaText: z.string().min(1),
     ctaHref: z.string().min(1)
+  }),
+  Card: z.object({
+    title: z.string().min(1),
+    description: z.string().min(1),
+    ctaText: z.string().min(1),
+    ctaHref: z.string().min(1)
+  }),
+  CardGrid: z.object({
+    title: z.string().min(1),
+    cards: z
+      .array(
+        z.object({
+          title: z.string().min(1),
+          description: z.string().min(1),
+          ctaText: z.string().min(1),
+          ctaHref: z.string().min(1)
+        })
+      )
+      .min(1)
   })
 } as const
 

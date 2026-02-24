@@ -52,21 +52,208 @@
   z-index: 20;
 }
 
-.editor-selectable:hover::after {
+.editor-block-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(calc(-100% + 1px));
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 22;
+}
+
+.editor-has-badge::after {
+  opacity: 0 !important;
+}
+
+.editor-block-badge-label {
+  position: static;
+  background: rgba(var(--editor-accent-rgb), 0.95);
+  color: #f8fafc;
+  border-radius: 8px 8px 0 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.editor-selectable:hover > .editor-block-badge {
   opacity: 1;
 }
 
-.hero.editor-selectable::after {
-  top: 1px;
-  transform: none;
+.editor-selectable:hover::after {
+  opacity: 1;
 }
 
 .editor-highlight {
   outline: 3px solid var(--editor-accent-strong);
   outline-offset: -3px;
 }
+.editor-highlight > .editor-block-badge {
+  opacity: 1;
+}
+
 .editor-highlight::after {
   opacity: 1;
+}
+
+.editor-selected-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translateY(calc(-100% + 1px));
+  border: 0;
+  background: rgba(var(--editor-accent-rgb), 0.95);
+  color: #fff;
+  border-radius: 8px 8px 0 0;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 23;
+}
+
+.editor-selected-move {
+  position: absolute;
+  top: 0;
+  border: 0;
+  background: rgba(var(--editor-accent-rgb), 0.95);
+  color: #fff;
+  border-radius: 8px 8px 0 0;
+  width: 22px;
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 23;
+  transform: translateY(calc(-100% + 1px));
+}
+
+.editor-selected-move-up {
+  right: 58px;
+}
+
+.editor-selected-move-down {
+  right: 32px;
+}
+
+.editor-selected-move:hover {
+  background: #0d4f68;
+}
+
+.editor-selected-move:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.editor-selected-delete::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-top: 0;
+  border-radius: 1px;
+  box-sizing: border-box;
+  transform: translateY(1px);
+}
+
+.editor-selected-delete::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  width: 12px;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+.editor-selected-delete:hover {
+  background: #991b1b;
+}
+
+.editor-selectable [data-editable-label] {
+  position: relative;
+}
+
+.editor-selectable [data-editable-label]::after {
+  content: attr(data-editable-label);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translate(calc(-100% - 12px), -50%);
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 21;
+}
+
+.editor-highlight:hover [data-editable-label]::after,
+.editor-highlight [data-editable-label]:hover::after {
+  opacity: 1;
+}
+
+.editor-highlight [data-editable-target] {
+  position: relative;
+}
+
+.editor-highlight [data-editable-target]:hover {
+  outline: 2px dashed rgba(var(--editor-accent-rgb), 0.55);
+  outline-offset: 2px;
+}
+
+.editor-highlight [data-editable-target]::before {
+  content: attr(data-editable-target-label);
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 4px 7px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 3;
+}
+
+.editor-highlight [data-editable-target]:hover::before {
+  opacity: 1;
+}
+
+.editor-child-highlight {
+  outline: 3px solid rgba(var(--editor-accent-rgb), 0.82) !important;
+  outline-offset: 2px;
+}
+
+.editor-child-highlight::before {
+  opacity: 1 !important;
 }
 
 .editor-flash {
