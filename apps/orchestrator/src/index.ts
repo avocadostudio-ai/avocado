@@ -1,11 +1,16 @@
+import dotenv from "dotenv"
+import { existsSync } from "node:fs"
+import { resolve } from "node:path"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
 import OpenAI from "openai"
+import { z } from "zod"
 import {
   allowedBlockTypes,
   blockSchemas,
   demoPublishedPages,
   editPlanSchema,
+  operationSchema,
   type BlockType,
   type EditPlan,
   type Operation,
@@ -16,6 +21,14 @@ import {
 const app = Fastify({ logger: true })
 await app.register(cors, { origin: true })
 
+const envCandidates = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
+for (const path of envCandidates) {
+  if (existsSync(path)) {
+    dotenv.config({ path })
+    break
+  }
+}
+
 const publishedPages = new Map<string, PageDoc>()
 for (const page of demoPublishedPages()) publishedPages.set(page.slug, structuredClone(page))
 
@@ -23,6 +36,7 @@ const draftPages = new Map<string, Map<string, PageDoc>>()
 const historyUndo = new Map<string, Map<string, PageDoc[]>>()
 const historyRedo = new Map<string, Map<string, PageDoc[]>>()
 const versions = new Map<string, number>()
+const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
 
 const modelLookup = {
   fast: process.env.OPENAI_MODEL_FAST ?? "gpt-4o-mini",
@@ -39,18 +53,209 @@ type ChatRequestBody = {
   modelKey?: ModelKey
   activeBlockId?: string
   activeBlockType?: string
+  activeEditablePath?: string
+}
+
+type ApplyOpsRequestBody = {
+  session?: string
+  ops?: unknown
 }
 
 type ChatResult = {
   status: string
   summary: string
   changes: string[]
+  suggestions?: string[]
   validationErrors?: unknown
   previewVersion: number
   focusBlockId?: string
   plannerSource: "openai" | "demo"
   modelUsed: string
   modelKey: ModelKey
+}
+
+function isInfoQuery(message: string) {
+  const m = message.toLowerCase()
+  const normalized = m.replace(/\s+/g, " ").trim()
+  const blockCatalogPatterns = [
+    /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
+    /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
+    /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
+    /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
+    /\bwhat\s+else\s+can\s+i\s+add\b/,
+    /\bwhat\s+other\s+content\b/,
+    /\bavailable\s+blocks?\b/,
+    /\bavailable\s+block\s+types?\b/
+  ]
+  if (blockCatalogPatterns.some((re) => re.test(normalized))) return true
+
+  return (
+    m.includes("what blocks can you add") ||
+    m.includes("what block can you add") ||
+    m.includes("which blocks can you add") ||
+    m.includes("which block types can i add") ||
+    m.includes("what block types can i add") ||
+    m.includes("available blocks") ||
+    m.includes("what can i change") ||
+    m.includes("what can i edit") ||
+    m.includes("what content") ||
+    m.includes("content elements") ||
+    m.includes("which fields") ||
+    m.includes("what fields") ||
+    m.includes("what properties") ||
+    m.includes("what props")
+  )
+}
+
+function isBlockCatalogQuery(message: string) {
+  const m = message.toLowerCase().replace(/\s+/g, " ").trim()
+  return (
+    /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/.test(m) ||
+    /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/.test(m) ||
+    /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/.test(m) ||
+    /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/.test(m) ||
+    /\bwhat\s+else\s+can\s+i\s+add\b/.test(m) ||
+    /\bavailable\s+blocks?\b/.test(m) ||
+    /\bavailable\s+block\s+types?\b/.test(m)
+  )
+}
+
+function editablePropsFromBlock(block: PageDoc["blocks"][number]) {
+  if (!block || !block.props || typeof block.props !== "object") return []
+  return Object.keys(block.props as Record<string, unknown>)
+}
+
+function promptFromPropKey(propKey: string) {
+  const labels: Record<string, string> = {
+    heading: "Change heading to \"...\"",
+    subheading: "Change subheading to \"...\"",
+    ctaText: "Change CTA text to \"...\"",
+    ctaHref: "Change CTA link to \"/...\"",
+    title: "Change title to \"...\"",
+    description: "Change description to \"...\"",
+    features: "Update feature list",
+    items: "Update items",
+    cards: "Update cards"
+  }
+  return labels[propKey] ?? `Change ${propKey} to \"...\"`
+}
+
+function childSuggestions(args: { selected: PageDoc["blocks"][number]; editablePath: string }) {
+  const { selected, editablePath } = args
+  const path = editablePath.trim()
+  if (!path) return []
+  const root = path.split(".")[0] ?? path
+
+  if (selected.type === "CardGrid" && root.startsWith("cards[")) {
+    return [
+      `Update ${root}.title to \"...\"`,
+      `Update ${root}.description to \"...\"`,
+      `Update ${root}.ctaText to \"...\"`,
+      `Update ${root}.ctaHref to \"/...\"`
+    ]
+  }
+
+  if (selected.type === "FeatureGrid" && root.startsWith("features[")) {
+    return [`Update ${root}.title to \"...\"`, `Update ${root}.description to \"...\"`]
+  }
+
+  if (selected.type === "Testimonials" && root.startsWith("items[")) {
+    return [`Update ${root}.quote to \"...\"`, `Update ${root}.author to \"...\"`]
+  }
+
+  if (selected.type === "FAQAccordion" && root.startsWith("items[")) {
+    return [`Update ${root}.q to \"...\"`, `Update ${root}.a to \"...\"`]
+  }
+
+  return [`Update ${root} ...`]
+}
+
+function infoResponse(args: {
+  body: ChatRequestBody
+  current: PageDoc
+  plannerSource: "openai" | "demo"
+  modelUsed: string
+  modelKey: ModelKey
+}): { code: number; payload: ChatResult } {
+  const { body, current, plannerSource, modelUsed, modelKey } = args
+  const lower = (body.message ?? "").toLowerCase()
+
+  const asksBlockTypes =
+    lower.includes("what blocks can you add") ||
+    lower.includes("what block can you add") ||
+    lower.includes("which blocks can you add") ||
+    lower.includes("which block types can i add") ||
+    lower.includes("what block types can i add") ||
+    lower.includes("available blocks")
+
+  if (asksBlockTypes) {
+    return {
+      code: 200,
+      payload: {
+        status: "info",
+        summary: `You can add these block types: ${allowedBlockTypes.join(", ")}.`,
+        changes: ["Tip: specify position, e.g. “add Testimonials below Hero”."],
+        suggestions: [
+          "Add Testimonials below Hero",
+          "Add CardGrid at the end",
+          "Add FeatureGrid after Hero",
+          "Add FAQAccordion before CTA",
+          "Add CTA at the end"
+        ],
+        previewVersion: versions.get(body.session ?? "dev") ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      }
+    }
+  }
+
+  const selected =
+    body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
+      ? current.blocks.find((b) => b.id === body.activeBlockId)
+      : null
+
+  if (selected) {
+    const keys = editablePropsFromBlock(selected)
+    const childPath = String(body.activeEditablePath ?? "")
+    const suggestions = childPath ? childSuggestions({ selected, editablePath: childPath }) : keys.slice(0, 4).map(promptFromPropKey)
+    const summary = childPath
+      ? `Focused ${selected.type} item: ${childPath}.`
+      : `You can edit ${selected.type} fields: ${keys.join(", ")}.`
+    return {
+      code: 200,
+      payload: {
+        status: "info",
+        summary,
+        changes: childPath
+          ? [`Selected block: ${selected.id}`, `Focused path: ${childPath}`]
+          : [`Selected block: ${selected.id}`, "Tip: click a field name in your prompt, e.g. “change heading to …”."],
+        suggestions,
+        previewVersion: versions.get(body.session ?? "dev") ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      }
+    }
+  }
+
+  const firstByType = new Map<BlockType, PageDoc["blocks"][number]>()
+  for (const block of current.blocks) {
+    if (!firstByType.has(block.type)) firstByType.set(block.type, block)
+  }
+  const byType = Array.from(firstByType.values()).map((b) => `${b.type}: ${editablePropsFromBlock(b).join(", ")}`)
+  return {
+    code: 200,
+    payload: {
+      status: "info",
+      summary: "Select a block to get precise editable fields. Current page supports:",
+      changes: byType,
+      previewVersion: versions.get(body.session ?? "dev") ?? 0,
+      plannerSource,
+      modelUsed,
+      modelKey
+    }
+  }
 }
 
 function getSessionDraft(session: string) {
@@ -97,6 +302,24 @@ function bumpVersion(session: string) {
   const next = current + 1
   versions.set(session, next)
   return next
+}
+
+function pushRecentEdit(session: string, entry: { slug: string; summary: string; ops: Operation[] }) {
+  const list = recentEdits.get(session) ?? []
+  list.push({ ...entry, at: new Date().toISOString() })
+  recentEdits.set(session, list.slice(-10))
+}
+
+function getRecentEdits(session: string, slug: string) {
+  const list = recentEdits.get(session) ?? []
+  return list
+    .filter((item) => item.slug === slug)
+    .slice(-3)
+    .map((item) => ({
+      at: item.at,
+      summary: item.summary,
+      ops: item.ops.map((op) => op.op)
+    }))
 }
 
 function demoPlanFromMessage(message: string, slug: string, activeBlockId?: string, activeBlockType?: string): EditPlan {
@@ -234,10 +457,23 @@ function normalizeOpName(op: unknown) {
   return aliases[key] ?? op
 }
 
-function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; currentPage?: PageDoc }) {
+function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; currentPage?: PageDoc; userMessage?: string }) {
   if (!input || typeof input !== "object") return input
   const root = input as Record<string, unknown>
   const ops = Array.isArray(root.ops) ? root.ops : Array.isArray(root.operations) ? root.operations : []
+  const userMessage = (args?.userMessage ?? "").toLowerCase()
+
+  const resolvePageSlug = (candidate: unknown) => {
+    if (typeof candidate !== "string" || candidate.length === 0) return args?.defaultSlug
+    if (candidate.startsWith("/")) return candidate
+
+    if (args?.currentPage) {
+      if (candidate === args.currentPage.id) return args.currentPage.slug
+      if (candidate.toLowerCase() === "home" && args.currentPage.slug === "/") return "/"
+    }
+
+    return args?.defaultSlug
+  }
 
   const beforeToAfter = (beforeId: unknown) => {
     if (!args?.currentPage || typeof beforeId !== "string") return undefined
@@ -248,12 +484,24 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
 
   const normalizedOps = ops.map((item) => {
     if (!item || typeof item !== "object") return item
-    const raw = { ...(item as Record<string, unknown>) }
-    raw.op = normalizeOpName(raw.op)
+    const source = item as Record<string, unknown>
+    const raw = { ...source }
 
-    if (!raw.pageSlug) {
-      raw.pageSlug = raw.page_slug ?? raw.slug ?? raw.page ?? args?.defaultSlug
+    // Accept malformed one-key op objects like { "move_block": { ...fields } }.
+    if (!raw.op && !raw.operation && !raw.action && !raw.kind) {
+      for (const key of ["create_page", "add_block", "update_props", "remove_block", "move_block"] as const) {
+        const value = source[key]
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          Object.assign(raw, value as Record<string, unknown>)
+          raw.op = key
+          break
+        }
+      }
     }
+
+    raw.op = normalizeOpName(raw.op ?? raw.operation ?? raw.action ?? raw.kind)
+
+    raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? raw.path)
     if (!raw.blockId) {
       raw.blockId = raw.block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.id
     }
@@ -273,6 +521,36 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
           props: raw.props ?? raw.patch ?? {}
         }
       }
+    }
+    if (raw.op === "add_block" && raw.block && typeof raw.block === "object" && !Array.isArray(raw.block)) {
+      const block = raw.block as Record<string, unknown>
+      if ((!block.id || typeof block.id !== "string") && typeof block.type === "string") {
+        block.id = `b_${String(block.type).toLowerCase()}_${Date.now()}`
+      }
+      raw.block = block
+    }
+
+    // LLMs sometimes emit create_page when they actually mean add_block.
+    if (raw.op === "create_page" && raw.block && !raw.page) {
+      raw.op = "add_block"
+      raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? args?.defaultSlug)
+    }
+
+    // Intent repair: if user asked for bottom/end and model omitted an anchor, place at end.
+    if (
+      (raw.op === "move_block" || raw.op === "add_block") &&
+      !raw.afterBlockId &&
+      args?.currentPage &&
+      (userMessage.includes("bottom") || userMessage.includes("end") || userMessage.includes("last"))
+    ) {
+      const movingId =
+        typeof raw.blockId === "string"
+          ? raw.blockId
+          : raw.op === "add_block" && raw.block && typeof raw.block === "object" && typeof (raw.block as { id?: unknown }).id === "string"
+            ? (raw.block as { id: string }).id
+            : undefined
+      const tail = [...args.currentPage.blocks].reverse().find((b) => b.id !== movingId)
+      if (tail) raw.afterBlockId = tail.id
     }
 
     return raw
@@ -307,27 +585,875 @@ function blockContractsSummary() {
       allowedProps: ["title", "description", "ctaText", "ctaHref"],
       required: ["title", "description", "ctaText", "ctaHref"],
       notes: "Keep existing props unless the user asks to change them."
+    },
+    Card: {
+      allowedProps: ["title", "description", "ctaText", "ctaHref"],
+      required: ["title", "description", "ctaText", "ctaHref"],
+      notes: "A standalone card with one CTA."
+    },
+    CardGrid: {
+      allowedProps: ["title", "cards"],
+      required: ["title", "cards"],
+      notes: "cards must be a non-empty array of {title, description, ctaText, ctaHref}."
     }
   }
 }
 
-function selectedBlockSnapshot(args: { currentPage: PageDoc; activeBlockId?: string }) {
+function readPathValue(root: unknown, path: string) {
+  if (!path) return undefined
+  const parts: Array<string | number> = []
+  const regex = /([^[.\]]+)|\[(\d+)\]/g
+  for (const match of path.matchAll(regex)) {
+    if (match[1]) parts.push(match[1])
+    if (match[2]) parts.push(Number(match[2]))
+  }
+  let current: unknown = root
+  for (const part of parts) {
+    if (typeof part === "number") {
+      if (!Array.isArray(current)) return undefined
+      current = current[part]
+      continue
+    }
+    if (!current || typeof current !== "object" || Array.isArray(current)) return undefined
+    current = (current as Record<string, unknown>)[part]
+  }
+  return current
+}
+
+function selectedBlockSnapshot(args: { currentPage: PageDoc; activeBlockId?: string; activeEditablePath?: string }) {
   if (!args.activeBlockId) return null
   const block = args.currentPage.blocks.find((item) => item.id === args.activeBlockId)
   if (!block) return null
+  const editablePath = typeof args.activeEditablePath === "string" && args.activeEditablePath.length > 0 ? args.activeEditablePath : null
   return {
     id: block.id,
     type: block.type,
-    props: block.props
+    props: block.props,
+    selectedEditablePath: editablePath,
+    selectedEditableValue: editablePath ? readPathValue(block.props, editablePath) ?? null : null
   }
+}
+
+const blockTypeEnum = z.enum(allowedBlockTypes as [BlockType, ...BlockType[]])
+const intentSchema = z.object({
+  action: z.enum(["add", "move", "update", "remove", "info", "clarify"]),
+  target_block_ref: z.string().min(1).optional(),
+  target_block_type: blockTypeEnum.optional(),
+  new_block_type: blockTypeEnum.optional(),
+  position: z.enum(["top", "bottom", "before", "after"]).optional(),
+  anchor_block_ref: z.string().min(1).optional(),
+  patch: z.record(z.unknown()).optional(),
+  summary: z.string().min(1).optional(),
+  assumption: z.string().min(1).optional()
+})
+type ParsedIntent = z.infer<typeof intentSchema>
+
+function inferBlockTypeFromText(text: string): BlockType | undefined {
+  const normalized = text.toLowerCase()
+  if (normalized.includes("hero")) return "Hero"
+  if (normalized.includes("featuregrid") || normalized.includes("feature grid") || normalized.includes("features")) return "FeatureGrid"
+  if (normalized.includes("testimonial")) return "Testimonials"
+  if (normalized.includes("faq")) return "FAQAccordion"
+  if (normalized.includes("cta")) return "CTA"
+  if (normalized.includes("cardgrid") || normalized.includes("card grid")) return "CardGrid"
+  if (normalized.includes("card")) return "Card"
+  return undefined
+}
+
+function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined {
+  const normalized = message.toLowerCase()
+  const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:a|an)?\s*([a-z ]+)/)
+  if (!addMatch?.[2]) return undefined
+  const chunk = addMatch[2].trim()
+  if (chunk.startsWith("card grid") || chunk.startsWith("cardgrid")) return "CardGrid"
+  if (chunk.startsWith("card")) return "Card"
+  if (chunk.startsWith("feature grid") || chunk.startsWith("featuregrid") || chunk.startsWith("features")) return "FeatureGrid"
+  if (chunk.startsWith("testimonial")) return "Testimonials"
+  if (chunk.startsWith("faq")) return "FAQAccordion"
+  if (chunk.startsWith("cta")) return "CTA"
+  if (chunk.startsWith("hero")) return "Hero"
+  return undefined
+}
+
+function resolveBlockRef(args: {
+  ref?: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  fallbackType?: BlockType
+}): PageDoc["blocks"][number] | null {
+  const { ref, currentPage, activeBlockId, fallbackType } = args
+  const blocks = currentPage.blocks
+  if (typeof ref === "string" && ref.length > 0) {
+    const exact = blocks.find((b) => b.id === ref)
+    if (exact) return exact
+    const key = ref.toLowerCase().replace(/[\s_-]/g, "")
+    if (["selected", "active", "current", "this"].includes(key) && activeBlockId) {
+      const selected = blocks.find((b) => b.id === activeBlockId)
+      if (selected) return selected
+    }
+    const byType = inferBlockTypeFromText(key)
+    if (byType) {
+      const found = blocks.find((b) => b.type === byType)
+      if (found) return found
+    }
+    const contains = blocks.find((b) => b.id.toLowerCase().includes(key))
+    if (contains) return contains
+  }
+
+  if (activeBlockId) {
+    const selected = blocks.find((b) => b.id === activeBlockId)
+    if (selected) return selected
+  }
+  if (fallbackType) {
+    const found = blocks.find((b) => b.type === fallbackType)
+    if (found) return found
+  }
+  return null
+}
+
+function ordinalToIndex(value: string) {
+  const key = value.toLowerCase()
+  if (key === "first" || key === "1st") return 0
+  if (key === "second" || key === "2nd") return 1
+  if (key === "third" || key === "3rd") return 2
+  if (key === "fourth" || key === "4th") return 3
+  if (key === "fifth" || key === "5th") return 4
+  if (key === "last") return -1
+  return null
+}
+
+function resolveByDescriptor(args: { descriptor: string; currentPage: PageDoc; activeBlockId?: string }) {
+  const { descriptor, currentPage, activeBlockId } = args
+  const normalized = descriptor.trim().toLowerCase()
+  if (!normalized) return null
+  if (["this", "this block", "this section", "selected", "selected block", "current block"].includes(normalized)) {
+    if (!activeBlockId) return null
+    return currentPage.blocks.find((b) => b.id === activeBlockId) ?? null
+  }
+
+  const exact = currentPage.blocks.find((b) => b.id.toLowerCase() === normalized)
+  if (exact) return exact
+
+  const type = inferBlockTypeFromText(normalized)
+  if (!type) return null
+  const typed = currentPage.blocks.filter((b) => b.type === type)
+  if (typed.length === 0) return null
+
+  const ord = normalized.match(/\b(first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th)\b/)?.[1]
+  const idx = ord ? ordinalToIndex(ord) : 0
+  if (idx === null) return typed[0]
+  if (idx === -1) return typed[typed.length - 1]
+  return typed[idx] ?? typed[0]
+}
+
+function resolveReferencesFromMessage(args: { message: string; currentPage: PageDoc; activeBlockId?: string }) {
+  const { message, currentPage, activeBlockId } = args
+  const lower = message.toLowerCase()
+
+  const mentioned = new Map<string, { id: string; type: BlockType; reason: string }>()
+  const addMention = (block: PageDoc["blocks"][number] | null, reason: string) => {
+    if (!block) return
+    if (!mentioned.has(block.id)) mentioned.set(block.id, { id: block.id, type: block.type, reason })
+  }
+
+  if (activeBlockId) {
+    const selected = currentPage.blocks.find((b) => b.id === activeBlockId) ?? null
+    addMention(selected, "active_selection")
+  }
+
+  const descriptorMatches = lower.match(
+    /\b(first|second|third|fourth|fifth|last)?\s*(hero|feature grid|features|testimonials?|faq|cta|card grid|card)s?\b/g
+  )
+  for (const match of descriptorMatches ?? []) {
+    addMention(resolveByDescriptor({ descriptor: match, currentPage, activeBlockId }), "descriptor_match")
+  }
+
+  for (const block of currentPage.blocks) {
+    if (lower.includes(block.id.toLowerCase())) addMention(block, "id_match")
+  }
+
+  const afterDescriptor = lower.match(/\b(?:after|below|under)\s+([a-z0-9_\-\s]+?)(?:[,.]|$)/)?.[1]?.trim()
+  const beforeDescriptor = lower.match(/\b(?:before|above)\s+([a-z0-9_\-\s]+?)(?:[,.]|$)/)?.[1]?.trim()
+  const primaryDescriptor = lower.match(/\b(?:update|change|edit|remove|delete|move)\s+([a-z0-9_\-\s]+?)(?:\b(?:to|into|with|after|before|above|below|under)\b|[,.]|$)/)?.[1]?.trim()
+
+  const anchor = resolveByDescriptor({
+    descriptor: afterDescriptor ?? beforeDescriptor ?? "",
+    currentPage,
+    activeBlockId
+  })
+  const target = resolveByDescriptor({
+    descriptor: primaryDescriptor ?? "",
+    currentPage,
+    activeBlockId
+  })
+  addMention(anchor, "anchor_match")
+  addMention(target, "target_match")
+
+  return {
+    target: target ? { id: target.id, type: target.type } : null,
+    anchor: anchor ? { id: anchor.id, type: anchor.type } : null,
+    mentionedBlocks: Array.from(mentioned.values()).slice(0, 8)
+  }
+}
+
+function plannerContextPack(args: {
+  session: string
+  slug: string
+  message: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeBlockType?: string
+  activeEditablePath?: string
+}) {
+  const { session, slug, message, currentPage, activeBlockId, activeBlockType, activeEditablePath } = args
+  const selectedIdx = activeBlockId ? currentPage.blocks.findIndex((b) => b.id === activeBlockId) : -1
+  const neighbors =
+    selectedIdx >= 0
+      ? {
+          previous: selectedIdx > 0 ? currentPage.blocks[selectedIdx - 1] : null,
+          next: selectedIdx < currentPage.blocks.length - 1 ? currentPage.blocks[selectedIdx + 1] : null
+        }
+      : { previous: null, next: null }
+
+  return {
+    route: slug,
+    blockCount: currentPage.blocks.length,
+    selected: {
+      blockId: activeBlockId ?? null,
+      blockType: activeBlockType ?? null,
+      editablePath: activeEditablePath ?? null,
+      block: selectedBlockSnapshot({ currentPage, activeBlockId, activeEditablePath })
+    },
+    neighbors: {
+      previous: neighbors.previous ? { id: neighbors.previous.id, type: neighbors.previous.type } : null,
+      next: neighbors.next ? { id: neighbors.next.id, type: neighbors.next.type } : null
+    },
+    pageOutline: currentPage.blocks.map((b) => ({
+      id: b.id,
+      type: b.type,
+      props: Object.keys(b.props as Record<string, unknown>)
+    })),
+    recentSuccessfulEdits: getRecentEdits(session, slug),
+    resolvedReferences: resolveReferencesFromMessage({ message, currentPage, activeBlockId })
+  }
+}
+
+function nextBlockId(type: BlockType, page: PageDoc) {
+  const base = `b_${type.toLowerCase()}_${Date.now()}`
+  if (!page.blocks.some((b) => b.id === base)) return base
+  let i = 1
+  while (page.blocks.some((b) => b.id === `${base}_${i}`)) i += 1
+  return `${base}_${i}`
+}
+
+function defaultPropsForType(type: BlockType) {
+  if (type === "Hero") {
+    return {
+      heading: "Build with confidence",
+      subheading: "Make changes safely with instant preview.",
+      ctaText: "Get Started",
+      ctaHref: "/"
+    }
+  }
+  if (type === "FeatureGrid") {
+    return {
+      title: "Key features",
+      features: [
+        { title: "Fast setup", description: "Launch quickly with guided defaults." },
+        { title: "Safe edits", description: "Structured operations keep content valid." },
+        { title: "Live updates", description: "Preview changes immediately." }
+      ]
+    }
+  }
+  if (type === "Testimonials") {
+    return {
+      title: "What customers say",
+      items: [
+        { quote: "We launched faster than expected.", author: "Alex" },
+        { quote: "Editing is straightforward for the whole team.", author: "Jordan" }
+      ]
+    }
+  }
+  if (type === "FAQAccordion") {
+    return {
+      title: "Frequently asked questions",
+      items: [
+        { q: "How fast can we publish?", a: "Most teams ship updates in minutes." },
+        { q: "Can we revise later?", a: "Yes, every block can be updated anytime." }
+      ]
+    }
+  }
+  if (type === "Card") {
+    return {
+      title: "Launch faster",
+      description: "Go from idea to published changes in minutes.",
+      ctaText: "Learn more",
+      ctaHref: "/pricing"
+    }
+  }
+  if (type === "CardGrid") {
+    return {
+      title: "Explore more",
+      cards: [
+        {
+          title: "Fast setup",
+          description: "Create and ship updates quickly.",
+          ctaText: "Get started",
+          ctaHref: "/"
+        },
+        {
+          title: "Safe updates",
+          description: "Schema-validated edits reduce breakage.",
+          ctaText: "See how",
+          ctaHref: "/pricing"
+        },
+        {
+          title: "Team workflow",
+          description: "Collaborate with clear, reviewable changes.",
+          ctaText: "Read guide",
+          ctaHref: "/"
+        }
+      ]
+    }
+  }
+  return {
+    title: "Ready to get started?",
+    description: "Apply your next change in seconds.",
+    ctaText: "Start now",
+    ctaHref: "/"
+  }
+}
+
+function coercePatchForBlock(block: PageDoc["blocks"][number], rawPatch: unknown) {
+  if (!rawPatch || typeof rawPatch !== "object" || Array.isArray(rawPatch)) return {}
+  const source =
+    "props" in (rawPatch as Record<string, unknown>) &&
+    (rawPatch as { props?: unknown }).props &&
+    typeof (rawPatch as { props?: unknown }).props === "object" &&
+    !Array.isArray((rawPatch as { props?: unknown }).props)
+      ? ((rawPatch as { props: Record<string, unknown> }).props as Record<string, unknown>)
+      : (rawPatch as Record<string, unknown>)
+
+  const allowed = Object.keys(block.props as Record<string, unknown>)
+  const normalizedToAllowed = new Map<string, string>()
+  for (const key of allowed) normalizedToAllowed.set(key.toLowerCase(), key)
+
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(source)) {
+    if (allowed.includes(key)) {
+      out[key] = value
+      continue
+    }
+    const mapped = normalizedToAllowed.get(key.toLowerCase())
+    if (mapped) out[mapped] = value
+  }
+  return out
+}
+
+function patchObject(rawPatch: unknown) {
+  if (!rawPatch || typeof rawPatch !== "object" || Array.isArray(rawPatch)) return null
+  if (
+    "props" in (rawPatch as Record<string, unknown>) &&
+    (rawPatch as { props?: unknown }).props &&
+    typeof (rawPatch as { props?: unknown }).props === "object" &&
+    !Array.isArray((rawPatch as { props?: unknown }).props)
+  ) {
+    return (rawPatch as { props: Record<string, unknown> }).props
+  }
+  return rawPatch as Record<string, unknown>
+}
+
+function parseIndexedPath(path: string) {
+  const match = /^([a-zA-Z0-9_]+)\[(\d+)\](?:\.(.+))?$/.exec(path.trim())
+  if (!match) return null
+  return {
+    listKey: match[1],
+    index: Number(match[2]),
+    leaf: match[3]
+  }
+}
+
+function inferSimpleFieldPatchFromMessage(message: string) {
+  const m = message
+    .replace(/[“”]/g, '"')
+    .match(/\b(?:change|set|update|edit)\b[\s\w]*?\b(title|description|cta\s*text|cta|link|href|quote|author|question|answer|q|a)\b[\s\w]*?\b(?:to|as)\b\s+"?([^"\n]+)"?/i)
+  if (!m) return null
+  const rawField = m[1].toLowerCase().replace(/\s+/g, "")
+  const value = m[2]?.trim()
+  if (!value) return null
+  const map: Record<string, string> = {
+    title: "title",
+    description: "description",
+    ctatext: "ctaText",
+    cta: "ctaText",
+    link: "ctaHref",
+    href: "ctaHref",
+    quote: "quote",
+    author: "author",
+    question: "q",
+    answer: "a",
+    q: "q",
+    a: "a"
+  }
+  const key = map[rawField]
+  if (!key) return null
+  return { [key]: value } as Record<string, unknown>
+}
+
+function coercePatchForEditablePath(block: PageDoc["blocks"][number], editablePath: string | undefined, rawPatch: unknown, message: string) {
+  if (!editablePath) return null
+  const directKey = editablePath.trim()
+  const blockProps = block.props as Record<string, unknown>
+  if (directKey && Object.prototype.hasOwnProperty.call(blockProps, directKey)) {
+    const source = patchObject(rawPatch) ?? inferSimpleFieldPatchFromMessage(message)
+    let value: unknown
+
+    if (source) {
+      if (Object.prototype.hasOwnProperty.call(source, directKey)) value = source[directKey]
+      else {
+        const mapped = Object.keys(source).find((key) => key.toLowerCase() === directKey.toLowerCase())
+        if (mapped) value = source[mapped]
+      }
+    }
+
+    if (value === undefined) {
+      const quoted = quotedText(message)
+      if (quoted) value = quoted
+    }
+    if (value === undefined) return null
+
+    return {
+      patch: { [directKey]: value } as Record<string, unknown>,
+      changedKeys: [directKey],
+      rootKey: directKey
+    }
+  }
+
+  const parsed = parseIndexedPath(editablePath)
+  if (!parsed) return null
+
+  const list = (block.props as Record<string, unknown>)[parsed.listKey]
+  if (!Array.isArray(list) || parsed.index < 0 || parsed.index >= list.length) return null
+  const rowRaw = list[parsed.index]
+  if (!rowRaw || typeof rowRaw !== "object" || Array.isArray(rowRaw)) return null
+  const row = rowRaw as Record<string, unknown>
+
+  const source = patchObject(rawPatch) ?? inferSimpleFieldPatchFromMessage(message)
+  if (!source) return null
+
+  const allowedItemKeys = Object.keys(row)
+  const normalizedToAllowed = new Map<string, string>()
+  for (const key of allowedItemKeys) normalizedToAllowed.set(key.toLowerCase(), key)
+
+  const itemPatch: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(source)) {
+    const normalized = key.trim()
+    const fromPathPrefix = `${parsed.listKey}[${parsed.index}].`
+    const childKey = normalized.startsWith(fromPathPrefix) ? normalized.slice(fromPathPrefix.length) : normalized
+    const mapped = normalizedToAllowed.get(childKey.toLowerCase())
+    if (mapped) itemPatch[mapped] = value
+  }
+  if (Object.keys(itemPatch).length === 0) return null
+
+  const nextList = list.map((entry, idx) => {
+    if (idx !== parsed.index || !entry || typeof entry !== "object" || Array.isArray(entry)) return entry
+    return { ...(entry as Record<string, unknown>), ...itemPatch }
+  })
+  return {
+    patch: { [parsed.listKey]: nextList } as Record<string, unknown>,
+    changedKeys: Object.keys(itemPatch),
+    rootKey: parsed.listKey
+  }
+}
+
+function quotedText(message: string) {
+  return /"([^"]+)"/.exec(message)?.[1]?.trim()
+}
+
+function buildListAppendPatch(block: PageDoc["blocks"][number], message: string) {
+  const lower = message.toLowerCase()
+  const quoted = quotedText(message)
+
+  if (block.type === "FAQAccordion") {
+    const existing = Array.isArray(block.props.items) ? (block.props.items as Array<Record<string, unknown>>) : []
+    const q = quoted ?? (lower.includes("question") ? "New question" : "How does this work?")
+    const next = [...existing, { q, a: "Add answer here." }]
+    return { items: next }
+  }
+
+  if (block.type === "Testimonials") {
+    const existing = Array.isArray(block.props.items) ? (block.props.items as Array<Record<string, unknown>>) : []
+    const quote = quoted ?? "Great experience."
+    const next = [...existing, { quote, author: "Customer" }]
+    return { items: next }
+  }
+
+  if (block.type === "FeatureGrid") {
+    const existing = Array.isArray(block.props.features) ? (block.props.features as Array<Record<string, unknown>>) : []
+    const title = quoted ?? "New feature"
+    const next = [...existing, { title, description: "Describe this feature." }]
+    return { features: next }
+  }
+
+  if (block.type === "CardGrid") {
+    const existing = Array.isArray(block.props.cards) ? (block.props.cards as Array<Record<string, unknown>>) : []
+    const title = quoted ?? "New card"
+    const next = [...existing, { title, description: "Add card description.", ctaText: "Learn more", ctaHref: "/" }]
+    return { cards: next }
+  }
+
+  return null
+}
+
+function compileDeterministicPlan(args: {
+  intent: ParsedIntent
+  message: string
+  slug: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}): EditPlan | null {
+  const { intent, message, slug, currentPage, activeBlockId, activeEditablePath } = args
+  const lowerMessage = message.toLowerCase()
+  const assumptions: string[] = []
+  if (intent.assumption) assumptions.push(intent.assumption)
+
+  const selectedBlock = activeBlockId ? currentPage.blocks.find((b) => b.id === activeBlockId) ?? null : null
+  const asksInlineAdd =
+    lowerMessage.includes("add") &&
+    (lowerMessage.includes("inside") ||
+      lowerMessage.includes("within") ||
+      lowerMessage.includes("current") ||
+      lowerMessage.includes("this one") ||
+      lowerMessage.includes("more"))
+
+  if ((intent.action === "add" || intent.action === "clarify") && selectedBlock && asksInlineAdd) {
+    const patch = buildListAppendPatch(selectedBlock, message)
+    if (patch) {
+      return {
+        intent: "edit_plan",
+        summary_for_user: `Updated ${selectedBlock.type}.`,
+        change_log: [...assumptions, `Added one entry to ${selectedBlock.id}.`],
+        ops: [{ op: "update_props", pageSlug: slug, blockId: selectedBlock.id, patch }]
+      }
+    }
+  }
+
+  if (intent.action === "info" || intent.action === "clarify") {
+    return {
+      intent: "needs_clarification",
+      summary_for_user: intent.summary ?? "Please specify the section and exact change you want.",
+      change_log: assumptions,
+      ops: []
+    }
+  }
+
+  if (intent.action === "remove") {
+    const target = resolveBlockRef({
+      ref: intent.target_block_ref,
+      currentPage,
+      activeBlockId,
+      fallbackType: intent.target_block_type
+    })
+    if (!target) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "I need to know which block to remove.",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+    return {
+      intent: "edit_plan",
+      summary_for_user: intent.summary ?? `Removed ${target.type}.`,
+      change_log: [...assumptions, `Removed block ${target.id}.`],
+      ops: [{ op: "remove_block", pageSlug: slug, blockId: target.id }]
+    }
+  }
+
+  if (intent.action === "update" || (intent.action === "clarify" && !!activeEditablePath)) {
+    const target = resolveBlockRef({
+      ref: intent.target_block_ref,
+      currentPage,
+      activeBlockId,
+      fallbackType: intent.target_block_type
+    })
+    if (!target) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "I need to know which block to update.",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+    const childPatch = coercePatchForEditablePath(target, activeEditablePath, intent.patch, message)
+    const patch = childPatch?.patch ?? coercePatchForBlock(target, intent.patch)
+    if (Object.keys(patch).length === 0) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: `Please specify at least one valid field for ${target.type}.`,
+        change_log: [...assumptions, `Editable fields: ${Object.keys(target.props).join(", ")}`],
+        ops: []
+      }
+    }
+    return {
+      intent: "edit_plan",
+      summary_for_user: intent.summary ?? `Updated ${target.type}.`,
+      change_log: [
+        ...assumptions,
+        childPatch
+          ? `Updated ${target.id} ${activeEditablePath}: ${childPatch.changedKeys.join(", ")}`
+          : `Updated ${target.id}: ${Object.keys(patch).join(", ")}`
+      ],
+      ops: [{ op: "update_props", pageSlug: slug, blockId: target.id, patch }]
+    }
+  }
+
+  if (intent.action === "move") {
+    const target = resolveBlockRef({
+      ref: intent.target_block_ref,
+      currentPage,
+      activeBlockId,
+      fallbackType: intent.target_block_type
+    })
+    if (!target) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "I need to know which block to move.",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+
+    let afterBlockId: string | undefined
+    if (intent.position === "top") {
+      afterBlockId = undefined
+    } else if (intent.position === "bottom") {
+      const tail = [...currentPage.blocks].reverse().find((b) => b.id !== target.id)
+      afterBlockId = tail?.id
+    } else if (intent.position === "after" || (intent.anchor_block_ref && !intent.position)) {
+      const anchor = resolveBlockRef({ ref: intent.anchor_block_ref, currentPage })
+      if (!anchor) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: "I could not find the anchor block to move after.",
+          change_log: assumptions,
+          ops: []
+        }
+      }
+      afterBlockId = anchor.id
+    } else if (intent.position === "before") {
+      const anchor = resolveBlockRef({ ref: intent.anchor_block_ref, currentPage })
+      if (!anchor) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: "I could not find the anchor block to move before.",
+          change_log: assumptions,
+          ops: []
+        }
+      }
+      const idx = currentPage.blocks.findIndex((b) => b.id === anchor.id)
+      if (idx > 0) afterBlockId = currentPage.blocks[idx - 1]?.id
+      else afterBlockId = undefined
+    } else if (message.toLowerCase().includes("bottom") || message.toLowerCase().includes("end")) {
+      const tail = [...currentPage.blocks].reverse().find((b) => b.id !== target.id)
+      afterBlockId = tail?.id
+    } else {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "Please specify where to move the block (top, bottom, before, after).",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+
+    return {
+      intent: "edit_plan",
+      summary_for_user: intent.summary ?? `Moved ${target.type}.`,
+      change_log: [...assumptions, `Moved block ${target.id}.`],
+      ops: [{ op: "move_block", pageSlug: slug, blockId: target.id, afterBlockId }]
+    }
+  }
+
+  if (intent.action === "add") {
+    const blockType =
+      intent.new_block_type ??
+      inferAddedBlockTypeFromMessage(message) ??
+      intent.target_block_type ??
+      inferBlockTypeFromText(intent.target_block_ref ?? "") ??
+      inferBlockTypeFromText(message)
+    if (!blockType) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: `Please specify which block type to add (${allowedBlockTypes.join(", ")}).`,
+        change_log: assumptions,
+        ops: []
+      }
+    }
+
+    const blockId = nextBlockId(blockType, currentPage)
+    const baseProps = defaultPropsForType(blockType)
+    const patch = coercePatchForBlock({ id: blockId, type: blockType, props: baseProps }, intent.patch)
+    const props = { ...baseProps, ...patch }
+
+    const addOp: Operation = {
+      op: "add_block",
+      pageSlug: slug,
+      block: { id: blockId, type: blockType, props }
+    }
+
+    let extraMoveTop: Operation | null = null
+    if (intent.position === "after" || (intent.anchor_block_ref && !intent.position)) {
+      const anchor = resolveBlockRef({ ref: intent.anchor_block_ref, currentPage })
+      if (!anchor) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: "I could not find the anchor block to place this after.",
+          change_log: assumptions,
+          ops: []
+        }
+      }
+      addOp.afterBlockId = anchor.id
+    } else if (intent.position === "before") {
+      const anchor = resolveBlockRef({ ref: intent.anchor_block_ref, currentPage })
+      if (!anchor) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: "I could not find the anchor block to place this before.",
+          change_log: assumptions,
+          ops: []
+        }
+      }
+      const idx = currentPage.blocks.findIndex((b) => b.id === anchor.id)
+      if (idx > 0) addOp.afterBlockId = currentPage.blocks[idx - 1]?.id
+      else extraMoveTop = { op: "move_block", pageSlug: slug, blockId, afterBlockId: undefined }
+    } else if (intent.position === "top") {
+      extraMoveTop = { op: "move_block", pageSlug: slug, blockId, afterBlockId: undefined }
+    } else if (intent.position === "bottom" || !intent.position) {
+      // no-op: add without anchor appends to bottom in applyOpsAtomically
+    }
+
+    const ops: Operation[] = extraMoveTop ? [addOp, extraMoveTop] : [addOp]
+    return {
+      intent: "edit_plan",
+      summary_for_user: intent.summary ?? `Added ${blockType}.`,
+      change_log: [...assumptions, `Added ${blockType} block ${blockId}.`],
+      ops
+    }
+  }
+
+  return null
+}
+
+async function parseIntentWithOpenAI(args: {
+  message: string
+  slug: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeBlockType?: string
+  activeEditablePath?: string
+  model: string
+}): Promise<ParsedIntent> {
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const system = [
+    "You extract editing intent for a website editor.",
+    "Return ONLY one JSON object. No markdown.",
+    "Never return operations.",
+    "Map request to action: add | move | update | remove | info | clarify.",
+    "If the user asks what is editable/available, use action=info.",
+    "Use explicit block references when present (id/type words like hero/faq/cta).",
+    "For move/add with placement words, set position to top/bottom/before/after and anchor_block_ref when relevant.",
+    "For update, include patch with only requested fields."
+  ].join("\n")
+
+  const user = {
+    request: args.message,
+    slug: args.slug,
+    activeBlockId: args.activeBlockId ?? null,
+    activeBlockType: args.activeBlockType ?? null,
+    activeEditablePath: args.activeEditablePath ?? null,
+    availableBlockTypes: allowedBlockTypes,
+    blocks: args.currentPage.blocks.map((b) => ({ id: b.id, type: b.type, props: Object.keys(b.props) }))
+  }
+
+  const completion = await client.chat.completions.create({
+    model: args.model,
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify(user) }
+    ]
+  })
+
+  const raw = completion.choices[0]?.message?.content ?? ""
+  const jsonText = extractJsonObject(raw)
+  if (!jsonText) throw new Error("Intent parser did not return JSON")
+  const parsedRoot = JSON.parse(jsonText) as Record<string, unknown>
+  const normalized = { ...parsedRoot } as Record<string, unknown>
+
+  if (typeof normalized.action !== "string") {
+    const intent = typeof normalized.intent === "string" ? normalized.intent : undefined
+    if (intent === "needs_clarification") normalized.action = "clarify"
+    if (intent === "info") normalized.action = "info"
+  }
+
+  if (
+    typeof normalized.action !== "string" &&
+    Array.isArray(normalized.ops) &&
+    normalized.ops.length > 0 &&
+    normalized.ops[0] &&
+    typeof normalized.ops[0] === "object"
+  ) {
+    const first = normalized.ops[0] as Record<string, unknown>
+    const op = normalizeOpName(first.op ?? first.operation ?? first.action ?? first.kind)
+    if (op === "add_block") {
+      normalized.action = "add"
+      const block = first.block && typeof first.block === "object" ? (first.block as Record<string, unknown>) : null
+      if (block && typeof block.type === "string") normalized.new_block_type = block.type
+      if (typeof first.afterBlockId === "string") {
+        normalized.position = "after"
+        normalized.anchor_block_ref = first.afterBlockId
+      } else {
+        normalized.position = "bottom"
+      }
+      if (block && typeof block.props === "object" && block.props !== null && !Array.isArray(block.props)) {
+        normalized.patch = block.props
+      }
+    } else if (op === "update_props") {
+      normalized.action = "update"
+      if (typeof first.blockId === "string") normalized.target_block_ref = first.blockId
+      if (first.patch && typeof first.patch === "object" && !Array.isArray(first.patch)) normalized.patch = first.patch
+    } else if (op === "remove_block") {
+      normalized.action = "remove"
+      if (typeof first.blockId === "string") normalized.target_block_ref = first.blockId
+    } else if (op === "move_block") {
+      normalized.action = "move"
+      if (typeof first.blockId === "string") normalized.target_block_ref = first.blockId
+      if (typeof first.afterBlockId === "string") {
+        normalized.position = "after"
+        normalized.anchor_block_ref = first.afterBlockId
+      } else {
+        normalized.position = "top"
+      }
+    }
+  }
+
+  const parsed = intentSchema.safeParse(normalized)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    const detail = issue?.message ?? "Invalid intent parser output"
+    const at = issue?.path?.length ? ` at ${issue.path.join(".")}` : ""
+    throw new Error(`${detail}${at}`)
+  }
+  return parsed.data
 }
 
 async function generatePlanWithOpenAI(args: {
   message: string
   slug: string
   currentPage: PageDoc
-  activeBlockId?: string
-  activeBlockType?: string
+  contextPack: ReturnType<typeof plannerContextPack>
   model: string
   feedback?: string
 }): Promise<EditPlan> {
@@ -343,18 +1469,16 @@ async function generatePlanWithOpenAI(args: {
     "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
+    "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     `Allowed block types: ${allowedBlockTypes.join(", ")}.`
   ].join("\n")
 
   const user = {
     request: args.message,
     slug: args.slug,
-    activeBlockId: args.activeBlockId ?? null,
-    activeBlockType: args.activeBlockType ?? null,
-    selectedBlock: selectedBlockSnapshot({ currentPage: args.currentPage, activeBlockId: args.activeBlockId }),
+    contextPack: args.contextPack,
     blockContracts: blockContractsSummary(),
     knownBlockTypes: Object.keys(blockSchemas),
-    currentPage: args.currentPage,
     editPlanShape: {
       intent: "edit_plan | needs_clarification",
       summary_for_user: "string",
@@ -378,7 +1502,11 @@ async function generatePlanWithOpenAI(args: {
   const jsonText = extractJsonObject(raw)
   if (!jsonText) throw new Error("Model did not return JSON")
 
-  const parsed = normalizePlanCandidate(JSON.parse(jsonText), { defaultSlug: args.slug, currentPage: args.currentPage })
+  const parsed = normalizePlanCandidate(JSON.parse(jsonText), {
+    defaultSlug: args.slug,
+    currentPage: args.currentPage,
+    userMessage: args.message
+  })
   const planResult = editPlanSchema.safeParse(parsed)
   if (!planResult.success) {
     const first = planResult.error.issues[0]
@@ -433,7 +1561,7 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
       if (alreadyExists) throw new Error(`Block id ${op.block.id} already exists`)
 
       if (!op.afterBlockId) {
-        page.blocks.unshift({ ...op.block, props: propCheck.data })
+        page.blocks.push({ ...op.block, props: propCheck.data })
       } else {
         const idx = page.blocks.findIndex((b) => b.id === op.afterBlockId)
         if (idx === -1) throw new Error(`afterBlockId ${op.afterBlockId} not found`)
@@ -539,10 +1667,97 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
   const current = getPage(body.session, body.slug)
   if (!current) return { code: 404, payload: { error: "page not found" } }
 
-  if (!process.env.OPENAI_API_KEY) {
-    let demoPlan: EditPlan
+  if (isInfoQuery(body.message)) {
+    return infoResponse({ body, current, plannerSource, modelUsed, modelKey })
+  }
+
+  const contextPack = plannerContextPack({
+    session: body.session,
+    slug: body.slug,
+    message: body.message,
+    currentPage: current,
+    activeBlockId: body.activeBlockId,
+    activeBlockType: body.activeBlockType,
+    activeEditablePath: body.activeEditablePath
+  })
+
+  const respondFromPlan = (plan: EditPlan, source: "openai" | "demo") => {
+    if (plan.intent === "needs_clarification" && isBlockCatalogQuery(body.message)) {
+      const forcedInfo = infoResponse({ body, current, plannerSource: source, modelUsed, modelKey })
+      return { done: true as const, response: forcedInfo }
+    }
+
+    if (plan.intent === "needs_clarification") {
+      return {
+        done: true as const,
+        response: {
+          code: 200,
+          payload: {
+            status: "needs_clarification",
+            summary: plan.summary_for_user,
+            changes: plan.change_log,
+            previewVersion: versions.get(body.session) ?? 0,
+            plannerSource: source,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult
+        }
+      }
+    }
+
+    const previous = getPage(body.session, body.slug)
+    if (!previous) {
+      return {
+        done: true as const,
+        response: { code: 404, payload: { error: "page not found" } as { error: string } }
+      }
+    }
+
     try {
-      demoPlan = demoPlanFromMessage(body.message, body.slug, body.activeBlockId, body.activeBlockType)
+      applyOpsAtomically(body.session, plan.ops)
+      pushUndo(body.session, body.slug, previous)
+      pushRecentEdit(body.session, { slug: body.slug, summary: plan.summary_for_user, ops: plan.ops })
+      const previewVersion = bumpVersion(body.session)
+      const focusBlockId = pickFocusBlockId(plan.ops)
+      return {
+        done: true as const,
+        response: {
+          code: 200,
+          payload: {
+            status: "applied",
+            summary: plan.summary_for_user,
+            changes: plan.change_log,
+            previewVersion,
+            focusBlockId,
+            plannerSource: source,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult
+        }
+      }
+    } catch (error) {
+      return { done: false as const, reason: toErrorDetail(error) }
+    }
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    try {
+      const demoPlan = demoPlanFromMessage(body.message, body.slug, body.activeBlockId, body.activeBlockType)
+      const outcome = respondFromPlan(demoPlan, "demo")
+      if (outcome.done) return outcome.response
+      return {
+        code: 400,
+        payload: {
+          status: "validation_error",
+          summary: "I could not apply that change safely.",
+          changes: [],
+          validationErrors: [outcome.reason],
+          previewVersion: versions.get(body.session) ?? 0,
+          plannerSource: "demo",
+          modelUsed,
+          modelKey
+        }
+      }
     } catch (error) {
       return {
         code: 500,
@@ -551,58 +1766,7 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
           summary: "Could not generate an edit plan.",
           changes: [toErrorDetail(error).slice(0, 300)],
           previewVersion: versions.get(body.session) ?? 0,
-          plannerSource,
-          modelUsed,
-          modelKey
-        }
-      }
-    }
-
-    if (demoPlan.intent === "needs_clarification") {
-      return {
-        code: 200,
-        payload: {
-          status: "needs_clarification",
-          summary: demoPlan.summary_for_user,
-          changes: demoPlan.change_log,
-          previewVersion: versions.get(body.session) ?? 0,
-          plannerSource,
-          modelUsed,
-          modelKey
-        }
-      }
-    }
-
-    const previous = getPage(body.session, body.slug)
-    if (!previous) return { code: 404, payload: { error: "page not found" } }
-    try {
-      applyOpsAtomically(body.session, demoPlan.ops)
-      pushUndo(body.session, body.slug, previous)
-      const previewVersion = bumpVersion(body.session)
-      const focusBlockId = pickFocusBlockId(demoPlan.ops)
-      return {
-        code: 200,
-        payload: {
-          status: "applied",
-          summary: demoPlan.summary_for_user,
-          changes: demoPlan.change_log,
-          previewVersion,
-          focusBlockId,
-          plannerSource,
-          modelUsed,
-          modelKey
-        }
-      }
-    } catch (error) {
-      return {
-        code: 400,
-        payload: {
-          status: "validation_error",
-          summary: "I could not apply that change safely.",
-          changes: [],
-          validationErrors: [toErrorDetail(error)],
-          previewVersion: versions.get(body.session) ?? 0,
-          plannerSource,
+          plannerSource: "demo",
           modelUsed,
           modelKey
         }
@@ -620,8 +1784,7 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
         message: body.message,
         slug: body.slug,
         currentPage: current,
-        activeBlockId: body.activeBlockId,
-        activeBlockType: body.activeBlockType,
+        contextPack,
         model: modelUsed,
         feedback: repairFeedback.length > 0 ? repairFeedback.join(" | ") : undefined
       })
@@ -646,71 +1809,29 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
       continue
     }
 
-    if (plan.intent === "needs_clarification") {
-      return {
-        code: 200,
-        payload: {
-          status: "needs_clarification",
-          summary: plan.summary_for_user,
-          changes: plan.change_log,
-          previewVersion: versions.get(body.session) ?? 0,
-          plannerSource,
-          modelUsed,
-          modelKey
-        }
-      }
-    }
+    const outcome = respondFromPlan(plan, "openai")
+    if (outcome.done) return outcome.response
+    repairFeedback.push(`Attempt ${attempt} apply failed: ${outcome.reason}`)
+  }
 
-    const previous = getPage(body.session, body.slug)
-    if (!previous) return { code: 404, payload: { error: "page not found" } }
-
-    try {
-      applyOpsAtomically(body.session, plan.ops)
-      pushUndo(body.session, body.slug, previous)
-      const previewVersion = bumpVersion(body.session)
-      const focusBlockId = pickFocusBlockId(plan.ops)
-      return {
-        code: 200,
-        payload: {
-          status: "applied",
-          summary: plan.summary_for_user,
-          changes: plan.change_log,
-          previewVersion,
-          focusBlockId,
-          plannerSource,
-          modelUsed,
-          modelKey
-        }
-      }
-    } catch (error) {
-      const reason = toErrorDetail(error)
-      repairFeedback.push(`Attempt ${attempt} apply failed: ${reason}`)
-      if (attempt === maxAttempts) {
-        return {
-          code: 400,
-          payload: {
-            status: "validation_error",
-            summary: "I could not apply that change safely.",
-            changes: [],
-            validationErrors: repairFeedback.slice(-3),
-            previewVersion: versions.get(body.session) ?? 0,
-            plannerSource,
-            modelUsed,
-            modelKey
-          }
-        }
-      }
-    }
+  try {
+    const fallbackPlan = demoPlanFromMessage(body.message, body.slug, body.activeBlockId, body.activeBlockType)
+    const fallbackOutcome = respondFromPlan(fallbackPlan, "demo")
+    if (fallbackOutcome.done) return fallbackOutcome.response
+    repairFeedback.push(`Demo fallback apply failed: ${fallbackOutcome.reason}`)
+  } catch (error) {
+    repairFeedback.push(`Demo fallback planning failed: ${toErrorDetail(error)}`)
   }
 
   return {
-    code: 500,
+    code: 400,
     payload: {
-      status: "error",
-      summary: "Could not generate an edit plan.",
+      status: "validation_error",
+      summary: "I could not apply that change safely.",
       changes: [],
+      validationErrors: repairFeedback.slice(-4),
       previewVersion: versions.get(body.session) ?? 0,
-      plannerSource,
+      plannerSource: "demo",
       modelUsed,
       modelKey
     }
@@ -740,6 +1861,43 @@ app.get("/draft/pages", async (request, reply) => {
   return structuredClone(page)
 })
 
+app.post("/ops", async (request, reply) => {
+  const body = request.body as ApplyOpsRequestBody
+  const session = body.session ?? "dev"
+  const parsedOps = z.array(operationSchema).safeParse(body.ops)
+  if (!parsedOps.success) return reply.code(400).send({ error: "invalid ops payload" })
+  if (parsedOps.data.length === 0) return reply.code(400).send({ error: "ops must not be empty" })
+
+  const snapshots = new Map<string, PageDoc>()
+  for (const op of parsedOps.data) {
+    if (!("pageSlug" in op) || typeof op.pageSlug !== "string") continue
+    if (snapshots.has(op.pageSlug)) continue
+    const current = getPage(session, op.pageSlug)
+    if (!current) return reply.code(404).send({ error: `page not found: ${op.pageSlug}` })
+    snapshots.set(op.pageSlug, current)
+  }
+
+  try {
+    applyOpsAtomically(session, parsedOps.data)
+    for (const [slug, snapshot] of snapshots) pushUndo(session, slug, snapshot)
+    const firstSlugOp = parsedOps.data.find((op) => "pageSlug" in op && typeof op.pageSlug === "string")
+    if (firstSlugOp && "pageSlug" in firstSlugOp && typeof firstSlugOp.pageSlug === "string") {
+      pushRecentEdit(session, { slug: firstSlugOp.pageSlug, summary: "Applied operations.", ops: parsedOps.data })
+    }
+    const previewVersion = bumpVersion(session)
+    const focusBlockId = pickFocusBlockId(parsedOps.data)
+    return {
+      status: "applied",
+      summary: "Applied operations.",
+      changes: [],
+      previewVersion,
+      focusBlockId
+    }
+  } catch (error) {
+    return reply.code(400).send({ error: toErrorDetail(error) })
+  }
+})
+
 app.post("/chat", async (request, reply) => {
   const body = request.body as ChatRequestBody
   const result = await runChatPipeline(body)
@@ -758,7 +1916,7 @@ app.get("/chat/stream", async (request, reply) => {
   reply.raw.setHeader("Vary", "Origin")
 
   reply.raw.write("retry: 60000\n\n")
-  sseWrite(reply, { type: "status", message: "Planning edit..." })
+  sseWrite(reply, { type: "status", message: "Crafting your update..." })
 
   const result = await runChatPipeline(query)
   if (result.code >= 400) {
@@ -823,6 +1981,9 @@ app.post("/history/redo", async (request, reply) => {
 })
 
 app.get("/health", async () => ({ ok: true }))
+app.get("/status/planner", async () => ({
+  plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo"
+}))
 
 const port = Number(process.env.PORT ?? 4200)
 await app.listen({ port, host: "0.0.0.0" })

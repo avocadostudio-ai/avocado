@@ -1,25 +1,22 @@
 import { BlockRenderer } from "../../components/block-renderer"
-import { PreviewBridge } from "@ai-site-editor/preview-adapter"
-import type { PageDoc } from "@ai-site-editor/shared"
+import { EditorPreviewBridge } from "../../components/editor-harness"
+import { fetchDraftPage } from "../../lib/content-api"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
+const DEFAULT_SESSION = "dev"
+const DEFAULT_EDITOR_ORIGIN = "http://localhost:4100"
+
 function buildSlug(parts?: string[]) {
   if (!parts || parts.length === 0) return "/"
   return `/${parts.join("/")}`
 }
 
-async function fetchPage(slug: string, session: string): Promise<PageDoc | null> {
-  const baseUrl = process.env.ORCHESTRATOR_URL ?? "http://localhost:4200"
-  const res = await fetch(`${baseUrl}/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent(slug)}`, {
-    cache: "no-store"
-  })
-
-  if (!res.ok) return null
-  return (await res.json()) as PageDoc
+function getSingleValue(value: string | string[] | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined
 }
 
 export default async function SitePage({ params, searchParams }: PageProps) {
@@ -28,10 +25,10 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const slug = buildSlug(resolvedParams.slug)
 
   const editorMode = resolvedSearch.__editor === "1"
-  const session = typeof resolvedSearch.session === "string" ? resolvedSearch.session : "dev"
-  const editorOrigin = typeof resolvedSearch.editorOrigin === "string" ? resolvedSearch.editorOrigin : "http://localhost:4100"
+  const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
+  const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
 
-  const page = await fetchPage(slug, session)
+  const page = await fetchDraftPage(slug, session)
 
   if (!page) {
     return (
@@ -49,7 +46,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
           <BlockRenderer key={block.id} block={block} editorMode={editorMode} />
         ))}
       </main>
-      {editorMode ? <PreviewBridge slug={slug} editorOrigin={editorOrigin} /> : null}
+      {editorMode ? <EditorPreviewBridge slug={slug} editorOrigin={editorOrigin} /> : null}
     </>
   )
 }
