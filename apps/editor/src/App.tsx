@@ -441,6 +441,9 @@ export function App() {
     postToSite("highlightBlock", { blockId: activeBlockId, editablePath: activeEditablePath ?? null })
   }, [activeBlockId, activeEditablePath])
 
+  const streamIsError = streamStatus ? /failed|error/i.test(streamStatus) : false
+  const streamLabel = streamIsError ? streamStatus : "Crafting your updates"
+
   return (
     <div className="layout">
       <aside className="chat-panel">
@@ -539,7 +542,18 @@ export function App() {
               {entry.meta ? <div className="msg-meta">{entry.meta}</div> : null}
             </article>
           ))}
-          {streamStatus ? <div className="streaming-pill">{streamStatus}</div> : null}
+          {streamStatus ? (
+            <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"}`}>
+              <span>{streamLabel}</span>
+              {!streamIsError ? (
+                <span className="streaming-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <div ref={chatEndRef} />
         </section>
 
