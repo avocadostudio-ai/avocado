@@ -195,7 +195,21 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         return
       }
       const node = target?.closest<HTMLElement>("[data-block-id]")
-      if (!node) return
+      if (!node) {
+        const hadSelection = !!document.querySelector(".editor-highlight")
+        if (hadSelection) {
+          clearChildFocus()
+          removeSelectedDeleteHandle()
+          document.querySelectorAll(".editor-highlight").forEach((n) => n.classList.remove("editor-highlight"))
+          selectedBlockRef.current = null
+          selectedEditablePathRef.current = null
+          window.parent.postMessage(
+            { protocol: "site-editor/v1", type: "blockClicked", payload: { slug, blockId: null, blockType: null, editablePath: null } },
+            editorOrigin
+          )
+        }
+        return
+      }
       const childNode = target?.closest<HTMLElement>("[data-editable-target]")
 
       event.preventDefault()
