@@ -40,7 +40,7 @@ const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: 
 
 const modelLookup = {
   fast: process.env.OPENAI_MODEL_FAST ?? "gpt-4o-mini",
-  balanced: process.env.OPENAI_MODEL_BALANCED ?? "gpt-4o",
+  balanced: process.env.OPENAI_MODEL_BALANCED ?? "gpt-5",
   reasoning: process.env.OPENAI_MODEL_REASONING ?? "gpt-5",
   codex: process.env.OPENAI_MODEL_CODEX ?? "gpt-5-codex"
 } as const
