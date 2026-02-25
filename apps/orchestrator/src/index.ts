@@ -506,6 +506,12 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     }
 
     raw.op = normalizeOpName(raw.op ?? raw.operation ?? raw.action ?? raw.kind)
+    const rawType =
+      raw.type ?? raw.blockType ?? raw.block_type ?? raw.newBlockType ?? raw.new_block_type ?? raw.target_block_type ?? raw.targetBlockType
+    const normalizedType =
+      typeof rawType === "string"
+        ? allowedBlockTypes.find((type) => type.toLowerCase() === rawType.toLowerCase()) ?? inferBlockTypeFromText(rawType)
+        : undefined
 
     raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? raw.path)
     if (!raw.blockId) {
@@ -520,16 +526,27 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     }
     if (!raw.block) {
       raw.block = raw.newBlock ?? raw.new_block
-      if (!raw.block && raw.op === "add_block" && typeof raw.type === "string") {
+      if (!raw.block && (raw.op === "add_block" || raw.op === "create_page") && normalizedType) {
+        const generatedId =
+          typeof raw.blockId === "string" && raw.blockId.length > 0
+            ? raw.blockId
+            : args?.currentPage
+              ? nextBlockId(normalizedType, args.currentPage)
+              : `b_${String(normalizedType).toLowerCase()}_${Date.now()}`
+        const incomingPatch = patchObject(raw.props ?? raw.patch ?? raw.changes) ?? {}
         raw.block = {
-          id: typeof raw.blockId === "string" && raw.blockId.length > 0 ? raw.blockId : `b_${raw.type.toLowerCase()}_${Date.now()}`,
-          type: raw.type,
-          props: raw.props ?? raw.patch ?? {}
+          id: generatedId,
+          type: normalizedType,
+          props: { ...defaultPropsForType(normalizedType), ...incomingPatch }
         }
       }
     }
     if (raw.op === "add_block" && raw.block && typeof raw.block === "object" && !Array.isArray(raw.block)) {
       const block = raw.block as Record<string, unknown>
+      if ((!block.type || typeof block.type !== "string") && normalizedType) block.type = normalizedType
+      if ((!block.props || typeof block.props !== "object" || Array.isArray(block.props)) && (raw.patch || raw.props || raw.changes)) {
+        block.props = patchObject(raw.patch ?? raw.props ?? raw.changes) ?? {}
+      }
       if ((!block.id || typeof block.id !== "string") && typeof block.type === "string") {
         block.id = `b_${String(block.type).toLowerCase()}_${Date.now()}`
       }
@@ -537,7 +554,7 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     }
 
     // LLMs sometimes emit create_page when they actually mean add_block.
-    if (raw.op === "create_page" && raw.block && !raw.page) {
+    if (raw.op === "create_page" && !raw.page && (raw.block || normalizedType || raw.blockId || raw.patch || raw.props)) {
       raw.op = "add_block"
       raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? args?.defaultSlug)
     }
