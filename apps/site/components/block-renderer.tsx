@@ -79,15 +79,27 @@ function Testimonials(props: Record<string, unknown>) {
   return (
     <section>
       <h2 data-editable-label="title">{String(props.title ?? "")}</h2>
-      {items.map((item, idx) => {
-        const row = (item ?? {}) as Record<string, unknown>
-        return (
-          <blockquote key={idx} data-editable-target={`items[${idx}]`} data-editable-target-label={`items[${idx}]`}>
-            <span data-editable-label={`items[${idx}].quote`}>"{String(row.quote ?? "")}"</span> -{" "}
-            <span data-editable-label={`items[${idx}].author`}>{String(row.author ?? "")}</span>
-          </blockquote>
-        )
-      })}
+      <div className="testimonials-grid">
+        {items.map((item, idx) => {
+          const row = (item ?? {}) as Record<string, unknown>
+          return (
+            <blockquote
+              key={idx}
+              className="testimonial-card"
+              data-editable-target={`items[${idx}]`}
+              data-editable-target-label={`items[${idx}]`}
+            >
+              <span className="testimonial-card__mark" aria-hidden="true">&ldquo;</span>
+              <p className="testimonial-card__quote" data-editable-label={`items[${idx}].quote`}>
+                {String(row.quote ?? "")}
+              </p>
+              <footer className="testimonial-card__author" data-editable-label={`items[${idx}].author`}>
+                &mdash; {String(row.author ?? "")}
+              </footer>
+            </blockquote>
+          )
+        })}
+      </div>
     </section>
   )
 }

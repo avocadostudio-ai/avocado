@@ -146,6 +146,44 @@ a {
   padding: 16px;
 }
 
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.testimonial-card {
+  margin: 0;
+  padding: 20px 24px 20px;
+  background: #f8fafc;
+  border-left: 3px solid #0f766e;
+  position: relative;
+}
+
+.testimonial-card__mark {
+  font-size: 3rem;
+  line-height: 1;
+  color: #0f766e;
+  opacity: 0.25;
+  display: block;
+  margin-bottom: 6px;
+  font-family: Georgia, serif;
+}
+
+.testimonial-card__quote {
+  margin: 0 0 14px;
+  font-style: italic;
+  color: #1e293b;
+  line-height: 1.6;
+}
+
+.testimonial-card__author {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
 .rich-text {}
 
 .rich-text__body p {
