@@ -256,6 +256,40 @@
   opacity: 1 !important;
 }
 
+.editor-delete-confirm {
+  position: absolute;
+  top: 0;
+  right: 26px;
+  transform: translateY(calc(-100% + 1px));
+  background: #7f1d1d;
+  color: #fff;
+  border-radius: 8px 0 0 0;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 25;
+  white-space: nowrap;
+}
+
+.editor-delete-confirm-btn {
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  background: transparent;
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.editor-delete-confirm-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .editor-flash {
   animation: flash 260ms ease-out;
 }

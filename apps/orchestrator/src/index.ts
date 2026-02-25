@@ -1128,12 +1128,22 @@ function plannerContextPack(args: {
       previous: neighbors.previous ? { id: neighbors.previous.id, type: neighbors.previous.type } : null,
       next: neighbors.next ? { id: neighbors.next.id, type: neighbors.next.type } : null
     },
-    pageOutline: currentPage.blocks.map((b) => ({
-      id: b.id,
-      type: b.type,
-      props: structuredClone(b.props),
-      arrayProps: arrayPropLengths(b.props as Record<string, unknown>)
-    })),
+    pageOutline: currentPage.blocks.map((b) => {
+      const bProps = b.props as Record<string, unknown>
+      const arrProps = arrayPropLengths(bProps)
+      // Selected block: send full props for precise editing context
+      if (b.id === activeBlockId) {
+        return { id: b.id, type: b.type, props: structuredClone(bProps), arrayProps: arrProps }
+      }
+      // Other blocks: scalar props only — keeps token count low
+      const scalarProps: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(bProps)) {
+        if (!Array.isArray(value) && (typeof value !== "object" || value === null)) {
+          scalarProps[key] = value
+        }
+      }
+      return { id: b.id, type: b.type, props: scalarProps, arrayProps: arrProps }
+    }),
     pageIntent: pageIntentSummary({ slug, currentPage }),
     recentSuccessfulEdits: getRecentEdits(session, slug),
     resolvedReferences: resolveReferencesFromMessage({ message, currentPage, activeBlockId })
@@ -1998,7 +2008,10 @@ function pickFocusBlockId(ops: Operation[]) {
 
 async function runChatPipeline(
   body: ChatRequestBody,
-  options?: { onPlanningToken?: (token: string) => void }
+  options?: {
+    onPlanningToken?: (token: string) => void
+    onOpApplied?: (event: { index: number; total: number; op: Operation; previewVersion: number; focusBlockId?: string }) => void
+  }
 ): Promise<{ code: number; payload: ChatResult | { error: string } }> {
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
@@ -2063,10 +2076,51 @@ async function runChatPipeline(
     }
 
     try {
-      applyOpsAtomically(body.session!, plan.ops)
+      if (options?.onOpApplied) {
+        const rollbackBySlug = new Map<string, PageDoc>()
+        for (const op of plan.ops) {
+          const slug = op.op === "create_page" ? op.page.slug : op.pageSlug
+          if (rollbackBySlug.has(slug)) continue
+          const existing = getPage(body.session!, slug)
+          if (existing) rollbackBySlug.set(slug, structuredClone(existing))
+        }
+
+        // Validate the whole plan from the current state before progressive apply.
+        applyOpsAtomically(body.session!, plan.ops)
+
+        // Roll back to pre-apply state so we can replay ops progressively.
+        for (const [slug, snapshot] of rollbackBySlug) {
+          setPage(body.session!, { ...snapshot, slug })
+        }
+        for (const op of plan.ops) {
+          if (op.op !== "create_page") continue
+          if (rollbackBySlug.has(op.page.slug)) {
+            setPage(body.session!, structuredClone(rollbackBySlug.get(op.page.slug)!))
+            continue
+          }
+          const sessionDraft = getSessionDraft(body.session!)
+          sessionDraft.delete(op.page.slug)
+        }
+
+        const total = plan.ops.length
+        for (let index = 0; index < total; index += 1) {
+          const op = plan.ops[index]
+          applyOpsAtomically(body.session!, [op])
+          const previewVersion = bumpVersion(body.session!)
+          options.onOpApplied({
+            index: index + 1,
+            total,
+            op,
+            previewVersion,
+            focusBlockId: pickFocusBlockId([op])
+          })
+        }
+      } else {
+        applyOpsAtomically(body.session!, plan.ops)
+      }
       pushUndo(body.session!, body.slug!, previous)
       pushRecentEdit(body.session!, { slug: body.slug!, summary: plan.summary_for_user, ops: plan.ops })
-      const previewVersion = bumpVersion(body.session!)
+      const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
       schedulePersistState()
       const focusBlockId = pickFocusBlockId(plan.ops)
       return {
@@ -2280,7 +2334,16 @@ app.get("/chat/stream", async (request, reply) => {
   reply.raw.write("retry: 60000\n\n")
   sseWrite(reply, { type: "status", message: "Crafting your update..." })
   const result = await runChatPipeline(query, {
-    onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token })
+    onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token }),
+    onOpApplied: (event) =>
+      sseWrite(reply, {
+        type: "op_applied",
+        index: event.index,
+        total: event.total,
+        op: event.op,
+        previewVersion: event.previewVersion,
+        focusBlockId: event.focusBlockId ?? null
+      })
   })
   if (result.code >= 400) {
     sseWrite(reply, { type: "error", result: result.payload, code: result.code })

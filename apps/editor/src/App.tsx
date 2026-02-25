@@ -70,6 +70,7 @@ export function App() {
   const [useStreaming, setUseStreaming] = useState(true)
   const [showControls, setShowControls] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
+  const [streamTokenCount, setStreamTokenCount] = useState(0)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
   const [chatLog, setChatLog] = useState<ChatEntry[]>([
     {
@@ -328,11 +329,62 @@ export function App() {
       const source = new EventSource(`${orchestrator}/chat/stream?${params.toString()}`)
       let settled = false
       let gotAnyEvent = false
+      let streamEntryId: string | null = null
+      let streamText = ""
+      let pendingFocusBlockId: string | null = null
+      let opRefreshTimer: number | null = null
+
+      const ensureStreamEntry = () => {
+        if (streamEntryId) return streamEntryId
+        const id = createId()
+        streamEntryId = id
+        setChatLog((prev) => [...prev, { id, role: "assistant", text: "", status: "streaming" }])
+        return id
+      }
+
+      const appendStreamText = (text: string) => {
+        if (!text) return
+        const id = ensureStreamEntry()
+        streamText += text
+        setChatLog((prev) => prev.map((entry) => (entry.id === id ? { ...entry, text: streamText } : entry)))
+      }
+
+      const removeStreamEntry = () => {
+        if (!streamEntryId) return
+        const id = streamEntryId
+        streamEntryId = null
+        setChatLog((prev) => prev.filter((entry) => entry.id !== id))
+      }
+
+      const flushOpRefresh = () => {
+        postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId })
+        if (pendingFocusBlockId) setActiveBlockId(pendingFocusBlockId)
+        setActiveEditablePath(undefined)
+        pendingFocusBlockId = null
+      }
+
+      const clearOpRefreshTimer = () => {
+        if (opRefreshTimer === null) return
+        window.clearTimeout(opRefreshTimer)
+        opRefreshTimer = null
+      }
+
+      const scheduleOpRefresh = () => {
+        clearOpRefreshTimer()
+        opRefreshTimer = window.setTimeout(() => {
+          opRefreshTimer = null
+          flushOpRefresh()
+        }, 100)
+      }
 
       source.onmessage = (event) => {
         let payload: {
-          type: "status" | "final" | "error"
+          type: "status" | "token" | "op_applied" | "final" | "error"
           message?: string
+          text?: string
+          index?: number
+          total?: number
+          focusBlockId?: string | null
           result?: AssistantResponse
         }
         try {
@@ -344,11 +396,41 @@ export function App() {
 
         if (payload.type === "status") {
           setStreamStatus(payload.message ?? "Working...")
+          ensureStreamEntry()
+        }
+
+        if (payload.type === "token") {
+          const text = payload.text ?? ""
+          if (text) {
+            setStreamTokenCount((prev) => prev + text.length)
+            appendStreamText(text)
+          }
+        }
+
+        if (payload.type === "op_applied") {
+          const total = Number(payload.total ?? 0)
+          const index = Number(payload.index ?? 0)
+          if (total > 0 && index > 0) {
+            setStreamStatus(`Applying changes (${index}/${total})...`)
+          } else {
+            setStreamStatus("Applying changes...")
+          }
+          pendingFocusBlockId = typeof payload.focusBlockId === "string" ? payload.focusBlockId : null
+          if (total > 0 && index >= total) {
+            clearOpRefreshTimer()
+            flushOpRefresh()
+          } else {
+            scheduleOpRefresh()
+          }
         }
 
         if (payload.type === "final") {
           settled = true
           setStreamStatus(null)
+          setStreamTokenCount(0)
+          clearOpRefreshTimer()
+          if (pendingFocusBlockId !== null) flushOpRefresh()
+          removeStreamEntry()
           if (payload.result) applyChatResult(payload.result)
           source.close()
           resolve(true)
@@ -357,6 +439,10 @@ export function App() {
         if (payload.type === "error") {
           settled = true
           setStreamStatus(null)
+          setStreamTokenCount(0)
+          clearOpRefreshTimer()
+          pendingFocusBlockId = null
+          removeStreamEntry()
           if (payload.result) {
             applyChatResult(payload.result)
           } else {
@@ -369,11 +455,18 @@ export function App() {
 
       source.onerror = () => {
         if (settled || gotAnyEvent) {
+          clearOpRefreshTimer()
+          pendingFocusBlockId = null
+          removeStreamEntry()
           source.close()
           resolve(true)
           return
         }
         setStreamStatus("Streaming failed, retrying with standard request...")
+        setStreamTokenCount(0)
+        clearOpRefreshTimer()
+        pendingFocusBlockId = null
+        removeStreamEntry()
         settled = true
         source.close()
         resolve(false)
@@ -388,6 +481,7 @@ export function App() {
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: finalMessage }])
     setIsLoading(true)
     setStreamStatus(useStreaming ? "Connecting..." : null)
+    setStreamTokenCount(0)
     try {
       if (useStreaming) {
         const ok = await submitChatStream(finalMessage)
@@ -442,7 +536,7 @@ export function App() {
   }, [activeBlockId, activeEditablePath])
 
   const streamIsError = streamStatus ? /failed|error/i.test(streamStatus) : false
-  const streamLabel = streamIsError ? streamStatus : "Crafting your updates"
+  const streamLabel = streamIsError ? streamStatus : streamTokenCount > 0 ? "Planning your edit..." : "Crafting your updates"
 
   return (
     <div className="layout">
@@ -507,9 +601,9 @@ export function App() {
 
         <section className="chat-thread" ref={chatThreadRef}>
           {chatLog.map((entry) => (
-            <article key={entry.id} className={`msg msg-${entry.role}`}>
+            <article key={entry.id} className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""}`}>
               <div className="msg-main">{entry.text}</div>
-              {entry.status ? <div className="msg-status">{entry.status}</div> : null}
+              {entry.status ? <div className="msg-status">{entry.status === "needs_clarification" ? "question" : entry.status}</div> : null}
               {(entry.changes ?? []).length > 0 ? (
                 <ul className="msg-list">
                   {entry.changes?.map((line, idx) => (

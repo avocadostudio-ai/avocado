@@ -214,6 +214,11 @@ textarea {
   align-self: flex-start;
 }
 
+.msg-clarification {
+  border-color: #7db8ff;
+  background: #f3f8ff;
+}
+
 .msg-main {
   font-size: 14px;
   line-height: 1.45;

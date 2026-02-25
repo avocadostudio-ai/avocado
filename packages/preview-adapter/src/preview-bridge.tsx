@@ -16,6 +16,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
   const suppressClickUntilRef = useRef(0)
   const selectedBlockRef = useRef<string | null>(null)
   const selectedEditablePathRef = useRef<string | null>(null)
+  const deleteConfirmTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const clearChildFocus = () => {
@@ -37,6 +38,11 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     const removeSelectedDeleteHandle = () => {
       document.querySelectorAll(".editor-selected-delete").forEach((node) => node.remove())
       document.querySelectorAll(".editor-selected-move").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-delete-confirm").forEach((node) => node.remove())
+      if (deleteConfirmTimerRef.current) {
+        window.clearTimeout(deleteConfirmTimerRef.current)
+        deleteConfirmTimerRef.current = null
+      }
     }
 
     const mountSelectedDeleteHandle = () => {
@@ -56,14 +62,46 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       del.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
-        window.parent.postMessage(
-          {
-            protocol: "site-editor/v1",
-            type: "blockDeleteRequested",
-            payload: { slug, blockId, blockType }
-          },
-          editorOrigin
-        )
+
+        // If confirm popover already showing, dismiss it
+        const existing = selected.querySelector(".editor-delete-confirm")
+        if (existing) {
+          existing.remove()
+          if (deleteConfirmTimerRef.current) {
+            window.clearTimeout(deleteConfirmTimerRef.current)
+            deleteConfirmTimerRef.current = null
+          }
+          return
+        }
+
+        // Show confirmation popover
+        const popover = document.createElement("div")
+        popover.className = "editor-delete-confirm"
+        const label = document.createElement("span")
+        label.textContent = "Delete block?"
+        const confirmBtn = document.createElement("button")
+        confirmBtn.type = "button"
+        confirmBtn.className = "editor-delete-confirm-btn"
+        confirmBtn.textContent = "Confirm"
+        confirmBtn.addEventListener("click", (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          popover.remove()
+          if (deleteConfirmTimerRef.current) {
+            window.clearTimeout(deleteConfirmTimerRef.current)
+            deleteConfirmTimerRef.current = null
+          }
+          window.parent.postMessage(
+            { protocol: "site-editor/v1", type: "blockDeleteRequested", payload: { slug, blockId, blockType } },
+            editorOrigin
+          )
+        })
+        popover.append(label, confirmBtn)
+        selected.prepend(popover)
+        deleteConfirmTimerRef.current = window.setTimeout(() => {
+          popover.remove()
+          deleteConfirmTimerRef.current = null
+        }, 4000)
       })
 
       selected.prepend(del)
@@ -191,7 +229,12 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         return
       }
       const target = event.target as HTMLElement | null
-      if (target?.closest(".editor-block-delete") || target?.closest(".editor-selected-delete") || target?.closest(".editor-selected-move")) {
+      if (
+        target?.closest(".editor-block-delete") ||
+        target?.closest(".editor-selected-delete") ||
+        target?.closest(".editor-selected-move") ||
+        target?.closest(".editor-delete-confirm")
+      ) {
         return
       }
       const node = target?.closest<HTMLElement>("[data-block-id]")

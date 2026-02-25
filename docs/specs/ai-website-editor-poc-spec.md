@@ -98,6 +98,8 @@ Example allowed blocks (PoC):
 - `Testimonials`
 - `FAQAccordion`
 - `CTA`
+- `Card`
+- `CardGrid`
 
 Orchestrator validates any `add_block` or `update_props` patches against schemas before saving draft.
 
@@ -137,8 +139,11 @@ The Editor embeds the Site via iframe:
 
 The Site uses a minimal preview adapter package (enabled only when `__editor=1`) to:
 - wrap blocks with `data-block-id` + `data-block-type`
+- tag editable sub-fields within a block with `data-editable-target="<propPath>"` (e.g. `"title"`, `"items.0.heading"`)
 - add overlay hover + click handling
 - postMessage events to parent editor
+
+Clicking a sub-field element sends `editablePath` alongside `blockId`, giving the orchestrator enough context to target a specific prop in an `update_props` patch without the user having to describe it.
 
 To keep the website codebase clean, preview behavior lives in a separate workspace package (`packages/preview-adapter`) and the site consumes it through a minimal integration surface.
 
@@ -149,11 +154,11 @@ All messages include:
 - `payload`
 
 #### Site → Editor
-- `blockClicked`: `{ slug, blockId, blockType }`
+- `blockClicked`: `{ slug, blockId, blockType, editablePath?: string }` — `editablePath` is set when the click lands on a `data-editable-target` child element
 - `routeChanged`: `{ slug }`
 
 #### Editor → Site
-- `highlightBlock`: `{ blockId }`
+- `highlightBlock`: `{ blockId, editablePath?: string }` — `editablePath` scrolls/highlights the specific sub-field after the block is focused
 - `draftUpdated`: `{ focusBlockId?: string }`
 
 ### Instant refresh strategy (PoC)
@@ -177,7 +182,7 @@ In-memory maps:
 2. Build prompts with:
    - allowed block types + schema summary
    - current page doc (draft)
-   - activeBlockId/type
+   - activeBlockId/type/editablePath (if set, LLM is constrained to target that block/field)
 3. Call OpenAI model (chosen via `modelKey`)
 4. Parse strict JSON to `EditPlan`
 5. Validate plan structure
@@ -194,13 +199,15 @@ In-memory maps:
 
 ### Editing endpoints (used by Editor)
 - `POST /chat` — non-streaming
-  - body: `{ session, slug, message, modelKey?, activeBlockId?, activeBlockType? }`
-  - response: `{ status, summary, changes, validationErrors?, previewVersion, focusBlockId?, modelUsed, modelKey }`
+  - body: `{ session, slug, message, modelKey?, activeBlockId?, activeBlockType?, activeEditablePath? }`
+  - `activeEditablePath` mirrors the `editablePath` from `blockClicked`; orchestrator uses it to constrain the LLM to a specific prop in `update_props`
+  - response: `{ status, summary, changes, validationErrors?, suggestions?, previewVersion, focusBlockId?, modelUsed, modelKey, plannerSource }`
 
 Optional streaming endpoint (Phase 2):
 - `GET /chat/stream?...` — SSE streaming deltas then final
   - implemented shape:
     - `data: {"type":"status","message":"Planning edit..."}`
+    - `data: {"type":"token","text":"<incremental text>"}` — zero or more progress tokens streamed while planning
     - `data: {"type":"final","result":<same object as POST /chat response>}`
     - `data: {"type":"error","result":<error payload>,"code":<http-like code>}`
 
