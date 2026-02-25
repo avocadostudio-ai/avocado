@@ -19,7 +19,11 @@ export const blockSchemas = {
     heading: z.string().min(1),
     subheading: z.string().min(1),
     ctaText: z.string().min(1),
-    ctaHref: z.string().min(1)
+    ctaHref: z.string().min(1),
+    imageUrl: z.string().min(1),
+    imageAlt: z.string().min(1),
+    secondaryCtaText: z.string().optional(),
+    secondaryCtaHref: z.string().optional()
   }),
   FeatureGrid: z.object({
     title: z.string().min(1),
@@ -57,6 +61,10 @@ export const blockSchemas = {
         })
       )
       .min(1)
+  }),
+  RichText: z.object({
+    title: z.string(),
+    body: z.string().min(1)
   })
 } as const
 
@@ -144,7 +152,9 @@ export function demoPublishedPages(): PageDoc[] {
             heading: "Build websites with plain language",
             subheading: "Edit content instantly with chat and live preview.",
             ctaText: "Start Editing",
-            ctaHref: "/pricing"
+            ctaHref: "/pricing",
+            imageUrl: "/hero-generated.svg",
+            imageAlt: "Abstract generated illustration for the hero section"
           }
         },
         {
@@ -184,7 +194,9 @@ export function demoPublishedPages(): PageDoc[] {
             heading: "Pricing that grows with you",
             subheading: "Start free, upgrade when you're ready.",
             ctaText: "Choose Plan",
-            ctaHref: "/"
+            ctaHref: "/",
+            imageUrl: "/hero-generated.svg",
+            imageAlt: "Abstract generated illustration for the pricing hero"
           }
         },
         {

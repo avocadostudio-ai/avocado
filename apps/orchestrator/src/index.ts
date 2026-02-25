@@ -155,6 +155,9 @@ function promptFromPropKey(propKey: string) {
     ctaHref: "Change CTA link to \"/...\"",
     imageUrl: "Update hero image (e.g. picsum.photos/seed/topic/1600/900)",
     imageAlt: "Change image alt text to \"...\"",
+    secondaryCtaText: "Add secondary CTA button \"...\"",
+    secondaryCtaHref: "Change secondary CTA link to \"/...\"",
+    body: "Edit body text to \"...\"",
     title: "Change title to \"...\"",
     description: "Change description to \"...\"",
     features: "Update feature list",
@@ -551,6 +554,38 @@ function demoPlanFromMessage(message: string, slug: string, activeBlockId?: stri
     }
   }
 
+  if (lower.includes("rich text") || lower.includes("richtext") || lower.includes("text block") || lower.includes("prose")) {
+    if (lower.includes("add") || lower.includes("insert") || lower.includes("create")) {
+      return {
+        intent: "edit_plan",
+        summary_for_user: "Added a rich text section.",
+        change_log: ["Inserted RichText block."],
+        ops: [
+          {
+            op: "add_block",
+            pageSlug: slug,
+            block: {
+              id: `b_richtext_${Date.now()}`,
+              type: "RichText",
+              props: {
+                title: "",
+                body: "Add your content here.\n\nUse a second paragraph to break up the text into readable sections."
+              }
+            }
+          }
+        ]
+      }
+    }
+    if (activeBlockId && activeBlockType === "RichText" && quoted) {
+      return {
+        intent: "edit_plan",
+        summary_for_user: "Updated the rich text body.",
+        change_log: [`Set body to "${quoted}".`],
+        ops: [{ op: "update_props", pageSlug: slug, blockId: activeBlockId, patch: { body: quoted } }]
+      }
+    }
+  }
+
   if (lower.includes("add testimonials")) {
     return {
       intent: "edit_plan",
@@ -794,10 +829,10 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
 function blockContractsSummary() {
   return {
     Hero: {
-      allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt"],
+      allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
       required: ["heading", "subheading", "ctaText", "ctaHref"],
-      optional: ["imageUrl", "imageAlt"],
-      notes: "Use heading for the main headline; never invent prop names. For imageUrl: when the user asks to generate, change, or update the hero image, use https://picsum.photos/seed/{keyword}/1600/900 where {keyword} is 1–2 lowercase hyphenated words derived from the heading content (e.g. heading 'Build AI Websites' → seed 'ai-websites'). Always update imageAlt to describe what the image represents. Do not invent other image URLs."
+      optional: ["imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
+      notes: "Use heading for the main headline; never invent prop names. For imageUrl: when the user asks to generate, change, or update the hero image, use https://picsum.photos/seed/{keyword}/1600/900 where {keyword} is 1–2 lowercase hyphenated words derived from the heading content (e.g. heading 'Build AI Websites' → seed 'ai-websites'). Always update imageAlt to describe what the image represents. Do not invent other image URLs. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
     },
     FeatureGrid: {
       allowedProps: ["title", "features"],
@@ -828,6 +863,12 @@ function blockContractsSummary() {
       allowedProps: ["title", "cards"],
       required: ["title", "cards"],
       notes: "cards must be a non-empty array of {title, description, ctaText, ctaHref}."
+    },
+    RichText: {
+      allowedProps: ["title", "body"],
+      required: ["body"],
+      optional: ["title"],
+      notes: "body is a string; use \\n\\n to separate paragraphs and **word** for bold text. title is an optional section heading. Never invent prop names."
     }
   }
 }
@@ -890,12 +931,13 @@ function inferBlockTypeFromText(text: string): BlockType | undefined {
   if (normalized.includes("cta")) return "CTA"
   if (normalized.includes("cardgrid") || normalized.includes("card grid")) return "CardGrid"
   if (normalized.includes("card")) return "Card"
+  if (normalized.includes("richtext") || normalized.includes("rich text") || normalized.includes("rich-text") || normalized.includes("prose") || normalized.includes("text block")) return "RichText"
   return undefined
 }
 
 function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined {
   const normalized = message.toLowerCase()
-  const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:a|an)?\s*([a-z ]+)/)
+  const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:a|an)?\s*([a-z -]+)/)
   if (!addMatch?.[2]) return undefined
   const chunk = addMatch[2].trim()
   if (chunk.startsWith("card grid") || chunk.startsWith("cardgrid")) return "CardGrid"
@@ -905,6 +947,7 @@ function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined 
   if (chunk.startsWith("faq")) return "FAQAccordion"
   if (chunk.startsWith("cta")) return "CTA"
   if (chunk.startsWith("hero")) return "Hero"
+  if (chunk.startsWith("rich text") || chunk.startsWith("richtext") || chunk.startsWith("rich-text") || chunk.startsWith("prose") || chunk.startsWith("text block")) return "RichText"
   return undefined
 }
 
@@ -1150,6 +1193,12 @@ function defaultPropsForType(type: BlockType) {
       description: "Go from idea to published changes in minutes.",
       ctaText: "Learn more",
       ctaHref: "/pricing"
+    }
+  }
+  if (type === "RichText") {
+    return {
+      title: "",
+      body: "Add your content here.\n\nUse a second paragraph to break up the text into readable sections."
     }
   }
   if (type === "CardGrid") {
