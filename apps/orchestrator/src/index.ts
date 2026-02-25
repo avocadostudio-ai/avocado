@@ -74,6 +74,12 @@ type ChatResult = {
   modelKey: ModelKey
 }
 
+function openAIChatOptionsForModel(model: string) {
+  // gpt-5 family rejects temperature=0 in chat.completions; omit to use model default.
+  if (model.startsWith("gpt-5")) return {}
+  return { temperature: 0 as const }
+}
+
 function isInfoQuery(message: string) {
   const m = message.toLowerCase()
   const normalized = m.replace(/\s+/g, " ").trim()
@@ -1378,7 +1384,7 @@ async function parseIntentWithOpenAI(args: {
 
   const completion = await client.chat.completions.create({
     model: args.model,
-    temperature: 0,
+    ...openAIChatOptionsForModel(args.model),
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
@@ -1490,7 +1496,7 @@ async function generatePlanWithOpenAI(args: {
 
   const completion = await client.chat.completions.create({
     model: args.model,
-    temperature: 0,
+    ...openAIChatOptionsForModel(args.model),
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
