@@ -1,5 +1,6 @@
 import dotenv from "dotenv"
 import { existsSync } from "node:fs"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
@@ -37,6 +38,21 @@ const historyUndo = new Map<string, Map<string, PageDoc[]>>()
 const historyRedo = new Map<string, Map<string, PageDoc[]>>()
 const versions = new Map<string, number>()
 const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
+const stateFilePath = process.env.ORCHESTRATOR_STATE_FILE ?? resolve(process.cwd(), "../../.data/orchestrator-state.json")
+let persistTimer: NodeJS.Timeout | null = null
+
+function ensureHeroImageProps(page: PageDoc) {
+  for (const block of page.blocks) {
+    if (block.type !== "Hero") continue
+    const props = block.props as Record<string, unknown>
+    if (typeof props.imageUrl !== "string" || props.imageUrl.length === 0) {
+      props.imageUrl = "/hero-generated.svg"
+    }
+    if (typeof props.imageAlt !== "string" || props.imageAlt.length === 0) {
+      props.imageAlt = page.slug === "/pricing" ? "Abstract generated illustration for the pricing hero" : "Abstract generated illustration for the hero section"
+    }
+  }
+}
 
 const modelLookup = {
   fast: process.env.OPENAI_MODEL_FAST ?? "gpt-4o-mini",
@@ -137,6 +153,8 @@ function promptFromPropKey(propKey: string) {
     subheading: "Change subheading to \"...\"",
     ctaText: "Change CTA text to \"...\"",
     ctaHref: "Change CTA link to \"/...\"",
+    imageUrl: "Update hero image (e.g. picsum.photos/seed/topic/1600/900)",
+    imageAlt: "Change image alt text to \"...\"",
     title: "Change title to \"...\"",
     description: "Change description to \"...\"",
     features: "Update feature list",
@@ -268,7 +286,11 @@ function getSessionDraft(session: string) {
   let sessionMap = draftPages.get(session)
   if (!sessionMap) {
     sessionMap = new Map<string, PageDoc>()
-    for (const [slug, page] of publishedPages) sessionMap.set(slug, structuredClone(page))
+    for (const [slug, page] of publishedPages) {
+      const copy = structuredClone(page)
+      ensureHeroImageProps(copy)
+      sessionMap.set(slug, copy)
+    }
     draftPages.set(session, sessionMap)
   }
   return sessionMap
@@ -290,6 +312,7 @@ function getPage(session: string, slug: string) {
 
 function setPage(session: string, page: PageDoc) {
   const sessionDraft = getSessionDraft(session)
+  ensureHeroImageProps(page)
   sessionDraft.set(page.slug, page)
 }
 
@@ -316,6 +339,136 @@ function pushRecentEdit(session: string, entry: { slug: string; summary: string;
   recentEdits.set(session, list.slice(-10))
 }
 
+type PersistedState = {
+  publishedPages: PageDoc[]
+  draftPages: Record<string, Record<string, PageDoc>>
+  historyUndo: Record<string, Record<string, PageDoc[]>>
+  historyRedo: Record<string, Record<string, PageDoc[]>>
+  versions: Record<string, number>
+  recentEdits: Record<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>
+}
+
+function nestedPageMapToObject(source: Map<string, Map<string, PageDoc>>) {
+  const out: Record<string, Record<string, PageDoc>> = {}
+  for (const [session, pages] of source) {
+    out[session] = {}
+    for (const [slug, page] of pages) out[session][slug] = structuredClone(page)
+  }
+  return out
+}
+
+function nestedHistoryMapToObject(source: Map<string, Map<string, PageDoc[]>>) {
+  const out: Record<string, Record<string, PageDoc[]>> = {}
+  for (const [session, bySlug] of source) {
+    out[session] = {}
+    for (const [slug, snapshots] of bySlug) out[session][slug] = snapshots.map((item) => structuredClone(item))
+  }
+  return out
+}
+
+function objectToNestedPageMap(source: unknown) {
+  const out = new Map<string, Map<string, PageDoc>>()
+  if (!source || typeof source !== "object") return out
+  for (const [session, pages] of Object.entries(source as Record<string, unknown>)) {
+    if (!pages || typeof pages !== "object") continue
+    const bySlug = new Map<string, PageDoc>()
+    for (const [slug, page] of Object.entries(pages as Record<string, unknown>)) {
+      if (!page || typeof page !== "object") continue
+      bySlug.set(slug, page as PageDoc)
+    }
+    out.set(session, bySlug)
+  }
+  return out
+}
+
+function objectToNestedHistoryMap(source: unknown) {
+  const out = new Map<string, Map<string, PageDoc[]>>()
+  if (!source || typeof source !== "object") return out
+  for (const [session, bySlugRaw] of Object.entries(source as Record<string, unknown>)) {
+    if (!bySlugRaw || typeof bySlugRaw !== "object") continue
+    const bySlug = new Map<string, PageDoc[]>()
+    for (const [slug, listRaw] of Object.entries(bySlugRaw as Record<string, unknown>)) {
+      if (!Array.isArray(listRaw)) continue
+      bySlug.set(slug, listRaw.filter((item) => item && typeof item === "object") as PageDoc[])
+    }
+    out.set(session, bySlug)
+  }
+  return out
+}
+
+async function persistStateNow() {
+  const payload: PersistedState = {
+    publishedPages: Array.from(publishedPages.values()).map((page) => structuredClone(page)),
+    draftPages: nestedPageMapToObject(draftPages),
+    historyUndo: nestedHistoryMapToObject(historyUndo),
+    historyRedo: nestedHistoryMapToObject(historyRedo),
+    versions: Object.fromEntries(versions.entries()),
+    recentEdits: Object.fromEntries(recentEdits.entries())
+  }
+  await mkdir(resolve(stateFilePath, ".."), { recursive: true })
+  await writeFile(stateFilePath, JSON.stringify(payload), "utf8")
+}
+
+function schedulePersistState() {
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => {
+    void persistStateNow().catch((error: unknown) => {
+      app.log.error({ err: toErrorDetail(error) }, "Failed to persist orchestrator state")
+    })
+  }, 80)
+}
+
+async function loadStateFromDisk() {
+  if (!existsSync(stateFilePath)) return
+  try {
+    const raw = await readFile(stateFilePath, "utf8")
+    const parsed = JSON.parse(raw) as Partial<PersistedState>
+
+    if (Array.isArray(parsed.publishedPages) && parsed.publishedPages.length > 0) {
+      publishedPages.clear()
+      for (const page of parsed.publishedPages) {
+        if (!page || typeof page !== "object" || typeof page.slug !== "string") continue
+        ensureHeroImageProps(page as PageDoc)
+        publishedPages.set(page.slug, page as PageDoc)
+      }
+    }
+
+    draftPages.clear()
+    for (const [session, bySlug] of objectToNestedPageMap(parsed.draftPages)) {
+      for (const page of bySlug.values()) ensureHeroImageProps(page)
+      draftPages.set(session, bySlug)
+    }
+
+    historyUndo.clear()
+    for (const [session, bySlug] of objectToNestedHistoryMap(parsed.historyUndo)) historyUndo.set(session, bySlug)
+
+    historyRedo.clear()
+    for (const [session, bySlug] of objectToNestedHistoryMap(parsed.historyRedo)) historyRedo.set(session, bySlug)
+
+    versions.clear()
+    if (parsed.versions && typeof parsed.versions === "object") {
+      for (const [session, value] of Object.entries(parsed.versions)) {
+        if (typeof value === "number" && Number.isFinite(value)) versions.set(session, value)
+      }
+    }
+
+    recentEdits.clear()
+    if (parsed.recentEdits && typeof parsed.recentEdits === "object") {
+      for (const [session, listRaw] of Object.entries(parsed.recentEdits)) {
+        if (!Array.isArray(listRaw)) continue
+        const list = listRaw
+          .filter((entry) => entry && typeof entry === "object")
+          .map((entry) => entry as { slug: string; summary: string; ops: Operation[]; at: string })
+        recentEdits.set(session, list.slice(-10))
+      }
+    }
+
+    app.log.info({ file: stateFilePath }, "Loaded persisted orchestrator state")
+  } catch (error) {
+    app.log.error({ err: toErrorDetail(error), file: stateFilePath }, "Failed to load persisted orchestrator state")
+  }
+}
+
 function getRecentEdits(session: string, slug: string) {
   const list = recentEdits.get(session) ?? []
   return list
@@ -326,6 +479,25 @@ function getRecentEdits(session: string, slug: string) {
       summary: item.summary,
       ops: item.ops.map((op) => op.op)
     }))
+}
+
+function clarificationSuggestions(args: { body: ChatRequestBody; current: PageDoc; selected?: PageDoc["blocks"][number] | null }) {
+  const { selected } = args
+  if (selected) {
+    const keys = editablePropsFromBlock(selected)
+    if (keys.length > 0) return keys.slice(0, 4).map(promptFromPropKey)
+    return [
+      `Update ${selected.type} title to "..."`,
+      `Move ${selected.type} to bottom`,
+      `Remove selected block`
+    ]
+  }
+  return [
+    "Change heading to \"...\"",
+    "Add Testimonials below Hero",
+    "Move FAQ to bottom",
+    "Remove selected block"
+  ]
 }
 
 function demoPlanFromMessage(message: string, slug: string, activeBlockId?: string, activeBlockType?: string): EditPlan {
@@ -488,7 +660,7 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     return args.currentPage.blocks[idx - 1]?.id
   }
 
-  const normalizedOps = ops.map((item) => {
+  const normalizedOps = ops.flatMap((item) => {
     if (!item || typeof item !== "object") return item
     const source = item as Record<string, unknown>
     const raw = { ...source }
@@ -515,7 +687,8 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
 
     raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? raw.path)
     if (!raw.blockId) {
-      raw.blockId = raw.block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.id
+      const pathCandidate = typeof raw.path === "string" && raw.path.startsWith("b_") ? raw.path : undefined
+      raw.blockId = raw.block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.id ?? pathCandidate
     }
     if (!raw.afterBlockId) {
       raw.afterBlockId =
@@ -559,6 +732,42 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
       raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? args?.defaultSlug)
     }
 
+    // LLMs also emit create_page with blocks[] for existing pages. Convert to add_block sequence.
+    if (
+      raw.op === "create_page" &&
+      !raw.page &&
+      Array.isArray(raw.blocks) &&
+      raw.blocks.length > 0
+    ) {
+      const pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? args?.defaultSlug) ?? args?.defaultSlug
+      if (!pageSlug) return raw
+      const out: Record<string, unknown>[] = []
+      let previousId: string | undefined
+      for (const candidate of raw.blocks) {
+        if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue
+        const block = { ...(candidate as Record<string, unknown>) }
+        const typeRaw = typeof block.type === "string" ? block.type : ""
+        const blockType =
+          allowedBlockTypes.find((t) => t.toLowerCase() === typeRaw.toLowerCase()) ?? inferBlockTypeFromText(typeRaw)
+        if (!blockType) continue
+        if (typeof block.id !== "string" || block.id.length === 0) {
+          block.id = args?.currentPage ? nextBlockId(blockType, args.currentPage) : `b_${blockType.toLowerCase()}_${Date.now()}`
+        }
+        if (!block.props || typeof block.props !== "object" || Array.isArray(block.props)) {
+          block.props = defaultPropsForType(blockType)
+        }
+        const addOp: Record<string, unknown> = {
+          op: "add_block",
+          pageSlug,
+          block
+        }
+        if (previousId) addOp.afterBlockId = previousId
+        previousId = block.id as string
+        out.push(addOp)
+      }
+      return out.length > 0 ? out : raw
+    }
+
     // Intent repair: if user asked for bottom/end and model omitted an anchor, place at end.
     if (
       (raw.op === "move_block" || raw.op === "add_block") &&
@@ -585,9 +794,10 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
 function blockContractsSummary() {
   return {
     Hero: {
-      allowedProps: ["heading", "subheading", "ctaText", "ctaHref"],
+      allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt"],
       required: ["heading", "subheading", "ctaText", "ctaHref"],
-      notes: "Use heading for the main headline; never invent prop names."
+      optional: ["imageUrl", "imageAlt"],
+      notes: "Use heading for the main headline; never invent prop names. For imageUrl: when the user asks to generate, change, or update the hero image, use https://picsum.photos/seed/{keyword}/1600/900 where {keyword} is 1–2 lowercase hyphenated words derived from the heading content (e.g. heading 'Build AI Websites' → seed 'ai-websites'). Always update imageAlt to describe what the image represents. Do not invent other image URLs."
     },
     FeatureGrid: {
       allowedProps: ["title", "features"],
@@ -819,6 +1029,30 @@ function resolveReferencesFromMessage(args: { message: string; currentPage: Page
   }
 }
 
+function arrayPropLengths(props: Record<string, unknown>) {
+  const out: Record<string, { length: number }> = {}
+  for (const [key, value] of Object.entries(props)) {
+    if (Array.isArray(value)) out[key] = { length: value.length }
+  }
+  return out
+}
+
+function pageIntentSummary(args: { slug: string; currentPage: PageDoc }) {
+  const { slug, currentPage } = args
+  const typeCounts = new Map<string, number>()
+  for (const block of currentPage.blocks) {
+    typeCounts.set(block.type, (typeCounts.get(block.type) ?? 0) + 1)
+  }
+  const composition = Array.from(typeCounts.entries())
+    .map(([type, count]) => (count > 1 ? `${type} x${count}` : type))
+    .join(", ")
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  const heroHeading = hero && typeof (hero.props as Record<string, unknown>).heading === "string" ? (hero.props as { heading: string }).heading : ""
+  const routeLabel = slug === "/" ? "Home page" : `Page ${slug}`
+  const headingPart = heroHeading ? ` Hero message: "${heroHeading}".` : ""
+  return `${routeLabel} with ${currentPage.blocks.length} blocks (${composition}).${headingPart}`
+}
+
 function plannerContextPack(args: {
   session: string
   slug: string
@@ -854,8 +1088,10 @@ function plannerContextPack(args: {
     pageOutline: currentPage.blocks.map((b) => ({
       id: b.id,
       type: b.type,
-      props: Object.keys(b.props as Record<string, unknown>)
+      props: structuredClone(b.props),
+      arrayProps: arrayPropLengths(b.props as Record<string, unknown>)
     })),
+    pageIntent: pageIntentSummary({ slug, currentPage }),
     recentSuccessfulEdits: getRecentEdits(session, slug),
     resolvedReferences: resolveReferencesFromMessage({ message, currentPage, activeBlockId })
   }
@@ -875,7 +1111,9 @@ function defaultPropsForType(type: BlockType) {
       heading: "Build with confidence",
       subheading: "Make changes safely with instant preview.",
       ctaText: "Get Started",
-      ctaHref: "/"
+      ctaHref: "/",
+      imageUrl: "/hero-generated.svg",
+      imageAlt: "Abstract generated illustration"
     }
   }
   if (type === "FeatureGrid") {
@@ -1194,7 +1432,7 @@ function compileDeterministicPlan(args: {
     }
   }
 
-  if (intent.action === "update" || (intent.action === "clarify" && !!activeEditablePath)) {
+  if (intent.action === "update") {
     const target = resolveBlockRef({
       ref: intent.target_block_ref,
       currentPage,
@@ -1479,8 +1717,16 @@ async function generatePlanWithOpenAI(args: {
   contextPack: ReturnType<typeof plannerContextPack>
   model: string
   feedback?: string
+  onToken?: (token: string) => void
 }): Promise<EditPlan> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
+  const explicitOtherReference =
+    selectedBlockId.length > 0 &&
+    Array.isArray(args.contextPack.resolvedReferences.mentionedBlocks) &&
+    args.contextPack.resolvedReferences.mentionedBlocks.some(
+      (entry) => entry && typeof entry === "object" && "id" in entry && (entry as { id?: unknown }).id !== selectedBlockId
+    )
 
   const system = [
     "You are an editing planner for a website builder.",
@@ -1493,6 +1739,10 @@ async function generatePlanWithOpenAI(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
+    "For Hero imageUrl, only use https://picsum.photos/seed/{keyword}/1600/900 or a URL explicitly provided by the user. Never invent image paths.",
+    selectedBlockId.length > 0 && !explicitOtherReference
+      ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
+      : "Respect explicit user target references when present.",
     `Allowed block types: ${allowedBlockTypes.join(", ")}.`
   ].join("\n")
 
@@ -1511,17 +1761,36 @@ async function generatePlanWithOpenAI(args: {
     feedback: args.feedback ?? null
   }
 
-  const completion = await client.chat.completions.create({
-    model: args.model,
-    ...openAIChatOptionsForModel(args.model),
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: JSON.stringify(user) }
-    ]
-  })
-
-  const raw = completion.choices[0]?.message?.content ?? ""
+  let raw = ""
+  if (args.onToken) {
+    const stream = await client.chat.completions.create({
+      model: args.model,
+      ...openAIChatOptionsForModel(args.model),
+      stream: true,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: JSON.stringify(user) }
+      ]
+    })
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content
+      if (typeof delta !== "string" || delta.length === 0) continue
+      raw += delta
+      args.onToken(delta)
+    }
+  } else {
+    const completion = await client.chat.completions.create({
+      model: args.model,
+      ...openAIChatOptionsForModel(args.model),
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: JSON.stringify(user) }
+      ]
+    })
+    raw = completion.choices[0]?.message?.content ?? ""
+  }
   const jsonText = extractJsonObject(raw)
   if (!jsonText) throw new Error("Model did not return JSON")
 
@@ -1678,7 +1947,10 @@ function pickFocusBlockId(ops: Operation[]) {
   return undefined
 }
 
-async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; payload: ChatResult | { error: string } }> {
+async function runChatPipeline(
+  body: ChatRequestBody,
+  options?: { onPlanningToken?: (token: string) => void }
+): Promise<{ code: number; payload: ChatResult | { error: string } }> {
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
@@ -1705,12 +1977,16 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
   })
 
   const respondFromPlan = (plan: EditPlan, source: "openai" | "demo") => {
-    if (plan.intent === "needs_clarification" && isBlockCatalogQuery(body.message)) {
+    if (plan.intent === "needs_clarification" && isBlockCatalogQuery(body.message!)) {
       const forcedInfo = infoResponse({ body, current, plannerSource: source, modelUsed, modelKey })
       return { done: true as const, response: forcedInfo }
     }
 
     if (plan.intent === "needs_clarification") {
+      const selected =
+        body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
+          ? current.blocks.find((b) => b.id === body.activeBlockId)
+          : null
       return {
         done: true as const,
         response: {
@@ -1719,7 +1995,8 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
             status: "needs_clarification",
             summary: plan.summary_for_user,
             changes: plan.change_log,
-            previewVersion: versions.get(body.session) ?? 0,
+            suggestions: clarificationSuggestions({ body, current, selected }),
+            previewVersion: versions.get(body.session!) ?? 0,
             plannerSource: source,
             modelUsed,
             modelKey
@@ -1728,7 +2005,7 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
       }
     }
 
-    const previous = getPage(body.session, body.slug)
+    const previous = getPage(body.session!, body.slug!)
     if (!previous) {
       return {
         done: true as const,
@@ -1737,10 +2014,11 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
     }
 
     try {
-      applyOpsAtomically(body.session, plan.ops)
-      pushUndo(body.session, body.slug, previous)
-      pushRecentEdit(body.session, { slug: body.slug, summary: plan.summary_for_user, ops: plan.ops })
-      const previewVersion = bumpVersion(body.session)
+      applyOpsAtomically(body.session!, plan.ops)
+      pushUndo(body.session!, body.slug!, previous)
+      pushRecentEdit(body.session!, { slug: body.slug!, summary: plan.summary_for_user, ops: plan.ops })
+      const previewVersion = bumpVersion(body.session!)
+      schedulePersistState()
       const focusBlockId = pickFocusBlockId(plan.ops)
       return {
         done: true as const,
@@ -1809,7 +2087,8 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
         currentPage: current,
         contextPack,
         model: modelUsed,
-        feedback: repairFeedback.length > 0 ? repairFeedback.join(" | ") : undefined
+        feedback: repairFeedback.length > 0 ? repairFeedback.join(" | ") : undefined,
+        onToken: options?.onPlanningToken
       })
     } catch (error) {
       const reason = toErrorDetail(error)
@@ -1862,7 +2141,17 @@ async function runChatPipeline(body: ChatRequestBody): Promise<{ code: number; p
 }
 
 function sseWrite(reply: { raw: NodeJS.WritableStream }, payload: unknown) {
-  reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`)
+  const stream = reply.raw as NodeJS.WritableStream & {
+    destroyed?: boolean
+    writableEnded?: boolean
+    writable?: boolean
+  }
+  if (stream.destroyed || stream.writableEnded === true || stream.writable === false) return
+  try {
+    stream.write(`data: ${JSON.stringify(payload)}\n\n`)
+  } catch {
+    // Client disconnected; ignore write errors for SSE.
+  }
 }
 
 app.get("/published/pages", async (request, reply) => {
@@ -1908,6 +2197,7 @@ app.post("/ops", async (request, reply) => {
       pushRecentEdit(session, { slug: firstSlugOp.pageSlug, summary: "Applied operations.", ops: parsedOps.data })
     }
     const previewVersion = bumpVersion(session)
+    schedulePersistState()
     const focusBlockId = pickFocusBlockId(parsedOps.data)
     return {
       status: "applied",
@@ -1940,8 +2230,9 @@ app.get("/chat/stream", async (request, reply) => {
 
   reply.raw.write("retry: 60000\n\n")
   sseWrite(reply, { type: "status", message: "Crafting your update..." })
-
-  const result = await runChatPipeline(query)
+  const result = await runChatPipeline(query, {
+    onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token })
+  })
   if (result.code >= 400) {
     sseWrite(reply, { type: "error", result: result.payload, code: result.code })
     reply.raw.end()
@@ -1975,6 +2266,7 @@ app.post("/history/undo", async (request, reply) => {
 
   setPage(body.session, structuredClone(prev))
   const previewVersion = bumpVersion(body.session)
+  schedulePersistState()
   return { status: "applied", previewVersion }
 })
 
@@ -2000,6 +2292,7 @@ app.post("/history/redo", async (request, reply) => {
 
   setPage(body.session, structuredClone(next))
   const previewVersion = bumpVersion(body.session)
+  schedulePersistState()
   return { status: "applied", previewVersion }
 })
 
@@ -2009,5 +2302,6 @@ app.get("/status/planner", async () => ({
 }))
 
 const port = Number(process.env.PORT ?? 4200)
+await loadStateFromDisk()
 await app.listen({ port, host: "0.0.0.0" })
 app.log.info(`Orchestrator listening on ${port}`)
