@@ -3,13 +3,13 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T14:59:26.334Z",
+    "updatedAt": "2026-02-26T15:01:03.238Z",
     "blocks": [
       {
         "id": "b_hero_home",
         "type": "Hero",
         "props": {
-          "heading": "GIT_PUBLISH_OK_2026_02_26T1315",
+          "heading": "Experience Avocado Excellence 🥑",
           "subheading": "Savor the rich, creamy taste of our premium avocados. Ideal for gourmet dishes or simple snacks, they bring luxury and nutrition to every meal.",
           "ctaText": "Explore the Possibilities",
           "ctaHref": "/pricing",
