@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 
 type SiteMessage = {
   protocol: "site-editor/v1"
-  type: "highlightBlock" | "draftUpdated"
+  type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility"
   payload: Record<string, unknown>
 }
 
@@ -19,19 +19,41 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
   const deleteConfirmTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
+    const setNestedLabelsVisibility = (visible: boolean) => {
+      document.documentElement.classList.toggle("editor-hide-nested-labels", !visible)
+    }
+    // Keep nested labels hidden by default until the editor explicitly enables them.
+    setNestedLabelsVisibility(false)
+
     const clearChildFocus = () => {
       document.querySelectorAll(".editor-child-highlight").forEach((node) => node.classList.remove("editor-child-highlight"))
     }
 
+    const findBlockNode = (blockId: string) => {
+      if (!blockId) return null
+      if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+        return document.querySelector<HTMLElement>(`[data-block-id='${CSS.escape(blockId)}']`)
+      }
+      return document.querySelector<HTMLElement>(`[data-block-id='${blockId}']`)
+    }
+
+    const findEditableNode = (parent: HTMLElement, editablePath: string) => {
+      const nodes = parent.querySelectorAll<HTMLElement>("[data-editable-target]")
+      for (const node of nodes) {
+        if ((node.getAttribute("data-editable-target") ?? "") === editablePath) return node
+      }
+      return null
+    }
+
     const applyChildFocus = (parentBlockId: string, editablePath?: string) => {
       clearChildFocus()
-      if (!editablePath) return
-      const parent = document.querySelector<HTMLElement>(`[data-block-id='${parentBlockId}']`)
-      if (!parent) return
-      const child = parent.querySelector<HTMLElement>(`[data-editable-target='${editablePath}']`)
-      if (!child) return
       selectedBlockRef.current = parentBlockId
-      selectedEditablePathRef.current = editablePath
+      selectedEditablePathRef.current = editablePath ?? null
+      if (!editablePath) return
+      const parent = findBlockNode(parentBlockId)
+      if (!parent) return
+      const child = findEditableNode(parent, editablePath)
+      if (!child) return
       child.classList.add("editor-child-highlight")
     }
 
@@ -58,7 +80,8 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       del.draggable = false
       del.setAttribute("aria-label", `Delete ${blockType}`)
       del.title = `Delete ${blockType}`
-      del.textContent = ""
+      del.innerHTML =
+        '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 3h7"/><path d="M4.5 3V2h3v1"/><path d="M3.5 3h5l-.4 6.2a.8.8 0 0 1-.8.8H4.7a.8.8 0 0 1-.8-.8z"/></svg>'
       del.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -155,7 +178,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       clearChildFocus()
       removeSelectedDeleteHandle()
       document.querySelectorAll(".editor-highlight").forEach((node) => node.classList.remove("editor-highlight"))
-      const match = document.querySelector<HTMLElement>(`[data-block-id='${blockId}']`)
+      const match = findBlockNode(blockId)
       if (!match) return false
 
       if (enter) match.classList.add("editor-enter")
@@ -173,7 +196,10 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         btn.className = `editor-selected-move editor-selected-move-${direction}`
         btn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} ${direction}`)
         btn.title = `Move ${direction}`
-        btn.textContent = direction === "up" ? "↑" : "↓"
+        btn.innerHTML =
+          direction === "up"
+            ? '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 10V2"/><path d="M2.5 5.5L6 2l3.5 3.5"/></svg>'
+            : '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2.5 6.5L6 10l3.5-3.5"/></svg>'
         const result = computeMoveAfter(blockId, direction)
         btn.disabled = !result.canMove
         btn.addEventListener("click", (event) => {
@@ -196,8 +222,11 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       mountSelectedMoveHandle("up")
       mountSelectedMoveHandle("down")
       mountSelectedDeleteHandle()
+      const previousSelectedBlockId = selectedBlockRef.current
+      const previousEditablePath = selectedEditablePathRef.current
       selectedBlockRef.current = blockId
-      const effectivePath = editablePath ?? (selectedBlockRef.current === blockId ? selectedEditablePathRef.current ?? undefined : undefined)
+      const effectivePath = editablePath ?? (previousSelectedBlockId === blockId ? previousEditablePath ?? undefined : undefined)
+      if (!effectivePath) selectedEditablePathRef.current = null
       if (effectivePath) applyChildFocus(blockId, effectivePath)
       return true
     }
@@ -295,6 +324,10 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         const editablePath = String(msg.payload.editablePath ?? "") || undefined
         if (!editablePath) selectedEditablePathRef.current = null
         applyBlockFocus(blockId, false, editablePath)
+      }
+
+      if (msg.type === "setNestedLabelsVisibility") {
+        setNestedLabelsVisibility(Boolean(msg.payload.visible))
       }
     }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
 type PlannerSource = "openai" | "demo"
@@ -14,6 +14,7 @@ type AssistantResponse = {
   modelKey?: string
   plannerSource?: PlannerSource
   focusBlockId?: string
+  updatedSlug?: string
   suggestions?: string[]
   error?: string
 }
@@ -41,6 +42,7 @@ type ApplyOpsResponse = {
   changes?: string[]
   previewVersion?: number
   focusBlockId?: string
+  updatedSlug?: string
   error?: string
 }
 
@@ -50,7 +52,32 @@ type HistoryResponse = {
   error?: string
 }
 
-const editorOrigin = "http://localhost:4100"
+type PublishResponse = {
+  status?: string
+  session?: string
+  slugs?: string[]
+  deployStatus?: number
+  deployResponse?: string
+  inspectUrl?: string
+  deploymentId?: string
+  vercelState?: string
+  error?: string
+}
+
+type PublishStatus = {
+  session?: string
+  status?: string
+  startedAt?: string
+  updatedAt?: string
+  slugs?: string[]
+  deployStatus?: number
+  inspectUrl?: string
+  deploymentId?: string
+  deploymentUrl?: string
+  vercelState?: string
+  lastCheckError?: string
+}
+
 const siteOrigin = "http://localhost:3000"
 const orchestrator = "http://localhost:4200"
 
@@ -58,20 +85,40 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
+function slugLabel(route: string) {
+  if (route === "/") return "Home (/)"
+  const pretty = route
+    .slice(1)
+    .split("/")
+    .filter(Boolean)
+    .map((part) => part.replace(/[-_]/g, " "))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" / ")
+  return `${pretty || route} (${route})`
+}
+
 export function App() {
+  const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const [session] = useState("dev")
   const [slug, setSlug] = useState("/")
+  const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
+  const [isLoadingSlugs, setIsLoadingSlugs] = useState(false)
   const [modelKey, setModelKey] = useState<ModelKey>("balanced")
   const [message, setMessage] = useState("")
   const [activeBlockId, setActiveBlockId] = useState<string | undefined>()
   const [activeBlockType, setActiveBlockType] = useState<string | undefined>()
   const [activeEditablePath, setActiveEditablePath] = useState<string | undefined>()
   const [isLoading, setIsLoading] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null)
   const [useStreaming, setUseStreaming] = useState(true)
-  const [showControls, setShowControls] = useState(false)
+  const [showNestedLabels, setShowNestedLabels] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [previewRevision, setPreviewRevision] = useState(0)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
+  const [composerHeight, setComposerHeight] = useState(220)
   const [chatLog, setChatLog] = useState<ChatEntry[]>([
     {
       id: "welcome",
@@ -81,17 +128,41 @@ export function App() {
     }
   ])
 
+  const chatPanelRef = useRef<HTMLElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
+  const splitHandleRef = useRef<HTMLDivElement>(null)
+  const activeBlockIdRef = useRef<string | undefined>(undefined)
+  const activeBlockTypeRef = useRef<string | undefined>(undefined)
+  const activeEditablePathRef = useRef<string | undefined>(undefined)
+  const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
+
+  useEffect(() => {
+    activeBlockIdRef.current = activeBlockId
+  }, [activeBlockId])
+
+  useEffect(() => {
+    activeBlockTypeRef.current = activeBlockType
+  }, [activeBlockType])
+
+  useEffect(() => {
+    activeEditablePathRef.current = activeEditablePath
+  }, [activeEditablePath])
 
   const previewSrc = useMemo(() => {
     const url = new URL(`${siteOrigin}${slug === "/" ? "" : slug}`)
     url.searchParams.set("__editor", "1")
     url.searchParams.set("session", session)
     url.searchParams.set("editorOrigin", editorOrigin)
+    url.searchParams.set("__rev", String(previewRevision))
     return url.toString()
-  }, [session, slug])
+  }, [previewRevision, session, slug])
+
+  const routeOptions = useMemo(() => {
+    const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
+    return raw.includes("/") ? ["/", ...raw.filter((route) => route !== "/")] : raw
+  }, [availableSlugs, slug])
 
   useEffect(() => {
     let active = true
@@ -138,7 +209,42 @@ export function App() {
     thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" })
   }, [chatLog, streamStatus])
 
-  const postToSite = (type: "highlightBlock" | "draftUpdated", payload: Record<string, unknown>) => {
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      const started = resizeStartRef.current
+      if (!started) return
+      const panel = chatPanelRef.current
+      const thread = chatThreadRef.current
+      if (!panel || !thread) return
+
+      const minComposer = 120
+      const minThread = 120
+      const splitterHeight = 10
+      const topRowsHeight = thread.offsetTop
+      const maxComposer = Math.max(minComposer, panel.clientHeight - topRowsHeight - splitterHeight - minThread)
+
+      const deltaY = event.clientY - started.y
+      const next = Math.min(maxComposer, Math.max(minComposer, started.composerHeight - deltaY))
+      setComposerHeight(next)
+    }
+
+    const onPointerUp = () => {
+      resizeStartRef.current = null
+      document.body.style.userSelect = ""
+    }
+
+    window.addEventListener("pointermove", onPointerMove)
+    window.addEventListener("pointerup", onPointerUp)
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerup", onPointerUp)
+    }
+  }, [])
+
+  const postToSite = (
+    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility",
+    payload: Record<string, unknown>
+  ) => {
     iframeRef.current?.contentWindow?.postMessage(
       {
         protocol: "site-editor/v1",
@@ -150,6 +256,10 @@ export function App() {
   }
 
   useEffect(() => {
+    postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })
+  }, [showNestedLabels])
+
+  useEffect(() => {
     const onMessage = (event: MessageEvent<SiteMessage>) => {
       if (event.origin !== siteOrigin) return
       const msg = event.data
@@ -157,33 +267,45 @@ export function App() {
 
       if (msg.type === "blockClicked") {
         setSlug(String(msg.payload.slug ?? "/"))
-        const nextBlockId = String(msg.payload.blockId ?? "")
-        setActiveBlockId(nextBlockId || undefined)
-        setActiveBlockType(String(msg.payload.blockType ?? "") || undefined)
-        const path = String(msg.payload.editablePath ?? "")
-        setActiveEditablePath(path || undefined)
-        if (nextBlockId) postToSite("highlightBlock", { blockId: nextBlockId, editablePath: path || null })
+        const rawBlockId = msg.payload.blockId
+        const rawBlockType = msg.payload.blockType
+        const rawPath = msg.payload.editablePath
+
+        const nextBlockId = typeof rawBlockId === "string" && rawBlockId.length > 0 ? rawBlockId : undefined
+        const nextBlockType = typeof rawBlockType === "string" && rawBlockType.length > 0 ? rawBlockType : undefined
+        const nextPath = typeof rawPath === "string" && rawPath.length > 0 ? rawPath : undefined
+
+        activeBlockIdRef.current = nextBlockId
+        activeBlockTypeRef.current = nextBlockType
+        activeEditablePathRef.current = nextPath
+        setActiveBlockId(nextBlockId)
+        setActiveBlockType(nextBlockType)
+        setActiveEditablePath(nextPath)
+        if (nextBlockId) postToSite("highlightBlock", { blockId: nextBlockId, editablePath: nextPath ?? null })
       }
 
       if (msg.type === "routeChanged") {
         setSlug(String(msg.payload.slug ?? "/"))
+        activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
       }
 
       if (msg.type === "blockReordered") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = String(msg.payload.blockId ?? "")
+        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
         const afterRaw = msg.payload.afterBlockId
         const afterBlockId = typeof afterRaw === "string" && afterRaw.length > 0 ? afterRaw : undefined
         if (nextSlug !== slug) setSlug(nextSlug)
+        activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
         void reorderBlock(nextSlug, blockId, afterBlockId)
       }
 
       if (msg.type === "blockDeleteRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = String(msg.payload.blockId ?? "")
+        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
         if (nextSlug !== slug) setSlug(nextSlug)
+        activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
         void deleteBlock(nextSlug, blockId)
       }
@@ -223,9 +345,46 @@ export function App() {
     }
     pushAssistantFromResult(data)
     if (data.status === "applied") {
+      const nextSlug = typeof data.updatedSlug === "string" && data.updatedSlug.length > 0 ? data.updatedSlug : slug
+      if (nextSlug !== slug) {
+        setSlug(nextSlug)
+        activeBlockIdRef.current = undefined
+        activeBlockTypeRef.current = undefined
+        activeEditablePathRef.current = undefined
+        setActiveBlockId(undefined)
+        setActiveBlockType(undefined)
+        setActiveEditablePath(undefined)
+      }
+      setPreviewRevision((prev) => prev + 1)
       postToSite("draftUpdated", { focusBlockId: data.focusBlockId ?? null })
-      if (data.focusBlockId) setActiveBlockId(data.focusBlockId)
+      if (data.focusBlockId) {
+        activeBlockIdRef.current = data.focusBlockId
+        setActiveBlockId(data.focusBlockId)
+      }
+      activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
+      void refreshRouteSlugs()
+    }
+  }
+
+  async function refreshRouteSlugs() {
+    setIsLoadingSlugs(true)
+    try {
+      const res = await fetch(`${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}`)
+      if (!res.ok) return routeOptions
+      const data = (await res.json()) as { slugs?: unknown }
+      const list = Array.isArray(data.slugs)
+        ? data.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
+        : []
+      if (list.length > 0) {
+        setAvailableSlugs(list)
+        return list
+      }
+      return routeOptions
+    } catch {
+      return routeOptions
+    } finally {
+      setIsLoadingSlugs(false)
     }
   }
 
@@ -251,6 +410,8 @@ export function App() {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
+      activeBlockIdRef.current = focusBlockId
+      activeEditablePathRef.current = undefined
       setActiveBlockId(focusBlockId)
       postToSite("draftUpdated", { focusBlockId })
     } catch {
@@ -282,6 +443,9 @@ export function App() {
         return
       }
 
+      activeBlockIdRef.current = undefined
+      activeBlockTypeRef.current = undefined
+      activeEditablePathRef.current = undefined
       setActiveBlockId(undefined)
       setActiveBlockType(undefined)
       setActiveEditablePath(undefined)
@@ -304,9 +468,9 @@ export function App() {
         slug,
         message: finalMessage,
         modelKey,
-        activeBlockId,
-        activeBlockType,
-        activeEditablePath
+        activeBlockId: activeBlockIdRef.current,
+        activeBlockType: activeBlockTypeRef.current,
+        activeEditablePath: activeEditablePathRef.current
       })
     })
 
@@ -322,43 +486,23 @@ export function App() {
         message: finalMessage,
         modelKey
       })
-      if (activeBlockId) params.set("activeBlockId", activeBlockId)
-      if (activeBlockType) params.set("activeBlockType", activeBlockType)
-      if (activeEditablePath) params.set("activeEditablePath", activeEditablePath)
+      if (activeBlockIdRef.current) params.set("activeBlockId", activeBlockIdRef.current)
+      if (activeBlockTypeRef.current) params.set("activeBlockType", activeBlockTypeRef.current)
+      if (activeEditablePathRef.current) params.set("activeEditablePath", activeEditablePathRef.current)
 
       const source = new EventSource(`${orchestrator}/chat/stream?${params.toString()}`)
       let settled = false
       let gotAnyEvent = false
-      let streamEntryId: string | null = null
-      let streamText = ""
       let pendingFocusBlockId: string | null = null
       let opRefreshTimer: number | null = null
 
-      const ensureStreamEntry = () => {
-        if (streamEntryId) return streamEntryId
-        const id = createId()
-        streamEntryId = id
-        setChatLog((prev) => [...prev, { id, role: "assistant", text: "", status: "streaming" }])
-        return id
-      }
-
-      const appendStreamText = (text: string) => {
-        if (!text) return
-        const id = ensureStreamEntry()
-        streamText += text
-        setChatLog((prev) => prev.map((entry) => (entry.id === id ? { ...entry, text: streamText } : entry)))
-      }
-
-      const removeStreamEntry = () => {
-        if (!streamEntryId) return
-        const id = streamEntryId
-        streamEntryId = null
-        setChatLog((prev) => prev.filter((entry) => entry.id !== id))
-      }
-
       const flushOpRefresh = () => {
         postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId })
-        if (pendingFocusBlockId) setActiveBlockId(pendingFocusBlockId)
+        if (pendingFocusBlockId) {
+          activeBlockIdRef.current = pendingFocusBlockId
+          setActiveBlockId(pendingFocusBlockId)
+        }
+        activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
         pendingFocusBlockId = null
       }
@@ -396,14 +540,12 @@ export function App() {
 
         if (payload.type === "status") {
           setStreamStatus(payload.message ?? "Working...")
-          ensureStreamEntry()
         }
 
         if (payload.type === "token") {
           const text = payload.text ?? ""
           if (text) {
             setStreamTokenCount((prev) => prev + text.length)
-            appendStreamText(text)
           }
         }
 
@@ -430,7 +572,6 @@ export function App() {
           setStreamTokenCount(0)
           clearOpRefreshTimer()
           if (pendingFocusBlockId !== null) flushOpRefresh()
-          removeStreamEntry()
           if (payload.result) applyChatResult(payload.result)
           source.close()
           resolve(true)
@@ -442,7 +583,6 @@ export function App() {
           setStreamTokenCount(0)
           clearOpRefreshTimer()
           pendingFocusBlockId = null
-          removeStreamEntry()
           if (payload.result) {
             applyChatResult(payload.result)
           } else {
@@ -457,7 +597,6 @@ export function App() {
         if (settled || gotAnyEvent) {
           clearOpRefreshTimer()
           pendingFocusBlockId = null
-          removeStreamEntry()
           source.close()
           resolve(true)
           return
@@ -466,7 +605,6 @@ export function App() {
         setStreamTokenCount(0)
         clearOpRefreshTimer()
         pendingFocusBlockId = null
-        removeStreamEntry()
         settled = true
         source.close()
         resolve(false)
@@ -479,6 +617,7 @@ export function App() {
     if (!finalMessage || isLoading) return
 
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: finalMessage }])
+    setMessage("")
     setIsLoading(true)
     setStreamStatus(useStreaming ? "Connecting..." : null)
     setStreamTokenCount(0)
@@ -489,7 +628,6 @@ export function App() {
       } else {
         await submitChatHttp(finalMessage)
       }
-      setMessage("")
     } finally {
       setStreamStatus(null)
       setIsLoading(false)
@@ -514,6 +652,7 @@ export function App() {
         return
       }
 
+      activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       postToSite("draftUpdated", { focusBlockId: null })
       pushAssistantFromResult({
@@ -530,74 +669,143 @@ export function App() {
     }
   }
 
+  async function publishSite() {
+    if (isLoading || isPublishing) return
+    setIsPublishing(true)
+    try {
+      const res = await fetch(`${orchestrator}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session })
+      })
+      const data = (await res.json()) as PublishResponse
+      if (!res.ok || data.status !== "triggered") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? "Failed to trigger publish.",
+          changes: []
+        })
+        return
+      }
+
+      const slugText = Array.isArray(data.slugs) && data.slugs.length > 0 ? data.slugs.join(", ") : "none"
+      setPublishStatus({
+        session: data.session ?? session,
+        status: data.status,
+        slugs: data.slugs ?? [],
+        deployStatus: data.deployStatus,
+        inspectUrl: data.inspectUrl,
+        deploymentId: data.deploymentId,
+        vercelState: data.vercelState
+      })
+      void fetchPublishStatus()
+      pushAssistantFromResult({
+        status: "applied",
+        summary: "Publish triggered. Vercel deployment started.",
+        changes: [
+          `Session: ${data.session ?? session}`,
+          `Slugs: ${slugText}`,
+          `Deploy status: ${data.deployStatus ?? "unknown"}`,
+          `Vercel state: ${data.vercelState ?? "TRIGGERED"}`
+        ]
+      })
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Failed to trigger publish.",
+        changes: []
+      })
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  async function fetchPublishStatus() {
+    try {
+      const res = await fetch(`${orchestrator}/publish/status?session=${encodeURIComponent(session)}`)
+      if (!res.ok) return
+      const data = (await res.json()) as PublishStatus
+      setPublishStatus(data)
+    } catch {
+      // Ignore status poll failures.
+    }
+  }
+
   useEffect(() => {
     if (!activeBlockId) return
     postToSite("highlightBlock", { blockId: activeBlockId, editablePath: activeEditablePath ?? null })
   }, [activeBlockId, activeEditablePath])
 
+  useEffect(() => {
+    void refreshRouteSlugs()
+  }, [session])
+
+  useEffect(() => {
+    if (!showSettingsModal) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowSettingsModal(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [showSettingsModal])
+
+  const publishState = (publishStatus?.vercelState ?? publishStatus?.status ?? "").toUpperCase()
+  const publishInProgress =
+    isPublishing || publishState === "PENDING" || publishState === "QUEUED" || publishState === "BUILDING" || publishState === "INITIALIZING"
+  const publishTerminal =
+    publishState === "READY" || publishState === "ERROR" || publishState === "FAILED" || publishState === "CANCELED" || publishState === "SUCCEEDED"
+
+  useEffect(() => {
+    if (!publishStatus || publishTerminal) return
+    const timer = window.setInterval(() => {
+      void fetchPublishStatus()
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [publishStatus, publishTerminal, session])
+
   const streamIsError = streamStatus ? /failed|error/i.test(streamStatus) : false
-  const streamLabel = streamIsError ? streamStatus : streamTokenCount > 0 ? "Planning your edit..." : "Crafting your updates"
+  const streamLabel = streamIsError ? streamStatus : streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."
+  const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
+  const hasUserEntry = chatLog.some((entry) => entry.role === "user")
 
   return (
     <div className="layout">
-      <aside className="chat-panel">
+      <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
-          <h1>Site Editor</h1>
-          <p>Chat-first editing with live preview</p>
-          <div
-            className={`source-badge ${
-              plannerBadgeState === "openai"
-                ? "src-openai"
-                : plannerBadgeState === "demo"
-                  ? "src-demo"
-                  : plannerBadgeState === "error"
-                    ? "src-error"
-                    : "src-unknown"
-            }`}
-          >
-            {plannerBadgeState === "openai"
-              ? "OpenAI connected"
-              : plannerBadgeState === "demo"
-                ? "Demo mode"
-                : plannerBadgeState === "error"
-                  ? "Status unavailable"
-                  : "Checking..."}
-          </div>
-        </header>
-
-        <section className={`controls ${showControls ? "open" : ""}`}>
-          <button
-            type="button"
-            className="controls-toggle"
-            aria-expanded={showControls}
-            onClick={() => setShowControls((prev) => !prev)}
-          >
-            <span>Settings</span>
-            <span aria-hidden="true">{showControls ? "▾" : "▸"}</span>
-          </button>
-
-          <div className="controls-body">
-            <label>
-              <span>Route</span>
-              <input value={slug} onChange={(e) => setSlug(e.target.value || "/")} />
-            </label>
-
-            <label>
-              <span>Model</span>
-              <select value={modelKey} onChange={(e) => setModelKey(e.target.value as ModelKey)}>
-                <option value="fast">fast</option>
-                <option value="balanced">balanced</option>
-                <option value="reasoning">reasoning</option>
-                <option value="codex">codex</option>
+          <div className="chat-header-controls">
+            <label className="chat-header-slug">
+              <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
+                {routeOptions.map((route) => (
+                  <option key={route} value={route}>
+                    {slugLabel(route)}
+                  </option>
+                ))}
               </select>
             </label>
-
-            <label className="inline-toggle">
-              <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
-              <span>Streaming</span>
-            </label>
+            <div className="chat-header-primary-actions">
+              <button
+                type="button"
+                className="settings-icon-btn"
+                aria-label="Open settings"
+                onClick={() => setShowSettingsModal(true)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10.33 3.08c.27-1.44 3.07-1.44 3.34 0a1.72 1.72 0 0 0 2.57 1.16c1.27-.74 3.26 1.25 2.52 2.52a1.72 1.72 0 0 0 1.16 2.57c1.44.27 1.44 3.07 0 3.34a1.72 1.72 0 0 0-1.16 2.57c.74 1.27-1.25 3.26-2.52 2.52a1.72 1.72 0 0 0-2.57 1.16c-.27 1.44-3.07 1.44-3.34 0a1.72 1.72 0 0 0-2.57-1.16c-1.27.74-3.26-1.25-2.52-2.52a1.72 1.72 0 0 0-1.16-2.57c-1.44-.27-1.44-3.07 0-3.34a1.72 1.72 0 0 0 1.16-2.57c-.74-1.27 1.25-3.26 2.52-2.52a1.72 1.72 0 0 0 2.57-1.16z" />
+                  <circle cx="12" cy="12" r="3.25" />
+                </svg>
+              </button>
+              <button type="button" className="publish-preview-btn" onClick={() => void publishSite()} disabled={isLoading || isPublishing}>
+                {publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
+                {publishInProgress ? "Publishing" : "Publish"}
+              </button>
+            </div>
+            {publishStatus?.inspectUrl ? (
+              <a className="publish-view-link" href={publishStatus.inspectUrl} target="_blank" rel="noreferrer">
+                View deploy
+              </a>
+            ) : null}
           </div>
-        </section>
+        </header>
 
         <section className="chat-thread" ref={chatThreadRef}>
           {chatLog.map((entry) => (
@@ -638,7 +846,10 @@ export function App() {
           ))}
           {streamStatus ? (
             <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"}`}>
-              <span>{streamLabel}</span>
+              <span className="streaming-pill-title">
+                <span className="streaming-pill-sparkle">✦</span>
+              </span>
+              <span className="streaming-pill-status">{streamLabel}</span>
               {!streamIsError ? (
                 <span className="streaming-dots" aria-hidden="true">
                   <i />
@@ -651,6 +862,18 @@ export function App() {
           <div ref={chatEndRef} />
         </section>
 
+        <div
+          ref={splitHandleRef}
+          className="composer-splitter"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize input panel"
+          onPointerDown={(event) => {
+            resizeStartRef.current = { y: event.clientY, composerHeight }
+            document.body.style.userSelect = "none"
+          }}
+        />
+
         <footer className="composer">
           <textarea
             value={message}
@@ -661,27 +884,87 @@ export function App() {
                 void submitChat()
               }
             }}
-            placeholder="Try: Add testimonials below hero"
+            placeholder={hasUserEntry ? "" : "Try: Add testimonials below hero"}
             rows={4}
           />
           <div className="composer-actions">
-            <button type="button" className="secondary-btn" onClick={() => void applyHistory("undo")} disabled={isLoading}>
-              Undo
-            </button>
-            <button type="button" className="secondary-btn" onClick={() => void applyHistory("redo")} disabled={isLoading}>
-              Redo
-            </button>
-            <button type="button" className="primary-btn" onClick={() => void submitChat()} disabled={isLoading || message.trim().length === 0}>
-              Send
-            </button>
+            <div
+              className={`source-badge source-badge-bottom ${
+                plannerBadgeState === "openai"
+                  ? "src-openai"
+                  : plannerBadgeState === "demo"
+                    ? "src-demo"
+                    : plannerBadgeState === "error"
+                      ? "src-error"
+                      : "src-unknown"
+              }`}
+            >
+              {plannerBadgeState === "openai"
+                ? "OpenAI"
+                : plannerBadgeState === "demo"
+                  ? "Demo mode"
+                  : plannerBadgeState === "error"
+                    ? "Status unavailable"
+                    : "Checking..."}
+            </div>
+            <div className="composer-actions-right">
+              <button type="button" className="secondary-btn" onClick={() => void applyHistory("undo")} disabled={isLoading}>
+                Undo
+              </button>
+              <button type="button" className="secondary-btn" onClick={() => void applyHistory("redo")} disabled={isLoading}>
+                Redo
+              </button>
+              <button type="button" className="primary-btn" onClick={() => void submitChat()} disabled={isLoading || message.trim().length === 0}>
+                Send
+              </button>
+            </div>
           </div>
 
         </footer>
       </aside>
 
       <section className="preview">
-        <iframe ref={iframeRef} title="Live preview" src={previewSrc} />
+        <iframe
+          ref={iframeRef}
+          title="Live preview"
+          src={previewSrc}
+          onLoad={() => postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })}
+        />
       </section>
+
+      {showSettingsModal ? (
+        <div className="settings-modal-backdrop" onClick={() => setShowSettingsModal(false)}>
+          <div className="settings-modal" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-modal-header">
+              <h2>Settings</h2>
+              <button type="button" className="settings-close-btn" aria-label="Close settings" onClick={() => setShowSettingsModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className="settings-modal-body">
+              <label>
+                <span>Model</span>
+                <select value={modelKey} onChange={(e) => setModelKey(e.target.value as ModelKey)}>
+                  <option value="fast">fast</option>
+                  <option value="balanced">balanced</option>
+                  <option value="reasoning">reasoning</option>
+                  <option value="codex">codex</option>
+                </select>
+              </label>
+
+              <label className="inline-toggle">
+                <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
+                <span>Streaming</span>
+              </label>
+
+              <label className="inline-toggle">
+                <input type="checkbox" checked={showNestedLabels} onChange={(e) => setShowNestedLabels(e.target.checked)} />
+                <span>Nested labels</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
