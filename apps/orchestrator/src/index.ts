@@ -139,8 +139,17 @@ function requirePublishToken(request: { headers: Record<string, unknown> }) {
 }
 
 async function runGit(args: string[], cwd: string) {
-  const result = await execFileAsync("git", args, { cwd })
-  return { stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
+  try {
+    const result = await execFileAsync("git", args, { cwd })
+    return { stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
+  } catch (error) {
+    const maybe = error as { stdout?: string; stderr?: string; message?: string }
+    const stderr = (maybe.stderr ?? "").trim()
+    const stdout = (maybe.stdout ?? "").trim()
+    const message = (maybe.message ?? "").trim()
+    const detail = stderr || stdout || message || toErrorDetail(error)
+    throw new Error(detail)
+  }
 }
 
 function sanitizeBranch(input: string) {
@@ -180,6 +189,19 @@ async function publishViaGit(session: string) {
   }
 
   await runGit(["add", targetPath], repoRoot)
+  try {
+    await runGit(["diff", "--cached", "--quiet", "--", targetPath], repoRoot)
+    return {
+      status: "ready" as const,
+      session,
+      slugs,
+      branch,
+      message: "No content changes to publish."
+    }
+  } catch {
+    // Expected when there are staged changes for targetPath.
+  }
+
   const commitMessage = `publish: session ${session} ${new Date().toISOString()}`
 
   try {
@@ -874,6 +896,24 @@ function normalizeOpName(op: unknown) {
     copyblock: "duplicate_block",
     clone_block: "duplicate_block",
     cloneblock: "duplicate_block",
+    add_item: "add_item",
+    additem: "add_item",
+    insert_item: "add_item",
+    insertitem: "add_item",
+    append_item: "add_item",
+    appenditem: "add_item",
+    update_item: "update_item",
+    updateitem: "update_item",
+    edit_item: "update_item",
+    edititem: "update_item",
+    remove_item: "remove_item",
+    removeitem: "remove_item",
+    delete_item: "remove_item",
+    deleteitem: "remove_item",
+    move_item: "move_item",
+    moveitem: "move_item",
+    reorder_item: "move_item",
+    reorderitem: "move_item",
     move_page: "move_page",
     movepage: "move_page",
     reorder_page: "move_page",
@@ -1085,6 +1125,10 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
         "remove_block",
         "move_block",
         "duplicate_block",
+        "add_item",
+        "update_item",
+        "remove_item",
+        "move_item",
         "rename_page",
         "remove_page",
         "move_page",
@@ -1114,7 +1158,32 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     if (!raw.blockId) {
       const pathCandidate = typeof raw.path === "string" && raw.path.startsWith("b_") ? raw.path : undefined
       raw.blockId =
-        raw.block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.sourceBlockId ?? raw.source_block_id ?? raw.id ?? pathCandidate
+        raw.block_id ??
+        raw.targetBlockId ??
+        raw.target_block_id ??
+        raw.sourceBlockId ??
+        raw.source_block_id ??
+        raw.fromBlockId ??
+        raw.from_block_id ??
+        raw.id ??
+        pathCandidate
+    }
+    if (!raw.listKey) {
+      raw.listKey = raw.list_key ?? raw.arrayKey ?? raw.array_key ?? raw.collection ?? raw.itemsKey ?? raw.items_key
+    }
+    if (typeof raw.index !== "number") {
+      const indexRaw = raw.index ?? raw.itemIndex ?? raw.item_index ?? raw.fromIndex ?? raw.from_index
+      const normalizedIndex = typeof indexRaw === "string" ? Number(indexRaw) : indexRaw
+      if (typeof normalizedIndex === "number" && Number.isFinite(normalizedIndex)) raw.index = Math.trunc(normalizedIndex)
+    }
+    if (typeof raw.afterIndex !== "number") {
+      const afterIndexRaw = raw.afterIndex ?? raw.after_index ?? raw.toIndex ?? raw.to_index ?? raw.targetIndex ?? raw.target_index
+      const normalizedAfter = typeof afterIndexRaw === "string" ? Number(afterIndexRaw) : afterIndexRaw
+      if (typeof normalizedAfter === "number" && Number.isFinite(normalizedAfter)) raw.afterIndex = Math.trunc(normalizedAfter)
+    }
+    if (!raw.item) {
+      const sourceItem = raw.newItem ?? raw.new_item ?? raw.value
+      if (sourceItem && typeof sourceItem === "object" && !Array.isArray(sourceItem)) raw.item = sourceItem
     }
     if (!raw.newBlockId) {
       raw.newBlockId = raw.new_block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.copiedBlockId ?? raw.copied_block_id
@@ -1211,6 +1280,12 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
         const lower = userMessage
         if (/\b(after|below|under)\b/.test(lower)) raw.afterPageSlug = routeMentions[1]
       }
+    }
+
+    if (raw.op === "duplicate_block") {
+      raw.toPageSlug = resolvePageSlug(
+        raw.toPageSlug ?? raw.to_page_slug ?? raw.targetPageSlug ?? raw.target_page_slug ?? raw.newPageSlug ?? raw.new_page_slug
+      )
     }
     if (!raw.block) {
       raw.block = raw.newBlock ?? raw.new_block
@@ -2589,11 +2664,12 @@ async function generatePlanWithOpenAI(args: {
     "If request is ambiguous, return intent=needs_clarification and no ops.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
-    "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block, duplicate_block, rename_page, remove_page, move_page, duplicate_page.",
+    "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page.",
     "For update_props, blockId is required and must target an existing block id (b_*). Never use a page route/path as blockId or path.",
     "Use rename_page for page route changes (pageSlug -> newPageSlug).",
     "Use remove_page when the user asks to delete a page path.",
     "Use move_page to reorder nav pages (pageSlug + optional afterPageSlug). Home (/) must stay first.",
+    "For duplicate_block, blockId is required; use optional toPageSlug when duplicating into a different page.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
@@ -2719,6 +2795,18 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
     }
     withoutInserted.splice(insertIndex, 0, insertedSlug)
     return withoutInserted
+  }
+
+  const listValueForOp = (block: PageDoc["blocks"][number], listKey: string) => {
+    const candidate = (block.props as Record<string, unknown>)[listKey]
+    if (!Array.isArray(candidate)) throw new Error(`List ${listKey} not found on ${block.id}`)
+    return candidate
+  }
+
+  const withValidatedBlockProps = (block: PageDoc["blocks"][number], nextProps: Record<string, unknown>) => {
+    const propCheck = validateBlockProps(block.type as BlockType, nextProps)
+    if (!propCheck.success) throw new Error(`Invalid props for ${block.type}`)
+    return propCheck.data
   }
 
   const sessionDraft = getSessionDraft(session)
@@ -2863,17 +2951,96 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const source = page.blocks[idx]
-      const nextId = nextUniqueBlockId(page.blocks, typeof op.newBlockId === "string" ? op.newBlockId : `${source.id}_copy`)
+      const targetPageSlug = typeof op.toPageSlug === "string" && op.toPageSlug.length > 0 ? op.toPageSlug : op.pageSlug
+      const targetPage = staged.get(targetPageSlug)
+      if (!targetPage) throw new Error(`Target page not found for slug ${targetPageSlug}`)
+      const nextId = nextUniqueBlockId(targetPage.blocks, typeof op.newBlockId === "string" ? op.newBlockId : `${source.id}_copy`)
       op.newBlockId = nextId
       const duplicate = { ...structuredClone(source), id: nextId }
 
       if (!op.afterBlockId) {
-        page.blocks.splice(idx + 1, 0, duplicate)
+        if (targetPageSlug === op.pageSlug) page.blocks.splice(idx + 1, 0, duplicate)
+        else targetPage.blocks.push(duplicate)
       } else {
-        const anchorIdx = page.blocks.findIndex((b) => b.id === op.afterBlockId)
+        const anchorIdx = targetPage.blocks.findIndex((b) => b.id === op.afterBlockId)
         if (anchorIdx === -1) throw new Error(`afterBlockId ${op.afterBlockId} not found`)
-        page.blocks.splice(anchorIdx + 1, 0, duplicate)
+        targetPage.blocks.splice(anchorIdx + 1, 0, duplicate)
       }
+      targetPage.updatedAt = new Date().toISOString()
+      touchedSlugs.add(targetPage.slug)
+      continue
+    }
+
+    if (op.op === "add_item") {
+      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      const block = page.blocks[blockIdx]
+      const list = listValueForOp(block, op.listKey)
+      const nextList = [...list]
+      const insertIndex = typeof op.afterIndex === "number" ? op.afterIndex + 1 : nextList.length
+      if (insertIndex < 0 || insertIndex > nextList.length) {
+        throw new Error(`afterIndex ${op.afterIndex} is out of range for ${op.listKey}`)
+      }
+      nextList.splice(insertIndex, 0, structuredClone(op.item))
+      const nextProps = { ...(block.props as Record<string, unknown>), [op.listKey]: nextList }
+      page.blocks[blockIdx] = { ...block, props: withValidatedBlockProps(block, nextProps) }
+      page.updatedAt = new Date().toISOString()
+      touchedSlugs.add(page.slug)
+      continue
+    }
+
+    if (op.op === "update_item") {
+      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      const block = page.blocks[blockIdx]
+      const list = listValueForOp(block, op.listKey)
+      if (op.index < 0 || op.index >= list.length) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
+      const currentItem = list[op.index]
+      if (!currentItem || typeof currentItem !== "object" || Array.isArray(currentItem)) {
+        throw new Error(`List item ${op.listKey}[${op.index}] is not an object`)
+      }
+      const nextList = list.map((entry, idx) => {
+        if (idx !== op.index) return entry
+        return { ...(entry as Record<string, unknown>), ...(op.patch as Record<string, unknown>) }
+      })
+      const nextProps = { ...(block.props as Record<string, unknown>), [op.listKey]: nextList }
+      page.blocks[blockIdx] = { ...block, props: withValidatedBlockProps(block, nextProps) }
+      page.updatedAt = new Date().toISOString()
+      touchedSlugs.add(page.slug)
+      continue
+    }
+
+    if (op.op === "remove_item") {
+      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      const block = page.blocks[blockIdx]
+      const list = listValueForOp(block, op.listKey)
+      if (op.index < 0 || op.index >= list.length) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
+      const nextList = [...list]
+      nextList.splice(op.index, 1)
+      const nextProps = { ...(block.props as Record<string, unknown>), [op.listKey]: nextList }
+      page.blocks[blockIdx] = { ...block, props: withValidatedBlockProps(block, nextProps) }
+      page.updatedAt = new Date().toISOString()
+      touchedSlugs.add(page.slug)
+      continue
+    }
+
+    if (op.op === "move_item") {
+      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      const block = page.blocks[blockIdx]
+      const list = listValueForOp(block, op.listKey)
+      if (op.index < 0 || op.index >= list.length) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
+      const nextList = [...list]
+      const [item] = nextList.splice(op.index, 1)
+      if (item === undefined) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
+      const insertIndex = typeof op.afterIndex === "number" ? op.afterIndex + 1 : 0
+      if (insertIndex < 0 || insertIndex > nextList.length) {
+        throw new Error(`afterIndex ${op.afterIndex} is out of range for ${op.listKey}`)
+      }
+      nextList.splice(insertIndex, 0, item)
+      const nextProps = { ...(block.props as Record<string, unknown>), [op.listKey]: nextList }
+      page.blocks[blockIdx] = { ...block, props: withValidatedBlockProps(block, nextProps) }
       page.updatedAt = new Date().toISOString()
       touchedSlugs.add(page.slug)
       continue
@@ -2960,6 +3127,11 @@ function pickFocusBlockId(ops: Operation[]) {
   const duplicate = ops.find((op) => op.op === "duplicate_block")
   if (duplicate && duplicate.op === "duplicate_block" && typeof duplicate.newBlockId === "string") return duplicate.newBlockId
 
+  const listOp = ops.find(
+    (op) => op.op === "add_item" || op.op === "update_item" || op.op === "remove_item" || op.op === "move_item"
+  )
+  if (listOp && "blockId" in listOp && typeof listOp.blockId === "string") return listOp.blockId
+
   const move = ops.find((op) => op.op === "move_block")
   if (move && move.op === "move_block") return move.blockId
 
@@ -3009,6 +3181,11 @@ function collectMentionedSlugsFromPlan(plan: EditPlan, fallbackSlug?: string) {
     if (op.op === "move_page") {
       push(op.pageSlug)
       push(op.afterPageSlug)
+      continue
+    }
+    if (op.op === "duplicate_block") {
+      if (typeof op.toPageSlug === "string" && op.toPageSlug.length > 0) push(op.toPageSlug)
+      else push(op.pageSlug)
       continue
     }
     if (op.op === "duplicate_page") {
@@ -3194,10 +3371,18 @@ async function runChatPipeline(
       if (options?.onOpApplied && !hasPageStructuralOps) {
         const rollbackBySlug = new Map<string, PageDoc>()
         for (const op of resolvedPlan.ops) {
-          const slug = op.op === "create_page" ? op.page.slug : op.pageSlug
-          if (rollbackBySlug.has(slug)) continue
-          const existing = getPage(body.session!, slug)
-          if (existing) rollbackBySlug.set(slug, structuredClone(existing))
+          const slugsToSnapshot: string[] = []
+          if (op.op === "create_page") slugsToSnapshot.push(op.page.slug)
+          else slugsToSnapshot.push(op.pageSlug)
+          if (op.op === "duplicate_block" && typeof op.toPageSlug === "string" && op.toPageSlug.length > 0) {
+            slugsToSnapshot.push(op.toPageSlug)
+          }
+
+          for (const slug of slugsToSnapshot) {
+            if (rollbackBySlug.has(slug)) continue
+            const existing = getPage(body.session!, slug)
+            if (existing) rollbackBySlug.set(slug, structuredClone(existing))
+          }
         }
 
         // Validate the whole plan from the current state before progressive apply.
