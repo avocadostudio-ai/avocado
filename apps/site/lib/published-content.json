@@ -3,13 +3,13 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T21:05:27.560Z",
+    "updatedAt": "2026-02-26T21:05:49.634Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Magic of Avocados",
+          "heading": "Discover the Magic of Avocados 🥑",
           "subheading": "Fresh, nutritious, and sustainably grown — perfect for every meal.",
           "ctaText": "Get Started",
           "ctaHref": "/",
