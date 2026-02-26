@@ -314,6 +314,63 @@
     ]
   },
   {
+    "id": "p_cherries",
+    "slug": "/cherries",
+    "title": "Cherries",
+    "updatedAt": "2026-02-26T20:32:05.628Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772137257073",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover the Delight of Cherries",
+          "subheading": "Explore the sweet and tart flavors of our premium cherries. Perfect for desserts, snacks, and more.",
+          "ctaText": "Learn More",
+          "ctaHref": "/cherries",
+          "imageUrl": "https://images.unsplash.com/photo-1622399126828-b965470f068f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMGNoZXJyaWVzfGVufDF8MHx8fDE3NzIxMzc3MTN8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Fresh cherries in natural light."
+        }
+      },
+      {
+        "id": "b_richtext_1772137766387",
+        "type": "RichText",
+        "props": {
+          "title": "Benefits of Cherries",
+          "body": "Cherries are not only delicious but also packed with nutrients. They are rich in antioxidants, which help fight free radicals in the body, reducing inflammation and potentially lowering the risk of chronic diseases. Additionally, cherries are a good source of vitamin C, potassium, and fiber, all of which contribute to overall health.\n\nConsuming cherries can also improve sleep quality due to their natural melatonin content. This hormone regulates sleep-wake cycles, making cherries a great snack for those struggling with insomnia. Furthermore, the anti-inflammatory properties of cherries can aid in muscle recovery, making them a popular choice among athletes."
+        }
+      },
+      {
+        "id": "b_faqaccordion_1772137776777",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Frequently Asked Questions about Cherries",
+          "items": [
+            {
+              "q": "What are the health benefits of cherries?",
+              "a": "Cherries are rich in antioxidants, vitamin C, potassium, and fiber, which help reduce inflammation and improve overall health."
+            },
+            {
+              "q": "Can cherries help improve sleep?",
+              "a": "Yes, cherries contain natural melatonin, which can help regulate sleep-wake cycles and improve sleep quality."
+            },
+            {
+              "q": "Are cherries good for muscle recovery?",
+              "a": "Cherries have anti-inflammatory properties that can aid in muscle recovery, making them popular among athletes."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1772137893814",
+        "type": "RichText",
+        "props": {
+          "title": "Vitamins in Cherries",
+          "body": "**Cherries are a great source of essential vitamins, providing a delicious way to meet your daily nutritional needs.** They contain **vitamin C**, which is important for the growth and repair of tissues in the body, helping to maintain healthy skin and a strong immune system.\n\nAdditionally, cherries provide **vitamin A**, which supports vision and immune function, ensuring that your eyes remain healthy and your body can effectively fight off infections. Including cherries in your diet can help you meet your daily vitamin needs while enjoying a delicious fruit that is both sweet and nutritious."
+        }
+      }
+    ]
+  },
+  {
     "id": "p_about_us",
     "slug": "/about-us",
     "title": "About Us",
@@ -385,6 +442,78 @@
               "a": "Yes, we offer international shipping to select countries. Please check our shipping policy for more details."
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_test",
+    "slug": "/test",
+    "title": "Test",
+    "updatedAt": "2026-02-26T20:51:52.058Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772138902220",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover the Magic of Avocados",
+          "subheading": "Fresh, nutritious, and sustainably grown — perfect for every meal.",
+          "ctaText": "Get Started",
+          "ctaHref": "/",
+          "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
+          "imageAlt": "Close-up of avocados in natural light"
+        }
+      },
+      {
+        "id": "b_featuregrid_1772138902220",
+        "type": "FeatureGrid",
+        "props": {
+          "title": "Featured Content",
+          "features": [
+            {
+              "title": "Avocado Culinary Delights",
+              "description": "Discover creative ways to use avocados in salads, smoothies, spreads, and even baking."
+            },
+            {
+              "title": "Avocado Wellness",
+              "description": "Learn how avocados support heart health and provide essential vitamins and nutrients."
+            },
+            {
+              "title": "Avocado Sustainability",
+              "description": "Explore how responsible farming methods ensure quality and environmental care."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_testimonials_1772138902220",
+        "type": "Testimonials",
+        "props": {
+          "title": "What Avocado Lovers Say",
+          "items": [
+            {
+              "quote": "Creamy texture and rich flavor make these avocados a staple in my kitchen.",
+              "author": "Emily Avocado"
+            },
+            {
+              "quote": "The versatility of these avocados is unmatched.",
+              "author": "Michael Green"
+            },
+            {
+              "quote": "Premium quality avocados that integrate perfectly into my lifestyle.",
+              "author": "Sarah Chef"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1772139074922",
+        "type": "CTA",
+        "props": {
+          "title": "Join the Avocado Revolution",
+          "description": "Fresh, creamy, and packed with natural goodness — elevate every meal with premium avocados.",
+          "ctaText": "Explore the Flavor",
+          "ctaHref": "/"
         }
       }
     ]
