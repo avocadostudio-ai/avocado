@@ -6,7 +6,9 @@ import { promisify } from "node:util"
 import { resolve } from "node:path"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
+import multipart from "@fastify/multipart"
 import OpenAI from "openai"
+import { toFile } from "openai/uploads"
 import { z } from "zod"
 import {
   allowedBlockTypes,
@@ -20,9 +22,16 @@ import {
   type PageDoc,
   validateBlockProps
 } from "@ai-site-editor/shared"
+import { type UnsplashImage, type UnsplashResolveOptions } from "./variation-images.js"
 
 const app = Fastify({ logger: true })
 await app.register(cors, { origin: true })
+await app.register(multipart, {
+  limits: {
+    files: 1,
+    fileSize: 25 * 1024 * 1024
+  }
+})
 const execFileAsync = promisify(execFile)
 
 const envCandidates = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
@@ -90,6 +99,212 @@ function findStringByKeys(root: unknown, wanted: Set<string>): string | undefine
 function firstUrlFromText(text: string): string | undefined {
   const match = text.match(/https?:\/\/[^\s"']+/)
   return match ? match[0] : undefined
+}
+
+function normalizeUnsplashQuery(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80)
+}
+
+function toSeedSlug(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+}
+
+function extractUnsplashQuery(message: string) {
+  const aboutBeforeFromUnsplash = message.match(/\b(?:about|of|with|for)\s+([^,.!?;\n]+?)\s+from\s+unsplash\b/i)
+  const fromUnsplashMatch = message.match(/\bfrom\s+unsplash\b[^.?!\n]*?(?:showing|of|with|for)?\s*([^,.!?;\n]+)/i)
+  const unsplashMatch = message.match(/\bunsplash\b[^.?!\n]*?(?:showing|of|with|for)\s+([^,.!?;\n]+)/i)
+  const quoted = /"([^"]+)"/.exec(message)?.[1]
+  const candidate = aboutBeforeFromUnsplash?.[1] ?? fromUnsplashMatch?.[1] ?? unsplashMatch?.[1] ?? quoted
+  if (!candidate) return undefined
+  const cleaned = candidate
+    .replace(/\b(an?|the)\s+/gi, "")
+    .replace(/\b(image|photo|picture)\b/gi, "")
+    .replace(/\b(of|with|showing|for)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+  const normalized = normalizeUnsplashQuery(cleaned)
+  return normalized.length > 0 ? normalized : undefined
+}
+
+const IMAGE_QUERY_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "background",
+  "backgrounds",
+  "different",
+  "for",
+  "from",
+  "image",
+  "images",
+  "of",
+  "on",
+  "photo",
+  "photos",
+  "picture",
+  "pictures",
+  "the",
+  "types",
+  "unsplash",
+  "various",
+  "varied",
+  "with"
+])
+
+function imageKeywordsFromQuery(raw: string, max = 3): string[] {
+  const tokens = normalizeUnsplashQuery(raw)
+    .split(" ")
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 3 && !IMAGE_QUERY_STOPWORDS.has(part))
+  const unique = Array.from(new Set(tokens))
+  return unique.slice(0, max)
+}
+
+type VariationImageIntent = {
+  baseQuery: string
+  subjectKeywords: string[]
+  varyBackgrounds: boolean
+  styleTerms: string[]
+}
+
+function deriveVariationImageIntent(args: { message: string; block: PageDoc["blocks"][number] }): VariationImageIntent {
+  const fromMessage = extractUnsplashQuery(args.message)
+  const props = args.block.props as Record<string, unknown>
+  const headingLike =
+    typeof props.heading === "string"
+      ? props.heading
+      : typeof props.title === "string"
+        ? props.title
+        : typeof props.subheading === "string"
+          ? props.subheading
+          : ""
+  const fallback = normalizeUnsplashQuery([headingLike, args.block.type].filter(Boolean).join(" "))
+  const baseQuery = fromMessage ?? (fallback.length > 0 ? fallback : "abstract hero background")
+
+  const lowerMessage = args.message.toLowerCase()
+  const varyBackgrounds =
+    /\bdifferent\s+(?:types?\s+of\s+)?backgrounds?\b/.test(lowerMessage) ||
+    /\bunique\s+backgrounds?\b/.test(lowerMessage) ||
+    /\bvaried\s+backgrounds?\b/.test(lowerMessage) ||
+    /\bvarious\s+backgrounds?\b/.test(lowerMessage)
+
+  const styleTerms: string[] = []
+  if (/\bclose[\s-]?up\b/.test(lowerMessage) || /\bmacro\b/.test(lowerMessage)) styleTerms.push("close up")
+  if (/\bstudio\b/.test(lowerMessage)) styleTerms.push("studio lighting")
+  if (/\bfood\b/.test(lowerMessage) || /\bproduct\b/.test(lowerMessage)) styleTerms.push("food photography")
+  if (/\bdark\b/.test(lowerMessage)) styleTerms.push("dark moody")
+  if (/\bminimal\b/.test(lowerMessage)) styleTerms.push("minimal")
+  if (/\boutdoor\b/.test(lowerMessage) || /\bnature\b/.test(lowerMessage)) styleTerms.push("natural light")
+
+  return {
+    baseQuery,
+    subjectKeywords: imageKeywordsFromQuery(baseQuery, 4),
+    varyBackgrounds,
+    styleTerms
+  }
+}
+
+function buildVariationImageQuery(intent: VariationImageIntent, variationIndex: number): string {
+  const base = [intent.baseQuery, ...intent.styleTerms].filter(Boolean).join(" ")
+  if (!intent.varyBackgrounds) return normalizeUnsplashQuery(base)
+  const backgrounds = ["studio background", "wood table background", "kitchen background", "dark background", "outdoor background"]
+  const chosen = backgrounds[variationIndex % backgrounds.length]
+  return normalizeUnsplashQuery(`${base} ${chosen}`)
+}
+
+async function resolveUnsplashImage(query: string, options?: UnsplashResolveOptions): Promise<UnsplashImage | null> {
+  const safeQuery = normalizeUnsplashQuery(query)
+  if (!safeQuery) return null
+  const variationIndex =
+    typeof options?.variationIndex === "number" && Number.isInteger(options.variationIndex) && options.variationIndex >= 0
+      ? options.variationIndex
+      : 0
+  const page = variationIndex + 1
+
+  const accessKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
+  if (accessKey) {
+    try {
+      const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(safeQuery)}&orientation=landscape&per_page=8&page=1&content_filter=high`
+      const res = await fetch(endpoint, {
+        headers: {
+          Authorization: `Client-ID ${accessKey}`,
+          "Accept-Version": "v1"
+        }
+      })
+
+      type UnsplashResult = {
+        alt_description?: unknown
+        description?: unknown
+        urls?: { regular?: unknown; full?: unknown }
+      }
+      function toImage(result: UnsplashResult | undefined): UnsplashImage | null {
+        const baseUrl =
+          typeof result?.urls?.regular === "string"
+            ? result.urls.regular
+            : typeof result?.urls?.full === "string"
+              ? result.urls.full
+              : undefined
+        if (!baseUrl) return null
+        const joiner = baseUrl.includes("?") ? "&" : "?"
+        const url = `${baseUrl}${joiner}auto=format&fit=crop&w=1600&q=80`
+        const altCandidate =
+          typeof result?.alt_description === "string"
+            ? result.alt_description
+            : typeof result?.description === "string"
+              ? result.description
+              : ""
+        return {
+          url,
+          alt: altCandidate.trim() || `Unsplash photo of ${safeQuery}`,
+          query: safeQuery
+        }
+      }
+
+      if (res.ok) {
+        const payload = (await res.json()) as { results?: UnsplashResult[] }
+        const list = Array.isArray(payload.results) ? payload.results : []
+        const subjectKeywords =
+          Array.isArray(options?.subjectKeywords) && options?.subjectKeywords.length > 0
+            ? options.subjectKeywords.map((k) => k.toLowerCase())
+            : imageKeywordsFromQuery(safeQuery, 2)
+        const usedImageUrls = options?.usedImageUrls
+        const matched = subjectKeywords.length > 0
+          ? list.filter((item) => {
+            const haystack = `${typeof item.alt_description === "string" ? item.alt_description : ""} ${
+              typeof item.description === "string" ? item.description : ""
+            }`.toLowerCase()
+            return subjectKeywords.some((keyword) => haystack.includes(keyword))
+          })
+          : []
+        const ordered = matched.length > 0 ? [...matched, ...list.filter((item) => !matched.includes(item))] : list
+        for (const item of ordered) {
+          const next = toImage(item)
+          if (!next) continue
+          if (usedImageUrls && usedImageUrls.has(next.url)) continue
+          return next
+        }
+      }
+    } catch {
+      // Fall through to source URL fallback.
+    }
+  }
+
+  const seed = toSeedSlug(`${safeQuery}-${page}`) || "hero-image"
+  const sourceUrl = `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`
+  return {
+    url: sourceUrl,
+    alt: `Photo for ${safeQuery}`,
+    query: safeQuery
+  }
 }
 
 function deploymentIdFromAny(input: string): string | undefined {
@@ -293,6 +508,24 @@ type ApplyOpsRequestBody = {
   ops?: unknown
 }
 
+const allowedTranscriptionMimeTypes = new Set([
+  "audio/mp3",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/mpga",
+  "audio/m4a",
+  "audio/wav",
+  "audio/webm"
+])
+
+function parseTranscriptionModelList(raw: string | undefined) {
+  if (!raw) return []
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
+
 type ChatResult = {
   status: string
   summary: string
@@ -306,6 +539,69 @@ type ChatResult = {
   plannerSource: "openai" | "demo"
   modelUsed: string
   modelKey: ModelKey
+}
+
+type VariationRequestBody = {
+  session?: string
+  slug?: string
+  message?: string
+  modelKey?: ModelKey
+  activeBlockId?: string
+  activeBlockType?: string
+  activeEditablePath?: string
+}
+
+type VariationOption = {
+  id: string
+  title: string
+  summary: string
+  patch: Record<string, unknown>
+  changedKeys: string[]
+}
+
+type VariationResult = {
+  status: "ok"
+  summary: string
+  blockId: string
+  blockType: BlockType
+  pageSlug: string
+  baseProps: Record<string, unknown>
+  variations: VariationOption[]
+  plannerSource: "openai" | "demo"
+  modelUsed: string
+  modelKey: ModelKey
+}
+
+const DEFAULT_VARIATION_COUNT = 3
+const MAX_VARIATION_COUNT = 12
+
+function requestedVariationCount(message: string): number {
+  const normalized = message.toLowerCase().replace(/-/g, " ")
+  const numberMatch = normalized.match(/\b(\d{1,2})\s+variations?\b/)
+  if (numberMatch) {
+    const parsed = Number.parseInt(numberMatch[1], 10)
+    if (Number.isFinite(parsed) && parsed > 0) return Math.min(parsed, MAX_VARIATION_COUNT)
+  }
+
+  const wordsToNumbers: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12
+  }
+  for (const [word, value] of Object.entries(wordsToNumbers)) {
+    const re = new RegExp(`\\b${word}\\s+variations?\\b`, "i")
+    if (re.test(normalized)) return value
+  }
+  return DEFAULT_VARIATION_COUNT
 }
 
 function openAIChatOptionsForModel(model: string) {
@@ -371,7 +667,7 @@ function promptFromPropKey(propKey: string) {
     subheading: "Change subheading to \"...\"",
     ctaText: "Change CTA text to \"...\"",
     ctaHref: "Change CTA link to \"/...\"",
-    imageUrl: "Update hero image (e.g. picsum.photos/seed/topic/1600/900)",
+    imageUrl: "Update hero image (e.g. from Unsplash: cherries)",
     imageAlt: "Change image alt text to \"...\"",
     secondaryCtaText: "Add secondary CTA button \"...\"",
     secondaryCtaHref: "Change secondary CTA link to \"/...\"",
@@ -1488,7 +1784,7 @@ function blockContractsSummary() {
       allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
       required: ["heading", "subheading", "ctaText", "ctaHref"],
       optional: ["imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
-      notes: "Use heading for the main headline; never invent prop names. For imageUrl: when the user asks to generate, change, or update the hero image, use https://picsum.photos/seed/{keyword}/1600/900 where {keyword} is 1–2 lowercase hyphenated words derived from the heading content (e.g. heading 'Build AI Websites' → seed 'ai-websites'). Always update imageAlt to describe what the image represents. Do not invent other image URLs. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
+      notes: "Use heading for the main headline; never invent prop names. For imageUrl: if the user explicitly asks for Unsplash, use an Unsplash image URL and update imageAlt to describe the image. If the user does not specify a source, use https://picsum.photos/seed/{keyword}/1600/900 where {keyword} is 1–2 lowercase hyphenated words derived from heading content (e.g. heading 'Build AI Websites' -> seed 'ai-websites'). secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
     },
     FeatureGrid: {
       allowedProps: ["title", "features"],
@@ -1928,6 +2224,281 @@ function coercePatchForBlock(block: PageDoc["blocks"][number], rawPatch: unknown
   return out
 }
 
+function sanitizeVariationPatch(block: PageDoc["blocks"][number], patch: unknown): Record<string, unknown> | null {
+  const safePatch = coercePatchForBlock(block, patch)
+  if (Object.keys(safePatch).length === 0) return null
+  const nextProps = { ...(block.props as Record<string, unknown>), ...safePatch }
+  const validated = validateBlockProps(block.type as BlockType, nextProps)
+  if (!validated.success) return null
+  if (JSON.stringify(block.props) === JSON.stringify(validated.data)) return null
+  return safePatch
+}
+
+function supportsImageVariation(block: PageDoc["blocks"][number]) {
+  return Object.prototype.hasOwnProperty.call(block.props, "imageUrl")
+}
+
+async function withDefaultImageVariations(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+  variations: VariationOption[]
+}): Promise<VariationOption[]> {
+  if (!supportsImageVariation(args.block)) return args.variations
+  const explicitUrl = firstUrlFromText(args.message)
+  const imageIntent = deriveVariationImageIntent({ message: args.message, block: args.block })
+  const noDuplicateRequested =
+    /\bno\s+duplicates?\b/i.test(args.message) ||
+    /\bdo\s+not\s+reuse\b/i.test(args.message) ||
+    /\bunique\s+images?\b/i.test(args.message)
+  const usedImageUrls = new Set<string>()
+
+  const out: VariationOption[] = []
+  for (const [variationIndex, variation] of args.variations.entries()) {
+    const patch = { ...variation.patch }
+    if (explicitUrl) {
+      patch.imageUrl = explicitUrl
+      if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
+        patch.imageAlt = `Image for ${args.block.type} variation`
+      }
+    } else {
+      const query = buildVariationImageQuery(imageIntent, variationIndex)
+      const resolved = await resolveUnsplashImage(query, {
+        variationIndex,
+        subjectKeywords: imageIntent.subjectKeywords,
+        usedImageUrls: noDuplicateRequested ? usedImageUrls : undefined
+      })
+      if (resolved) {
+        patch.imageUrl = resolved.url
+        usedImageUrls.add(resolved.url)
+        if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
+          patch.imageAlt = resolved.alt
+        }
+      }
+    }
+
+    const sanitized = sanitizeVariationPatch(args.block, patch)
+    if (!sanitized) continue
+    out.push({
+      ...variation,
+      patch: sanitized,
+      changedKeys: Object.keys(sanitized)
+    })
+  }
+  return out
+}
+
+function inferVariationTextKey(block: PageDoc["blocks"][number]) {
+  const preferred = ["heading", "title", "subheading", "description", "body", "ctaText", "imageAlt"]
+  const props = block.props as Record<string, unknown>
+  for (const key of preferred) {
+    if (typeof props[key] === "string" && (props[key] as string).trim().length > 0) return key
+  }
+  const firstString = Object.entries(props).find(([, value]) => typeof value === "string" && value.trim().length > 0)
+  return firstString?.[0] ?? null
+}
+
+function variationConstraints(message: string, block: PageDoc["blocks"][number]) {
+  const lower = message.toLowerCase()
+  const keepTitle =
+    /\bsame\s+title\b/.test(lower) ||
+    /\bkeep\s+(the\s+)?title\b/.test(lower) ||
+    /\btitle\s+(unchanged|same)\b/.test(lower)
+  const cardsOnly =
+    block.type === "CardGrid" && (/\bcards?\s+only\b/.test(lower) || /\bonly\s+cards?\b/.test(lower))
+  return { keepTitle, cardsOnly }
+}
+
+function applyVariationConstraints(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+  patch: Record<string, unknown>
+}) {
+  const constraints = variationConstraints(args.message, args.block)
+  let nextPatch = { ...args.patch }
+
+  if (constraints.keepTitle) {
+    delete nextPatch.title
+  }
+  if (constraints.cardsOnly && args.block.type === "CardGrid") {
+    nextPatch = Object.prototype.hasOwnProperty.call(nextPatch, "cards") ? { cards: nextPatch.cards } : {}
+  }
+  return nextPatch
+}
+
+function deterministicCardGridVariations(args: {
+  block: PageDoc["blocks"][number]
+  count: number
+  existing: VariationOption[]
+}): VariationOption[] {
+  if (args.block.type !== "CardGrid") return []
+  const cards = Array.isArray(args.block.props.cards) ? (args.block.props.cards as Array<Record<string, unknown>>) : []
+  if (cards.length === 0) return []
+
+  const tones = [
+    {
+      title: "Crisp",
+      summary: "Shorter and more direct card copy.",
+      description: (cardTitle: string) => `${cardTitle} essentials in one quick guide.`,
+      ctaText: "Explore"
+    },
+    {
+      title: "Benefit-led",
+      summary: "Highlights outcomes in every card.",
+      description: (cardTitle: string) => `Get practical ${cardTitle.toLowerCase()} tips you can use right away.`,
+      ctaText: "See Benefits"
+    },
+    {
+      title: "Action-driven",
+      summary: "Pushes a stronger next step.",
+      description: (cardTitle: string) => `Start ${cardTitle.toLowerCase()} today with a clear step-by-step plan.`,
+      ctaText: "Start Now"
+    }
+  ]
+
+  const seen = new Set(args.existing.map((item) => JSON.stringify(item.patch)))
+  const out: VariationOption[] = []
+  for (const tone of tones) {
+    if (args.existing.length + out.length >= args.count) break
+    const nextCards = cards.map((card) => {
+      const title = typeof card.title === "string" && card.title.trim().length > 0 ? card.title.trim() : "Card"
+      return {
+        ...card,
+        description: tone.description(title),
+        ctaText: tone.ctaText
+      }
+    })
+    const patch = sanitizeVariationPatch(args.block, { cards: nextCards })
+    if (!patch) continue
+    const key = JSON.stringify(patch)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({
+      id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title: tone.title,
+      summary: tone.summary,
+      patch,
+      changedKeys: Object.keys(patch)
+    })
+  }
+  return out
+}
+
+function deterministicVariations(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+  count: number
+  existing: VariationOption[]
+}): VariationOption[] {
+  const { block, count } = args
+  if (block.type === "CardGrid") {
+    return deterministicCardGridVariations({
+      block,
+      count,
+      existing: args.existing
+    })
+  }
+  const textKey = inferVariationTextKey(block)
+  if (!textKey) return []
+  const currentValue = String((block.props as Record<string, unknown>)[textKey] ?? "").trim()
+  if (!currentValue) return []
+
+  const tones = [
+    { title: "Crisp", suffix: " Keep it concise and direct.", summary: "Shorter and more direct copy." },
+    { title: "Benefit-led", suffix: " Emphasize the user benefit first.", summary: "Highlights user outcomes." },
+    { title: "Action-driven", suffix: " Use a stronger action-oriented tone.", summary: "Adds stronger CTA energy." }
+  ]
+
+  const seen = new Set(args.existing.map((item) => JSON.stringify(item.patch)))
+  const out: VariationOption[] = []
+  for (const tone of tones) {
+    if (args.existing.length + out.length >= count) break
+    const nextText = `${currentValue.replace(/\s+/g, " ").trim()}${tone.suffix}`
+    const patch = sanitizeVariationPatch(block, { [textKey]: nextText })
+    if (!patch) continue
+    const key = JSON.stringify(patch)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({
+      id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title: tone.title,
+      summary: tone.summary,
+      patch,
+      changedKeys: Object.keys(patch)
+    })
+  }
+  return out
+}
+
+async function generateVariationsWithOpenAI(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+  model: string
+  modelKey: ModelKey
+  count: number
+}): Promise<VariationOption[]> {
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const props = args.block.props as Record<string, unknown>
+  const allowedKeys = Object.keys(props)
+  const constraints = variationConstraints(args.message, args.block)
+  const system = [
+    "You generate alternative content variations for one selected website block.",
+    "Return ONLY JSON object: {\"variations\":[{\"title\":\"...\",\"summary\":\"...\",\"patch\":{...}}]}",
+    `Generate exactly ${args.count} variations.`,
+    "Each patch must only include keys from the selected block props.",
+    "Each variation must be materially different from the others.",
+    "Do not include unchanged values in patch.",
+    ...(constraints.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
+    ...(constraints.cardsOnly && args.block.type === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
+    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."
+  ].join("\n")
+
+  const user = {
+    request: args.message,
+    blockId: args.block.id,
+    blockType: args.block.type,
+    currentProps: props,
+    allowedPatchKeys: allowedKeys
+  }
+
+  const completion = await client.chat.completions.create({
+    model: args.model,
+    ...openAIChatOptionsForModel(args.model),
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify(user) }
+    ]
+  })
+
+  const raw = completion.choices[0]?.message?.content ?? ""
+  const parsed = parseJsonMaybe(raw) as { variations?: Array<{ title?: unknown; summary?: unknown; patch?: unknown }> } | null
+  const list = Array.isArray(parsed?.variations) ? parsed!.variations : []
+
+  const seen = new Set<string>()
+  const out: VariationOption[] = []
+  for (const item of list) {
+    if (out.length >= args.count) break
+    const constrainedPatch = applyVariationConstraints({
+      block: args.block,
+      message: args.message,
+      patch: coercePatchForBlock(args.block, item.patch)
+    })
+    const patch = sanitizeVariationPatch(args.block, constrainedPatch)
+    if (!patch) continue
+    const patchKey = JSON.stringify(patch)
+    if (seen.has(patchKey)) continue
+    seen.add(patchKey)
+    out.push({
+      id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title: typeof item.title === "string" && item.title.trim().length > 0 ? item.title.trim() : `Variation ${out.length + 1}`,
+      summary: typeof item.summary === "string" && item.summary.trim().length > 0 ? item.summary.trim() : "Alternative copy direction.",
+      patch,
+      changedKeys: Object.keys(patch)
+    })
+  }
+  return out
+}
+
 function patchObject(rawPatch: unknown) {
   if (!rawPatch || typeof rawPatch !== "object" || Array.isArray(rawPatch)) return null
   if (
@@ -1988,6 +2559,24 @@ function isRewriteRequest(message: string) {
     lower.includes("make this shorter") ||
     lower.includes("shorten")
   )
+}
+
+function isTranslationRequest(message: string) {
+  const lower = message.toLowerCase()
+  return /\btranslate|translation|localiz|in\s+[a-z]+\b/.test(lower)
+}
+
+function shouldKeepRichTextTitleOnTranslate(args: {
+  target: PageDoc["blocks"][number]
+  activeEditablePath?: string
+  message: string
+  fullPatch: Record<string, unknown>
+}) {
+  const { target, activeEditablePath, message, fullPatch } = args
+  if (target.type !== "RichText") return false
+  if (activeEditablePath !== "body") return false
+  if (!isTranslationRequest(message)) return false
+  return Object.prototype.hasOwnProperty.call(fullPatch, "title")
 }
 
 function inferFieldHintFromMessage(message: string, allowedKeys: string[]) {
@@ -2377,7 +2966,16 @@ function compileDeterministicPlan(args: {
       }
     }
     const childPatch = coercePatchForEditablePath(target, activeEditablePath, intent.patch, message)
-    const patch = childPatch?.patch ?? coercePatchForBlock(target, intent.patch)
+    const fullPatch = coercePatchForBlock(target, intent.patch)
+    const mergedRichTextTranslationPatch = shouldKeepRichTextTitleOnTranslate({
+      target,
+      activeEditablePath,
+      message,
+      fullPatch
+    })
+      ? { ...fullPatch, ...(childPatch?.patch ?? {}) }
+      : null
+    const patch = mergedRichTextTranslationPatch ?? childPatch?.patch ?? fullPatch
     if (Object.keys(patch).length === 0) {
       return {
         intent: "needs_clarification",
@@ -2392,7 +2990,7 @@ function compileDeterministicPlan(args: {
       change_log: [
         ...assumptions,
         childPatch
-          ? `Updated ${target.id} ${activeEditablePath}: ${childPatch.changedKeys.join(", ")}`
+          ? `Updated ${target.id} ${activeEditablePath}: ${Object.keys(patch).join(", ")}`
           : `Updated ${target.id}: ${Object.keys(patch).join(", ")}`
       ],
       ops: [{ op: "update_props", pageSlug: slug, blockId: target.id, patch }]
@@ -2673,7 +3271,7 @@ async function generatePlanWithOpenAI(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
-    "For Hero imageUrl, only use https://picsum.photos/seed/{keyword}/1600/900 or a URL explicitly provided by the user. Never invent image paths.",
+    "For Hero imageUrl, if user asks for Unsplash, use an Unsplash URL; otherwise use https://picsum.photos/seed/{keyword}/1600/900 or a URL explicitly provided by the user. Never invent local image paths.",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
@@ -3142,6 +3740,8 @@ function pickFocusBlockId(ops: Operation[]) {
 }
 
 function pickUpdatedSlug(session: string, currentSlug: string, ops: Operation[]) {
+  const created = ops.find((op) => op.op === "create_page")
+  if (created && created.op === "create_page") return created.page.slug
   const duplicate = ops.find((op) => op.op === "duplicate_page" && op.pageSlug === currentSlug)
   if (duplicate && duplicate.op === "duplicate_page") return duplicate.newPageSlug
   const rename = ops.find((op) => op.op === "rename_page" && op.pageSlug === currentSlug)
@@ -3255,6 +3855,81 @@ function normalizePlanCopyForUi(plan: EditPlan, currentPage: PageDoc): EditPlan 
   }
 }
 
+async function withUnsplashHeroImage(args: {
+  plan: EditPlan
+  message: string
+  slug: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}): Promise<EditPlan> {
+  const lowerMessage = args.message.toLowerCase()
+  if (!lowerMessage.includes("unsplash")) return args.plan
+  if (args.plan.intent !== "edit_plan") return args.plan
+
+  const query = extractUnsplashQuery(args.message)
+  if (!query) return args.plan
+  const resolved = await resolveUnsplashImage(query)
+  if (!resolved) return args.plan
+
+  const plan = structuredClone(args.plan)
+  let changed = false
+
+  for (const op of plan.ops) {
+    if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
+    const target = args.currentPage.blocks.find((block) => block.id === op.blockId)
+    if (!target || target.type !== "Hero") continue
+
+    const rawPatch = op.patch as Record<string, unknown>
+    const patchCandidate =
+      rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
+        ? (rawPatch.props as Record<string, unknown>)
+        : rawPatch
+
+    const touchesImage =
+      Object.prototype.hasOwnProperty.call(patchCandidate, "imageUrl") ||
+      args.activeEditablePath === "imageUrl" ||
+      /\b(image|photo|picture|hero)\b/.test(lowerMessage)
+    if (!touchesImage) continue
+
+    const nextPatch: Record<string, unknown> = { ...patchCandidate, imageUrl: resolved.url }
+    if (
+      !Object.prototype.hasOwnProperty.call(nextPatch, "imageAlt") ||
+      typeof nextPatch.imageAlt !== "string" ||
+      nextPatch.imageAlt.trim().length === 0
+    ) {
+      nextPatch.imageAlt = resolved.alt
+    }
+    op.patch = nextPatch
+    changed = true
+  }
+
+  if (!changed && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+    const selectedBlock =
+      args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
+        ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
+        : null
+    const fallbackHero =
+      selectedBlock?.type === "Hero" ? selectedBlock : args.currentPage.blocks.find((block) => block.type === "Hero") ?? null
+
+    if (fallbackHero) {
+      plan.ops.push({
+        op: "update_props",
+        pageSlug: args.slug,
+        blockId: fallbackHero.id,
+        patch: { imageUrl: resolved.url, imageAlt: resolved.alt }
+      })
+      changed = true
+    }
+  }
+
+  if (changed) {
+    plan.change_log = [...plan.change_log, `Set Hero image from Unsplash query "${resolved.query}".`]
+  }
+
+  return plan
+}
+
 function resolveEffectiveSlug(args: { session: string; requestedSlug: string; activeBlockId?: string }) {
   const { session, requestedSlug, activeBlockId } = args
   if (!activeBlockId) return requestedSlug
@@ -3309,8 +3984,16 @@ async function runChatPipeline(
     activeEditablePath: body.activeEditablePath
   })
 
-  const respondFromPlan = (plan: EditPlan, source: "openai" | "demo") => {
+  const respondFromPlan = async (plan: EditPlan, source: "openai" | "demo") => {
     let resolvedPlan = normalizePlanCopyForUi(plan, current)
+    resolvedPlan = await withUnsplashHeroImage({
+      plan: resolvedPlan,
+      message: body.message ?? "",
+      slug: effectiveSlug,
+      currentPage: current,
+      activeBlockId: body.activeBlockId,
+      activeEditablePath: body.activeEditablePath
+    })
 
     if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
       const focusedFallback = compileDeterministicPlan({
@@ -3480,7 +4163,7 @@ async function runChatPipeline(
   if (!process.env.OPENAI_API_KEY) {
     try {
       const demoPlan = demoPlanFromMessage(body.message, effectiveSlug, body.activeBlockId, body.activeBlockType)
-      const outcome = respondFromPlan(demoPlan, "demo")
+      const outcome = await respondFromPlan(demoPlan, "demo")
       if (outcome.done) return outcome.response
       return {
         code: 400,
@@ -3547,14 +4230,14 @@ async function runChatPipeline(
       continue
     }
 
-    const outcome = respondFromPlan(plan, "openai")
+    const outcome = await respondFromPlan(plan, "openai")
     if (outcome.done) return outcome.response
     repairFeedback.push(`Attempt ${attempt} apply failed: ${outcome.reason}`)
   }
 
   try {
     const fallbackPlan = demoPlanFromMessage(body.message, effectiveSlug, body.activeBlockId, body.activeBlockType)
-    const fallbackOutcome = respondFromPlan(fallbackPlan, "demo")
+    const fallbackOutcome = await respondFromPlan(fallbackPlan, "demo")
     if (fallbackOutcome.done) return fallbackOutcome.response
     repairFeedback.push(`Demo fallback apply failed: ${fallbackOutcome.reason}`)
   } catch (error) {
@@ -3570,6 +4253,88 @@ async function runChatPipeline(
       validationErrors: repairFeedback.slice(-4),
       previewVersion: versions.get(body.session) ?? 0,
       plannerSource: "demo",
+      modelUsed,
+      modelKey
+    }
+  }
+}
+
+async function runVariationPipeline(body: VariationRequestBody): Promise<{ code: number; payload: VariationResult | { error: string } }> {
+  if (!body.session || !body.slug || !body.message) {
+    return { code: 400, payload: { error: "session, slug, and message are required" } }
+  }
+
+  const requestedSlug = body.slug
+  const effectiveSlug = resolveEffectiveSlug({
+    session: body.session,
+    requestedSlug,
+    activeBlockId: body.activeBlockId
+  })
+  if (!body.activeBlockId) {
+    return { code: 400, payload: { error: "Select a block first before generating variations." } }
+  }
+
+  const page = getPage(body.session, effectiveSlug)
+  if (!page) return { code: 404, payload: { error: "page not found" } }
+  const selected = page.blocks.find((block) => block.id === body.activeBlockId)
+  if (!selected) {
+    return { code: 404, payload: { error: "selected block not found on current page" } }
+  }
+
+  const modelKey = body.modelKey && modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const modelUsed = modelLookup[modelKey]
+  const count = requestedVariationCount(body.message)
+  const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
+
+  let variations: VariationOption[] = []
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      variations = await generateVariationsWithOpenAI({
+        block: selected,
+        message: body.message,
+        model: modelUsed,
+        modelKey,
+        count
+      })
+    } catch {
+      variations = []
+    }
+  }
+
+  if (variations.length < count) {
+    const fallback = deterministicVariations({
+      block: selected,
+      message: body.message,
+      count,
+      existing: variations
+    })
+    variations = [...variations, ...fallback].slice(0, count)
+  }
+
+  variations = await withDefaultImageVariations({
+    block: selected,
+    message: body.message,
+    variations
+  })
+
+  if (variations.length === 0) {
+    return {
+      code: 400,
+      payload: { error: "Could not generate valid variations for this block. Try a more specific instruction." }
+    }
+  }
+
+  return {
+    code: 200,
+    payload: {
+      status: "ok",
+      summary: `Generated ${variations.length} variations for ${selected.type}.`,
+      blockId: selected.id,
+      blockType: selected.type,
+      pageSlug: effectiveSlug,
+      baseProps: structuredClone(selected.props as Record<string, unknown>),
+      variations,
+      plannerSource,
       modelUsed,
       modelKey
     }
@@ -3793,6 +4558,78 @@ app.post("/chat", async (request, reply) => {
   return reply.code(result.code).send(result.payload)
 })
 
+app.post("/chat/variations", async (request, reply) => {
+  const body = request.body as VariationRequestBody
+  const result = await runVariationPipeline(body)
+  return reply.code(result.code).send(result.payload)
+})
+
+app.post("/audio/transcribe", async (request, reply) => {
+  if (!process.env.OPENAI_API_KEY) {
+    return reply.code(503).send({ error: "OPENAI_API_KEY is not configured" })
+  }
+
+  const inputFile = await request.file()
+  if (!inputFile) return reply.code(400).send({ error: "audio file is required" })
+  if (inputFile.fieldname !== "audio") return reply.code(400).send({ error: "audio field must be named 'audio'" })
+  if (!allowedTranscriptionMimeTypes.has(inputFile.mimetype)) {
+    return reply.code(415).send({
+      error: `unsupported audio type: ${inputFile.mimetype}`
+    })
+  }
+
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+
+  for await (const chunk of inputFile.file) {
+    const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    totalBytes += data.byteLength
+    if (totalBytes > 25 * 1024 * 1024) {
+      return reply.code(413).send({ error: "audio file is too large (max 25MB)" })
+    }
+    chunks.push(data)
+  }
+
+  if (totalBytes === 0) return reply.code(400).send({ error: "audio file is empty" })
+
+  const primaryModel = process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "gpt-4o-mini-transcribe"
+  const fallbackModels = parseTranscriptionModelList(process.env.OPENAI_TRANSCRIBE_FALLBACK_MODELS)
+  const modelsToTry = Array.from(new Set([primaryModel, ...fallbackModels]))
+  const filename = inputFile.filename || `recording.${inputFile.mimetype.split("/")[1] ?? "webm"}`
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+  try {
+    const audioFile = await toFile(Buffer.concat(chunks), filename, { type: inputFile.mimetype })
+    const errors: string[] = []
+
+    for (const model of modelsToTry) {
+      try {
+        const transcription = await client.audio.transcriptions.create({
+          file: audioFile,
+          model
+        })
+
+        return {
+          text: transcription.text ?? "",
+          model,
+          bytes: totalBytes,
+          mimeType: inputFile.mimetype,
+          fallbackUsed: model !== primaryModel
+        }
+      } catch (error) {
+        errors.push(`${model}: ${toErrorDetail(error)}`)
+      }
+    }
+
+    return reply.code(502).send({
+      error: "transcription failed",
+      detail: errors.join(" | ").slice(0, 1200)
+    })
+  } catch (error) {
+    return reply.code(502).send({ error: "transcription failed", detail: toErrorDetail(error) })
+  }
+})
+
 app.get("/chat/stream", async (request, reply) => {
   const query = request.query as ChatRequestBody
   const origin = request.headers.origin ?? "*"
@@ -3883,7 +4720,8 @@ app.post("/history/redo", async (request, reply) => {
 
 app.get("/health", async () => ({ ok: true }))
 app.get("/status/planner", async () => ({
-  plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo"
+  plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo",
+  unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
 }))
 app.get("/favicon.ico", async (_request, reply) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">

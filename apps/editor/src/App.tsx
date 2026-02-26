@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
+import { SharedBlockRenderer } from "@ai-site-editor/blocks"
+import type { BlockInstance } from "@ai-site-editor/shared"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
 type PlannerSource = "openai" | "demo"
@@ -22,9 +24,31 @@ type AssistantResponse = {
   error?: string
 }
 
+type VariationOption = {
+  id: string
+  title: string
+  summary: string
+  patch: Record<string, unknown>
+  changedKeys: string[]
+}
+
+type VariationResponse = {
+  status?: string
+  summary?: string
+  blockId?: string
+  blockType?: string
+  pageSlug?: string
+  baseProps?: Record<string, unknown>
+  variations?: VariationOption[]
+  plannerSource?: PlannerSource
+  modelUsed?: string
+  modelKey?: string
+  error?: string
+}
+
 type SiteMessage = {
   protocol: "site-editor/v1"
-  type: "blockClicked" | "routeChanged" | "blockReordered" | "blockDeleteRequested"
+  type: "blockClicked" | "routeChanged" | "blockReordered" | "blockDeleteRequested" | "inlineTextCommitted"
   payload: Record<string, unknown>
 }
 
@@ -87,9 +111,25 @@ type PublishStatus = {
   lastCheckError?: string
 }
 
+type VariationModalState = {
+  requestText: string
+  blockId: string
+  blockType: string
+  pageSlug: string
+  baseProps: Record<string, unknown>
+  options: VariationOption[]
+}
+
+type PreviewWidthPreset = "desktop" | "tablet" | "mobile"
+
 const siteOrigin = "http://localhost:3000"
 const orchestrator = "http://localhost:4200"
 const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
+const previewPresetWidths: Record<PreviewWidthPreset, number> = {
+  desktop: 1200,
+  tablet: 834,
+  mobile: 390
+}
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -105,6 +145,76 @@ function slugLabel(route: string) {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" / ")
   return `${pretty || route} (${route})`
+}
+
+function extensionFromMimeType(mimeType: string) {
+  const normalized = mimeType.toLowerCase()
+  if (normalized.includes("webm")) return "webm"
+  if (normalized.includes("wav")) return "wav"
+  if (normalized.includes("mpeg") || normalized.includes("mp3")) return "mp3"
+  if (normalized.includes("mp4") || normalized.includes("m4a")) return "m4a"
+  return "webm"
+}
+
+function isVariationRequest(message: string) {
+  const lower = message.toLowerCase()
+  const asksGenerate = lower.includes("generate") || lower.includes("create")
+  const asksVariation = /variat/.test(lower)
+  return asksGenerate && asksVariation
+}
+
+function mergedVariationProps(baseProps: Record<string, unknown>, patch: Record<string, unknown>) {
+  return { ...baseProps, ...patch }
+}
+
+function VariationScaledPreview(args: { block: BlockInstance; virtualWidth: number }) {
+  const shellRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [shellWidth, setShellWidth] = useState(0)
+  const [contentHeight, setContentHeight] = useState(240)
+
+  useEffect(() => {
+    if (!shellRef.current) return
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0
+      setShellWidth(Math.max(0, width))
+    })
+    observer.observe(shellRef.current)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+    const observer = new ResizeObserver((entries) => {
+      const height = entries[0]?.contentRect.height ?? 240
+      setContentHeight(Math.max(120, height))
+    })
+    observer.observe(canvasRef.current)
+    return () => observer.disconnect()
+  }, [args.block.id, args.block.type, args.block.props, args.virtualWidth])
+
+  const scale = shellWidth > 0 ? Math.min(1, shellWidth / args.virtualWidth) : 1
+  const scaledHeight = Math.max(170, Math.ceil(contentHeight * scale))
+
+  return (
+    <div className="variation-live-preview">
+      <div ref={shellRef} className="variation-live-preview-shell" style={{ height: scaledHeight }}>
+        <div
+          ref={canvasRef}
+          className="variation-live-preview-canvas"
+          style={
+            {
+              width: `${args.virtualWidth}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left"
+            } satisfies CSSProperties
+          }
+        >
+          <SharedBlockRenderer block={args.block} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function App() {
@@ -124,6 +234,9 @@ export function App() {
   const [useStreaming, setUseStreaming] = useState(true)
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [variationModal, setVariationModal] = useState<VariationModalState | null>(null)
+  const [variationPreviewPreset, setVariationPreviewPreset] = useState<PreviewWidthPreset>("desktop")
+  const [isApplyingVariation, setIsApplyingVariation] = useState(false)
   const [previewRevision, setPreviewRevision] = useState(0)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
@@ -149,6 +262,26 @@ export function App() {
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
+
+  const clampComposerHeight = (value: number) => {
+    const minComposer = 124
+    const panel = chatPanelRef.current
+    const thread = chatThreadRef.current
+    if (!panel || !thread) return Math.max(minComposer, value)
+
+    const minThread = 120
+    const splitterHeight = 10
+    const topRowsHeight = thread.offsetTop
+    const maxComposer = Math.max(minComposer, panel.clientHeight - topRowsHeight - splitterHeight - minThread)
+    return Math.min(maxComposer, Math.max(minComposer, value))
+  }
+
+  const handleComposerAutoHeight = useCallback((height: number) => {
+    setComposerHeight((prev) => {
+      const next = clampComposerHeight(height)
+      return next === prev ? prev : next
+    })
+  }, [])
 
   useEffect(() => {
     activeBlockIdRef.current = activeBlockId
@@ -225,18 +358,9 @@ export function App() {
     const onPointerMove = (event: PointerEvent) => {
       const started = resizeStartRef.current
       if (!started) return
-      const panel = chatPanelRef.current
-      const thread = chatThreadRef.current
-      if (!panel || !thread) return
-
-      const minComposer = 124
-      const minThread = 120
-      const splitterHeight = 10
-      const topRowsHeight = thread.offsetTop
-      const maxComposer = Math.max(minComposer, panel.clientHeight - topRowsHeight - splitterHeight - minThread)
 
       const deltaY = event.clientY - started.y
-      const next = Math.min(maxComposer, Math.max(minComposer, started.composerHeight - deltaY))
+      const next = clampComposerHeight(started.composerHeight - deltaY)
       setComposerHeight(next)
     }
 
@@ -251,6 +375,15 @@ export function App() {
       window.removeEventListener("pointermove", onPointerMove)
       window.removeEventListener("pointerup", onPointerUp)
     }
+  }, [])
+
+  useEffect(() => {
+    const onWindowResize = () => {
+      setComposerHeight((prev) => clampComposerHeight(prev))
+    }
+
+    window.addEventListener("resize", onWindowResize)
+    return () => window.removeEventListener("resize", onWindowResize)
   }, [])
 
   const postToSite = (
@@ -320,6 +453,19 @@ export function App() {
         activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
         void deleteBlock(nextSlug, blockId)
+      }
+
+      if (msg.type === "inlineTextCommitted") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
+        const editablePath = typeof msg.payload.editablePath === "string" ? msg.payload.editablePath : ""
+        const value = typeof msg.payload.value === "string" ? msg.payload.value : ""
+        if (nextSlug !== slug) setSlug(nextSlug)
+        if (editablePath) {
+          activeEditablePathRef.current = editablePath
+          setActiveEditablePath(editablePath)
+        }
+        void inlineEditCommit(nextSlug, blockId, editablePath, value)
       }
     }
 
@@ -472,6 +618,73 @@ export function App() {
     }
   }
 
+  async function inlineEditCommit(slugForOp: string, blockId: string, editablePath: string, value: string) {
+    if (!blockId || !editablePath) return
+
+    const indexedPath = /^([A-Za-z_][A-Za-z0-9_]*)\[([0-9]+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(editablePath)
+    let op: Record<string, unknown> | null = null
+
+    if (indexedPath) {
+      const listKey = indexedPath[1]
+      const index = Number(indexedPath[2])
+      const fieldKey = indexedPath[3]
+      op = {
+        op: "update_item",
+        pageSlug: slugForOp,
+        blockId,
+        listKey,
+        index,
+        patch: { [fieldKey]: value }
+      }
+    } else if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(editablePath)) {
+      op = {
+        op: "update_props",
+        pageSlug: slugForOp,
+        blockId,
+        patch: { [editablePath]: value }
+      }
+    }
+
+    if (!op) {
+      pushAssistantFromResult({
+        status: "error",
+        summary: `Inline edit is not supported for "${editablePath}".`,
+        changes: []
+      })
+      return
+    }
+
+    try {
+      const res = await fetch(`${orchestrator}/ops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, ops: [op] })
+      })
+      const data = (await res.json()) as ApplyOpsResponse
+      if (!res.ok || data.status !== "applied") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? data.summary ?? "Could not apply inline edit.",
+          changes: data.changes ?? []
+        })
+        return
+      }
+
+      const focusBlockId = data.focusBlockId ?? blockId
+      activeBlockIdRef.current = focusBlockId
+      activeEditablePathRef.current = editablePath
+      setActiveBlockId(focusBlockId)
+      setActiveEditablePath(editablePath)
+      postToSite("draftUpdated", { focusBlockId })
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Could not apply inline edit.",
+        changes: []
+      })
+    }
+  }
+
   async function submitChatHttp(finalMessage: string) {
     const res = await fetch(`${orchestrator}/chat`, {
       method: "POST",
@@ -489,6 +702,109 @@ export function App() {
 
     const data = (await res.json()) as AssistantResponse
     applyChatResult(data)
+  }
+
+  async function submitVariations(finalMessage: string) {
+    const selectedBlockId = activeBlockIdRef.current
+    const selectedBlockType = activeBlockTypeRef.current
+    if (!selectedBlockId || !selectedBlockType) {
+      pushAssistantFromResult({
+        status: "needs_clarification",
+        summary: "Select a block first, then ask to generate variations.",
+        changes: []
+      })
+      return
+    }
+
+    const res = await fetch(`${orchestrator}/chat/variations`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session,
+        slug,
+        message: finalMessage,
+        modelKey,
+        activeBlockId: selectedBlockId,
+        activeBlockType: selectedBlockType,
+        activeEditablePath: activeEditablePathRef.current
+      })
+    })
+
+    const data = (await res.json()) as VariationResponse
+    if (!res.ok || data.status !== "ok" || !Array.isArray(data.variations) || data.variations.length === 0) {
+      pushAssistantFromResult({
+        status: "error",
+        summary: data.error ?? data.summary ?? "Could not generate variations.",
+        changes: []
+      })
+      return
+    }
+
+    setVariationModal({
+      requestText: finalMessage,
+      blockId: data.blockId ?? selectedBlockId,
+      blockType: data.blockType ?? selectedBlockType,
+      pageSlug: data.pageSlug ?? slug,
+      baseProps: (data.baseProps && typeof data.baseProps === "object" ? data.baseProps : {}) as Record<string, unknown>,
+      options: data.variations
+    })
+    pushAssistantFromResult({
+      status: "info",
+      summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
+      changes: [`Block: ${data.blockType ?? selectedBlockType}`, `Options: ${data.variations.length}`]
+    })
+  }
+
+  async function applyVariation(option: VariationOption) {
+    if (!variationModal || isApplyingVariation) return
+    setIsApplyingVariation(true)
+    try {
+      const res = await fetch(`${orchestrator}/ops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          session,
+          ops: [
+            {
+              op: "update_props",
+              pageSlug: variationModal.pageSlug,
+              blockId: variationModal.blockId,
+              patch: option.patch
+            }
+          ]
+        })
+      })
+      const data = (await res.json()) as ApplyOpsResponse
+      if (!res.ok || data.status !== "applied") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? data.summary ?? "Could not apply variation.",
+          changes: data.changes ?? []
+        })
+        return
+      }
+
+      const focusBlockId = data.focusBlockId ?? variationModal.blockId
+      activeBlockIdRef.current = focusBlockId
+      activeEditablePathRef.current = undefined
+      setActiveBlockId(focusBlockId)
+      setActiveEditablePath(undefined)
+      postToSite("draftUpdated", { focusBlockId })
+      setVariationModal(null)
+      pushAssistantFromResult({
+        status: "applied",
+        summary: `Applied variation: ${option.title}`,
+        changes: [option.summary]
+      })
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Could not apply variation.",
+        changes: []
+      })
+    } finally {
+      setIsApplyingVariation(false)
+    }
   }
 
   async function submitChatStream(finalMessage: string) {
@@ -635,6 +951,10 @@ export function App() {
     setStreamStatus(useStreaming ? "Connecting..." : null)
     setStreamTokenCount(0)
     try {
+      if (isVariationRequest(finalMessage)) {
+        await submitVariations(finalMessage)
+        return
+      }
       if (useStreaming) {
         const ok = await submitChatStream(finalMessage)
         if (!ok) await submitChatHttp(finalMessage)
@@ -645,6 +965,26 @@ export function App() {
       setStreamStatus(null)
       setIsLoading(false)
     }
+  }
+
+  async function transcribeAudio(blob: Blob, mimeType: string) {
+    const fileExt = extensionFromMimeType(mimeType)
+    const file = new File([blob], `recording.${fileExt}`, {
+      type: mimeType || blob.type || "audio/webm"
+    })
+    const form = new FormData()
+    form.append("audio", file)
+
+    const res = await fetch(`${orchestrator}/audio/transcribe`, {
+      method: "POST",
+      body: form
+    })
+
+    const data = (await res.json()) as { text?: string; error?: string; detail?: string }
+    if (!res.ok) throw new Error(data.error ?? data.detail ?? "Transcription failed.")
+    const text = (data.text ?? "").trim()
+    if (!text) throw new Error("No speech detected. Try speaking more clearly or recording longer.")
+    return text
   }
 
   async function applyHistory(action: "undo" | "redo") {
@@ -802,6 +1142,15 @@ export function App() {
       window.removeEventListener("scroll", updatePopoverPosition, true)
     }
   }, [showSettingsModal])
+
+  useEffect(() => {
+    if (!variationModal) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isApplyingVariation) setVariationModal(null)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [variationModal, isApplyingVariation])
 
   const publishState = (publishStatus?.vercelState ?? publishStatus?.status ?? "").toUpperCase()
   const publishInProgress =
@@ -974,9 +1323,11 @@ export function App() {
             hasUserEntry={hasUserEntry}
             onMessageChange={setMessage}
             onModelChange={setModelKey}
-            onSubmit={() => void submitChat()}
+            onSubmit={(explicitMessage) => void submitChat(explicitMessage)}
             onUndo={() => void applyHistory("undo")}
             onRedo={() => void applyHistory("redo")}
+            onTranscribeAudio={transcribeAudio}
+            onAutoHeightChange={handleComposerAutoHeight}
           />
         </footer>
       </aside>
@@ -989,6 +1340,66 @@ export function App() {
           onLoad={() => postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })}
         />
       </section>
+
+      {variationModal ? (
+        <div
+          className="variation-modal-backdrop"
+          onClick={() => {
+            if (!isApplyingVariation) setVariationModal(null)
+          }}
+        >
+          <div className="variation-modal" role="dialog" aria-modal="true" aria-label="Choose a variation" onClick={(e) => e.stopPropagation()}>
+            <div className="variation-modal-header">
+              <h2>Choose a Variation</h2>
+              <p>{variationModal.blockType} · {variationModal.blockId}</p>
+              <div className="variation-preview-presets" role="group" aria-label="Preview width">
+                {(["desktop", "tablet", "mobile"] as PreviewWidthPreset[]).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`variation-preview-preset-btn${variationPreviewPreset === preset ? " is-active" : ""}`}
+                    onClick={() => setVariationPreviewPreset(preset)}
+                    disabled={isApplyingVariation}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="settings-close-btn"
+                aria-label="Close variation picker"
+                onClick={() => setVariationModal(null)}
+                disabled={isApplyingVariation}
+              >
+                ×
+              </button>
+            </div>
+            <div className="variation-modal-body">
+              {variationModal.options.map((option) => (
+                <article key={option.id} className="variation-card">
+                  <header className="variation-card-header">
+                    <h3>{option.title}</h3>
+                    <span>{option.changedKeys.join(", ") || "patch"}</span>
+                  </header>
+                  <p>{option.summary}</p>
+                  <VariationScaledPreview
+                    virtualWidth={previewPresetWidths[variationPreviewPreset]}
+                    block={{
+                      id: variationModal.blockId,
+                      type: variationModal.blockType as BlockInstance["type"],
+                      props: mergedVariationProps(variationModal.baseProps, option.patch)
+                    }}
+                  />
+                  <button type="button" className="publish-preview-btn variation-apply-btn" onClick={() => void applyVariation(option)} disabled={isApplyingVariation}>
+                    {isApplyingVariation ? "Applying..." : "Apply this variation"}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showSettingsModal ? (
         <div className="settings-popover-backdrop" onClick={() => setShowSettingsModal(false)}>
