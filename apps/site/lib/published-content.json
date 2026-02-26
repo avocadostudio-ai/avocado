@@ -91,18 +91,18 @@
     "id": "p_bananas",
     "slug": "/bananas",
     "title": "Bananas",
-    "updatedAt": "2026-02-26T20:03:25.037Z",
+    "updatedAt": "2026-02-26T23:55:19.815Z",
     "blocks": [
       {
         "id": "b_hero_1772016866777",
         "type": "Hero",
         "props": {
-          "heading": "Bananas: Nature's Energy Booster 🍌",
+          "heading": "Bananas: Nature's Energy Booster 🍌 Keep it concise and direct.",
           "subheading": "Explore the benefits and versatility of bananas, a delicious and nutritious fruit perfect for any time of the day.",
           "ctaText": "Learn More",
           "ctaHref": "/banana-benefits",
-          "imageUrl": "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8YmFuYW5hfGVufDB8fDB8fHwy",
-          "imageAlt": "A bunch of ripe bananas"
+          "imageUrl": "https://images.unsplash.com/photo-1713370711464-dc1d94dc77a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxiYW5hbmFzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBzdHVkaW8lMjBiYWNrZ3JvdW5kfGVufDF8MHx8fDE3NzIxNTAxMTF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a woman holding two bananas and a pineapple"
         }
       },
       {
@@ -250,18 +250,18 @@
     "id": "p_olives",
     "slug": "/olives",
     "title": "Olives",
-    "updatedAt": "2026-02-26T20:03:47.616Z",
+    "updatedAt": "2026-02-26T23:56:20.128Z",
     "blocks": [
       {
         "id": "b_hero_1772048325072",
         "type": "Hero",
         "props": {
-          "heading": "Finest Olive Oils 🫒",
+          "heading": "Finest Olive Oils 🫒 Keep it concise and direct.",
           "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
           "ctaText": "Shop the Collection",
           "ctaHref": "/shop",
-          "imageUrl": "https://images.unsplash.com/photo-1698775942613-3e9fc114b2a1?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8b2xpdmVzfGVufDB8fDB8fHwy",
-          "imageAlt": "Olive oil bottles on a wooden table"
+          "imageUrl": "https://images.unsplash.com/photo-1632702931182-8095478495c1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvbGl2ZXMlMjBkaWZmZXJlbnQlMjBiYWNrZ3JvdW5kcyUyMHN0dWRpbyUyMGJhY2tncm91bmR8ZW58MXwwfHx8MTc3MjE1MDE3MHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a white bowl filled with green olives on top of a table"
         }
       },
       {
@@ -317,7 +317,7 @@
     "id": "p_cherries",
     "slug": "/cherries",
     "title": "Cherries",
-    "updatedAt": "2026-02-26T20:32:05.628Z",
+    "updatedAt": "2026-02-26T23:56:39.876Z",
     "blocks": [
       {
         "id": "b_hero_1772137257073",
@@ -327,8 +327,8 @@
           "subheading": "Explore the sweet and tart flavors of our premium cherries. Perfect for desserts, snacks, and more.",
           "ctaText": "Learn More",
           "ctaHref": "/cherries",
-          "imageUrl": "https://images.unsplash.com/photo-1622399126828-b965470f068f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMGNoZXJyaWVzfGVufDF8MHx8fDE3NzIxMzc3MTN8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Fresh cherries in natural light."
+          "imageUrl": "https://images.unsplash.com/photo-1646794768981-f83a366e6504?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjaGVycmllcyUyMGRpZmZlcmVudCUyMGJhY2tncm91bmRzJTIwd29vZCUyMHRhYmxlJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTUwMTM2fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a group of apples sitting on top of a table"
         }
       },
       {
