@@ -346,5 +346,60 @@
     "title": "Avocado",
     "updatedAt": "2026-02-26T07:52:29.962Z",
     "blocks": []
+  },
+  {
+    "id": "p_strawberries",
+    "slug": "/strawberries",
+    "title": "Strawberries",
+    "updatedAt": "2026-02-26T15:54:02.107Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772121141940",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover the Sweetness of Strawberries",
+          "subheading": "Nature's candy packed with nutrients.",
+          "ctaText": "Learn More",
+          "ctaHref": "/strawberries",
+          "imageUrl": "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=450&auto=format&fit=crop&h=300&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8c3RyYXdiZXJyaWVzfGVufDB8fDB8fHww",
+          "imageAlt": "Fresh strawberries in a basket"
+        }
+      },
+      {
+        "id": "b_richtext_1772121141940",
+        "type": "RichText",
+        "props": {
+          "title": "Why Strawberries?",
+          "body": "Strawberries are not only delicious but also packed with vitamins, fiber, and high levels of antioxidants known as polyphenols. They are a sodium-free, fat-free, cholesterol-free, low-calorie food."
+        }
+      },
+      {
+        "id": "b_featuregrid_1772121141940",
+        "type": "FeatureGrid",
+        "props": {
+          "title": "Health Benefits",
+          "features": [
+            {
+              "title": "Rich in Nutrients",
+              "description": "Strawberries are an excellent source of vitamin C and manganese and also contain decent amounts of folate (vitamin B9) and potassium."
+            },
+            {
+              "title": "Antioxidant Powerhouse",
+              "description": "These berries are loaded with antioxidants and plant compounds, which may have benefits for heart health and blood sugar control."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1772121141940",
+        "type": "CTA",
+        "props": {
+          "title": "Enjoy Strawberries Today",
+          "description": "Add strawberries to your diet and enjoy their sweet taste and health benefits.",
+          "ctaText": "Find Recipes",
+          "ctaHref": "/strawberries-recipes"
+        }
+      }
+    ]
   }
 ]
