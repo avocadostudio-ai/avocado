@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T15:01:03.238Z",
+    "updatedAt": "2026-02-26T19:16:47.971Z",
     "blocks": [
       {
         "id": "b_hero_home",
@@ -83,6 +83,14 @@
           "description": "Experience the richness and health benefits of our premium avocados. Perfect for any meal, any time.",
           "ctaText": "Get Started",
           "ctaHref": "/signup"
+        }
+      },
+      {
+        "id": "b_richtext_1772133407965",
+        "type": "RichText",
+        "props": {
+          "title": "",
+          "body": "This is additional text added below the existing content. Feel free to customize it further."
         }
       }
     ]
