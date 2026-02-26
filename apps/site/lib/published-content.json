@@ -222,13 +222,13 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-02-26T20:00:49.124Z",
+    "updatedAt": "2026-02-26T20:04:48.132Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
         "type": "Hero",
         "props": {
-          "heading": "Discover the World of Oranges",
+          "heading": "Discover the World of Oranges 🍊",
           "subheading": "Juicy, sweet, and full of zest. Dive into the vibrant world of oranges.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
