@@ -1,0 +1,5 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - heading "Page not found" [level=1] [ref=e3]
+    - paragraph [ref=e4]: No content exists for /.
+  - alert [ref=e5]

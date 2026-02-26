@@ -28,22 +28,23 @@ body {
   font-family: "Manrope", sans-serif;
   background:
     radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.6), transparent 45%),
-    linear-gradient(145deg, #d8dfe6 0%, #cfd6dd 52%, #c7d0d8 100%);
+    linear-gradient(145deg, #e6ebf0 0%, #dde4ea 52%, #d7dfe6 100%);
 }
 
 .layout {
   height: 100vh;
   display: grid;
   grid-template-columns: 1fr minmax(370px, 420px);
-  column-gap: 18px;
+  column-gap: 10px;
   row-gap: 14px;
-  padding: 0 0 0 12px;
+  padding: 0;
   overflow: hidden;
 }
 
 .chat-panel {
   background: var(--panel);
   border: 1px solid var(--line);
+  border-left: 0;
   border-radius: 0;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
   display: grid;
@@ -57,7 +58,8 @@ body {
 
 .chat-header {
   padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
+  background: #f3f6f9;
   display: grid;
   gap: 10px;
 }
@@ -65,7 +67,7 @@ body {
 .chat-header-top {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .chat-header-actions {
@@ -90,6 +92,12 @@ body {
   border: 1px solid #9eb4c8;
   background: #edf3fa;
   color: #1f3348;
+}
+
+.source-badge-compact {
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .source-badge.src-openai {
@@ -143,6 +151,21 @@ body {
 .chat-header-slug select {
   min-width: 0;
   width: 100%;
+  max-width: 100%;
+  border: 0;
+  background: #ffffff;
+  color: #1b2a3d;
+  font-size: 13px;
+}
+
+.chat-header-slug select:focus,
+.chat-header-slug select:focus-visible,
+.settings-icon-btn:focus,
+.settings-icon-btn:focus-visible,
+.publish-preview-btn:focus,
+.publish-preview-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .chat-header-primary-actions {
@@ -158,8 +181,8 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  border: 1px solid #9fb1c3;
-  background: #eef3f8;
+  border: 0;
+  background: #ced9e5;
   color: #24364b;
   display: inline-flex;
   align-items: center;
@@ -220,8 +243,12 @@ textarea {
 
 .chat-thread {
   padding: 14px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -230,11 +257,13 @@ textarea {
 
 .msg {
   max-width: 88%;
+  min-width: 0;
   border-radius: 12px;
   padding: 11px 13px;
   border: 1px solid #e3e8ef;
   background: #fff;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  overflow-wrap: anywhere;
 }
 
 .msg-user {
@@ -253,13 +282,13 @@ textarea {
 }
 
 .msg-main {
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .msg-status {
   margin-top: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -302,6 +331,16 @@ textarea {
 .msg-suggestion:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.msg-page-links {
+  margin-top: 7px;
+}
+
+.msg-page-link {
+  border-color: #7aa6d8;
+  background: #e5f0ff;
+  color: #16324f;
 }
 
 .streaming-pill {
@@ -385,20 +424,43 @@ textarea {
 
 .composer {
   border-top: 0;
-  padding: 12px 14px 14px;
-  background: linear-gradient(180deg, rgba(245, 247, 251, 0.8), #f5f7fb);
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 10px;
+  padding: 14px 12px 14px;
+  background: var(--panel);
+  display: block;
   overflow: hidden;
   min-height: 0;
+}
+
+.composer-shell {
+  position: relative;
+  height: 100%;
+  border: 1.5px solid #a7b2c2;
+  border-radius: 32px;
+  background: #fff;
+  padding: 14px 14px 10px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
 }
 
 .composer textarea {
   width: 100%;
   height: 100%;
-  min-height: 84px;
+  max-height: 100%;
+  min-height: 0;
   resize: none;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.32;
+  letter-spacing: -0.02em;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.composer textarea:focus {
+  outline: none;
 }
 
 .composer-actions {
@@ -406,16 +468,134 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  align-self: end;
+}
+
+.composer-actions-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .composer-actions-right {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  min-width: 0;
 }
 
-.source-badge-bottom {
-  flex-shrink: 0;
+.composer-ghost-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: #5f6674;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.composer-ghost-btn:hover {
+  background: #e9eef5;
+  color: #334155;
+}
+
+.composer-ghost-btn:focus-visible {
+  outline: none;
+}
+
+.composer-ghost-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.composer-model-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 0;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #5f6674;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  padding: 0 30px 0 16px;
+  flex: 0 0 auto;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.composer-model-picker:hover,
+.composer-model-picker:focus-within {
+  background: #e9eef5;
+  color: #334155;
+}
+
+.composer-model-picker span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.composer-model-picker::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid #94a3b8;
+  border-bottom: 1.5px solid #94a3b8;
+  transform: translateY(-62%) rotate(45deg);
+  pointer-events: none;
+}
+
+.composer-model-picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+
+.composer-send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 0;
+  background: #d97f55;
+  color: #0b0f14;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(180, 102, 69, 0.2);
+}
+
+.composer-send-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
 }
 
 .composer-splitter {
@@ -428,8 +608,8 @@ textarea {
 .composer-splitter::before {
   content: "";
   position: absolute;
-  left: 28px;
-  right: 28px;
+  left: 0;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
   height: 1px;
@@ -442,11 +622,11 @@ textarea {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 64px;
-  height: 8px;
+  width: 38px;
+  height: 6px;
   border-radius: 999px;
   background: #a9b7c7;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 3px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
 .secondary-btn,
@@ -471,7 +651,9 @@ textarea {
 }
 
 .secondary-btn:disabled,
-.primary-btn:disabled {
+.primary-btn:disabled,
+.composer-ghost-btn:disabled,
+.composer-send-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -479,12 +661,12 @@ textarea {
 .preview {
   padding: 0;
   min-height: 0;
-  margin: 12px 0;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 0;
   background: #fff;
-  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
   grid-column: 1;
   grid-row: 1;
 }
@@ -495,15 +677,15 @@ textarea {
   color: #fff;
   border-radius: 10px;
   padding: 8px 14px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex: 0 0 190px;
-  min-width: 190px;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .publish-preview-btn:disabled {
@@ -543,6 +725,13 @@ textarea {
   z-index: 1000;
 }
 
+.settings-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 1000;
+}
+
 .settings-modal {
   width: min(460px, calc(100vw - 24px));
   background: #f8fbff;
@@ -550,6 +739,11 @@ textarea {
   border-radius: 14px;
   box-shadow: 0 18px 42px rgb(15 23 42 / 0.24);
   overflow: hidden;
+}
+
+.settings-modal-popover {
+  position: fixed;
+  width: min(320px, calc(100vw - 16px));
 }
 
 .settings-modal-header {
@@ -597,7 +791,7 @@ textarea {
   .layout {
     grid-template-columns: 1fr;
     height: 100vh;
-    padding: 0 0 0 10px;
+    padding: 0;
     overflow: auto;
   }
 
@@ -632,5 +826,51 @@ textarea {
   .chat-header-slug select {
     min-width: 0;
     width: 100%;
+  }
+
+  .composer-actions-left {
+    gap: 8px;
+  }
+
+  .composer-model-picker {
+    min-width: 150px;
+    height: 42px;
+    font-size: 14px;
+    padding: 0 34px 0 12px;
+    border-width: 2px;
+  }
+
+  .composer-model-picker::after {
+    width: 8px;
+    height: 8px;
+    right: 12px;
+    border-right-width: 1.5px;
+    border-bottom-width: 1.5px;
+  }
+
+  .composer-send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+
+  .composer-ghost-btn {
+    width: 42px;
+    height: 42px;
+  }
+
+  .composer-ghost-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .composer textarea {
+    font-size: 13px;
+    padding: 0;
+  }
+
+  .composer-shell {
+    border-radius: 24px;
+    padding: 12px;
   }
 }

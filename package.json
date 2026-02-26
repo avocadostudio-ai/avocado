@@ -5,6 +5,13 @@
   "packageManager": "pnpm@10.10.0",
   "scripts": {
     "dev": "pnpm -r --parallel --filter @ai-site-editor/site --filter @ai-site-editor/editor --filter @ai-site-editor/orchestrator dev",
+    "dev:ctl": "./scripts/devctl.sh",
+    "dev:start": "./scripts/devctl.sh start",
+    "dev:stop": "./scripts/devctl.sh stop",
+    "dev:restart": "./scripts/devctl.sh restart",
+    "dev:status": "./scripts/devctl.sh status",
+    "dev:logs": "./scripts/devctl.sh logs",
+    "dev:doctor": "./scripts/devctl.sh doctor",
     "dev:site": "pnpm --filter @ai-site-editor/site dev",
     "dev:editor": "pnpm --filter @ai-site-editor/editor dev",
     "dev:orchestrator": "pnpm --filter @ai-site-editor/orchestrator dev",

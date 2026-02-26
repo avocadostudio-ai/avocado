@@ -112,13 +112,83 @@ const moveBlockSchema = z.object({
   blockId: z.string().min(1),
   afterBlockId: z.string().min(1).optional()
 })
+const duplicateBlockSchema = z.object({
+  op: z.literal("duplicate_block"),
+  pageSlug: z.string().min(1),
+  blockId: z.string().min(1),
+  toPageSlug: z.string().min(1).optional(),
+  newBlockId: z.string().min(1).optional(),
+  afterBlockId: z.string().min(1).optional()
+})
+const addItemSchema = z.object({
+  op: z.literal("add_item"),
+  pageSlug: z.string().min(1),
+  blockId: z.string().min(1),
+  listKey: z.string().min(1),
+  item: z.record(z.unknown()),
+  afterIndex: z.number().int().min(0).optional()
+})
+const updateItemSchema = z.object({
+  op: z.literal("update_item"),
+  pageSlug: z.string().min(1),
+  blockId: z.string().min(1),
+  listKey: z.string().min(1),
+  index: z.number().int().min(0),
+  patch: z.record(z.unknown())
+})
+const removeItemSchema = z.object({
+  op: z.literal("remove_item"),
+  pageSlug: z.string().min(1),
+  blockId: z.string().min(1),
+  listKey: z.string().min(1),
+  index: z.number().int().min(0)
+})
+const moveItemSchema = z.object({
+  op: z.literal("move_item"),
+  pageSlug: z.string().min(1),
+  blockId: z.string().min(1),
+  listKey: z.string().min(1),
+  index: z.number().int().min(0),
+  afterIndex: z.number().int().min(0).optional()
+})
+const renamePageSchema = z.object({
+  op: z.literal("rename_page"),
+  pageSlug: z.string().min(1),
+  newPageSlug: z.string().min(1),
+  newTitle: z.string().min(1).optional()
+})
+const removePageSchema = z.object({
+  op: z.literal("remove_page"),
+  pageSlug: z.string().min(1)
+})
+const movePageSchema = z.object({
+  op: z.literal("move_page"),
+  pageSlug: z.string().min(1),
+  afterPageSlug: z.string().min(1).optional()
+})
+const duplicatePageSchema = z.object({
+  op: z.literal("duplicate_page"),
+  pageSlug: z.string().min(1),
+  newPageSlug: z.string().min(1).optional(),
+  newTitle: z.string().min(1).optional(),
+  afterPageSlug: z.string().min(1).optional()
+})
 
 export const operationSchema = z.discriminatedUnion("op", [
   createPageSchema,
   addBlockSchema,
   updatePropsSchema,
   removeBlockSchema,
-  moveBlockSchema
+  moveBlockSchema,
+  duplicateBlockSchema,
+  addItemSchema,
+  updateItemSchema,
+  removeItemSchema,
+  moveItemSchema,
+  renamePageSchema,
+  removePageSchema,
+  movePageSchema,
+  duplicatePageSchema
 ])
 
 export type Operation = z.infer<typeof operationSchema>

@@ -23,18 +23,52 @@ function renderInline(text: string) {
   return tokens
 }
 
-function renderParagraph(para: string, idx: number) {
-  if (/^#{1,3} /.test(para)) {
-    return <h3 key={idx}>{renderInline(para.replace(/^#{1,3} /, ""))}</h3>
+function renderRichTextBlock(block: string, idx: number) {
+  const lines = block
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return null
+
+  if (lines.length === 1 && /^#{1,3}\s+/.test(lines[0])) {
+    return <h3 key={idx}>{renderInline(lines[0].replace(/^#{1,3}\s+/, ""))}</h3>
   }
-  return <p key={idx}>{renderInline(para)}</p>
+
+  const unorderedItems = lines
+    .map((line) => /^\s*[-*]\s+(.+)$/.exec(line)?.[1]?.trim() ?? null)
+    .filter((line): line is string => !!line && line.length > 0)
+  if (unorderedItems.length === lines.length) {
+    return (
+      <ul key={idx}>
+        {unorderedItems.map((item, itemIdx) => (
+          <li key={itemIdx}>{renderInline(item)}</li>
+        ))}
+      </ul>
+    )
+  }
+
+  const orderedItems = lines
+    .map((line) => /^\s*\d+\.\s+(.+)$/.exec(line)?.[1]?.trim() ?? null)
+    .filter((line): line is string => !!line && line.length > 0)
+  if (orderedItems.length === lines.length) {
+    return (
+      <ol key={idx}>
+        {orderedItems.map((item, itemIdx) => (
+          <li key={itemIdx}>{renderInline(item)}</li>
+        ))}
+      </ol>
+    )
+  }
+
+  return <p key={idx}>{renderInline(block)}</p>
 }
 
 function Hero({ previewWrapperProps, ...props }: Record<string, unknown> & { previewWrapperProps?: EditorBlockWrapperProps }) {
   const mergedClassName = ["hero", previewWrapperProps?.className].filter(Boolean).join(" ")
   return (
     <section {...previewWrapperProps} className={mergedClassName}>
-      <div className="hero__inner">
+      <div className="section__inner hero__inner">
         <div className="hero__content">
           <h1 data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
             {String(props.heading ?? "")}
@@ -79,36 +113,38 @@ function FeatureGrid(props: Record<string, unknown>) {
   const items = Array.isArray(props.features) ? props.features : []
   return (
     <section>
-      <h2
-        data-editable-target="title"
-        data-editable-target-label="title"
-        data-editable-label="title"
-      >
-        {String(props.title ?? "")}
-      </h2>
-      <ul className="feature-grid">
-        {items.map((item, idx) => {
-          const row = (item ?? {}) as Record<string, unknown>
-          return (
-            <li key={idx} className="feature-card">
-              <strong
-                data-editable-target={`features[${idx}].title`}
-                data-editable-target-label={`features[${idx}].title`}
-                data-editable-label={`features[${idx}].title`}
-              >
-                {String(row.title ?? "")}
-              </strong>
-              <p
-                data-editable-target={`features[${idx}].description`}
-                data-editable-target-label={`features[${idx}].description`}
-                data-editable-label={`features[${idx}].description`}
-              >
-                {String(row.description ?? "")}
-              </p>
-            </li>
-          )
-        })}
-      </ul>
+      <div className="section__inner">
+        <h2
+          data-editable-target="title"
+          data-editable-target-label="title"
+          data-editable-label="title"
+        >
+          {String(props.title ?? "")}
+        </h2>
+        <ul className="feature-grid">
+          {items.map((item, idx) => {
+            const row = (item ?? {}) as Record<string, unknown>
+            return (
+              <li key={idx} className="feature-card">
+                <strong
+                  data-editable-target={`features[${idx}].title`}
+                  data-editable-target-label={`features[${idx}].title`}
+                  data-editable-label={`features[${idx}].title`}
+                >
+                  {String(row.title ?? "")}
+                </strong>
+                <p
+                  data-editable-target={`features[${idx}].description`}
+                  data-editable-target-label={`features[${idx}].description`}
+                  data-editable-label={`features[${idx}].description`}
+                >
+                  {String(row.description ?? "")}
+                </p>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
     </section>
   )
 }
@@ -117,38 +153,40 @@ function Testimonials(props: Record<string, unknown>) {
   const items = Array.isArray(props.items) ? props.items : []
   return (
     <section>
-      <h2
-        data-editable-target="title"
-        data-editable-target-label="title"
-        data-editable-label="title"
-      >
-        {String(props.title ?? "")}
-      </h2>
-      <div className="testimonials-grid">
-        {items.map((item, idx) => {
-          const row = (item ?? {}) as Record<string, unknown>
-          return (
-            <blockquote key={idx} className="testimonial-card">
-              <span className="testimonial-card__mark" aria-hidden="true">&ldquo;</span>
-              <p
-                className="testimonial-card__quote"
-                data-editable-target={`items[${idx}].quote`}
-                data-editable-target-label={`items[${idx}].quote`}
-                data-editable-label={`items[${idx}].quote`}
-              >
-                {String(row.quote ?? "")}
-              </p>
-              <footer
-                className="testimonial-card__author"
-                data-editable-target={`items[${idx}].author`}
-                data-editable-target-label={`items[${idx}].author`}
-                data-editable-label={`items[${idx}].author`}
-              >
-                &mdash; {String(row.author ?? "")}
-              </footer>
-            </blockquote>
-          )
-        })}
+      <div className="section__inner">
+        <h2
+          data-editable-target="title"
+          data-editable-target-label="title"
+          data-editable-label="title"
+        >
+          {String(props.title ?? "")}
+        </h2>
+        <div className="testimonials-grid">
+          {items.map((item, idx) => {
+            const row = (item ?? {}) as Record<string, unknown>
+            return (
+              <blockquote key={idx} className="testimonial-card">
+                <span className="testimonial-card__mark" aria-hidden="true">&ldquo;</span>
+                <p
+                  className="testimonial-card__quote"
+                  data-editable-target={`items[${idx}].quote`}
+                  data-editable-target-label={`items[${idx}].quote`}
+                  data-editable-label={`items[${idx}].quote`}
+                >
+                  {String(row.quote ?? "")}
+                </p>
+                <footer
+                  className="testimonial-card__author"
+                  data-editable-target={`items[${idx}].author`}
+                  data-editable-target-label={`items[${idx}].author`}
+                  data-editable-label={`items[${idx}].author`}
+                >
+                  &mdash; {String(row.author ?? "")}
+                </footer>
+              </blockquote>
+            )
+          })}
+        </div>
       </div>
     </section>
   )
@@ -158,34 +196,36 @@ function FAQAccordion(props: Record<string, unknown>) {
   const items = Array.isArray(props.items) ? props.items : []
   return (
     <section>
-      <h2
-        data-editable-target="title"
-        data-editable-target-label="title"
-        data-editable-label="title"
-      >
-        {String(props.title ?? "")}
-      </h2>
-      {items.map((item, idx) => {
-        const row = (item ?? {}) as Record<string, unknown>
-        return (
-          <details key={idx} className="faq-item">
-            <summary
-              data-editable-target={`items[${idx}].q`}
-              data-editable-target-label={`items[${idx}].q`}
-              data-editable-label={`items[${idx}].q`}
-            >
-              {String(row.q ?? "")}
-            </summary>
-            <p
-              data-editable-target={`items[${idx}].a`}
-              data-editable-target-label={`items[${idx}].a`}
-              data-editable-label={`items[${idx}].a`}
-            >
-              {String(row.a ?? "")}
-            </p>
-          </details>
-        )
-      })}
+      <div className="section__inner">
+        <h2
+          data-editable-target="title"
+          data-editable-target-label="title"
+          data-editable-label="title"
+        >
+          {String(props.title ?? "")}
+        </h2>
+        {items.map((item, idx) => {
+          const row = (item ?? {}) as Record<string, unknown>
+          return (
+            <details key={idx} className="faq-item">
+              <summary
+                data-editable-target={`items[${idx}].q`}
+                data-editable-target-label={`items[${idx}].q`}
+                data-editable-label={`items[${idx}].q`}
+              >
+                {String(row.q ?? "")}
+              </summary>
+              <p
+                data-editable-target={`items[${idx}].a`}
+                data-editable-target-label={`items[${idx}].a`}
+                data-editable-label={`items[${idx}].a`}
+              >
+                {String(row.a ?? "")}
+              </p>
+            </details>
+          )
+        })}
+      </div>
     </section>
   )
 }
@@ -193,102 +233,116 @@ function FAQAccordion(props: Record<string, unknown>) {
 function CTA(props: Record<string, unknown>) {
   return (
     <section className="cta-section">
-      <h2
-        data-editable-target="title"
-        data-editable-target-label="title"
-        data-editable-label="title"
-      >
-        {String(props.title ?? "")}
-      </h2>
-      <p
-        data-editable-target="description"
-        data-editable-target-label="description"
-        data-editable-label="description"
-      >
-        {String(props.description ?? "")}
-      </p>
-      <PrimaryButton
-        href={String(props.ctaHref ?? "#")}
-        data-editable-target="ctaText"
-        data-editable-target-label="ctaText"
-        data-editable-label="ctaText"
-      >
-        {String(props.ctaText ?? "")}
-      </PrimaryButton>
+      <div className="section__inner">
+        <h2
+          data-editable-target="title"
+          data-editable-target-label="title"
+          data-editable-label="title"
+        >
+          {String(props.title ?? "")}
+        </h2>
+        <p
+          data-editable-target="description"
+          data-editable-target-label="description"
+          data-editable-label="description"
+        >
+          {String(props.description ?? "")}
+        </p>
+        <PrimaryButton
+          href={String(props.ctaHref ?? "#")}
+          data-editable-target="ctaText"
+          data-editable-target-label="ctaText"
+          data-editable-label="ctaText"
+        >
+          {String(props.ctaText ?? "")}
+        </PrimaryButton>
+      </div>
     </section>
   )
 }
 
 function Card(props: Record<string, unknown>) {
   return (
-    <article className="card">
-      <h3
-        data-editable-target="title"
-        data-editable-target-label="title"
-        data-editable-label="title"
-      >
-        {String(props.title ?? "")}
-      </h3>
-      <p
-        data-editable-target="description"
-        data-editable-target-label="description"
-        data-editable-label="description"
-      >
-        {String(props.description ?? "")}
-      </p>
-      <PrimaryButton
-        href={String(props.ctaHref ?? "#")}
-        data-editable-target="ctaText"
-        data-editable-target-label="ctaText"
-        data-editable-label="ctaText"
-      >
-        {String(props.ctaText ?? "")}
-      </PrimaryButton>
-    </article>
+    <section>
+      <div className="section__inner">
+        <article className="card">
+          <h3
+            data-editable-target="title"
+            data-editable-target-label="title"
+            data-editable-label="title"
+          >
+            {String(props.title ?? "")}
+          </h3>
+          <p
+            data-editable-target="description"
+            data-editable-target-label="description"
+            data-editable-label="description"
+          >
+            {String(props.description ?? "")}
+          </p>
+          <PrimaryButton
+            href={String(props.ctaHref ?? "#")}
+            data-editable-target="ctaText"
+            data-editable-target-label="ctaText"
+            data-editable-label="ctaText"
+          >
+            {String(props.ctaText ?? "")}
+          </PrimaryButton>
+        </article>
+      </div>
+    </section>
   )
 }
 
 function CardGrid(props: Record<string, unknown>) {
   const cards = Array.isArray(props.cards) ? props.cards : []
   return (
-    <section>
-      <h2
-        data-editable-target="title"
-        data-editable-target-label="title"
-        data-editable-label="title"
-      >
-        {String(props.title ?? "")}
-      </h2>
-      <div className="card-grid">
-        {cards.map((item, idx) => {
-          const row = (item ?? {}) as Record<string, unknown>
-          return (
-            <article className="card" key={idx}>
-              <h3
-                data-editable-target={`cards[${idx}].title`}
-                data-editable-target-label={`cards[${idx}].title`}
-                data-editable-label={`cards[${idx}].title`}
+    <section className="card-grid-section">
+      <div className="section__inner">
+        <h2
+          data-editable-target="title"
+          data-editable-target-label="title"
+          data-editable-label="title"
+        >
+          {String(props.title ?? "")}
+        </h2>
+        <div className="card-grid">
+          {cards.map((item, idx) => {
+            const row = (item ?? {}) as Record<string, unknown>
+            return (
+              <article
+                className="card"
+                key={idx}
+                data-editable-target={`cards[${idx}]`}
+                data-editable-target-label={`cards[${idx}]`}
+                data-editable-label={`cards[${idx}]`}
               >
-                {String(row.title ?? "")}
-              </h3>
-              <p
-                data-editable-target={`cards[${idx}].description`}
-                data-editable-target-label={`cards[${idx}].description`}
-                data-editable-label={`cards[${idx}].description`}
-              >
-                {String(row.description ?? "")}
-              </p>
-              <PrimaryButton
-                href={String(row.ctaHref ?? "#")}
-                data-editable-target={`cards[${idx}].ctaText`}
-                data-editable-target-label={`cards[${idx}].ctaText`}
-                data-editable-label={`cards[${idx}].ctaText`}
-              >
-                {String(row.ctaText ?? "")}
-              </PrimaryButton>
-            </article>
-          )
-        })}
+                <h3
+                  data-editable-target={`cards[${idx}].title`}
+                  data-editable-target-label={`cards[${idx}].title`}
+                  data-editable-label={`cards[${idx}].title`}
+                >
+                  {String(row.title ?? "")}
+                </h3>
+                <p
+                  data-editable-target={`cards[${idx}].description`}
+                  data-editable-target-label={`cards[${idx}].description`}
+                  data-editable-label={`cards[${idx}].description`}
+                >
+                  {String(row.description ?? "")}
+                </p>
+                <PrimaryButton
+                  href={String(row.ctaHref ?? "#")}
+                  data-editable-target={`cards[${idx}].ctaText`}
+                  data-editable-target-label={`cards[${idx}].ctaText`}
+                  data-editable-label={`cards[${idx}].ctaText`}
+                >
+                  {String(row.ctaText ?? "")}
+                </PrimaryButton>
+              </article>
+            )
+          })}
+        </div>
       </div>
     </section>
   )
@@ -297,25 +351,30 @@ function CardGrid(props: Record<string, unknown>) {
 function RichText(props: Record<string, unknown>) {
   const title = String(props.title ?? "")
   const body = String(props.body ?? "")
-  const paragraphs = body.split(/\n\n+/).filter(Boolean)
+  const blocks = body
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
   return (
     <section className="rich-text">
-      {title.length > 0 && (
-        <h2
-          data-editable-target="title"
-          data-editable-target-label="title"
-          data-editable-label="title"
+      <div className="section__inner">
+        {title.length > 0 && (
+          <h2
+            data-editable-target="title"
+            data-editable-target-label="title"
+            data-editable-label="title"
+          >
+            {title}
+          </h2>
+        )}
+        <div
+          className="rich-text__body"
+          data-editable-target="body"
+          data-editable-target-label="body"
+          data-editable-label="body"
         >
-          {title}
-        </h2>
-      )}
-      <div
-        className="rich-text__body"
-        data-editable-target="body"
-        data-editable-target-label="body"
-        data-editable-label="body"
-      >
-        {paragraphs.map((para, idx) => renderParagraph(para, idx))}
+          {blocks.map((block, idx) => renderRichTextBlock(block, idx))}
+        </div>
       </div>
     </section>
   )

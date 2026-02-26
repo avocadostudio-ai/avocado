@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import ClaudeStyleChatInput from "./components/claude-style-chat-input"
+import Settings2Icon from "./components/settings2-icon"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
 type PlannerSource = "openai" | "demo"
@@ -8,6 +10,7 @@ type AssistantResponse = {
   status?: string
   summary?: string
   changes?: string[]
+  mentionedSlugs?: string[]
   previewVersion?: number
   validationErrors?: string[] | { fieldErrors?: Record<string, string[]>; formErrors?: string[] }
   modelUsed?: string
@@ -31,6 +34,7 @@ type ChatEntry = {
   text: string
   status?: string
   changes?: string[]
+  mentionedSlugs?: string[]
   suggestions?: string[]
   errors?: string[]
   meta?: string
@@ -56,6 +60,11 @@ type PublishResponse = {
   status?: string
   session?: string
   slugs?: string[]
+  branch?: string
+  commitSha?: string
+  message?: string
+  reason?: string
+  details?: string[]
   deployStatus?: number
   deployResponse?: string
   inspectUrl?: string
@@ -80,6 +89,7 @@ type PublishStatus = {
 
 const siteOrigin = "http://localhost:3000"
 const orchestrator = "http://localhost:4200"
+const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -118,7 +128,8 @@ export function App() {
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
-  const [composerHeight, setComposerHeight] = useState(220)
+  const [composerHeight, setComposerHeight] = useState(124)
+  const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
   const [chatLog, setChatLog] = useState<ChatEntry[]>([
     {
       id: "welcome",
@@ -133,6 +144,7 @@ export function App() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
   const splitHandleRef = useRef<HTMLDivElement>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
@@ -217,7 +229,7 @@ export function App() {
       const thread = chatThreadRef.current
       if (!panel || !thread) return
 
-      const minComposer = 120
+      const minComposer = 124
       const minThread = 120
       const splitterHeight = 10
       const topRowsHeight = thread.offsetTop
@@ -331,6 +343,7 @@ export function App() {
       text: data.summary ?? data.error ?? "Request failed.",
       status: data.status,
       changes: data.changes ?? [],
+      mentionedSlugs: Array.isArray(data.mentionedSlugs) ? data.mentionedSlugs.filter((s): s is string => typeof s === "string") : [],
       suggestions: data.suggestions ?? [],
       errors,
       meta: data.modelUsed ? `${data.modelUsed}${data.modelKey ? ` (${data.modelKey})` : ""}` : undefined
@@ -675,11 +688,14 @@ export function App() {
     try {
       const res = await fetch(`${orchestrator}/publish`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(publishToken ? { "x-publish-token": publishToken } : {})
+        },
         body: JSON.stringify({ session })
       })
       const data = (await res.json()) as PublishResponse
-      if (!res.ok || data.status !== "triggered") {
+      if (!res.ok || (data.status !== "triggered" && data.status !== "ready")) {
         pushAssistantFromResult({
           status: "error",
           summary: data.error ?? "Failed to trigger publish.",
@@ -699,16 +715,31 @@ export function App() {
         vercelState: data.vercelState
       })
       void fetchPublishStatus()
-      pushAssistantFromResult({
-        status: "applied",
-        summary: "Publish triggered. Vercel deployment started.",
-        changes: [
-          `Session: ${data.session ?? session}`,
-          `Slugs: ${slugText}`,
-          `Deploy status: ${data.deployStatus ?? "unknown"}`,
-          `Vercel state: ${data.vercelState ?? "TRIGGERED"}`
-        ]
-      })
+      if (data.status === "ready") {
+        pushAssistantFromResult({
+          status: "applied",
+          summary: data.message ?? "Nothing new to publish.",
+          changes: [
+            `Session: ${data.session ?? session}`,
+            `Slugs: ${slugText}`,
+            ...(data.branch ? [`Branch: ${data.branch}`] : [])
+          ]
+        })
+      } else {
+        pushAssistantFromResult({
+          status: "applied",
+          summary: "Publish triggered. Vercel deployment started.",
+          changes: [
+            `Session: ${data.session ?? session}`,
+            `Slugs: ${slugText}`,
+            `Deploy status: ${data.deployStatus ?? "unknown"}`,
+            `Vercel state: ${data.vercelState ?? "TRIGGERED"}`,
+            ...(data.commitSha ? [`Commit: ${data.commitSha.slice(0, 12)}`] : []),
+            ...(data.branch ? [`Branch: ${data.branch}`] : []),
+            ...(data.message ? [data.message] : [])
+          ]
+        })
+      }
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -742,11 +773,34 @@ export function App() {
 
   useEffect(() => {
     if (!showSettingsModal) return
+    const updatePopoverPosition = () => {
+      const button = settingsButtonRef.current
+      if (!button) return
+      const rect = button.getBoundingClientRect()
+      const popoverWidth = 320
+      const popoverHeight = 220
+      const gap = 8
+      const minEdge = 8
+      const maxLeft = Math.max(minEdge, window.innerWidth - popoverWidth - minEdge)
+      const maxTop = Math.max(minEdge, window.innerHeight - popoverHeight - minEdge)
+      const left = Math.min(maxLeft, Math.max(minEdge, rect.right - popoverWidth))
+      const top = Math.min(maxTop, Math.max(minEdge, rect.bottom + gap))
+      setSettingsPopoverPos({ top, left })
+    }
+
+    updatePopoverPosition()
+    window.addEventListener("resize", updatePopoverPosition)
+    window.addEventListener("scroll", updatePopoverPosition, true)
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowSettingsModal(false)
     }
     window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("resize", updatePopoverPosition)
+      window.removeEventListener("scroll", updatePopoverPosition, true)
+    }
   }, [showSettingsModal])
 
   const publishState = (publishStatus?.vercelState ?? publishStatus?.status ?? "").toUpperCase()
@@ -767,11 +821,33 @@ export function App() {
   const streamLabel = streamIsError ? streamStatus : streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const hasUserEntry = chatLog.some((entry) => entry.role === "user")
-
   return (
     <div className="layout">
       <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
+          <div className="chat-header-top">
+            {/*
+            <div
+              className={`source-badge source-badge-compact ${
+                plannerBadgeState === "openai"
+                  ? "src-openai"
+                  : plannerBadgeState === "demo"
+                    ? "src-demo"
+                    : plannerBadgeState === "error"
+                      ? "src-error"
+                      : "src-unknown"
+              }`}
+            >
+              {plannerBadgeState === "openai"
+                ? "OpenAI"
+                : plannerBadgeState === "demo"
+                  ? "Demo mode"
+                  : plannerBadgeState === "error"
+                    ? "Status unavailable"
+                    : "Checking..."}
+            </div>
+            */}
+          </div>
           <div className="chat-header-controls">
             <label className="chat-header-slug">
               <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
@@ -788,11 +864,9 @@ export function App() {
                 className="settings-icon-btn"
                 aria-label="Open settings"
                 onClick={() => setShowSettingsModal(true)}
+                ref={settingsButtonRef}
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M10.33 3.08c.27-1.44 3.07-1.44 3.34 0a1.72 1.72 0 0 0 2.57 1.16c1.27-.74 3.26 1.25 2.52 2.52a1.72 1.72 0 0 0 1.16 2.57c1.44.27 1.44 3.07 0 3.34a1.72 1.72 0 0 0-1.16 2.57c.74 1.27-1.25 3.26-2.52 2.52a1.72 1.72 0 0 0-2.57 1.16c-.27 1.44-3.07 1.44-3.34 0a1.72 1.72 0 0 0-2.57-1.16c-1.27.74-3.26-1.25-2.52-2.52a1.72 1.72 0 0 0-1.16-2.57c-1.44-.27-1.44-3.07 0-3.34a1.72 1.72 0 0 0 1.16-2.57c-.74-1.27 1.25-3.26 2.52-2.52a1.72 1.72 0 0 0 2.57-1.16z" />
-                  <circle cx="12" cy="12" r="3.25" />
-                </svg>
+                <Settings2Icon size={16} color="currentColor" />
               </button>
               <button type="button" className="publish-preview-btn" onClick={() => void publishSite()} disabled={isLoading || isPublishing}>
                 {publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
@@ -830,6 +904,24 @@ export function App() {
                       disabled={isLoading}
                     >
                       {line}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {(entry.mentionedSlugs ?? []).length > 0 ? (
+                <div className="msg-suggestions msg-page-links">
+                  {entry.mentionedSlugs?.map((route, idx) => (
+                    <button
+                      key={`${entry.id}-route-${idx}`}
+                      type="button"
+                      className="msg-suggestion msg-page-link"
+                      onClick={() => {
+                        setSlug(route)
+                        setPreviewRevision((prev) => prev + 1)
+                      }}
+                      disabled={isLoading}
+                    >
+                      Open {route}
                     </button>
                   ))}
                 </div>
@@ -875,51 +967,17 @@ export function App() {
         />
 
         <footer className="composer">
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                void submitChat()
-              }
-            }}
-            placeholder={hasUserEntry ? "" : "Try: Add testimonials below hero"}
-            rows={4}
+          <ClaudeStyleChatInput
+            message={message}
+            isLoading={isLoading}
+            modelKey={modelKey}
+            hasUserEntry={hasUserEntry}
+            onMessageChange={setMessage}
+            onModelChange={setModelKey}
+            onSubmit={() => void submitChat()}
+            onUndo={() => void applyHistory("undo")}
+            onRedo={() => void applyHistory("redo")}
           />
-          <div className="composer-actions">
-            <div
-              className={`source-badge source-badge-bottom ${
-                plannerBadgeState === "openai"
-                  ? "src-openai"
-                  : plannerBadgeState === "demo"
-                    ? "src-demo"
-                    : plannerBadgeState === "error"
-                      ? "src-error"
-                      : "src-unknown"
-              }`}
-            >
-              {plannerBadgeState === "openai"
-                ? "OpenAI"
-                : plannerBadgeState === "demo"
-                  ? "Demo mode"
-                  : plannerBadgeState === "error"
-                    ? "Status unavailable"
-                    : "Checking..."}
-            </div>
-            <div className="composer-actions-right">
-              <button type="button" className="secondary-btn" onClick={() => void applyHistory("undo")} disabled={isLoading}>
-                Undo
-              </button>
-              <button type="button" className="secondary-btn" onClick={() => void applyHistory("redo")} disabled={isLoading}>
-                Redo
-              </button>
-              <button type="button" className="primary-btn" onClick={() => void submitChat()} disabled={isLoading || message.trim().length === 0}>
-                Send
-              </button>
-            </div>
-          </div>
-
         </footer>
       </aside>
 
@@ -933,8 +991,15 @@ export function App() {
       </section>
 
       {showSettingsModal ? (
-        <div className="settings-modal-backdrop" onClick={() => setShowSettingsModal(false)}>
-          <div className="settings-modal" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-popover-backdrop" onClick={() => setShowSettingsModal(false)}>
+          <div
+            className="settings-modal settings-modal-popover"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+            onClick={(e) => e.stopPropagation()}
+            style={settingsPopoverPos ? { top: settingsPopoverPos.top, left: settingsPopoverPos.left } : undefined}
+          >
             <div className="settings-modal-header">
               <h2>Settings</h2>
               <button type="button" className="settings-close-btn" aria-label="Close settings" onClick={() => setShowSettingsModal(false)}>
@@ -942,16 +1007,6 @@ export function App() {
               </button>
             </div>
             <div className="settings-modal-body">
-              <label>
-                <span>Model</span>
-                <select value={modelKey} onChange={(e) => setModelKey(e.target.value as ModelKey)}>
-                  <option value="fast">fast</option>
-                  <option value="balanced">balanced</option>
-                  <option value="reasoning">reasoning</option>
-                  <option value="codex">codex</option>
-                </select>
-              </label>
-
               <label className="inline-toggle">
                 <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
                 <span>Streaming</span>
