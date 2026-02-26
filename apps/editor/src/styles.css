@@ -1053,6 +1053,13 @@ textarea {
   padding: 16px;
 }
 
+.variation-live-preview-canvas .card-grid .card {
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(circle at 100% 0, rgba(15, 118, 110, 0.1) 0, rgba(15, 118, 110, 0) 42%),
+    linear-gradient(145deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0) 38%);
+}
+
 .variation-live-preview-canvas .faq-item {
   border-bottom: 1px solid #e2e8f0;
 }
