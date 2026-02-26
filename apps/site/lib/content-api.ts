@@ -26,8 +26,8 @@ function localFallbackPage(slug: string): PageDoc | null {
 
 function getConfiguredOrchestratorUrl() {
   const value = process.env.ORCHESTRATOR_URL?.trim()
-  if (!value) return null
-  return value.replace(/\/$/, "")
+  if (value) return value.replace(/\/$/, "")
+  return "http://127.0.0.1:4200"
 }
 
 function buildCandidateBaseUrls(configuredBaseUrl: string): string[] {
@@ -49,7 +49,7 @@ function buildCandidateBaseUrls(configuredBaseUrl: string): string[] {
   return candidates
 }
 
-export async function fetchDraftPage(slug: string, session: string): Promise<PageDoc | null> {
+export async function fetchDraftPage(slug: string, session: string, strictDraft = false): Promise<PageDoc | null> {
   const configuredBaseUrl = getConfiguredOrchestratorUrl()
   if (configuredBaseUrl) {
     const baseUrls = buildCandidateBaseUrls(configuredBaseUrl)
@@ -71,10 +71,11 @@ export async function fetchDraftPage(slug: string, session: string): Promise<Pag
     }
   }
 
+  if (strictDraft) return null
   return localFallbackPage(slug)
 }
 
-export async function fetchDraftSlugs(session: string): Promise<string[]> {
+export async function fetchDraftSlugs(session: string, strictDraft = false): Promise<string[]> {
   const configuredBaseUrl = getConfiguredOrchestratorUrl()
   if (configuredBaseUrl) {
     const baseUrls = buildCandidateBaseUrls(configuredBaseUrl)
@@ -93,5 +94,6 @@ export async function fetchDraftSlugs(session: string): Promise<string[]> {
     }
   }
 
+  if (strictDraft) return []
   return publishedSlugs
 }
