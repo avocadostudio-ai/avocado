@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T21:37:56.968Z",
+    "updatedAt": "2026-02-26T22:09:45.576Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -23,24 +23,24 @@
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Sustainable Avocado Adventures Emphasize the user benefit first.",
+          "title": "Nachhaltige Avocado-Abenteuer betonen zuerst den Nutzen für den Benutzer.",
           "cards": [
             {
-              "title": "🥑 Avocado Culinary Delights",
-              "description": "Uncover new culinary uses for avocados.",
-              "ctaText": "Try Now",
+              "title": "🥑 Avocado-Kulinarische Köstlichkeiten",
+              "description": "Entdecken Sie neue kulinarische Anwendungen für Avocados.",
+              "ctaText": "Jetzt probieren",
               "ctaHref": "/avocado-culinary"
             },
             {
-              "title": "🥑 Avocado Wellness",
-              "description": "Explore the wellness benefits of avocados.",
-              "ctaText": "Discover",
+              "title": "🥑 Avocado-Wellness",
+              "description": "Erforschen Sie die Wellness-Vorteile von Avocados.",
+              "ctaText": "Entdecken",
               "ctaHref": "/avocado-wellness"
             },
             {
-              "title": "🥑 Avocado Sustainability",
-              "description": "Learn about sustainable avocado farming practices.",
-              "ctaText": "Learn More",
+              "title": "🥑 Avocado-Nachhaltigkeit",
+              "description": "Erfahren Sie mehr über nachhaltige Avocado-Anbaumethoden.",
+              "ctaText": "Mehr erfahren",
               "ctaHref": "/avocado-sustainability"
             }
           ]
@@ -72,7 +72,7 @@
         "type": "RichText",
         "props": {
           "title": "Discover the Magic of Avocados",
-          "body": "Avocados are not only **delicious** but also packed with essential **nutrients**. 🥑 They are a rich source of vitamins **C**, **E**, **K**, and **B-6**, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium. Additionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. 🥑\n\nBeyond their nutritional benefits, avocados are incredibly **versatile** in the kitchen. 🥑 They can enhance salads, smoothies, and even serve as a butter substitute in baking. Their creamy texture and mild flavor make them a favorite for chefs and home cooks alike. 🥑\n\nMoreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease. 🥑"
+          "body": "Avocados are not only **delicious**, but also rich in essential **nutrients**. 🥑 They are a rich source of vitamins **C**, **E**, **K**, and **B-6**, as well as riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium. Additionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. 🥑\n\nBesides their nutritional properties, avocados are incredibly **versatile** in the kitchen. 🥑 They can enhance salads, smoothies, and even serve as a butter substitute in baking. Their creamy texture and mild flavor make them a favorite for both chefs and home cooks. 🥑\n\nMoreover, avocados are known for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of cardiovascular diseases. 🥑"
         }
       },
       {
@@ -222,7 +222,7 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-02-26T20:04:48.132Z",
+    "updatedAt": "2026-02-26T22:29:10.802Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
@@ -232,8 +232,8 @@
           "subheading": "Juicy, sweet, and full of zest. Dive into the vibrant world of oranges.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "https://images.unsplash.com/photo-1557800636-894a64c1696f?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8b3JhbmdlfGVufDB8fDB8fHwy",
-          "imageAlt": "A vibrant orange grove"
+          "imageUrl": "https://images.unsplash.com/photo-1765979831319-5bf36ca47fe0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw1fHxvcmFuZ2VzJTIwc3R1ZGlvJTIwbGlnaHRpbmclMjBkYXJrJTIwbW9vZHklMjBuYXR1cmFsJTIwbGlnaHQlMjBraXRjaGVuJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTQ0OTI1fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Oranges with a dark moody background"
         }
       },
       {
