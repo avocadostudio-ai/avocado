@@ -17,6 +17,14 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
   const selectedBlockRef = useRef<string | null>(null)
   const selectedEditablePathRef = useRef<string | null>(null)
   const deleteConfirmTimerRef = useRef<number | null>(null)
+  const inlineEditingRef = useRef<{
+    node: HTMLElement
+    blockId: string
+    blockType: string
+    editablePath: string
+    initialValue: string
+    isMultiline: boolean
+  } | null>(null)
 
   useEffect(() => {
     const setNestedLabelsVisibility = (visible: boolean) => {
@@ -55,6 +63,82 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       const child = findEditableNode(parent, editablePath)
       if (!child) return
       child.classList.add("editor-child-highlight")
+    }
+
+    const supportsInlineEditablePath = (editablePath: string) => {
+      if (!editablePath) return false
+      if (!/^[A-Za-z_][A-Za-z0-9_]*(?:\[[0-9]+\]\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(editablePath)) return false
+      if (/(^|\.)(?:ctaHref|secondaryCtaHref|imageUrl|imageAlt|href|url)$/i.test(editablePath)) return false
+      return true
+    }
+
+    const readNodeText = (node: HTMLElement) => node.innerText.replace(/\r\n/g, "\n").replace(/\u00a0/g, " ")
+
+    const placeCaretAtEnd = (node: HTMLElement) => {
+      const selection = window.getSelection?.()
+      if (!selection) return
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      range.collapse(false)
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+
+    const cancelInlineEdit = () => {
+      const state = inlineEditingRef.current
+      if (!state) return
+      state.node.textContent = state.initialValue
+      state.node.setAttribute("contenteditable", "false")
+      state.node.classList.remove("editor-inline-editing")
+      inlineEditingRef.current = null
+    }
+
+    const commitInlineEdit = () => {
+      const state = inlineEditingRef.current
+      if (!state) return
+
+      state.node.setAttribute("contenteditable", "false")
+      state.node.classList.remove("editor-inline-editing")
+      inlineEditingRef.current = null
+
+      const nextValue = readNodeText(state.node)
+      if (nextValue === state.initialValue) return
+
+      window.parent.postMessage(
+        {
+          protocol: "site-editor/v1",
+          type: "inlineTextCommitted",
+          payload: {
+            slug,
+            blockId: state.blockId,
+            blockType: state.blockType,
+            editablePath: state.editablePath,
+            value: nextValue
+          }
+        },
+        editorOrigin
+      )
+    }
+
+    const startInlineEdit = (args: { node: HTMLElement; blockId: string; blockType: string; editablePath: string }) => {
+      if (!supportsInlineEditablePath(args.editablePath)) return
+      const existing = inlineEditingRef.current
+      if (existing?.node === args.node) return
+      if (existing) commitInlineEdit()
+
+      const initialValue = readNodeText(args.node)
+      inlineEditingRef.current = {
+        node: args.node,
+        blockId: args.blockId,
+        blockType: args.blockType,
+        editablePath: args.editablePath,
+        initialValue,
+        isMultiline: args.editablePath === "body"
+      }
+      args.node.setAttribute("contenteditable", "true")
+      args.node.classList.add("editor-inline-editing")
+      args.node.focus()
+      placeCaretAtEnd(args.node)
     }
 
     const removeSelectedDeleteHandle = () => {
@@ -247,6 +331,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     }
 
     const smoothRefresh = () => {
+      cancelInlineEdit()
       router.refresh()
       window.setTimeout(queueFocusAfterRefresh, 80)
     }
@@ -258,6 +343,10 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         return
       }
       const target = event.target as HTMLElement | null
+      const editing = inlineEditingRef.current
+      if (editing && target && !editing.node.contains(target)) {
+        commitInlineEdit()
+      }
       if (
         target?.closest(".editor-block-delete") ||
         target?.closest(".editor-selected-delete") ||
@@ -296,6 +385,10 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       if (!editablePath) selectedEditablePathRef.current = null
       applyBlockFocus(blockId, false, editablePath)
 
+      if (childNode && editablePath) {
+        startInlineEdit({ node: childNode, blockId, blockType, editablePath })
+      }
+
       window.parent.postMessage(
         {
           protocol: "site-editor/v1",
@@ -332,6 +425,22 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const editing = inlineEditingRef.current
+      if (editing && editing.node.contains(event.target as Node)) {
+        if (event.key === "Escape") {
+          event.preventDefault()
+          event.stopPropagation()
+          cancelInlineEdit()
+          return
+        }
+        if (event.key === "Enter" && (!editing.isMultiline || !event.shiftKey)) {
+          event.preventDefault()
+          event.stopPropagation()
+          commitInlineEdit()
+          return
+        }
+      }
+
       if (!event.altKey) return
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
 
@@ -367,6 +476,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     window.addEventListener("message", onMessage)
 
     return () => {
+      cancelInlineEdit()
       clearChildFocus()
       removeSelectedDeleteHandle()
       observer.disconnect()

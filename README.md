@@ -31,12 +31,19 @@ Alternative (recommended for repeated restarts without opening new terminals):
 
 - `GET /draft/pages?session=dev&slug=/`
 - `POST /chat`
+- `POST /audio/transcribe` (multipart field: `audio`)
 - `POST /history/undo`
 - `POST /history/redo`
 
 ## Notes
 
 - If `OPENAI_API_KEY` is missing, `/chat` uses deterministic demo planning.
+- Speech transcription model defaults to `gpt-4o-mini-transcribe`.
+- Configure transcription model order with:
+  - `OPENAI_TRANSCRIBE_MODEL` (primary)
+  - `OPENAI_TRANSCRIBE_FALLBACK_MODELS` (comma-separated, tried in order when primary fails)
+- Optional Unsplash search for hero image requests:
+  - `UNSPLASH_ACCESS_KEY` (if set, orchestrator uses Unsplash Search API; otherwise it falls back to a deterministic Picsum URL to avoid broken `source.unsplash.com` links)
 - Site preview refresh is triggered by editor `postMessage` with `draftUpdated`.
 
 ## Deployment

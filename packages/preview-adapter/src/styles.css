@@ -93,7 +93,19 @@
 .editor-highlight {
   outline: 3px solid rgb(var(--editor-selected-rgb));
   outline-offset: -3px;
+  /* Keep selection frame visible on full-bleed/overflowing layouts. */
+  box-shadow: inset 0 0 0 3px rgba(var(--editor-selected-rgb), 0.95);
+  overflow: visible !important;
 }
+
+/* Block content is rendered inside a wrapper; draw the selected frame on the
+   visible section surface too so full-bleed heroes don't hide it. */
+.editor-highlight > section {
+  outline: 3px solid rgb(var(--editor-selected-rgb));
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 3px rgba(var(--editor-selected-rgb), 0.95);
+}
+
 .editor-highlight > .editor-block-badge {
   opacity: 1;
 }
@@ -240,6 +252,13 @@
 .editor-highlight [data-editable-target]:hover {
   outline: 2px dashed rgba(var(--editor-accent-rgb), 0.55);
   outline-offset: 2px;
+}
+
+.editor-highlight [data-editable-target].editor-inline-editing {
+  outline: 2px solid rgba(var(--editor-selected-rgb), 0.95);
+  outline-offset: 2px;
+  background: rgba(var(--editor-selected-rgb), 0.07);
+  cursor: text;
 }
 
 .editor-highlight [data-editable-target]::before {

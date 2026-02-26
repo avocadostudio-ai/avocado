@@ -10,6 +10,12 @@ importers:
 
   apps/editor:
     dependencies:
+      '@ai-site-editor/blocks':
+        specifier: workspace:*
+        version: link:../../packages/blocks
+      '@ai-site-editor/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       lucide-react:
         specifier: ^0.575.0
         version: 0.575.0(react@19.0.0)
@@ -72,6 +78,9 @@ importers:
 
   apps/site:
     dependencies:
+      '@ai-site-editor/blocks':
+        specifier: workspace:*
+        version: link:../../packages/blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../../packages/preview-adapter
@@ -109,6 +118,22 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.4
         version: 19.2.3(@types/react@19.2.14)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/blocks:
+    dependencies:
+      '@ai-site-editor/shared':
+        specifier: workspace:*
+        version: link:../shared
+      react:
+        specifier: '>=19.0.0'
+        version: 19.0.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.10
+        version: 19.2.14
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

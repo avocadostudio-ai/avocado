@@ -1,0 +1,1 @@
+export { SharedBlockRenderer } from "./renderer"

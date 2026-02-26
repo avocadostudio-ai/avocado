@@ -36,16 +36,35 @@ DEV_CMD=(
   --filter @ai-site-editor/orchestrator
   dev
 )
+DEV_MATCH_PATTERN="pnpm -r --parallel --filter @ai-site-editor/site --filter @ai-site-editor/editor --filter @ai-site-editor/orchestrator dev"
 
 cleanup_orphans() {
   # Only target this workspace's known dev commands.
   pkill -f "/Users/yury/Projects/ai-site-editor/apps/site/node_modules/.*/next dev -p 3000" 2>/dev/null || true
   pkill -f "/Users/yury/Projects/ai-site-editor/apps/editor/node_modules/.*/vite/bin/vite.js --port 4100 --strictPort" 2>/dev/null || true
   pkill -f "/Users/yury/Projects/ai-site-editor/apps/orchestrator/node_modules/.*/tsx/dist/cli.mjs watch src/index.ts" 2>/dev/null || true
-  pkill -f "pnpm -r --parallel --filter @ai-site-editor/site --filter @ai-site-editor/editor --filter @ai-site-editor/orchestrator dev" 2>/dev/null || true
+  pkill -f "$DEV_MATCH_PATTERN" 2>/dev/null || true
+}
+
+find_running_dev_pid() {
+  pgrep -f "$DEV_MATCH_PATTERN" | tail -n 1 || true
+}
+
+refresh_pid_file_from_process_table() {
+  local discovered
+  discovered="$(find_running_dev_pid)"
+  if [[ -n "$discovered" ]]; then
+    echo "$discovered" > "$PID_FILE"
+    return 0
+  fi
+  return 1
 }
 
 is_running() {
+  if [[ ! -f "$PID_FILE" ]]; then
+    refresh_pid_file_from_process_table || true
+  fi
+
   if [[ ! -f "$PID_FILE" ]]; then
     return 1
   fi
@@ -57,12 +76,82 @@ is_running() {
   fi
 
   if ! kill -0 "$pid" 2>/dev/null; then
-    return 1
+    refresh_pid_file_from_process_table || true
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+      return 1
+    fi
   fi
 
   local cmd
   cmd="$(ps -p "$pid" -o command= || true)"
+  if [[ "$cmd" != *"pnpm"*"--parallel"* ]]; then
+    refresh_pid_file_from_process_table || true
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+      return 1
+    fi
+    cmd="$(ps -p "$pid" -o command= || true)"
+  fi
+
   [[ "$cmd" == *"pnpm"*"--parallel"* ]]
+}
+
+start_detached_dev() {
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid "${DEV_CMD[@]}" >"$LOG_FILE" 2>&1 < /dev/null &
+  else
+    nohup "${DEV_CMD[@]}" >"$LOG_FILE" 2>&1 < /dev/null &
+  fi
+  local child_pid="$!"
+  disown "$child_pid" 2>/dev/null || true
+  echo "$child_pid" > "$PID_FILE"
+}
+
+start() {
+  local wait_mode="${1:-0}"
+  local wait_timeout="${2:-60}"
+
+  if is_running; then
+    echo "dev stack already running (pid $(cat "$PID_FILE"))."
+    echo "logs: $LOG_FILE"
+    if [[ "$wait_mode" == "1" ]]; then
+      wait_for_ready "$wait_timeout"
+    fi
+    return 0
+  fi
+
+  # Remove stale pid file before starting a fresh managed process.
+  rm -f "$PID_FILE"
+  cleanup_orphans
+
+  # Launch from repo root in a detached session where possible.
+  (
+    cd "$ROOT_DIR"
+    start_detached_dev
+  )
+
+  # Prefer the actual pnpm dev process PID when discoverable.
+  refresh_pid_file_from_process_table || true
+  local pid
+  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+
+  sleep 1
+  if ! is_running; then
+    echo "failed to start dev stack. check logs: $LOG_FILE"
+    return 1
+  fi
+
+  echo "dev stack started (pid $pid)."
+  echo "logs: $LOG_FILE"
+
+  if [[ "$wait_mode" == "1" ]]; then
+    wait_for_ready "$wait_timeout" || {
+      echo "recent logs:"
+      logs 120
+      return 1
+    }
+  fi
 }
 
 check_health() {
@@ -124,53 +213,6 @@ parse_wait_args() {
         ;;
     esac
   done
-}
-
-start() {
-  local wait_mode="${1:-0}"
-  local wait_timeout="${2:-60}"
-
-  if is_running; then
-    echo "dev stack already running (pid $(cat "$PID_FILE"))."
-    echo "logs: $LOG_FILE"
-    if [[ "$wait_mode" == "1" ]]; then
-      wait_for_ready "$wait_timeout"
-    fi
-    return 0
-  fi
-
-  # Remove stale pid file before starting a fresh managed process.
-  rm -f "$PID_FILE"
-  cleanup_orphans
-
-  # Launch from repo root and disown so it remains detached from caller shell.
-  (
-    cd "$ROOT_DIR"
-    nohup "${DEV_CMD[@]}" >"$LOG_FILE" 2>&1 < /dev/null &
-    local child_pid="$!"
-    disown "$child_pid" 2>/dev/null || true
-    echo "$child_pid" > "$PID_FILE"
-  )
-
-  local pid
-  pid="$(cat "$PID_FILE")"
-
-  sleep 1
-  if ! is_running; then
-    echo "failed to start dev stack. check logs: $LOG_FILE"
-    return 1
-  fi
-
-  echo "dev stack started (pid $pid)."
-  echo "logs: $LOG_FILE"
-
-  if [[ "$wait_mode" == "1" ]]; then
-    wait_for_ready "$wait_timeout" || {
-      echo "recent logs:"
-      logs 120
-      return 1
-    }
-  fi
 }
 
 stop() {

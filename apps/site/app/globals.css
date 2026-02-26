@@ -578,6 +578,18 @@ a {
   line-height: 1.75;
 }
 
+.rich-text__body ul {
+  list-style: disc;
+}
+
+.rich-text__body ol {
+  list-style: decimal;
+}
+
+.rich-text__body li {
+  display: list-item;
+}
+
 .rich-text__body li + li {
   margin-top: 0.3em;
 }
