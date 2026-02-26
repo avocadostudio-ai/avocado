@@ -3,25 +3,27 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T21:05:49.634Z",
+    "updatedAt": "2026-02-26T21:37:56.968Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Magic of Avocados 🥑",
-          "subheading": "Fresh, nutritious, and sustainably grown — perfect for every meal.",
-          "ctaText": "Get Started",
-          "ctaHref": "/",
+          "heading": "Avocado Adventures Await",
+          "subheading": "Join us in discovering the taste and health wonders of avocados.",
+          "ctaText": "Start Your Journey",
+          "ctaHref": "/discover",
           "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
-          "imageAlt": "Close-up of avocados in natural light"
+          "imageAlt": "Juicy avocado on display",
+          "secondaryCtaText": "Learn More",
+          "secondaryCtaHref": "/learn-more"
         }
       },
       {
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Sustainable Avocado Adventures",
+          "title": "Sustainable Avocado Adventures Emphasize the user benefit first.",
           "cards": [
             {
               "title": "🥑 Avocado Culinary Delights",
