@@ -1,5 +1,6 @@
 .editor-selectable {
   --editor-accent-rgb: 14, 116, 144;
+  --editor-selected-rgb: 37, 99, 235;
   --editor-accent-strong: rgb(var(--editor-accent-rgb));
   --editor-accent-soft: rgba(var(--editor-accent-rgb), 0.35);
   position: relative;
@@ -90,7 +91,7 @@
 }
 
 .editor-highlight {
-  outline: 3px solid var(--editor-accent-strong);
+  outline: 3px solid rgb(var(--editor-selected-rgb));
   outline-offset: -3px;
 }
 .editor-highlight > .editor-block-badge {
@@ -99,6 +100,11 @@
 
 .editor-highlight::after {
   opacity: 1;
+  background: rgba(var(--editor-selected-rgb), 0.97);
+}
+
+.editor-highlight > .editor-block-badge .editor-block-badge-label {
+  background: rgba(var(--editor-selected-rgb), 0.97);
 }
 
 .editor-selected-delete {
@@ -109,18 +115,26 @@
   border: 0;
   background: rgba(var(--editor-accent-rgb), 0.95);
   color: #fff;
-  border-radius: 8px 8px 0 0;
-  width: 26px;
+  border-radius: 3px 3px 0 0;
+  width: 28px;
   height: 24px;
   padding: 0;
   line-height: 1;
-  font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   z-index: 23;
+}
+
+.editor-selected-delete svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
 }
 
 .editor-selected-move {
@@ -129,13 +143,12 @@
   border: 0;
   background: rgba(var(--editor-accent-rgb), 0.95);
   color: #fff;
-  border-radius: 8px 8px 0 0;
-  width: 22px;
+  border-radius: 3px 3px 0 0;
+  width: 24px;
   height: 24px;
   padding: 0;
   line-height: 1;
-  font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -144,42 +157,46 @@
   transform: translateY(calc(-100% + 1px));
 }
 
+.editor-selected-move svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
 .editor-selected-move-up {
-  right: 58px;
+  right: 62px;
 }
 
 .editor-selected-move-down {
-  right: 32px;
+  right: 36px;
 }
 
 .editor-selected-move:hover {
   background: #0d4f68;
 }
 
+.editor-selected-move:focus,
+.editor-selected-delete:focus,
+.editor-delete-confirm-btn:focus {
+  outline: none;
+}
+
+.editor-selected-move:focus-visible,
+.editor-selected-delete:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+.editor-delete-confirm-btn:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+
 .editor-selected-move:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.editor-selected-delete::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border: 2px solid #fff;
-  border-top: 0;
-  border-radius: 1px;
-  box-sizing: border-box;
-  transform: translateY(1px);
-}
-
-.editor-selected-delete::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  width: 12px;
-  height: 2px;
-  background: #fff;
-  border-radius: 2px;
 }
 
 .editor-selected-delete:hover {
@@ -228,23 +245,32 @@
 .editor-highlight [data-editable-target]::before {
   content: attr(data-editable-target-label);
   position: absolute;
-  right: 6px;
-  top: 6px;
-  background: rgba(15, 23, 42, 0.82);
-  color: #fff;
-  font-size: 10px;
+  top: 0;
+  left: 4px;
+  right: auto;
+  transform: translateY(calc(-100% - 4px));
+  background: rgba(var(--editor-accent-rgb), 0.95);
+  color: #f8fafc;
+  border-radius: 8px 8px 0 0;
+  padding: 6px 10px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
-  border-radius: 999px;
-  padding: 4px 7px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
-  z-index: 3;
+  z-index: 24;
 }
 
 .editor-highlight [data-editable-target]:hover::before {
   opacity: 1;
+}
+
+.editor-hide-nested-labels .editor-highlight [data-editable-target]::before,
+.editor-hide-nested-labels .editor-highlight [data-editable-label]::after {
+  display: none !important;
 }
 
 .editor-child-highlight {
@@ -263,8 +289,9 @@
   transform: translateY(calc(-100% + 1px));
   background: #7f1d1d;
   color: #fff;
-  border-radius: 8px 0 0 0;
-  padding: 5px 10px;
+  border-radius: 3px 0 0 0;
+  height: 24px;
+  padding: 0 10px;
   font-size: 11px;
   font-weight: 600;
   display: flex;
@@ -279,11 +306,15 @@
   background: transparent;
   color: #fff;
   border-radius: 4px;
-  padding: 2px 8px;
+  height: 20px;
+  padding: 0 10px;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .editor-delete-confirm-btn:hover {
