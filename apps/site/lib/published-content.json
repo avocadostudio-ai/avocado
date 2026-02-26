@@ -3,20 +3,18 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T20:08:14.184Z",
+    "updatedAt": "2026-02-26T21:05:27.560Z",
     "blocks": [
       {
-        "id": "b_hero_home",
+        "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Experience Avocado Excellence 🥑",
-          "subheading": "Savor the rich, creamy taste of our premium avocados. Ideal for gourmet dishes or simple snacks, they bring luxury and nutrition to every meal.",
-          "ctaText": "Explore the Possibilities",
-          "ctaHref": "/bananas",
+          "heading": "Discover the Magic of Avocados",
+          "subheading": "Fresh, nutritious, and sustainably grown — perfect for every meal.",
+          "ctaText": "Get Started",
+          "ctaHref": "/",
           "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
-          "imageAlt": "Image representing a supreme adventure",
-          "secondaryCtaText": "About us",
-          "secondaryCtaHref": "/about-us"
+          "imageAlt": "Close-up of avocados in natural light"
         }
       },
       {
@@ -442,78 +440,6 @@
               "a": "Yes, we offer international shipping to select countries. Please check our shipping policy for more details."
             }
           ]
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_test",
-    "slug": "/test",
-    "title": "Test",
-    "updatedAt": "2026-02-26T20:51:52.058Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772138902220",
-        "type": "Hero",
-        "props": {
-          "heading": "Discover the Magic of Avocados",
-          "subheading": "Fresh, nutritious, and sustainably grown — perfect for every meal.",
-          "ctaText": "Get Started",
-          "ctaHref": "/",
-          "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
-          "imageAlt": "Close-up of avocados in natural light"
-        }
-      },
-      {
-        "id": "b_featuregrid_1772138902220",
-        "type": "FeatureGrid",
-        "props": {
-          "title": "Featured Content",
-          "features": [
-            {
-              "title": "Avocado Culinary Delights",
-              "description": "Discover creative ways to use avocados in salads, smoothies, spreads, and even baking."
-            },
-            {
-              "title": "Avocado Wellness",
-              "description": "Learn how avocados support heart health and provide essential vitamins and nutrients."
-            },
-            {
-              "title": "Avocado Sustainability",
-              "description": "Explore how responsible farming methods ensure quality and environmental care."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_testimonials_1772138902220",
-        "type": "Testimonials",
-        "props": {
-          "title": "What Avocado Lovers Say",
-          "items": [
-            {
-              "quote": "Creamy texture and rich flavor make these avocados a staple in my kitchen.",
-              "author": "Emily Avocado"
-            },
-            {
-              "quote": "The versatility of these avocados is unmatched.",
-              "author": "Michael Green"
-            },
-            {
-              "quote": "Premium quality avocados that integrate perfectly into my lifestyle.",
-              "author": "Sarah Chef"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cta_1772139074922",
-        "type": "CTA",
-        "props": {
-          "title": "Join the Avocado Revolution",
-          "description": "Fresh, creamy, and packed with natural goodness — elevate every meal with premium avocados.",
-          "ctaText": "Explore the Flavor",
-          "ctaHref": "/"
         }
       }
     ]
