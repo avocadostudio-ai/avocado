@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { unstable_noStore as noStore } from "next/cache"
 import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
 import { EditorPreviewBridge } from "../../components/editor-harness"
@@ -12,6 +13,8 @@ type PageProps = {
 const DEFAULT_SESSION = "dev"
 const DEFAULT_EDITOR_ORIGIN = process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? "http://localhost:4100"
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 function buildSlug(parts?: string[]) {
   if (!parts || parts.length === 0) return "/"
@@ -46,6 +49,7 @@ export function generateStaticParams() {
 }
 
 export default async function SitePage({ params, searchParams }: PageProps) {
+  noStore()
   const resolvedParams = await params
   const resolvedSearch = await searchParams
   const slug = buildSlug(resolvedParams.slug)
@@ -54,13 +58,21 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
   const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
 
-  const page = await fetchDraftPage(slug, session)
-  const fetchedSlugs = await fetchDraftSlugs(session)
+  const page = await fetchDraftPage(slug, session, editorMode)
+  const fetchedSlugs = await fetchDraftSlugs(session, editorMode)
   const navRaw = Array.from(new Set([...(fetchedSlugs.length > 0 ? fetchedSlugs : ["/", "/pricing"]), slug]))
   const navSlugs = navRaw.includes("/") ? ["/", ...navRaw.filter((route) => route !== "/")] : navRaw
   const editorQuery = editorMode ? `?__editor=1&session=${encodeURIComponent(session)}&editorOrigin=${encodeURIComponent(editorOrigin)}` : ""
 
   if (!page) {
+    if (editorMode) {
+      return (
+        <main>
+          <h1>Draft unavailable</h1>
+          <p>Could not load draft content from orchestrator for {slug}.</p>
+        </main>
+      )
+    }
     return (
       <main>
         <h1>Page not found</h1>

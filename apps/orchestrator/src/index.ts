@@ -1,6 +1,8 @@
 import dotenv from "dotenv"
+import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { promisify } from "node:util"
 import { resolve } from "node:path"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
@@ -21,6 +23,7 @@ import {
 
 const app = Fastify({ logger: true })
 await app.register(cors, { origin: true })
+const execFileAsync = promisify(execFile)
 
 const envCandidates = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
 for (const path of envCandidates) {
@@ -38,8 +41,199 @@ const historyUndo = new Map<string, Map<string, PageDoc[]>>()
 const historyRedo = new Map<string, Map<string, PageDoc[]>>()
 const versions = new Map<string, number>()
 const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
+type PublishTracker = {
+  session: string
+  status: "triggered" | "failed"
+  startedAt: string
+  updatedAt: string
+  slugs: string[]
+  deployStatus?: number
+  deployResponse?: string
+  inspectUrl?: string
+  deploymentId?: string
+  deploymentUrl?: string
+  vercelState?: string
+  lastCheckError?: string
+}
+const publishStatusBySession = new Map<string, PublishTracker>()
 const stateFilePath = process.env.ORCHESTRATOR_STATE_FILE ?? resolve(process.cwd(), "../../.data/orchestrator-state.json")
 let persistTimer: NodeJS.Timeout | null = null
+
+function parseJsonMaybe(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+function findStringByKeys(root: unknown, wanted: Set<string>): string | undefined {
+  if (!root || typeof root !== "object") return undefined
+  if (Array.isArray(root)) {
+    for (const item of root) {
+      const found = findStringByKeys(item, wanted)
+      if (found) return found
+    }
+    return undefined
+  }
+  const obj = root as Record<string, unknown>
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === "string" && wanted.has(key)) return value
+    if (value && typeof value === "object") {
+      const found = findStringByKeys(value, wanted)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
+function firstUrlFromText(text: string): string | undefined {
+  const match = text.match(/https?:\/\/[^\s"']+/)
+  return match ? match[0] : undefined
+}
+
+function deploymentIdFromAny(input: string): string | undefined {
+  const match = input.match(/\b(dpl_[a-zA-Z0-9]+)\b/)
+  return match?.[1]
+}
+
+async function refreshPublishStatusFromVercel(current: PublishTracker) {
+  const token = process.env.VERCEL_TOKEN?.trim()
+  if (!token || !current.deploymentId) return current
+
+  const teamId = process.env.VERCEL_TEAM_ID?.trim()
+  const query = teamId ? `?teamId=${encodeURIComponent(teamId)}` : ""
+  try {
+    const res = await fetch(`https://api.vercel.com/v13/deployments/${current.deploymentId}${query}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) {
+      current.lastCheckError = `vercel_api_${res.status}`
+      current.updatedAt = new Date().toISOString()
+      return current
+    }
+
+    const payload = (await res.json()) as { readyState?: unknown; url?: unknown; inspectorUrl?: unknown }
+    const readyState = typeof payload.readyState === "string" ? payload.readyState.toUpperCase() : undefined
+    const url = typeof payload.url === "string" && payload.url.length > 0 ? `https://${payload.url}` : undefined
+    const inspectorUrl = typeof payload.inspectorUrl === "string" && payload.inspectorUrl.length > 0 ? payload.inspectorUrl : undefined
+
+    current.vercelState = readyState ?? current.vercelState
+    current.deploymentUrl = url ?? current.deploymentUrl
+    current.inspectUrl = inspectorUrl ?? current.inspectUrl
+    current.lastCheckError = undefined
+    current.updatedAt = new Date().toISOString()
+    return current
+  } catch (error) {
+    current.lastCheckError = toErrorDetail(error)
+    current.updatedAt = new Date().toISOString()
+    return current
+  }
+}
+
+function requirePublishToken(request: { headers: Record<string, unknown> }) {
+  const configured = process.env.PUBLISH_TOKEN?.trim()
+  if (!configured) return true
+  const provided = String(request.headers["x-publish-token"] ?? "").trim()
+  return provided.length > 0 && provided === configured
+}
+
+async function runGit(args: string[], cwd: string) {
+  const result = await execFileAsync("git", args, { cwd })
+  return { stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
+}
+
+function sanitizeBranch(input: string) {
+  const trimmed = input.trim()
+  return trimmed.length > 0 ? trimmed : "main"
+}
+
+async function publishViaGit(session: string) {
+  const repoRoot = resolve(process.cwd(), "../..")
+  const targetPath = "apps/site/lib/published-content.json"
+  const absoluteTargetPath = resolve(repoRoot, targetPath)
+  const branch = sanitizeBranch(process.env.PUBLISH_GIT_BRANCH ?? "main")
+  const strict = process.env.PUBLISH_GIT_STRICT === "1"
+  const pages = getSessionPages(session)
+  const slugs = pages.map((page) => page.slug)
+  const payload = `${JSON.stringify(pages, null, 2)}\n`
+
+  await writeFile(absoluteTargetPath, payload, "utf8")
+
+  const statusRaw = await runGit(["status", "--porcelain"], repoRoot)
+  const statusLines = statusRaw.stdout
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+
+  if (strict) {
+    const blocking = statusLines.filter((line) => !line.endsWith(` ${targetPath}`) && !line.endsWith(` ${targetPath.replace(/\//g, "\\/")}`))
+    if (blocking.length > 0) {
+      return {
+        status: "failed" as const,
+        session,
+        slugs,
+        reason: "working_tree_not_clean",
+        details: blocking.slice(0, 12)
+      }
+    }
+  }
+
+  await runGit(["add", targetPath], repoRoot)
+  const commitMessage = `publish: session ${session} ${new Date().toISOString()}`
+
+  try {
+    await runGit(["commit", "-m", commitMessage], repoRoot)
+  } catch (error) {
+    const detail = toErrorDetail(error)
+    if (detail.includes("nothing to commit")) {
+      return {
+        status: "ready" as const,
+        session,
+        slugs,
+        branch,
+        message: "No content changes to publish."
+      }
+    }
+    return {
+      status: "failed" as const,
+      session,
+      slugs,
+      reason: "commit_failed",
+      details: [detail]
+    }
+  }
+
+  let headSha = ""
+  try {
+    const rev = await runGit(["rev-parse", "HEAD"], repoRoot)
+    headSha = rev.stdout.trim()
+  } catch {
+    // Ignore; commit succeeded.
+  }
+
+  try {
+    await runGit(["push", "origin", branch], repoRoot)
+    return {
+      status: "triggered" as const,
+      session,
+      slugs,
+      branch,
+      commitSha: headSha || undefined,
+      vercelState: "TRIGGERED"
+    }
+  } catch (error) {
+    return {
+      status: "failed" as const,
+      session,
+      slugs,
+      branch,
+      commitSha: headSha || undefined,
+      reason: "push_failed",
+      details: [toErrorDetail(error)]
+    }
+  }
+}
 
 function ensureHeroImageProps(page: PageDoc) {
   for (const block of page.blocks) {
@@ -81,10 +275,12 @@ type ChatResult = {
   status: string
   summary: string
   changes: string[]
+  mentionedSlugs?: string[]
   suggestions?: string[]
   validationErrors?: unknown
   previewVersion: number
   focusBlockId?: string
+  updatedSlug?: string
   plannerSource: "openai" | "demo"
   modelUsed: string
   modelKey: ModelKey
@@ -311,6 +507,12 @@ function getHistoryMap(store: Map<string, Map<string, PageDoc[]>>, session: stri
 function getPage(session: string, slug: string) {
   const sessionDraft = getSessionDraft(session)
   return sessionDraft.get(slug) ?? null
+}
+
+function getSessionPages(session: string) {
+  const draft = getSessionDraft(session)
+  const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
+  return slugs.map((slug) => structuredClone(draft.get(slug)!))
 }
 
 function setPage(session: string, page: PageDoc) {
@@ -665,9 +867,177 @@ function normalizeOpName(op: unknown) {
     move_block: "move_block",
     moveblock: "move_block",
     reorder_block: "move_block",
-    reorderblock: "move_block"
+    reorderblock: "move_block",
+    duplicate_block: "duplicate_block",
+    duplicateblock: "duplicate_block",
+    copy_block: "duplicate_block",
+    copyblock: "duplicate_block",
+    clone_block: "duplicate_block",
+    cloneblock: "duplicate_block",
+    move_page: "move_page",
+    movepage: "move_page",
+    reorder_page: "move_page",
+    reorderpage: "move_page",
+    duplicate_page: "duplicate_page",
+    duplicatepage: "duplicate_page",
+    copy_page: "duplicate_page",
+    copypage: "duplicate_page",
+    clone_page: "duplicate_page",
+    clonepage: "duplicate_page",
+    rename: "rename_page",
+    rename_page: "rename_page",
+    renamepage: "rename_page",
+    remove_page: "remove_page",
+    removepage: "remove_page",
+    delete_page: "remove_page",
+    deletepage: "remove_page"
   }
   return aliases[key] ?? op
+}
+
+function normalizeRouteCandidate(candidate: unknown): string | null {
+  if (typeof candidate !== "string") return null
+  const trimmed = candidate.trim()
+  if (!trimmed) return null
+  if (trimmed === "/") return "/"
+  if (trimmed.startsWith("/")) return trimmed
+  if (/^[a-z0-9][a-z0-9/_-]*$/i.test(trimmed)) return `/${trimmed}`
+  return null
+}
+
+function firstRouteMention(message?: string) {
+  if (!message) return null
+  const match = message.match(/\/[a-z0-9/_-]*/i)
+  if (!match) return null
+  return normalizeRouteCandidate(match[0])
+}
+
+function extractRouteMentions(message?: string) {
+  if (!message) return []
+  const matches = message.match(/\/[a-z0-9/_-]*/gi) ?? []
+  const out: string[] = []
+  for (const item of matches) {
+    const normalized = normalizeRouteCandidate(item)
+    if (!normalized) continue
+    if (out.includes(normalized)) continue
+    out.push(normalized)
+  }
+  return out
+}
+
+function orderSlugsHomeFirst(slugs: string[]) {
+  return slugs.includes("/") ? ["/", ...slugs.filter((route) => route !== "/")] : slugs
+}
+
+function isPageRouteRenameRequest(message?: string) {
+  if (!message) return false
+  const lower = message.toLowerCase()
+  const mentionsRoute = lower.includes("slug") || lower.includes("path") || lower.includes("route") || /\/[a-z0-9/_-]*/i.test(message)
+  const asksRename =
+    lower.includes("rename") ||
+    lower.includes("change") ||
+    lower.includes("update") ||
+    lower.includes("move") ||
+    lower.includes("switch")
+  const mentionsPage = lower.includes("page") || lower.includes("this page")
+  return mentionsRoute && asksRename && mentionsPage
+}
+
+function pageIdFromSlug(slug: string) {
+  if (slug === "/") return "p_home"
+  const core = slug
+    .slice(1)
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "")
+  return `p_${core || "page"}`
+}
+
+function pageTitleFromSlug(slug: string) {
+  if (slug === "/") return "Home"
+  const text = slug
+    .slice(1)
+    .split("/")
+    .filter(Boolean)
+    .map((part) => part.replace(/[-_]/g, " "))
+    .join(" ")
+    .trim()
+  if (!text) return "Untitled Page"
+  return text
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function remapRouteReference(value: string, fromSlug: string, toSlug: string) {
+  if (!value.startsWith("/")) return value
+  if (fromSlug === "/") {
+    if (value === "/") return toSlug
+    if (value.startsWith("/?") || value.startsWith("/#")) return `${toSlug}${value.slice(1)}`
+    return value
+  }
+  if (value === fromSlug) return toSlug
+  if (value.startsWith(`${fromSlug}/`) || value.startsWith(`${fromSlug}?`) || value.startsWith(`${fromSlug}#`)) {
+    return `${toSlug}${value.slice(fromSlug.length)}`
+  }
+  return value
+}
+
+function rewriteRouteLinksInValue(input: unknown, fromSlug: string, toSlug: string): { value: unknown; changed: boolean } {
+  if (typeof input === "string") {
+    const mapped = remapRouteReference(input, fromSlug, toSlug)
+    return { value: mapped, changed: mapped !== input }
+  }
+
+  if (Array.isArray(input)) {
+    let changed = false
+    const next = input.map((item) => {
+      const mapped = rewriteRouteLinksInValue(item, fromSlug, toSlug)
+      if (mapped.changed) changed = true
+      return mapped.value
+    })
+    return { value: changed ? next : input, changed }
+  }
+
+  if (!input || typeof input !== "object") return { value: input, changed: false }
+  const source = input as Record<string, unknown>
+  let changed = false
+  const next: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value === "string" && key.toLowerCase().includes("href")) {
+      const mapped = remapRouteReference(value, fromSlug, toSlug)
+      if (mapped !== value) changed = true
+      next[key] = mapped
+      continue
+    }
+    if (typeof value === "string" && key === "body") {
+      const rewritten = value.replace(/\]\((\/[^)\s]+)\)/g, (full, routeCandidate: string) => {
+        const mapped = remapRouteReference(routeCandidate, fromSlug, toSlug)
+        if (mapped !== routeCandidate) return `](${mapped})`
+        return full
+      })
+      if (rewritten !== value) changed = true
+      next[key] = rewritten
+      continue
+    }
+    const mapped = rewriteRouteLinksInValue(value, fromSlug, toSlug)
+    if (mapped.changed) changed = true
+    next[key] = mapped.value
+  }
+
+  return { value: changed ? next : input, changed }
+}
+
+function rewriteLinksToRenamedPage(page: PageDoc, fromSlug: string, toSlug: string) {
+  let changed = false
+  const nextBlocks = page.blocks.map((block) => {
+    const mapped = rewriteRouteLinksInValue(block.props, fromSlug, toSlug)
+    if (!mapped.changed) return block
+    changed = true
+    return { ...block, props: mapped.value as Record<string, unknown> }
+  })
+  if (!changed) return { changed: false, page }
+  return { changed: true, page: { ...page, blocks: nextBlocks, updatedAt: new Date().toISOString() } }
 }
 
 function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; currentPage?: PageDoc; userMessage?: string }) {
@@ -675,12 +1045,16 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
   const root = input as Record<string, unknown>
   const ops = Array.isArray(root.ops) ? root.ops : Array.isArray(root.operations) ? root.operations : []
   const userMessage = (args?.userMessage ?? "").toLowerCase()
+  const requestedRoute = firstRouteMention(args?.userMessage)
+  const routeMentions = extractRouteMentions(args?.userMessage)
+  const createPageIntent = /\bcreate\b.*\bpage\b|\bnew\s+page\b/.test(userMessage)
 
   const resolvePageSlug = (candidate: unknown) => {
-    if (typeof candidate !== "string" || candidate.length === 0) return args?.defaultSlug
-    if (candidate.startsWith("/")) return candidate
+    const normalized = normalizeRouteCandidate(candidate)
+    if (normalized) return normalized
 
     if (args?.currentPage) {
+      if (typeof candidate !== "string") return args?.defaultSlug
       if (candidate === args.currentPage.id) return args.currentPage.slug
       if (candidate.toLowerCase() === "home" && args.currentPage.slug === "/") return "/"
     }
@@ -695,6 +1069,8 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     return args.currentPage.blocks[idx - 1]?.id
   }
 
+  let createdPageSlug: string | undefined
+  let droppedPageLevelUpdate = false
   const normalizedOps = ops.flatMap((item) => {
     if (!item || typeof item !== "object") return item
     const source = item as Record<string, unknown>
@@ -702,7 +1078,18 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
 
     // Accept malformed one-key op objects like { "move_block": { ...fields } }.
     if (!raw.op && !raw.operation && !raw.action && !raw.kind) {
-      for (const key of ["create_page", "add_block", "update_props", "remove_block", "move_block"] as const) {
+      for (const key of [
+        "create_page",
+        "add_block",
+        "update_props",
+        "remove_block",
+        "move_block",
+        "duplicate_block",
+        "rename_page",
+        "remove_page",
+        "move_page",
+        "duplicate_page"
+      ] as const) {
         const value = source[key]
         if (value && typeof value === "object" && !Array.isArray(value)) {
           Object.assign(raw, value as Record<string, unknown>)
@@ -720,17 +1107,110 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
         ? allowedBlockTypes.find((type) => type.toLowerCase() === rawType.toLowerCase()) ?? inferBlockTypeFromText(rawType)
         : undefined
 
-    raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? raw.path)
+    raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? raw.path ?? raw.route ?? raw.from)
+    raw.newPageSlug = normalizeRouteCandidate(
+      raw.newPageSlug ?? raw.new_page_slug ?? raw.targetSlug ?? raw.target_slug ?? raw.toPageSlug ?? raw.to_page_slug ?? raw.to
+    )
     if (!raw.blockId) {
       const pathCandidate = typeof raw.path === "string" && raw.path.startsWith("b_") ? raw.path : undefined
-      raw.blockId = raw.block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.id ?? pathCandidate
+      raw.blockId =
+        raw.block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.sourceBlockId ?? raw.source_block_id ?? raw.id ?? pathCandidate
+    }
+    if (!raw.newBlockId) {
+      raw.newBlockId = raw.new_block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.copiedBlockId ?? raw.copied_block_id
     }
     if (!raw.afterBlockId) {
       raw.afterBlockId =
         raw.after_block_id ?? raw.after ?? raw.insertAfterId ?? beforeToAfter(raw.beforeId ?? raw.insertBeforeId)
     }
+    if (!raw.afterPageSlug) {
+      raw.afterPageSlug =
+        raw.afterPageSlug ??
+        raw.after_page_slug ??
+        raw.afterPage ??
+        raw.after_page ??
+        raw.anchorPageSlug ??
+        raw.anchor_page_slug ??
+        raw.after
+    }
+    raw.afterPageSlug = resolvePageSlug(raw.afterPageSlug)
+    raw.beforePageSlug = resolvePageSlug(raw.beforePageSlug ?? raw.before_page_slug ?? raw.beforePage ?? raw.before_page)
     if (!raw.patch) {
       raw.patch = raw.props ?? raw.changes
+    }
+
+    if (
+      raw.op === "update_props" &&
+      (!raw.blockId || typeof raw.blockId !== "string") &&
+      args?.defaultSlug
+    ) {
+      const patch = patchObject(raw.patch)
+      const newSlugFromPatch = normalizeRouteCandidate(patch?.slug ?? patch?.path ?? patch?.route)
+      const newSlugFromPath = typeof raw.path === "string" && raw.path.startsWith("/") ? normalizeRouteCandidate(raw.path) : null
+      const fromSlugFromMentions = routeMentions[0]
+      const toSlugFromMentions = routeMentions.length >= 2 ? routeMentions[routeMentions.length - 1] : undefined
+      const nextSlug = raw.newPageSlug ?? newSlugFromPatch ?? newSlugFromPath ?? toSlugFromMentions
+      const fromSlug = resolvePageSlug(raw.pageSlug ?? raw.fromPageSlug ?? raw.from_page_slug ?? raw.oldSlug ?? fromSlugFromMentions)
+      if (fromSlug && nextSlug && fromSlug !== nextSlug) {
+        raw.op = "rename_page"
+        raw.pageSlug = fromSlug
+        raw.newPageSlug = nextSlug
+        delete raw.patch
+      }
+    }
+
+    if (raw.op === "remove_block" && (!raw.blockId || typeof raw.blockId !== "string")) {
+      const asksDeletePage = /\b(delete|remove)\b.*\bpage\b/.test(userMessage)
+      if (asksDeletePage) {
+        raw.op = "remove_page"
+        raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? raw.route ?? routeMentions[0] ?? args?.defaultSlug)
+      }
+    }
+
+    if (raw.op === "rename_page") {
+      const nextSlug =
+        raw.newPageSlug ??
+        normalizeRouteCandidate(raw.path) ??
+        normalizeRouteCandidate(raw.route) ??
+        normalizeRouteCandidate(raw.slug) ??
+        (routeMentions.length >= 2 ? routeMentions[routeMentions.length - 1] : undefined)
+      raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.fromPageSlug ?? raw.from_page_slug ?? raw.oldSlug ?? routeMentions[0])
+      raw.newPageSlug = nextSlug
+      if (!raw.newTitle && typeof raw.title === "string" && raw.title.trim().length > 0) raw.newTitle = raw.title.trim()
+      if (
+        typeof raw.pageSlug === "string" &&
+        typeof raw.newPageSlug === "string" &&
+        raw.pageSlug === raw.newPageSlug
+      ) {
+        return null
+      }
+    }
+
+    if (raw.op === "remove_page") {
+      raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? raw.route ?? routeMentions[0] ?? args?.defaultSlug)
+    }
+
+    if (raw.op === "move_page") {
+      raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? raw.route ?? routeMentions[0] ?? args?.defaultSlug)
+      if (!raw.afterPageSlug && raw.beforePageSlug && args?.currentPage) {
+        if (raw.beforePageSlug === "/") raw.afterPageSlug = undefined
+        else if (raw.beforePageSlug === args.currentPage.slug) raw.afterPageSlug = undefined
+      }
+      if (!raw.afterPageSlug && routeMentions.length >= 2) {
+        const lower = userMessage
+        if (/\b(after|below|under)\b/.test(lower)) raw.afterPageSlug = routeMentions[1]
+      }
+    }
+
+    if (raw.op === "duplicate_page") {
+      raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? raw.route ?? raw.from ?? routeMentions[0] ?? args?.defaultSlug)
+      raw.newPageSlug = normalizeRouteCandidate(
+        raw.newPageSlug ?? raw.new_page_slug ?? raw.targetSlug ?? raw.target_slug ?? raw.toPageSlug ?? raw.to_page_slug ?? raw.to
+      )
+      if (!raw.afterPageSlug && routeMentions.length >= 2) {
+        const lower = userMessage
+        if (/\b(after|below|under)\b/.test(lower)) raw.afterPageSlug = routeMentions[1]
+      }
     }
     if (!raw.block) {
       raw.block = raw.newBlock ?? raw.new_block
@@ -761,8 +1241,16 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
       raw.block = block
     }
 
+    const createSlugCandidate = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? requestedRoute)
+    const explicitCreateTarget = createSlugCandidate && createSlugCandidate !== args?.defaultSlug
+
     // LLMs sometimes emit create_page when they actually mean add_block.
-    if (raw.op === "create_page" && !raw.page && (raw.block || normalizedType || raw.blockId || raw.patch || raw.props)) {
+    if (
+      raw.op === "create_page" &&
+      !raw.page &&
+      !explicitCreateTarget &&
+      (raw.block || normalizedType || raw.blockId || raw.patch || raw.props)
+    ) {
       raw.op = "add_block"
       raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? args?.defaultSlug)
     }
@@ -803,6 +1291,68 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
       return out.length > 0 ? out : raw
     }
 
+    // Accept lightweight or partial create_page operations and synthesize a valid PageDoc payload.
+    if (raw.op === "create_page") {
+      const pageInput =
+        raw.page && typeof raw.page === "object" && !Array.isArray(raw.page) ? (raw.page as Record<string, unknown>) : {}
+      const pageSlugInput =
+        pageInput.slug ?? raw.pageSlug ?? raw.page_slug ?? raw.path ?? raw.slug ?? raw.route ?? requestedRoute ?? args?.defaultSlug ?? "/"
+      const slug = resolvePageSlug(pageSlugInput) ?? requestedRoute ?? args?.defaultSlug ?? "/"
+      const nowIso = new Date().toISOString()
+      const blocks: PageDoc["blocks"] = []
+
+      if (Array.isArray(pageInput.blocks)) {
+        for (const candidate of pageInput.blocks) {
+          if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue
+          const block = candidate as Record<string, unknown>
+          const typeRaw = typeof block.type === "string" ? block.type : ""
+          const blockType =
+            allowedBlockTypes.find((t) => t.toLowerCase() === typeRaw.toLowerCase()) ?? inferBlockTypeFromText(typeRaw)
+          if (!blockType) continue
+          const id = typeof block.id === "string" && block.id.length > 0 ? block.id : `b_${blockType.toLowerCase()}_${Date.now()}`
+          const props =
+            block.props && typeof block.props === "object" && !Array.isArray(block.props)
+              ? { ...defaultPropsForType(blockType), ...(block.props as Record<string, unknown>) }
+              : defaultPropsForType(blockType)
+          blocks.push({ id, type: blockType, props })
+        }
+      }
+
+      if (blocks.length === 0 && raw.block && typeof raw.block === "object" && !Array.isArray(raw.block)) {
+        const block = { ...(raw.block as Record<string, unknown>) }
+        const typeRaw = typeof block.type === "string" ? block.type : normalizedType
+        const blockType =
+          typeof typeRaw === "string"
+            ? allowedBlockTypes.find((t) => t.toLowerCase() === typeRaw.toLowerCase()) ?? inferBlockTypeFromText(typeRaw)
+            : undefined
+        if (blockType) {
+          const id = typeof block.id === "string" && block.id.length > 0 ? block.id : `b_${blockType.toLowerCase()}_${Date.now()}`
+          const props =
+            block.props && typeof block.props === "object" && !Array.isArray(block.props)
+              ? { ...defaultPropsForType(blockType), ...(block.props as Record<string, unknown>) }
+              : defaultPropsForType(blockType)
+          blocks.push({ id, type: blockType, props })
+        }
+      }
+
+      raw.page = {
+        id: typeof pageInput.id === "string" && pageInput.id.trim().length > 0 ? pageInput.id.trim() : pageIdFromSlug(slug),
+        slug,
+        title:
+          typeof pageInput.title === "string" && pageInput.title.trim().length > 0 ? pageInput.title.trim() : pageTitleFromSlug(slug),
+        updatedAt:
+          typeof pageInput.updatedAt === "string" && pageInput.updatedAt.trim().length > 0 ? pageInput.updatedAt.trim() : nowIso,
+        blocks
+      } satisfies PageDoc
+      raw.pageSlug = slug
+      createdPageSlug = slug
+    }
+
+    // If model mixes create_page + add_block and keeps add_block on the current route, move it to the new route.
+    if (raw.op === "add_block" && createPageIntent && createdPageSlug && raw.pageSlug === args?.defaultSlug) {
+      raw.pageSlug = createdPageSlug
+    }
+
     // Intent repair: if user asked for bottom/end and model omitted an anchor, place at end.
     if (
       (raw.op === "move_block" || raw.op === "add_block") &&
@@ -823,7 +1373,38 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     return raw
   })
 
-  return { ...root, ops: normalizedOps }
+  const sanitizedOps = normalizedOps.filter((item) => {
+    if (!item) return false
+    if (typeof item !== "object" || Array.isArray(item)) return true
+    const raw = item as Record<string, unknown>
+    if (normalizeOpName(raw.op) !== "update_props") return true
+    if (typeof raw.blockId === "string" && raw.blockId.length > 0) return true
+    const patch = patchObject(raw.patch)
+    const hasPageLevelPatch =
+      !!patch &&
+      (typeof patch.slug === "string" || typeof patch.path === "string" || typeof patch.route === "string" || typeof patch.title === "string")
+    const pathLooksLikeRoute = typeof raw.path === "string" && raw.path.startsWith("/")
+    if (hasPageLevelPatch || pathLooksLikeRoute) {
+      droppedPageLevelUpdate = true
+      return false
+    }
+    return false
+  })
+
+  if (droppedPageLevelUpdate && sanitizedOps.length === 0) {
+    return {
+      ...root,
+      intent: "needs_clarification",
+      summary_for_user: "I could not infer a valid page operation. Specify the source and target routes explicitly.",
+      change_log: [
+        "Ignored an invalid page-level update_props operation that was missing blockId.",
+        "Try: rename page from /old to /new, or delete page /path."
+      ],
+      ops: []
+    }
+  }
+
+  return { ...root, ops: sanitizedOps }
 }
 
 function blockContractsSummary() {
@@ -868,7 +1449,7 @@ function blockContractsSummary() {
       allowedProps: ["title", "body"],
       required: ["body"],
       optional: ["title"],
-      notes: "body is a string; use \\n\\n to separate paragraphs and **word** for bold text. title is an optional section heading. Never invent prop names."
+      notes: "body is a string; use \\n\\n to separate paragraphs. Supported inline syntax: **word** for bold, *word* for italic, [text](url) for links, '# Heading' lines become h3 headings. title is an optional section heading. Never invent prop names."
     }
   }
 }
@@ -1106,6 +1687,7 @@ function plannerContextPack(args: {
   activeEditablePath?: string
 }) {
   const { session, slug, message, currentPage, activeBlockId, activeBlockType, activeEditablePath } = args
+  const pageRoutes = orderSlugsHomeFirst(Array.from(getSessionDraft(session).keys()))
   const selectedIdx = activeBlockId ? currentPage.blocks.findIndex((b) => b.id === activeBlockId) : -1
   const neighbors =
     selectedIdx >= 0
@@ -1117,6 +1699,7 @@ function plannerContextPack(args: {
 
   return {
     route: slug,
+    pageRoutes,
     blockCount: currentPage.blocks.length,
     selected: {
       blockId: activeBlockId ?? null,
@@ -1320,6 +1903,57 @@ function inferSimpleFieldPatchFromMessage(message: string) {
   return { [key]: value } as Record<string, unknown>
 }
 
+function isRewriteRequest(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes("rewrite") ||
+    lower.includes("reword") ||
+    lower.includes("improve") ||
+    lower.includes("simplif") ||
+    lower.includes("make this shorter") ||
+    lower.includes("shorten")
+  )
+}
+
+function inferFieldHintFromMessage(message: string, allowedKeys: string[]) {
+  const lower = message.toLowerCase()
+  const keyMap: Array<{ test: RegExp; key: string }> = [
+    { test: /\btitle\b|\bheading\b/, key: "title" },
+    { test: /\bdescription\b|\bbody\b|\bcopy\b/, key: "description" },
+    { test: /\bcta\s*text\b|\bbutton\s*text\b/, key: "ctaText" },
+    { test: /\bcta\s*link\b|\bhref\b|\blink\b|\burl\b/, key: "ctaHref" },
+    { test: /\bquote\b/, key: "quote" },
+    { test: /\bauthor\b/, key: "author" },
+    { test: /\bquestion\b|\bfaq\s*q\b/, key: "q" },
+    { test: /\banswer\b|\bfaq\s*a\b/, key: "a" }
+  ]
+
+  for (const entry of keyMap) {
+    if (entry.test.test(lower) && allowedKeys.includes(entry.key)) return entry.key
+  }
+  return allowedKeys[0]
+}
+
+function rewriteFromExisting(existing: string, message: string) {
+  let next = existing
+    .replace(/\bamazing\b/gi, "great")
+    .replace(/\bincredible\b/gi, "powerful")
+    .replace(/\breally\b/gi, "")
+    .replace(/\bvery\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+
+  if (/short|shorter|concise|brief/i.test(message)) {
+    const sentence = next.split(/[.!?]/)[0]?.trim()
+    if (sentence) next = sentence.endsWith(".") ? sentence : `${sentence}.`
+  }
+
+  if (next === existing) {
+    next = existing.endsWith(".") ? `${existing.slice(0, -1)} today.` : `${existing} today.`
+  }
+  return next
+}
+
 function coercePatchForEditablePath(block: PageDoc["blocks"][number], editablePath: string | undefined, rawPatch: unknown, message: string) {
   if (!editablePath) return null
   const directKey = editablePath.trim()
@@ -1340,6 +1974,10 @@ function coercePatchForEditablePath(block: PageDoc["blocks"][number], editablePa
       const quoted = quotedText(message)
       if (quoted) value = quoted
     }
+    if (value === undefined && isRewriteRequest(message)) {
+      const existing = blockProps[directKey]
+      if (typeof existing === "string" && existing.trim().length > 0) value = rewriteFromExisting(existing, message)
+    }
     if (value === undefined) return null
 
     return {
@@ -1359,19 +1997,31 @@ function coercePatchForEditablePath(block: PageDoc["blocks"][number], editablePa
   const row = rowRaw as Record<string, unknown>
 
   const source = patchObject(rawPatch) ?? inferSimpleFieldPatchFromMessage(message)
-  if (!source) return null
 
   const allowedItemKeys = Object.keys(row)
   const normalizedToAllowed = new Map<string, string>()
   for (const key of allowedItemKeys) normalizedToAllowed.set(key.toLowerCase(), key)
 
   const itemPatch: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(source)) {
-    const normalized = key.trim()
-    const fromPathPrefix = `${parsed.listKey}[${parsed.index}].`
-    const childKey = normalized.startsWith(fromPathPrefix) ? normalized.slice(fromPathPrefix.length) : normalized
-    const mapped = normalizedToAllowed.get(childKey.toLowerCase())
-    if (mapped) itemPatch[mapped] = value
+  if (source) {
+    for (const [key, value] of Object.entries(source)) {
+      const normalized = key.trim()
+      const fromPathPrefix = `${parsed.listKey}[${parsed.index}].`
+      const childKey = normalized.startsWith(fromPathPrefix) ? normalized.slice(fromPathPrefix.length) : normalized
+      const mapped = normalizedToAllowed.get(childKey.toLowerCase())
+      if (mapped) itemPatch[mapped] = value
+    }
+  }
+
+  if (Object.keys(itemPatch).length === 0 && isRewriteRequest(message)) {
+    const preferredKey =
+      (parsed.leaf && normalizedToAllowed.get(parsed.leaf.toLowerCase())) ?? inferFieldHintFromMessage(message, allowedItemKeys)
+    if (preferredKey) {
+      const existing = row[preferredKey]
+      if (typeof existing === "string" && existing.trim().length > 0) {
+        itemPatch[preferredKey] = rewriteFromExisting(existing, message)
+      }
+    }
   }
   if (Object.keys(itemPatch).length === 0) return null
 
@@ -1426,6 +2076,7 @@ function buildListAppendPatch(block: PageDoc["blocks"][number], message: string)
 }
 
 function compileDeterministicPlan(args: {
+  session: string
   intent: ParsedIntent
   message: string
   slug: string
@@ -1433,12 +2084,156 @@ function compileDeterministicPlan(args: {
   activeBlockId?: string
   activeEditablePath?: string
 }): EditPlan | null {
-  const { intent, message, slug, currentPage, activeBlockId, activeEditablePath } = args
+  const { session, intent, message, slug, currentPage, activeBlockId, activeEditablePath } = args
   const lowerMessage = message.toLowerCase()
+  const routeMentions = extractRouteMentions(message)
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
 
   const selectedBlock = activeBlockId ? currentPage.blocks.find((b) => b.id === activeBlockId) ?? null : null
+  const secondaryButtonMentioned =
+    lowerMessage.includes("secondary cta") ||
+    lowerMessage.includes("secondary button") ||
+    lowerMessage.includes("second cta") ||
+    lowerMessage.includes("second button") ||
+    /sec\w*nd\w*ry\s+(cta|button)/.test(lowerMessage)
+  const asksSecondaryCtaAdd =
+    secondaryButtonMentioned &&
+    (lowerMessage.includes("add") || lowerMessage.includes("create") || lowerMessage.includes("insert") || lowerMessage.includes("include"))
+
+  const asksPageRename = isPageRouteRenameRequest(message)
+  if ((intent.action === "update" || intent.action === "move" || intent.action === "clarify") && asksPageRename) {
+    const fromSlug = routeMentions[0] ?? slug
+    const toSlug = routeMentions.length >= 2 ? routeMentions[routeMentions.length - 1] : undefined
+    if (!toSlug || toSlug === fromSlug) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "Please provide the target page path, for example: rename page from /old to /new.",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+    return {
+      intent: "edit_plan",
+      summary_for_user: `Renamed page path from ${fromSlug} to ${toSlug}.`,
+      change_log: [...assumptions, `Renamed page ${fromSlug} -> ${toSlug}.`],
+      ops: [{ op: "rename_page", pageSlug: fromSlug, newPageSlug: toSlug }]
+    }
+  }
+
+  const asksPageDelete = /\b(delete|remove)\b.*\bpage\b/.test(lowerMessage)
+  if ((intent.action === "remove" || intent.action === "clarify") && asksPageDelete) {
+    const targetSlug = routeMentions[0] ?? slug
+    if (targetSlug === "/") {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "Home page (/) cannot be deleted. Choose another page path.",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+    return {
+      intent: "edit_plan",
+      summary_for_user: `Deleted page ${targetSlug}.`,
+      change_log: [...assumptions, `Removed page ${targetSlug}.`],
+      ops: [{ op: "remove_page", pageSlug: targetSlug }]
+    }
+  }
+
+  const asksNavMove =
+    /\b(nav|navigation|menu|tabs?|tab order|page order)\b/.test(lowerMessage) ||
+    /\bmove\b.*\b(page|tab)\b/.test(lowerMessage) ||
+    /\breorder\b.*\b(page|nav|menu|tabs?)\b/.test(lowerMessage)
+  if ((intent.action === "move" || intent.action === "clarify") && asksNavMove) {
+    const sessionDraft = getSessionDraft(session)
+    const slugsRaw = Array.from(sessionDraft.keys())
+    const ordered = slugsRaw.includes("/") ? ["/", ...slugsRaw.filter((route) => route !== "/")] : slugsRaw
+    const movedSlug = routeMentions[0] ?? slug
+    if (!ordered.includes(movedSlug)) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: `I could not find page ${movedSlug}.`,
+        change_log: assumptions,
+        ops: []
+      }
+    }
+    if (movedSlug === "/") {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "Home page (/) is fixed at the first position in navigation.",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+
+    let afterPageSlug: string | undefined
+    if (/\b(top|first|start|beginning)\b/.test(lowerMessage)) {
+      afterPageSlug = undefined
+    } else if (/\b(bottom|last|end)\b/.test(lowerMessage)) {
+      const tail = [...ordered].reverse().find((route) => route !== movedSlug)
+      afterPageSlug = tail === "/" ? "/" : tail
+    } else if (/\b(after|below|under)\b/.test(lowerMessage) && routeMentions.length >= 2) {
+      afterPageSlug = routeMentions[1]
+    } else if (/\b(before|above)\b/.test(lowerMessage) && routeMentions.length >= 2) {
+      const anchor = routeMentions[1]
+      if (anchor === "/") afterPageSlug = undefined
+      else {
+        const index = ordered.findIndex((route) => route === anchor)
+        if (index === -1) {
+          return {
+            intent: "needs_clarification",
+            summary_for_user: `I could not find anchor page ${anchor}.`,
+            change_log: assumptions,
+            ops: []
+          }
+        }
+        const previous = ordered.slice(0, index).reverse().find((route) => route !== movedSlug)
+        afterPageSlug = previous === "/" ? "/" : previous
+      }
+    } else if (routeMentions.length >= 2) {
+      afterPageSlug = routeMentions[1]
+    } else {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "Specify where to place the page (first/last/before/after).",
+        change_log: assumptions,
+        ops: []
+      }
+    }
+
+    return {
+      intent: "edit_plan",
+      summary_for_user:
+        afterPageSlug === undefined
+          ? `Moved ${movedSlug} to the first nav position (after Home).`
+          : `Moved ${movedSlug} after ${afterPageSlug}.`,
+      change_log: [...assumptions, `Reordered nav: ${movedSlug}`],
+      ops: [{ op: "move_page", pageSlug: movedSlug, afterPageSlug }]
+    }
+  }
+
+  if (
+    selectedBlock?.type === "Hero" &&
+    asksSecondaryCtaAdd &&
+    (intent.action === "add" || intent.action === "clarify" || intent.action === "update")
+  ) {
+    const heroProps = selectedBlock.props as Record<string, unknown>
+    const existingText = typeof heroProps.secondaryCtaText === "string" ? heroProps.secondaryCtaText.trim() : ""
+    const existingHref = typeof heroProps.secondaryCtaHref === "string" ? heroProps.secondaryCtaHref.trim() : ""
+    const quoted = quotedText(message)
+    const patch: Record<string, unknown> = {
+      secondaryCtaText: quoted ?? (existingText.length > 0 ? existingText : "Learn more"),
+      secondaryCtaHref: existingHref.length > 0 ? existingHref : "/"
+    }
+
+    return {
+      intent: "edit_plan",
+      summary_for_user: "Added a secondary CTA button to the selected Hero.",
+      change_log: [...assumptions, `Updated ${selectedBlock.id}: secondaryCtaText, secondaryCtaHref`],
+      ops: [{ op: "update_props", pageSlug: slug, blockId: selectedBlock.id, patch }]
+    }
+  }
+
   const asksInlineAdd =
     lowerMessage.includes("add") &&
     (lowerMessage.includes("inside") ||
@@ -1459,7 +2254,7 @@ function compileDeterministicPlan(args: {
     }
   }
 
-  if (intent.action === "info" || intent.action === "clarify") {
+  if (intent.action === "info" || (intent.action === "clarify" && !activeEditablePath)) {
     return {
       intent: "needs_clarification",
       summary_for_user: intent.summary ?? "Please specify the section and exact change you want.",
@@ -1491,7 +2286,7 @@ function compileDeterministicPlan(args: {
     }
   }
 
-  if (intent.action === "update") {
+  if (intent.action === "update" || (intent.action === "clarify" && !!activeEditablePath)) {
     const target = resolveBlockRef({
       ref: intent.target_block_ref,
       currentPage,
@@ -1794,7 +2589,11 @@ async function generatePlanWithOpenAI(args: {
     "If request is ambiguous, return intent=needs_clarification and no ops.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
-    "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block.",
+    "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block, duplicate_block, rename_page, remove_page, move_page, duplicate_page.",
+    "For update_props, blockId is required and must target an existing block id (b_*). Never use a page route/path as blockId or path.",
+    "Use rename_page for page route changes (pageSlug -> newPageSlug).",
+    "Use remove_page when the user asks to delete a page path.",
+    "Use move_page to reorder nav pages (pageSlug + optional afterPageSlug). Home (/) must stay first.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
@@ -1889,15 +2688,152 @@ function toErrorDetail(error: unknown) {
 }
 
 function applyOpsAtomically(session: string, ops: Operation[]) {
+  const nextUniqueBlockId = (blocks: Array<{ id: string }>, preferred: string) => {
+    const base = preferred.trim()
+    if (base.length > 0 && !blocks.some((b) => b.id === base)) return base
+    const root = base.length > 0 ? base : "b_block_copy"
+    let i = 1
+    while (blocks.some((b) => b.id === `${root}_${i}`)) i += 1
+    return `${root}_${i}`
+  }
+
+  const nextDuplicateSlug = (candidateMap: Map<string, PageDoc>, sourceSlug: string) => {
+    const base = sourceSlug === "/" ? "/home-copy" : `${sourceSlug.replace(/\/+$/, "")}-copy`
+    if (!candidateMap.has(base)) return base
+    let i = 2
+    while (candidateMap.has(`${base}-${i}`)) i += 1
+    return `${base}-${i}`
+  }
+
+  const rebuildOrderWithInserted = (candidateMap: Map<string, PageDoc>, insertedSlug: string, afterPageSlug?: string) => {
+    const ordered = orderSlugsHomeFirst(Array.from(candidateMap.keys()))
+    const withoutInserted = ordered.filter((slug) => slug !== insertedSlug)
+    let insertIndex = 0
+    if (afterPageSlug) {
+      if (afterPageSlug === "/") insertIndex = 1
+      else {
+        const anchorIdx = withoutInserted.findIndex((slug) => slug === afterPageSlug)
+        if (anchorIdx === -1) throw new Error(`afterPageSlug ${afterPageSlug} not found`)
+        insertIndex = anchorIdx + 1
+      }
+    }
+    withoutInserted.splice(insertIndex, 0, insertedSlug)
+    return withoutInserted
+  }
+
   const sessionDraft = getSessionDraft(session)
   const staged = new Map<string, PageDoc>()
   for (const [slug, page] of sessionDraft) staged.set(slug, structuredClone(page))
   const touchedSlugs = new Set<string>()
+  const deletedSlugs = new Set<string>()
+  let orderChanged = false
 
   for (const op of ops) {
     if (op.op === "create_page") {
       staged.set(op.page.slug, structuredClone(op.page))
       touchedSlugs.add(op.page.slug)
+      continue
+    }
+
+    if (op.op === "duplicate_page") {
+      const source = staged.get(op.pageSlug)
+      if (!source) throw new Error(`Page not found for slug ${op.pageSlug}`)
+      const nextSlug = normalizeRouteCandidate(op.newPageSlug) ?? nextDuplicateSlug(staged, op.pageSlug)
+      if (staged.has(nextSlug)) throw new Error(`Target page slug already exists: ${nextSlug}`)
+      op.newPageSlug = nextSlug
+      const copy: PageDoc = {
+        ...structuredClone(source),
+        id: pageIdFromSlug(nextSlug),
+        slug: nextSlug,
+        title: typeof op.newTitle === "string" && op.newTitle.trim().length > 0 ? op.newTitle.trim() : `${source.title} Copy`,
+        updatedAt: new Date().toISOString(),
+        blocks: source.blocks.map((block) => ({ ...structuredClone(block), id: nextUniqueBlockId(source.blocks, `${block.id}_copy`) }))
+      }
+      staged.set(nextSlug, copy)
+      touchedSlugs.add(nextSlug)
+
+      const finalOrder = rebuildOrderWithInserted(staged, nextSlug, op.afterPageSlug ?? op.pageSlug)
+      const reordered = new Map<string, PageDoc>()
+      for (const route of finalOrder) {
+        const page = staged.get(route)
+        if (page) reordered.set(route, page)
+      }
+      staged.clear()
+      for (const [route, page] of reordered) staged.set(route, page)
+      orderChanged = true
+      continue
+    }
+
+    if (op.op === "rename_page") {
+      const nextSlug = normalizeRouteCandidate(op.newPageSlug)
+      if (!nextSlug) throw new Error(`Invalid newPageSlug ${op.newPageSlug}`)
+      if (op.pageSlug === nextSlug) throw new Error(`No effective page change for ${op.pageSlug}`)
+      const page = staged.get(op.pageSlug)
+      if (!page) throw new Error(`Page not found for slug ${op.pageSlug}`)
+      if (staged.has(nextSlug)) throw new Error(`Target page slug already exists: ${nextSlug}`)
+      staged.delete(op.pageSlug)
+      deletedSlugs.add(op.pageSlug)
+      staged.set(nextSlug, {
+        ...page,
+        id: pageIdFromSlug(nextSlug),
+        slug: nextSlug,
+        title: typeof op.newTitle === "string" && op.newTitle.trim().length > 0 ? op.newTitle.trim() : pageTitleFromSlug(nextSlug),
+        updatedAt: new Date().toISOString()
+      })
+      touchedSlugs.add(nextSlug)
+
+      // Keep route references consistent after a slug change.
+      for (const [slug, candidate] of staged) {
+        const rewritten = rewriteLinksToRenamedPage(candidate, op.pageSlug, nextSlug)
+        if (!rewritten.changed) continue
+        staged.set(slug, rewritten.page)
+        touchedSlugs.add(slug)
+      }
+      continue
+    }
+
+    if (op.op === "remove_page") {
+      if (op.pageSlug === "/") throw new Error("Cannot remove the home page (/)")
+      const page = staged.get(op.pageSlug)
+      if (!page) throw new Error(`Page not found for slug ${op.pageSlug}`)
+      if (staged.size <= 1) throw new Error("Cannot remove the last remaining page")
+      staged.delete(op.pageSlug)
+      deletedSlugs.add(op.pageSlug)
+      continue
+    }
+
+    if (op.op === "move_page") {
+      if (op.pageSlug === "/") throw new Error("Home page (/) cannot be moved")
+      if (!staged.has(op.pageSlug)) throw new Error(`Page not found for slug ${op.pageSlug}`)
+
+      const ordered = orderSlugsHomeFirst(Array.from(staged.keys()))
+      const movable = ordered.filter((route) => route !== "/")
+      const currentIdx = movable.findIndex((route) => route === op.pageSlug)
+      if (currentIdx === -1) throw new Error(`Page not found for slug ${op.pageSlug}`)
+      const nextMovable = movable.filter((route) => route !== op.pageSlug)
+
+      let insertIndex = 0
+      if (op.afterPageSlug) {
+        if (op.afterPageSlug === "/") insertIndex = 0
+        else {
+          const anchorIdx = nextMovable.findIndex((route) => route === op.afterPageSlug)
+          if (anchorIdx === -1) throw new Error(`afterPageSlug ${op.afterPageSlug} not found`)
+          insertIndex = anchorIdx + 1
+        }
+      }
+
+      nextMovable.splice(insertIndex, 0, op.pageSlug)
+      const finalOrder = ordered.includes("/") ? ["/", ...nextMovable] : nextMovable
+
+      const reordered = new Map<string, PageDoc>()
+      for (const route of finalOrder) {
+        const page = staged.get(route)
+        if (!page) continue
+        reordered.set(route, page)
+      }
+      staged.clear()
+      for (const [route, page] of reordered) staged.set(route, page)
+      orderChanged = true
       continue
     }
 
@@ -1923,6 +2859,26 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
       continue
     }
 
+    if (op.op === "duplicate_block") {
+      const idx = page.blocks.findIndex((b) => b.id === op.blockId)
+      if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      const source = page.blocks[idx]
+      const nextId = nextUniqueBlockId(page.blocks, typeof op.newBlockId === "string" ? op.newBlockId : `${source.id}_copy`)
+      op.newBlockId = nextId
+      const duplicate = { ...structuredClone(source), id: nextId }
+
+      if (!op.afterBlockId) {
+        page.blocks.splice(idx + 1, 0, duplicate)
+      } else {
+        const anchorIdx = page.blocks.findIndex((b) => b.id === op.afterBlockId)
+        if (anchorIdx === -1) throw new Error(`afterBlockId ${op.afterBlockId} not found`)
+        page.blocks.splice(anchorIdx + 1, 0, duplicate)
+      }
+      page.updatedAt = new Date().toISOString()
+      touchedSlugs.add(page.slug)
+      continue
+    }
+
     if (op.op === "update_props") {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
@@ -1934,7 +2890,12 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
           : rawPatch
 
       const patchKeys = Object.keys(patchCandidate ?? {})
-      const allowedPatchKeys = Object.keys(block.props as Record<string, unknown>)
+      const schemaForType = blockSchemas[block.type as BlockType]
+      const schemaShape =
+        schemaForType && typeof schemaForType === "object" && "shape" in schemaForType
+          ? (schemaForType.shape as Record<string, unknown>)
+          : null
+      const allowedPatchKeys = schemaShape ? Object.keys(schemaShape) : Object.keys(block.props as Record<string, unknown>)
       const invalidPatchKeys = patchKeys.filter((key) => !allowedPatchKeys.includes(key))
       if (invalidPatchKeys.length > 0) {
         throw new Error(
@@ -1982,20 +2943,22 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
     }
   }
 
-  if (touchedSlugs.size === 0) {
+  if (touchedSlugs.size === 0 && deletedSlugs.size === 0 && !orderChanged) {
     throw new Error("Edit plan produced no changes")
   }
 
-  for (const slug of touchedSlugs) {
-    const page = staged.get(slug)
-    if (!page) continue
-    setPage(session, { ...page, updatedAt: new Date().toISOString() })
+  sessionDraft.clear()
+  for (const [route, page] of staged) {
+    setPage(session, page)
   }
 }
 
 function pickFocusBlockId(ops: Operation[]) {
   const add = ops.find((op) => op.op === "add_block")
   if (add && add.op === "add_block") return add.block.id
+
+  const duplicate = ops.find((op) => op.op === "duplicate_block")
+  if (duplicate && duplicate.op === "duplicate_block" && typeof duplicate.newBlockId === "string") return duplicate.newBlockId
 
   const move = ops.find((op) => op.op === "move_block")
   if (move && move.op === "move_block") return move.blockId
@@ -2004,6 +2967,131 @@ function pickFocusBlockId(ops: Operation[]) {
   if (update && update.op === "update_props") return update.blockId
 
   return undefined
+}
+
+function pickUpdatedSlug(session: string, currentSlug: string, ops: Operation[]) {
+  const duplicate = ops.find((op) => op.op === "duplicate_page" && op.pageSlug === currentSlug)
+  if (duplicate && duplicate.op === "duplicate_page") return duplicate.newPageSlug
+  const rename = ops.find((op) => op.op === "rename_page" && op.pageSlug === currentSlug)
+  if (rename && rename.op === "rename_page") return rename.newPageSlug
+  const current = getPage(session, currentSlug)
+  if (current) return undefined
+  const draft = getSessionDraft(session)
+  const first = orderSlugsHomeFirst(Array.from(draft.keys()))[0]
+  return first
+}
+
+function collectMentionedSlugsFromPlan(plan: EditPlan, fallbackSlug?: string) {
+  const seen = new Set<string>()
+  const removed = new Set<string>()
+  const push = (slug?: string) => {
+    if (!slug || typeof slug !== "string") return
+    const normalized = normalizeRouteCandidate(slug)
+    if (!normalized) return
+    seen.add(normalized)
+  }
+
+  for (const op of plan.ops) {
+    if (op.op === "create_page") {
+      push(op.page.slug)
+      continue
+    }
+    if (op.op === "rename_page") {
+      // Old slug is not navigable after rename; only link to the new route.
+      push(op.newPageSlug)
+      continue
+    }
+    if (op.op === "remove_page") {
+      const normalized = normalizeRouteCandidate(op.pageSlug)
+      if (normalized) removed.add(normalized)
+      continue
+    }
+    if (op.op === "move_page") {
+      push(op.pageSlug)
+      push(op.afterPageSlug)
+      continue
+    }
+    if (op.op === "duplicate_page") {
+      push(op.pageSlug)
+      push(op.newPageSlug)
+      push(op.afterPageSlug)
+      continue
+    }
+    push(op.pageSlug)
+  }
+
+  for (const slug of removed) seen.delete(slug)
+  if (seen.size === 0) {
+    const normalizedFallback = normalizeRouteCandidate(fallbackSlug)
+    if (normalizedFallback && !removed.has(normalizedFallback)) seen.add(normalizedFallback)
+  }
+  return orderSlugsHomeFirst(Array.from(seen))
+}
+
+function collectMentionedSlugsFromOps(ops: Operation[], fallbackSlug?: string) {
+  return collectMentionedSlugsFromPlan(
+    {
+      intent: "edit_plan",
+      summary_for_user: "",
+      change_log: [],
+      ops
+    },
+    fallbackSlug
+  )
+}
+
+function normalizePlanCopyForUi(plan: EditPlan, currentPage: PageDoc): EditPlan {
+  const rewrite = (text: string) =>
+    text
+      .replace(/\bhome page secondary cta\b/gi, "Hero secondary CTA")
+      .replace(/\bsecondary cta\b/gi, "Hero secondary CTA")
+
+  const normalizedSummary = rewrite(plan.summary_for_user)
+  const normalizedChangeLog = plan.change_log.map(rewrite)
+
+  if (plan.intent !== "edit_plan" || plan.ops.length !== 1) return plan
+  const [op] = plan.ops
+  if (op.op !== "update_props") {
+    if (normalizedSummary !== plan.summary_for_user || normalizedChangeLog.some((line, idx) => line !== plan.change_log[idx])) {
+      return { ...plan, summary_for_user: normalizedSummary, change_log: normalizedChangeLog }
+    }
+    return plan
+  }
+  const block = currentPage.blocks.find((entry) => entry.id === op.blockId)
+  if (!block || block.type !== "Hero") {
+    if (normalizedSummary !== plan.summary_for_user || normalizedChangeLog.some((line, idx) => line !== plan.change_log[idx])) {
+      return { ...plan, summary_for_user: normalizedSummary, change_log: normalizedChangeLog }
+    }
+    return plan
+  }
+  const patch = op.patch as Record<string, unknown>
+  const hasSecondaryText = Object.prototype.hasOwnProperty.call(patch, "secondaryCtaText")
+  const hasSecondaryHref = Object.prototype.hasOwnProperty.call(patch, "secondaryCtaHref")
+  if (!hasSecondaryText && !hasSecondaryHref) return plan
+
+  const nextSummary = "Renamed the Hero secondary CTA."
+  const nextChangeLog = ["Updated the Hero secondary CTA text/link."]
+  return {
+    ...plan,
+    summary_for_user: nextSummary,
+    change_log: nextChangeLog
+  }
+}
+
+function resolveEffectiveSlug(args: { session: string; requestedSlug: string; activeBlockId?: string }) {
+  const { session, requestedSlug, activeBlockId } = args
+  if (!activeBlockId) return requestedSlug
+  const current = getPage(session, requestedSlug)
+  if (current?.blocks.some((block) => block.id === activeBlockId)) return requestedSlug
+  const draft = getSessionDraft(session)
+  for (const [slug, page] of draft) {
+    if (page.blocks.some((block) => block.id === activeBlockId)) return slug
+  }
+  return requestedSlug
+}
+
+function isNoEffectiveChangeError(reason: string) {
+  return /No effective prop change/i.test(reason)
 }
 
 async function runChatPipeline(
@@ -2016,12 +3104,18 @@ async function runChatPipeline(
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
+  const requestedSlug = body.slug
+  const effectiveSlug = resolveEffectiveSlug({
+    session: body.session,
+    requestedSlug,
+    activeBlockId: body.activeBlockId
+  })
 
   const modelKey = body.modelKey && modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
   const modelUsed = modelLookup[modelKey]
   const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
 
-  const current = getPage(body.session, body.slug)
+  const current = getPage(body.session, effectiveSlug)
   if (!current) return { code: 404, payload: { error: "page not found" } }
 
   if (isInfoQuery(body.message)) {
@@ -2030,7 +3124,7 @@ async function runChatPipeline(
 
   const contextPack = plannerContextPack({
     session: body.session,
-    slug: body.slug,
+    slug: effectiveSlug,
     message: body.message,
     currentPage: current,
     activeBlockId: body.activeBlockId,
@@ -2039,12 +3133,29 @@ async function runChatPipeline(
   })
 
   const respondFromPlan = (plan: EditPlan, source: "openai" | "demo") => {
-    if (plan.intent === "needs_clarification" && isBlockCatalogQuery(body.message!)) {
+    let resolvedPlan = normalizePlanCopyForUi(plan, current)
+
+    if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
+      const focusedFallback = compileDeterministicPlan({
+        session: body.session ?? "dev",
+        intent: { action: "clarify" },
+        message: body.message ?? "",
+        slug: effectiveSlug ?? "/",
+        currentPage: current,
+        activeBlockId: body.activeBlockId,
+        activeEditablePath: body.activeEditablePath
+      })
+      if (focusedFallback?.intent === "edit_plan" && focusedFallback.ops.length > 0) {
+        resolvedPlan = focusedFallback
+      }
+    }
+
+    if (resolvedPlan.intent === "needs_clarification" && isBlockCatalogQuery(body.message!)) {
       const forcedInfo = infoResponse({ body, current, plannerSource: source, modelUsed, modelKey })
       return { done: true as const, response: forcedInfo }
     }
 
-    if (plan.intent === "needs_clarification") {
+    if (resolvedPlan.intent === "needs_clarification") {
       const selected =
         body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
           ? current.blocks.find((b) => b.id === body.activeBlockId)
@@ -2055,8 +3166,9 @@ async function runChatPipeline(
           code: 200,
           payload: {
             status: "needs_clarification",
-            summary: plan.summary_for_user,
-            changes: plan.change_log,
+            summary: resolvedPlan.summary_for_user,
+            changes: resolvedPlan.change_log,
+            mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug),
             suggestions: clarificationSuggestions({ body, current, selected }),
             previewVersion: versions.get(body.session!) ?? 0,
             plannerSource: source,
@@ -2067,7 +3179,7 @@ async function runChatPipeline(
       }
     }
 
-    const previous = getPage(body.session!, body.slug!)
+    const previous = getPage(body.session!, effectiveSlug)
     if (!previous) {
       return {
         done: true as const,
@@ -2076,9 +3188,12 @@ async function runChatPipeline(
     }
 
     try {
-      if (options?.onOpApplied) {
+      const hasPageStructuralOps = resolvedPlan.ops.some(
+        (op) => op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
+      )
+      if (options?.onOpApplied && !hasPageStructuralOps) {
         const rollbackBySlug = new Map<string, PageDoc>()
-        for (const op of plan.ops) {
+        for (const op of resolvedPlan.ops) {
           const slug = op.op === "create_page" ? op.page.slug : op.pageSlug
           if (rollbackBySlug.has(slug)) continue
           const existing = getPage(body.session!, slug)
@@ -2086,25 +3201,35 @@ async function runChatPipeline(
         }
 
         // Validate the whole plan from the current state before progressive apply.
-        applyOpsAtomically(body.session!, plan.ops)
+        applyOpsAtomically(body.session!, resolvedPlan.ops)
 
         // Roll back to pre-apply state so we can replay ops progressively.
         for (const [slug, snapshot] of rollbackBySlug) {
           setPage(body.session!, { ...snapshot, slug })
         }
-        for (const op of plan.ops) {
-          if (op.op !== "create_page") continue
-          if (rollbackBySlug.has(op.page.slug)) {
-            setPage(body.session!, structuredClone(rollbackBySlug.get(op.page.slug)!))
+        for (const op of resolvedPlan.ops) {
+          if (op.op === "create_page") {
+            if (rollbackBySlug.has(op.page.slug)) {
+              setPage(body.session!, structuredClone(rollbackBySlug.get(op.page.slug)!))
+              continue
+            }
+            const sessionDraft = getSessionDraft(body.session!)
+            sessionDraft.delete(op.page.slug)
             continue
           }
-          const sessionDraft = getSessionDraft(body.session!)
-          sessionDraft.delete(op.page.slug)
+          if (op.op === "rename_page") {
+            const sessionDraft = getSessionDraft(body.session!)
+            if (rollbackBySlug.has(op.newPageSlug)) {
+              setPage(body.session!, structuredClone(rollbackBySlug.get(op.newPageSlug)!))
+            } else {
+              sessionDraft.delete(op.newPageSlug)
+            }
+          }
         }
 
-        const total = plan.ops.length
+        const total = resolvedPlan.ops.length
         for (let index = 0; index < total; index += 1) {
-          const op = plan.ops[index]
+          const op = resolvedPlan.ops[index]
           applyOpsAtomically(body.session!, [op])
           const previewVersion = bumpVersion(body.session!)
           options.onOpApplied({
@@ -2116,23 +3241,27 @@ async function runChatPipeline(
           })
         }
       } else {
-        applyOpsAtomically(body.session!, plan.ops)
+        applyOpsAtomically(body.session!, resolvedPlan.ops)
       }
-      pushUndo(body.session!, body.slug!, previous)
-      pushRecentEdit(body.session!, { slug: body.slug!, summary: plan.summary_for_user, ops: plan.ops })
+      pushUndo(body.session!, effectiveSlug, previous)
+      const planUpdatedSlug = pickUpdatedSlug(body.session!, effectiveSlug, resolvedPlan.ops)
+      const updatedSlug = planUpdatedSlug ?? (effectiveSlug !== requestedSlug ? effectiveSlug : undefined)
+      pushRecentEdit(body.session!, { slug: updatedSlug ?? effectiveSlug, summary: resolvedPlan.summary_for_user, ops: resolvedPlan.ops })
       const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
       schedulePersistState()
-      const focusBlockId = pickFocusBlockId(plan.ops)
+      const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       return {
         done: true as const,
         response: {
           code: 200,
           payload: {
             status: "applied",
-            summary: plan.summary_for_user,
-            changes: plan.change_log,
+            summary: resolvedPlan.summary_for_user,
+            changes: resolvedPlan.change_log,
+            mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, updatedSlug ?? effectiveSlug),
             previewVersion,
             focusBlockId,
+            updatedSlug,
             plannerSource: source,
             modelUsed,
             modelKey
@@ -2140,13 +3269,32 @@ async function runChatPipeline(
         }
       }
     } catch (error) {
-      return { done: false as const, reason: toErrorDetail(error) }
+      const reason = toErrorDetail(error)
+      if (isNoEffectiveChangeError(reason)) {
+        return {
+          done: true as const,
+          response: {
+            code: 200,
+            payload: {
+              status: "applied",
+              summary: "No changes needed. That content is already up to date.",
+              changes: [],
+              mentionedSlugs: [effectiveSlug],
+              previewVersion: versions.get(body.session!) ?? 0,
+              plannerSource: source,
+              modelUsed,
+              modelKey
+            } satisfies ChatResult
+          }
+        }
+      }
+      return { done: false as const, reason }
     }
   }
 
   if (!process.env.OPENAI_API_KEY) {
     try {
-      const demoPlan = demoPlanFromMessage(body.message, body.slug, body.activeBlockId, body.activeBlockType)
+      const demoPlan = demoPlanFromMessage(body.message, effectiveSlug, body.activeBlockId, body.activeBlockType)
       const outcome = respondFromPlan(demoPlan, "demo")
       if (outcome.done) return outcome.response
       return {
@@ -2186,7 +3334,7 @@ async function runChatPipeline(
     try {
       plan = await generatePlanWithOpenAI({
         message: body.message,
-        slug: body.slug,
+        slug: effectiveSlug,
         currentPage: current,
         contextPack,
         model: modelUsed,
@@ -2220,7 +3368,7 @@ async function runChatPipeline(
   }
 
   try {
-    const fallbackPlan = demoPlanFromMessage(body.message, body.slug, body.activeBlockId, body.activeBlockType)
+    const fallbackPlan = demoPlanFromMessage(body.message, effectiveSlug, body.activeBlockId, body.activeBlockType)
     const fallbackOutcome = respondFromPlan(fallbackPlan, "demo")
     if (fallbackOutcome.done) return fallbackOutcome.response
     repairFeedback.push(`Demo fallback apply failed: ${fallbackOutcome.reason}`)
@@ -2276,6 +3424,142 @@ app.get("/draft/pages", async (request, reply) => {
   return structuredClone(page)
 })
 
+app.get("/draft/slugs", async (request, reply) => {
+  const query = request.query as { session?: string }
+  const session = query.session ?? "dev"
+  const draft = getSessionDraft(session)
+  const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
+  return { slugs }
+})
+
+app.get("/publish/content", async (request, reply) => {
+  const query = request.query as { session?: string }
+  const session = query.session ?? "dev"
+  const pages = getSessionPages(session)
+  return {
+    session,
+    slugs: pages.map((page) => page.slug),
+    pages,
+    generatedAt: new Date().toISOString()
+  }
+})
+
+app.post("/publish", async (request, reply) => {
+  if (!requirePublishToken(request as { headers: Record<string, unknown> })) {
+    return reply.code(401).send({ error: "invalid publish token" })
+  }
+
+  const body = (request.body ?? {}) as { session?: string }
+  const session = body.session ?? "dev"
+  const publishMode = (process.env.PUBLISH_MODE?.trim().toLowerCase() || "deploy_hook") as "deploy_hook" | "git"
+
+  if (publishMode === "git") {
+    const result = await publishViaGit(session)
+    const tracker: PublishTracker = {
+      session,
+      status: result.status === "failed" ? "failed" : "triggered",
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      slugs: result.slugs,
+      vercelState: result.status === "failed" ? "ERROR" : "READY",
+      deployResponse: "git_publish",
+      deployStatus: result.status === "failed" ? 500 : 200
+    }
+    publishStatusBySession.set(session, tracker)
+
+    if (result.status === "failed") {
+      return reply.code(400).send({
+        status: "failed",
+        session: result.session,
+        slugs: result.slugs,
+        reason: result.reason,
+        details: result.details
+      })
+    }
+
+    return {
+      status: result.status,
+      session: result.session,
+      slugs: result.slugs,
+      branch: result.branch,
+      commitSha: result.commitSha,
+      message: result.message,
+      vercelState: result.vercelState ?? "READY"
+    }
+  }
+
+  const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL?.trim()
+  if (!deployHookUrl) {
+    return reply.code(400).send({ error: "VERCEL_DEPLOY_HOOK_URL is not configured" })
+  }
+
+  const pages = getSessionPages(session)
+  const slugs = pages.map((page) => page.slug)
+
+  try {
+    const hookResponse = await fetch(deployHookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "orchestrator",
+        session,
+        slugs,
+        publishedAt: new Date().toISOString()
+      })
+    })
+
+    const responseText = await hookResponse.text()
+    const responseJson = parseJsonMaybe(responseText)
+    const inspectUrl =
+      findStringByKeys(responseJson, new Set(["inspectorUrl", "inspectUrl", "url"])) ?? firstUrlFromText(responseText)
+    const deploymentId =
+      findStringByKeys(responseJson, new Set(["deploymentId", "id"])) ??
+      (inspectUrl ? deploymentIdFromAny(inspectUrl) : undefined) ??
+      deploymentIdFromAny(responseText)
+    const vercelStateRaw =
+      findStringByKeys(responseJson, new Set(["state", "readyState", "status"])) ??
+      (hookResponse.ok ? "TRIGGERED" : "FAILED")
+    const vercelState = typeof vercelStateRaw === "string" ? vercelStateRaw.toUpperCase() : undefined
+
+    const tracker: PublishTracker = {
+      session,
+      status: hookResponse.ok ? "triggered" : "failed",
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      slugs,
+      deployStatus: hookResponse.status,
+      deployResponse: responseText.slice(0, 500),
+      inspectUrl,
+      deploymentId,
+      vercelState
+    }
+    publishStatusBySession.set(session, tracker)
+
+    return {
+      status: hookResponse.ok ? "triggered" : "failed",
+      session,
+      slugs,
+      deployStatus: hookResponse.status,
+      deployResponse: responseText.slice(0, 500),
+      inspectUrl,
+      deploymentId,
+      vercelState
+    }
+  } catch (error) {
+    return reply.code(502).send({ error: toErrorDetail(error) })
+  }
+})
+
+app.get("/publish/status", async (request, reply) => {
+  const query = request.query as { session?: string }
+  const session = query.session ?? "dev"
+  const current = publishStatusBySession.get(session)
+  if (!current) return reply.code(404).send({ error: "no publish status for session" })
+  const refreshed = await refreshPublishStatusFromVercel(current)
+  publishStatusBySession.set(session, refreshed)
+  return refreshed
+})
+
 app.post("/ops", async (request, reply) => {
   const body = request.body as ApplyOpsRequestBody
   const session = body.session ?? "dev"
@@ -2296,8 +3580,10 @@ app.post("/ops", async (request, reply) => {
     applyOpsAtomically(session, parsedOps.data)
     for (const [slug, snapshot] of snapshots) pushUndo(session, slug, snapshot)
     const firstSlugOp = parsedOps.data.find((op) => "pageSlug" in op && typeof op.pageSlug === "string")
+    const firstSlug = firstSlugOp && "pageSlug" in firstSlugOp && typeof firstSlugOp.pageSlug === "string" ? firstSlugOp.pageSlug : undefined
+    const updatedSlug = firstSlug ? pickUpdatedSlug(session, firstSlug, parsedOps.data) : undefined
     if (firstSlugOp && "pageSlug" in firstSlugOp && typeof firstSlugOp.pageSlug === "string") {
-      pushRecentEdit(session, { slug: firstSlugOp.pageSlug, summary: "Applied operations.", ops: parsedOps.data })
+      pushRecentEdit(session, { slug: updatedSlug ?? firstSlugOp.pageSlug, summary: "Applied operations.", ops: parsedOps.data })
     }
     const previewVersion = bumpVersion(session)
     schedulePersistState()
@@ -2306,8 +3592,10 @@ app.post("/ops", async (request, reply) => {
       status: "applied",
       summary: "Applied operations.",
       changes: [],
+      mentionedSlugs: collectMentionedSlugsFromOps(parsedOps.data, updatedSlug ?? firstSlug),
       previewVersion,
-      focusBlockId
+      focusBlockId,
+      updatedSlug
     }
   } catch (error) {
     return reply.code(400).send({ error: toErrorDetail(error) })
@@ -2412,6 +3700,18 @@ app.get("/health", async () => ({ ok: true }))
 app.get("/status/planner", async () => ({
   plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo"
 }))
+app.get("/favicon.ico", async (_request, reply) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  <path d="M32 10l4.6 12.4L49 27l-12.4 4.6L32 44l-4.6-12.4L15 27l12.4-4.6L32 10z" fill="#f8fafc"/>
+  <path d="M49 36l2.2 6 6 2.2-6 2.2-2.2 6-2.2-6-6-2.2 6-2.2 2.2-6z" fill="#67e8f9"/>
+  <path d="M18 36l1.6 4.2 4.2 1.6-4.2 1.6L18 48l-1.6-4.2-4.2-1.6 4.2-1.6L18 36z" fill="#a7f3d0"/>
+</svg>`
+  reply
+    .header("content-type", "image/svg+xml; charset=utf-8")
+    .header("cache-control", "public, max-age=86400")
+    .send(svg)
+})
 
 const port = Number(process.env.PORT ?? 4200)
 await loadStateFromDisk()
