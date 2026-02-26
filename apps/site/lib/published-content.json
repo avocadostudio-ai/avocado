@@ -91,7 +91,7 @@
     "id": "p_bananas",
     "slug": "/bananas",
     "title": "Bananas",
-    "updatedAt": "2026-02-25T11:01:48.727Z",
+    "updatedAt": "2026-02-26T20:03:25.037Z",
     "blocks": [
       {
         "id": "b_hero_1772016866777",
@@ -101,7 +101,7 @@
           "subheading": "Explore the benefits and versatility of bananas, a delicious and nutritious fruit perfect for any time of the day.",
           "ctaText": "Learn More",
           "ctaHref": "/banana-benefits",
-          "imageUrl": "https://images.unsplash.com/photo-1542062837-627a059e547f?w=450&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTV8fGJhbmFuYXxlbnwwfHwwfHx8MA%3D%3D",
+          "imageUrl": "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8YmFuYW5hfGVufDB8fDB8fHwy",
           "imageAlt": "A bunch of ripe bananas"
         }
       },
@@ -143,77 +143,10 @@
     ]
   },
   {
-    "id": "p_olives",
-    "slug": "/olives",
-    "title": "Olives",
-    "updatedAt": "2026-02-26T16:15:55.613Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772048325072",
-        "type": "Hero",
-        "props": {
-          "heading": "Finest Olive Oils 🫒",
-          "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
-          "ctaText": "Shop the Collection",
-          "ctaHref": "/shop",
-          "imageUrl": "https://images.unsplash.com/photo-1609763951640-c0d7bd98b257?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8b2xpdmUlMjBvaWx8ZW58MHx8MHx8fDA%3D",
-          "imageAlt": "Olive oil bottles on a wooden table"
-        }
-      },
-      {
-        "id": "b_cardgrid_1772048497347",
-        "type": "CardGrid",
-        "props": {
-          "title": "Key Health Benefits of Olive Oil",
-          "cards": [
-            {
-              "title": "Rich in Healthy Fats",
-              "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
-              "ctaText": "Learn More",
-              "ctaHref": "/health-benefits#healthy-fats"
-            },
-            {
-              "title": "High in Antioxidants",
-              "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
-              "ctaText": "Discover More",
-              "ctaHref": "/health-benefits#antioxidants"
-            },
-            {
-              "title": "Anti-inflammatory Properties",
-              "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
-              "ctaText": "Read More",
-              "ctaHref": "/health-benefits#anti-inflammatory"
-            },
-            {
-              "title": "Supports Heart Health",
-              "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
-              "ctaText": "Find Out More",
-              "ctaHref": "/health-benefits#heart-health"
-            },
-            {
-              "title": "Promotes Weight Loss",
-              "description": "Incorporating olive oil into your diet can aid in weight management and promote a healthy lifestyle.",
-              "ctaText": "Get Tips",
-              "ctaHref": "/health-benefits#weight-loss"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_richtext_1772048420274",
-        "type": "RichText",
-        "props": {
-          "title": "",
-          "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
-        }
-      }
-    ]
-  },
-  {
     "id": "p_strawberries",
     "slug": "/strawberries",
     "title": "Strawberries",
-    "updatedAt": "2026-02-26T16:03:06.791Z",
+    "updatedAt": "2026-02-26T20:02:58.431Z",
     "blocks": [
       {
         "id": "b_hero_1772121141940",
@@ -223,7 +156,7 @@
           "subheading": "Nature's candy packed with nutrients.",
           "ctaText": "Learn More",
           "ctaHref": "/strawberries",
-          "imageUrl": "https://chatgpt.com/backend-api/estuary/public_content/enc/eyJpZCI6Im1fNjlhMDZlNWY4MjVjODE5MWJmZDQwM2YxNmMwMDcyMzc6ZmlsZV8wMDAwMDAwMDFiMjA3MjQ2YTFkYTdlMjE5NmY1ZWVkNCIsInRzIjoiMjA1MTAiLCJwIjoicHlpIiwiY2lkIjoiMSIsInNpZyI6IjkzZDA3ZDYzYWY2OTA3NWRlMTc5NmQ3YjZkZWMxNTg1ZGU2OGU2YWI5YThiMDdhY2RmYmEyM2IyM2UzNmIzNTkiLCJ2IjoiMCIsImdpem1vX2lkIjpudWxsLCJjcyI6bnVsbCwiY2RuIjpudWxsLCJjcCI6bnVsbCwibWEiOm51bGx9",
+          "imageUrl": "https://images.unsplash.com/photo-1589533610925-1cffc309ebaa?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OTJ8fHN0cmF3YmVycnl8ZW58MHx8MHx8fDI%3D",
           "imageAlt": "Fresh strawberries in a basket"
         }
       },
@@ -286,10 +219,105 @@
     ]
   },
   {
+    "id": "p_oranges",
+    "slug": "/oranges",
+    "title": "Oranges",
+    "updatedAt": "2026-02-26T20:00:49.124Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772135749521",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover the World of Oranges",
+          "subheading": "Juicy, sweet, and full of zest. Dive into the vibrant world of oranges.",
+          "ctaText": "Learn More",
+          "ctaHref": "/oranges",
+          "imageUrl": "https://images.unsplash.com/photo-1557800636-894a64c1696f?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8b3JhbmdlfGVufDB8fDB8fHwy",
+          "imageAlt": "A vibrant orange grove"
+        }
+      },
+      {
+        "id": "b_richtext_1772135749521",
+        "type": "RichText",
+        "props": {
+          "title": "Fascinating Facts About Oranges",
+          "body": "**Oranges** are one of the most popular fruits in the world. They are not only **delicious** but also packed with essential nutrients. Here are some interesting facts about oranges:\n\n- **Oranges are a great source of Vitamin C**, which is vital for a healthy immune system.\n- The orange tree is an evergreen, flowering tree that can grow up to 10 meters tall.\n- There are over **600 varieties** of oranges.\n- Oranges originated in Southeast Asia and have been cultivated for thousands of years.\n- The fruit is not only eaten fresh but also used in cooking, baking, and making juices and marmalades.\n\nExplore more about the benefits and uses of oranges on our page."
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_olives",
+    "slug": "/olives",
+    "title": "Olives",
+    "updatedAt": "2026-02-26T20:03:47.616Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772048325072",
+        "type": "Hero",
+        "props": {
+          "heading": "Finest Olive Oils 🫒",
+          "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
+          "ctaText": "Shop the Collection",
+          "ctaHref": "/shop",
+          "imageUrl": "https://images.unsplash.com/photo-1698775942613-3e9fc114b2a1?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8b2xpdmVzfGVufDB8fDB8fHwy",
+          "imageAlt": "Olive oil bottles on a wooden table"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772048497347",
+        "type": "CardGrid",
+        "props": {
+          "title": "Key Health Benefits of Olive Oil",
+          "cards": [
+            {
+              "title": "Rich in Healthy Fats",
+              "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
+              "ctaText": "Learn More",
+              "ctaHref": "/health-benefits#healthy-fats"
+            },
+            {
+              "title": "High in Antioxidants",
+              "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
+              "ctaText": "Discover More",
+              "ctaHref": "/health-benefits#antioxidants"
+            },
+            {
+              "title": "Anti-inflammatory Properties",
+              "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
+              "ctaText": "Read More",
+              "ctaHref": "/health-benefits#anti-inflammatory"
+            },
+            {
+              "title": "Supports Heart Health",
+              "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
+              "ctaText": "Find Out More",
+              "ctaHref": "/health-benefits#heart-health"
+            },
+            {
+              "title": "Promotes Weight Loss",
+              "description": "Incorporating olive oil into your diet can aid in weight management and promote a healthy lifestyle.",
+              "ctaText": "Get Tips",
+              "ctaHref": "/health-benefits#weight-loss"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1772048420274",
+        "type": "RichText",
+        "props": {
+          "title": "",
+          "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
+        }
+      }
+    ]
+  },
+  {
     "id": "p_about_us",
     "slug": "/about-us",
     "title": "About Us",
-    "updatedAt": "2026-02-26T14:05:00.818Z",
+    "updatedAt": "2026-02-26T20:01:21.390Z",
     "blocks": [
       {
         "id": "b_hero_1772023500949",
@@ -299,7 +327,7 @@
           "subheading": "Celebrating 100 years of innovation and excellence",
           "ctaText": "Discover Our Legacy",
           "ctaHref": "/about-us",
-          "imageUrl": "https://picsum.photos/seed/welcome-to-our-company/1600/900",
+          "imageUrl": "https://images.unsplash.com/photo-1557224145-a0dfba7b4f08?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8cGxhbnRhZ2V8ZW58MHx8MHx8fDI%3D",
           "imageAlt": "Welcome to Our Company"
         }
       },
@@ -357,34 +385,6 @@
               "a": "Yes, we offer international shipping to select countries. Please check our shipping policy for more details."
             }
           ]
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_oranges",
-    "slug": "/oranges",
-    "title": "Oranges",
-    "updatedAt": "2026-02-26T19:56:14.387Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772135749521",
-        "type": "Hero",
-        "props": {
-          "heading": "Discover the World of Oranges",
-          "subheading": "Juicy, sweet, and full of zest. Dive into the vibrant world of oranges.",
-          "ctaText": "Learn More",
-          "ctaHref": "/oranges",
-          "imageUrl": "https://picsum.photos/seed/oranges/1600/900",
-          "imageAlt": "A vibrant orange grove"
-        }
-      },
-      {
-        "id": "b_richtext_1772135749521",
-        "type": "RichText",
-        "props": {
-          "title": "Fascinating Facts About Oranges",
-          "body": "**Oranges** are one of the most popular fruits in the world. They are not only **delicious** but also packed with essential nutrients. Here are some interesting facts about oranges:\n\n- **Oranges are a great source of Vitamin C**, which is vital for a healthy immune system.\n- The orange tree is an evergreen, flowering tree that can grow up to 10 meters tall.\n- There are over **600 varieties** of oranges.\n- Oranges originated in Southeast Asia and have been cultivated for thousands of years.\n- The fruit is not only eaten fresh but also used in cooking, baking, and making juices and marmalades.\n\nExplore more about the benefits and uses of oranges on our page."
         }
       }
     ]
