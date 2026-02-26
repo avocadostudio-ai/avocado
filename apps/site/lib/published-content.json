@@ -360,5 +360,33 @@
         }
       }
     ]
+  },
+  {
+    "id": "p_oranges",
+    "slug": "/oranges",
+    "title": "Oranges",
+    "updatedAt": "2026-02-26T19:56:14.387Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772135749521",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover the World of Oranges",
+          "subheading": "Juicy, sweet, and full of zest. Dive into the vibrant world of oranges.",
+          "ctaText": "Learn More",
+          "ctaHref": "/oranges",
+          "imageUrl": "https://picsum.photos/seed/oranges/1600/900",
+          "imageAlt": "A vibrant orange grove"
+        }
+      },
+      {
+        "id": "b_richtext_1772135749521",
+        "type": "RichText",
+        "props": {
+          "title": "Fascinating Facts About Oranges",
+          "body": "**Oranges** are one of the most popular fruits in the world. They are not only **delicious** but also packed with essential nutrients. Here are some interesting facts about oranges:\n\n- **Oranges are a great source of Vitamin C**, which is vital for a healthy immune system.\n- The orange tree is an evergreen, flowering tree that can grow up to 10 meters tall.\n- There are over **600 varieties** of oranges.\n- Oranges originated in Southeast Asia and have been cultivated for thousands of years.\n- The fruit is not only eaten fresh but also used in cooking, baking, and making juices and marmalades.\n\nExplore more about the benefits and uses of oranges on our page."
+        }
+      }
+    ]
   }
 ]
