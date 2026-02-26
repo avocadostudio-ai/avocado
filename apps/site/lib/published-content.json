@@ -1,0 +1,329 @@
+[
+  {
+    "id": "p_home",
+    "slug": "/",
+    "title": "Home",
+    "updatedAt": "2026-02-25T20:34:43.446Z",
+    "blocks": [
+      {
+        "id": "b_hero_home",
+        "type": "Hero",
+        "props": {
+          "heading": "Experience Avocado Excellence 🥑",
+          "subheading": "Indulge in the rich, creamy taste of our premium avocados. Perfect for gourmet dishes or simple snacks, they add a touch of luxury and nutrition to any meal.",
+          "ctaText": "Explore the Possibilities",
+          "ctaHref": "/pricing",
+          "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
+          "imageAlt": "Image representing a supreme adventure",
+          "secondaryCtaText": "View Pricing",
+          "secondaryCtaHref": "/pricing"
+        }
+      },
+      {
+        "id": "b_cardgrid_1771979444550",
+        "type": "CardGrid",
+        "props": {
+          "title": "Sustainable Avocado Adventures",
+          "cards": [
+            {
+              "title": "🥑 Avocado Culinary Delights",
+              "description": "Uncover new culinary uses for avocados.",
+              "ctaText": "Try Now",
+              "ctaHref": "/avocado-culinary"
+            },
+            {
+              "title": "🥑 Avocado Wellness",
+              "description": "Explore the wellness benefits of avocados.",
+              "ctaText": "Discover",
+              "ctaHref": "/avocado-wellness"
+            },
+            {
+              "title": "🥑 Avocado Sustainability",
+              "description": "Learn about sustainable avocado farming practices.",
+              "ctaText": "Learn More",
+              "ctaHref": "/avocado-sustainability"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_testimonials_1771979725070",
+        "type": "Testimonials",
+        "props": {
+          "title": "Testimonials from Avocado Enthusiasts",
+          "items": [
+            {
+              "quote": "Avocados are nature's perfect gift! 🥑 They are not only delicious but also packed with nutrients that benefit your health in numerous ways.",
+              "author": "John Doe"
+            },
+            {
+              "quote": "These creamy delights bring joy every day. 🍇 Their versatility in recipes makes them a staple in my kitchen, from salads to smoothies.",
+              "author": "Jane Smith"
+            },
+            {
+              "quote": "Unmatched taste and quality, always! 🍉 Whether enjoyed on their own or as part of a dish, avocados never disappoint.",
+              "author": "Alex Example"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1771982675835",
+        "type": "RichText",
+        "props": {
+          "title": "Discover the Magic of Avocados",
+          "body": "Avocados are not only **delicious** but also packed with essential **nutrients**. 🥑 They are a rich source of vitamins **C**, **E**, **K**, and **B-6**, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium. Additionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. 🥑\n\nBeyond their nutritional benefits, avocados are incredibly **versatile** in the kitchen. 🥑 They can enhance salads, smoothies, and even serve as a butter substitute in baking. Their creamy texture and mild flavor make them a favorite for chefs and home cooks alike. 🥑\n\nMoreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease. 🥑\n\nFor more fruity goodness, check out our 🍌 [banana page](/bananas). "
+        }
+      },
+      {
+        "id": "b_cta_1771983958937",
+        "type": "CTA",
+        "props": {
+          "title": "Join the Avocado Revolution 🥑",
+          "description": "Experience the richness and health benefits of our premium avocados. Perfect for any meal, any time.",
+          "ctaText": "Get Started",
+          "ctaHref": "/signup"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_pricing",
+    "slug": "/pricing",
+    "title": "Pricing",
+    "updatedAt": "2026-02-25T10:40:55.150Z",
+    "blocks": [
+      {
+        "id": "b_hero_pricing",
+        "type": "Hero",
+        "props": {
+          "heading": "Pricing that grows with you",
+          "subheading": "Start free, upgrade when you're ready.",
+          "ctaText": "Choose Plan",
+          "ctaHref": "/",
+          "imageUrl": "/hero-generated.svg",
+          "imageAlt": "Abstract generated illustration for the pricing hero"
+        }
+      },
+      {
+        "id": "b_richtext_1772016020967",
+        "type": "RichText",
+        "props": {
+          "title": "",
+          "body": "Our pricing plans are designed to fit your needs. Start with our free plan and upgrade as your business grows. Enjoy flexible options and competitive rates."
+        }
+      },
+      {
+        "id": "b_faq_pricing",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Pricing FAQ",
+          "items": [
+            {
+              "q": "Can I cancel anytime?",
+              "a": "Yes, there are no long-term contracts."
+            },
+            {
+              "q": "Do you offer support?",
+              "a": "Yes, email support is included."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1772016049365",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to Get Started?",
+          "description": "Choose the plan that best suits your business needs and start your journey with us today.",
+          "ctaText": "View Plans",
+          "ctaHref": "/plans"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_bananas",
+    "slug": "/bananas",
+    "title": "Bananas",
+    "updatedAt": "2026-02-25T11:01:48.727Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772016866777",
+        "type": "Hero",
+        "props": {
+          "heading": "Bananas: Nature's Energy Booster 🍌",
+          "subheading": "Explore the benefits and versatility of bananas, a delicious and nutritious fruit perfect for any time of the day.",
+          "ctaText": "Learn More",
+          "ctaHref": "/banana-benefits",
+          "imageUrl": "https://images.unsplash.com/photo-1542062837-627a059e547f?w=450&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTV8fGJhbmFuYXxlbnwwfHwwfHx8MA%3D%3D",
+          "imageAlt": "A bunch of ripe bananas"
+        }
+      },
+      {
+        "id": "b_richtext_1772016966005",
+        "type": "RichText",
+        "props": {
+          "title": "",
+          "body": "**Bananas** are not only a great source of energy but also packed with essential nutrients. They are rich in potassium, vitamin C, and vitamin B6, making them an excellent choice for a healthy diet. Whether you enjoy them as a snack, in smoothies, or as part of a dessert, bananas offer versatility and health benefits. 🍌\n\nIn addition to their nutritional value, bananas are incredibly convenient. They come in their own natural packaging, making them easy to carry and eat on the go. This makes them a perfect snack for busy individuals who need a quick energy boost without the hassle of preparation. 🚀\n\nFurthermore, bananas have been linked to various health benefits, including improved digestion and heart health. Their high fiber content aids in digestion, while the potassium helps maintain healthy blood pressure levels. Incorporating bananas into your daily diet can contribute to overall well-being. ❤️"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772017308725",
+        "type": "CardGrid",
+        "props": {
+          "title": "Explore More Banana Benefits",
+          "cards": [
+            {
+              "title": "Nutritional Facts",
+              "description": "Discover the essential nutrients packed in bananas.",
+              "ctaText": "Learn More",
+              "ctaHref": "/banana-nutrition"
+            },
+            {
+              "title": "Banana Recipes",
+              "description": "Try delicious banana recipes for every meal.",
+              "ctaText": "Get Recipes",
+              "ctaHref": "/banana-recipes"
+            },
+            {
+              "title": "Health Benefits",
+              "description": "Understand how bananas contribute to your health.",
+              "ctaText": "Read More",
+              "ctaHref": "/banana-health"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_olives",
+    "slug": "/olives",
+    "title": "Olives",
+    "updatedAt": "2026-02-25T19:51:17.994Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772048325072",
+        "type": "Hero",
+        "props": {
+          "heading": "Taste the World’s Finest Olive Oils",
+          "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
+          "ctaText": "Shop the Collection",
+          "ctaHref": "/shop",
+          "imageUrl": "https://images.unsplash.com/photo-1609763951640-c0d7bd98b257?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8b2xpdmUlMjBvaWx8ZW58MHx8MHx8fDA%3D",
+          "imageAlt": "Olive oil bottles on a wooden table"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772048497347",
+        "type": "CardGrid",
+        "props": {
+          "title": "Key Health Benefits of Olive Oil",
+          "cards": [
+            {
+              "title": "Rich in Healthy Fats",
+              "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
+              "ctaText": "Learn More",
+              "ctaHref": "/health-benefits#healthy-fats"
+            },
+            {
+              "title": "High in Antioxidants",
+              "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
+              "ctaText": "Discover More",
+              "ctaHref": "/health-benefits#antioxidants"
+            },
+            {
+              "title": "Anti-inflammatory Properties",
+              "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
+              "ctaText": "Read More",
+              "ctaHref": "/health-benefits#anti-inflammatory"
+            },
+            {
+              "title": "Supports Heart Health",
+              "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
+              "ctaText": "Find Out More",
+              "ctaHref": "/health-benefits#heart-health"
+            },
+            {
+              "title": "Promotes Weight Loss",
+              "description": "Incorporating olive oil into your diet can aid in weight management and promote a healthy lifestyle.",
+              "ctaText": "Get Tips",
+              "ctaHref": "/health-benefits#weight-loss"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1772048420274",
+        "type": "RichText",
+        "props": {
+          "title": "",
+          "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_about_us",
+    "slug": "/about-us",
+    "title": "About Us",
+    "updatedAt": "2026-02-25T12:48:13.931Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772023500949",
+        "type": "Hero",
+        "props": {
+          "heading": "Welcome to Our Company",
+          "subheading": "Celebrating 100 years of innovation and excellence",
+          "ctaText": "Discover Our Legacy",
+          "ctaHref": "/about-us",
+          "imageUrl": "https://picsum.photos/seed/welcome-to-our-company/1600/900",
+          "imageAlt": "Welcome to Our Company"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772023520393",
+        "type": "CardGrid",
+        "props": {
+          "title": "Our Values",
+          "cards": [
+            {
+              "title": "Integrity",
+              "description": "We uphold the highest standards of integrity in all of our actions.",
+              "ctaText": "Learn More",
+              "ctaHref": "/values/integrity"
+            },
+            {
+              "title": "Innovation",
+              "description": "We strive to innovate and improve our services continuously.",
+              "ctaText": "Learn More",
+              "ctaHref": "/values/innovation"
+            },
+            {
+              "title": "Customer Commitment",
+              "description": "We develop relationships that make a positive difference in our customers' lives.",
+              "ctaText": "Learn More",
+              "ctaHref": "/values/customer-commitment"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1772023581205",
+        "type": "RichText",
+        "props": {
+          "title": "",
+          "body": "**Our journey with avocados** began over a century ago, when our founders discovered the unique potential of this versatile fruit. From humble beginnings, we have grown into a leading name in the avocado industry, known for our commitment to quality and sustainability.\n\nThroughout the years, we have pioneered innovative farming techniques that have not only increased yield but also ensured the preservation of the environment. Our dedication to sustainable practices has earned us numerous accolades and the trust of consumers worldwide.\n\nToday, we continue to push the boundaries of what is possible with avocados, exploring new markets and developing exciting new products. Our story is one of passion, innovation, and a deep respect for the natural world.\n\n- Commitment to quality\n- Sustainable practices\n- Innovative farming techniques"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_avocado",
+    "slug": "/avocado",
+    "title": "Avocado",
+    "updatedAt": "2026-02-26T07:52:29.962Z",
+    "blocks": []
+  }
+]
