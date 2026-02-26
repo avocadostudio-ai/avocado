@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T19:16:56.492Z",
+    "updatedAt": "2026-02-26T20:05:43.187Z",
     "blocks": [
       {
         "id": "b_hero_home",
@@ -17,27 +17,6 @@
           "imageAlt": "Image representing a supreme adventure",
           "secondaryCtaText": "About us",
           "secondaryCtaHref": "/about-us"
-        }
-      },
-      {
-        "id": "b_testimonials_1771979725070",
-        "type": "Testimonials",
-        "props": {
-          "title": "Testimonials from Avocado Enthusiasts",
-          "items": [
-            {
-              "quote": "Avocados are a superfood that never fails to impress! 🥑 Their creamy texture and rich flavor make every meal a delight.",
-              "author": "Emily Avocado"
-            },
-            {
-              "quote": "From breakfast to dinner, avocados are my go-to ingredient. 🥑 They add a touch of luxury to every dish.",
-              "author": "Michael Green"
-            },
-            {
-              "quote": "The best avocados I've ever tasted! 🥑 Perfectly ripe and full of flavor, they elevate any recipe.",
-              "author": "Sarah Chef"
-            }
-          ]
         }
       },
       {
@@ -68,11 +47,32 @@
         }
       },
       {
+        "id": "b_testimonials_1771979725070",
+        "type": "Testimonials",
+        "props": {
+          "title": "Testimonials from Avocado Enthusiasts",
+          "items": [
+            {
+              "quote": "Avocados are a superfood that never fails to impress! 🥑 Their creamy texture and rich flavor make every meal a delight.",
+              "author": "Emily Avocado"
+            },
+            {
+              "quote": "From breakfast to dinner, avocados are my go-to ingredient. 🥑 They add a touch of luxury to every dish.",
+              "author": "Michael Green"
+            },
+            {
+              "quote": "The best avocados I've ever tasted! 🥑 Perfectly ripe and full of flavor, they elevate any recipe.",
+              "author": "Sarah Chef"
+            }
+          ]
+        }
+      },
+      {
         "id": "b_richtext_1771982675835",
         "type": "RichText",
         "props": {
           "title": "Discover the Magic of Avocados",
-          "body": "Avocados are not only **delicious** but also packed with essential **nutrients**. 🥑 They are a rich source of vitamins **C**, **E**, **K**, and **B-6**, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium. Additionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. 🥑\n\nBeyond their nutritional benefits, avocados are incredibly **versatile** in the kitchen. 🥑 They can enhance salads, smoothies, and even serve as a butter substitute in baking. Their creamy texture and mild flavor make them a favorite for chefs and home cooks alike. 🥑\n\nMoreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease. 🥑\n\nFor more fruity goodness, check out our 🍌 [banana page](/bananas). "
+          "body": "Avocados are not only **delicious** but also packed with essential **nutrients**. 🥑 They are a rich source of vitamins **C**, **E**, **K**, and **B-6**, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium. Additionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. 🥑\n\nBeyond their nutritional benefits, avocados are incredibly **versatile** in the kitchen. 🥑 They can enhance salads, smoothies, and even serve as a butter substitute in baking. Their creamy texture and mild flavor make them a favorite for chefs and home cooks alike. 🥑\n\nMoreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease. 🥑"
         }
       },
       {
