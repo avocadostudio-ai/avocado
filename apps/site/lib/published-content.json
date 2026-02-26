@@ -146,13 +146,13 @@
     "id": "p_olives",
     "slug": "/olives",
     "title": "Olives",
-    "updatedAt": "2026-02-25T19:51:17.994Z",
+    "updatedAt": "2026-02-26T16:15:55.613Z",
     "blocks": [
       {
         "id": "b_hero_1772048325072",
         "type": "Hero",
         "props": {
-          "heading": "Taste the World’s Finest Olive Oils",
+          "heading": "Finest Olive Oils 🫒",
           "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
           "ctaText": "Shop the Collection",
           "ctaHref": "/shop",
@@ -205,61 +205,6 @@
         "props": {
           "title": "",
           "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_pricing",
-    "slug": "/pricing",
-    "title": "Pricing",
-    "updatedAt": "2026-02-25T10:40:55.150Z",
-    "blocks": [
-      {
-        "id": "b_hero_pricing",
-        "type": "Hero",
-        "props": {
-          "heading": "Pricing that grows with you",
-          "subheading": "Start free, upgrade when you're ready.",
-          "ctaText": "Choose Plan",
-          "ctaHref": "/",
-          "imageUrl": "/hero-generated.svg",
-          "imageAlt": "Abstract generated illustration for the pricing hero"
-        }
-      },
-      {
-        "id": "b_richtext_1772016020967",
-        "type": "RichText",
-        "props": {
-          "title": "",
-          "body": "Our pricing plans are designed to fit your needs. Start with our free plan and upgrade as your business grows. Enjoy flexible options and competitive rates."
-        }
-      },
-      {
-        "id": "b_faq_pricing",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Pricing FAQ",
-          "items": [
-            {
-              "q": "Can I cancel anytime?",
-              "a": "Yes, there are no long-term contracts."
-            },
-            {
-              "q": "Do you offer support?",
-              "a": "Yes, email support is included."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cta_1772016049365",
-        "type": "CTA",
-        "props": {
-          "title": "Ready to Get Started?",
-          "description": "Choose the plan that best suits your business needs and start your journey with us today.",
-          "ctaText": "View Plans",
-          "ctaHref": "/plans"
         }
       }
     ]
