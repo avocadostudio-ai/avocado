@@ -1,4 +1,5 @@
 import Link from "next/link"
+import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
 import { EditorPreviewBridge } from "../../components/editor-harness"
 import { fetchDraftPage, fetchDraftSlugs, getPublishedSlugs } from "../../lib/content-api"
