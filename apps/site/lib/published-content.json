@@ -3,13 +3,13 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T22:09:45.576Z",
+    "updatedAt": "2026-02-26T23:05:35.032Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Avocado Adventures Await",
+          "heading": "Embark on an Avocado Odyssey",
           "subheading": "Join us in discovering the taste and health wonders of avocados.",
           "ctaText": "Start Your Journey",
           "ctaHref": "/discover",
@@ -23,24 +23,24 @@
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Nachhaltige Avocado-Abenteuer betonen zuerst den Nutzen für den Benutzer.",
+          "title": "Discover the Benefits of Avocados",
           "cards": [
             {
-              "title": "🥑 Avocado-Kulinarische Köstlichkeiten",
-              "description": "Entdecken Sie neue kulinarische Anwendungen für Avocados.",
-              "ctaText": "Jetzt probieren",
+              "title": "🥑 Avocado Culinary Delights",
+              "description": "Discover new culinary applications for avocados.",
+              "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary"
             },
             {
-              "title": "🥑 Avocado-Wellness",
-              "description": "Erforschen Sie die Wellness-Vorteile von Avocados.",
-              "ctaText": "Entdecken",
+              "title": "🥑 Avocado Wellness",
+              "description": "Explore the wellness benefits of avocados.",
+              "ctaText": "Discover",
               "ctaHref": "/avocado-wellness"
             },
             {
-              "title": "🥑 Avocado-Nachhaltigkeit",
-              "description": "Erfahren Sie mehr über nachhaltige Avocado-Anbaumethoden.",
-              "ctaText": "Mehr erfahren",
+              "title": "🥑 Avocado Sustainability",
+              "description": "Learn about sustainable avocado farming methods.",
+              "ctaText": "Learn More",
               "ctaHref": "/avocado-sustainability"
             }
           ]
@@ -222,26 +222,26 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-02-26T22:31:32.483Z",
+    "updatedAt": "2026-02-26T22:40:07.960Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
         "type": "Hero",
         "props": {
-          "heading": "Explore Citrus Delights",
-          "subheading": "Experience the zest and vibrancy of the citrus world.",
+          "heading": "Citrus Bliss",
+          "subheading": "Discover the vibrant world of citrus fruits.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "https://images.unsplash.com/photo-1730126146633-bcbc3e42e0f6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2VzJTIwaW4lMjB1bmlxdWUlMjBiYWNrZ3JvdW5kc3xlbnwxfDB8fHwxNzcyMTQ1MDg0fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Oranges with a bright colorful background"
+          "imageUrl": "https://images.unsplash.com/photo-1657746430182-d08f11b013fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2VzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTQ1MjIwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Oranges on a blue background"
         }
       },
       {
         "id": "b_richtext_1772135749521",
         "type": "RichText",
         "props": {
-          "title": "Fascinating Facts About Oranges",
-          "body": "**Oranges** are one of the most popular fruits in the world. They are not only **delicious** but also packed with essential nutrients. Here are some interesting facts about oranges:\n\n- **Oranges are a great source of Vitamin C**, which is vital for a healthy immune system.\n- The orange tree is an evergreen, flowering tree that can grow up to 10 meters tall.\n- There are over **600 varieties** of oranges.\n- Oranges originated in Southeast Asia and have been cultivated for thousands of years.\n- The fruit is not only eaten fresh but also used in cooking, baking, and making juices and marmalades.\n\nExplore more about the benefits and uses of oranges on our page."
+          "title": "The Wonders of Oranges",
+          "body": "**Oranges** are among the most beloved fruits globally, cherished not only for their **delicious taste** but also for their nutritional benefits. Here are some intriguing insights about oranges:\n\n- **Rich in Vitamin C**, oranges play a crucial role in boosting the immune system and maintaining skin health.\n- The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.\n- With over **600 varieties**, oranges offer a diverse range of flavors and uses.\n- Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.\n- Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.\n\nDiscover more about the diverse benefits and culinary uses of oranges on our page."
         }
       }
     ]
