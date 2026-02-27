@@ -450,7 +450,7 @@
     "id": "p_about_lemons",
     "slug": "/about-lemons",
     "title": "About Lemons",
-    "updatedAt": "2026-02-27T23:19:41.389Z",
+    "updatedAt": "2026-02-27T23:31:28.707Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
@@ -460,8 +460,8 @@
           "subheading": "Discover Health and Culinary Uses",
           "ctaText": "Find Out More",
           "ctaHref": "/about-lemons",
-          "imageUrl": "http://localhost:4200/generated-images/var_1772234381386_45sj8a.png",
-          "imageAlt": "Photorealistic image of fresh yellow lemons, one whole and one sliced, on a modern kitchen surface",
+          "imageUrl": "http://localhost:4200/generated-images/var_1772235088704_kepgwc.png",
+          "imageAlt": "Lemon on a blue background",
           "secondaryCtaText": "Learn More",
           "secondaryCtaHref": "/lemons-benefits"
         }
