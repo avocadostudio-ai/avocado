@@ -122,9 +122,16 @@ type VariationModalState = {
 
 type PreviewWidthPreset = "desktop" | "tablet" | "mobile"
 
-const siteOrigin = "http://localhost:3000"
-const orchestrator = "http://localhost:4200"
+function resolveOrigin(value: string | undefined, fallback: string) {
+  const trimmed = value?.trim()
+  if (!trimmed) return fallback
+  return trimmed.replace(/\/+$/, "")
+}
+
+const siteOrigin = resolveOrigin(import.meta.env.VITE_SITE_ORIGIN as string | undefined, "http://localhost:3000")
+const orchestrator = resolveOrigin(import.meta.env.VITE_ORCHESTRATOR_URL as string | undefined, "http://localhost:4200")
 const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
+
 const previewPresetWidths: Record<PreviewWidthPreset, number> = {
   desktop: 1200,
   tablet: 834,
