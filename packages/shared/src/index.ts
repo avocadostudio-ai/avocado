@@ -71,6 +71,18 @@ export const blockSchemas = {
 export type BlockType = keyof typeof blockSchemas
 export const allowedBlockTypes = Object.keys(blockSchemas) as BlockType[]
 
+const blockPropDisplayNames: Partial<Record<BlockType, Record<string, string>>> = {
+  Hero: {
+    imageUrl: "Hero block image",
+    imageAlt: "Hero image alt text"
+  }
+}
+
+export function getPropDisplayName(blockType: BlockType | undefined, propKey: string) {
+  if (!blockType) return propKey
+  return blockPropDisplayNames[blockType]?.[propKey] ?? propKey
+}
+
 export const blockInstanceSchema = z.object({
   id: z.string().min(1),
   type: z.enum(allowedBlockTypes as [BlockType, ...BlockType[]]),

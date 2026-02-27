@@ -1,0 +1,133 @@
+# Guardrail Schema Concept for Predictable AI Editing
+
+## Purpose
+
+Define a schema contract that constrains AI-generated edits so results stay predictable, valid, and aligned with customer expectations.
+
+## Why This Matters
+
+- AI outputs become deterministic enough for production editing workflows.
+- Invalid edits are blocked before they reach rendering.
+- Users get clearer behavior boundaries ("what AI can safely change").
+- Product quality improves through consistent structure and copy constraints.
+
+## Current State (As Implemented)
+
+- The project already validates:
+  - Edit plan structure (`EditPlan`, operations)
+  - Block props via shared schemas
+- The editing model is page + block list (`PageDoc.blocks`), without section-aware schema rules yet.
+- Ambiguous requests can return `needs_clarification`.
+
+## Decisions (Locked for MVP)
+
+1. Hard-blocking enforcement for schema/structure violations.
+2. MVP scope is structural/schema guardrails only (no policy/tone/SEO/accessibility checks yet).
+3. Guardrails are global in MVP; per-customer profiles are introduced later with multi-customer support.
+4. Cross-section moves are blocked by default; allowed only when explicitly requested and valid against target section rules.
+5. AI is expected to generate plans that already follow guardrails; validator is a strict failsafe.
+6. Use one bounded auto-repair retry for deterministic schema errors only.
+7. Auto-repair must not do semantic rewrites; it can only fix structural/schema issues.
+8. If retry fails, return `needs_clarification` with precise violating fields.
+
+## Target Concept
+
+Use a layered schema model as an AI guardrail:
+
+1. **Plan Schema Guardrail**
+- Validate operation shape and required fields.
+- Reject unknown ops and malformed payloads.
+
+2. **Content Schema Guardrail**
+- Validate block props by block type.
+- Enforce field types, ranges, enums, and required fields.
+
+3. **Composition Schema Guardrail (Planned)**
+- Enforce page composition rules by section (planned terminology).
+- Example: which block types can appear in each section, count limits, ordering policies.
+
+4. **Policy Guardrail**
+- Enforce non-structural constraints:
+  - length limits
+  - banned phrases/claims
+  - URL format restrictions
+  - optional brand tone constraints
+
+## Guardrail Pipeline
+
+1. User request enters orchestrator.
+2. AI proposes an edit plan.
+3. Validate plan schema.
+4. Validate content/composition/policy schemas.
+5. If valid: apply atomically and version.
+6. If invalid but repairable: auto-repair with strict bounded retries.
+7. If still invalid/ambiguous: return `needs_clarification` with focused suggestions.
+
+## Predictability Principles
+
+- No direct AI writes to React/TS files.
+- All mutations pass through typed operations.
+- All operations pass schema checks before persistence.
+- Fallback behavior is explicit and user-visible.
+
+## Customer Expectation Model
+
+Customers can expect:
+
+- Safe edits that preserve site structure.
+- Clear failure mode when requests exceed constraints.
+- Repeatable outcomes for similar prompts.
+
+Customers should not expect:
+
+- Arbitrary free-form structural changes outside allowed schemas.
+- Silent acceptance of invalid/unsafe requests.
+
+## Iteration Plan
+
+### v1 (Baseline Hardening)
+
+- Tighten field-level schema constraints for existing blocks.
+- Add explicit validation error categories:
+  - `schema_violation`
+  - `policy_violation`
+  - `ambiguity`
+- Improve `needs_clarification` suggestions from schema metadata.
+
+### v2 (Section-Aware Composition)
+
+- Introduce section-aware composition schema (planned model).
+- Add section-level constraints:
+  - allowed block types
+  - min/max counts
+  - optional ordering rules
+- Extend operations with section context (planned).
+
+### v3 (Policy + Quality Signals)
+
+- Add policy packs per customer/site profile.
+- Add quality checks for readability, SEO basics, accessibility hints.
+- Add explainable rejection messages mapped to policy keys.
+
+## Success Metrics
+
+- Validation failure rate decreases release-over-release.
+- Auto-repair success rate increases without increasing regressions.
+- Fewer clarification loops per successful edit.
+- Higher user acceptance of first applied result.
+
+## Open Design Questions
+
+1. How strict should auto-repair be before returning clarification?
+2. Which policy constraints are global vs customer-specific?
+3. Should section constraints be hard-blocking or soft-warning at first rollout?
+4. What telemetry is required to evaluate guardrail effectiveness?
+
+## Next Step
+
+Convert this concept into a concrete `Guardrail Schema v1` specification with:
+
+1. Field-level constraints per block type.
+2. Error taxonomy and response contract.
+3. Auto-repair retry strategy and stopping rules.
+4. Acceptance tests for valid/invalid edit scenarios.

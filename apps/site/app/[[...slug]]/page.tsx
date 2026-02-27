@@ -11,7 +11,8 @@ type PageProps = {
 }
 
 const DEFAULT_SESSION = "dev"
-const DEFAULT_EDITOR_ORIGIN = process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? "http://localhost:4100"
+const DEFAULT_EDITOR_ORIGIN =
+  process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? (process.env.NODE_ENV !== "production" ? "http://localhost:4100" : "")
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -62,7 +63,13 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const fetchedSlugs = await fetchDraftSlugs(session, editorMode)
   const navRaw = Array.from(new Set([...(fetchedSlugs.length > 0 ? fetchedSlugs : ["/", "/pricing"]), slug]))
   const navSlugs = navRaw.includes("/") ? ["/", ...navRaw.filter((route) => route !== "/")] : navRaw
-  const editorQuery = editorMode ? `?__editor=1&session=${encodeURIComponent(session)}&editorOrigin=${encodeURIComponent(editorOrigin)}` : ""
+  const editorQuery = editorMode
+    ? (() => {
+        const params = new URLSearchParams({ __editor: "1", session })
+        if (editorOrigin) params.set("editorOrigin", editorOrigin)
+        return `?${params.toString()}`
+      })()
+    : ""
 
   if (!page) {
     if (editorMode) {

@@ -358,7 +358,7 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage 
   return (
     <div className="relative w-full max-w-2xl mx-auto transition-all duration-300 font-sans" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       <div className="!box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-bg-300 dark:border-transparent shadow-[0_0_15px_rgba(0,0,0,0.08)] hover:shadow-[0_0_20px_rgba(0,0,0,0.12)] focus-within:shadow-[0_0_25px_rgba(0,0,0,0.15)] bg-white dark:bg-[#30302E] font-sans antialiased">
-        <div className="flex flex-col px-3 pt-3 pb-2 gap-2">
+        <div className="flex flex-col px-3 pt-3 pb-2 gap-2 min-h-0">
           {(files.length > 0 || pastedContent.length > 0) && (
             <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2 px-1">
               {pastedContent.map((content) => (
@@ -370,8 +370,8 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage 
             </div>
           )}
 
-          <div className="relative mb-1">
-            <div className="max-h-96 w-full overflow-y-auto custom-scrollbar font-sans break-words transition-opacity duration-200 min-h-[2.5rem] pl-1">
+          <div className="relative mb-1 min-h-0">
+            <div className="max-h-96 w-full overflow-y-auto custom-scrollbar font-sans break-words transition-opacity duration-200 min-h-[2.5rem] pl-1 pr-1">
               <textarea
                 ref={textareaRef}
                 value={message}
@@ -387,7 +387,7 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage 
             </div>
           </div>
 
-          <div className="flex gap-2 w-full items-center">
+          <div className="flex gap-2 w-full items-center shrink-0">
             <div className="relative flex-1 flex items-center shrink min-w-0 gap-1">
               <button
                 onClick={() => fileInputRef.current?.click()}

@@ -70,6 +70,9 @@ Environment variables:
 - `PUBLISH_GIT_STRICT` (`1` to require clean tree before publish) on orchestrator
 - `PUBLISH_TOKEN` on orchestrator and `VITE_PUBLISH_TOKEN` in editor (optional auth)
 - `VERCEL_DEPLOY_HOOK_URL` only for `PUBLISH_MODE=deploy_hook`
+- `ORCHESTRATOR_CORS_ORIGINS` (comma-separated): required for hosted orchestrator; include deployed `site` and `editor` origins
+- `VITE_SITE_ORIGIN` in editor build (for iframe target)
+- `VITE_ORCHESTRATOR_URL` in editor build (for API requests)
 
 Recommended Vercel split:
 
@@ -90,3 +93,28 @@ Note: if you need true force-dynamic SSR on every request for preview/editor, us
 2. In `PUBLISH_MODE=git`, orchestrator writes `apps/site/lib/published-content.json`, commits, and pushes `main`.
 3. Vercel deploys from git and the static site includes that published snapshot.
 4. In `PUBLISH_MODE=deploy_hook` (phase 2), orchestrator triggers `VERCEL_DEPLOY_HOOK_URL` and Vercel build pulls `/publish/content`.
+
+### Full demo deployment (site + editor + orchestrator)
+
+To run the full demo publicly (not only local), deploy all three apps:
+
+1. `apps/site` on Vercel.
+2. `apps/orchestrator` on a long-running host (Render/Fly/Railway/VM).
+3. `apps/editor` on Vercel or static hosting.
+
+Required settings:
+
+- Orchestrator:
+  - `OPENAI_API_KEY`
+  - `ORCHESTRATOR_PUBLIC_ORIGIN=https://<orchestrator-host>`
+  - `ORCHESTRATOR_CORS_ORIGINS=https://<site-host>,https://<editor-host>`
+  - `PUBLISH_MODE=git`
+  - `PUBLISH_GIT_BRANCH=<deployment-branch>`
+- Site:
+  - `ORCHESTRATOR_URL=https://<orchestrator-host>` (preview/editor mode)
+  - `NEXT_PUBLIC_ENABLE_EDITOR=1` (for demo environments)
+  - `NEXT_PUBLIC_EDITOR_ORIGIN=https://<editor-host>`
+- Editor:
+  - `VITE_SITE_ORIGIN=https://<site-host>`
+  - `VITE_ORCHESTRATOR_URL=https://<orchestrator-host>`
+  - `VITE_PUBLISH_TOKEN=<same as orchestrator PUBLISH_TOKEN>` (if publish auth enabled)

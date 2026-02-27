@@ -46,6 +46,16 @@ function renderInline(text: string) {
   return tokens
 }
 
+function normalizeRichTextBody(input: string) {
+  return input
+    .replace(/\r\n?/g, "\n")
+    // Fix run-on sentence joins like "requested.Here's" -> "requested. Here's".
+    .replace(/([.!?])([A-Z])/g, "$1 $2")
+    // Avoid excessive blank lines while preserving paragraph breaks.
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
 function renderRichTextBlock(block: string, idx: number) {
   const lines = block
     .split(/\n+/)
@@ -119,8 +129,12 @@ function Hero(props: Record<string, unknown>) {
             )}
           </div>
         </div>
-        <div className="hero__media" data-editable-target="imageUrl" data-editable-target-label="imageUrl">
-          <img src={String(props.imageUrl ?? "/hero-generated.svg")} alt={String(props.imageAlt ?? "Hero image")} data-editable-label="imageUrl" />
+        <div className="hero__media" data-editable-target="imageUrl" data-editable-target-label="Hero block image">
+          <img
+            src={String(props.imageUrl ?? "/hero-generated.svg")}
+            alt={String(props.imageAlt ?? "Hero image")}
+            data-editable-label="Hero block image"
+          />
         </div>
       </div>
     </section>
@@ -322,7 +336,7 @@ function CardGrid(props: Record<string, unknown>) {
 
 function RichText(props: Record<string, unknown>) {
   const title = String(props.title ?? "")
-  const body = String(props.body ?? "")
+  const body = normalizeRichTextBody(String(props.body ?? ""))
   const blocks = body
     .split(/\n\s*\n+/)
     .map((block) => block.trim())

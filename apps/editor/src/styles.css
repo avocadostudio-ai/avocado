@@ -277,6 +277,53 @@ textarea {
   max-width: 94%;
 }
 
+.msg-has-undo {
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid #e3e8ef;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  padding: 11px 13px;
+}
+
+.msg-undo-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.msg-undo-btn {
+  border: 0;
+  background: transparent;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.msg-undo-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.72;
+}
+
+.msg-undo-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .msg-clarification {
   background: #f3f8ff;
 }
@@ -284,6 +331,28 @@ textarea {
 .msg-main {
   font-size: 14px;
   line-height: 1.55;
+}
+
+.msg-ai-insight {
+  margin-top: 10px;
+  border-left: 4px solid #cbd5e1;
+  padding-left: 10px;
+}
+
+.msg-ai-insight-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.msg-ai-insight blockquote {
+  margin: 0;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .msg-status {
@@ -437,9 +506,20 @@ textarea {
   border: 1.5px solid #a7b2c2;
   border-radius: 32px;
   background: #fff;
-  padding: 14px 14px 4px;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 10px;
+}
+
+.composer-input-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
   gap: 10px;
 }
 
@@ -476,33 +556,28 @@ textarea {
 .composer-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  align-self: end;
-}
-
-.composer-actions-left {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1 1 0;
-  min-width: 0;
+  justify-content: flex-start;
+  gap: 12px;
+  flex: 0 0 auto;
+  width: 100%;
 }
 
 .composer-actions-center {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  padding: 0 4px;
+  justify-content: flex-start;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0;
 }
 
 .composer-actions-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  flex: 1 1 0;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -1146,10 +1221,6 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .composer-actions-left {
-    gap: 8px;
-  }
-
   .composer-actions-right {
     gap: 8px;
   }
@@ -1193,6 +1264,6 @@ textarea {
 
   .composer-shell {
     border-radius: 24px;
-    padding: 12px 12px 6px;
+    padding: 12px;
   }
 }
