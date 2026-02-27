@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import ArrowUpIcon from "./arrow-up-icon"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
@@ -11,8 +11,6 @@ type Props = {
   onMessageChange: (value: string) => void
   onModelChange: (value: ModelKey) => void
   onSubmit: (explicitMessage?: string) => void
-  onUndo: () => void
-  onRedo: () => void
   onTranscribeAudio: (blob: Blob, mimeType: string) => Promise<string>
   onAutoHeightChange: (height: number) => void
 }
@@ -25,7 +23,7 @@ function modelLabel(model: ModelKey) {
 }
 
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, modelKey, hasUserEntry, onMessageChange, onModelChange, onSubmit, onUndo, onRedo, onTranscribeAudio, onAutoHeightChange } = props
+  const { message, isLoading, modelKey, hasUserEntry, onMessageChange, onModelChange, onSubmit, onTranscribeAudio, onAutoHeightChange } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null)
@@ -42,7 +40,7 @@ export default function ClaudeStyleChatInput(props: Props) {
     if (!textarea || !shell) return
 
     const maxTextareaHeight = 220
-    textarea.style.height = "0px"
+    textarea.style.height = "auto"
     const target = Math.min(maxTextareaHeight, Math.max(24, textarea.scrollHeight))
     textarea.style.height = `${target}px`
     textarea.style.overflowY = textarea.scrollHeight > maxTextareaHeight ? "auto" : "hidden"
@@ -63,7 +61,7 @@ export default function ClaudeStyleChatInput(props: Props) {
     }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     syncComposerHeight()
   }, [message, isRecording, isTranscribing, transcriptionError, onAutoHeightChange])
 
@@ -171,37 +169,29 @@ export default function ClaudeStyleChatInput(props: Props) {
 
   return (
     <div className="composer-shell" ref={shellRef}>
-      <textarea
-        ref={textareaRef}
-        value={message}
-        onChange={(e) => onMessageChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !micBusy) {
-            e.preventDefault()
-            onSubmit()
-          }
-        }}
-        placeholder={hasUserEntry ? "" : "Try: Add testimonials below hero"}
-        rows={1}
-      />
-      {isRecording ? <div className="composer-input-note">Listening... click ✓ to send or X to cancel.</div> : null}
-      {isTranscribing ? <div className="composer-input-note">Transcribing...</div> : null}
-      {transcriptionError ? <div className="composer-input-note composer-input-note-error">{transcriptionError}</div> : null}
+      <div className="composer-input-area">
+        <textarea
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => {
+            onMessageChange(e.target.value)
+            syncComposerHeight()
+          }}
+          onInput={() => syncComposerHeight()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !micBusy) {
+              e.preventDefault()
+              onSubmit()
+            }
+          }}
+          placeholder={hasUserEntry ? "" : "Try: Add testimonials below hero"}
+          rows={1}
+        />
+        {isRecording ? <div className="composer-input-note">Listening... click ✓ to send or X to cancel.</div> : null}
+        {isTranscribing ? <div className="composer-input-note">Transcribing...</div> : null}
+        {transcriptionError ? <div className="composer-input-note composer-input-note-error">{transcriptionError}</div> : null}
+      </div>
       <div className="composer-actions">
-        <div className="composer-actions-left" role="group" aria-label="History actions">
-          <button type="button" className="composer-ghost-btn" onClick={onUndo} disabled={isLoading} aria-label="Undo">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 7 4 12l5 5" />
-              <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
-            </svg>
-          </button>
-          <button type="button" className="composer-ghost-btn" onClick={onRedo} disabled={isLoading} aria-label="Redo">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m15 7 5 5-5 5" />
-              <path d="M19 12h-7a4.5 4.5 0 0 0 0 9h2" />
-            </svg>
-          </button>
-        </div>
         <div className="composer-actions-center">
           <label className="composer-model-picker">
             <span>{modelLabel(modelKey)}</span>

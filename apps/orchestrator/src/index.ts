@@ -1,5 +1,6 @@
 import dotenv from "dotenv"
 import { execFile } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
@@ -15,6 +16,7 @@ import {
   blockSchemas,
   demoPublishedPages,
   editPlanSchema,
+  getPropDisplayName,
   operationSchema,
   type BlockType,
   type EditPlan,
@@ -25,14 +27,6 @@ import {
 import { type UnsplashImage, type UnsplashResolveOptions } from "./variation-images.js"
 
 const app = Fastify({ logger: true })
-await app.register(cors, { origin: true })
-await app.register(multipart, {
-  limits: {
-    files: 1,
-    fileSize: 25 * 1024 * 1024
-  }
-})
-const execFileAsync = promisify(execFile)
 
 const envCandidates = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
 for (const path of envCandidates) {
@@ -41,6 +35,41 @@ for (const path of envCandidates) {
     break
   }
 }
+const execFileAsync = promisify(execFile)
+
+function normalizedOrigin(value: string) {
+  return value.trim().replace(/\/+$/, "")
+}
+
+function getAllowedCorsOrigins() {
+  const configured = (process.env.ORCHESTRATOR_CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => normalizedOrigin(origin))
+    .filter(Boolean)
+  if (configured.length > 0) return new Set(configured)
+  return new Set([
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:4100",
+    "http://127.0.0.1:4100"
+  ])
+}
+
+const allowedCorsOrigins = getAllowedCorsOrigins()
+
+await app.register(cors, {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true)
+    if (allowedCorsOrigins.has(normalizedOrigin(origin))) return cb(null, true)
+    return cb(new Error("Origin not allowed"), false)
+  }
+})
+await app.register(multipart, {
+  limits: {
+    files: 1,
+    fileSize: 25 * 1024 * 1024
+  }
+})
 
 const publishedPages = new Map<string, PageDoc>()
 for (const page of demoPublishedPages()) publishedPages.set(page.slug, structuredClone(page))
@@ -50,6 +79,7 @@ const historyUndo = new Map<string, Map<string, PageDoc[]>>()
 const historyRedo = new Map<string, Map<string, PageDoc[]>>()
 const versions = new Map<string, number>()
 const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
+const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()
 type PublishTracker = {
   session: string
   status: "triggered" | "failed"
@@ -66,6 +96,8 @@ type PublishTracker = {
 }
 const publishStatusBySession = new Map<string, PublishTracker>()
 const stateFilePath = process.env.ORCHESTRATOR_STATE_FILE ?? resolve(process.cwd(), "../../.data/orchestrator-state.json")
+const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
+const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
 let persistTimer: NodeJS.Timeout | null = null
 
 function parseJsonMaybe(text: string): unknown {
@@ -135,6 +167,38 @@ function extractUnsplashQuery(message: string) {
   return normalized.length > 0 ? normalized : undefined
 }
 
+function heroImageQueryFromContext(args: {
+  message: string
+  currentPage: PageDoc
+  targetBlock: PageDoc["blocks"][number]
+  patchCandidate?: Record<string, unknown>
+}) {
+  const explicit = extractUnsplashQuery(args.message)
+  if (explicit) return explicit
+
+  const patch = args.patchCandidate
+  const patchHeading = typeof patch?.heading === "string" ? patch.heading : ""
+  const patchSubheading = typeof patch?.subheading === "string" ? patch.subheading : ""
+  const patchAlt = typeof patch?.imageAlt === "string" ? patch.imageAlt : ""
+
+  const targetProps = args.targetBlock.props as Record<string, unknown>
+  const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
+  const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
+  const alt = typeof targetProps.imageAlt === "string" ? targetProps.imageAlt : ""
+
+  const candidates = [patchAlt, patchHeading, patchSubheading, heading, subheading, alt, args.currentPage.title]
+    .map((entry) => normalizeUnsplashQuery(entry))
+    .filter(Boolean)
+
+  for (const candidate of candidates) {
+    const terms = imageKeywordsFromQuery(candidate, 4)
+    if (terms.length > 0) return terms.join(" ")
+  }
+
+  const fallback = normalizeUnsplashQuery(args.currentPage.title || args.targetBlock.type || "hero image")
+  return fallback || "hero image"
+}
+
 const IMAGE_QUERY_STOPWORDS = new Set([
   "a",
   "an",
@@ -174,6 +238,8 @@ type VariationImageIntent = {
   subjectKeywords: string[]
   varyBackgrounds: boolean
   styleTerms: string[]
+  provider: "unsplash" | "llm"
+  backgroundTerms: string[]
 }
 
 function deriveVariationImageIntent(args: { message: string; block: PageDoc["blocks"][number] }): VariationImageIntent {
@@ -205,11 +271,28 @@ function deriveVariationImageIntent(args: { message: string; block: PageDoc["blo
   if (/\bminimal\b/.test(lowerMessage)) styleTerms.push("minimal")
   if (/\boutdoor\b/.test(lowerMessage) || /\bnature\b/.test(lowerMessage)) styleTerms.push("natural light")
 
+  const backgroundTerms = Array.from(
+    new Set(
+      Array.from(lowerMessage.matchAll(/\b(?:background|backgrounds)\s+(?:like|such as|with|in)?\s*([a-z0-9\s-]{3,45})/gi))
+        .map((match) => normalizeUnsplashQuery(match[1] ?? ""))
+        .filter(Boolean)
+    )
+  ).slice(0, 5)
+
+  const provider: "unsplash" | "llm" =
+    /\bunsplash\b/.test(lowerMessage)
+      ? "unsplash"
+      : /\b(llm|openai|ai[-\s]?generated|generated backgrounds?|synthetic backgrounds?)\b/.test(lowerMessage)
+        ? "llm"
+        : "unsplash"
+
   return {
     baseQuery,
     subjectKeywords: imageKeywordsFromQuery(baseQuery, 4),
     varyBackgrounds,
-    styleTerms
+    styleTerms,
+    provider,
+    backgroundTerms
   }
 }
 
@@ -221,7 +304,87 @@ function buildVariationImageQuery(intent: VariationImageIntent, variationIndex: 
   return normalizeUnsplashQuery(`${base} ${chosen}`)
 }
 
-async function resolveUnsplashImage(query: string, options?: UnsplashResolveOptions): Promise<UnsplashImage | null> {
+function buildVariationImagePrompt(args: {
+  intent: VariationImageIntent
+  blockType: string
+  variationIndex: number
+}): string {
+  const fallbackBackgrounds = [
+    "clean neutral studio gradient",
+    "cozy wooden table scene",
+    "bright kitchen countertop",
+    "dark cinematic backdrop",
+    "outdoor natural light"
+  ]
+  const customBackgrounds = args.intent.backgroundTerms
+  const backgrounds = customBackgrounds.length > 0 ? customBackgrounds : fallbackBackgrounds
+  const chosenBackground = args.intent.varyBackgrounds ? backgrounds[args.variationIndex % backgrounds.length] : backgrounds[0]
+  const subject = args.intent.baseQuery || `${args.blockType} hero visual`
+  const style = args.intent.styleTerms.length > 0 ? args.intent.styleTerms.join(", ") : "natural product photography"
+
+  return [
+    "Use case: precise-object-edit",
+    `Asset type: website ${args.blockType} image`,
+    `Primary request: create a high-quality hero image featuring ${subject}`,
+    `Scene/background: ${chosenBackground}`,
+    `Style/medium: ${style}`,
+    "Composition/framing: landscape composition with clear focal subject and breathing room",
+    "Lighting/mood: clean, editorial, realistic",
+    "Constraints: no text, no logos, no watermark",
+    "Avoid: clutter, over-saturation, distorted objects"
+  ].join("\n")
+}
+
+async function generateVariationImageWithOpenAI(args: {
+  prompt: string
+  altText: string
+}): Promise<UnsplashImage | null> {
+  if (!process.env.OPENAI_API_KEY) return null
+
+  const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1"
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+  try {
+    const result = await client.images.generate({
+      model,
+      prompt: args.prompt,
+      size: "1536x1024"
+    })
+
+    const image = result.data?.[0]
+    let bytes: Buffer | null = null
+
+    if (typeof image?.b64_json === "string" && image.b64_json.length > 0) {
+      bytes = Buffer.from(image.b64_json, "base64")
+    } else if (typeof image?.url === "string" && image.url.length > 0) {
+      const fetched = await fetch(image.url)
+      if (fetched.ok) {
+        const arrayBuffer = await fetched.arrayBuffer()
+        bytes = Buffer.from(arrayBuffer)
+      }
+    }
+
+    if (!bytes || bytes.byteLength === 0) return null
+
+    await mkdir(generatedImageDir, { recursive: true })
+    const fileName = `var_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
+    await writeFile(resolve(generatedImageDir, fileName), bytes)
+
+    return {
+      url: `${orchestratorPublicOrigin}/generated-images/${fileName}`,
+      alt: args.altText,
+      query: args.prompt
+    }
+  } catch {
+    return null
+  }
+}
+
+async function resolveUnsplashImage(
+  query: string,
+  options?: UnsplashResolveOptions,
+  logContext?: { chatRequestId?: string }
+): Promise<UnsplashImage | null> {
   const safeQuery = normalizeUnsplashQuery(query)
   if (!safeQuery) return null
   const variationIndex =
@@ -231,6 +394,17 @@ async function resolveUnsplashImage(query: string, options?: UnsplashResolveOpti
   const page = variationIndex + 1
 
   const accessKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
+  app.log.info(
+    {
+      event: "hero_image_resolve_start",
+      chatRequestId: logContext?.chatRequestId,
+      query: safeQuery,
+      variationIndex,
+      hasUnsplashKey: Boolean(accessKey),
+      subjectKeywords: options?.subjectKeywords ?? []
+    },
+    "Resolving hero image candidate"
+  )
   if (accessKey) {
     try {
       const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(safeQuery)}&orientation=landscape&per_page=8&page=1&content_filter=high`
@@ -290,16 +464,46 @@ async function resolveUnsplashImage(query: string, options?: UnsplashResolveOpti
           const next = toImage(item)
           if (!next) continue
           if (usedImageUrls && usedImageUrls.has(next.url)) continue
+          app.log.info(
+            {
+              event: "hero_image_resolve_success",
+              chatRequestId: logContext?.chatRequestId,
+              provider: "unsplash_api",
+              query: safeQuery,
+              url: next.url,
+              alt: next.alt
+            },
+            "Resolved hero image from Unsplash API"
+          )
           return next
         }
       }
     } catch {
       // Fall through to source URL fallback.
+      app.log.warn(
+        {
+          event: "hero_image_resolve_unsplash_error",
+          chatRequestId: logContext?.chatRequestId,
+          query: safeQuery
+        },
+        "Unsplash API lookup failed; falling back to seeded source"
+      )
     }
   }
 
   const seed = toSeedSlug(`${safeQuery}-${page}`) || "hero-image"
   const sourceUrl = `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`
+  app.log.warn(
+    {
+      event: "hero_image_resolve_fallback",
+      chatRequestId: logContext?.chatRequestId,
+      provider: "picsum_seed",
+      query: safeQuery,
+      seed,
+      url: sourceUrl
+    },
+    "Falling back to picsum seeded hero image"
+  )
   return {
     url: sourceUrl,
     alt: `Photo for ${safeQuery}`,
@@ -656,6 +860,24 @@ function isBlockCatalogQuery(message: string) {
   )
 }
 
+function isLikelyClarificationFollowUp(message: string) {
+  const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
+  if (!normalized) return false
+  const words = normalized.split(" ").filter(Boolean)
+  const hasReferenceCue =
+    /\b(selected|this|that|it|them|those|these|one|ones|same)\b/.test(normalized) ||
+    /\bfirst|second|third|last\b/.test(normalized)
+  const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace)\b/.test(normalized)
+  return (words.length <= 8 && hasReferenceCue) || (!hasActionVerb && words.length <= 5)
+}
+
+function plannerMessageWithPendingContext(session: string, message: string) {
+  const pending = pendingClarificationBySession.get(session)
+  if (!pending) return message
+  if (!isLikelyClarificationFollowUp(message)) return message
+  return `${pending.baseRequest}\nClarification from user: ${message}`
+}
+
 function editablePropsFromBlock(block: PageDoc["blocks"][number]) {
   if (!block || !block.props || typeof block.props !== "object") return []
   return Object.keys(block.props as Record<string, unknown>)
@@ -679,6 +901,10 @@ function promptFromPropKey(propKey: string) {
     cards: "Update cards"
   }
   return labels[propKey] ?? `Change ${propKey} to \"...\"`
+}
+
+function userFacingPropNames(blockType: BlockType, keys: string[]) {
+  return keys.map((key) => getPropDisplayName(blockType, key))
 }
 
 function childSuggestions(args: { selected: PageDoc["blocks"][number]; editablePath: string }) {
@@ -1784,7 +2010,7 @@ function blockContractsSummary() {
       allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
       required: ["heading", "subheading", "ctaText", "ctaHref"],
       optional: ["imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
-      notes: "Use heading for the main headline; never invent prop names. For imageUrl: if the user explicitly asks for Unsplash, use an Unsplash image URL and update imageAlt to describe the image. If the user does not specify a source, use https://picsum.photos/seed/{keyword}/1600/900 where {keyword} is 1–2 lowercase hyphenated words derived from heading content (e.g. heading 'Build AI Websites' -> seed 'ai-websites'). secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
+      notes: "Use heading for the main headline; never invent prop names. For imageUrl: prefer a semantically relevant Unsplash image URL (explicit user URL is allowed) and update imageAlt to describe the image. Avoid random placeholder services for topical hero requests. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
     },
     FeatureGrid: {
       allowedProps: ["title", "features"],
@@ -2221,6 +2447,15 @@ function coercePatchForBlock(block: PageDoc["blocks"][number], rawPatch: unknown
     const mapped = normalizedToAllowed.get(key.toLowerCase())
     if (mapped) out[mapped] = value
   }
+
+  if (block.type === "RichText" && typeof out.body === "string") {
+    out.body = out.body
+      .replace(/\r\n?/g, "\n")
+      .replace(/([.!?])([A-Z])/g, "$1 $2")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  }
+
   return out
 }
 
@@ -2259,6 +2494,22 @@ async function withDefaultImageVariations(args: {
       patch.imageUrl = explicitUrl
       if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
         patch.imageAlt = `Image for ${args.block.type} variation`
+      }
+    } else if (imageIntent.provider === "llm") {
+      const prompt = buildVariationImagePrompt({
+        intent: imageIntent,
+        blockType: args.block.type,
+        variationIndex
+      })
+      const generated = await generateVariationImageWithOpenAI({
+        prompt,
+        altText: `AI-generated ${args.block.type} image variation ${variationIndex + 1}`
+      })
+      if (generated) {
+        patch.imageUrl = generated.url
+        if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
+          patch.imageAlt = generated.alt
+        }
       }
     } else {
       const query = buildVariationImageQuery(imageIntent, variationIndex)
@@ -2977,21 +3228,23 @@ function compileDeterministicPlan(args: {
       : null
     const patch = mergedRichTextTranslationPatch ?? childPatch?.patch ?? fullPatch
     if (Object.keys(patch).length === 0) {
+      const editableFields = userFacingPropNames(target.type, Object.keys(target.props))
       return {
         intent: "needs_clarification",
         summary_for_user: `Please specify at least one valid field for ${target.type}.`,
-        change_log: [...assumptions, `Editable fields: ${Object.keys(target.props).join(", ")}`],
+        change_log: [...assumptions, `Editable fields: ${editableFields.join(", ")}`],
         ops: []
       }
     }
+    const changedKeys = userFacingPropNames(target.type, Object.keys(patch))
     return {
       intent: "edit_plan",
       summary_for_user: intent.summary ?? `Updated ${target.type}.`,
       change_log: [
         ...assumptions,
         childPatch
-          ? `Updated ${target.id} ${activeEditablePath}: ${Object.keys(patch).join(", ")}`
-          : `Updated ${target.id}: ${Object.keys(patch).join(", ")}`
+          ? `Updated ${target.id} ${activeEditablePath}: ${changedKeys.join(", ")}`
+          : `Updated ${target.id}: ${changedKeys.join(", ")}`
       ],
       ops: [{ op: "update_props", pageSlug: slug, blockId: target.id, patch }]
     }
@@ -3271,7 +3524,7 @@ async function generatePlanWithOpenAI(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
-    "For Hero imageUrl, if user asks for Unsplash, use an Unsplash URL; otherwise use https://picsum.photos/seed/{keyword}/1600/900 or a URL explicitly provided by the user. Never invent local image paths.",
+    "For Hero imageUrl, prefer a semantically relevant Unsplash URL (or a URL explicitly provided by the user). Avoid random placeholder services for topical hero requests. Never invent local image paths.",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
@@ -3361,6 +3614,46 @@ function toErrorDetail(error: unknown) {
   return "Unknown planner error"
 }
 
+type GuardrailErrorCategory = "schema_violation" | "ambiguity" | "not_found" | "no_effective_change" | "internal_error"
+
+function classifyGuardrailError(reason: string): GuardrailErrorCategory {
+  const lower = reason.toLowerCase()
+  if (isNoEffectiveChangeError(reason)) return "no_effective_change"
+  if (
+    lower.includes("page not found") ||
+    lower.includes("blockid") ||
+    lower.includes("afterblockid") ||
+    lower.includes("not found")
+  ) {
+    return "not_found"
+  }
+  if (lower.includes("ambiguous") || lower.includes("clarify") || lower.includes("unclear")) {
+    return "ambiguity"
+  }
+  if (
+    lower.includes("invalid") ||
+    lower.includes("required") ||
+    lower.includes("unknown props") ||
+    lower.includes("out of range") ||
+    lower.includes("must be")
+  ) {
+    return "schema_violation"
+  }
+  return "internal_error"
+}
+
+function formatValidationError(reason: string) {
+  return `${classifyGuardrailError(reason)}: ${reason}`
+}
+
+function isDeterministicRepairEligible(reason: string) {
+  return classifyGuardrailError(reason) === "schema_violation"
+}
+
+function buildDeterministicRepairFeedback(reason: string) {
+  return `Repair strictly for schema compliance only: ${reason}. Do not change user intent or rewrite copy semantics.`
+}
+
 function applyOpsAtomically(session: string, ops: Operation[]) {
   const nextUniqueBlockId = (blocks: Array<{ id: string }>, preferred: string) => {
     const base = preferred.trim()
@@ -3401,9 +3694,16 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
     return candidate
   }
 
+  const describeValidationIssue = (error: z.ZodError) => {
+    const first = error.issues[0]
+    const path = first?.path?.length ? first.path.join(".") : ""
+    const message = first?.message ?? "Invalid value"
+    return path ? `${path}: ${message}` : message
+  }
+
   const withValidatedBlockProps = (block: PageDoc["blocks"][number], nextProps: Record<string, unknown>) => {
     const propCheck = validateBlockProps(block.type as BlockType, nextProps)
-    if (!propCheck.success) throw new Error(`Invalid props for ${block.type}`)
+    if (!propCheck.success) throw new Error(`Invalid props for ${block.type}: ${describeValidationIssue(propCheck.error)}`)
     return propCheck.data
   }
 
@@ -3528,7 +3828,7 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
 
     if (op.op === "add_block") {
       const propCheck = validateBlockProps(op.block.type, op.block.props)
-      if (!propCheck.success) throw new Error(`Invalid props for ${op.block.type}`)
+      if (!propCheck.success) throw new Error(`Invalid props for ${op.block.type}: ${describeValidationIssue(propCheck.error)}`)
 
       const alreadyExists = page.blocks.some((b) => b.id === op.block.id)
       if (alreadyExists) throw new Error(`Block id ${op.block.id} already exists`)
@@ -3671,7 +3971,7 @@ function applyOpsAtomically(session: string, ops: Operation[]) {
       const nextProps = { ...block.props, ...patchCandidate } as Record<string, unknown>
 
       const propCheck = validateBlockProps(block.type as BlockType, nextProps)
-      if (!propCheck.success) throw new Error(`Invalid props for ${block.type}`)
+      if (!propCheck.success) throw new Error(`Invalid props for ${block.type}: ${describeValidationIssue(propCheck.error)}`)
       if (JSON.stringify(block.props) === JSON.stringify(propCheck.data)) {
         throw new Error(`No effective prop change for ${block.id}. Patch keys: ${patchKeys.join(", ") || "(none)"}`)
       }
@@ -3822,6 +4122,9 @@ function normalizePlanCopyForUi(plan: EditPlan, currentPage: PageDoc): EditPlan 
     text
       .replace(/\bhome page secondary cta\b/gi, "Hero secondary CTA")
       .replace(/\bsecondary cta\b/gi, "Hero secondary CTA")
+      .replace(/\bhero block imageurl\b/gi, "Hero block image")
+      .replace(/\bimageurl\b/gi, "Hero block image")
+      .replace(/\bimagealt\b/gi, "Hero image alt text")
 
   const normalizedSummary = rewrite(plan.summary_for_user)
   const normalizedChangeLog = plan.change_log.map(rewrite)
@@ -3862,18 +4165,26 @@ async function withUnsplashHeroImage(args: {
   currentPage: PageDoc
   activeBlockId?: string
   activeEditablePath?: string
+  chatRequestId?: string
 }): Promise<EditPlan> {
   const lowerMessage = args.message.toLowerCase()
-  if (!lowerMessage.includes("unsplash")) return args.plan
   if (args.plan.intent !== "edit_plan") return args.plan
 
-  const query = extractUnsplashQuery(args.message)
-  if (!query) return args.plan
-  const resolved = await resolveUnsplashImage(query)
-  if (!resolved) return args.plan
+  const explicitUnsplashRequest = lowerMessage.includes("unsplash")
+  app.log.info(
+    {
+      event: "hero_image_rewrite_start",
+      chatRequestId: args.chatRequestId,
+      slug: args.slug,
+      explicitUnsplashRequest,
+      message: args.message
+    },
+    "Evaluating hero image rewrite"
+  )
 
   const plan = structuredClone(args.plan)
   let changed = false
+  let sourceQuery: string | undefined
 
   for (const op of plan.ops) {
     if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
@@ -3886,11 +4197,39 @@ async function withUnsplashHeroImage(args: {
         ? (rawPatch.props as Record<string, unknown>)
         : rawPatch
 
+    const requestedImageUrl = typeof patchCandidate.imageUrl === "string" ? patchCandidate.imageUrl.trim() : ""
     const touchesImage =
       Object.prototype.hasOwnProperty.call(patchCandidate, "imageUrl") ||
       args.activeEditablePath === "imageUrl" ||
-      /\b(image|photo|picture|hero)\b/.test(lowerMessage)
-    if (!touchesImage) continue
+      /\b(image|photo|picture)\b/.test(lowerMessage)
+    const userProvidedExplicitUrl = Boolean(firstUrlFromText(args.message))
+    const shouldReplaceWithUnsplash =
+      !userProvidedExplicitUrl && touchesImage && (explicitUnsplashRequest || requestedImageUrl.length > 0)
+    if (!touchesImage || !shouldReplaceWithUnsplash) continue
+
+    const query = heroImageQueryFromContext({
+      message: args.message,
+      currentPage: args.currentPage,
+      targetBlock: target,
+      patchCandidate
+    })
+    let resolved: UnsplashImage | null = null
+    if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY) {
+      const generatedAlt = `AI-generated hero image featuring ${query}`
+      const generatedPrompt = [
+        "Use case: website hero image update",
+        `Primary subject: ${query}`,
+        "Style: photorealistic editorial product photography",
+        "Composition: clean landscape frame with clear focal subject",
+        "Lighting: natural and vibrant",
+        "Constraints: no text, no logos, no watermark"
+      ].join("\n")
+      resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt })
+    }
+    if (!resolved) {
+      resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4) }, { chatRequestId: args.chatRequestId })
+    }
+    if (!resolved) continue
 
     const nextPatch: Record<string, unknown> = { ...patchCandidate, imageUrl: resolved.url }
     if (
@@ -3901,10 +4240,25 @@ async function withUnsplashHeroImage(args: {
       nextPatch.imageAlt = resolved.alt
     }
     op.patch = nextPatch
+    sourceQuery = resolved.query
+    app.log.info(
+      {
+        event: "hero_image_rewrite_applied",
+        chatRequestId: args.chatRequestId,
+        slug: args.slug,
+        blockId: op.blockId,
+        query,
+        explicitUnsplashRequest,
+        previousImageUrl: requestedImageUrl,
+        nextImageUrl: resolved.url,
+        nextImageAlt: nextPatch.imageAlt
+      },
+      "Applied hero image rewrite"
+    )
     changed = true
   }
 
-  if (!changed && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+  if (!changed && explicitUnsplashRequest && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -3913,18 +4267,43 @@ async function withUnsplashHeroImage(args: {
       selectedBlock?.type === "Hero" ? selectedBlock : args.currentPage.blocks.find((block) => block.type === "Hero") ?? null
 
     if (fallbackHero) {
+      const query = heroImageQueryFromContext({
+        message: args.message,
+        currentPage: args.currentPage,
+        targetBlock: fallbackHero
+      })
+      const resolved = await resolveUnsplashImage(
+        query,
+        { subjectKeywords: imageKeywordsFromQuery(query, 4) },
+        { chatRequestId: args.chatRequestId }
+      )
+      if (!resolved) return plan
+
       plan.ops.push({
         op: "update_props",
         pageSlug: args.slug,
         blockId: fallbackHero.id,
         patch: { imageUrl: resolved.url, imageAlt: resolved.alt }
       })
+      sourceQuery = resolved.query
       changed = true
     }
   }
 
   if (changed) {
-    plan.change_log = [...plan.change_log, `Set Hero image from Unsplash query "${resolved.query}".`]
+    const loggedQuery = sourceQuery ? ` from query "${sourceQuery}"` : ""
+    plan.change_log = [...plan.change_log, `Set Hero image to a relevant result${loggedQuery}.`]
+  } else {
+    app.log.info(
+      {
+        event: "hero_image_rewrite_skipped",
+        chatRequestId: args.chatRequestId,
+        slug: args.slug,
+        explicitUnsplashRequest,
+        message: args.message
+      },
+      "Skipped hero image rewrite"
+    )
   }
 
   return plan
@@ -3946,6 +4325,84 @@ function isNoEffectiveChangeError(reason: string) {
   return /No effective prop change/i.test(reason)
 }
 
+const AI_JUSTIFICATION_PREFIX = "__ai_justification__:"
+const AI_PERFORMANCE_PREFIX = "__ai_performance__:"
+
+function isRewriteLikeMessage(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    /\brewrite\b/.test(lower) ||
+    /\brephrase\b/.test(lower) ||
+    /\breword\b/.test(lower) ||
+    /\bmake\b.*\b(shorter|clearer|crisper|concise)\b/.test(lower) ||
+    /\bimprove\b.*\b(copy|text|wording|messaging)\b/.test(lower) ||
+    /\bchange\b.*\b(tone|copy|wording)\b/.test(lower)
+  )
+}
+
+function isPerformanceAwareMessage(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    /\bseo\b/.test(lower) ||
+    /\bkeyword/.test(lower) ||
+    /\bsemantic/.test(lower) ||
+    /\bconversion/.test(lower) ||
+    /\baccessibility/.test(lower) ||
+    /\breadability/.test(lower) ||
+    /\bcta\b/.test(lower) ||
+    /\bperformance\b/.test(lower)
+  )
+}
+
+function isLikelyTextField(key: string) {
+  if (!key) return false
+  return !/(^|\.)(?:href|url|image|icon|id)$/i.test(key)
+}
+
+function collectChangedTextFields(ops: Operation[]) {
+  const out = new Set<string>()
+  for (const op of ops) {
+    if (op.op === "update_props") {
+      const patch = op.patch as Record<string, unknown>
+      for (const [key, value] of Object.entries(patch ?? {})) {
+        if (typeof value !== "string" || value.trim().length === 0) continue
+        if (!isLikelyTextField(key)) continue
+        out.add(key)
+      }
+      continue
+    }
+
+    if (op.op === "update_item") {
+      const patch = op.patch as Record<string, unknown>
+      for (const [key, value] of Object.entries(patch ?? {})) {
+        if (typeof value !== "string" || value.trim().length === 0) continue
+        if (!isLikelyTextField(key)) continue
+        out.add(`${op.listKey}.${key}`)
+      }
+    }
+  }
+  return Array.from(out)
+}
+
+function buildAiInsightChanges(args: { plan: EditPlan; message: string }) {
+  if (args.plan.intent !== "edit_plan" || args.plan.ops.length === 0) return []
+
+  const textFields = collectChangedTextFields(args.plan.ops)
+  if (textFields.length === 0) return []
+
+  const rewriteLike = isRewriteLikeMessage(args.message)
+  const performanceAware = isPerformanceAwareMessage(args.message)
+
+  const lines: string[] = []
+  if (rewriteLike) {
+    lines.push(`${AI_JUSTIFICATION_PREFIX}This version is more benefit-driven and action-oriented.`)
+  }
+  if (performanceAware) {
+    lines.push(`${AI_PERFORMANCE_PREFIX}This wording improves semantic relevance and supports SEO, accessibility, and conversion checks.`)
+  }
+  return lines
+}
+
 async function runChatPipeline(
   body: ChatRequestBody,
   options?: {
@@ -3956,12 +4413,27 @@ async function runChatPipeline(
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
+  const plannerMessage = plannerMessageWithPendingContext(body.session, body.message)
+  const chatRequestId = randomUUID()
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({
     session: body.session,
     requestedSlug,
     activeBlockId: body.activeBlockId
   })
+  app.log.info(
+    {
+      event: "chat_pipeline_start",
+      chatRequestId,
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      activeBlockId: body.activeBlockId,
+      activeEditablePath: body.activeEditablePath,
+      message: body.message
+    },
+    "Chat pipeline request received"
+  )
 
   const modelKey = body.modelKey && modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
   const modelUsed = modelLookup[modelKey]
@@ -3977,29 +4449,67 @@ async function runChatPipeline(
   const contextPack = plannerContextPack({
     session: body.session,
     slug: effectiveSlug,
-    message: body.message,
+    message: plannerMessage,
     currentPage: current,
     activeBlockId: body.activeBlockId,
     activeBlockType: body.activeBlockType,
     activeEditablePath: body.activeEditablePath
   })
 
+  const guardrailFailureResponse = (args: { reason: string; source: "openai" | "demo" }) => {
+    const category = classifyGuardrailError(args.reason)
+    if (category === "ambiguity") {
+      const selected =
+        body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
+          ? current.blocks.find((b) => b.id === body.activeBlockId)
+          : null
+      return {
+        code: 200,
+        payload: {
+          status: "needs_clarification",
+          summary: "I need one more detail before applying this safely.",
+          changes: [],
+          mentionedSlugs: [effectiveSlug],
+          suggestions: clarificationSuggestions({ body, current, selected }),
+          previewVersion: versions.get(body.session!) ?? 0,
+          plannerSource: args.source,
+          modelUsed,
+          modelKey
+        } satisfies ChatResult
+      }
+    }
+    return {
+      code: 400,
+      payload: {
+        status: "validation_error",
+        summary: "I could not apply that change safely.",
+        changes: [],
+        validationErrors: [formatValidationError(args.reason)],
+        previewVersion: versions.get(body.session!) ?? 0,
+        plannerSource: args.source,
+        modelUsed,
+        modelKey
+      } satisfies ChatResult
+    }
+  }
+
   const respondFromPlan = async (plan: EditPlan, source: "openai" | "demo") => {
     let resolvedPlan = normalizePlanCopyForUi(plan, current)
     resolvedPlan = await withUnsplashHeroImage({
       plan: resolvedPlan,
-      message: body.message ?? "",
+      message: plannerMessage,
       slug: effectiveSlug,
       currentPage: current,
       activeBlockId: body.activeBlockId,
-      activeEditablePath: body.activeEditablePath
+      activeEditablePath: body.activeEditablePath,
+      chatRequestId
     })
 
     if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
       const focusedFallback = compileDeterministicPlan({
         session: body.session ?? "dev",
         intent: { action: "clarify" },
-        message: body.message ?? "",
+        message: plannerMessage,
         slug: effectiveSlug ?? "/",
         currentPage: current,
         activeBlockId: body.activeBlockId,
@@ -4016,6 +4526,7 @@ async function runChatPipeline(
     }
 
     if (resolvedPlan.intent === "needs_clarification") {
+      pendingClarificationBySession.set(body.session!, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
       const selected =
         body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
           ? current.blocks.find((b) => b.id === body.activeBlockId)
@@ -4112,12 +4623,14 @@ async function runChatPipeline(
         applyOpsAtomically(body.session!, resolvedPlan.ops)
       }
       pushUndo(body.session!, effectiveSlug, previous)
+      pendingClarificationBySession.delete(body.session!)
       const planUpdatedSlug = pickUpdatedSlug(body.session!, effectiveSlug, resolvedPlan.ops)
       const updatedSlug = planUpdatedSlug ?? (effectiveSlug !== requestedSlug ? effectiveSlug : undefined)
       pushRecentEdit(body.session!, { slug: updatedSlug ?? effectiveSlug, summary: resolvedPlan.summary_for_user, ops: resolvedPlan.ops })
       const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
       schedulePersistState()
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
+      const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
       return {
         done: true as const,
         response: {
@@ -4125,7 +4638,7 @@ async function runChatPipeline(
           payload: {
             status: "applied",
             summary: resolvedPlan.summary_for_user,
-            changes: resolvedPlan.change_log,
+            changes: [...resolvedPlan.change_log, ...aiInsightChanges],
             mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, updatedSlug ?? effectiveSlug),
             previewVersion,
             focusBlockId,
@@ -4162,22 +4675,10 @@ async function runChatPipeline(
 
   if (!process.env.OPENAI_API_KEY) {
     try {
-      const demoPlan = demoPlanFromMessage(body.message, effectiveSlug, body.activeBlockId, body.activeBlockType)
+      const demoPlan = demoPlanFromMessage(plannerMessage, effectiveSlug, body.activeBlockId, body.activeBlockType)
       const outcome = await respondFromPlan(demoPlan, "demo")
       if (outcome.done) return outcome.response
-      return {
-        code: 400,
-        payload: {
-          status: "validation_error",
-          summary: "I could not apply that change safely.",
-          changes: [],
-          validationErrors: [outcome.reason],
-          previewVersion: versions.get(body.session) ?? 0,
-          plannerSource: "demo",
-          modelUsed,
-          modelKey
-        }
-      }
+      return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
     } catch (error) {
       return {
         code: 500,
@@ -4194,32 +4695,32 @@ async function runChatPipeline(
     }
   }
 
-  const maxAttempts = 3
-  const repairFeedback: string[] = []
+  const maxPlanningAttempts = 3
+  let initialPlan: EditPlan | null = null
+  const planningErrors: string[] = []
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let plan: EditPlan
+  for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
     try {
-      plan = await generatePlanWithOpenAI({
-        message: body.message,
+      initialPlan = await generatePlanWithOpenAI({
+        message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
         contextPack,
         model: modelUsed,
-        feedback: repairFeedback.length > 0 ? repairFeedback.join(" | ") : undefined,
         onToken: options?.onPlanningToken
       })
+      break
     } catch (error) {
       const reason = toErrorDetail(error)
-      repairFeedback.push(`Attempt ${attempt} planning failed: ${reason}`)
-      if (attempt === maxAttempts) {
+      planningErrors.push(`Attempt ${attempt} planning failed: ${reason}`)
+      if (attempt === maxPlanningAttempts) {
         return {
           code: 500,
           payload: {
             status: "error",
             summary: "Could not generate an edit plan.",
             changes: [reason.slice(0, 300)],
-            validationErrors: repairFeedback.slice(-3),
+            validationErrors: planningErrors.slice(-3),
             previewVersion: versions.get(body.session) ?? 0,
             plannerSource,
             modelUsed,
@@ -4227,36 +4728,63 @@ async function runChatPipeline(
           }
         }
       }
-      continue
     }
-
-    const outcome = await respondFromPlan(plan, "openai")
-    if (outcome.done) return outcome.response
-    repairFeedback.push(`Attempt ${attempt} apply failed: ${outcome.reason}`)
   }
 
+  if (!initialPlan) {
+    return {
+      code: 500,
+      payload: {
+        status: "error",
+        summary: "Could not generate an edit plan.",
+        changes: [],
+        validationErrors: planningErrors.slice(-3),
+        previewVersion: versions.get(body.session) ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      }
+    }
+  }
+
+  const initialOutcome = await respondFromPlan(initialPlan, "openai")
+  if (initialOutcome.done) return initialOutcome.response
+
+  if (!isDeterministicRepairEligible(initialOutcome.reason)) {
+    return guardrailFailureResponse({ reason: initialOutcome.reason, source: "openai" })
+  }
+
+  let repairedPlan: EditPlan
   try {
-    const fallbackPlan = demoPlanFromMessage(body.message, effectiveSlug, body.activeBlockId, body.activeBlockType)
-    const fallbackOutcome = await respondFromPlan(fallbackPlan, "demo")
-    if (fallbackOutcome.done) return fallbackOutcome.response
-    repairFeedback.push(`Demo fallback apply failed: ${fallbackOutcome.reason}`)
+    repairedPlan = await generatePlanWithOpenAI({
+      message: plannerMessage,
+      slug: effectiveSlug,
+      currentPage: current,
+      contextPack,
+      model: modelUsed,
+      feedback: buildDeterministicRepairFeedback(initialOutcome.reason),
+      onToken: options?.onPlanningToken
+    })
   } catch (error) {
-    repairFeedback.push(`Demo fallback planning failed: ${toErrorDetail(error)}`)
-  }
-
-  return {
-    code: 400,
-    payload: {
-      status: "validation_error",
-      summary: "I could not apply that change safely.",
-      changes: [],
-      validationErrors: repairFeedback.slice(-4),
-      previewVersion: versions.get(body.session) ?? 0,
-      plannerSource: "demo",
-      modelUsed,
-      modelKey
+    const reason = toErrorDetail(error)
+    return {
+      code: 400,
+      payload: {
+        status: "validation_error",
+        summary: "I could not apply that change safely.",
+        changes: [],
+        validationErrors: [formatValidationError(reason)],
+        previewVersion: versions.get(body.session) ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      }
     }
   }
+
+  const repairedOutcome = await respondFromPlan(repairedPlan, "openai")
+  if (repairedOutcome.done) return repairedOutcome.response
+  return guardrailFailureResponse({ reason: repairedOutcome.reason, source: "openai" })
 }
 
 async function runVariationPipeline(body: VariationRequestBody): Promise<{ code: number; payload: VariationResult | { error: string } }> {
@@ -4380,6 +4908,23 @@ app.get("/draft/slugs", async (request, reply) => {
   const draft = getSessionDraft(session)
   const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
   return { slugs }
+})
+
+app.get("/generated-images/:fileName", async (request, reply) => {
+  const params = request.params as { fileName?: string }
+  const fileName = typeof params.fileName === "string" ? params.fileName.trim() : ""
+  if (!/^[a-zA-Z0-9_-]+\.png$/.test(fileName)) {
+    return reply.code(400).send({ error: "invalid filename" })
+  }
+
+  try {
+    const bytes = await readFile(resolve(generatedImageDir, fileName))
+    reply.header("content-type", "image/png")
+    reply.header("cache-control", "public, max-age=31536000, immutable")
+    return reply.send(bytes)
+  } catch {
+    return reply.code(404).send({ error: "not found" })
+  }
 })
 
 app.get("/publish/content", async (request, reply) => {
@@ -4548,7 +5093,8 @@ app.post("/ops", async (request, reply) => {
       updatedSlug
     }
   } catch (error) {
-    return reply.code(400).send({ error: toErrorDetail(error) })
+    const reason = toErrorDetail(error)
+    return reply.code(400).send({ error: reason, errorCode: classifyGuardrailError(reason) })
   }
 })
 
@@ -4646,6 +5192,7 @@ app.get("/chat/stream", async (request, reply) => {
   const result = await runChatPipeline(query, {
     onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token }),
     onOpApplied: (event) =>
+      // The editor consumes op_applied as patch-transport input for incremental preview updates.
       sseWrite(reply, {
         type: "op_applied",
         index: event.index,

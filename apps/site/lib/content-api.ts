@@ -27,7 +27,8 @@ function localFallbackPage(slug: string): PageDoc | null {
 function getConfiguredOrchestratorUrl() {
   const value = process.env.ORCHESTRATOR_URL?.trim()
   if (value) return value.replace(/\/$/, "")
-  return "http://127.0.0.1:4200"
+  if (process.env.NODE_ENV !== "production") return "http://127.0.0.1:4200"
+  return null
 }
 
 function buildCandidateBaseUrls(configuredBaseUrl: string): string[] {

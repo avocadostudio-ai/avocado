@@ -57,11 +57,15 @@ type ChatEntry = {
   role: "user" | "assistant"
   text: string
   status?: string
+  canUndo?: boolean
+  wasUndone?: boolean
   changes?: string[]
   mentionedSlugs?: string[]
   suggestions?: string[]
   errors?: string[]
   meta?: string
+  aiJustification?: string
+  aiPerformanceNote?: string
 }
 
 type ApplyOpsResponse = {
@@ -131,6 +135,8 @@ function resolveOrigin(value: string | undefined, fallback: string) {
 const siteOrigin = resolveOrigin(import.meta.env.VITE_SITE_ORIGIN as string | undefined, "http://localhost:3000")
 const orchestrator = resolveOrigin(import.meta.env.VITE_ORCHESTRATOR_URL as string | undefined, "http://localhost:4200")
 const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
+const AI_JUSTIFICATION_PREFIX = "__ai_justification__:"
+const AI_PERFORMANCE_PREFIX = "__ai_performance__:"
 
 const previewPresetWidths: Record<PreviewWidthPreset, number> = {
   desktop: 1200,
@@ -172,6 +178,91 @@ function isVariationRequest(message: string) {
 
 function mergedVariationProps(baseProps: Record<string, unknown>, patch: Record<string, unknown>) {
   return { ...baseProps, ...patch }
+}
+
+function normalizeComparableText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/["'`]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+function comparableTokens(value: string) {
+  const stopwords = new Set([
+    "the",
+    "a",
+    "an",
+    "in",
+    "on",
+    "to",
+    "for",
+    "of",
+    "and",
+    "with",
+    "by",
+    "from",
+    "that",
+    "this",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "it",
+    "its",
+    "selected",
+    "block"
+  ])
+  return normalizeComparableText(value)
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2 && !stopwords.has(token))
+}
+
+function isRedundantChangeLine(summary: string | undefined, line: string) {
+  const summaryNorm = normalizeComparableText(summary ?? "")
+  const lineNorm = normalizeComparableText(line)
+  if (!summaryNorm || !lineNorm) return false
+  if (lineNorm === summaryNorm || lineNorm.includes(summaryNorm) || summaryNorm.includes(lineNorm)) return true
+
+  const summaryTokens = new Set(comparableTokens(summaryNorm))
+  const lineTokens = new Set(comparableTokens(lineNorm))
+  if (summaryTokens.size === 0 || lineTokens.size === 0) return false
+
+  let overlap = 0
+  for (const token of lineTokens) {
+    if (summaryTokens.has(token)) overlap += 1
+  }
+
+  const coverLine = overlap / lineTokens.size
+  const coverSummary = overlap / summaryTokens.size
+  return coverLine >= 0.55 || coverSummary >= 0.55
+}
+
+function splitAiInsightChanges(lines: string[] | undefined) {
+  const raw = Array.isArray(lines) ? lines : []
+  let aiJustification: string | undefined
+  let aiPerformanceNote: string | undefined
+  const changes: string[] = []
+
+  for (const line of raw) {
+    if (typeof line !== "string") continue
+    if (line.startsWith(AI_JUSTIFICATION_PREFIX)) {
+      const value = line.slice(AI_JUSTIFICATION_PREFIX.length).trim()
+      if (value) aiJustification = value
+      continue
+    }
+    if (line.startsWith(AI_PERFORMANCE_PREFIX)) {
+      const value = line.slice(AI_PERFORMANCE_PREFIX.length).trim()
+      if (value) aiPerformanceNote = value
+      continue
+    }
+    changes.push(line)
+  }
+
+  return { changes, aiJustification, aiPerformanceNote }
 }
 
 function VariationScaledPreview(args: { block: BlockInstance; virtualWidth: number }) {
@@ -244,12 +335,12 @@ export function App() {
   const [variationModal, setVariationModal] = useState<VariationModalState | null>(null)
   const [variationPreviewPreset, setVariationPreviewPreset] = useState<PreviewWidthPreset>("desktop")
   const [isApplyingVariation, setIsApplyingVariation] = useState(false)
-  const [previewRevision, setPreviewRevision] = useState(0)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
   const [composerHeight, setComposerHeight] = useState(124)
   const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
+  const [undoInFlightEntryId, setUndoInFlightEntryId] = useState<string | null>(null)
   const [chatLog, setChatLog] = useState<ChatEntry[]>([
     {
       id: "welcome",
@@ -307,9 +398,8 @@ export function App() {
     url.searchParams.set("__editor", "1")
     url.searchParams.set("session", session)
     url.searchParams.set("editorOrigin", editorOrigin)
-    url.searchParams.set("__rev", String(previewRevision))
     return url.toString()
-  }, [previewRevision, session, slug])
+  }, [session, slug])
 
   const routeOptions = useMemo(() => {
     const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
@@ -488,28 +578,37 @@ export function App() {
     return [...form, ...field]
   }
 
-  function pushAssistantFromResult(data: AssistantResponse) {
+  function pushAssistantFromResult(data: AssistantResponse, options?: { canUndo?: boolean }) {
     const errors = normalizeValidationErrors(data.validationErrors)
+    const parsedChanges = splitAiInsightChanges(data.changes)
     const entry: ChatEntry = {
       id: createId(),
       role: "assistant",
       text: data.summary ?? data.error ?? "Request failed.",
       status: data.status,
-      changes: data.changes ?? [],
+      canUndo: options?.canUndo ?? false,
+      wasUndone: false,
+      changes: parsedChanges.changes,
       mentionedSlugs: Array.isArray(data.mentionedSlugs) ? data.mentionedSlugs.filter((s): s is string => typeof s === "string") : [],
       suggestions: data.suggestions ?? [],
       errors,
-      meta: data.modelUsed ? `${data.modelUsed}${data.modelKey ? ` (${data.modelKey})` : ""}` : undefined
+      meta: data.modelUsed ? `${data.modelUsed}${data.modelKey ? ` (${data.modelKey})` : ""}` : undefined,
+      aiJustification: parsedChanges.aiJustification,
+      aiPerformanceNote: parsedChanges.aiPerformanceNote
     }
 
-    setChatLog((prev) => [...prev, entry])
+    setChatLog((prev) => {
+      if (!entry.canUndo) return [...prev, entry]
+      const withoutUndo = prev.map((row) => (row.canUndo ? { ...row, canUndo: false, wasUndone: false } : row))
+      return [...withoutUndo, entry]
+    })
   }
 
   function applyChatResult(data: AssistantResponse) {
     if (data.plannerSource === "openai" || data.plannerSource === "demo") {
       setPlannerBadgeState(data.plannerSource)
     }
-    pushAssistantFromResult(data)
+    pushAssistantFromResult(data, { canUndo: data.status === "applied" })
     if (data.status === "applied") {
       const nextSlug = typeof data.updatedSlug === "string" && data.updatedSlug.length > 0 ? data.updatedSlug : slug
       if (nextSlug !== slug) {
@@ -521,7 +620,6 @@ export function App() {
         setActiveBlockType(undefined)
         setActiveEditablePath(undefined)
       }
-      setPreviewRevision((prev) => prev + 1)
       postToSite("draftUpdated", { focusBlockId: data.focusBlockId ?? null })
       if (data.focusBlockId) {
         activeBlockIdRef.current = data.focusBlockId
@@ -798,11 +896,14 @@ export function App() {
       setActiveEditablePath(undefined)
       postToSite("draftUpdated", { focusBlockId })
       setVariationModal(null)
-      pushAssistantFromResult({
-        status: "applied",
-        summary: `Applied variation: ${option.title}`,
-        changes: [option.summary]
-      })
+      pushAssistantFromResult(
+        {
+          status: "applied",
+          summary: `Applied variation: ${option.title}`,
+          changes: [option.summary]
+        },
+        { canUndo: true }
+      )
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -994,10 +1095,11 @@ export function App() {
     return text
   }
 
-  async function applyHistory(action: "undo" | "redo") {
-    if (isLoading) return
+  async function applyUndoHistory(entryId: string) {
+    if (isLoading || undoInFlightEntryId) return
+    setUndoInFlightEntryId(entryId)
     try {
-      const res = await fetch(`${orchestrator}/history/${action}`, {
+      const res = await fetch(`${orchestrator}/history/undo`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ session, slug })
@@ -1006,7 +1108,7 @@ export function App() {
       if (!res.ok || data.status !== "applied") {
         pushAssistantFromResult({
           status: "error",
-          summary: data.error ?? `Could not ${action}.`,
+          summary: data.error ?? "Could not undo.",
           changes: []
         })
         return
@@ -1015,17 +1117,30 @@ export function App() {
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       postToSite("draftUpdated", { focusBlockId: null })
-      pushAssistantFromResult({
-        status: "applied",
-        summary: action === "undo" ? "Undid last change." : "Redid last change.",
-        changes: []
+      setChatLog((prev) => {
+        const targetIndex = prev.findIndex((entry) => entry.id === entryId)
+        if (targetIndex < 0) return prev
+
+        const next = prev.map((entry, index) => (index === targetIndex ? { ...entry, canUndo: false, wasUndone: true } : entry))
+        let promoteIndex = -1
+        for (let index = targetIndex - 1; index >= 0; index -= 1) {
+          const entry = next[index]
+          if (entry.role === "assistant" && entry.status === "applied") {
+            promoteIndex = index
+            break
+          }
+        }
+        if (promoteIndex >= 0) next[promoteIndex] = { ...next[promoteIndex], canUndo: true, wasUndone: false }
+        return next
       })
     } catch {
       pushAssistantFromResult({
         status: "error",
-        summary: `Could not ${action}.`,
+        summary: "Could not undo.",
         changes: []
       })
+    } finally {
+      setUndoInFlightEntryId(null)
     }
   }
 
@@ -1239,12 +1354,29 @@ export function App() {
 
         <section className="chat-thread" ref={chatThreadRef}>
           {chatLog.map((entry) => (
-            <article key={entry.id} className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""}`}>
+            <article
+              key={entry.id}
+              className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""}`}
+            >
               <div className="msg-main">{entry.text}</div>
-              {entry.status ? <div className="msg-status">{entry.status === "needs_clarification" ? "question" : entry.status}</div> : null}
-              {(entry.changes ?? []).length > 0 ? (
+              {entry.aiJustification ? (
+                <div className="msg-ai-insight">
+                  <div className="msg-ai-insight-label">AI justification</div>
+                  <blockquote>{entry.aiJustification}</blockquote>
+                </div>
+              ) : null}
+              {entry.aiPerformanceNote ? (
+                <div className="msg-ai-insight">
+                  <div className="msg-ai-insight-label">Performance awareness</div>
+                  <blockquote>{entry.aiPerformanceNote}</blockquote>
+                </div>
+              ) : null}
+              {entry.status && !entry.canUndo ? <div className="msg-status">{entry.status === "needs_clarification" ? "question" : entry.status}</div> : null}
+              {(entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line)).length > 0 ? (
                 <ul className="msg-list">
-                  {entry.changes?.map((line, idx) => (
+                  {(entry.changes ?? [])
+                    .filter((line) => !isRedundantChangeLine(entry.text, line))
+                    .map((line, idx) => (
                     <li key={idx}>{line}</li>
                   ))}
                 </ul>
@@ -1264,24 +1396,27 @@ export function App() {
                   ))}
                 </div>
               ) : null}
-              {(entry.mentionedSlugs ?? []).length > 0 ? (
-                <div className="msg-suggestions msg-page-links">
-                  {entry.mentionedSlugs?.map((route, idx) => (
-                    <button
-                      key={`${entry.id}-route-${idx}`}
-                      type="button"
-                      className="msg-suggestion msg-page-link"
-                      onClick={() => {
-                        setSlug(route)
-                        setPreviewRevision((prev) => prev + 1)
-                      }}
-                      disabled={isLoading}
-                    >
-                      Open {route}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              {(() => {
+                const routes = (entry.mentionedSlugs ?? []).filter((route) => route !== slug)
+                if (routes.length === 0) return null
+                return (
+                  <div className="msg-suggestions msg-page-links">
+                    {routes.map((route, idx) => (
+                      <button
+                        key={`${entry.id}-route-${idx}`}
+                        type="button"
+                        className="msg-suggestion msg-page-link"
+                        onClick={() => {
+                          setSlug(route)
+                        }}
+                        disabled={isLoading}
+                      >
+                        Open {route}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
               {(entry.errors ?? []).length > 0 ? (
                 <ul className="msg-errors">
                   {entry.errors?.map((line, idx) => (
@@ -1289,7 +1424,22 @@ export function App() {
                   ))}
                 </ul>
               ) : null}
-              {entry.meta ? <div className="msg-meta">{entry.meta}</div> : null}
+              {entry.canUndo || entry.wasUndone ? (
+                <div className="msg-undo-row">
+                  <button
+                    type="button"
+                    className="msg-undo-btn"
+                    onClick={() => void applyUndoHistory(entry.id)}
+                    disabled={!entry.canUndo || isLoading || undoInFlightEntryId !== null}
+                  >
+                    <span>{entry.wasUndone ? "Undone" : "Undo"}</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M9 7 4 12l5 5" />
+                      <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
+                    </svg>
+                  </button>
+                </div>
+              ) : null}
             </article>
           ))}
           {streamStatus ? (
@@ -1331,8 +1481,6 @@ export function App() {
             onMessageChange={setMessage}
             onModelChange={setModelKey}
             onSubmit={(explicitMessage) => void submitChat(explicitMessage)}
-            onUndo={() => void applyHistory("undo")}
-            onRedo={() => void applyHistory("redo")}
             onTranscribeAudio={transcribeAudio}
             onAutoHeightChange={handleComposerAutoHeight}
           />

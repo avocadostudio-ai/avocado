@@ -13,6 +13,8 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
   const router = useRouter()
   const pathname = usePathname()
   const pendingFocusRef = useRef<string | null>(null)
+  const pendingScrollIntoViewRef = useRef(false)
+  const pendingScrollRestoreRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickUntilRef = useRef(0)
   const selectedBlockRef = useRef<string | null>(null)
   const selectedEditablePathRef = useRef<string | null>(null)
@@ -122,6 +124,9 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
 
     const startInlineEdit = (args: { node: HTMLElement; blockId: string; blockType: string; editablePath: string }) => {
       if (!supportsInlineEditablePath(args.editablePath)) return
+      // Avoid mutating React-managed rich text structures (lists/headings/paragraph trees).
+      // contenteditable on container nodes with element children can cause reconciliation crashes.
+      if (args.node.children.length > 0) return
       const existing = inlineEditingRef.current
       if (existing?.node === args.node) return
       if (existing) commitInlineEdit()
@@ -257,7 +262,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       }
     }
 
-    const applyBlockFocus = (blockId: string, enter: boolean, editablePath?: string) => {
+    const applyBlockFocus = (blockId: string, enter: boolean, editablePath?: string, options?: { scrollIntoView?: boolean }) => {
       if (!blockId) return false
       clearChildFocus()
       removeSelectedDeleteHandle()
@@ -267,7 +272,18 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
 
       if (enter) match.classList.add("editor-enter")
       match.classList.add("editor-highlight", "editor-flash")
-      match.scrollIntoView({ behavior: "smooth", block: "center" })
+      if (enter) {
+        match.classList.remove("aifx-updated")
+        // Force reflow so repeated updates can replay the wave animation.
+        void match.offsetWidth
+        match.classList.add("aifx-updated")
+        window.setTimeout(() => {
+          match.classList.remove("aifx-updated")
+        }, 980)
+      }
+      if (options?.scrollIntoView !== false) {
+        match.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
 
       window.setTimeout(() => {
         match.classList.remove("editor-flash")
@@ -321,19 +337,32 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
 
       let attempts = 0
       const timer = window.setInterval(() => {
-        const done = applyBlockFocus(targetId, true)
+        const done = applyBlockFocus(targetId, true, undefined, { scrollIntoView: pendingScrollIntoViewRef.current })
         attempts += 1
         if (done || attempts >= 20) {
           window.clearInterval(timer)
           pendingFocusRef.current = null
+          pendingScrollIntoViewRef.current = false
         }
       }, 45)
     }
 
     const smoothRefresh = () => {
+      if (!pendingScrollIntoViewRef.current) {
+        pendingScrollRestoreRef.current = { x: window.scrollX, y: window.scrollY }
+      } else {
+        pendingScrollRestoreRef.current = null
+      }
       cancelInlineEdit()
       router.refresh()
-      window.setTimeout(queueFocusAfterRefresh, 80)
+      window.setTimeout(() => {
+        if (pendingScrollRestoreRef.current) {
+          const { x, y } = pendingScrollRestoreRef.current
+          window.scrollTo({ left: x, top: y, behavior: "auto" })
+          pendingScrollRestoreRef.current = null
+        }
+        queueFocusAfterRefresh()
+      }, 80)
     }
 
     const onClick = (event: MouseEvent) => {
@@ -407,6 +436,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       if (msg.type === "draftUpdated") {
         const focusBlockId = String(msg.payload.focusBlockId ?? "")
         pendingFocusRef.current = focusBlockId || null
+        pendingScrollIntoViewRef.current = focusBlockId.length > 0
         clearChildFocus()
         selectedEditablePathRef.current = null
         smoothRefresh()

@@ -145,3 +145,47 @@ Then add orchestrator/editor deployment as phase 2.
 1. Phase 1: Public site only on Vercel (stable, low risk)
 2. Phase 2: Externalize orchestrator state storage
 3. Phase 3: Deploy orchestrator + editor with locked CORS and env-driven origins
+
+---
+
+## Recommended Beta Split (Avoid Production Overwrite)
+
+Use separate URLs/environments for production and editor demo.
+
+### Production site (stable)
+
+- Vercel project/branch: `main`
+- URL: public production URL (for end users)
+- Env:
+  - `ORCHESTRATOR_URL` unset
+  - `NEXT_PUBLIC_ENABLE_EDITOR=0`
+
+Behavior: serves committed `apps/site/lib/published-content.json` only.
+
+### Staging/demo site (editor preview target)
+
+- Vercel project or branch: `beta-editor` (recommended separate project URL)
+- URL: staging/demo URL
+- Env:
+  - `ORCHESTRATOR_URL=https://<orchestrator-host>`
+  - `NEXT_PUBLIC_ENABLE_EDITOR=1`
+  - `NEXT_PUBLIC_EDITOR_ORIGIN=https://<editor-host>`
+
+Behavior: can read live draft content from orchestrator for demo/editing.
+
+### Editor app
+
+- Vercel project root: `apps/editor`
+- Env:
+  - `VITE_SITE_ORIGIN=https://<staging-site-host>` (not production)
+  - `VITE_ORCHESTRATOR_URL=https://<orchestrator-host>`
+  - `VITE_PUBLISH_TOKEN=<same as orchestrator PUBLISH_TOKEN>` (if enabled)
+
+### Orchestrator
+
+- Host on Render (or equivalent long-running host)
+- Env:
+  - `PUBLISH_GIT_BRANCH=beta-editor`
+  - `ORCHESTRATOR_CORS_ORIGINS=https://<staging-site-host>,https://<editor-host>`
+
+Behavior: publish writes to beta branch, preventing accidental updates to production `main`.
