@@ -317,13 +317,13 @@
     "id": "p_cherries",
     "slug": "/cherries",
     "title": "Cherries",
-    "updatedAt": "2026-02-26T23:56:39.876Z",
+    "updatedAt": "2026-02-26T23:56:48.311Z",
     "blocks": [
       {
         "id": "b_hero_1772137257073",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Delight of Cherries",
+          "heading": "Discover the Delight of Cherries.",
           "subheading": "Explore the sweet and tart flavors of our premium cherries. Perfect for desserts, snacks, and more.",
           "ctaText": "Learn More",
           "ctaHref": "/cherries",
@@ -442,6 +442,26 @@
               "a": "Yes, we offer international shipping to select countries. Please check our shipping policy for more details."
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_about_lemons",
+    "slug": "/about-lemons",
+    "title": "About Lemons",
+    "updatedAt": "2026-02-27T00:05:07.049Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772150570555",
+        "type": "Hero",
+        "props": {
+          "heading": "Lemon Odyssey",
+          "subheading": "Explore the Tangy World of Lemons",
+          "ctaText": "Discover More",
+          "ctaHref": "/about-lemons",
+          "imageUrl": "https://images.unsplash.com/photo-1762970019787-866d987cbb39?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxsZW1vbnMlMjBkaWZmZXJlbnQlMjBiYWNrZ3JvdW5kcyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDF8MHx8fDE3NzIxNTA2MDB8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Lemons in the mountains"
         }
       }
     ]
