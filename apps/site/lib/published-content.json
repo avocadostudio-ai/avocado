@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-28T22:57:41.817Z",
+    "updatedAt": "2026-02-28T23:03:18.592Z",
     "blocks": [
       {
         "id": "b_hero_1772319324619",
@@ -15,6 +15,14 @@
           "ctaHref": "/adventures",
           "imageUrl": "http://localhost:4200/generated-images/var_1772319461813_xw24h5.png",
           "imageAlt": "A group of hikers exploring a mountain trail"
+        }
+      },
+      {
+        "id": "b_richtext_1772319767117",
+        "type": "RichText",
+        "props": {
+          "title": "Discover Your Adventure",
+          "body": "Adventure awaits! Explore the great outdoors, conquer new challenges, and create unforgettable memories. Whether you're hiking through lush forests, scaling majestic mountains, or navigating winding rivers, every adventure is a chance to discover something new about the world and yourself. Join us in embracing the spirit of adventure and let your journey begin!\n\nAs you embark on your journey, remember that every step is a story waiting to be told. Connect with nature, meet fellow adventurers, and let the thrill of exploration ignite your passion for the great outdoors."
         }
       }
     ]
