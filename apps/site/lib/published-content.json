@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-28T22:55:24.626Z",
+    "updatedAt": "2026-02-28T22:57:41.817Z",
     "blocks": [
       {
         "id": "b_hero_1772319324619",
@@ -13,8 +13,8 @@
           "subheading": "Unleash Your Inner Explorer",
           "ctaText": "Start Your Adventure",
           "ctaHref": "/adventures",
-          "imageUrl": "https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0",
-          "imageAlt": "A breathtaking view of an adventure landscape"
+          "imageUrl": "http://localhost:4200/generated-images/var_1772319461813_xw24h5.png",
+          "imageAlt": "A group of hikers exploring a mountain trail"
         }
       }
     ]
