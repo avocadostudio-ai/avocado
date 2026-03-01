@@ -349,10 +349,15 @@ export async function withUnsplashHeroImage(args: {
 
   if (changed) {
     const sourceLabel =
-      imageSource === "ai-generated" ? "Generated Hero image with AI"
-      : imageSource === "unsplash" ? "Set Hero image from Unsplash"
+      imageSource === "ai-generated" ? "Generated a new image with AI"
+      : imageSource === "unsplash" ? "Found a matching image from Unsplash"
       : "Set Hero image from placeholder"
     plan.change_log = [...plan.change_log, `${sourceLabel}.`]
+    // Rewrite summary to not mislead about the actual image source
+    plan.summary_for_user = plan.summary_for_user
+      .replace(/\bUnsplash\s+/gi, "")
+      .replace(/\bfrom unsplash\b/gi, "")
+      .replace(/\ban?\s+unsplash\b/gi, "a new")
   } else {
     args.log.info(
       {
