@@ -2,6 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import ArrowUpIcon from "./arrow-up-icon"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
+const MODEL_LABELS: Record<ModelKey, string> = {
+  fast: "gpt-4o-mini",
+  balanced: "gpt-4o",
+  reasoning: "o1",
+  codex: "o3"
+}
 
 type Props = {
   message: string
@@ -12,21 +18,21 @@ type Props = {
   onModelChange: (value: ModelKey) => void
   onSubmit: (explicitMessage?: string) => void
   onTranscribeAudio: (blob: Blob, mimeType: string) => Promise<string>
+  onInterpretImage: (blob: Blob, mimeType: string) => Promise<string>
   onAutoHeightChange: (height: number) => void
 }
 
 function modelLabel(model: ModelKey) {
-  if (model === "fast") return "Fast"
-  if (model === "reasoning") return "Reasoning"
-  if (model === "codex") return "Codex"
-  return "Balanced"
+  return MODEL_LABELS[model]
 }
 
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, modelKey, hasUserEntry, onMessageChange, onModelChange, onSubmit, onTranscribeAudio, onAutoHeightChange } = props
+  const { message, isLoading, modelKey, hasUserEntry, onMessageChange, onModelChange, onSubmit, onTranscribeAudio, onInterpretImage, onAutoHeightChange } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false)
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null)
+  const [imagePasteError, setImagePasteError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const shellRef = useRef<HTMLDivElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -63,7 +69,7 @@ export default function ClaudeStyleChatInput(props: Props) {
 
   useLayoutEffect(() => {
     syncComposerHeight()
-  }, [message, isRecording, isTranscribing, transcriptionError, onAutoHeightChange])
+  }, [message, isRecording, isTranscribing, isAnalyzingImage, transcriptionError, imagePasteError, onAutoHeightChange])
 
   useEffect(() => {
     const onResize = () => syncComposerHeight()
@@ -80,6 +86,33 @@ export default function ClaudeStyleChatInput(props: Props) {
     if (!transcript) return
     const prefix = message.trim().length > 0 ? `${message.trim()} ` : ""
     onMessageChange(`${prefix}${transcript}`.trim())
+  }
+
+  function appendImageContext(text: string) {
+    const context = text.trim()
+    if (!context) return
+    const line = `Image context: ${context}`
+    const nextMessage = [message.trim(), line].filter(Boolean).join("\n")
+    onMessageChange(nextMessage)
+  }
+
+  async function handleImagePaste(blob: Blob, mimeType: string) {
+    setImagePasteError(null)
+    setIsAnalyzingImage(true)
+    try {
+      const interpreted = await onInterpretImage(blob, mimeType)
+      const context = interpreted.trim()
+      if (!context) {
+        setImagePasteError("Could not extract context from the pasted image.")
+        return
+      }
+      appendImageContext(context)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Failed to analyze pasted image."
+      setImagePasteError(detail)
+    } finally {
+      setIsAnalyzingImage(false)
+    }
   }
 
   async function handleMicClick() {
@@ -165,7 +198,7 @@ export default function ClaudeStyleChatInput(props: Props) {
   }
 
   const micBusy = isRecording || isTranscribing
-  const canSubmit = !isLoading && !micBusy && message.trim().length > 0
+  const canSubmit = !isLoading && !micBusy && !isAnalyzingImage && message.trim().length > 0
 
   return (
     <div className="composer-shell" ref={shellRef}>
@@ -178,6 +211,18 @@ export default function ClaudeStyleChatInput(props: Props) {
             syncComposerHeight()
           }}
           onInput={() => syncComposerHeight()}
+          onPaste={(e) => {
+            const items = e.clipboardData?.items
+            if (!items) return
+            for (const item of items) {
+              if (!item.type?.startsWith("image/")) continue
+              const file = item.getAsFile()
+              if (!file) continue
+              e.preventDefault()
+              void handleImagePaste(file, file.type || "image/png")
+              return
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !micBusy) {
               e.preventDefault()
@@ -189,17 +234,19 @@ export default function ClaudeStyleChatInput(props: Props) {
         />
         {isRecording ? <div className="composer-input-note">Listening... click ✓ to send or X to cancel.</div> : null}
         {isTranscribing ? <div className="composer-input-note">Transcribing...</div> : null}
+        {isAnalyzingImage ? <div className="composer-input-note">Analyzing pasted image...</div> : null}
         {transcriptionError ? <div className="composer-input-note composer-input-note-error">{transcriptionError}</div> : null}
+        {imagePasteError ? <div className="composer-input-note composer-input-note-error">{imagePasteError}</div> : null}
       </div>
       <div className="composer-actions">
         <div className="composer-actions-center">
           <label className="composer-model-picker">
             <span>{modelLabel(modelKey)}</span>
             <select value={modelKey} onChange={(e) => onModelChange(e.target.value as ModelKey)} aria-label="Select model">
-              <option value="fast">Fast</option>
-              <option value="balanced">Balanced</option>
-              <option value="reasoning">Reasoning</option>
-              <option value="codex">Codex</option>
+              <option value="fast">{MODEL_LABELS.fast}</option>
+              <option value="balanced">{MODEL_LABELS.balanced}</option>
+              <option value="reasoning">{MODEL_LABELS.reasoning}</option>
+              <option value="codex">{MODEL_LABELS.codex}</option>
             </select>
           </label>
         </div>
