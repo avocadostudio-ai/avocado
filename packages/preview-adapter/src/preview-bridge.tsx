@@ -456,7 +456,10 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       }
       const childNode = target?.closest<HTMLElement>("[data-editable-target]")
 
-      event.preventDefault()
+      // Allow native <details>/<summary> toggle so accordions keep working
+      if (!target?.closest("summary")) {
+        event.preventDefault()
+      }
       event.stopPropagation()
 
       const blockId = node.getAttribute("data-block-id")
