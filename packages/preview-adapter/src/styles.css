@@ -94,15 +94,8 @@
 .editor-highlight {
   outline: 2px solid rgb(var(--editor-selected-rgb));
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(var(--editor-selected-rgb), 0.2);
+  box-shadow: 0 0 0 4px rgba(var(--editor-selected-rgb), 0.12);
   overflow: visible !important;
-}
-
-/* Keep selected frame visible and consistent on rendered section surfaces. */
-.editor-highlight > section {
-  outline: 2px solid rgb(var(--editor-selected-rgb));
-  outline-offset: -2px;
-  box-shadow: inset 0 0 0 2px rgba(var(--editor-selected-rgb), 0.95);
 }
 
 .editor-highlight > .editor-block-badge {
