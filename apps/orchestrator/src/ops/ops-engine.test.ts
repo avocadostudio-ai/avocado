@@ -1,0 +1,788 @@
+import { describe, it, beforeEach } from "node:test"
+import assert from "node:assert/strict"
+import type { PageDoc, Operation } from "@ai-site-editor/shared"
+import {
+  draftPages,
+  publishedPages,
+  historyUndo,
+  historyRedo,
+  versions,
+  recentEdits
+} from "../state/session-state.js"
+import {
+  applyOpsAtomically,
+  pickFocusBlockId,
+  pickUpdatedSlug,
+  classifyGuardrailError,
+  isNoEffectiveChangeError,
+  isDeterministicRepairEligible,
+  toErrorDetail
+} from "./ops-engine.js"
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const TEST_SESSION = "__test__"
+
+function makePage(overrides: Partial<PageDoc> = {}): PageDoc {
+  return {
+    id: "p_home",
+    slug: "/",
+    title: "Home",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    blocks: [
+      {
+        id: "b_hero",
+        type: "Hero",
+        props: {
+          heading: "Hello",
+          subheading: "World",
+          ctaText: "Click",
+          ctaHref: "/pricing",
+          imageUrl: "/hero.svg",
+          imageAlt: "Hero"
+        }
+      },
+      {
+        id: "b_cta",
+        type: "CTA",
+        props: {
+          title: "Ready?",
+          description: "Go for it.",
+          ctaText: "Go",
+          ctaHref: "/"
+        }
+      }
+    ],
+    ...overrides
+  }
+}
+
+function makePricingPage(): PageDoc {
+  return {
+    id: "p_pricing",
+    slug: "/pricing",
+    title: "Pricing",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    blocks: [
+      {
+        id: "b_hero_pricing",
+        type: "Hero",
+        props: {
+          heading: "Pricing",
+          subheading: "Plans",
+          ctaText: "Buy",
+          ctaHref: "/",
+          imageUrl: "/hero.svg",
+          imageAlt: "Pricing hero"
+        }
+      }
+    ]
+  }
+}
+
+function makeFeaturePage(): PageDoc {
+  return {
+    id: "p_features",
+    slug: "/features",
+    title: "Features",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    blocks: [
+      {
+        id: "b_grid",
+        type: "FeatureGrid",
+        props: {
+          title: "Our Features",
+          features: [
+            { title: "Fast", description: "Speedy." },
+            { title: "Safe", description: "Secure." },
+            { title: "Simple", description: "Easy." }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+function seedSession(...pages: PageDoc[]) {
+  const sessionMap = new Map<string, PageDoc>()
+  for (const page of pages) sessionMap.set(page.slug, structuredClone(page))
+  draftPages.set(TEST_SESSION, sessionMap)
+}
+
+function getDraft(slug: string) {
+  return draftPages.get(TEST_SESSION)?.get(slug) ?? null
+}
+
+function resetState() {
+  draftPages.delete(TEST_SESSION)
+  historyUndo.delete(TEST_SESSION)
+  historyRedo.delete(TEST_SESSION)
+  versions.delete(TEST_SESSION)
+  recentEdits.delete(TEST_SESSION)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("ops-engine: add_block", () => {
+  beforeEach(resetState)
+
+  it("appends a block to the end when no afterBlockId", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      block: {
+        id: "b_new",
+        type: "CTA",
+        props: { title: "New", description: "Desc", ctaText: "Go", ctaHref: "/" }
+      }
+    }
+    applyOpsAtomically(TEST_SESSION, [op])
+    const page = getDraft("/")!
+    assert.equal(page.blocks.length, 3)
+    assert.equal(page.blocks[2].id, "b_new")
+  })
+
+  it("inserts after a specific block", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      afterBlockId: "b_hero",
+      block: {
+        id: "b_mid",
+        type: "CTA",
+        props: { title: "Mid", description: "D", ctaText: "X", ctaHref: "/" }
+      }
+    }
+    applyOpsAtomically(TEST_SESSION, [op])
+    const page = getDraft("/")!
+    assert.equal(page.blocks.length, 3)
+    assert.equal(page.blocks[0].id, "b_hero")
+    assert.equal(page.blocks[1].id, "b_mid")
+    assert.equal(page.blocks[2].id, "b_cta")
+  })
+
+  it("rejects duplicate block id", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      block: {
+        id: "b_hero",
+        type: "CTA",
+        props: { title: "Dup", description: "D", ctaText: "X", ctaHref: "/" }
+      }
+    }
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /already exists/)
+  })
+
+  it("rejects invalid props", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      block: {
+        id: "b_bad",
+        type: "CTA",
+        props: { title: "", description: "D", ctaText: "X", ctaHref: "/" }
+      }
+    }
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /Invalid props/)
+  })
+
+  it("rejects when afterBlockId not found", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      afterBlockId: "b_nonexistent",
+      block: {
+        id: "b_new",
+        type: "CTA",
+        props: { title: "New", description: "D", ctaText: "X", ctaHref: "/" }
+      }
+    }
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /afterBlockId/)
+  })
+
+  it("rejects when page not found", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/missing",
+      block: {
+        id: "b_new",
+        type: "CTA",
+        props: { title: "New", description: "D", ctaText: "X", ctaHref: "/" }
+      }
+    }
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /Page not found/)
+  })
+})
+
+describe("ops-engine: remove_block", () => {
+  beforeEach(resetState)
+
+  it("removes an existing block", () => {
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [{ op: "remove_block", pageSlug: "/", blockId: "b_cta" }])
+    const page = getDraft("/")!
+    assert.equal(page.blocks.length, 1)
+    assert.equal(page.blocks[0].id, "b_hero")
+  })
+
+  it("rejects when blockId not found", () => {
+    seedSession(makePage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "remove_block", pageSlug: "/", blockId: "b_nope" }]),
+      /not found/
+    )
+  })
+})
+
+describe("ops-engine: move_block", () => {
+  beforeEach(resetState)
+
+  it("moves a block to the top (no afterBlockId)", () => {
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [{ op: "move_block", pageSlug: "/", blockId: "b_cta" }])
+    const page = getDraft("/")!
+    assert.equal(page.blocks[0].id, "b_cta")
+    assert.equal(page.blocks[1].id, "b_hero")
+  })
+
+  it("moves a block after another", () => {
+    // Add a third block first, then move it between the other two
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "add_block",
+        pageSlug: "/",
+        block: { id: "b_third", type: "CTA", props: { title: "T", description: "D", ctaText: "X", ctaHref: "/" } }
+      }
+    ])
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "move_block", pageSlug: "/", blockId: "b_third", afterBlockId: "b_hero" }
+    ])
+    const page = getDraft("/")!
+    assert.equal(page.blocks[0].id, "b_hero")
+    assert.equal(page.blocks[1].id, "b_third")
+    assert.equal(page.blocks[2].id, "b_cta")
+  })
+
+  it("rejects when blockId not found", () => {
+    seedSession(makePage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "move_block", pageSlug: "/", blockId: "b_nope" }]),
+      /not found/
+    )
+  })
+})
+
+describe("ops-engine: update_props", () => {
+  beforeEach(resetState)
+
+  it("updates a scalar prop", () => {
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { title: "Updated Title" } }
+    ])
+    const block = getDraft("/")!.blocks.find((b) => b.id === "b_cta")!
+    assert.equal((block.props as Record<string, unknown>).title, "Updated Title")
+  })
+
+  it("rejects unknown prop keys", () => {
+    seedSession(makePage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { bogus: "value" } }
+        ]),
+      /unknown props/i
+    )
+  })
+
+  it("rejects no-op patch (same value)", () => {
+    seedSession(makePage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { title: "Ready?" } }
+        ]),
+      /No effective prop change/
+    )
+  })
+
+  it("rejects invalid value (empty string for required field)", () => {
+    seedSession(makePage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { title: "" } }
+        ]),
+      /Invalid props/
+    )
+  })
+
+  it("handles nested props object (unwraps .props wrapper)", () => {
+    seedSession(makePage())
+    // The ops-engine unwraps { props: { ... } } to just { ... }
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { props: { title: "Unwrapped" } } as any }
+    ])
+    const block = getDraft("/")!.blocks.find((b) => b.id === "b_cta")!
+    assert.equal((block.props as Record<string, unknown>).title, "Unwrapped")
+  })
+})
+
+describe("ops-engine: create_page", () => {
+  beforeEach(resetState)
+
+  it("creates a new page", () => {
+    seedSession(makePage())
+    const newPage = makePricingPage()
+    applyOpsAtomically(TEST_SESSION, [{ op: "create_page", page: newPage }])
+    const page = getDraft("/pricing")
+    assert.ok(page)
+    assert.equal(page!.title, "Pricing")
+    assert.equal(page!.blocks.length, 1)
+  })
+})
+
+describe("ops-engine: remove_page", () => {
+  beforeEach(resetState)
+
+  it("removes a non-home page", () => {
+    seedSession(makePage(), makePricingPage())
+    applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/pricing" }])
+    assert.equal(getDraft("/pricing"), null)
+    assert.ok(getDraft("/"))
+  })
+
+  it("rejects removing the home page", () => {
+    seedSession(makePage(), makePricingPage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/" }]),
+      /Cannot remove the home page/
+    )
+  })
+
+  it("rejects removing the last page", () => {
+    seedSession(makePage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/" }]),
+      /Cannot remove/
+    )
+  })
+})
+
+describe("ops-engine: rename_page", () => {
+  beforeEach(resetState)
+
+  it("renames a page and rewrites links in other pages", () => {
+    seedSession(makePage(), makePricingPage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/plans" }
+    ])
+    assert.equal(getDraft("/pricing"), null)
+    const plans = getDraft("/plans")
+    assert.ok(plans)
+    assert.equal(plans!.slug, "/plans")
+
+    // The home page Hero had ctaHref: "/pricing" — should be rewritten to "/plans"
+    const hero = getDraft("/")!.blocks.find((b) => b.id === "b_hero")!
+    assert.equal((hero.props as Record<string, unknown>).ctaHref, "/plans")
+  })
+
+  it("rejects rename to existing slug", () => {
+    seedSession(makePage(), makePricingPage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "rename_page", pageSlug: "/pricing", newPageSlug: "/" }]),
+      /already exists/
+    )
+  })
+
+  it("rejects rename to same slug", () => {
+    seedSession(makePage(), makePricingPage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/pricing" }
+        ]),
+      /No effective page change/
+    )
+  })
+})
+
+describe("ops-engine: duplicate_page", () => {
+  beforeEach(resetState)
+
+  it("duplicates a page with auto-generated slug", () => {
+    seedSession(makePage(), makePricingPage())
+    applyOpsAtomically(TEST_SESSION, [{ op: "duplicate_page", pageSlug: "/pricing" }])
+    const copy = getDraft("/pricing-copy")
+    assert.ok(copy)
+    assert.equal(copy!.blocks.length, 1)
+    // Block IDs should be different from source
+    assert.notEqual(copy!.blocks[0].id, "b_hero_pricing")
+  })
+
+  it("duplicates with explicit slug and title", () => {
+    seedSession(makePage(), makePricingPage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "duplicate_page", pageSlug: "/pricing", newPageSlug: "/enterprise", newTitle: "Enterprise" }
+    ])
+    const page = getDraft("/enterprise")
+    assert.ok(page)
+    assert.equal(page!.title, "Enterprise")
+  })
+})
+
+describe("ops-engine: move_page", () => {
+  beforeEach(resetState)
+
+  it("rejects moving the home page", () => {
+    seedSession(makePage(), makePricingPage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "move_page", pageSlug: "/" }]),
+      /Home page.*cannot be moved/
+    )
+  })
+})
+
+describe("ops-engine: duplicate_block", () => {
+  beforeEach(resetState)
+
+  it("duplicates a block within the same page", () => {
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "duplicate_block", pageSlug: "/", blockId: "b_cta" }
+    ])
+    const page = getDraft("/")!
+    assert.equal(page.blocks.length, 3)
+    // Original at idx 1, copy at idx 2
+    assert.equal(page.blocks[1].id, "b_cta")
+    assert.ok(page.blocks[2].id.startsWith("b_cta"))
+    assert.notEqual(page.blocks[2].id, "b_cta")
+  })
+
+  it("duplicates a block to another page", () => {
+    seedSession(makePage(), makePricingPage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "duplicate_block", pageSlug: "/", blockId: "b_cta", toPageSlug: "/pricing" }
+    ])
+    const pricing = getDraft("/pricing")!
+    assert.equal(pricing.blocks.length, 2)
+  })
+})
+
+describe("ops-engine: list item operations", () => {
+  beforeEach(resetState)
+
+  it("add_item appends to list", () => {
+    seedSession(makeFeaturePage())
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "add_item",
+        pageSlug: "/features",
+        blockId: "b_grid",
+        listKey: "features",
+        item: { title: "New", description: "New feature." }
+      }
+    ])
+    const block = getDraft("/features")!.blocks[0]
+    const features = (block.props as Record<string, unknown>).features as unknown[]
+    assert.equal(features.length, 4)
+    assert.deepEqual(features[3], { title: "New", description: "New feature." })
+  })
+
+  it("add_item inserts at specific position", () => {
+    seedSession(makeFeaturePage())
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "add_item",
+        pageSlug: "/features",
+        blockId: "b_grid",
+        listKey: "features",
+        afterIndex: 0,
+        item: { title: "Inserted", description: "After first." }
+      }
+    ])
+    const features = (getDraft("/features")!.blocks[0].props as Record<string, unknown>).features as Array<{
+      title: string
+    }>
+    assert.equal(features.length, 4)
+    assert.equal(features[1].title, "Inserted")
+  })
+
+  it("update_item patches a list item", () => {
+    seedSession(makeFeaturePage())
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "update_item",
+        pageSlug: "/features",
+        blockId: "b_grid",
+        listKey: "features",
+        index: 1,
+        patch: { title: "Updated Safe" }
+      }
+    ])
+    const features = (getDraft("/features")!.blocks[0].props as Record<string, unknown>).features as Array<{
+      title: string
+    }>
+    assert.equal(features[1].title, "Updated Safe")
+    // Other items unchanged
+    assert.equal(features[0].title, "Fast")
+  })
+
+  it("remove_item removes from list", () => {
+    seedSession(makeFeaturePage())
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "remove_item",
+        pageSlug: "/features",
+        blockId: "b_grid",
+        listKey: "features",
+        index: 1
+      }
+    ])
+    const features = (getDraft("/features")!.blocks[0].props as Record<string, unknown>).features as Array<{
+      title: string
+    }>
+    assert.equal(features.length, 2)
+    assert.equal(features[0].title, "Fast")
+    assert.equal(features[1].title, "Simple")
+  })
+
+  it("move_item reorders within list", () => {
+    seedSession(makeFeaturePage())
+    // Move last item (index 2) to the front (no afterIndex = position 0)
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "move_item",
+        pageSlug: "/features",
+        blockId: "b_grid",
+        listKey: "features",
+        index: 2
+      }
+    ])
+    const features = (getDraft("/features")!.blocks[0].props as Record<string, unknown>).features as Array<{
+      title: string
+    }>
+    assert.equal(features[0].title, "Simple")
+    assert.equal(features[1].title, "Fast")
+    assert.equal(features[2].title, "Safe")
+  })
+
+  it("rejects out-of-range index for update_item", () => {
+    seedSession(makeFeaturePage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          {
+            op: "update_item",
+            pageSlug: "/features",
+            blockId: "b_grid",
+            listKey: "features",
+            index: 99,
+            patch: { title: "Nope" }
+          }
+        ]),
+      /out of range/
+    )
+  })
+
+  it("rejects invalid listKey", () => {
+    seedSession(makeFeaturePage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          {
+            op: "add_item",
+            pageSlug: "/features",
+            blockId: "b_grid",
+            listKey: "nonexistent",
+            item: { title: "X", description: "Y" }
+          }
+        ]),
+      /not found/
+    )
+  })
+})
+
+describe("ops-engine: atomicity", () => {
+  beforeEach(resetState)
+
+  it("rolls back all changes when a later operation fails", () => {
+    seedSession(makePage())
+    const originalBlocks = getDraft("/")!.blocks.map((b) => b.id)
+
+    assert.throws(() =>
+      applyOpsAtomically(TEST_SESSION, [
+        // First op is valid
+        {
+          op: "add_block",
+          pageSlug: "/",
+          block: { id: "b_temp", type: "CTA", props: { title: "T", description: "D", ctaText: "X", ctaHref: "/" } }
+        },
+        // Second op fails (unknown block)
+        { op: "remove_block", pageSlug: "/", blockId: "b_nonexistent" }
+      ])
+    )
+
+    // State should be unchanged — the first add_block should NOT have persisted
+    const page = getDraft("/")!
+    const currentIds = page.blocks.map((b) => b.id)
+    assert.deepEqual(currentIds, originalBlocks)
+  })
+
+  it("throws when ops produce no changes", () => {
+    seedSession(makePage())
+    // An empty ops list produces no changes
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, []), /no changes/)
+  })
+})
+
+describe("ops-engine: multi-op sequences", () => {
+  beforeEach(resetState)
+
+  it("creates a page and adds a block in one atomic batch", () => {
+    seedSession(makePage())
+    const newPage: PageDoc = {
+      id: "p_about",
+      slug: "/about",
+      title: "About",
+      updatedAt: new Date().toISOString(),
+      blocks: []
+    }
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "create_page", page: newPage },
+      {
+        op: "add_block",
+        pageSlug: "/about",
+        block: { id: "b_about_hero", type: "CTA", props: { title: "About", description: "Us", ctaText: "Learn", ctaHref: "/" } }
+      }
+    ])
+    const about = getDraft("/about")!
+    assert.equal(about.blocks.length, 1)
+    assert.equal(about.blocks[0].id, "b_about_hero")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Helper function tests
+// ---------------------------------------------------------------------------
+
+describe("pickFocusBlockId", () => {
+  it("picks add_block id first", () => {
+    const ops: Operation[] = [
+      { op: "update_props", pageSlug: "/", blockId: "b_1", patch: { title: "X" } },
+      { op: "add_block", pageSlug: "/", block: { id: "b_new", type: "CTA", props: {} } }
+    ]
+    assert.equal(pickFocusBlockId(ops), "b_new")
+  })
+
+  it("picks update_props blockId when no add", () => {
+    const ops: Operation[] = [
+      { op: "update_props", pageSlug: "/", blockId: "b_1", patch: { title: "X" } }
+    ]
+    assert.equal(pickFocusBlockId(ops), "b_1")
+  })
+
+  it("returns undefined for page-level ops only", () => {
+    const ops: Operation[] = [{ op: "remove_page", pageSlug: "/pricing" }]
+    assert.equal(pickFocusBlockId(ops), undefined)
+  })
+})
+
+describe("pickUpdatedSlug", () => {
+  beforeEach(resetState)
+
+  it("returns created page slug", () => {
+    seedSession(makePage())
+    const ops: Operation[] = [
+      {
+        op: "create_page",
+        page: { id: "p", slug: "/new", title: "New", updatedAt: "", blocks: [] }
+      }
+    ]
+    assert.equal(pickUpdatedSlug(TEST_SESSION, "/", ops), "/new")
+  })
+
+  it("returns undefined when current page still exists", () => {
+    seedSession(makePage())
+    const ops: Operation[] = [
+      { op: "update_props", pageSlug: "/", blockId: "b_hero", patch: { heading: "X" } }
+    ]
+    assert.equal(pickUpdatedSlug(TEST_SESSION, "/", ops), undefined)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Error classification
+// ---------------------------------------------------------------------------
+
+describe("classifyGuardrailError", () => {
+  it("classifies schema violations", () => {
+    assert.equal(classifyGuardrailError("Invalid props for Hero"), "schema_violation")
+    assert.equal(classifyGuardrailError("heading is required"), "schema_violation")
+  })
+
+  it("classifies not_found", () => {
+    assert.equal(classifyGuardrailError("Page not found for slug /x"), "not_found")
+    assert.equal(classifyGuardrailError("blockId b_1 not found"), "not_found")
+  })
+
+  it("classifies ambiguity", () => {
+    assert.equal(classifyGuardrailError("Request is ambiguous"), "ambiguity")
+  })
+
+  it("classifies no effective change", () => {
+    assert.equal(classifyGuardrailError("No effective prop change for b_1"), "no_effective_change")
+  })
+
+  it("falls back to internal_error", () => {
+    assert.equal(classifyGuardrailError("something weird happened"), "internal_error")
+  })
+})
+
+describe("isNoEffectiveChangeError", () => {
+  it("matches the pattern", () => {
+    assert.equal(isNoEffectiveChangeError("No effective prop change for b_cta"), true)
+    assert.equal(isNoEffectiveChangeError("some other error"), false)
+  })
+})
+
+describe("isDeterministicRepairEligible", () => {
+  it("is eligible for schema violations", () => {
+    assert.equal(isDeterministicRepairEligible("Invalid props for CTA: title required"), true)
+  })
+
+  it("is not eligible for not_found", () => {
+    assert.equal(isDeterministicRepairEligible("Page not found"), false)
+  })
+})
+
+describe("toErrorDetail", () => {
+  it("extracts message from Error", () => {
+    assert.equal(toErrorDetail(new Error("broken")), "broken")
+  })
+
+  it("extracts first issue from zod-like error", () => {
+    const zodLike = { issues: [{ message: "Invalid value", path: ["heading"] }] }
+    assert.equal(toErrorDetail(zodLike), "Invalid value at heading")
+  })
+
+  it("returns string as-is", () => {
+    assert.equal(toErrorDetail("plain string"), "plain string")
+  })
+
+  it("falls back for unknown types", () => {
+    assert.equal(toErrorDetail(42), "Unknown planner error")
+  })
+})

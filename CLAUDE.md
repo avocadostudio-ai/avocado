@@ -23,7 +23,20 @@ pnpm build
 pnpm typecheck
 ```
 
-No test suite is currently configured.
+## Tests
+
+```bash
+# Run all tests (orchestrator)
+pnpm test
+
+# Run orchestrator tests directly
+pnpm --filter @ai-site-editor/orchestrator test
+
+# Run with coverage
+pnpm --filter @ai-site-editor/orchestrator coverage
+```
+
+Tests use Node's built-in test runner (`node:test`) with `tsx`. Test files live alongside source as `*.test.ts`.
 
 ## Architecture
 
@@ -63,7 +76,7 @@ Zod schemas are the source of truth for all data structures:
 - `Operation` — discriminated union of edit operations: `create_page`, `add_block`, `update_props`, `remove_block`, `move_block`
 - `EditPlan` — AI planner output: `{ intent, summary, changelog, operations[] }`
 
-Registered block types: `Hero`, `FeatureGrid`, `Testimonials`, `FAQAccordion`, `CTA`, `Card`, `CardGrid`
+Registered block types: `Hero`, `FeatureGrid`, `Testimonials`, `FAQAccordion`, `CTA`, `Card`, `CardGrid`, `RichText`
 
 ### packages/preview-adapter
 
