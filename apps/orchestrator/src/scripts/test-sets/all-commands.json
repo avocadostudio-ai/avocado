@@ -1,0 +1,72 @@
+[
+  {
+    "id": "create_page",
+    "prompt": "Create a new page at /about titled About with a Hero block introducing our team.",
+    "expectedOps": ["create_page"]
+  },
+  {
+    "id": "add_block",
+    "prompt": "On /pricing, add a CTA block at the bottom with title 'Start today', description 'No credit card required', ctaText 'Get started', ctaHref '/signup'.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "update_props",
+    "prompt": "On /, update the hero heading to 'Build and ship faster' and subheading to 'Edit your site in minutes with AI assistance'.",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "remove_block",
+    "prompt": "On /pricing, remove the testimonials section.",
+    "expectedOps": ["remove_block"]
+  },
+  {
+    "id": "move_block",
+    "prompt": "On /, move the CTA block to the top of the page above the hero.",
+    "expectedOps": ["move_block"]
+  },
+  {
+    "id": "duplicate_block",
+    "prompt": "Duplicate the FAQ block on /pricing and place the copy after the original.",
+    "expectedOps": ["duplicate_block"]
+  },
+  {
+    "id": "add_item",
+    "prompt": "On /pricing in the FAQAccordion block, add a new FAQ item with q 'Do you offer discounts?' and a 'Yes, annual plans include a discount.' at the end of the list.",
+    "expectedOps": ["add_item"]
+  },
+  {
+    "id": "update_item",
+    "prompt": "On /pricing in the FAQAccordion block, update item 0 so the answer says 'Email support is available Monday through Friday.'",
+    "expectedOps": ["update_item"]
+  },
+  {
+    "id": "remove_item",
+    "prompt": "On /pricing in the FAQAccordion block, remove item index 1 from the FAQ list.",
+    "expectedOps": ["remove_item"]
+  },
+  {
+    "id": "move_item",
+    "prompt": "On /pricing in the FAQAccordion block, move FAQ item index 2 to the top of the list.",
+    "expectedOps": ["move_item"]
+  },
+  {
+    "id": "rename_page",
+    "prompt": "Rename page /pricing to /plans and change its title to Plans.",
+    "expectedOps": ["rename_page"]
+  },
+  {
+    "id": "remove_page",
+    "prompt": "Delete the page at /about.",
+    "expectedOps": ["remove_page"]
+  },
+  {
+    "id": "move_page",
+    "prompt": "In navigation, move /pricing so it appears before /.",
+    "expectedOps": ["move_page"]
+  },
+  {
+    "id": "duplicate_page",
+    "prompt": "Duplicate page /pricing to a new page /pricing-copy titled Pricing Copy and place it after /pricing in navigation.",
+    "expectedOps": ["duplicate_page"]
+  }
+]
