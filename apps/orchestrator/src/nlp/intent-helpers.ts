@@ -1,0 +1,92 @@
+export function toSeedSlug(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+}
+
+export function normalizeRouteCandidate(candidate: unknown): string | null {
+  if (typeof candidate !== "string") return null
+  const trimmed = candidate.trim()
+  if (!trimmed) return null
+  if (trimmed === "/") return "/"
+  if (trimmed.startsWith("/")) return trimmed
+  if (/^[a-z0-9][a-z0-9/_-]*$/i.test(trimmed)) return `/${trimmed}`
+  return null
+}
+
+export function firstRouteMention(message?: string) {
+  if (!message) return null
+  const match = message.match(/\/[a-z0-9/_-]*/i)
+  if (!match) return null
+  return normalizeRouteCandidate(match[0])
+}
+
+export function extractRouteMentions(message?: string) {
+  if (!message) return []
+  const matches = message.match(/\/[a-z0-9/_-]*/gi) ?? []
+  const out: string[] = []
+  for (const item of matches) {
+    const normalized = normalizeRouteCandidate(item)
+    if (!normalized) continue
+    if (out.includes(normalized)) continue
+    out.push(normalized)
+  }
+  return out
+}
+
+export function isLikelyClarificationFollowUp(message: string) {
+  const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
+  if (!normalized) return false
+  const words = normalized.split(" ").filter(Boolean)
+  const hasReferenceCue =
+    /\b(selected|this|that|it|them|those|these|one|ones|same)\b/.test(normalized) ||
+    /\bfirst|second|third|last\b/.test(normalized)
+  const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace)\b/.test(normalized)
+  return (words.length <= 8 && hasReferenceCue) || (!hasActionVerb && words.length <= 5)
+}
+
+export function isStandalonePageOperation(message: string) {
+  const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
+  return /\b(create|generate|add|make|build|remove|delete|rename|move)\b.*\bpage\b/.test(normalized)
+}
+
+export function parseCreatePageRequest(message: string) {
+  const lower = message.toLowerCase().replace(/\s+/g, " ").trim()
+  const mentionsCurrentPage = /\b(this|current|selected)\s+page\b/.test(lower)
+  const hasExplicitRoute = Boolean(firstRouteMention(message) ?? extractRouteMentions(message)[0])
+  const asksNewPage = /\bnew\s+page\b/.test(lower)
+  if (mentionsCurrentPage && !asksNewPage && !hasExplicitRoute) return null
+
+  const hasPageWord = /\bpage\b/.test(lower)
+  if (!hasPageWord) return null
+  const explicitCreatePhrase =
+    /\b(create|generate|make|build|draft)\b[^.\n]{0,24}\b(new\s+)?page\b/.test(lower) ||
+    /\badd\b[^.\n]{0,16}\bnew\s+page\b/.test(lower) ||
+    /\bnew\s+page\b/.test(lower)
+  const hasCreateVerb = /\b(create|generate|add|make|build|draft)\b/.test(lower)
+  const hasRouteHint = /\/[a-z0-9/_-]*/i.test(message)
+  if (!explicitCreatePhrase && !(hasCreateVerb && hasRouteHint && hasPageWord)) return null
+  if (mentionsCurrentPage && !asksNewPage && !hasExplicitRoute) return null
+
+  const directRoute = firstRouteMention(message) ?? extractRouteMentions(message)[0]
+  if (directRoute) {
+    const normalized = normalizeRouteCandidate(directRoute)
+    if (normalized && normalized !== "/") return normalized
+  }
+
+  const forAudience = lower.match(/\bpage\s+for\s+([a-z0-9 -]{2,60})$/)?.[1]
+  if (forAudience) {
+    const seed = toSeedSlug(forAudience)
+    if (seed) return `/for-${seed}`
+  }
+
+  const aboutTopic = lower.match(/\b(?:new\s+)?page\s+(?:about|on|for)\s+([a-z0-9 -]{2,60})\b/)?.[1]
+  if (aboutTopic) {
+    const seed = toSeedSlug(aboutTopic)
+    if (seed) return `/${seed}`
+  }
+
+  return "/new-page"
+}
