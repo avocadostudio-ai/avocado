@@ -31,6 +31,8 @@ Alternative (recommended for repeated restarts without opening new terminals):
 
 - `GET /draft/pages?session=dev&slug=/`
 - `POST /chat`
+- `GET /telemetry/chat`
+- `GET /telemetry/chat/review`
 - `POST /audio/transcribe` (multipart field: `audio`)
 - `POST /history/undo`
 - `POST /history/redo`
@@ -38,6 +40,7 @@ Alternative (recommended for repeated restarts without opening new terminals):
 ## Notes
 
 - If `OPENAI_API_KEY` is missing, `/chat` uses deterministic demo planning.
+- `CHAT_STRICT_PRIMARY_OP_MODE=1` makes `/chat` planner choose one primary operation in `ops` (strict mode).
 - Speech transcription model defaults to `gpt-4o-mini-transcribe`.
 - Configure transcription model order with:
   - `OPENAI_TRANSCRIBE_MODEL` (primary)
@@ -45,6 +48,27 @@ Alternative (recommended for repeated restarts without opening new terminals):
 - Optional Unsplash search for hero image requests:
   - `UNSPLASH_ACCESS_KEY` (if set, orchestrator uses Unsplash Search API; otherwise it falls back to a deterministic Picsum URL to avoid broken `source.unsplash.com` links)
 - Site preview refresh is triggered by editor `postMessage` with `draftUpdated`.
+- Chat troubleshooting playbook:
+  - `docs/chat-behavior-troubleshooting.md`
+- Product improvement backlog:
+  - `docs/things-to-improve.md`
+- Editor debug mode:
+  - Enable in Settings -> `Debug mode` to show trace/debug data per assistant response.
+  - Optional default-on via `VITE_CHAT_DEBUG=1`.
+
+## Planner Command Test Set
+
+- Complete command coverage prompt set:
+  - `apps/orchestrator/src/scripts/test-sets/all-commands.json`
+  - Includes `expectedOps` labels for automatic command accuracy scoring (exact match, F1, recall, precision).
+- Run with mini model first:
+  - `pnpm -C apps/orchestrator benchmark:models --model gpt-4o-mini --runs 1 --prompts src/scripts/test-sets/all-commands.json --out ../../.data/model-benchmark-all-commands-mini.json`
+- Run with structured op evaluation (recommended):
+  - `pnpm -C apps/orchestrator benchmark:models --model gpt-4o-mini --runs 1 --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --out ../../.data/model-benchmark-all-commands-mini-ops-json.json`
+- Run with another model (configurable):
+  - `pnpm -C apps/orchestrator benchmark:models --model gpt-5 --runs 1 --prompts src/scripts/test-sets/all-commands.json --out ../../.data/model-benchmark-all-commands-gpt5.json`
+- Multi-model comparison:
+  - `pnpm -C apps/orchestrator benchmark:models --models \"gpt-4o-mini,gpt-4o,gpt-5\" --runs 1 --prompts src/scripts/test-sets/all-commands.json --out ../../.data/model-benchmark-all-commands-multi.json`
 
 ## Deployment
 
