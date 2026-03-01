@@ -50,7 +50,7 @@ function buildCandidateBaseUrls(configuredBaseUrl: string): string[] {
   return candidates
 }
 
-export async function fetchDraftPage(slug: string, session: string, strictDraft = false): Promise<PageDoc | null> {
+export async function fetchDraftPage(slug: string, session: string, siteId: string, strictDraft = false): Promise<PageDoc | null> {
   const configuredBaseUrl = getConfiguredOrchestratorUrl()
   if (configuredBaseUrl) {
     const baseUrls = buildCandidateBaseUrls(configuredBaseUrl)
@@ -58,7 +58,7 @@ export async function fetchDraftPage(slug: string, session: string, strictDraft 
     for (const candidateBase of baseUrls) {
       try {
         const res = await fetch(
-          `${candidateBase}/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent(slug)}`,
+          `${candidateBase}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slug)}`,
           { cache: "no-store" }
         )
 
@@ -76,14 +76,17 @@ export async function fetchDraftPage(slug: string, session: string, strictDraft 
   return localFallbackPage(slug)
 }
 
-export async function fetchDraftSlugs(session: string, strictDraft = false): Promise<string[]> {
+export async function fetchDraftSlugs(session: string, siteId: string, strictDraft = false): Promise<string[]> {
   const configuredBaseUrl = getConfiguredOrchestratorUrl()
   if (configuredBaseUrl) {
     const baseUrls = buildCandidateBaseUrls(configuredBaseUrl)
 
     for (const candidateBase of baseUrls) {
       try {
-        const res = await fetch(`${candidateBase}/draft/slugs?session=${encodeURIComponent(session)}`, { cache: "no-store" })
+        const res = await fetch(
+          `${candidateBase}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`,
+          { cache: "no-store" }
+        )
         if (!res.ok) continue
         const payload = (await res.json()) as { slugs?: unknown }
         if (!Array.isArray(payload.slugs)) continue

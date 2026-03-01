@@ -11,6 +11,7 @@ type PageProps = {
 }
 
 const DEFAULT_SESSION = "dev"
+const DEFAULT_SITE_ID = "avocado-stories"
 const DEFAULT_EDITOR_ORIGIN =
   process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? (process.env.NODE_ENV !== "production" ? "http://localhost:4100" : "")
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
@@ -56,16 +57,18 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const slug = buildSlug(resolvedParams.slug)
 
   const editorMode = EDITOR_ENABLED && resolvedSearch.__editor === "1"
+  const tileMode = getSingleValue(resolvedSearch.__tile) === "1"
   const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
+  const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
   const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
 
-  const page = await fetchDraftPage(slug, session, editorMode)
-  const fetchedSlugs = await fetchDraftSlugs(session, editorMode)
+  const page = await fetchDraftPage(slug, session, siteId, editorMode)
+  const fetchedSlugs = await fetchDraftSlugs(session, siteId, editorMode)
   const navRaw = Array.from(new Set([...(fetchedSlugs.length > 0 ? fetchedSlugs : ["/", "/pricing"]), slug]))
   const navSlugs = navRaw.includes("/") ? ["/", ...navRaw.filter((route) => route !== "/")] : navRaw
   const editorQuery = editorMode
-    ? (() => {
-        const params = new URLSearchParams({ __editor: "1", session })
+      ? (() => {
+        const params = new URLSearchParams({ __editor: "1", session, siteId })
         if (editorOrigin) params.set("editorOrigin", editorOrigin)
         return `?${params.toString()}`
       })()
@@ -90,6 +93,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
 
   return (
     <>
+      {tileMode ? <style>{`nextjs-portal { display: none !important; }`}</style> : null}
       <header className="site-top-nav">
         <Link className="site-brand" href={`/${editorQuery}`}>
           <span className="avocado-mark" aria-hidden="true">
