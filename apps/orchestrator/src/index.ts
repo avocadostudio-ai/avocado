@@ -1,8 +1,8 @@
 import dotenv from "dotenv"
 import { execFile } from "node:child_process"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
 import { resolve } from "node:path"
 import Fastify from "fastify"
@@ -25,6 +25,15 @@ import {
   validateBlockProps
 } from "@ai-site-editor/shared"
 import { type UnsplashImage, type UnsplashResolveOptions } from "./variation-images.js"
+import {
+  extractRouteMentions,
+  firstRouteMention,
+  isLikelyClarificationFollowUp,
+  isStandalonePageOperation,
+  normalizeRouteCandidate,
+  parseCreatePageRequest,
+  toSeedSlug
+} from "./nlp/intent-helpers.js"
 
 const app = Fastify({ logger: true })
 
@@ -96,9 +105,132 @@ type PublishTracker = {
 }
 const publishStatusBySession = new Map<string, PublishTracker>()
 const stateFilePath = process.env.ORCHESTRATOR_STATE_FILE ?? resolve(process.cwd(), "../../.data/orchestrator-state.json")
+const chatTelemetryFilePath = process.env.CHAT_TELEMETRY_FILE ?? resolve(process.cwd(), "../../.data/chat-telemetry.ndjson")
 const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
 const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
+const chatStrictPrimaryOpMode = /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
+const chatTelemetryLimit = Number(process.env.CHAT_TELEMETRY_LIMIT ?? 500)
 let persistTimer: NodeJS.Timeout | null = null
+let telemetryFlushTimer: NodeJS.Timeout | null = null
+
+type ChatTelemetryPhase =
+  | "received"
+  | "forced_plan"
+  | "plan_attempt_failed"
+  | "plan_generated"
+  | "plan_apply_failed"
+  | "repair_attempt"
+  | "repair_generated"
+  | "result"
+
+type ChatTelemetryEntry = {
+  id: string
+  at: string
+  phase: ChatTelemetryPhase
+  session: string
+  requestedSlug: string
+  effectiveSlug: string
+  plannerSource: "openai" | "demo"
+  modelKey: ModelKey
+  modelUsed: string
+  promptHash: string
+  promptExcerpt: string
+  promptLength: number
+  outcome?: string
+  reason?: string
+  reasonCategory?: GuardrailErrorCategory
+  opCount?: number
+  opTypes?: string[]
+  intent?: EditPlan["intent"]
+}
+
+const chatTelemetryBuffer: ChatTelemetryEntry[] = []
+const chatTelemetryPendingWrites: ChatTelemetryEntry[] = []
+
+function shouldPersistTelemetry() {
+  return !/^(0|false|no|off)$/i.test((process.env.CHAT_TELEMETRY_PERSIST ?? "1").trim())
+}
+
+async function flushTelemetryNow() {
+  if (!shouldPersistTelemetry()) return
+  if (chatTelemetryPendingWrites.length === 0) return
+  const pending = chatTelemetryPendingWrites.splice(0, chatTelemetryPendingWrites.length)
+  const lines = pending.map((item) => JSON.stringify(item)).join("\n")
+  await mkdir(resolve(chatTelemetryFilePath, ".."), { recursive: true })
+  await appendFile(chatTelemetryFilePath, `${lines}\n`, "utf8")
+}
+
+function scheduleTelemetryFlush() {
+  if (telemetryFlushTimer) clearTimeout(telemetryFlushTimer)
+  telemetryFlushTimer = setTimeout(() => {
+    void flushTelemetryNow().catch((error: unknown) => {
+      app.log.error({ err: toErrorDetail(error), file: chatTelemetryFilePath }, "Failed to flush chat telemetry")
+    })
+  }, 150)
+}
+
+async function loadTelemetryFromDisk() {
+  if (!shouldPersistTelemetry()) return
+  if (!existsSync(chatTelemetryFilePath)) return
+  try {
+    const raw = await readFile(chatTelemetryFilePath, "utf8")
+    const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean)
+    const tail = lines.slice(-Math.max(chatTelemetryLimit, 100))
+    chatTelemetryBuffer.length = 0
+    for (const line of tail) {
+      try {
+        const parsed = JSON.parse(line) as ChatTelemetryEntry
+        if (!parsed || typeof parsed !== "object") continue
+        if (typeof parsed.id !== "string" || typeof parsed.phase !== "string") continue
+        chatTelemetryBuffer.push(parsed)
+      } catch {
+        // Skip malformed telemetry lines.
+      }
+    }
+    app.log.info({ file: chatTelemetryFilePath, loaded: chatTelemetryBuffer.length }, "Loaded chat telemetry")
+  } catch (error) {
+    app.log.error({ err: toErrorDetail(error), file: chatTelemetryFilePath }, "Failed to load chat telemetry")
+  }
+}
+
+function telemetryPromptExcerpt(message: string) {
+  return message.replace(/\s+/g, " ").trim().slice(0, 180)
+}
+
+function telemetryPromptHash(message: string) {
+  return createHash("sha256").update(message).digest("hex").slice(0, 16)
+}
+
+function pushChatTelemetry(entry: ChatTelemetryEntry) {
+  chatTelemetryBuffer.push(entry)
+  if (chatTelemetryBuffer.length > chatTelemetryLimit) {
+    chatTelemetryBuffer.splice(0, chatTelemetryBuffer.length - chatTelemetryLimit)
+  }
+  if (shouldPersistTelemetry()) {
+    chatTelemetryPendingWrites.push(entry)
+    scheduleTelemetryFlush()
+  }
+  app.log.info(
+    {
+      event: "chat_telemetry",
+      id: entry.id,
+      phase: entry.phase,
+      session: entry.session,
+      requestedSlug: entry.requestedSlug,
+      effectiveSlug: entry.effectiveSlug,
+      plannerSource: entry.plannerSource,
+      modelKey: entry.modelKey,
+      modelUsed: entry.modelUsed,
+      promptHash: entry.promptHash,
+      promptLength: entry.promptLength,
+      outcome: entry.outcome,
+      reasonCategory: entry.reasonCategory,
+      opCount: entry.opCount,
+      opTypes: entry.opTypes
+    },
+    "Chat telemetry event"
+  )
+}
 
 function parseJsonMaybe(text: string): unknown {
   try {
@@ -140,14 +272,6 @@ function normalizeUnsplashQuery(raw: string) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 80)
-}
-
-function toSeedSlug(raw: string) {
-  return raw
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
 }
 
 function extractUnsplashQuery(message: string) {
@@ -692,13 +816,45 @@ function ensureHeroImageProps(page: PageDoc) {
 const modelLookup = {
   fast: process.env.OPENAI_MODEL_FAST ?? "gpt-4o-mini",
   balanced: process.env.OPENAI_MODEL_BALANCED ?? "gpt-4o",
-  reasoning: process.env.OPENAI_MODEL_REASONING ?? "gpt-5",
-  codex: process.env.OPENAI_MODEL_CODEX ?? "gpt-5-codex"
+  reasoning: process.env.OPENAI_MODEL_REASONING ?? "o1",
+  codex: process.env.OPENAI_MODEL_CODEX ?? "o3"
 } as const
 
 type ModelKey = keyof typeof modelLookup
+const DEFAULT_SITE_ID = "avocado-stories"
+const DEFAULT_SESSION = "dev"
+
+function normalizeSiteId(value: unknown) {
+  if (typeof value !== "string") return DEFAULT_SITE_ID
+  const cleaned = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  return cleaned || DEFAULT_SITE_ID
+}
+
+function normalizeSession(value: unknown) {
+  if (typeof value !== "string") return DEFAULT_SESSION
+  const cleaned = value.trim()
+  return cleaned || DEFAULT_SESSION
+}
+
+function scopedSessionKey(session: unknown, siteId: unknown) {
+  const normalizedSession = normalizeSession(session)
+  const normalizedSiteId = normalizeSiteId(siteId)
+  if (normalizedSiteId === "avocado-stories" || normalizedSiteId === "default") {
+    // Keep Avocado Stories on legacy session keys so existing content is preserved.
+    return normalizedSession
+  }
+  return `${normalizedSiteId}::${normalizedSession}`
+}
+
 type ChatRequestBody = {
   session?: string
+  siteId?: string
+  sitePurpose?: string
+  siteHosting?: string
   slug?: string
   message?: string
   modelKey?: ModelKey
@@ -709,6 +865,7 @@ type ChatRequestBody = {
 
 type ApplyOpsRequestBody = {
   session?: string
+  siteId?: string
   ops?: unknown
 }
 
@@ -720,6 +877,12 @@ const allowedTranscriptionMimeTypes = new Set([
   "audio/m4a",
   "audio/wav",
   "audio/webm"
+])
+const allowedImageAnalysisMimeTypes = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif"
 ])
 
 function parseTranscriptionModelList(raw: string | undefined) {
@@ -743,10 +906,23 @@ type ChatResult = {
   plannerSource: "openai" | "demo"
   modelUsed: string
   modelKey: ModelKey
+  debug?: {
+    traceId: string
+    promptHash: string
+    promptExcerpt: string
+    outcome?: string
+    reasonCategory?: GuardrailErrorCategory
+    intent?: EditPlan["intent"]
+    opTypes?: string[]
+    opCount?: number
+  }
 }
 
 type VariationRequestBody = {
   session?: string
+  siteId?: string
+  sitePurpose?: string
+  siteHosting?: string
   slug?: string
   message?: string
   modelKey?: ModelKey
@@ -809,73 +985,274 @@ function requestedVariationCount(message: string): number {
 }
 
 function openAIChatOptionsForModel(model: string) {
-  // gpt-5 family rejects temperature=0 in chat.completions; omit to use model default.
-  if (model.startsWith("gpt-5")) return {}
+  // o-series and gpt-5 family reject temperature in chat.completions; omit to use model default.
+  const lower = model.toLowerCase()
+  if (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("gpt-5")) return {}
   return { temperature: 0 as const }
 }
 
-function isInfoQuery(message: string) {
-  const m = message.toLowerCase()
-  const normalized = m.replace(/\s+/g, " ").trim()
-  const blockCatalogPatterns = [
-    /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
-    /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
-    /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
-    /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
-    /\bwhat\s+else\s+can\s+i\s+add\b/,
-    /\bwhat\s+other\s+content\b/,
-    /\bavailable\s+blocks?\b/,
-    /\bavailable\s+block\s+types?\b/
-  ]
-  if (blockCatalogPatterns.some((re) => re.test(normalized))) return true
-
-  return (
-    m.includes("what blocks can you add") ||
-    m.includes("what block can you add") ||
-    m.includes("which blocks can you add") ||
-    m.includes("which block types can i add") ||
-    m.includes("what block types can i add") ||
-    m.includes("available blocks") ||
-    m.includes("what can i change") ||
-    m.includes("what can i edit") ||
-    m.includes("what content") ||
-    m.includes("content elements") ||
-    m.includes("which fields") ||
-    m.includes("what fields") ||
-    m.includes("what properties") ||
-    m.includes("what props")
-  )
+function isResponsesOnlyModel(_model: string) {
+  // No current OpenAI model requires the Responses API exclusively; all supported models
+  // use chat.completions. Update this if a future model mandates the Responses API.
+  return false
 }
+
+function extractResponsesOutputText(response: unknown) {
+  const direct = (response as { output_text?: unknown } | null)?.output_text
+  if (typeof direct === "string" && direct.length > 0) return direct
+
+  const output = (response as { output?: unknown } | null)?.output
+  if (!Array.isArray(output)) return ""
+
+  const chunks: string[] = []
+  for (const item of output as Array<{ content?: unknown }>) {
+    if (!item || typeof item !== "object") continue
+    const content = item.content
+    if (!Array.isArray(content)) continue
+    for (const part of content as Array<{ text?: unknown; type?: unknown }>) {
+      if (!part || typeof part !== "object") continue
+      if (part.type === "output_text" && typeof part.text === "string") chunks.push(part.text)
+    }
+  }
+  return chunks.join("")
+}
+
+// Shared normaliser used by all intent detectors below.
+function normalizeForIntent(message: string) {
+  return message.toLowerCase().replace(/\s+/g, " ").trim()
+}
+
+// Single source of truth for block-catalog query patterns.
+const BLOCK_CATALOG_PATTERNS: RegExp[] = [
+  /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
+  /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
+  /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
+  /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
+  /\bwhat\s+else\s+can\s+i\s+add\b/,
+  /\bwhat\s+other\s+content\b/,
+  /\bavailable\s+blocks?\b/,
+  /\bavailable\s+block\s+types?\b/
+]
 
 function isBlockCatalogQuery(message: string) {
-  const m = message.toLowerCase().replace(/\s+/g, " ").trim()
+  const m = normalizeForIntent(message)
+  return BLOCK_CATALOG_PATTERNS.some((re) => re.test(m))
+}
+
+function isInfoQuery(message: string) {
+  const m = normalizeForIntent(message)
   return (
-    /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/.test(m) ||
-    /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/.test(m) ||
-    /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/.test(m) ||
-    /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/.test(m) ||
-    /\bwhat\s+else\s+can\s+i\s+add\b/.test(m) ||
-    /\bavailable\s+blocks?\b/.test(m) ||
-    /\bavailable\s+block\s+types?\b/.test(m)
+    BLOCK_CATALOG_PATTERNS.some((re) => re.test(m)) ||
+    /\bwhat\s+can\s+i\s+(change|edit)\b/.test(m) ||
+    /\bwhat\s+content\b/.test(m) ||
+    /\bcontent\s+elements?\b/.test(m) ||
+    /\b(which|what)\s+fields?\b/.test(m) ||
+    /\bwhat\s+prop(ertie)?s?\b/.test(m)
   )
 }
 
-function isLikelyClarificationFollowUp(message: string) {
-  const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
-  if (!normalized) return false
-  const words = normalized.split(" ").filter(Boolean)
-  const hasReferenceCue =
-    /\b(selected|this|that|it|them|those|these|one|ones|same)\b/.test(normalized) ||
-    /\bfirst|second|third|last\b/.test(normalized)
-  const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace)\b/.test(normalized)
-  return (words.length <= 8 && hasReferenceCue) || (!hasActionVerb && words.length <= 5)
+function isAdviceQuery(message: string) {
+  const m = normalizeForIntent(message)
+  return (
+    /\b(is it good|is this good|should (we|i)|do you recommend|would you recommend)\b/.test(m) ||
+    /\bwhat do you think\b/.test(m) ||
+    /\bwhat (can|should) be improved\b/.test(m) ||
+    /\bhow can (this|the) page be improved\b/.test(m) ||
+    /\bhow (can|should) i improve (this|the) page\b/.test(m) ||
+    /\bimprovements?\b/.test(m) ||
+    /\bis faq\b/.test(m) ||
+    /\bshould .*faq\b/.test(m) ||
+    /\bgood idea\b/.test(m)
+  )
+}
+
+function adviceResponse(args: {
+  body: ChatRequestBody
+  current: PageDoc
+  plannerSource: "openai" | "demo"
+  modelUsed: string
+  modelKey: ModelKey
+}): { code: number; payload: ChatResult } {
+  const { body, current, plannerSource, modelUsed, modelKey } = args
+  const message = (body.message ?? "").toLowerCase()
+  const pageLabel = current.slug === "/" ? "this home page" : `this page (${current.slug})`
+  const hasFaq = current.blocks.some((block) => block.type === "FAQAccordion")
+  const hasHero = current.blocks.some((block) => block.type === "Hero")
+  const hasCta = current.blocks.some((block) => block.type === "CTA")
+
+  if (/\bfaq\b/.test(message)) {
+    const summary = hasFaq
+      ? `Yes, FAQ can work on ${pageLabel}, but keep it concise and near the bottom so it supports decisions without distracting from the main content.`
+      : `FAQ is usually a good fit on ${pageLabel} when visitors may have objections (pricing, process, trust, support).`
+    const changes = hasFaq
+      ? ["Current state: FAQ already exists on this page.", "Recommendation: keep 3-6 high-intent questions."]
+      : ["Current state: no FAQ block detected on this page.", "Recommendation: add a compact FAQ section near the bottom."]
+    return {
+      code: 200,
+      payload: {
+        status: "advice",
+        summary,
+        changes,
+        suggestions: hasFaq
+          ? ["Move FAQ to bottom", "Rewrite FAQ questions for this audience", "Keep FAQ, but reduce to 4 questions"]
+          : ["Add FAQ section with 4 questions at the bottom", "Add FAQ below testimonials", "Skip FAQ on this page"],
+        mentionedSlugs: [current.slug],
+        previewVersion: versions.get(body.session ?? "dev") ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      }
+    }
+  }
+
+  const summary = `It depends on the page goal. For ${pageLabel}, prioritize a clear Hero, supporting proof, and one strong CTA before adding extra sections.`
+  const changes = [
+    hasHero ? "Hero is present." : "Hero is missing.",
+    hasCta ? "CTA is present." : "CTA is missing."
+  ]
+  return {
+    code: 200,
+    payload: {
+      status: "advice",
+      summary,
+      changes,
+      suggestions: [
+        "Add testimonials below Hero",
+        "Add FAQ at the bottom",
+        "Strengthen the main CTA copy"
+      ],
+      mentionedSlugs: [current.slug],
+      previewVersion: versions.get(body.session ?? "dev") ?? 0,
+      plannerSource,
+      modelUsed,
+      modelKey
+    }
+  }
 }
 
 function plannerMessageWithPendingContext(session: string, message: string) {
   const pending = pendingClarificationBySession.get(session)
   if (!pending) return message
+  if (isStandalonePageOperation(message)) return message
   if (!isLikelyClarificationFollowUp(message)) return message
   return `${pending.baseRequest}\nClarification from user: ${message}`
+}
+
+function withSiteContext(message: string, sitePurpose?: string, siteHosting?: string) {
+  const purpose = typeof sitePurpose === "string" ? sitePurpose.trim() : ""
+  const hosting = typeof siteHosting === "string" ? siteHosting.trim() : ""
+  if (!purpose && !hosting) return message
+  const lines: string[] = []
+  if (purpose) lines.push(`Site purpose: ${purpose}`)
+  if (hosting) lines.push(`Hosting context: ${hosting}`)
+  return `${message}\n\n[site context]\n${lines.join("\n")}\n[/site context]`
+}
+
+function extractAudienceTarget(message: string) {
+  const lower = message.toLowerCase()
+  const patternMatches = [
+    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,80}?)\s+(?:audience|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/),
+    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,80})$/),
+    lower.match(/\btarget(?:ing)?\s+([a-z0-9 ,&/-]{2,80})\b/)
+  ]
+  const raw = patternMatches.find(Boolean)?.[1]
+  if (!raw) return undefined
+  const cleaned = raw
+    .replace(/\b(an?|the)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80)
+  return cleaned.length > 1 ? cleaned : undefined
+}
+
+function titleCaseWords(text: string) {
+  return text
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => (word.length > 2 ? word[0].toUpperCase() + word.slice(1) : word))
+    .join(" ")
+}
+
+function addAudienceSuffix(value: string, audience: string) {
+  const normalized = value.trim()
+  if (!normalized) return normalized
+  const audienceRe = new RegExp(`\\b${audience.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i")
+  if (audienceRe.test(normalized)) return normalized
+  return `${normalized} for ${audience}`
+}
+
+function audiencePatchForBlock(block: PageDoc["blocks"][number], audience: string) {
+  const props = block.props as Record<string, unknown>
+  if (block.type === "Hero") {
+    const heading = typeof props.heading === "string" ? props.heading : ""
+    const subheading = typeof props.subheading === "string" ? props.subheading : ""
+    const nextHeading = addAudienceSuffix(heading, audience)
+    const nextSubheading = addAudienceSuffix(subheading, audience)
+    const patch: Record<string, unknown> = {}
+    if (nextHeading && nextHeading !== heading) patch.heading = nextHeading
+    if (nextSubheading && nextSubheading !== subheading) patch.subheading = nextSubheading
+    return patch
+  }
+  if (block.type === "RichText") {
+    const body = typeof props.body === "string" ? props.body : ""
+    const nextBody = body.toLowerCase().includes(audience.toLowerCase()) ? body : `For ${audience}: ${body}`
+    return nextBody !== body ? { body: nextBody } : {}
+  }
+  if (block.type === "CTA") {
+    const title = typeof props.title === "string" ? props.title : ""
+    const nextTitle = addAudienceSuffix(title, audience)
+    return nextTitle !== title ? { title: nextTitle } : {}
+  }
+  if (block.type === "FeatureGrid" || block.type === "Testimonials" || block.type === "FAQAccordion" || block.type === "CardGrid" || block.type === "Card") {
+    const title = typeof props.title === "string" ? props.title : ""
+    const nextTitle = addAudienceSuffix(title, audience)
+    return nextTitle !== title ? { title: nextTitle } : {}
+  }
+  return {}
+}
+
+function nextAvailableSlug(session: string, baseSlug: string) {
+  const draft = getSessionDraft(session)
+  if (!draft.has(baseSlug)) return baseSlug
+  let idx = 2
+  while (draft.has(`${baseSlug}-${idx}`)) idx += 1
+  return `${baseSlug}-${idx}`
+}
+
+function buildCreatePagePlan(args: { session: string; requestedSlug: string; assumptions?: string[] }) {
+  const normalizedRequested = normalizeRouteCandidate(args.requestedSlug)
+  if (!normalizedRequested || normalizedRequested === "/") return null
+  const draft = getSessionDraft(args.session)
+  if (draft.has(normalizedRequested)) {
+    return {
+      intent: "needs_clarification",
+      summary_for_user: `Page ${normalizedRequested} already exists. Provide a different page path.`,
+      change_log: args.assumptions ?? [],
+      ops: []
+    } satisfies EditPlan
+  }
+
+  const seed = toSeedSlug(normalizedRequested.replace(/^\//, "") || "new-page") || "new-page"
+  const now = new Date().toISOString()
+  const page: PageDoc = {
+    id: pageIdFromSlug(normalizedRequested),
+    slug: normalizedRequested,
+    title: pageTitleFromSlug(normalizedRequested),
+    updatedAt: now,
+    blocks: [
+      {
+        id: `b_hero_${seed}`,
+        type: "Hero",
+        props: defaultPropsForType("Hero")
+      }
+    ]
+  }
+  return {
+    intent: "edit_plan",
+    summary_for_user: `Created page ${normalizedRequested}.`,
+    change_log: [...(args.assumptions ?? []), `Created new page ${normalizedRequested}.`],
+    ops: [{ op: "create_page", page }]
+  } satisfies EditPlan
 }
 
 function editablePropsFromBlock(block: PageDoc["blocks"][number]) {
@@ -947,15 +1324,7 @@ function infoResponse(args: {
   const { body, current, plannerSource, modelUsed, modelKey } = args
   const lower = (body.message ?? "").toLowerCase()
 
-  const asksBlockTypes =
-    lower.includes("what blocks can you add") ||
-    lower.includes("what block can you add") ||
-    lower.includes("which blocks can you add") ||
-    lower.includes("which block types can i add") ||
-    lower.includes("what block types can i add") ||
-    lower.includes("available blocks")
-
-  if (asksBlockTypes) {
+  if (isBlockCatalogQuery(body.message ?? "")) {
     return {
       code: 200,
       payload: {
@@ -1457,36 +1826,6 @@ function normalizeOpName(op: unknown) {
   return aliases[key] ?? op
 }
 
-function normalizeRouteCandidate(candidate: unknown): string | null {
-  if (typeof candidate !== "string") return null
-  const trimmed = candidate.trim()
-  if (!trimmed) return null
-  if (trimmed === "/") return "/"
-  if (trimmed.startsWith("/")) return trimmed
-  if (/^[a-z0-9][a-z0-9/_-]*$/i.test(trimmed)) return `/${trimmed}`
-  return null
-}
-
-function firstRouteMention(message?: string) {
-  if (!message) return null
-  const match = message.match(/\/[a-z0-9/_-]*/i)
-  if (!match) return null
-  return normalizeRouteCandidate(match[0])
-}
-
-function extractRouteMentions(message?: string) {
-  if (!message) return []
-  const matches = message.match(/\/[a-z0-9/_-]*/gi) ?? []
-  const out: string[] = []
-  for (const item of matches) {
-    const normalized = normalizeRouteCandidate(item)
-    if (!normalized) continue
-    if (out.includes(normalized)) continue
-    out.push(normalized)
-  }
-  return out
-}
-
 function orderSlugsHomeFirst(slugs: string[]) {
   return slugs.includes("/") ? ["/", ...slugs.filter((route) => route !== "/")] : slugs
 }
@@ -1609,7 +1948,9 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
   const userMessage = (args?.userMessage ?? "").toLowerCase()
   const requestedRoute = firstRouteMention(args?.userMessage)
   const routeMentions = extractRouteMentions(args?.userMessage)
-  const createPageIntent = /\bcreate\b.*\bpage\b|\bnew\s+page\b/.test(userMessage)
+  const requestedCreateSlug = parseCreatePageRequest(args?.userMessage ?? "")
+  const createPageIntent = Boolean(requestedCreateSlug)
+  const refersToCurrentPage = /\b(this|current|selected)\s+page\b/.test(userMessage)
 
   const resolvePageSlug = (candidate: unknown) => {
     const normalized = normalizeRouteCandidate(candidate)
@@ -1673,7 +2014,9 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
         ? allowedBlockTypes.find((type) => type.toLowerCase() === rawType.toLowerCase()) ?? inferBlockTypeFromText(rawType)
         : undefined
 
-    raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? raw.path ?? raw.route ?? raw.from)
+    const isListOperation = raw.op === "add_item" || raw.op === "update_item" || raw.op === "remove_item" || raw.op === "move_item"
+    const pathLooksLikeListKey = typeof raw.path === "string" && !raw.path.startsWith("/")
+    raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? (isListOperation ? undefined : raw.path) ?? raw.route ?? raw.from)
     raw.newPageSlug = normalizeRouteCandidate(
       raw.newPageSlug ?? raw.new_page_slug ?? raw.targetSlug ?? raw.target_slug ?? raw.toPageSlug ?? raw.to_page_slug ?? raw.to
     )
@@ -1692,6 +2035,15 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     }
     if (!raw.listKey) {
       raw.listKey = raw.list_key ?? raw.arrayKey ?? raw.array_key ?? raw.collection ?? raw.itemsKey ?? raw.items_key
+      if (!raw.listKey && isListOperation && pathLooksLikeListKey) raw.listKey = raw.path
+      if (!raw.listKey && isListOperation && typeof raw.path === "string") {
+        const keyCandidate = raw.path.trim().replace(/^\/+/, "")
+        if (keyCandidate && !keyCandidate.includes("/")) raw.listKey = keyCandidate
+      }
+    }
+    if (isListOperation && typeof raw.listKey === "string") raw.listKey = raw.listKey.replace(/^\/+/, "")
+    if (isListOperation && typeof raw.listKey === "string" && typeof raw.pageSlug === "string" && raw.pageSlug === `/${raw.listKey}` && args?.defaultSlug) {
+      raw.pageSlug = args.defaultSlug
     }
     if (typeof raw.index !== "number") {
       const indexRaw = raw.index ?? raw.itemIndex ?? raw.item_index ?? raw.fromIndex ?? raw.from_index
@@ -1706,6 +2058,25 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     if (!raw.item) {
       const sourceItem = raw.newItem ?? raw.new_item ?? raw.value
       if (sourceItem && typeof sourceItem === "object" && !Array.isArray(sourceItem)) raw.item = sourceItem
+    }
+    if (raw.op === "add_item" && (!raw.item || typeof raw.item !== "object" || Array.isArray(raw.item))) {
+      const listKey = typeof raw.listKey === "string" ? raw.listKey.replace(/^\/+/, "") : ""
+      const blockId = typeof raw.blockId === "string" ? raw.blockId : ""
+      const currentBlock = blockId ? args?.currentPage?.blocks.find((block) => block.id === blockId) : undefined
+      const currentProps = currentBlock?.props as Record<string, unknown> | undefined
+      const listValue = listKey ? currentProps?.[listKey] : undefined
+      const firstItem = Array.isArray(listValue) ? listValue.find((entry) => entry && typeof entry === "object" && !Array.isArray(entry)) : undefined
+      if (firstItem) {
+        raw.item = structuredClone(firstItem as Record<string, unknown>)
+      } else if (currentBlock?.type === "FAQAccordion") {
+        raw.item = { q: "New question", a: "New answer" }
+      } else if (currentBlock?.type === "FeatureGrid") {
+        raw.item = { title: "New feature", description: "Feature description" }
+      } else if (currentBlock?.type === "Testimonials") {
+        raw.item = { quote: "New testimonial", author: "Customer" }
+      } else if (currentBlock?.type === "CardGrid") {
+        raw.item = { title: "New card", description: "Card description", ctaText: "Learn more", ctaHref: "/" }
+      }
     }
     if (!raw.newBlockId) {
       raw.newBlockId = raw.new_block_id ?? raw.targetBlockId ?? raw.target_block_id ?? raw.copiedBlockId ?? raw.copied_block_id
@@ -1841,6 +2212,50 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
     const createSlugCandidate = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? requestedRoute)
     const explicitCreateTarget = createSlugCandidate && createSlugCandidate !== args?.defaultSlug
 
+    // If user asked to create a page and model emitted add_block on a new route, synthesize create_page.
+    if (raw.op === "add_block" && createPageIntent && explicitCreateTarget && !createdPageSlug) {
+      const createSlug = createSlugCandidate ?? requestedRoute ?? args?.defaultSlug ?? "/"
+      const nowIso = new Date().toISOString()
+
+      let firstBlock: PageDoc["blocks"][number] | null = null
+      if (raw.block && typeof raw.block === "object" && !Array.isArray(raw.block)) {
+        const block = raw.block as Record<string, unknown>
+        const typeRaw = typeof block.type === "string" ? block.type : normalizedType
+        const blockType =
+          typeof typeRaw === "string"
+            ? allowedBlockTypes.find((t) => t.toLowerCase() === typeRaw.toLowerCase()) ?? inferBlockTypeFromText(typeRaw)
+            : undefined
+        if (blockType) {
+          const id = typeof block.id === "string" && block.id.length > 0 ? block.id : `b_${blockType.toLowerCase()}_${Date.now()}`
+          const props =
+            block.props && typeof block.props === "object" && !Array.isArray(block.props)
+              ? { ...defaultPropsForType(blockType), ...(block.props as Record<string, unknown>) }
+              : defaultPropsForType(blockType)
+          firstBlock = { id, type: blockType, props }
+        }
+      }
+
+      if (!firstBlock) {
+        firstBlock = {
+          id: `b_hero_${Date.now()}`,
+          type: "Hero",
+          props: defaultPropsForType("Hero")
+        }
+      }
+
+      raw.op = "create_page"
+      raw.page = {
+        id: pageIdFromSlug(createSlug),
+        slug: createSlug,
+        title: pageTitleFromSlug(createSlug),
+        updatedAt: nowIso,
+        blocks: [firstBlock]
+      } satisfies PageDoc
+      raw.pageSlug = createSlug
+      createdPageSlug = createSlug
+      return raw
+    }
+
     // LLMs sometimes emit create_page when they actually mean add_block.
     if (
       raw.op === "create_page" &&
@@ -1897,6 +2312,8 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
       const slug = resolvePageSlug(pageSlugInput) ?? requestedRoute ?? args?.defaultSlug ?? "/"
       const nowIso = new Date().toISOString()
       const blocks: PageDoc["blocks"] = []
+      const shouldTreatAsCurrentPageEdit =
+        !requestedCreateSlug && refersToCurrentPage && !!args?.defaultSlug && slug === args.defaultSlug
 
       if (Array.isArray(pageInput.blocks)) {
         for (const candidate of pageInput.blocks) {
@@ -1915,6 +2332,18 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
         }
       }
 
+      if (shouldTreatAsCurrentPageEdit && blocks.length > 0) {
+        let previousId: string | undefined
+        const out: Record<string, unknown>[] = []
+        for (const block of blocks) {
+          const addOp: Record<string, unknown> = { op: "add_block", pageSlug: slug, block }
+          if (previousId) addOp.afterBlockId = previousId
+          previousId = block.id
+          out.push(addOp)
+        }
+        return out
+      }
+
       if (blocks.length === 0 && raw.block && typeof raw.block === "object" && !Array.isArray(raw.block)) {
         const block = { ...(raw.block as Record<string, unknown>) }
         const typeRaw = typeof block.type === "string" ? block.type : normalizedType
@@ -1930,6 +2359,16 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
               : defaultPropsForType(blockType)
           blocks.push({ id, type: blockType, props })
         }
+      }
+      if (shouldTreatAsCurrentPageEdit && blocks.length > 0) {
+        raw.op = "add_block"
+        raw.pageSlug = slug
+        raw.block = blocks[0]
+        delete raw.page
+        delete raw.page_slug
+        delete raw.slug
+        delete raw.path
+        return raw
       }
 
       raw.page = {
@@ -3004,6 +3443,14 @@ function compileDeterministicPlan(args: {
   const routeMentions = extractRouteMentions(message)
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
+  const hasConditionalQualifier = /\bif\s+(required|needed|necessary)\b/.test(lowerMessage)
+  const asksSectionReorder =
+    /\b(reorder|re-order|rearrange|re-organize|reorganize)\b/.test(lowerMessage) &&
+    /\b(section|sections|block|blocks|content|layout|flow|readability)\b/.test(lowerMessage)
+  const hasExplicitPlacementCue = /\b(top|bottom|first|last|before|after|above|below|under|between)\b/.test(lowerMessage)
+  const hasExplicitBlockMentionInMessage =
+    /\bb_[a-z0-9_]+\b/.test(lowerMessage) ||
+    /\b(hero|feature grid|features|testimonials?|faq|cta|card grid|cards?|rich[\s-]?text)\b/.test(lowerMessage)
 
   const selectedBlock = activeBlockId ? currentPage.blocks.find((b) => b.id === activeBlockId) ?? null : null
   const secondaryButtonMentioned =
@@ -3053,6 +3500,12 @@ function compileDeterministicPlan(args: {
       change_log: [...assumptions, `Removed page ${targetSlug}.`],
       ops: [{ op: "remove_page", pageSlug: targetSlug }]
     }
+  }
+
+  const requestedCreateSlug = parseCreatePageRequest(message)
+  if ((intent.action === "add" || intent.action === "clarify" || intent.action === "update") && requestedCreateSlug) {
+    const createPlan = buildCreatePagePlan({ session, requestedSlug: requestedCreateSlug, assumptions })
+    if (createPlan) return createPlan
   }
 
   const asksNavMove =
@@ -3124,6 +3577,113 @@ function compileDeterministicPlan(args: {
           : `Moved ${movedSlug} after ${afterPageSlug}.`,
       change_log: [...assumptions, `Reordered nav: ${movedSlug}`],
       ops: [{ op: "move_page", pageSlug: movedSlug, afterPageSlug }]
+    }
+  }
+
+  const audience = extractAudienceTarget(message)
+  const asksAudienceCreatePage =
+    Boolean(audience) &&
+    /\b(create|generate|build|make|draft)\b/.test(lowerMessage) &&
+    /\b(page|landing page)\b/.test(lowerMessage)
+  if (asksAudienceCreatePage && audience) {
+    const seed = toSeedSlug(audience) || "audience"
+    const requestedSlug = routeMentions[0] ?? `/for-${seed}`
+    const normalizedRequested = normalizeRouteCandidate(requestedSlug) ?? `/for-${seed}`
+    const newSlug = nextAvailableSlug(session, normalizedRequested)
+    const label = titleCaseWords(audience)
+    const now = new Date().toISOString()
+    const page: PageDoc = {
+      id: `p_for_${seed}`,
+      slug: newSlug,
+      title: `For ${label}`,
+      updatedAt: now,
+      blocks: [
+        {
+          id: `b_hero_${seed}`,
+          type: "Hero",
+          props: {
+            heading: `Built for ${label}`,
+            subheading: `Everything on this page is tailored for ${audience}.`,
+            ctaText: "Get Started",
+            ctaHref: "/",
+            imageUrl: `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`,
+            imageAlt: `Audience-focused hero image for ${label}`
+          }
+        },
+        {
+          id: `b_features_${seed}`,
+          type: "FeatureGrid",
+          props: {
+            title: `Why ${label} choose this`,
+            features: [
+              { title: "Relevant messaging", description: `Copy aligned to ${audience} needs and language.` },
+              { title: "Clear outcomes", description: "Benefits are framed around practical results." },
+              { title: "Focused next step", description: "CTA is tuned for this audience journey." }
+            ]
+          }
+        },
+        {
+          id: `b_faq_${seed}`,
+          type: "FAQAccordion",
+          props: {
+            title: `FAQ for ${label}`,
+            items: [
+              { q: `Is this suitable for ${audience}?`, a: `Yes, this page is tailored for ${audience}.` },
+              { q: "How quickly can I start?", a: "Most visitors can get started in minutes." },
+              { q: "Can I customize later?", a: "Yes, content and sections can be updated anytime." }
+            ]
+          }
+        },
+        {
+          id: `b_cta_${seed}`,
+          type: "CTA",
+          props: {
+            title: `Start with a plan for ${label}`,
+            description: "Take the next step with content designed for your audience.",
+            ctaText: "Start now",
+            ctaHref: "/"
+          }
+        }
+      ]
+    }
+    return {
+      intent: "edit_plan",
+      summary_for_user: `Created a new page tailored for ${audience}.`,
+      change_log: [...assumptions, `Created page ${newSlug} for audience: ${audience}.`],
+      ops: [{ op: "create_page", page }]
+    }
+  }
+
+  const asksAudienceRetarget =
+    Boolean(audience) &&
+    !asksAudienceCreatePage &&
+    (/\bfor\b/.test(lowerMessage) || /\baudience\b/.test(lowerMessage) || /\btarget\b/.test(lowerMessage))
+  if (asksAudienceRetarget && audience) {
+    const targets = selectedBlock
+      ? [selectedBlock]
+      : currentPage.blocks.filter((block) => block.type === "Hero" || block.type === "CTA" || block.type === "RichText").slice(0, 3)
+    const ops: Operation[] = []
+    for (const block of targets) {
+      const patch = audiencePatchForBlock(block, audience)
+      if (Object.keys(patch).length === 0) continue
+      ops.push({ op: "update_props", pageSlug: slug, blockId: block.id, patch })
+    }
+    if (ops.length > 0) {
+      return {
+        intent: "edit_plan",
+        summary_for_user: `Tailored this page for ${audience}.`,
+        change_log: [...assumptions, `Retargeted copy for audience: ${audience}.`],
+        ops
+      }
+    }
+  }
+
+  if (intent.action === "move" && hasConditionalQualifier && asksSectionReorder && !hasExplicitPlacementCue && !hasExplicitBlockMentionInMessage) {
+    return {
+      intent: "needs_clarification",
+      summary_for_user: "I can reorder sections if needed, but please specify what should move (for example: move FAQ below Testimonials).",
+      change_log: [...assumptions, "Skipped ambiguous conditional reorder request without explicit section or placement."],
+      ops: []
     }
   }
 
@@ -3501,6 +4061,7 @@ async function generatePlanWithOpenAI(args: {
 }): Promise<EditPlan> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
+  const audienceHint = extractAudienceTarget(args.message)
   const explicitOtherReference =
     selectedBlockId.length > 0 &&
     Array.isArray(args.contextPack.resolvedReferences.mentionedBlocks) &&
@@ -3521,10 +4082,19 @@ async function generatePlanWithOpenAI(args: {
     "Use remove_page when the user asks to delete a page path.",
     "Use move_page to reorder nav pages (pageSlug + optional afterPageSlug). Home (/) must stay first.",
     "For duplicate_block, blockId is required; use optional toPageSlug when duplicating into a different page.",
+    "If the user specifies an audience (e.g. 'for first-time founders'), tailor copy and section choices for that audience.",
+    "If user asks to create a page for an audience, create_page with audience-specific Hero/benefits/CTA content.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     "For Hero imageUrl, prefer a semantically relevant Unsplash URL (or a URL explicitly provided by the user). Avoid random placeholder services for topical hero requests. Never invent local image paths.",
+    ...(chatStrictPrimaryOpMode
+      ? [
+          "STRICT MODE: choose exactly one PRIMARY operation only.",
+          "In intent=edit_plan, return exactly one op in ops[].",
+          "Do not include secondary/follow-up operations."
+        ]
+      : []),
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
@@ -3533,6 +4103,7 @@ async function generatePlanWithOpenAI(args: {
 
   const user = {
     request: args.message,
+    audienceHint: audienceHint ?? null,
     slug: args.slug,
     contextPack: args.contextPack,
     blockContracts: blockContractsSummary(),
@@ -3547,7 +4118,15 @@ async function generatePlanWithOpenAI(args: {
   }
 
   let raw = ""
-  if (args.onToken) {
+  if (isResponsesOnlyModel(args.model)) {
+    const response = await client.responses.create({
+      model: args.model,
+      instructions: system,
+      input: JSON.stringify(user)
+    })
+    raw = extractResponsesOutputText(response)
+    if (args.onToken && raw.length > 0) args.onToken(raw)
+  } else if (args.onToken) {
     const stream = await client.chat.completions.create({
       model: args.model,
       ...openAIChatOptionsForModel(args.model),
@@ -3593,6 +4172,12 @@ async function generatePlanWithOpenAI(args: {
     throw new Error(`${message}${path}. Parsed sample: ${sample}`)
   }
 
+  if (chatStrictPrimaryOpMode && planResult.data.intent === "edit_plan" && planResult.data.ops.length > 1) {
+    return {
+      ...planResult.data,
+      ops: [planResult.data.ops[0]]
+    }
+  }
   return planResult.data
 }
 
@@ -4403,6 +4988,12 @@ function buildAiInsightChanges(args: { plan: EditPlan; message: string }) {
   return lines
 }
 
+function deterministicCreatePagePlan(args: { session: string; message: string }) {
+  const requestedSlug = parseCreatePageRequest(args.message)
+  if (!requestedSlug) return null
+  return buildCreatePagePlan({ session: args.session, requestedSlug })
+}
+
 async function runChatPipeline(
   body: ChatRequestBody,
   options?: {
@@ -4413,7 +5004,8 @@ async function runChatPipeline(
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
-  const plannerMessage = plannerMessageWithPendingContext(body.session, body.message)
+  const messageWithContext = withSiteContext(body.message, body.sitePurpose, body.siteHosting)
+  const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
   const chatRequestId = randomUUID()
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({
@@ -4438,12 +5030,47 @@ async function runChatPipeline(
   const modelKey = body.modelKey && modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
   const modelUsed = modelLookup[modelKey]
   const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
+  const promptHash = telemetryPromptHash(plannerMessage)
+  const promptExcerpt = telemetryPromptExcerpt(plannerMessage)
+  const withDebugPayload = (
+    payload: ChatResult,
+    extra?: Partial<NonNullable<ChatResult["debug"]>>
+  ): ChatResult => ({
+    ...payload,
+    debug: {
+      traceId: chatRequestId,
+      promptHash,
+      promptExcerpt,
+      ...(payload.debug ?? {}),
+      ...(extra ?? {})
+    }
+  })
+  pushChatTelemetry({
+    id: chatRequestId,
+    at: new Date().toISOString(),
+    phase: "received",
+    session: body.session,
+    requestedSlug,
+    effectiveSlug,
+    plannerSource,
+    modelKey,
+    modelUsed,
+    promptHash,
+    promptExcerpt,
+    promptLength: plannerMessage.length
+  })
 
   const current = getPage(body.session, effectiveSlug)
   if (!current) return { code: 404, payload: { error: "page not found" } }
 
   if (isInfoQuery(body.message)) {
-    return infoResponse({ body, current, plannerSource, modelUsed, modelKey })
+    const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
+    return { code: info.code, payload: withDebugPayload(info.payload, { outcome: "info" }) }
+  }
+  if (isAdviceQuery(body.message)) {
+    pendingClarificationBySession.delete(body.session)
+    const advice = adviceResponse({ body, current, plannerSource, modelUsed, modelKey })
+    return { code: advice.code, payload: withDebugPayload(advice.payload, { outcome: "advice" }) }
   }
 
   const contextPack = plannerContextPack({
@@ -4458,6 +5085,23 @@ async function runChatPipeline(
 
   const guardrailFailureResponse = (args: { reason: string; source: "openai" | "demo" }) => {
     const category = classifyGuardrailError(args.reason)
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "result",
+      session: body.session!,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource: args.source,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "guardrail_failure",
+      reason: args.reason.slice(0, 300),
+      reasonCategory: category
+    })
     if (category === "ambiguity") {
       const selected =
         body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
@@ -4465,7 +5109,7 @@ async function runChatPipeline(
           : null
       return {
         code: 200,
-        payload: {
+        payload: withDebugPayload({
           status: "needs_clarification",
           summary: "I need one more detail before applying this safely.",
           changes: [],
@@ -4475,12 +5119,12 @@ async function runChatPipeline(
           plannerSource: args.source,
           modelUsed,
           modelKey
-        } satisfies ChatResult
+        } satisfies ChatResult, { outcome: "needs_clarification", reasonCategory: category })
       }
     }
     return {
       code: 400,
-      payload: {
+      payload: withDebugPayload({
         status: "validation_error",
         summary: "I could not apply that change safely.",
         changes: [],
@@ -4489,11 +5133,28 @@ async function runChatPipeline(
         plannerSource: args.source,
         modelUsed,
         modelKey
-      } satisfies ChatResult
+      } satisfies ChatResult, { outcome: "validation_error", reasonCategory: category })
     }
   }
 
   const respondFromPlan = async (plan: EditPlan, source: "openai" | "demo") => {
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "plan_generated",
+      session: body.session!,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource: source,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      intent: plan.intent,
+      opCount: plan.ops.length,
+      opTypes: plan.ops.map((op) => op.op)
+    })
     let resolvedPlan = normalizePlanCopyForUi(plan, current)
     resolvedPlan = await withUnsplashHeroImage({
       plan: resolvedPlan,
@@ -4527,6 +5188,24 @@ async function runChatPipeline(
 
     if (resolvedPlan.intent === "needs_clarification") {
       pendingClarificationBySession.set(body.session!, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
+      pushChatTelemetry({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "needs_clarification",
+        intent: resolvedPlan.intent,
+        opCount: resolvedPlan.ops.length,
+        opTypes: resolvedPlan.ops.map((op) => op.op)
+      })
       const selected =
         body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
           ? current.blocks.find((b) => b.id === body.activeBlockId)
@@ -4535,7 +5214,7 @@ async function runChatPipeline(
         done: true as const,
         response: {
           code: 200,
-          payload: {
+          payload: withDebugPayload({
             status: "needs_clarification",
             summary: resolvedPlan.summary_for_user,
             changes: resolvedPlan.change_log,
@@ -4545,7 +5224,12 @@ async function runChatPipeline(
             plannerSource: source,
             modelUsed,
             modelKey
-          } satisfies ChatResult
+          } satisfies ChatResult, {
+            outcome: "needs_clarification",
+            intent: resolvedPlan.intent,
+            opCount: resolvedPlan.ops.length,
+            opTypes: resolvedPlan.ops.map((op) => op.op)
+          })
         }
       }
     }
@@ -4631,11 +5315,29 @@ async function runChatPipeline(
       schedulePersistState()
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
+      pushChatTelemetry({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "applied",
+        intent: resolvedPlan.intent,
+        opCount: resolvedPlan.ops.length,
+        opTypes: resolvedPlan.ops.map((op) => op.op)
+      })
       return {
         done: true as const,
         response: {
           code: 200,
-          payload: {
+          payload: withDebugPayload({
             status: "applied",
             summary: resolvedPlan.summary_for_user,
             changes: [...resolvedPlan.change_log, ...aiInsightChanges],
@@ -4646,17 +5348,38 @@ async function runChatPipeline(
             plannerSource: source,
             modelUsed,
             modelKey
-          } satisfies ChatResult
+          } satisfies ChatResult, {
+            outcome: "applied",
+            intent: resolvedPlan.intent,
+            opCount: resolvedPlan.ops.length,
+            opTypes: resolvedPlan.ops.map((op) => op.op)
+          })
         }
       }
     } catch (error) {
       const reason = toErrorDetail(error)
       if (isNoEffectiveChangeError(reason)) {
+        pushChatTelemetry({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "result",
+          session: body.session!,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource: source,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: "no_effective_change",
+          reason: reason.slice(0, 300)
+        })
         return {
           done: true as const,
           response: {
             code: 200,
-            payload: {
+            payload: withDebugPayload({
               status: "applied",
               summary: "No changes needed. That content is already up to date.",
               changes: [],
@@ -4665,12 +5388,53 @@ async function runChatPipeline(
               plannerSource: source,
               modelUsed,
               modelKey
-            } satisfies ChatResult
+            } satisfies ChatResult, { outcome: "no_effective_change" })
           }
         }
       }
+      pushChatTelemetry({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "plan_apply_failed",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "apply_failed",
+        reason: reason.slice(0, 300),
+        reasonCategory: classifyGuardrailError(reason)
+      })
       return { done: false as const, reason }
     }
+  }
+
+  const forcedCreatePlan = deterministicCreatePagePlan({ session: body.session, message: plannerMessage })
+  if (forcedCreatePlan) {
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "forced_plan",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "forced_create_page",
+      intent: forcedCreatePlan.intent,
+      opCount: forcedCreatePlan.ops.length,
+      opTypes: forcedCreatePlan.ops.map((op) => op.op)
+    })
+    const forcedOutcome = await respondFromPlan(forcedCreatePlan, plannerSource)
+    if (forcedOutcome.done) return forcedOutcome.response
   }
 
   if (!process.env.OPENAI_API_KEY) {
@@ -4680,17 +5444,35 @@ async function runChatPipeline(
       if (outcome.done) return outcome.response
       return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
     } catch (error) {
+      const reason = toErrorDetail(error)
+      pushChatTelemetry({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: "demo",
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "planner_exception",
+        reason: reason.slice(0, 300),
+        reasonCategory: classifyGuardrailError(reason)
+      })
       return {
         code: 500,
-        payload: {
+        payload: withDebugPayload({
           status: "error",
           summary: "Could not generate an edit plan.",
-          changes: [toErrorDetail(error).slice(0, 300)],
+          changes: [reason.slice(0, 300)],
           previewVersion: versions.get(body.session) ?? 0,
           plannerSource: "demo",
           modelUsed,
           modelKey
-        }
+        }, { outcome: "planner_exception", reasonCategory: classifyGuardrailError(reason) })
       }
     }
   }
@@ -4712,11 +5494,45 @@ async function runChatPipeline(
       break
     } catch (error) {
       const reason = toErrorDetail(error)
+      pushChatTelemetry({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "plan_attempt_failed",
+        session: body.session,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: `attempt_${attempt}_failed`,
+        reason: reason.slice(0, 300),
+        reasonCategory: classifyGuardrailError(reason)
+      })
       planningErrors.push(`Attempt ${attempt} planning failed: ${reason}`)
       if (attempt === maxPlanningAttempts) {
+        pushChatTelemetry({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "result",
+          session: body.session,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: "planning_exhausted",
+          reason: reason.slice(0, 300),
+          reasonCategory: classifyGuardrailError(reason)
+        })
         return {
           code: 500,
-          payload: {
+          payload: withDebugPayload({
             status: "error",
             summary: "Could not generate an edit plan.",
             changes: [reason.slice(0, 300)],
@@ -4725,16 +5541,31 @@ async function runChatPipeline(
             plannerSource,
             modelUsed,
             modelKey
-          }
+          }, { outcome: "planning_exhausted", reasonCategory: classifyGuardrailError(reason) })
         }
       }
     }
   }
 
   if (!initialPlan) {
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "result",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "planning_missing"
+    })
     return {
       code: 500,
-      payload: {
+      payload: withDebugPayload({
         status: "error",
         summary: "Could not generate an edit plan.",
         changes: [],
@@ -4743,7 +5574,7 @@ async function runChatPipeline(
         plannerSource,
         modelUsed,
         modelKey
-      }
+      }, { outcome: "planning_missing" })
     }
   }
 
@@ -4756,6 +5587,23 @@ async function runChatPipeline(
 
   let repairedPlan: EditPlan
   try {
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "repair_attempt",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "repair_started",
+      reason: initialOutcome.reason.slice(0, 300),
+      reasonCategory: classifyGuardrailError(initialOutcome.reason)
+    })
     repairedPlan = await generatePlanWithOpenAI({
       message: plannerMessage,
       slug: effectiveSlug,
@@ -4765,11 +5613,46 @@ async function runChatPipeline(
       feedback: buildDeterministicRepairFeedback(initialOutcome.reason),
       onToken: options?.onPlanningToken
     })
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "repair_generated",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "repair_plan_generated",
+      intent: repairedPlan.intent,
+      opCount: repairedPlan.ops.length,
+      opTypes: repairedPlan.ops.map((op) => op.op)
+    })
   } catch (error) {
     const reason = toErrorDetail(error)
+    pushChatTelemetry({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "result",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "repair_failed",
+      reason: reason.slice(0, 300),
+      reasonCategory: classifyGuardrailError(reason)
+    })
     return {
       code: 400,
-      payload: {
+      payload: withDebugPayload({
         status: "validation_error",
         summary: "I could not apply that change safely.",
         changes: [],
@@ -4778,7 +5661,7 @@ async function runChatPipeline(
         plannerSource,
         modelUsed,
         modelKey
-      }
+      }, { outcome: "repair_failed", reasonCategory: classifyGuardrailError(reason) })
     }
   }
 
@@ -4791,6 +5674,7 @@ async function runVariationPipeline(body: VariationRequestBody): Promise<{ code:
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
+  const contextualMessage = withSiteContext(body.message, body.sitePurpose, body.siteHosting)
 
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({
@@ -4811,7 +5695,7 @@ async function runVariationPipeline(body: VariationRequestBody): Promise<{ code:
 
   const modelKey = body.modelKey && modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
   const modelUsed = modelLookup[modelKey]
-  const count = requestedVariationCount(body.message)
+  const count = requestedVariationCount(contextualMessage)
   const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
 
   let variations: VariationOption[] = []
@@ -4819,7 +5703,7 @@ async function runVariationPipeline(body: VariationRequestBody): Promise<{ code:
     try {
       variations = await generateVariationsWithOpenAI({
         block: selected,
-        message: body.message,
+        message: contextualMessage,
         model: modelUsed,
         modelKey,
         count
@@ -4832,7 +5716,7 @@ async function runVariationPipeline(body: VariationRequestBody): Promise<{ code:
   if (variations.length < count) {
     const fallback = deterministicVariations({
       block: selected,
-      message: body.message,
+      message: contextualMessage,
       count,
       existing: variations
     })
@@ -4841,7 +5725,7 @@ async function runVariationPipeline(body: VariationRequestBody): Promise<{ code:
 
   variations = await withDefaultImageVariations({
     block: selected,
-    message: body.message,
+    message: contextualMessage,
     variations
   })
 
@@ -4893,18 +5777,19 @@ app.get("/published/pages", async (request, reply) => {
 })
 
 app.get("/draft/pages", async (request, reply) => {
-  const query = request.query as { session?: string; slug?: string }
+  const query = request.query as { session?: string; siteId?: string; slug?: string }
   if (!query.slug || !query.session) return reply.code(400).send({ error: "session and slug are required" })
+  const session = scopedSessionKey(query.session, query.siteId)
 
-  const page = getPage(query.session, query.slug)
+  const page = getPage(session, query.slug)
   if (!page) return reply.code(404).send({ error: "not found" })
 
   return structuredClone(page)
 })
 
 app.get("/draft/slugs", async (request, reply) => {
-  const query = request.query as { session?: string }
-  const session = query.session ?? "dev"
+  const query = request.query as { session?: string; siteId?: string }
+  const session = scopedSessionKey(query.session, query.siteId)
   const draft = getSessionDraft(session)
   const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
   return { slugs }
@@ -4928,9 +5813,10 @@ app.get("/generated-images/:fileName", async (request, reply) => {
 })
 
 app.get("/publish/content", async (request, reply) => {
-  const query = request.query as { session?: string }
-  const session = query.session ?? "dev"
-  const pages = getSessionPages(session)
+  const query = request.query as { session?: string; siteId?: string }
+  const session = normalizeSession(query.session)
+  const scopedSession = scopedSessionKey(session, query.siteId)
+  const pages = getSessionPages(scopedSession)
   return {
     session,
     slugs: pages.map((page) => page.slug),
@@ -4944,12 +5830,13 @@ app.post("/publish", async (request, reply) => {
     return reply.code(401).send({ error: "invalid publish token" })
   }
 
-  const body = (request.body ?? {}) as { session?: string }
-  const session = body.session ?? "dev"
+  const body = (request.body ?? {}) as { session?: string; siteId?: string }
+  const session = normalizeSession(body.session)
+  const scopedSession = scopedSessionKey(session, body.siteId)
   const publishMode = (process.env.PUBLISH_MODE?.trim().toLowerCase() || "deploy_hook") as "deploy_hook" | "git"
 
   if (publishMode === "git") {
-    const result = await publishViaGit(session)
+    const result = await publishViaGit(scopedSession)
     const tracker: PublishTracker = {
       session,
       status: result.status === "failed" ? "failed" : "triggered",
@@ -4960,12 +5847,12 @@ app.post("/publish", async (request, reply) => {
       deployResponse: "git_publish",
       deployStatus: result.status === "failed" ? 500 : 200
     }
-    publishStatusBySession.set(session, tracker)
+    publishStatusBySession.set(scopedSession, tracker)
 
     if (result.status === "failed") {
       return reply.code(400).send({
         status: "failed",
-        session: result.session,
+        session,
         slugs: result.slugs,
         reason: result.reason,
         details: result.details
@@ -4974,7 +5861,7 @@ app.post("/publish", async (request, reply) => {
 
     return {
       status: result.status,
-      session: result.session,
+      session,
       slugs: result.slugs,
       branch: result.branch,
       commitSha: result.commitSha,
@@ -4988,7 +5875,7 @@ app.post("/publish", async (request, reply) => {
     return reply.code(400).send({ error: "VERCEL_DEPLOY_HOOK_URL is not configured" })
   }
 
-  const pages = getSessionPages(session)
+  const pages = getSessionPages(scopedSession)
   const slugs = pages.map((page) => page.slug)
 
   try {
@@ -4997,7 +5884,7 @@ app.post("/publish", async (request, reply) => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         source: "orchestrator",
-        session,
+        session: scopedSession,
         slugs,
         publishedAt: new Date().toISOString()
       })
@@ -5028,7 +5915,7 @@ app.post("/publish", async (request, reply) => {
       deploymentId,
       vercelState
     }
-    publishStatusBySession.set(session, tracker)
+    publishStatusBySession.set(scopedSession, tracker)
 
     return {
       status: hookResponse.ok ? "triggered" : "failed",
@@ -5046,18 +5933,19 @@ app.post("/publish", async (request, reply) => {
 })
 
 app.get("/publish/status", async (request, reply) => {
-  const query = request.query as { session?: string }
-  const session = query.session ?? "dev"
-  const current = publishStatusBySession.get(session)
+  const query = request.query as { session?: string; siteId?: string }
+  const session = normalizeSession(query.session)
+  const scopedSession = scopedSessionKey(session, query.siteId)
+  const current = publishStatusBySession.get(scopedSession)
   if (!current) return reply.code(404).send({ error: "no publish status for session" })
   const refreshed = await refreshPublishStatusFromVercel(current)
-  publishStatusBySession.set(session, refreshed)
+  publishStatusBySession.set(scopedSession, refreshed)
   return refreshed
 })
 
 app.post("/ops", async (request, reply) => {
   const body = request.body as ApplyOpsRequestBody
-  const session = body.session ?? "dev"
+  const session = scopedSessionKey(body.session, body.siteId)
   const parsedOps = z.array(operationSchema).safeParse(body.ops)
   if (!parsedOps.success) return reply.code(400).send({ error: "invalid ops payload" })
   if (parsedOps.data.length === 0) return reply.code(400).send({ error: "ops must not be empty" })
@@ -5100,13 +5988,13 @@ app.post("/ops", async (request, reply) => {
 
 app.post("/chat", async (request, reply) => {
   const body = request.body as ChatRequestBody
-  const result = await runChatPipeline(body)
+  const result = await runChatPipeline({ ...body, session: scopedSessionKey(body.session, body.siteId) })
   return reply.code(result.code).send(result.payload)
 })
 
 app.post("/chat/variations", async (request, reply) => {
   const body = request.body as VariationRequestBody
-  const result = await runVariationPipeline(body)
+  const result = await runVariationPipeline({ ...body, session: scopedSessionKey(body.session, body.siteId) })
   return reply.code(result.code).send(result.payload)
 })
 
@@ -5176,8 +6064,73 @@ app.post("/audio/transcribe", async (request, reply) => {
   }
 })
 
+app.post("/image/interpret", async (request, reply) => {
+  if (!process.env.OPENAI_API_KEY) {
+    return reply.code(503).send({ error: "OPENAI_API_KEY is not configured" })
+  }
+
+  const inputFile = await request.file()
+  if (!inputFile) return reply.code(400).send({ error: "image file is required" })
+  if (inputFile.fieldname !== "image") return reply.code(400).send({ error: "image field must be named 'image'" })
+  if (!allowedImageAnalysisMimeTypes.has(inputFile.mimetype)) {
+    return reply.code(415).send({ error: `unsupported image type: ${inputFile.mimetype}` })
+  }
+
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+  for await (const chunk of inputFile.file) {
+    const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    totalBytes += data.byteLength
+    if (totalBytes > 10 * 1024 * 1024) {
+      return reply.code(413).send({ error: "image file is too large (max 10MB)" })
+    }
+    chunks.push(data)
+  }
+  if (totalBytes === 0) return reply.code(400).send({ error: "image file is empty" })
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const model = process.env.OPENAI_VISION_MODEL?.trim() || "gpt-4o"
+  const base64 = Buffer.concat(chunks).toString("base64")
+  const dataUrl = `data:${inputFile.mimetype};base64,${base64}`
+
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      ...openAIChatOptionsForModel(model),
+      messages: [
+        {
+          role: "system",
+          content:
+            "You interpret pasted screenshots for a website editing assistant. Return one concise sentence describing the most actionable visual/context clue the editor should know. No markdown."
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze this screenshot and provide concise context for a website edit instruction." },
+            { type: "image_url", image_url: { url: dataUrl } }
+          ]
+        }
+      ]
+    })
+
+    const text = (completion.choices[0]?.message?.content ?? "").trim()
+    if (!text) {
+      return reply.code(502).send({ error: "image interpretation failed", detail: "No text returned." })
+    }
+    return {
+      text,
+      model,
+      bytes: totalBytes,
+      mimeType: inputFile.mimetype
+    }
+  } catch (error) {
+    return reply.code(502).send({ error: "image interpretation failed", detail: toErrorDetail(error) })
+  }
+})
+
 app.get("/chat/stream", async (request, reply) => {
   const query = request.query as ChatRequestBody
+  const scopedQuery: ChatRequestBody = { ...query, session: scopedSessionKey(query.session, query.siteId) }
   const origin = request.headers.origin ?? "*"
 
   reply.raw.setHeader("Content-Type", "text/event-stream")
@@ -5189,7 +6142,7 @@ app.get("/chat/stream", async (request, reply) => {
 
   reply.raw.write("retry: 60000\n\n")
   sseWrite(reply, { type: "status", message: "Crafting your update..." })
-  const result = await runChatPipeline(query, {
+  const result = await runChatPipeline(scopedQuery, {
     onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token }),
     onOpApplied: (event) =>
       // The editor consumes op_applied as patch-transport input for incremental preview updates.
@@ -5214,15 +6167,16 @@ app.get("/chat/stream", async (request, reply) => {
 })
 
 app.post("/history/undo", async (request, reply) => {
-  const body = request.body as { session?: string; slug?: string }
+  const body = request.body as { session?: string; siteId?: string; slug?: string }
   if (!body.session || !body.slug) return reply.code(400).send({ error: "session and slug are required" })
+  const session = scopedSessionKey(body.session, body.siteId)
 
-  const undoMap = getHistoryMap(historyUndo, body.session)
-  const redoMap = getHistoryMap(historyRedo, body.session)
+  const undoMap = getHistoryMap(historyUndo, session)
+  const redoMap = getHistoryMap(historyRedo, session)
   const list = undoMap.get(body.slug) ?? []
   if (list.length === 0) return reply.code(400).send({ error: "nothing to undo" })
 
-  const current = getPage(body.session, body.slug)
+  const current = getPage(session, body.slug)
   if (!current) return reply.code(404).send({ error: "page not found" })
 
   const prev = list.pop()
@@ -5233,22 +6187,23 @@ app.post("/history/undo", async (request, reply) => {
   redoList.push(structuredClone(current))
   redoMap.set(body.slug, redoList)
 
-  setPage(body.session, structuredClone(prev))
-  const previewVersion = bumpVersion(body.session)
+  setPage(session, structuredClone(prev))
+  const previewVersion = bumpVersion(session)
   schedulePersistState()
   return { status: "applied", previewVersion }
 })
 
 app.post("/history/redo", async (request, reply) => {
-  const body = request.body as { session?: string; slug?: string }
+  const body = request.body as { session?: string; siteId?: string; slug?: string }
   if (!body.session || !body.slug) return reply.code(400).send({ error: "session and slug are required" })
+  const session = scopedSessionKey(body.session, body.siteId)
 
-  const undoMap = getHistoryMap(historyUndo, body.session)
-  const redoMap = getHistoryMap(historyRedo, body.session)
+  const undoMap = getHistoryMap(historyUndo, session)
+  const redoMap = getHistoryMap(historyRedo, session)
   const list = redoMap.get(body.slug) ?? []
   if (list.length === 0) return reply.code(400).send({ error: "nothing to redo" })
 
-  const current = getPage(body.session, body.slug)
+  const current = getPage(session, body.slug)
   if (!current) return reply.code(404).send({ error: "page not found" })
 
   const next = list.pop()
@@ -5259,8 +6214,8 @@ app.post("/history/redo", async (request, reply) => {
   undoList.push(structuredClone(current))
   undoMap.set(body.slug, undoList)
 
-  setPage(body.session, structuredClone(next))
-  const previewVersion = bumpVersion(body.session)
+  setPage(session, structuredClone(next))
+  const previewVersion = bumpVersion(session)
   schedulePersistState()
   return { status: "applied", previewVersion }
 })
@@ -5270,6 +6225,103 @@ app.get("/status/planner", async () => ({
   plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo",
   unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
 }))
+app.get("/telemetry/chat", async (request) => {
+  const query = request.query as { limit?: string; outcome?: string; phase?: string; session?: string }
+  const limitRaw = Number(query.limit ?? 100)
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 1000) : 100
+  let rows = chatTelemetryBuffer
+  if (query.outcome) rows = rows.filter((row) => row.outcome === query.outcome)
+  if (query.phase) rows = rows.filter((row) => row.phase === query.phase)
+  if (query.session) rows = rows.filter((row) => row.session === query.session)
+
+  const recent = rows.slice(Math.max(0, rows.length - limit))
+  const byOutcome: Record<string, number> = {}
+  const byReasonCategory: Record<string, number> = {}
+  for (const row of recent) {
+    if (row.outcome) byOutcome[row.outcome] = (byOutcome[row.outcome] ?? 0) + 1
+    if (row.reasonCategory) byReasonCategory[row.reasonCategory] = (byReasonCategory[row.reasonCategory] ?? 0) + 1
+  }
+
+  return {
+    totalBuffered: chatTelemetryBuffer.length,
+    returned: recent.length,
+    byOutcome,
+    byReasonCategory,
+    rows: recent
+  }
+})
+app.get("/telemetry/chat/review", async (request) => {
+  const query = request.query as { limit?: string; session?: string }
+  const limitRaw = Number(query.limit ?? 300)
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 2000) : 300
+  let rows = chatTelemetryBuffer
+  if (query.session) rows = rows.filter((row) => row.session === query.session)
+  const recent = rows.slice(Math.max(0, rows.length - limit))
+
+  const failureOutcomes = new Set([
+    "guardrail_failure",
+    "apply_failed",
+    "repair_failed",
+    "planner_exception",
+    "planning_exhausted",
+    "planning_missing"
+  ])
+  const failures = recent.filter((row) => row.phase === "result" && row.outcome && failureOutcomes.has(row.outcome))
+  const success = recent.filter((row) => row.phase === "result" && row.outcome === "applied")
+
+  const failureByReasonCategory: Record<string, number> = {}
+  const failureByOutcome: Record<string, number> = {}
+  const byPromptHash = new Map<
+    string,
+    { promptExcerpt: string; count: number; outcomes: Record<string, number>; reasonCategories: Record<string, number>; lastAt: string }
+  >()
+
+  for (const row of failures) {
+    if (row.reasonCategory) failureByReasonCategory[row.reasonCategory] = (failureByReasonCategory[row.reasonCategory] ?? 0) + 1
+    if (row.outcome) failureByOutcome[row.outcome] = (failureByOutcome[row.outcome] ?? 0) + 1
+    const current =
+      byPromptHash.get(row.promptHash) ??
+      { promptExcerpt: row.promptExcerpt, count: 0, outcomes: {}, reasonCategories: {}, lastAt: row.at }
+    current.count += 1
+    if (row.outcome) current.outcomes[row.outcome] = (current.outcomes[row.outcome] ?? 0) + 1
+    if (row.reasonCategory) current.reasonCategories[row.reasonCategory] = (current.reasonCategories[row.reasonCategory] ?? 0) + 1
+    if (row.at > current.lastAt) current.lastAt = row.at
+    byPromptHash.set(row.promptHash, current)
+  }
+
+  const topFailedPrompts = Array.from(byPromptHash.entries())
+    .map(([promptHash, value]) => ({ promptHash, ...value }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12)
+
+  const recommendations: string[] = []
+  if ((failureByReasonCategory.schema_violation ?? 0) > 0) {
+    recommendations.push("Schema violations are frequent: add stricter pre-apply normalization for missing required fields and alias keys.")
+  }
+  if ((failureByReasonCategory.not_found ?? 0) > 0) {
+    recommendations.push("Not-found failures detected: improve slug/block resolution using active selection and current page context.")
+  }
+  if ((failureByReasonCategory.ambiguity ?? 0) > 0) {
+    recommendations.push("Ambiguity is high: improve follow-up question templates with explicit selectable options.")
+  }
+  if ((failureByOutcome.planning_exhausted ?? 0) > 0) {
+    recommendations.push("Planner retries are exhausting: add deterministic fallback plans for the top failed prompt families.")
+  }
+  if (recommendations.length === 0) {
+    recommendations.push("No dominant failure mode detected in this sample. Review top failed prompts and add targeted tests for each.")
+  }
+
+  return {
+    analyzed: recent.length,
+    appliedCount: success.length,
+    failedCount: failures.length,
+    failureRate: recent.length > 0 ? Number((failures.length / recent.length).toFixed(4)) : 0,
+    failureByOutcome,
+    failureByReasonCategory,
+    topFailedPrompts,
+    recommendations
+  }
+})
 app.get("/favicon.ico", async (_request, reply) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="14" fill="#0f172a"/>
@@ -5283,7 +6335,24 @@ app.get("/favicon.ico", async (_request, reply) => {
     .send(svg)
 })
 
-const port = Number(process.env.PORT ?? 4200)
-await loadStateFromDisk()
-await app.listen({ port, host: "0.0.0.0" })
-app.log.info(`Orchestrator listening on ${port}`)
+async function startServer() {
+  const port = Number(process.env.PORT ?? 4200)
+  await loadStateFromDisk()
+  await loadTelemetryFromDisk()
+  await app.listen({ port, host: "0.0.0.0" })
+  app.log.info(`Orchestrator listening on ${port}`)
+}
+
+if (process.env.NODE_ENV !== "test") {
+  await startServer()
+}
+
+export {
+  app,
+  parseCreatePageRequest,
+  buildCreatePagePlan,
+  isLikelyClarificationFollowUp,
+  plannerMessageWithPendingContext,
+  normalizePlanCandidate,
+  compileDeterministicPlan
+}
