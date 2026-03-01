@@ -149,6 +149,14 @@ type SiteConfig = {
   hosting: string
 }
 
+type RestoreSnapshot = {
+  commit: string
+  committedAt: string
+  message: string
+  pageCount: number
+  homeHeading: string
+}
+
 const SITE_LIST_STORAGE_KEY = "editor-site-list-v1"
 const DEFAULT_SITE_HOSTING = "Vercel production site (single shared project)"
 const LEGACY_AVOCADO_SITE_ID = "avocado-stories"
@@ -519,6 +527,13 @@ export function App() {
   const [newSiteHosting, setNewSiteHosting] = useState(DEFAULT_SITE_HOSTING)
   const [showSiteModal, setShowSiteModal] = useState(false)
   const [configSiteId, setConfigSiteId] = useState<string | null>(null)
+  const [restoreSiteId, setRestoreSiteId] = useState<string | null>(null)
+  const [restoreOptions, setRestoreOptions] = useState<RestoreSnapshot[]>([])
+  const [restoreCommit, setRestoreCommit] = useState("")
+  const [isLoadingRestoreOptions, setIsLoadingRestoreOptions] = useState(false)
+  const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
+  const [siteTileRefreshToken, setSiteTileRefreshToken] = useState(0)
   const [slug, setSlug] = useState("/")
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
   const [isLoadingSlugs, setIsLoadingSlugs] = useState(false)
@@ -596,6 +611,62 @@ export function App() {
     const url = new URL("/", window.location.origin)
     url.searchParams.set("siteId", targetSiteId)
     window.location.href = url.toString()
+  }
+
+  const openRestoreModal = async (targetSiteId: string) => {
+    setRestoreSiteId(targetSiteId)
+    setRestoreError(null)
+    setIsLoadingRestoreOptions(true)
+    setRestoreOptions([])
+    setRestoreCommit("")
+    try {
+      const res = await fetch(`${orchestrator}/restore/snapshots?limit=30`)
+      const data = (await res.json()) as { snapshots?: RestoreSnapshot[]; error?: string }
+      if (!res.ok) {
+        setRestoreError(data.error ?? "Failed to load snapshots.")
+        return
+      }
+      const options = Array.isArray(data.snapshots) ? data.snapshots : []
+      setRestoreOptions(options)
+      setRestoreCommit(options[0]?.commit ?? "")
+      if (options.length === 0) {
+        setRestoreError("No snapshots available yet.")
+      }
+    } catch {
+      setRestoreError("Failed to load snapshots.")
+    } finally {
+      setIsLoadingRestoreOptions(false)
+    }
+  }
+
+  const restoreSnapshotForSite = async () => {
+    if (!restoreSiteId || !restoreCommit) return
+    setRestoreError(null)
+    setIsRestoringSnapshot(true)
+    try {
+      const res = await fetch(`${orchestrator}/restore/snapshot`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          commit: restoreCommit,
+          session,
+          siteId: restoreSiteId
+        })
+      })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) {
+        setRestoreError(data.error ?? "Failed to restore snapshot.")
+        return
+      }
+      setSiteTileRefreshToken((prev) => prev + 1)
+      setRestoreSiteId(null)
+      setRestoreCommit("")
+      setRestoreOptions([])
+    } catch {
+      setRestoreError("Failed to restore snapshot.")
+    } finally {
+      setIsRestoringSnapshot(false)
+    }
   }
 
   const addSiteFromName = () => {
@@ -682,6 +753,7 @@ export function App() {
             previewSrc.searchParams.set("siteId", site.id)
             previewSrc.searchParams.set("siteName", site.name)
             previewSrc.searchParams.set("__tile", "1")
+            previewSrc.searchParams.set("__refresh", String(siteTileRefreshToken))
             return (
               <article key={site.id} className="site-tile">
                 <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc.toString()} />
@@ -696,6 +768,9 @@ export function App() {
                         <circle cx="10" cy="10" r="2.4" />
                       </svg>
                       <span>Config</span>
+                    </button>
+                    <button type="button" className="secondary-btn site-config-btn" onClick={() => void openRestoreModal(site.id)} aria-label={`Restore snapshot for ${site.name}`}>
+                      <span>Restore snapshot</span>
                     </button>
                     <button type="button" className="primary-btn" onClick={() => openEditorForSite(site.id)}>
                       <span>Open editor</span>
@@ -782,6 +857,50 @@ export function App() {
               <footer className="sites-modal-footer">
                 <button type="button" className="primary-btn" onClick={() => setConfigSiteId(null)}>
                   Done
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+        {restoreSiteId ? (
+          <div className="sites-modal-backdrop" onClick={() => setRestoreSiteId(null)}>
+            <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Restore snapshot" onClick={(event) => event.stopPropagation()}>
+              <header className="sites-modal-header">
+                <h2>Restore Snapshot</h2>
+                <button type="button" className="settings-close-btn" onClick={() => setRestoreSiteId(null)} aria-label="Close">
+                  ×
+                </button>
+              </header>
+              <div className="sites-modal-body">
+                <p className="site-purpose">Restore a previous published snapshot into <strong>{restoreSiteId}</strong>.</p>
+                <select
+                  value={restoreCommit}
+                  onChange={(event) => setRestoreCommit(event.target.value)}
+                  disabled={isLoadingRestoreOptions || isRestoringSnapshot || restoreOptions.length === 0}
+                >
+                  {restoreOptions.map((option) => {
+                    const dateLabel = new Date(option.committedAt).toLocaleString()
+                    const label = `${option.commit} · ${option.pageCount} pages · ${option.homeHeading} · ${dateLabel}`
+                    return (
+                      <option key={option.commit} value={option.commit}>
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
+                {restoreError ? <p className="site-purpose">{restoreError}</p> : null}
+              </div>
+              <footer className="sites-modal-footer">
+                <button type="button" className="secondary-btn" onClick={() => setRestoreSiteId(null)} disabled={isRestoringSnapshot}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={() => void restoreSnapshotForSite()}
+                  disabled={isLoadingRestoreOptions || isRestoringSnapshot || !restoreCommit}
+                >
+                  {isRestoringSnapshot ? "Restoring..." : "Restore"}
                 </button>
               </footer>
             </section>
