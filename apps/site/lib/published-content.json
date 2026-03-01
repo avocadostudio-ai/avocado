@@ -3,31 +3,29 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-26T23:05:35.032Z",
+    "updatedAt": "2026-02-27T21:55:11.715Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Embark on an Avocado Odyssey",
-          "subheading": "Join us in discovering the taste and health wonders of avocados.",
-          "ctaText": "Start Your Journey",
-          "ctaHref": "/discover",
+          "heading": "Discover the Magic of Avocados 🥑",
+          "subheading": "Experience the vibrant taste and health benefits of our avocados — a delightful addition to any dish.",
+          "ctaText": "Get Started",
+          "ctaHref": "/",
           "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
-          "imageAlt": "Juicy avocado on display",
-          "secondaryCtaText": "Learn More",
-          "secondaryCtaHref": "/learn-more"
+          "imageAlt": "Close-up of avocados in natural light"
         }
       },
       {
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Discover the Benefits of Avocados",
+          "title": "Sustainable Avocado Adventures",
           "cards": [
             {
               "title": "🥑 Avocado Culinary Delights",
-              "description": "Discover new culinary applications for avocados.",
+              "description": "Uncover new culinary uses for avocados.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary"
             },
@@ -39,7 +37,7 @@
             },
             {
               "title": "🥑 Avocado Sustainability",
-              "description": "Learn about sustainable avocado farming methods.",
+              "description": "Learn about sustainable avocado farming practices.",
               "ctaText": "Learn More",
               "ctaHref": "/avocado-sustainability"
             }
@@ -57,7 +55,7 @@
               "author": "Emily Avocado"
             },
             {
-              "quote": "From breakfast to dinner, avocados are my go-to ingredient. 🥑 They add a touch of luxury to every dish.",
+              "quote": "Avocados are my culinary secret weapon from morning to night. 🥑 They bring a luxurious touch to every meal.",
               "author": "Michael Green"
             },
             {
@@ -72,7 +70,7 @@
         "type": "RichText",
         "props": {
           "title": "Discover the Magic of Avocados",
-          "body": "Avocados are not only **delicious**, but also rich in essential **nutrients**. 🥑 They are a rich source of vitamins **C**, **E**, **K**, and **B-6**, as well as riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium. Additionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. 🥑\n\nBesides their nutritional properties, avocados are incredibly **versatile** in the kitchen. 🥑 They can enhance salads, smoothies, and even serve as a butter substitute in baking. Their creamy texture and mild flavor make them a favorite for both chefs and home cooks. 🥑\n\nMoreover, avocados are known for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of cardiovascular diseases. 🥑"
+          "body": "# Nutritional Benefits of Avocados\n\nAvocados are not only delicious but also packed with essential nutrients. 🥑 They are a rich source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n# Heart-Healthy Fats\n\nAdditionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. Moreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease.\n\n# Enjoy Avocados Today\n\nEnjoy the magic of avocados in your meals today!"
         }
       },
       {
@@ -222,18 +220,18 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-03-01T07:14:34.617Z",
+    "updatedAt": "2026-02-26T22:40:07.960Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
         "type": "Hero",
         "props": {
-          "heading": "Citrus Adventure",
-          "subheading": "Dive into the zesty world of citrus fruits.",
+          "heading": "Citrus Bliss",
+          "subheading": "Discover the vibrant world of citrus fruits.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "https://images.unsplash.com/photo-1714837957161-109188fa3647?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxvcmFuZ2VzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBraXRjaGVuJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMzQ5MjYzfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Oranges on an adventurous background"
+          "imageUrl": "https://images.unsplash.com/photo-1657746430182-d08f11b013fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2VzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTQ1MjIwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Oranges on a blue background"
         }
       },
       {
@@ -317,7 +315,7 @@
     "id": "p_cherries",
     "slug": "/cherries",
     "title": "Cherries",
-    "updatedAt": "2026-02-26T23:56:48.311Z",
+    "updatedAt": "2026-02-27T23:24:35.403Z",
     "blocks": [
       {
         "id": "b_hero_1772137257073",
@@ -327,8 +325,10 @@
           "subheading": "Explore the sweet and tart flavors of our premium cherries. Perfect for desserts, snacks, and more.",
           "ctaText": "Learn More",
           "ctaHref": "/cherries",
-          "imageUrl": "https://images.unsplash.com/photo-1646794768981-f83a366e6504?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjaGVycmllcyUyMGRpZmZlcmVudCUyMGJhY2tncm91bmRzJTIwd29vZCUyMHRhYmxlJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTUwMTM2fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "a group of apples sitting on top of a table"
+          "imageUrl": "http://localhost:4200/generated-images/var_1772234675399_j8psne.png",
+          "imageAlt": "Photorealistic pair of cherries on a bright yellow background",
+          "secondaryCtaText": "Shop Now",
+          "secondaryCtaHref": "/shop-cherries"
         }
       },
       {
@@ -366,6 +366,63 @@
         "props": {
           "title": "Vitamins in Cherries",
           "body": "**Cherries are a great source of essential vitamins, providing a delicious way to meet your daily nutritional needs.** They contain **vitamin C**, which is important for the growth and repair of tissues in the body, helping to maintain healthy skin and a strong immune system.\n\nAdditionally, cherries provide **vitamin A**, which supports vision and immune function, ensuring that your eyes remain healthy and your body can effectively fight off infections. Including cherries in your diet can help you meet your daily vitamin needs while enjoying a delicious fruit that is both sweet and nutritious."
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_about_lemons",
+    "slug": "/about-lemons",
+    "title": "About Lemons",
+    "updatedAt": "2026-02-27T23:31:28.707Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772150570555",
+        "type": "Hero",
+        "props": {
+          "heading": "Explore the Benefits of Lemons",
+          "subheading": "Discover Health and Culinary Uses",
+          "ctaText": "Find Out More",
+          "ctaHref": "/about-lemons",
+          "imageUrl": "http://localhost:4200/generated-images/var_1772235088704_kepgwc.png",
+          "imageAlt": "Lemon on a blue background",
+          "secondaryCtaText": "Learn More",
+          "secondaryCtaHref": "/lemons-benefits"
+        }
+      },
+      {
+        "id": "b_richtext_1772228488636",
+        "type": "RichText",
+        "props": {
+          "title": "The Zesty World of Lemons",
+          "body": "🍋 **When life gives you lemons, make lemonade!** 🍋\n\nLemons are not just a fruit; they are a way of life. Embrace the zest and enjoy the tangy goodness!\n\n## Health Benefits of Lemons\n\nLemons are rich in vitamin C and have numerous health benefits. They can boost your immune system, improve skin quality, and aid digestion. Including lemons in your diet can lead to a healthier lifestyle.\n\n## Culinary Uses of Lemons\n\nLemons add a refreshing flavor to dishes and drinks. From lemon chicken to lemonade, their versatility is unmatched. Discover how lemons can enhance your culinary creations.\n\nExplore the zesty world of lemons and discover their many uses and benefits!"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772228568669",
+        "type": "CardGrid",
+        "props": {
+          "title": "Interesting Lemon Facts",
+          "cards": [
+            {
+              "title": "Health Benefits",
+              "description": "Lemons are rich in vitamin C and antioxidants.",
+              "ctaText": "Learn More",
+              "ctaHref": "/lemons-health-benefits"
+            },
+            {
+              "title": "Culinary Uses",
+              "description": "Lemons add flavor to dishes and drinks.",
+              "ctaText": "Explore Recipes",
+              "ctaHref": "/lemons-recipes"
+            },
+            {
+              "title": "Lemon Varieties",
+              "description": "Discover different types of lemons around the world.",
+              "ctaText": "See Varieties",
+              "ctaHref": "/lemons-varieties"
+            }
+          ]
         }
       }
     ]
