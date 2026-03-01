@@ -78,8 +78,13 @@ export function useChatEngine(config: ChatEngineConfig) {
     {
       id: "welcome",
       role: "assistant",
-      text: "Ask for any website change. Simple edits apply immediately; complex requests pause for plan approval with a stop option.",
-      status: "ready"
+      text: "I can add sections, edit text, rearrange blocks, create new pages, and more. Click anything in the preview or describe what you'd like to change.",
+      suggestions: [
+        "Add testimonials below hero",
+        "Change the hero headline",
+        "Create a new /about page",
+        "Add a FAQ section"
+      ]
     }
   ])
   const [isLoading, setIsLoading] = useState(false)

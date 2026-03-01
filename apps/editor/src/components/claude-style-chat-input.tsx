@@ -45,13 +45,54 @@ export default function ClaudeStyleChatInput(props: Props) {
     const shell = shellRef.current
     if (!textarea || !shell) return
 
-    const maxTextareaHeight = 220
+    // Temporarily remove height constraints so we can measure natural content height
     textarea.style.height = "auto"
-    const target = Math.min(maxTextareaHeight, Math.max(24, textarea.scrollHeight))
-    textarea.style.height = `${target}px`
-    textarea.style.overflowY = textarea.scrollHeight > maxTextareaHeight ? "auto" : "hidden"
+    textarea.style.overflowY = "hidden"
+    const naturalHeight = textarea.scrollHeight
 
-    onAutoHeightChange(shell.scrollHeight)
+    // Compute available space inside the shell for the textarea:
+    // shell height minus padding, gap, and actions row
+    const shellStyle = getComputedStyle(shell)
+    const shellPaddingTop = parseFloat(shellStyle.paddingTop) || 0
+    const shellPaddingBottom = parseFloat(shellStyle.paddingBottom) || 0
+    const shellGap = parseFloat(shellStyle.gap) || 0
+
+    // Measure the actions row height
+    const actionsEl = shell.querySelector(".composer-actions") as HTMLElement | null
+    const actionsHeight = actionsEl ? actionsEl.offsetHeight : 38
+
+    // Measure any status notes below the textarea inside composer-input-area
+    const inputArea = shell.querySelector(".composer-input-area") as HTMLElement | null
+    let notesHeight = 0
+    if (inputArea) {
+      const inputAreaGap = parseFloat(getComputedStyle(inputArea).gap) || 0
+      for (const child of inputArea.children) {
+        if (child !== textarea) {
+          notesHeight += (child as HTMLElement).offsetHeight + inputAreaGap
+        }
+      }
+    }
+
+    // Hard cap on textarea growth (absolute max before scrolling)
+    const maxTextareaHeight = 220
+    const target = Math.min(maxTextareaHeight, Math.max(24, naturalHeight))
+    textarea.style.height = `${target}px`
+    // Enable scrolling when content exceeds the capped height.
+    // Also handles the case where flex-shrink compresses the textarea below target.
+    textarea.style.overflowY = naturalHeight > target ? "auto" : "hidden"
+
+    // Report the ideal total height to the parent so the grid row can grow.
+    // Include the shell's border and the .composer wrapper's own vertical padding.
+    const shellBorderV = (parseFloat(shellStyle.borderTopWidth) || 0) + (parseFloat(shellStyle.borderBottomWidth) || 0)
+
+    const composerWrapper = shell.parentElement
+    let wrapperPaddingV = 28 // fallback: 14px top + 14px bottom
+    if (composerWrapper) {
+      const ws = getComputedStyle(composerWrapper)
+      wrapperPaddingV = (parseFloat(ws.paddingTop) || 0) + (parseFloat(ws.paddingBottom) || 0)
+    }
+    const idealHeight = shellPaddingTop + shellPaddingBottom + shellBorderV + target + notesHeight + shellGap + actionsHeight + wrapperPaddingV
+    onAutoHeightChange(idealHeight)
   }
 
   useEffect(() => {
@@ -201,7 +242,7 @@ export default function ClaudeStyleChatInput(props: Props) {
   const canSubmit = !isLoading && !micBusy && !isAnalyzingImage && message.trim().length > 0
 
   return (
-    <div className="composer-shell" ref={shellRef}>
+    <div className={`composer-shell${isLoading ? " is-loading" : ""}`} ref={shellRef}>
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}

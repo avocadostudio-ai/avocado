@@ -64,10 +64,11 @@ body {
   gap: 10px;
 }
 
-.chat-header-top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+.chat-header-site-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
 }
 
 .chat-header-actions {
@@ -251,6 +252,7 @@ textarea {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 30%);
 }
@@ -465,27 +467,33 @@ textarea {
 }
 
 .streaming-pill {
-  align-self: flex-start;
-  display: inline-flex;
+  align-self: stretch;
+  display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 8px;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 12px;
   font-weight: 600;
 }
 
 .streaming-pill.is-active {
-  color: #1f3348;
-  background: #eef3f8;
-  border: 1px solid #c9d3df;
-  box-shadow: 0 1px 3px rgba(51, 65, 85, 0.08);
+  color: #054844;
+  background: #dff6f3;
+  border: 1px solid #67c9bf;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.1);
+  animation: streaming-pulse 2s ease-in-out infinite;
 }
 
 .streaming-pill.is-error {
   color: #7f1d1d;
   background: #fee2e2;
   border: 1px solid #fca5a5;
+}
+
+@keyframes streaming-pulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(15, 118, 110, 0.1); }
+  50% { box-shadow: 0 2px 12px rgba(15, 118, 110, 0.22); }
 }
 
 .streaming-pill-title {
@@ -497,10 +505,10 @@ textarea {
 }
 
 .streaming-pill-sparkle {
-  color: #d97706;
-  font-size: 13px;
+  color: #0f766e;
+  font-size: 14px;
   line-height: 1;
-  text-shadow: 0 0 4px rgba(217, 119, 6, 0.35);
+  text-shadow: 0 0 4px rgba(15, 118, 110, 0.35);
 }
 
 .streaming-pill-status {
@@ -548,7 +556,7 @@ textarea {
   padding: 14px 12px 14px;
   background: var(--panel);
   display: block;
-  overflow: hidden;
+  overflow: visible;
   min-height: 0;
 }
 
@@ -563,6 +571,30 @@ textarea {
   flex-direction: column;
   min-height: 0;
   gap: 10px;
+  overflow: hidden;
+  transition: border-color 200ms ease;
+}
+
+.composer-shell.is-loading {
+  border-color: #67c9bf;
+}
+
+.composer-shell.is-loading::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, #0f766e, transparent);
+  animation: composer-loading-bar 1.5s ease-in-out infinite;
+}
+
+@keyframes composer-loading-bar {
+  0% { transform: translateX(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
 }
 
 .composer-input-area {
@@ -570,7 +602,7 @@ textarea {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding-right: 2px;
   gap: 10px;
 }
@@ -578,8 +610,8 @@ textarea {
 .composer textarea {
   width: 100%;
   height: auto;
-  max-height: 220px;
   min-height: 24px;
+  flex: 1 1 auto;
   resize: none;
   overflow-y: hidden;
   font-size: 14px;
@@ -653,8 +685,8 @@ textarea {
 }
 
 .composer-ghost-btn.is-active {
-  background: #d97f55;
-  color: #0b0f14;
+  background: #0f766e;
+  color: #fff;
 }
 
 .composer-ghost-btn:focus-visible {
@@ -734,13 +766,13 @@ textarea {
   height: 34px;
   border-radius: 10px;
   border: 0;
-  background: #d97f55;
-  color: #0b0f14;
+  background: #0f766e;
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(180, 102, 69, 0.2);
+  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.25);
 }
 
 .composer-send-btn svg {
@@ -1509,10 +1541,6 @@ textarea {
   .chat-header-controls {
     align-items: center;
     flex-wrap: nowrap;
-  }
-
-  .chat-header-top {
-    justify-content: space-between;
   }
 
   .chat-header-slug {

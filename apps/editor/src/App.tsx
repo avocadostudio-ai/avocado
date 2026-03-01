@@ -299,8 +299,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     <div className="layout">
       <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
-          <div className="chat-header-top">
-          </div>
+          <div className="chat-header-site-name">{activeSiteConfig.name}</div>
           <div className="chat-header-controls">
             <label className="chat-header-slug">
               <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
