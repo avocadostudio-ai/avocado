@@ -151,6 +151,23 @@ type SiteConfig = {
 
 const SITE_LIST_STORAGE_KEY = "editor-site-list-v1"
 const DEFAULT_SITE_HOSTING = "Vercel production site (single shared project)"
+const LEGACY_AVOCADO_SITE_ID = "avocado-stories"
+const LEGACY_AVOCADO_SITE_NAME = "Avocado Stories"
+const LEGACY_AVOCADO_SITE_PURPOSE = "Marketing site for Avocado Stories products, recipes, and sustainability messaging."
+const AUTO_SITE_PRESETS: SiteConfig[] = [
+  {
+    id: "avocado-magic",
+    name: "Avocado Magic",
+    purpose: "Restored site snapshot: Discover the Magic of Avocados.",
+    hosting: DEFAULT_SITE_HOSTING
+  },
+  {
+    id: "avocado-odyssey",
+    name: "Avocado Odyssey",
+    purpose: "Restored site snapshot: Embark on an Avocado Odyssey.",
+    hosting: DEFAULT_SITE_HOSTING
+  }
+]
 
 function sanitizeSiteId(value: string) {
   return value
@@ -202,10 +219,33 @@ function loadSiteListFromStorage(siteId: string) {
         hosting: typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
-    if (cleaned.length > 0) return cleaned
-    return defaultSiteList(siteId)
+    const mergePresets = (list: SiteConfig[]) => {
+      const existingIds = new Set(list.map((site) => site.id))
+      const merged = [...list]
+      for (const preset of AUTO_SITE_PRESETS) {
+        if (existingIds.has(preset.id)) continue
+        merged.push(preset)
+      }
+      return merged
+    }
+
+    if (cleaned.length > 0) {
+      if (cleaned.length > 1) {
+        const migrated = cleaned.filter((site) => {
+          const isLegacyAvocado =
+            site.id === LEGACY_AVOCADO_SITE_ID &&
+            site.name === LEGACY_AVOCADO_SITE_NAME &&
+            (site.purpose === "" || site.purpose === LEGACY_AVOCADO_SITE_PURPOSE) &&
+            site.hosting === DEFAULT_SITE_HOSTING
+          return !isLegacyAvocado
+        })
+        if (migrated.length > 0) return mergePresets(migrated)
+      }
+      return mergePresets(cleaned)
+    }
+    return mergePresets(defaultSiteList(siteId))
   } catch {
-    return defaultSiteList(siteId)
+    return [...defaultSiteList(siteId), ...AUTO_SITE_PRESETS]
   }
 }
 
@@ -606,7 +646,13 @@ export function App() {
   }
 
   if (isSitesPage) {
-    const dedupedSites = siteList.filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
+    const dedupedSites = siteList
+      .filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
+      .sort((a, b) => {
+        const aLegacy = a.id === LEGACY_AVOCADO_SITE_ID ? 1 : 0
+        const bLegacy = b.id === LEGACY_AVOCADO_SITE_ID ? 1 : 0
+        return aLegacy - bLegacy
+      })
     return (
       <main className="sites-page">
         <header className="sites-header">
