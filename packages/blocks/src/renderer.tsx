@@ -64,8 +64,15 @@ function renderRichTextBlock(block: string, idx: number) {
 
   if (lines.length === 0) return null
 
-  if (lines.length === 1 && /^#{1,3}\s+/.test(lines[0])) {
-    return <h3 key={idx}>{renderInline(lines[0].replace(/^#{1,3}\s+/, ""))}</h3>
+  const headingMatch = /^(#{1,6})\s+(.+)$/.exec(lines[0])
+  if (headingMatch) {
+    const heading = <h3 key={`${idx}-heading`}>{renderInline(headingMatch[2].trim())}</h3>
+    const remainder = lines.slice(1).join(" ").trim()
+    if (!remainder) return heading
+    return [
+      heading,
+      <p key={`${idx}-paragraph`}>{renderInline(remainder)}</p>
+    ]
   }
 
   const unorderedItems = lines
