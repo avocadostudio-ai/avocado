@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
+import { COMPLEX_TASK_HEURISTICS } from "./config/complex-task-heuristics"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
 import type { BlockInstance, ApplyPatchMessage, PatchAckMessage, Operation } from "@ai-site-editor/shared"
 
@@ -284,13 +285,15 @@ function isComplexTaskRequest(message: string) {
   const trimmed = message.trim()
   if (trimmed.length === 0) return false
   const lower = trimmed.toLowerCase()
-  const actionMatches = (lower.match(/\b(add|remove|delete|replace|move|duplicate|rename|create|rewrite|update|change|reorder|insert)\b/g) ?? []).length
-  const connectorMatches = (lower.match(/\b(and|then|also|after|before|while|plus)\b/g) ?? []).length
+  const actionPattern = new RegExp(`\\b(${COMPLEX_TASK_HEURISTICS.actionKeywords.join("|")})\\b`, "g")
+  const connectorPattern = new RegExp(`\\b(${COMPLEX_TASK_HEURISTICS.connectorKeywords.join("|")})\\b`, "g")
+  const actionMatches = (lower.match(actionPattern) ?? []).length
+  const connectorMatches = (lower.match(connectorPattern) ?? []).length
   const clauseMatches = (trimmed.match(/[,.!?;]/g) ?? []).length
-  if (trimmed.length >= 180) return true
-  if (actionMatches >= 2 && connectorMatches >= 1) return true
-  if (actionMatches >= 3) return true
-  return actionMatches >= 2 && clauseMatches >= 2
+  if (trimmed.length >= COMPLEX_TASK_HEURISTICS.minCharsForComplex) return true
+  if (actionMatches >= COMPLEX_TASK_HEURISTICS.minActionsWithConnector && connectorMatches >= COMPLEX_TASK_HEURISTICS.minConnectorsForActionRule) return true
+  if (actionMatches >= COMPLEX_TASK_HEURISTICS.minActionsAny) return true
+  return actionMatches >= COMPLEX_TASK_HEURISTICS.minActionsWithClauses && clauseMatches >= COMPLEX_TASK_HEURISTICS.minClausesForActionRule
 }
 
 function mergedVariationProps(baseProps: Record<string, unknown>, patch: Record<string, unknown>) {
