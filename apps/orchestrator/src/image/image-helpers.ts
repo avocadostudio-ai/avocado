@@ -174,6 +174,8 @@ export function buildVariationImagePrompt(args: {
   intent: VariationImageIntent
   blockType: string
   variationIndex: number
+  sectionContext?: string
+  pageContext?: string
 }): string {
   const fallbackBackgrounds = [
     "clean neutral studio gradient",
@@ -188,9 +190,13 @@ export function buildVariationImagePrompt(args: {
   const subject = args.intent.baseQuery || `${args.blockType} hero visual`
   const style = args.intent.styleTerms.length > 0 ? args.intent.styleTerms.join(", ") : "natural product photography"
 
-  return [
+  const lines = [
     "Use case: precise-object-edit",
-    `Asset type: website ${args.blockType} image`,
+    `Asset type: website ${args.blockType} image`
+  ]
+  if (args.pageContext) lines.push(`Page: ${args.pageContext}`)
+  if (args.sectionContext) lines.push(`Section: ${args.sectionContext}`)
+  lines.push(
     `Primary request: create a high-quality hero image featuring ${subject}`,
     `Scene/background: ${chosenBackground}`,
     `Style/medium: ${style}`,
@@ -198,7 +204,8 @@ export function buildVariationImagePrompt(args: {
     "Lighting/mood: clean, editorial, realistic",
     "Constraints: no text, no logos, no watermark",
     "Avoid: clutter, over-saturation, distorted objects"
-  ].join("\n")
+  )
+  return lines.join("\n")
 }
 
 // ---------------------------------------------------------------------------

@@ -182,6 +182,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     }
 
     const removeSelectedDeleteHandle = () => {
+      document.querySelectorAll(".editor-block-toolbar").forEach((node) => node.remove())
       document.querySelectorAll(".editor-selected-delete").forEach((node) => node.remove())
       document.querySelectorAll(".editor-selected-move").forEach((node) => node.remove())
       document.querySelectorAll(".editor-delete-confirm").forEach((node) => node.remove())
@@ -251,7 +252,12 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         }, 4000)
       })
 
-      selected.prepend(del)
+      const toolbar = selected.querySelector(".editor-block-toolbar")
+      if (toolbar) {
+        toolbar.append(del)
+      } else {
+        selected.prepend(del)
+      }
     }
 
     const blockOrder = () =>
@@ -325,37 +331,50 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         match.classList.remove("editor-enter")
       }, 280)
 
-      const mountSelectedMoveHandle = (direction: "up" | "down") => {
-        const btn = document.createElement("button")
-        btn.type = "button"
-        btn.className = `editor-selected-move editor-selected-move-${direction}`
-        btn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} ${direction}`)
-        btn.title = `Move ${direction}`
-        btn.innerHTML =
-          direction === "up"
-            ? '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 10V2"/><path d="M2.5 5.5L6 2l3.5 3.5"/></svg>'
-            : '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2.5 6.5L6 10l3.5-3.5"/></svg>'
-        const result = computeMoveAfter(blockId, direction)
-        btn.disabled = !result.canMove
-        btn.addEventListener("click", (event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          const move = computeMoveAfter(blockId, direction)
-          if (!move.canMove) return
-          window.parent.postMessage(
-            {
-              protocol: "site-editor/v1",
-              type: "blockReordered",
-              payload: { slug, blockId, afterBlockId: move.afterBlockId }
-            },
-            editorOrigin
-          )
-        })
-        match.prepend(btn)
-      }
+      // Create a toolbar container for action buttons
+      const toolbar = document.createElement("div")
+      toolbar.className = "editor-block-toolbar"
 
-      mountSelectedMoveHandle("up")
-      mountSelectedMoveHandle("down")
+      const moveUpBtn = document.createElement("button")
+      moveUpBtn.type = "button"
+      moveUpBtn.className = "editor-selected-move editor-selected-move-up"
+      moveUpBtn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} up`)
+      moveUpBtn.title = "Move up"
+      moveUpBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 10V2"/><path d="M2.5 5.5L6 2l3.5 3.5"/></svg>'
+      const upResult = computeMoveAfter(blockId, "up")
+      moveUpBtn.disabled = !upResult.canMove
+      moveUpBtn.addEventListener("click", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const move = computeMoveAfter(blockId, "up")
+        if (!move.canMove) return
+        window.parent.postMessage(
+          { protocol: "site-editor/v1", type: "blockReordered", payload: { slug, blockId, afterBlockId: move.afterBlockId } },
+          editorOrigin
+        )
+      })
+
+      const moveDownBtn = document.createElement("button")
+      moveDownBtn.type = "button"
+      moveDownBtn.className = "editor-selected-move editor-selected-move-down"
+      moveDownBtn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} down`)
+      moveDownBtn.title = "Move down"
+      moveDownBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2.5 6.5L6 10l3.5-3.5"/></svg>'
+      const downResult = computeMoveAfter(blockId, "down")
+      moveDownBtn.disabled = !downResult.canMove
+      moveDownBtn.addEventListener("click", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const move = computeMoveAfter(blockId, "down")
+        if (!move.canMove) return
+        window.parent.postMessage(
+          { protocol: "site-editor/v1", type: "blockReordered", payload: { slug, blockId, afterBlockId: move.afterBlockId } },
+          editorOrigin
+        )
+      })
+
+      toolbar.append(moveUpBtn, moveDownBtn)
+      match.prepend(toolbar)
       mountSelectedDeleteHandle()
       const previousSelectedBlockId = selectedBlockRef.current
       const previousEditablePath = selectedEditablePathRef.current

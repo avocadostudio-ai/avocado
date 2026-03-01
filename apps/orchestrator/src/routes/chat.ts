@@ -51,7 +51,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
           op: event.op,
           previewVersion: event.previewVersion,
           focusBlockId: event.focusBlockId ?? null
-        })
+        }),
+      onStatusUpdate: (message) => sseWrite(reply, { type: "status", message })
     })
     if (result.code >= 400) {
       sseWrite(reply, { type: "error", result: result.payload, code: result.code })

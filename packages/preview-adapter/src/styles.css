@@ -6,9 +6,7 @@
   --editor-accent-soft: rgba(var(--editor-accent-rgb), 0.35);
   position: relative;
   overflow: visible;
-  transition: outline-color 140ms ease, transform 220ms ease, opacity 220ms ease;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
+  transition: transform 220ms ease, opacity 220ms ease;
 }
 
 .editor-selectable::before {
@@ -28,23 +26,29 @@
 }
 
 .editor-selectable:hover {
-  outline-color: var(--editor-accent-soft);
   cursor: pointer;
+}
+
+.editor-selectable:hover::before {
+  opacity: 1;
+  inset: 0;
+  border: 2px solid rgba(var(--editor-accent-rgb), 0.5);
+  background: none;
+  mix-blend-mode: normal;
 }
 
 .editor-selectable::after {
   content: attr(data-block-type);
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 4px;
+  left: 4px;
   right: auto;
-  transform: translateY(calc(-100% + 1px));
-  background: rgba(var(--editor-accent-rgb), 0.95);
+  background: rgba(var(--editor-accent-rgb), 0.9);
   color: #f8fafc;
   border: 0;
-  border-radius: 8px 8px 0 0;
-  padding: 6px 10px;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -56,9 +60,8 @@
 
 .editor-block-badge {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform: translateY(calc(-100% + 1px));
+  top: 4px;
+  left: 4px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -73,11 +76,11 @@
 
 .editor-block-badge-label {
   position: static;
-  background: rgba(var(--editor-accent-rgb), 0.95);
+  background: rgba(var(--editor-accent-rgb), 0.9);
   color: #f8fafc;
-  border-radius: 8px 8px 0 0;
-  padding: 6px 10px;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -92,10 +95,15 @@
 }
 
 .editor-highlight {
-  outline: 2px solid rgb(var(--editor-selected-rgb));
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(var(--editor-selected-rgb), 0.12);
   overflow: visible !important;
+}
+
+.editor-highlight::before {
+  opacity: 1;
+  inset: 0;
+  border: 3px solid rgb(var(--editor-selected-rgb));
+  background: none;
+  mix-blend-mode: normal;
 }
 
 .editor-highlight > .editor-block-badge {
@@ -111,17 +119,23 @@
   background: rgba(var(--editor-selected-rgb), 0.97);
 }
 
-.editor-selected-delete {
+.editor-block-toolbar {
   position: absolute;
-  top: 0;
-  right: 0;
-  transform: translateY(calc(-100% + 1px));
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 23;
+}
+
+.editor-selected-delete {
   border: 0;
-  background: rgba(var(--editor-accent-rgb), 0.95);
+  background: rgba(var(--editor-selected-rgb), 0.92);
   color: #fff;
-  border-radius: 3px 3px 0 0;
-  width: 28px;
-  height: 24px;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   line-height: 1;
   cursor: pointer;
@@ -132,8 +146,8 @@
 }
 
 .editor-selected-delete svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   stroke: currentColor;
   stroke-width: 2.1;
   stroke-linecap: round;
@@ -142,14 +156,12 @@
 }
 
 .editor-selected-move {
-  position: absolute;
-  top: 0;
   border: 0;
-  background: rgba(var(--editor-accent-rgb), 0.95);
+  background: rgba(var(--editor-selected-rgb), 0.92);
   color: #fff;
-  border-radius: 3px 3px 0 0;
-  width: 24px;
-  height: 24px;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   line-height: 1;
   font-weight: 700;
@@ -158,12 +170,11 @@
   align-items: center;
   justify-content: center;
   z-index: 23;
-  transform: translateY(calc(-100% + 1px));
 }
 
 .editor-selected-move svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   stroke: currentColor;
   stroke-width: 2.3;
   stroke-linecap: round;
@@ -171,16 +182,8 @@
   fill: none;
 }
 
-.editor-selected-move-up {
-  right: 62px;
-}
-
-.editor-selected-move-down {
-  right: 36px;
-}
-
 .editor-selected-move:hover {
-  background: #0d4f68;
+  background: rgba(var(--editor-selected-rgb), 1);
 }
 
 .editor-selected-move:focus,
@@ -242,16 +245,13 @@
 }
 
 .editor-highlight [data-editable-target]:hover {
-  outline: 2px dashed rgba(var(--editor-accent-rgb), 0.55);
-  outline-offset: 2px;
-  background: rgba(var(--editor-accent-rgb), 0.06);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--editor-selected-rgb), 0.4);
+  background: rgba(var(--editor-selected-rgb), 0.04);
 }
 
 .editor-highlight [data-editable-target].editor-inline-editing {
-  outline: 2px solid rgba(var(--editor-focus-rgb), 0.95);
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 2px rgba(var(--editor-focus-rgb), 0.95);
   background: rgba(var(--editor-focus-rgb), 0.12);
-  box-shadow: 0 0 0 3px rgba(var(--editor-focus-rgb), 0.22);
   cursor: text;
 }
 
@@ -287,12 +287,11 @@
 }
 
 .editor-child-highlight {
-  outline: 2px dashed rgba(var(--editor-focus-rgb), 0.95) !important;
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 1.5px rgba(var(--editor-selected-rgb), 0.5) !important;
 }
 
 .editor-child-highlight:not(a):not(.btn-primary):not(.btn-secondary) {
-  background: rgba(var(--editor-focus-rgb), 0.1);
+  background: rgba(var(--editor-selected-rgb), 0.04);
 }
 
 .editor-child-highlight::before {
@@ -301,13 +300,12 @@
 
 .editor-delete-confirm {
   position: absolute;
-  top: 0;
-  right: 26px;
-  transform: translateY(calc(-100% + 1px));
+  top: 4px;
+  right: 34px;
   background: #7f1d1d;
   color: #fff;
-  border-radius: 3px 0 0 0;
-  height: 24px;
+  border-radius: 6px;
+  height: 26px;
   padding: 0 10px;
   font-size: 11px;
   font-weight: 600;
@@ -381,10 +379,10 @@
 
 @keyframes flash {
   0% {
-    outline-color: rgba(var(--editor-accent-rgb), 0.55);
+    border-color: rgba(var(--editor-accent-rgb), 0.55);
   }
   100% {
-    outline-color: transparent;
+    border-color: transparent;
   }
 }
 

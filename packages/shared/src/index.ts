@@ -1,11 +1,18 @@
 import { z } from "zod"
 
+export type PageMeta = {
+  title?: string
+  description?: string
+  ogImage?: string
+}
+
 export type PageDoc = {
   id: string
   slug: string
   title: string
   updatedAt: string
   blocks: BlockInstance[]
+  meta?: PageMeta
 }
 
 export type BlockInstance = {
@@ -329,12 +336,19 @@ export const blockInstanceSchema = z.object({
   props: z.record(z.unknown())
 })
 
+export const pageMetaSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  ogImage: z.string().optional()
+})
+
 export const pageDocSchema: z.ZodType<PageDoc> = z.object({
   id: z.string().min(1),
   slug: z.string().min(1),
   title: z.string().min(1),
   updatedAt: z.string().min(1),
-  blocks: z.array(blockInstanceSchema)
+  blocks: z.array(blockInstanceSchema),
+  meta: pageMetaSchema.optional()
 })
 
 const createPageSchema = z.object({
@@ -425,6 +439,15 @@ const duplicatePageSchema = z.object({
   newTitle: z.string().min(1).optional(),
   afterPageSlug: z.string().min(1).optional()
 })
+const updatePageMetaSchema = z.object({
+  op: z.literal("update_page_meta"),
+  pageSlug: z.string().min(1),
+  patch: z.object({
+    title: z.string().optional(),
+    description: z.string().optional(),
+    ogImage: z.string().optional()
+  })
+})
 
 export const operationSchema = z.discriminatedUnion("op", [
   createPageSchema,
@@ -440,7 +463,8 @@ export const operationSchema = z.discriminatedUnion("op", [
   renamePageSchema,
   removePageSchema,
   movePageSchema,
-  duplicatePageSchema
+  duplicatePageSchema,
+  updatePageMetaSchema
 ])
 
 export type Operation = z.infer<typeof operationSchema>

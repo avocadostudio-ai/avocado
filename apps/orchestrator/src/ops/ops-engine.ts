@@ -329,6 +329,36 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       continue
     }
 
+    if (op.op === "update_page_meta") {
+      const page = staged.get(op.pageSlug)
+      if (!page) throw new Error(`Page not found for slug ${op.pageSlug}`)
+      const patch = op.patch as Record<string, unknown>
+      const patchKeys = Object.keys(patch).filter((k) => patch[k] !== undefined)
+      if (patchKeys.length === 0) throw new Error(`No effective meta change for ${op.pageSlug}`)
+      const current = page.meta ?? {}
+      const next: Record<string, unknown> = { ...current }
+      let changed = false
+      for (const key of patchKeys) {
+        const value = patch[key]
+        if (typeof value === "string" && value.length === 0) {
+          if ((current as Record<string, unknown>)[key] !== undefined) {
+            delete next[key]
+            changed = true
+          }
+        } else {
+          if ((current as Record<string, unknown>)[key] !== value) {
+            next[key] = value
+            changed = true
+          }
+        }
+      }
+      if (!changed) throw new Error(`No effective meta change for ${op.pageSlug}`)
+      page.meta = Object.keys(next).length > 0 ? (next as PageDoc["meta"]) : undefined
+      page.updatedAt = new Date().toISOString()
+      touchedSlugs.add(page.slug)
+      continue
+    }
+
     const page = staged.get(op.pageSlug)
     if (!page) throw new Error(`Page not found for slug ${op.pageSlug}`)
 

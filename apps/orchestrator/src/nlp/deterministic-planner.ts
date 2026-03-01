@@ -55,7 +55,13 @@ export function extractAudienceTarget(message: string) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 80)
-  return cleaned.length > 1 ? cleaned : undefined
+  if (cleaned.length <= 1) return undefined
+  const rejectWords = new Set(["a while", "now", "later", "free", "this", "me", "you", "testing", "demo", "it", "that", "here", "there", "sure", "fun", "good", "better", "best", "while"])
+  if (rejectWords.has(cleaned.toLowerCase())) return undefined
+  const stopwords = new Set(["a", "an", "the", "is", "it", "to", "of", "in", "on", "for", "and", "or", "so", "if"])
+  const words = cleaned.toLowerCase().split(/\s+/)
+  if (words.every((w) => stopwords.has(w))) return undefined
+  return cleaned
 }
 
 export function titleCaseWords(text: string) {
@@ -128,7 +134,11 @@ export function createPageBlocks(args: { requestedSlug: string; userMessage?: st
   const asksHero = /\bhero\b/.test(lowerMessage)
   const asksText = /\b(rich[\s-]?text|text(?:\s+section|\s+block)?|copy)\b/.test(lowerMessage)
   const asksCta = /\bcta\b|\bcall to action\b|\baction button\b/.test(lowerMessage)
-  const asksStructuredSections = asksHero || asksText || asksCta
+  const asksFeatures = /\bfeatures?\b/.test(lowerMessage)
+  const asksFaq = /\bfaq\b/.test(lowerMessage)
+  const asksTestimonials = /\btestimonials?\b/.test(lowerMessage)
+  const asksCards = /\bcards?\b/.test(lowerMessage)
+  const asksStructuredSections = asksHero || asksText || asksCta || asksFeatures || asksFaq || asksTestimonials || asksCards
   const sitePurpose = extractSiteContextLineValue(rawMessage, "Site purpose")
   const pageTitle = pageTitleFromSlug(args.requestedSlug)
 
@@ -174,6 +184,38 @@ export function createPageBlocks(args: { requestedSlug: string; userMessage?: st
         ...defaultPropsForType("RichText"),
         body: richTextBody
       }
+    })
+  }
+
+  if (asksStructuredSections && asksFeatures) {
+    blocks.push({
+      id: `b_features_${seed}`,
+      type: "FeatureGrid",
+      props: defaultPropsForType("FeatureGrid")
+    })
+  }
+
+  if (asksStructuredSections && asksTestimonials) {
+    blocks.push({
+      id: `b_testimonials_${seed}`,
+      type: "Testimonials",
+      props: defaultPropsForType("Testimonials")
+    })
+  }
+
+  if (asksStructuredSections && asksFaq) {
+    blocks.push({
+      id: `b_faq_${seed}`,
+      type: "FAQAccordion",
+      props: defaultPropsForType("FAQAccordion")
+    })
+  }
+
+  if (asksStructuredSections && asksCards) {
+    blocks.push({
+      id: `b_cardgrid_${seed}`,
+      type: "CardGrid",
+      props: defaultPropsForType("CardGrid")
     })
   }
 
@@ -304,6 +346,56 @@ export function clarificationSuggestions(args: { body: ChatRequestBody; current:
 export function demoPlanFromMessage(message: string, slug: string, activeBlockId?: string, activeBlockType?: string): EditPlan {
   const lower = message.toLowerCase()
   const quoted = /"([^"]+)"/.exec(message)?.[1]
+
+  // SEO metadata patterns — checked early so "seo title" isn't mistaken for hero heading
+  const hasSeoKeyword = /\b(seo|meta\s*desc|meta\s*title|og\s*image|open\s*graph)\b/.test(lower)
+  if (hasSeoKeyword) {
+    const seoGenerate = /\b(write|generate|create|add)\b.*\b(seo|meta)\b/.test(lower) && !quoted
+    const seoSetMatch = lower.match(/\b(?:set|change|update|add)\b.*?\b(meta\s*desc(?:ription)?|seo\s*desc(?:ription)?)\b/)
+      ?? lower.match(/\b(?:set|change|update|add)\b.*?\b(seo\s*title|meta\s*title)\b/)
+      ?? lower.match(/\b(?:set|change|update|add)\b.*?\b(og\s*image|open\s*graph\s*image)\b/)
+
+    if (seoSetMatch) {
+      const fieldRaw = seoSetMatch[1].toLowerCase()
+      const isTitle = /title/.test(fieldRaw)
+      const isOgImage = /og|open\s*graph/.test(fieldRaw)
+
+      const extractedQuoted = quoted
+      const afterTo = message.match(/\bto\s+(.+)$/i)?.[1]?.trim()
+      const value = extractedQuoted ?? afterTo ?? ""
+
+      if (!value) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: `Please provide the value — e.g. set ${isTitle ? "SEO title" : isOgImage ? "OG image" : "meta description"} to "Your value here".`,
+          change_log: [],
+          ops: []
+        }
+      }
+
+      const patch: Record<string, string> = {}
+      const fieldLabel = isTitle ? "SEO title" : isOgImage ? "OG image" : "Meta description"
+      if (isTitle) patch.title = value
+      else if (isOgImage) patch.ogImage = value
+      else patch.description = value
+
+      return {
+        intent: "edit_plan",
+        summary_for_user: `Updated the ${fieldLabel}.`,
+        change_log: [`${fieldLabel} \u2192 "${value}".`],
+        ops: [{ op: "update_page_meta", pageSlug: slug, patch }]
+      }
+    }
+
+    if (seoGenerate) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: "Demo mode cannot generate SEO metadata automatically. Please provide the exact title or description you'd like to set, for example: set meta description to \"Your description here\".",
+        change_log: [],
+        ops: []
+      }
+    }
+  }
 
   if (lower.includes("make this shorter") && activeBlockId && activeBlockType === "Hero") {
     return {
@@ -445,6 +537,18 @@ export function isPageRouteRenameRequest(message?: string) {
 
 
 
+export function pageMetaContractSummary() {
+  return {
+    op: "update_page_meta",
+    fields: {
+      title: "SEO/og title (falls back to page.title if absent). Max 60 chars; put primary keyword near front; avoid generic words like 'Home' or 'Welcome'; must be unique per page.",
+      description: "Meta description for search engines and social sharing. 150-160 chars; front-load key info in first 110 chars (mobile truncation); include a CTA verb; use active voice; never use quotes; never repeat the title verbatim.",
+      ogImage: "Open Graph image URL for social previews. Must be HTTPS; recommended dimensions 1200x630px."
+    },
+    notes: "Merge-patch semantics: only supplied keys are updated. Set a field to empty string to clear it. Always include the actual values you set in change_log so the user can see them (meta tags are not visible in the page preview)."
+  }
+}
+
 export function blockContractsSummary() {
   return {
     Hero: {
@@ -543,17 +647,19 @@ export type ParsedIntent = z.infer<typeof intentSchema>
 
 export function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined {
   const normalized = message.toLowerCase()
-  const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:a|an)?\s*([a-z -]+)/)
+  const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:(?:a|an)\b)?\s*([a-z -]+)/)
   if (!addMatch?.[2]) return undefined
   const chunk = addMatch[2].trim()
   if (chunk.startsWith("card grid") || chunk.startsWith("cardgrid")) return "CardGrid"
   if (chunk.startsWith("card")) return "Card"
   if (chunk.startsWith("feature grid") || chunk.startsWith("featuregrid") || chunk.startsWith("features")) return "FeatureGrid"
-  if (chunk.startsWith("testimonial")) return "Testimonials"
+  if (chunk.startsWith("testimonial") || chunk.startsWith("social proof") || chunk.startsWith("review") || chunk.startsWith("quote")) return "Testimonials"
   if (chunk.startsWith("faq")) return "FAQAccordion"
   if (chunk.startsWith("cta")) return "CTA"
   if (chunk.startsWith("hero")) return "Hero"
-  if (chunk.startsWith("rich text") || chunk.startsWith("richtext") || chunk.startsWith("rich-text") || chunk.startsWith("prose") || chunk.startsWith("text block")) return "RichText"
+  if (chunk.startsWith("rich text") || chunk.startsWith("richtext") || chunk.startsWith("rich-text") || chunk.startsWith("prose") || chunk.startsWith("text block") || chunk.startsWith("section") || chunk.startsWith("paragraph") || chunk.startsWith("copy")) return "RichText"
+  if (chunk.startsWith("benefit") || chunk.startsWith("advantage")) return "FeatureGrid"
+  if (chunk.startsWith("pricing")) return "CardGrid"
   return undefined
 }
 
@@ -752,6 +858,7 @@ export function plannerContextPack(args: {
       }
       return { id: b.id, type: b.type, props: scalarProps, arrayProps: arrProps }
     }),
+    pageMeta: currentPage.meta ?? null,
     pageIntent: pageIntentSummary({ slug, currentPage }),
     recentSuccessfulEdits: getRecentEdits(session, slug),
     resolvedReferences: resolveReferencesFromMessage({ message, currentPage, activeBlockId })
@@ -1036,6 +1143,9 @@ export function compileDeterministicPlan(args: {
   const routeMentions = extractRouteMentions(cleanMessage)
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
+
+  if (process.env.OPENAI_API_KEY && isRewriteRequest(message) && !quotedText(message)) return null
+
   const hasConditionalQualifier = /\bif\s+(required|needed|necessary)\b/.test(lowerMessage)
   const asksSectionReorder =
     /\b(reorder|re-order|rearrange|re-organize|reorganize)\b/.test(lowerMessage) &&
@@ -1058,8 +1168,13 @@ export function compileDeterministicPlan(args: {
 
   const asksPageRename = isPageRouteRenameRequest(message)
   if ((intent.action === "update" || intent.action === "move" || intent.action === "clarify") && asksPageRename) {
-    const fromSlug = routeMentions[0] ?? slug
-    const toSlug = routeMentions.length >= 2 ? routeMentions[routeMentions.length - 1] : undefined
+    const mentionsCurrentPage = /\b(this|current|the)\s+page\b/.test(lowerMessage)
+    let fromSlug = routeMentions[0] ?? slug
+    let toSlug = routeMentions.length >= 2 ? routeMentions[routeMentions.length - 1] : undefined
+    if (!toSlug && routeMentions.length === 1 && mentionsCurrentPage) {
+      toSlug = routeMentions[0]
+      fromSlug = slug
+    }
     if (!toSlug || toSlug === fromSlug) {
       return {
         intent: "needs_clarification",
@@ -1101,9 +1216,11 @@ export function compileDeterministicPlan(args: {
     if (createPlan) return createPlan
   }
 
+  const hasNavContext = /\b(nav|navigation|menu|first|last|position)\b/.test(lowerMessage) || routeMentions.length >= 2
   const asksNavMove =
     /\b(nav|navigation|menu|tabs?|tab order|page order)\b/.test(lowerMessage) ||
-    /\bmove\b.*\b(page|tab)\b/.test(lowerMessage) ||
+    /\bmove\b.*\btab\b/.test(lowerMessage) ||
+    (/\bmove\b.*\bpage\b/.test(lowerMessage) && hasNavContext) ||
     /\breorder\b.*\b(page|nav|menu|tabs?)\b/.test(lowerMessage)
   if ((intent.action === "move" || intent.action === "clarify") && asksNavMove) {
     const sessionDraft = getSessionDraft(session)
@@ -1179,6 +1296,7 @@ export function compileDeterministicPlan(args: {
     /\b(create|generate|build|make|draft)\b/.test(lowerMessage) &&
     /\b(page|landing page)\b/.test(lowerMessage)
   if (asksAudienceCreatePage && audience) {
+    if (process.env.OPENAI_API_KEY) return null
     const seed = toSeedSlug(audience) || "audience"
     const requestedSlug = routeMentions[0] ?? `/for-${seed}`
     const normalizedRequested = normalizeRouteCandidate(requestedSlug) ?? `/for-${seed}`
@@ -1252,6 +1370,7 @@ export function compileDeterministicPlan(args: {
     !asksAudienceCreatePage &&
     (/\bfor\b/.test(lowerMessage) || /\baudience\b/.test(lowerMessage) || /\btarget\b/.test(lowerMessage))
   if (asksAudienceRetarget && audience) {
+    if (process.env.OPENAI_API_KEY) return null
     const targets = selectedBlock
       ? [selectedBlock]
       : currentPage.blocks.filter((block) => block.type === "Hero" || block.type === "CTA" || block.type === "RichText").slice(0, 3)
@@ -1308,16 +1427,35 @@ export function compileDeterministicPlan(args: {
       lowerMessage.includes("within") ||
       lowerMessage.includes("current") ||
       lowerMessage.includes("this one") ||
-      lowerMessage.includes("more"))
+      lowerMessage.includes("more") ||
+      lowerMessage.includes("another"))
 
-  if ((intent.action === "add" || intent.action === "clarify") && selectedBlock && asksInlineAdd) {
-    const patch = buildListAppendPatch(selectedBlock, message)
-    if (patch) {
-      return {
-        intent: "edit_plan",
-        summary_for_user: `Updated ${selectedBlock.type}.`,
-        change_log: [...assumptions, `Added one entry to ${selectedBlock.id}.`],
-        ops: [{ op: "update_props", pageSlug: slug, blockId: selectedBlock.id, patch }]
+  if ((intent.action === "add" || intent.action === "clarify") && asksInlineAdd) {
+    let inlineTarget = selectedBlock
+    if (!inlineTarget) {
+      const typeMap: Array<{ test: RegExp; type: BlockType }> = [
+        { test: /\btestimonial/, type: "Testimonials" },
+        { test: /\b(faq|question)/, type: "FAQAccordion" },
+        { test: /\bfeature/, type: "FeatureGrid" },
+        { test: /\bcard/, type: "CardGrid" }
+      ]
+      for (const entry of typeMap) {
+        if (entry.test.test(lowerMessage)) {
+          const matches = currentPage.blocks.filter((b) => b.type === entry.type)
+          if (matches.length === 1) inlineTarget = matches[0]
+          break
+        }
+      }
+    }
+    if (inlineTarget) {
+      const patch = buildListAppendPatch(inlineTarget, message)
+      if (patch) {
+        return {
+          intent: "edit_plan",
+          summary_for_user: `Updated ${inlineTarget.type}.`,
+          change_log: [...assumptions, `Added one entry to ${inlineTarget.id}.`],
+          ops: [{ op: "update_props", pageSlug: slug, blockId: inlineTarget.id, patch }]
+        }
       }
     }
   }
@@ -1332,12 +1470,19 @@ export function compileDeterministicPlan(args: {
   }
 
   if (intent.action === "remove") {
-    const target = resolveBlockRef({
+    let target = resolveBlockRef({
       ref: intent.target_block_ref,
       currentPage,
       activeBlockId,
       fallbackType: intent.target_block_type
     })
+    if (!target && !activeBlockId) {
+      const inferredType = inferBlockTypeFromText(cleanMessage)
+      if (inferredType) {
+        const matches = currentPage.blocks.filter((b) => b.type === inferredType)
+        if (matches.length === 1) target = matches[0]
+      }
+    }
     if (!target) {
       return {
         intent: "needs_clarification",

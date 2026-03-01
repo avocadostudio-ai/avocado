@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
 import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
 import type { UnsplashImage } from "../variation-images.js"
-import { normalizeRouteCandidate, parseCreatePageRequest } from "../nlp/intent-helpers.js"
+import { normalizeRouteCandidate, parseCreatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import {
   type ChatRequestBody,
   type ChatResult,
@@ -211,6 +211,7 @@ export async function withUnsplashHeroImage(args: {
   activeEditablePath?: string
   chatRequestId?: string
   log: FastifyBaseLogger
+  onStatusUpdate?: (message: string) => void
 }): Promise<EditPlan> {
   const lowerMessage = args.message.toLowerCase()
   if (args.plan.intent !== "edit_plan") return args.plan
@@ -230,6 +231,7 @@ export async function withUnsplashHeroImage(args: {
   const plan = structuredClone(args.plan)
   let changed = false
   let sourceQuery: string | undefined
+  let imageSource: "ai-generated" | "unsplash" | "placeholder" = "placeholder"
 
   for (const op of plan.ops) {
     if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
@@ -260,9 +262,16 @@ export async function withUnsplashHeroImage(args: {
     })
     let resolved: UnsplashImage | null = null
     if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY) {
+      args.onStatusUpdate?.("Generating image...")
+      const targetProps = target.props as Record<string, unknown>
+      const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
+      const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
+      const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
       const generatedAlt = `AI-generated hero image featuring ${query}`
       const generatedPrompt = [
         "Use case: website hero image update",
+        `Page: ${args.currentPage.title} (${args.slug})`,
+        `Section: ${target.type} — ${sectionContext}`,
         `Primary subject: ${query}`,
         "Style: photorealistic editorial product photography",
         "Composition: clean landscape frame with clear focal subject",
@@ -270,9 +279,12 @@ export async function withUnsplashHeroImage(args: {
         "Constraints: no text, no logos, no watermark"
       ].join("\n")
       resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt })
+      if (resolved) imageSource = "ai-generated"
     }
     if (!resolved) {
+      args.onStatusUpdate?.("Finding a suitable image...")
       resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4) }, { chatRequestId: args.chatRequestId, logger: args.log })
+      if (resolved) imageSource = resolved.url.includes("unsplash") ? "unsplash" : "placeholder"
     }
     if (!resolved) continue
 
@@ -336,8 +348,11 @@ export async function withUnsplashHeroImage(args: {
   }
 
   if (changed) {
-    const loggedQuery = sourceQuery ? ` from query "${sourceQuery}"` : ""
-    plan.change_log = [...plan.change_log, `Set Hero image to a relevant result${loggedQuery}.`]
+    const sourceLabel =
+      imageSource === "ai-generated" ? "Generated Hero image with AI"
+      : imageSource === "unsplash" ? "Set Hero image from Unsplash"
+      : "Set Hero image from placeholder"
+    plan.change_log = [...plan.change_log, `${sourceLabel}.`]
   } else {
     args.log.info(
       {
@@ -433,6 +448,24 @@ function collectChangedTextFields(ops: Operation[]) {
   return Array.from(out)
 }
 
+function buildMetaChangeLogEntries(ops: Operation[]): string[] {
+  const lines: string[] = []
+  for (const op of ops) {
+    if (op.op !== "update_page_meta") continue
+    const patch = op.patch as Record<string, unknown>
+    if (typeof patch.title === "string" && patch.title.length > 0) {
+      lines.push(`SEO title \u2192 "${patch.title}"`)
+    }
+    if (typeof patch.description === "string" && patch.description.length > 0) {
+      lines.push(`Meta description \u2192 "${patch.description}"`)
+    }
+    if (typeof patch.ogImage === "string" && patch.ogImage.length > 0) {
+      lines.push(`OG image \u2192 ${patch.ogImage}`)
+    }
+  }
+  return lines
+}
+
 function buildAiInsightChanges(args: { plan: EditPlan; message: string }) {
   if (args.plan.intent !== "edit_plan" || args.plan.ops.length === 0) return []
 
@@ -459,6 +492,11 @@ function buildAiInsightChanges(args: { plan: EditPlan; message: string }) {
 function deterministicCreatePagePlan(args: { session: string; message: string }) {
   const requestedSlug = parseCreatePageRequest(args.message)
   if (!requestedSlug) return null
+
+  // When the user asks for content generation beyond simple scaffolding,
+  // defer to the AI planner which can produce meaningful content.
+  if (requestsContentGeneration(args.message)) return null
+
   return buildCreatePagePlan({ session: args.session, requestedSlug, userMessage: args.message })
 }
 
@@ -490,6 +528,7 @@ export async function runChatPipeline(
   options?: {
     onPlanningToken?: (token: string) => void
     onOpApplied?: (event: { index: number; total: number; op: Operation; previewVersion: number; focusBlockId?: string }) => void
+    onStatusUpdate?: (message: string) => void
   }
 ): Promise<{ code: number; payload: ChatResult | { error: string } }> {
   const executionMode = body.executionMode ?? "auto"
@@ -698,7 +737,8 @@ export async function runChatPipeline(
         activeBlockId: body.activeBlockId,
         activeEditablePath: body.activeEditablePath,
         chatRequestId,
-        log: ctx.log
+        log: ctx.log,
+        onStatusUpdate: options?.onStatusUpdate
       })
 
       if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
@@ -909,6 +949,7 @@ export async function runChatPipeline(
       schedulePersistState(ctx.log)
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
+      const metaChangeLogEntries = buildMetaChangeLogEntries(resolvedPlan.ops)
       ctx.chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
@@ -934,7 +975,7 @@ export async function runChatPipeline(
           payload: withDebugPayload({
             status: "applied",
             summary: resolvedPlan.summary_for_user,
-            changes: [...resolvedPlan.change_log, ...aiInsightChanges],
+            changes: [...resolvedPlan.change_log, ...metaChangeLogEntries, ...aiInsightChanges],
             mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, updatedSlug ?? effectiveSlug),
             previewVersion,
             focusBlockId,
