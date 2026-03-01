@@ -34,6 +34,22 @@ import {
   parseCreatePageRequest,
   toSeedSlug
 } from "./nlp/intent-helpers.js"
+import {
+  type GuardrailErrorCategory,
+  type ChatRequestBody,
+  type ChatResult,
+  normalizeForIntent,
+  BLOCK_CATALOG_PATTERNS,
+  isBlockCatalogQuery,
+  isInfoQuery,
+  isAdviceQuery,
+  adviceResponse,
+  plannerMessageWithPendingContext,
+  withSiteContext,
+  stripSiteContextEnvelope,
+  extractSiteContextLineValue,
+  infoResponse
+} from "./nlp/intent-detection.js"
 import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
 import {
   type ModelKey,
@@ -607,6 +623,12 @@ type SnapshotDescriptor = {
   homeHeading: string
 }
 
+const RESTORE_SESSION_PRESETS: Array<{ sessionKey: string; commit: string }> = [
+  { sessionKey: "adventure-arena::dev", commit: "70584e0" },
+  { sessionKey: "avocado-magic::dev", commit: "269c0be" },
+  { sessionKey: "avocado-odyssey::dev", commit: "69eab10" }
+]
+
 async function loadPublishedSnapshotFromCommit(commit: string): Promise<PageDoc[]> {
   const repoRoot = resolve(process.cwd(), "../..")
   const targetPath = "apps/site/lib/published-content.json"
@@ -665,6 +687,40 @@ async function listRestoreSnapshots(limit = 30): Promise<SnapshotDescriptor[]> {
     }
   }
   return snapshots
+}
+
+function isTemplateFallbackSession(sessionDraft: Map<string, PageDoc>) {
+  const slugs = Array.from(sessionDraft.keys())
+  if (!(slugs.length === 1 || slugs.length === 2)) return false
+  const home = sessionDraft.get("/")
+  if (!home) return false
+  const heroHeading = home.blocks.find((block) => block.type === "Hero")?.props?.heading
+  return heroHeading === "Build websites with plain language"
+}
+
+async function ensurePresetRestoreSessions() {
+  let changed = false
+  for (const preset of RESTORE_SESSION_PRESETS) {
+    const existing = draftPages.get(preset.sessionKey)
+    if (existing && !isTemplateFallbackSession(existing)) continue
+
+    try {
+      const pages = await loadPublishedSnapshotFromCommit(preset.commit)
+      const seeded = new Map<string, PageDoc>()
+      for (const page of pages) {
+        const clone = structuredClone(page)
+        ensureHeroImageProps(clone)
+        seeded.set(clone.slug, clone)
+      }
+      draftPages.set(preset.sessionKey, seeded)
+      versions.set(preset.sessionKey, Math.max(1, versions.get(preset.sessionKey) ?? 0))
+      changed = true
+      app.log.info({ session: preset.sessionKey, commit: preset.commit }, "Seeded preset restore session")
+    } catch (error) {
+      app.log.warn({ session: preset.sessionKey, commit: preset.commit, err: toErrorDetail(error) }, "Failed to seed preset restore session")
+    }
+  }
+  if (changed) await persistStateNow(app.log)
 }
 
 function sanitizeBranch(input: string) {
@@ -779,21 +835,6 @@ const modelLookup = {
   codex: process.env.OPENAI_MODEL_CODEX ?? "o3"
 } as const
 
-type ChatRequestBody = {
-  session?: string
-  siteId?: string
-  sitePurpose?: string
-  siteHosting?: string
-  slug?: string
-  message?: string
-  modelKey?: ModelKey
-  activeBlockId?: string
-  activeBlockType?: string
-  activeEditablePath?: string
-  executionMode?: "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
-  pendingPlanId?: string
-}
-
 type ApplyOpsRequestBody = {
   session?: string
   siteId?: string
@@ -822,32 +863,6 @@ function parseTranscriptionModelList(raw: string | undefined) {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0)
-}
-
-type ChatResult = {
-  status: string
-  summary: string
-  changes: string[]
-  mentionedSlugs?: string[]
-  suggestions?: string[]
-  validationErrors?: unknown
-  previewVersion: number
-  focusBlockId?: string
-  updatedSlug?: string
-  plannerSource: "openai" | "demo"
-  modelUsed: string
-  modelKey: ModelKey
-  pendingPlanId?: string
-  debug?: {
-    traceId: string
-    promptHash: string
-    promptExcerpt: string
-    outcome?: string
-    reasonCategory?: GuardrailErrorCategory
-    intent?: EditPlan["intent"]
-    opTypes?: string[]
-    opCount?: number
-  }
 }
 
 type VariationRequestBody = {
@@ -949,137 +964,6 @@ function extractResponsesOutputText(response: unknown) {
   return chunks.join("")
 }
 
-// Shared normaliser used by all intent detectors below.
-function normalizeForIntent(message: string) {
-  return message.toLowerCase().replace(/\s+/g, " ").trim()
-}
-
-// Single source of truth for block-catalog query patterns.
-const BLOCK_CATALOG_PATTERNS: RegExp[] = [
-  /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
-  /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
-  /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
-  /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
-  /\bwhat\s+else\s+can\s+i\s+add\b/,
-  /\bwhat\s+other\s+content\b/,
-  /\bavailable\s+blocks?\b/,
-  /\bavailable\s+block\s+types?\b/
-]
-
-function isBlockCatalogQuery(message: string) {
-  const m = normalizeForIntent(message)
-  return BLOCK_CATALOG_PATTERNS.some((re) => re.test(m))
-}
-
-function isInfoQuery(message: string) {
-  const m = normalizeForIntent(message)
-  return (
-    BLOCK_CATALOG_PATTERNS.some((re) => re.test(m)) ||
-    /\bwhat\s+can\s+i\s+(change|edit)\b/.test(m) ||
-    /\bwhat\s+content\b/.test(m) ||
-    /\bcontent\s+elements?\b/.test(m) ||
-    /\b(which|what)\s+fields?\b/.test(m) ||
-    /\bwhat\s+prop(ertie)?s?\b/.test(m)
-  )
-}
-
-function isAdviceQuery(message: string) {
-  const m = normalizeForIntent(message)
-  return (
-    /\b(is it good|is this good|should (we|i)|do you recommend|would you recommend)\b/.test(m) ||
-    /\bwhat do you think\b/.test(m) ||
-    /\bwhat (can|should) be improved\b/.test(m) ||
-    /\bhow can (this|the) page be improved\b/.test(m) ||
-    /\bhow (can|should) i improve (this|the) page\b/.test(m) ||
-    /\bimprovements?\b/.test(m) ||
-    /\bis faq\b/.test(m) ||
-    /\bshould .*faq\b/.test(m) ||
-    /\bgood idea\b/.test(m)
-  )
-}
-
-function adviceResponse(args: {
-  body: ChatRequestBody
-  current: PageDoc
-  plannerSource: "openai" | "demo"
-  modelUsed: string
-  modelKey: ModelKey
-}): { code: number; payload: ChatResult } {
-  const { body, current, plannerSource, modelUsed, modelKey } = args
-  const message = (body.message ?? "").toLowerCase()
-  const pageLabel = current.slug === "/" ? "this home page" : `this page (${current.slug})`
-  const hasFaq = current.blocks.some((block) => block.type === "FAQAccordion")
-  const hasHero = current.blocks.some((block) => block.type === "Hero")
-  const hasCta = current.blocks.some((block) => block.type === "CTA")
-
-  if (/\bfaq\b/.test(message)) {
-    const summary = hasFaq
-      ? `Yes, FAQ can work on ${pageLabel}, but keep it concise and near the bottom so it supports decisions without distracting from the main content.`
-      : `FAQ is usually a good fit on ${pageLabel} when visitors may have objections (pricing, process, trust, support).`
-    const changes = hasFaq
-      ? ["Current state: FAQ already exists on this page.", "Recommendation: keep 3-6 high-intent questions."]
-      : ["Current state: no FAQ block detected on this page.", "Recommendation: add a compact FAQ section near the bottom."]
-    return {
-      code: 200,
-      payload: {
-        status: "advice",
-        summary,
-        changes,
-        suggestions: hasFaq
-          ? ["Move FAQ to bottom", "Rewrite FAQ questions for this audience", "Keep FAQ, but reduce to 4 questions"]
-          : ["Add FAQ section with 4 questions at the bottom", "Add FAQ below testimonials", "Skip FAQ on this page"],
-        mentionedSlugs: [current.slug],
-        previewVersion: versions.get(body.session ?? "dev") ?? 0,
-        plannerSource,
-        modelUsed,
-        modelKey
-      }
-    }
-  }
-
-  const summary = `It depends on the page goal. For ${pageLabel}, prioritize a clear Hero, supporting proof, and one strong CTA before adding extra sections.`
-  const changes = [
-    hasHero ? "Hero is present." : "Hero is missing.",
-    hasCta ? "CTA is present." : "CTA is missing."
-  ]
-  return {
-    code: 200,
-    payload: {
-      status: "advice",
-      summary,
-      changes,
-      suggestions: [
-        "Add testimonials below Hero",
-        "Add FAQ at the bottom",
-        "Strengthen the main CTA copy"
-      ],
-      mentionedSlugs: [current.slug],
-      previewVersion: versions.get(body.session ?? "dev") ?? 0,
-      plannerSource,
-      modelUsed,
-      modelKey
-    }
-  }
-}
-
-function plannerMessageWithPendingContext(session: string, message: string) {
-  const pending = pendingClarificationBySession.get(session)
-  if (!pending) return message
-  if (isStandalonePageOperation(message)) return message
-  if (!isLikelyClarificationFollowUp(message)) return message
-  return `${pending.baseRequest}\nClarification from user: ${message}`
-}
-
-function withSiteContext(message: string, sitePurpose?: string, siteHosting?: string) {
-  const purpose = typeof sitePurpose === "string" ? sitePurpose.trim() : ""
-  const hosting = typeof siteHosting === "string" ? siteHosting.trim() : ""
-  if (!purpose && !hosting) return message
-  const lines: string[] = []
-  if (purpose) lines.push(`Site purpose: ${purpose}`)
-  if (hosting) lines.push(`Hosting context: ${hosting}`)
-  return `${message}\n\n[site context]\n${lines.join("\n")}\n[/site context]`
-}
-
 function extractAudienceTarget(message: string) {
   const lower = message.toLowerCase()
   const patternMatches = [
@@ -1149,23 +1033,6 @@ function nextAvailableSlug(session: string, baseSlug: string) {
   let idx = 2
   while (draft.has(`${baseSlug}-${idx}`)) idx += 1
   return `${baseSlug}-${idx}`
-}
-
-function stripSiteContextEnvelope(message: string) {
-  return message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
-}
-
-function extractSiteContextLineValue(message: string, label: string) {
-  const lowerLabel = label.toLowerCase()
-  const section = message.match(/\[site context\]([\s\S]*?)\[\/site context\]/i)?.[1]
-  if (!section) return undefined
-  const line = section
-    .split("\n")
-    .map((item) => item.trim())
-    .find((item) => item.toLowerCase().startsWith(`${lowerLabel}:`))
-  if (!line) return undefined
-  const value = line.slice(line.indexOf(":") + 1).trim()
-  return value || undefined
 }
 
 function titleCaseSentence(text: string) {
@@ -1336,86 +1203,6 @@ function childSuggestions(args: { selected: PageDoc["blocks"][number]; editableP
   }
 
   return [`Update ${root} ...`]
-}
-
-function infoResponse(args: {
-  body: ChatRequestBody
-  current: PageDoc
-  plannerSource: "openai" | "demo"
-  modelUsed: string
-  modelKey: ModelKey
-}): { code: number; payload: ChatResult } {
-  const { body, current, plannerSource, modelUsed, modelKey } = args
-  const lower = (body.message ?? "").toLowerCase()
-
-  if (isBlockCatalogQuery(body.message ?? "")) {
-    return {
-      code: 200,
-      payload: {
-        status: "info",
-        summary: `You can add these block types: ${allowedBlockTypes.join(", ")}.`,
-        changes: ["Tip: specify position, e.g. “add Testimonials below Hero”."],
-        suggestions: [
-          "Add Testimonials below Hero",
-          "Add CardGrid at the end",
-          "Add FeatureGrid after Hero",
-          "Add FAQAccordion before CTA",
-          "Add CTA at the end"
-        ],
-        previewVersion: versions.get(body.session ?? "dev") ?? 0,
-        plannerSource,
-        modelUsed,
-        modelKey
-      }
-    }
-  }
-
-  const selected =
-    body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
-      ? current.blocks.find((b) => b.id === body.activeBlockId)
-      : null
-
-  if (selected) {
-    const keys = editablePropsFromBlock(selected)
-    const childPath = String(body.activeEditablePath ?? "")
-    const suggestions = childPath ? childSuggestions({ selected, editablePath: childPath }) : keys.slice(0, 4).map(promptFromPropKey)
-    const summary = childPath
-      ? `Focused ${selected.type} item: ${childPath}.`
-      : `You can edit ${selected.type} fields: ${keys.join(", ")}.`
-    return {
-      code: 200,
-      payload: {
-        status: "info",
-        summary,
-        changes: childPath
-          ? [`Selected block: ${selected.id}`, `Focused path: ${childPath}`]
-          : [`Selected block: ${selected.id}`, "Tip: click a field name in your prompt, e.g. “change heading to …”."],
-        suggestions,
-        previewVersion: versions.get(body.session ?? "dev") ?? 0,
-        plannerSource,
-        modelUsed,
-        modelKey
-      }
-    }
-  }
-
-  const firstByType = new Map<BlockType, PageDoc["blocks"][number]>()
-  for (const block of current.blocks) {
-    if (!firstByType.has(block.type)) firstByType.set(block.type, block)
-  }
-  const byType = Array.from(firstByType.values()).map((b) => `${b.type}: ${editablePropsFromBlock(b).join(", ")}`)
-  return {
-    code: 200,
-    payload: {
-      status: "info",
-      summary: "Select a block to get precise editable fields. Current page supports:",
-      changes: byType,
-      previewVersion: versions.get(body.session ?? "dev") ?? 0,
-      plannerSource,
-      modelUsed,
-      modelKey
-    }
-  }
 }
 
 function clarificationSuggestions(args: { body: ChatRequestBody; current: PageDoc; selected?: PageDoc["blocks"][number] | null }) {
@@ -3254,8 +3041,9 @@ function compileDeterministicPlan(args: {
   activeEditablePath?: string
 }): EditPlan | null {
   const { session, intent, message, slug, currentPage, activeBlockId, activeEditablePath } = args
+  const cleanMessage = stripSiteContextEnvelope(message)
   const lowerMessage = message.toLowerCase()
-  const routeMentions = extractRouteMentions(message)
+  const routeMentions = extractRouteMentions(cleanMessage)
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
   const hasConditionalQualifier = /\bif\s+(required|needed|necessary)\b/.test(lowerMessage)
@@ -6269,6 +6057,7 @@ app.get("/favicon.ico", async (_request, reply) => {
 async function startServer() {
   const port = Number(process.env.PORT ?? 4200)
   await loadStateFromDisk(app.log)
+  await ensurePresetRestoreSessions()
   await chatTelemetry.loadFromDisk()
   await app.listen({ port, host: "0.0.0.0" })
   app.log.info(`Orchestrator listening on ${port}`)
