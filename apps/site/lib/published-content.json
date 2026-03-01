@@ -89,13 +89,13 @@
     "id": "p_bananas",
     "slug": "/bananas",
     "title": "Bananas",
-    "updatedAt": "2026-02-26T23:55:19.815Z",
+    "updatedAt": "2026-03-01T20:33:40.616Z",
     "blocks": [
       {
         "id": "b_hero_1772016866777",
         "type": "Hero",
         "props": {
-          "heading": "Bananas: Nature's Energy Booster 🍌 Keep it concise and direct.",
+          "heading": "Bananas: Nature's Energy Booster 🍌",
           "subheading": "Explore the benefits and versatility of bananas, a delicious and nutritious fruit perfect for any time of the day.",
           "ctaText": "Learn More",
           "ctaHref": "/banana-benefits",
@@ -220,18 +220,18 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-02-26T22:40:07.960Z",
+    "updatedAt": "2026-03-01T20:33:24.682Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
         "type": "Hero",
         "props": {
-          "heading": "Citrus Bliss",
+          "heading": "Citrus Bliss 🍊",
           "subheading": "Discover the vibrant world of citrus fruits.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "https://images.unsplash.com/photo-1657746430182-d08f11b013fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2VzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTQ1MjIwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Oranges on a blue background"
+          "imageUrl": "http://localhost:4200/generated-images/var_1772396971986_okcprn.png",
+          "imageAlt": "Fresh oranges on a tree"
         }
       },
       {
@@ -371,21 +371,21 @@
     ]
   },
   {
-    "id": "p_about_lemons",
-    "slug": "/about-lemons",
-    "title": "About Lemons",
-    "updatedAt": "2026-02-27T23:31:28.707Z",
+    "id": "p_lemons",
+    "slug": "/lemons",
+    "title": "Lemons",
+    "updatedAt": "2026-03-01T21:00:25.131Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
         "type": "Hero",
         "props": {
-          "heading": "Explore the Benefits of Lemons",
+          "heading": "Explore the Benefits of Lemons 🍋",
           "subheading": "Discover Health and Culinary Uses",
           "ctaText": "Find Out More",
-          "ctaHref": "/about-lemons",
-          "imageUrl": "http://localhost:4200/generated-images/var_1772235088704_kepgwc.png",
-          "imageAlt": "Lemon on a blue background",
+          "ctaHref": "/lemons",
+          "imageUrl": "http://localhost:4200/generated-images/var_1772398825121_cmdkc2.png",
+          "imageAlt": "A single lemon on a plain background",
           "secondaryCtaText": "Learn More",
           "secondaryCtaHref": "/lemons-benefits"
         }
@@ -431,7 +431,7 @@
     "id": "p_about_us",
     "slug": "/about-us",
     "title": "About Us",
-    "updatedAt": "2026-02-26T20:01:21.390Z",
+    "updatedAt": "2026-03-01T21:01:52.041Z",
     "blocks": [
       {
         "id": "b_hero_1772023500949",
@@ -452,19 +452,19 @@
           "title": "Our Values",
           "cards": [
             {
-              "title": "Integrity",
+              "title": "Integrity 🍏",
               "description": "We uphold the highest standards of integrity in all of our actions.",
               "ctaText": "Learn More",
               "ctaHref": "/values/integrity"
             },
             {
-              "title": "Innovation",
+              "title": "Innovation 🌟",
               "description": "We strive to innovate and improve our services continuously.",
               "ctaText": "Learn More",
               "ctaHref": "/values/innovation"
             },
             {
-              "title": "Customer Commitment",
+              "title": "Customer Commitment 🤝",
               "description": "We develop relationships that make a positive difference in our customers' lives.",
               "ctaText": "Learn More",
               "ctaHref": "/values/customer-commitment"
@@ -501,6 +501,11 @@
           ]
         }
       }
-    ]
+    ],
+    "meta": {
+      "title": "About Us - Celebrating 100 Years of Avocado Innovation",
+      "description": "Explore our century-long journey in the avocado industry, pioneering sustainable practices and innovative farming techniques. Discover our legacy today.",
+      "ogImage": "https://images.unsplash.com/photo-1557224145-a0dfba7b4f08?w=1200&h=630&fit=crop&q=60"
+    }
   }
 ]
