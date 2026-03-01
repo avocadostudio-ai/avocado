@@ -1,6 +1,7 @@
 .editor-selectable {
   --editor-accent-rgb: 14, 116, 144;
   --editor-selected-rgb: 37, 99, 235;
+  --editor-focus-rgb: 217, 119, 6;
   --editor-accent-strong: rgb(var(--editor-accent-rgb));
   --editor-accent-soft: rgba(var(--editor-accent-rgb), 0.35);
   position: relative;
@@ -91,19 +92,17 @@
 }
 
 .editor-highlight {
-  outline: 3px solid rgb(var(--editor-selected-rgb));
-  outline-offset: -3px;
-  /* Keep selection frame visible on full-bleed/overflowing layouts. */
-  box-shadow: inset 0 0 0 3px rgba(var(--editor-selected-rgb), 0.95);
+  outline: 2px solid rgb(var(--editor-selected-rgb));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(var(--editor-selected-rgb), 0.2);
   overflow: visible !important;
 }
 
-/* Block content is rendered inside a wrapper; draw the selected frame on the
-   visible section surface too so full-bleed heroes don't hide it. */
+/* Keep selected frame visible and consistent on rendered section surfaces. */
 .editor-highlight > section {
-  outline: 3px solid rgb(var(--editor-selected-rgb));
-  outline-offset: -3px;
-  box-shadow: inset 0 0 0 3px rgba(var(--editor-selected-rgb), 0.95);
+  outline: 2px solid rgb(var(--editor-selected-rgb));
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 2px rgba(var(--editor-selected-rgb), 0.95);
 }
 
 .editor-highlight > .editor-block-badge {
@@ -252,12 +251,14 @@
 .editor-highlight [data-editable-target]:hover {
   outline: 2px dashed rgba(var(--editor-accent-rgb), 0.55);
   outline-offset: 2px;
+  background: rgba(var(--editor-accent-rgb), 0.06);
 }
 
 .editor-highlight [data-editable-target].editor-inline-editing {
-  outline: 2px solid rgba(var(--editor-selected-rgb), 0.95);
+  outline: 2px solid rgba(var(--editor-focus-rgb), 0.95);
   outline-offset: 2px;
-  background: rgba(var(--editor-selected-rgb), 0.07);
+  background: rgba(var(--editor-focus-rgb), 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--editor-focus-rgb), 0.22);
   cursor: text;
 }
 
@@ -293,8 +294,12 @@
 }
 
 .editor-child-highlight {
-  outline: 3px solid rgba(var(--editor-accent-rgb), 0.82) !important;
+  outline: 2px dashed rgba(var(--editor-focus-rgb), 0.95) !important;
   outline-offset: 2px;
+}
+
+.editor-child-highlight:not(a):not(.btn-primary):not(.btn-secondary) {
+  background: rgba(var(--editor-focus-rgb), 0.1);
 }
 
 .editor-child-highlight::before {
