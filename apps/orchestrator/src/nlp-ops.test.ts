@@ -499,3 +499,408 @@ test("chat apply_pending_plan without pending plan falls back to auto when messa
   assert.equal(payload.status, "applied")
   assert.match(String(payload.summary), /Created page \/intent-fallback\./)
 })
+
+test("compileDeterministicPlan renames page route when source and target paths are provided", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-rename-page",
+    intent: { action: "update" },
+    message: "rename page /pricing to /plans",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "rename_page")
+  if (plan?.ops[0]?.op === "rename_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+    assert.equal(plan.ops[0].newPageSlug, "/plans")
+  }
+})
+
+test("compileDeterministicPlan asks clarification when page rename target path is missing", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-rename-missing-target",
+    intent: { action: "update" },
+    message: "rename this page path",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan blocks deleting home page", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-delete-home",
+    intent: { action: "remove" },
+    message: "delete page /",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan returns nav move clarification when anchor page is missing", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-nav-missing-anchor",
+    intent: { action: "move" },
+    message: "move /pricing before /missing in nav",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan creates nav move op to first position", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-nav-first",
+    intent: { action: "move" },
+    message: "move /pricing to first in nav",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_page")
+  if (plan?.ops[0]?.op === "move_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+    assert.equal(plan.ops[0].afterPageSlug, undefined)
+  }
+})
+
+test("compileDeterministicPlan creates audience landing page with default audience route", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-audience-create",
+    intent: { action: "add" },
+    message: "create landing page for startup founders audience",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "create_page")
+  if (plan?.ops[0]?.op === "create_page") {
+    assert.equal(plan.ops[0].page.slug, "/for-startup-founders-audience")
+    assert.ok(plan.ops[0].page.blocks.length >= 1)
+  }
+})
+
+test("compileDeterministicPlan retargets selected hero block for audience", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((block) => block.type === "Hero")
+  assert.ok(hero)
+  const plan = compileDeterministicPlan({
+    session: "test-audience-retarget",
+    intent: { action: "update" },
+    message: "retarget this for developer teams audience",
+    slug: "/",
+    currentPage,
+    activeBlockId: hero?.id
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "update_props")
+  if (plan?.ops[0]?.op === "update_props") {
+    const patch = plan.ops[0].patch as Record<string, unknown>
+    assert.equal(typeof patch.heading, "string")
+    assert.match(String(patch.heading), /developer/i)
+  }
+})
+
+test("compileDeterministicPlan keeps RichText title patch when translating selected body", () => {
+  const currentPage = {
+    id: "p_custom",
+    slug: "/custom",
+    title: "Custom",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_richtext_custom",
+        type: "RichText" as const,
+        props: {
+          title: "Overview",
+          body: "Welcome to the site."
+        }
+      }
+    ]
+  }
+
+  const plan = compileDeterministicPlan({
+    session: "test-richtext-translate",
+    intent: {
+      action: "update",
+      target_block_ref: "b_richtext_custom",
+      patch: { title: "Resumen", body: "Bienvenido al sitio." }
+    },
+    message: "translate this body in spanish",
+    slug: "/custom",
+    currentPage,
+    activeBlockId: "b_richtext_custom",
+    activeEditablePath: "body"
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "update_props")
+  if (plan?.ops[0]?.op === "update_props") {
+    assert.equal(plan.ops[0].patch.title, "Resumen")
+    assert.equal(plan.ops[0].patch.body, "Bienvenido al sitio.")
+  }
+})
+
+test("compileDeterministicPlan add-before first block emits add then move-to-top ops", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-before-top",
+    intent: {
+      action: "add",
+      new_block_type: "CTA",
+      position: "before",
+      anchor_block_ref: "b_hero_home"
+    },
+    message: "add cta before hero",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops.length, 2)
+  assert.equal(plan?.ops[0]?.op, "add_block")
+  assert.equal(plan?.ops[1]?.op, "move_block")
+  if (plan?.ops[1]?.op === "move_block") {
+    assert.equal(plan.ops[1].afterBlockId, undefined)
+  }
+})
+
+test("compileDeterministicPlan add-after fails with unknown anchor block", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-after-missing-anchor",
+    intent: {
+      action: "add",
+      new_block_type: "FAQAccordion",
+      position: "after",
+      anchor_block_ref: "b_missing"
+    },
+    message: "add faq after missing block",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan asks for block type when add intent is ambiguous", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-missing-type",
+    intent: { action: "add" },
+    message: "add something here",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan add-before fails with unknown anchor block", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-before-missing-anchor",
+    intent: {
+      action: "add",
+      new_block_type: "CTA",
+      position: "before",
+      anchor_block_ref: "b_not_found"
+    },
+    message: "add cta before missing block",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan add-top emits add then move-to-top operations", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-top",
+    intent: {
+      action: "add",
+      new_block_type: "FAQAccordion",
+      position: "top"
+    },
+    message: "add faq at top",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops.length, 2)
+  assert.equal(plan?.ops[0]?.op, "add_block")
+  assert.equal(plan?.ops[1]?.op, "move_block")
+  if (plan?.ops[1]?.op === "move_block") {
+    assert.equal(plan.ops[1].afterBlockId, undefined)
+  }
+})
+
+test("compileDeterministicPlan move uses message bottom/end fallback when position is omitted", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-move-end-fallback",
+    intent: {
+      action: "move",
+      target_block_ref: "b_hero_home"
+    },
+    message: "move hero to end",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_block")
+  if (plan?.ops[0]?.op === "move_block") {
+    assert.equal(plan.ops[0].blockId, "b_hero_home")
+    assert.equal(typeof plan.ops[0].afterBlockId, "string")
+  }
+})
+
+test("compileDeterministicPlan move-before asks clarification when anchor block is missing", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-move-before-missing-anchor",
+    intent: {
+      action: "move",
+      target_block_ref: "b_hero_home",
+      position: "before",
+      anchor_block_ref: "b_missing"
+    },
+    message: "move hero before missing",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan move-after uses resolved anchor block id", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-move-after-anchor",
+    intent: {
+      action: "move",
+      target_block_ref: "b_cta_home",
+      position: "after",
+      anchor_block_ref: "b_hero_home"
+    },
+    message: "move cta after hero",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_block")
+  if (plan?.ops[0]?.op === "move_block") {
+    assert.equal(plan.ops[0].blockId, "b_cta_home")
+    assert.equal(plan.ops[0].afterBlockId, "b_hero_home")
+  }
+})
+
+test("compileDeterministicPlan move-before resolves predecessor anchor when anchor is not first", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-move-before-nonfirst-anchor",
+    intent: {
+      action: "move",
+      target_block_ref: "b_cta_home",
+      position: "before",
+      anchor_block_ref: "b_cta_home"
+    },
+    message: "move cta before cta",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_block")
+  if (plan?.ops[0]?.op === "move_block") {
+    // b_cta_home index is > 0; planner chooses predecessor id.
+    assert.equal(plan.ops[0].afterBlockId, "b_features_home")
+  }
+})
+
+test("compileDeterministicPlan move-before to first anchor resolves top placement", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-move-before-first-anchor",
+    intent: {
+      action: "move",
+      target_block_ref: "b_features_home",
+      position: "before",
+      anchor_block_ref: "b_hero_home"
+    },
+    message: "move features before hero",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_block")
+  if (plan?.ops[0]?.op === "move_block") {
+    assert.equal(plan.ops[0].afterBlockId, undefined)
+  }
+})
+
+test("compileDeterministicPlan move asks clarification when no placement is provided", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-move-missing-placement",
+    intent: {
+      action: "move",
+      target_block_ref: "b_cta_home"
+    },
+    message: "move cta",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+  assert.equal(plan?.ops.length, 0)
+})

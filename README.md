@@ -50,6 +50,8 @@ Alternative (recommended for repeated restarts without opening new terminals):
 - Site preview refresh is triggered by editor `postMessage` with `draftUpdated`.
 - Chat troubleshooting playbook:
   - `docs/chat-behavior-troubleshooting.md`
+- Dev server runbook (start/restart/status/logs/health checks):
+  - `docs/dev-server-runbook.md`
 - Product improvement backlog:
   - `docs/things-to-improve.md`
 - Editor debug mode:

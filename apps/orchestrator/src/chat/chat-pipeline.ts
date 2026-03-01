@@ -57,6 +57,16 @@ import {
   resolveUnsplashImage
 } from "../image/image-helpers.js"
 
+let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
+export function setGeneratePlanWithOpenAIForTests(fn?: typeof generatePlanWithOpenAI) {
+  generatePlanWithOpenAIImpl = fn ?? generatePlanWithOpenAI
+}
+
+let demoPlanFromMessageImpl = demoPlanFromMessage
+export function setDemoPlanFromMessageForTests(fn?: typeof demoPlanFromMessage) {
+  demoPlanFromMessageImpl = fn ?? demoPlanFromMessage
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline context
 // ---------------------------------------------------------------------------
@@ -1066,7 +1076,7 @@ export async function runChatPipeline(
 
   if (!process.env.OPENAI_API_KEY) {
     try {
-      const demoPlan = demoPlanFromMessage(plannerMessage, effectiveSlug, body.activeBlockId, body.activeBlockType)
+      const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, body.activeBlockId, body.activeBlockType)
       const outcome = await respondFromPlan(demoPlan, "demo", applyMode)
       if (outcome.done) return outcome.response
       return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
@@ -1110,7 +1120,7 @@ export async function runChatPipeline(
 
   for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
     try {
-      initialPlan = await generatePlanWithOpenAI({
+      initialPlan = await generatePlanWithOpenAIImpl({
         message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
@@ -1232,7 +1242,7 @@ export async function runChatPipeline(
       reason: initialOutcome.reason.slice(0, 300),
       reasonCategory: classifyGuardrailError(initialOutcome.reason)
     })
-    repairedPlan = await generatePlanWithOpenAI({
+    repairedPlan = await generatePlanWithOpenAIImpl({
       message: plannerMessage,
       slug: effectiveSlug,
       currentPage: current,

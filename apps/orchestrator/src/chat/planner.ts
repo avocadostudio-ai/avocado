@@ -19,8 +19,19 @@ import {
   normalizePlanCandidate
 } from "../nlp/plan-normalizer.js"
 
-function isChatStrictPrimaryOpMode() {
+export function isChatStrictPrimaryOpMode() {
   return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
+}
+
+export type PlannerOpenAIClient = {
+  chat: {
+    completions: {
+      create: (args: unknown) => any
+    }
+  }
+  responses: {
+    create: (args: unknown) => any
+  }
 }
 
 export function openAIChatOptionsForModel(model: string) {
@@ -64,8 +75,9 @@ export async function parseIntentWithOpenAI(args: {
   activeBlockType?: string
   activeEditablePath?: string
   model: string
+  client?: PlannerOpenAIClient
 }): Promise<ParsedIntent> {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
   const system = [
     "You extract editing intent for a website editor.",
     "Return ONLY one JSON object. No markdown.",
@@ -169,8 +181,9 @@ export async function generatePlanWithOpenAI(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
+  client?: PlannerOpenAIClient
 }): Promise<EditPlan> {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode()
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
   const audienceHint = extractAudienceTarget(args.message)
