@@ -198,6 +198,26 @@ test("compileDeterministicPlan keeps richtext add intent on this page as block e
   }
 })
 
+test("compileDeterministicPlan removes current page when site context includes unrelated route mentions", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-suite",
+    intent: { action: "remove" },
+    message:
+      "remove this page\n\n[site context]\nKnown routes: /site, /pricing, /\n[/site context]",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "remove_page")
+  if (plan?.ops[0]?.op === "remove_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+  }
+})
+
 test("buildCreatePagePlan returns clarification when slug already exists", () => {
   const existing = buildCreatePagePlan({
     session: "test-suite",
