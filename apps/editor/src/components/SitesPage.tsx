@@ -46,7 +46,6 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc.toString()} />
               <div className="site-tile-meta">
                 <h2>{site.name}</h2>
-                <p>{site.id} · {site.hosting}</p>
                 {site.purpose ? <p className="site-purpose">{site.purpose}</p> : null}
                 <div className="site-tile-actions">
                   <button type="button" className="secondary-btn site-config-btn" onClick={() => sites.setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`}>
@@ -54,7 +53,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                       <path d="M8.8 2h2.4l.5 2.1a6.7 6.7 0 0 1 1.5.6l1.9-1.1 1.7 1.7-1.1 1.9c.2.5.4 1 .5 1.5l2.1.5v2.4l-2.1.5a6.7 6.7 0 0 1-.6 1.5l1.1 1.9-1.7 1.7-1.9-1.1a6.7 6.7 0 0 1-1.5.6L11.2 18H8.8l-.5-2.1a6.7 6.7 0 0 1-1.5-.6l-1.9 1.1-1.7-1.7 1.1-1.9a6.7 6.7 0 0 1-.6-1.5L2 11.2V8.8l2.1-.5c.1-.5.3-1 .6-1.5L3.6 4.9l1.7-1.7 1.9 1.1c.5-.2 1-.4 1.5-.5L8.8 2z" />
                       <circle cx="10" cy="10" r="2.4" />
                     </svg>
-                    <span>Config</span>
+                    <span>Settings</span>
                   </button>
                   <button type="button" className="secondary-btn site-config-btn" onClick={() => void sites.openRestoreModal(site.id)} aria-label={`Restore snapshot for ${site.name}`}>
                     <span>Restore snapshot</span>

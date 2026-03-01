@@ -252,9 +252,13 @@ textarea {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   gap: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 30%);
+}
+
+.chat-thread::before {
+  content: "";
+  flex: 1 1 auto;
 }
 
 .msg {
@@ -943,23 +947,28 @@ textarea {
 .sites-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 14px;
+  gap: 18px;
 }
 
 .site-tile {
-  border: 1px solid #b5c0ca;
-  border-radius: 16px;
-  background: #f3f7fb;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
   overflow: hidden;
   display: grid;
   grid-template-rows: auto auto;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+.site-tile:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  transform: translateY(-2px);
 }
 
 .site-tile-preview {
   position: relative;
   background: linear-gradient(180deg, #deebf6, #d1e0eb);
-  border-bottom: 2px solid #9fb3c7;
   overflow: hidden;
 }
 
@@ -980,35 +989,32 @@ textarea {
 }
 
 .site-tile-meta {
-  background: #eef3f8;
-  border-top: 1px solid #c8d3df;
-  padding: 16px;
+  background: #f8fafb;
+  border-top: 1px solid var(--line);
+  padding: 14px 16px;
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 
 .site-tile-meta h2 {
   margin: 0;
-  font-size: 20px;
-  line-height: 1.1;
-}
-
-.site-tile-meta p {
-  margin: 0;
-  color: #4b607a;
-  font-size: 13px;
+  font-size: 17px;
+  line-height: 1.2;
 }
 
 .site-tile-meta .site-purpose {
-  font-size: 12px;
-  line-height: 1.35;
-  color: #334a63;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
 }
 
 .site-tile-actions {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .site-config-btn {
@@ -1030,19 +1036,15 @@ textarea {
 }
 
 .site-tile-meta .primary-btn {
-  margin-top: 2px;
   width: fit-content;
   min-height: 34px;
   border-radius: 10px;
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   font-weight: 600;
-  border-color: #96a9bd;
-  background: #e8eff6;
-  color: #274159;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
 }
 
 .site-tile-meta .primary-btn svg {
@@ -1053,7 +1055,6 @@ textarea {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.82;
 }
 
 .sites-create {
