@@ -38,6 +38,14 @@ function slugToLabel(route: string) {
     .join(" / ")
 }
 
+function siteNameFromId(siteId: string) {
+  return siteId
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
 export function generateStaticParams() {
   return getPublishedSlugs().map((slug) => ({
     slug:
@@ -60,6 +68,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const tileMode = getSingleValue(resolvedSearch.__tile) === "1"
   const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
   const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
+  const siteName = getSingleValue(resolvedSearch.siteName) ?? siteNameFromId(siteId) ?? "Site"
   const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
 
   const page = await fetchDraftPage(slug, session, siteId, editorMode)
@@ -69,6 +78,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const editorQuery = editorMode
       ? (() => {
         const params = new URLSearchParams({ __editor: "1", session, siteId })
+        params.set("siteName", siteName)
         if (editorOrigin) params.set("editorOrigin", editorOrigin)
         return `?${params.toString()}`
       })()
@@ -99,7 +109,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
           <span className="avocado-mark" aria-hidden="true">
             <span className="avocado-pit" />
           </span>
-          <span className="site-brand-text">Avocado Stories</span>
+          <span className="site-brand-text">{siteName}</span>
         </Link>
         <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
           {navSlugs.map((route) => (
