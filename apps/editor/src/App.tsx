@@ -149,8 +149,6 @@ type SiteConfig = {
   hosting: string
 }
 
-const AVOCADO_SITE_ID = "avocado-stories"
-const AVOCADO_SITE_NAME = "Avocado Stories"
 const SITE_LIST_STORAGE_KEY = "editor-site-list-v1"
 const DEFAULT_SITE_HOSTING = "Vercel production site (single shared project)"
 
@@ -163,30 +161,31 @@ function sanitizeSiteId(value: string) {
 }
 
 function resolveEditorSiteId() {
-  const fallback = sanitizeSiteId((import.meta.env.VITE_SITE_ID as string | undefined) ?? "") || AVOCADO_SITE_ID
+  const fallback = sanitizeSiteId((import.meta.env.VITE_SITE_ID as string | undefined) ?? "") || "dev-site"
   if (typeof window === "undefined") return fallback
   const fromQuery = sanitizeSiteId(new URLSearchParams(window.location.search).get("siteId") ?? "")
   return fromQuery || fallback
 }
 
-function defaultSiteList(): SiteConfig[] {
+function defaultSiteList(siteId: string): SiteConfig[] {
+  const resolvedId = sanitizeSiteId(siteId) || "dev-site"
   return [
     {
-      id: AVOCADO_SITE_ID,
-      name: AVOCADO_SITE_NAME,
-      purpose: "Marketing site for Avocado Stories products, recipes, and sustainability messaging.",
+      id: resolvedId,
+      name: siteNameFromId(resolvedId) || "Site",
+      purpose: "",
       hosting: DEFAULT_SITE_HOSTING
     }
   ]
 }
 
-function loadSiteListFromStorage() {
-  if (typeof window === "undefined") return defaultSiteList()
+function loadSiteListFromStorage(siteId: string) {
+  if (typeof window === "undefined") return defaultSiteList(siteId)
   try {
     const raw = window.localStorage.getItem(SITE_LIST_STORAGE_KEY)
-    if (!raw) return defaultSiteList()
+    if (!raw) return defaultSiteList(siteId)
     const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return defaultSiteList()
+    if (!Array.isArray(parsed)) return defaultSiteList(siteId)
     const cleaned = parsed
       .filter((site): site is { id: string; name: string; purpose?: string; hosting?: string } => {
         return Boolean(
@@ -203,13 +202,10 @@ function loadSiteListFromStorage() {
         hosting: typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
-    const merged = [...cleaned]
-    if (!merged.some((site) => site.id === AVOCADO_SITE_ID)) {
-      merged.unshift(defaultSiteList()[0])
-    }
-    return merged
+    if (cleaned.length > 0) return cleaned
+    return defaultSiteList(siteId)
   } catch {
-    return defaultSiteList()
+    return defaultSiteList(siteId)
   }
 }
 
@@ -477,7 +473,7 @@ export function App() {
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const [session] = useState("dev")
   const [siteId] = useState(() => resolveEditorSiteId())
-  const [siteList, setSiteList] = useState<SiteConfig[]>(() => loadSiteListFromStorage())
+  const [siteList, setSiteList] = useState<SiteConfig[]>(() => loadSiteListFromStorage(siteId))
   const [newSiteName, setNewSiteName] = useState("")
   const [newSitePurpose, setNewSitePurpose] = useState("")
   const [newSiteHosting, setNewSiteHosting] = useState(DEFAULT_SITE_HOSTING)
@@ -550,7 +546,7 @@ export function App() {
     if (match) return match
     return {
       id: siteId,
-      name: siteNameFromId(siteId) || AVOCADO_SITE_NAME,
+      name: siteNameFromId(siteId) || "Site",
       purpose: "",
       hosting: DEFAULT_SITE_HOSTING
     } satisfies SiteConfig
@@ -638,6 +634,7 @@ export function App() {
             const previewSrc = new URL(`${siteOrigin}/`, window.location.origin)
             previewSrc.searchParams.set("session", session)
             previewSrc.searchParams.set("siteId", site.id)
+            previewSrc.searchParams.set("siteName", site.name)
             previewSrc.searchParams.set("__tile", "1")
             return (
               <article key={site.id} className="site-tile">
@@ -785,9 +782,10 @@ export function App() {
     url.searchParams.set("__editor", "1")
     url.searchParams.set("session", session)
     url.searchParams.set("siteId", siteId)
+    url.searchParams.set("siteName", activeSiteConfig.name)
     url.searchParams.set("editorOrigin", editorOrigin)
     return url.toString()
-  }, [session, siteId, slug])
+  }, [activeSiteConfig.name, editorOrigin, session, siteId, slug])
 
   const routeOptions = useMemo(() => {
     const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
