@@ -17,6 +17,7 @@ import {
   editPlanSchema,
   getPropDisplayName,
   operationSchema,
+  pageDocSchema,
   type BlockType,
   type EditPlan,
   type Operation,
@@ -596,6 +597,74 @@ async function runGit(args: string[], cwd: string) {
     const detail = stderr || stdout || message || toErrorDetail(error)
     throw new Error(detail)
   }
+}
+
+type SnapshotDescriptor = {
+  commit: string
+  committedAt: string
+  message: string
+  pageCount: number
+  homeHeading: string
+}
+
+async function loadPublishedSnapshotFromCommit(commit: string): Promise<PageDoc[]> {
+  const repoRoot = resolve(process.cwd(), "../..")
+  const targetPath = "apps/site/lib/published-content.json"
+  const raw = (await runGit(["show", `${commit}:${targetPath}`], repoRoot)).stdout
+  const payload = JSON.parse(raw) as unknown
+  if (!Array.isArray(payload)) throw new Error("snapshot payload is not an array")
+
+  const pages: PageDoc[] = []
+  for (const candidate of payload) {
+    const parsed = pageDocSchema.safeParse(candidate)
+    if (!parsed.success) throw new Error("snapshot payload contains invalid page schema")
+    pages.push(parsed.data)
+  }
+  if (pages.length === 0) throw new Error("snapshot has no pages")
+  return pages
+}
+
+async function listRestoreSnapshots(limit = 30): Promise<SnapshotDescriptor[]> {
+  const repoRoot = resolve(process.cwd(), "../..")
+  const targetPath = "apps/site/lib/published-content.json"
+  const cappedLimit = Math.max(1, Math.min(80, Math.floor(limit)))
+  const rawLog = (await runGit(["log", "--max-count", String(cappedLimit * 4), "--date=iso-strict", "--pretty=format:%H|%ad|%s", "--", targetPath], repoRoot)).stdout
+  const lines = rawLog
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const seen = new Set<string>()
+  const snapshots: SnapshotDescriptor[] = []
+  for (const line of lines) {
+    const first = line.indexOf("|")
+    const second = line.indexOf("|", first + 1)
+    if (first <= 0 || second <= first) continue
+    const commit = line.slice(0, first).trim()
+    const committedAt = line.slice(first + 1, second).trim()
+    const message = line.slice(second + 1).trim()
+    if (!commit) continue
+    try {
+      const pages = await loadPublishedSnapshotFromCommit(commit)
+      const home = pages.find((page) => page.slug === "/")
+      const homeHeadingRaw = home?.blocks.find((block) => block.type === "Hero")?.props?.heading
+      const homeHeading = typeof homeHeadingRaw === "string" && homeHeadingRaw.trim().length > 0 ? homeHeadingRaw.trim() : "(no hero heading)"
+      const signature = `${pages.length}::${homeHeading}::${pages.map((page) => page.slug).join("|")}`
+      if (seen.has(signature)) continue
+      seen.add(signature)
+      snapshots.push({
+        commit: commit.slice(0, 7),
+        committedAt,
+        message,
+        pageCount: pages.length,
+        homeHeading
+      })
+      if (snapshots.length >= cappedLimit) break
+    } catch {
+      // Ignore malformed/unrelated historical snapshots.
+    }
+  }
+  return snapshots
 }
 
 function sanitizeBranch(input: string) {
@@ -5839,6 +5908,51 @@ app.get("/publish/status", async (request, reply) => {
   const refreshed = await refreshPublishStatusFromVercel(current)
   publishStatusBySession.set(scopedSession, refreshed)
   return refreshed
+})
+
+app.get("/restore/snapshots", async (request, reply) => {
+  const query = request.query as { limit?: string }
+  const limit = query.limit ? Number(query.limit) : 30
+  try {
+    const snapshots = await listRestoreSnapshots(Number.isFinite(limit) ? limit : 30)
+    return { snapshots }
+  } catch (error) {
+    return reply.code(500).send({ error: toErrorDetail(error) })
+  }
+})
+
+app.post("/restore/snapshot", async (request, reply) => {
+  const body = (request.body ?? {}) as { commit?: string; session?: string; siteId?: string }
+  const commit = typeof body.commit === "string" ? body.commit.trim() : ""
+  if (!/^[0-9a-f]{7,40}$/i.test(commit)) {
+    return reply.code(400).send({ error: "commit is required (7-40 hex chars)" })
+  }
+
+  const session = normalizeSession(body.session)
+  const scopedSession = scopedSessionKey(session, body.siteId)
+
+  try {
+    const pages = await loadPublishedSnapshotFromCommit(commit)
+    const draft = getSessionDraft(scopedSession)
+    draft.clear()
+    for (const page of pages) {
+      const clone = structuredClone(page)
+      ensureHeroImageProps(clone)
+      draft.set(clone.slug, clone)
+    }
+    const previewVersion = bumpVersion(scopedSession)
+    schedulePersistState(app.log)
+    return {
+      status: "restored",
+      commit: commit.slice(0, 7),
+      session,
+      scopedSession,
+      slugs: pages.map((page) => page.slug),
+      previewVersion
+    }
+  } catch (error) {
+    return reply.code(400).send({ error: toErrorDetail(error) })
+  }
 })
 
 app.post("/ops", async (request, reply) => {
