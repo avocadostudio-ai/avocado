@@ -299,7 +299,14 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     <div className="layout">
       <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
-          <div className="chat-header-site-name">{activeSiteConfig.name}</div>
+          <div className="chat-header-site-name">
+            {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Change</a>
+            {chatEngine.plannerBadgeState === "demo" ? (
+              <span className="planner-badge planner-badge-demo">Demo mode</span>
+            ) : chatEngine.plannerBadgeState === "openai" ? (
+              <span className="planner-badge planner-badge-ai">AI</span>
+            ) : null}
+          </div>
           <div className="chat-header-controls">
             <label className="chat-header-slug">
               <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
@@ -311,9 +318,6 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
               </select>
             </label>
             <div className="chat-header-primary-actions">
-              <a className="secondary-btn" href="/sites">
-                Sites
-              </a>
               <button
                 type="button"
                 className="settings-icon-btn"
@@ -507,7 +511,10 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
             hasUserEntry={hasUserEntry}
             onMessageChange={setMessage}
             onModelChange={setModelKey}
-            onSubmit={(explicitMessage) => void chatEngine.submitChat(explicitMessage, message)}
+            onSubmit={(explicitMessage) => {
+              setMessage("")
+              void chatEngine.submitChat(explicitMessage, message)
+            }}
             onTranscribeAudio={media.transcribeAudio}
             onInterpretImage={media.interpretPastedImage}
             onAutoHeightChange={handleComposerAutoHeight}

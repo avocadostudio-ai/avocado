@@ -53,9 +53,11 @@ export function isStandalonePageOperation(message: string) {
 }
 
 export function parseCreatePageRequest(message: string) {
-  const lower = message.toLowerCase().replace(/\s+/g, " ").trim()
+  // Strip [site context]...[/site context] metadata to prevent false route matches
+  const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
+  const lower = stripped.toLowerCase().replace(/\s+/g, " ").trim()
   const mentionsCurrentPage = /\b(this|current|selected)\s+page\b/.test(lower)
-  const hasExplicitRoute = Boolean(firstRouteMention(message) ?? extractRouteMentions(message)[0])
+  const hasExplicitRoute = Boolean(firstRouteMention(stripped) ?? extractRouteMentions(stripped)[0])
   const asksNewPage = /\bnew\s+page\b/.test(lower)
   if (mentionsCurrentPage && !asksNewPage && !hasExplicitRoute) return null
 
@@ -66,11 +68,11 @@ export function parseCreatePageRequest(message: string) {
     /\badd\b[^.\n]{0,16}\bnew\s+page\b/.test(lower) ||
     /\bnew\s+page\b/.test(lower)
   const hasCreateVerb = /\b(create|generate|add|make|build|draft)\b/.test(lower)
-  const hasRouteHint = /\/[a-z0-9/_-]*/i.test(message)
+  const hasRouteHint = /\/[a-z0-9/_-]*/i.test(stripped)
   if (!explicitCreatePhrase && !(hasCreateVerb && hasRouteHint && hasPageWord)) return null
   if (mentionsCurrentPage && !asksNewPage && !hasExplicitRoute) return null
 
-  const directRoute = firstRouteMention(message) ?? extractRouteMentions(message)[0]
+  const directRoute = firstRouteMention(stripped) ?? extractRouteMentions(stripped)[0]
   if (directRoute) {
     const normalized = normalizeRouteCandidate(directRoute)
     if (normalized && normalized !== "/") return normalized
@@ -89,4 +91,19 @@ export function parseCreatePageRequest(message: string) {
   }
 
   return "/new-page"
+}
+
+/** Returns true when the message asks for AI-generated content alongside a page create. */
+export function requestsContentGeneration(message: string) {
+  const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
+  const lower = stripped.toLowerCase()
+  const asksContent =
+    /\bcontent\b/.test(lower) ||
+    /\b(fill|populate)\b.*\b(page|it)\b/.test(lower) ||
+    /\b(write|describe|explain)\b.*\b(about|for|on)\b/.test(lower)
+  // Strip route paths before checking for block types so /faq doesn't match "faq"
+  const withoutRoutes = lower.replace(/\/[a-z0-9/_-]+/g, "")
+  const hasExplicitBlockTypes =
+    /\b(hero|cta|call to action|rich\s?text|text\s+(?:section|block)|feature|testimonial|faq|card)\b/.test(withoutRoutes)
+  return asksContent && !hasExplicitBlockTypes
 }

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { unstable_noStore as noStore } from "next/cache"
+import type { Metadata } from "next"
 import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
 import { EditorPreviewBridge } from "../../components/editor-harness"
@@ -56,6 +57,30 @@ export function generateStaticParams() {
             .split("/")
             .filter(Boolean)
   }))
+}
+
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  noStore()
+  const resolvedParams = await params
+  const resolvedSearch = await searchParams
+  const slug = buildSlug(resolvedParams.slug)
+  const editorMode = EDITOR_ENABLED && resolvedSearch.__editor === "1"
+  const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
+  const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
+
+  const page = await fetchDraftPage(slug, session, siteId, editorMode)
+  if (!page) return {}
+
+  const meta: Metadata = {
+    title: page.meta?.title ?? page.title
+  }
+  if (page.meta?.description) {
+    meta.description = page.meta.description
+  }
+  if (page.meta?.ogImage) {
+    meta.openGraph = { images: [page.meta.ogImage] }
+  }
+  return meta
 }
 
 export default async function SitePage({ params, searchParams }: PageProps) {

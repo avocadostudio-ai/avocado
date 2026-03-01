@@ -135,6 +135,7 @@ async function withDefaultImageVariations(args: {
   block: PageDoc["blocks"][number]
   message: string
   variations: VariationOption[]
+  page?: PageDoc
   log?: FastifyBaseLogger
 }): Promise<VariationOption[]> {
   if (!supportsImageVariation(args.block)) return args.variations
@@ -155,10 +156,17 @@ async function withDefaultImageVariations(args: {
         patch.imageAlt = `Image for ${args.block.type} variation`
       }
     } else if (imageIntent.provider === "llm") {
+      const blockProps = args.block.props as Record<string, unknown>
+      const heading = typeof blockProps.heading === "string" ? blockProps.heading : ""
+      const subheading = typeof blockProps.subheading === "string" ? blockProps.subheading : ""
+      const sectionContext = [args.block.type, heading, subheading].filter(Boolean).join(" — ")
+      const pageContext = args.page ? `${args.page.title} (${args.page.slug})` : undefined
       const prompt = buildVariationImagePrompt({
         intent: imageIntent,
         blockType: args.block.type,
-        variationIndex
+        variationIndex,
+        sectionContext,
+        pageContext
       })
       const generated = await generateVariationImageWithOpenAI({
         prompt,
@@ -489,6 +497,7 @@ export async function runVariationPipeline(
     block: selected,
     message: contextualMessage,
     variations,
+    page,
     log: ctx.log
   })
 

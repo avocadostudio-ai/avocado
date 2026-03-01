@@ -138,12 +138,13 @@ export function inferBlockTypeFromText(text: string): BlockType | undefined {
   const normalized = text.toLowerCase()
   if (normalized.includes("hero")) return "Hero"
   if (normalized.includes("featuregrid") || normalized.includes("feature grid") || normalized.includes("features")) return "FeatureGrid"
-  if (normalized.includes("testimonial")) return "Testimonials"
+  if (normalized.includes("testimonial") || normalized.includes("social proof") || normalized.includes("review") || normalized.includes("quote")) return "Testimonials"
   if (normalized.includes("faq")) return "FAQAccordion"
   if (normalized.includes("cta")) return "CTA"
-  if (normalized.includes("cardgrid") || normalized.includes("card grid")) return "CardGrid"
+  if (normalized.includes("cardgrid") || normalized.includes("card grid") || normalized.includes("pricing")) return "CardGrid"
   if (normalized.includes("card")) return "Card"
-  if (normalized.includes("richtext") || normalized.includes("rich text") || normalized.includes("rich-text") || normalized.includes("prose") || normalized.includes("text block")) return "RichText"
+  if (normalized.includes("richtext") || normalized.includes("rich text") || normalized.includes("rich-text") || normalized.includes("prose") || normalized.includes("text block") || normalized.includes("section") || normalized.includes("paragraph") || normalized.includes("copy")) return "RichText"
+  if (normalized.includes("benefit") || normalized.includes("advantage")) return "FeatureGrid"
   return undefined
 }
 

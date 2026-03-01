@@ -69,6 +69,40 @@ body {
   font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.planner-badge {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.planner-badge-demo {
+  background: #fef3c7;
+  color: #92400e;
+}
+.planner-badge-ai {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.chat-header-switch-site {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-left: 6px;
+}
+
+.chat-header-switch-site:hover {
+  color: #1d4ed8;
 }
 
 .chat-header-actions {
@@ -483,10 +517,9 @@ textarea {
 
 .streaming-pill.is-active {
   color: #054844;
-  background: #dff6f3;
-  border: 1px solid #67c9bf;
-  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.1);
-  animation: streaming-pulse 2s ease-in-out infinite;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .streaming-pill.is-error {
