@@ -14,8 +14,111 @@ export type BlockInstance = {
   props: Record<string, unknown>
 }
 
-export const blockSchemas = {
-  Hero: z.object({
+// ---------------------------------------------------------------------------
+// Field & block metadata types
+// ---------------------------------------------------------------------------
+
+/** Semantic kind for a block prop field. */
+export type FieldKind = "text" | "richtext" | "url" | "image" | "imageAlt" | "enum" | "color" | "number"
+
+/** Metadata for a single prop field on a block. */
+export type FieldMeta = {
+  kind: FieldKind
+  /** Human-readable label (e.g. "Heading text"). Falls back to prop key. */
+  label?: string
+  /** Whether this field supports inline editing in the preview. Defaults based on kind. */
+  inlineEditable?: boolean
+  /** For enum kind: the allowed values. */
+  options?: string[]
+}
+
+/** Metadata for list-type props (features, items, cards). */
+export type ListFieldMeta = {
+  /** Display label for the list (e.g. "Features"). */
+  label?: string
+  /** Field metadata for each item in the list. */
+  itemFields: Record<string, FieldMeta>
+}
+
+/** Full metadata for a registered block type. */
+export type BlockMeta = {
+  displayName: string
+  description?: string
+  category?: "content" | "media" | "navigation" | "conversion" | "layout"
+  /** Metadata for scalar (non-list) props. */
+  fields: Record<string, FieldMeta>
+  /** Metadata for array/list props. */
+  listFields?: Record<string, ListFieldMeta>
+}
+
+// ---------------------------------------------------------------------------
+// Block registry
+// ---------------------------------------------------------------------------
+
+const _blockSchemas: Record<string, z.ZodObject<any>> = {}
+const _blockMeta: Record<string, BlockMeta> = {}
+
+export type BlockRegistration = {
+  schema: z.ZodObject<any>
+  meta: BlockMeta
+}
+
+/**
+ * Register a block type. Can be called at module load time.
+ * Re-registering the same type overwrites the previous registration.
+ */
+export function registerBlock(type: string, config: BlockRegistration) {
+  _blockSchemas[type] = config.schema
+  _blockMeta[type] = config.meta
+}
+
+/** Get metadata for a registered block type, or undefined. */
+export function getBlockMeta(type: string): BlockMeta | undefined {
+  return _blockMeta[type]
+}
+
+/** Get all registered block metadata. */
+export function getAllBlockMeta(): Readonly<Record<string, BlockMeta>> {
+  return _blockMeta
+}
+
+/** Check if a field is inline-editable based on its metadata kind. */
+export function isFieldInlineEditable(type: string, fieldPath: string): boolean {
+  const meta = _blockMeta[type]
+  if (!meta) return true // no metadata = allow (backwards compat)
+
+  // Handle nested paths like "features[0].title" → list "features", item field "title"
+  const listMatch = fieldPath.match(/^([a-zA-Z_]+)\[\d+\]\.(.+)$/)
+  if (listMatch) {
+    const [, listKey, itemField] = listMatch
+    const listMeta = meta.listFields?.[listKey]
+    if (!listMeta) return true
+    const fm = listMeta.itemFields[itemField]
+    if (!fm) return true
+    if (fm.inlineEditable !== undefined) return fm.inlineEditable
+    return fm.kind === "text" || fm.kind === "richtext"
+  }
+
+  const fm = meta.fields[fieldPath]
+  if (!fm) return true
+  if (fm.inlineEditable !== undefined) return fm.inlineEditable
+  return fm.kind === "text" || fm.kind === "richtext"
+}
+
+// ---------------------------------------------------------------------------
+// Built-in block registrations
+// ---------------------------------------------------------------------------
+
+const f = {
+  text: (label?: string): FieldMeta => ({ kind: "text", label }),
+  richtext: (label?: string): FieldMeta => ({ kind: "richtext", label }),
+  url: (label?: string): FieldMeta => ({ kind: "url", label, inlineEditable: false }),
+  image: (label?: string): FieldMeta => ({ kind: "image", label, inlineEditable: false }),
+  imageAlt: (label?: string): FieldMeta => ({ kind: "imageAlt", label }),
+} as const
+
+registerBlock("Hero", {
+  schema: z.object({
     heading: z.string().min(1),
     subheading: z.string().min(1),
     ctaText: z.string().min(1),
@@ -25,31 +128,122 @@ export const blockSchemas = {
     secondaryCtaText: z.string().optional(),
     secondaryCtaHref: z.string().optional()
   }),
-  FeatureGrid: z.object({
+  meta: {
+    displayName: "Hero",
+    description: "Full-width hero section with headline, subheading, CTA buttons, and image.",
+    category: "content",
+    fields: {
+      heading: f.text("Heading"),
+      subheading: f.text("Subheading"),
+      ctaText: f.text("CTA button text"),
+      ctaHref: f.url("CTA link"),
+      imageUrl: f.image("Hero image"),
+      imageAlt: f.imageAlt("Hero image alt text"),
+      secondaryCtaText: f.text("Secondary CTA text"),
+      secondaryCtaHref: f.url("Secondary CTA link"),
+    }
+  }
+})
+
+registerBlock("FeatureGrid", {
+  schema: z.object({
     title: z.string().min(1),
     features: z.array(z.object({ title: z.string().min(1), description: z.string().min(1) })).min(1)
   }),
-  Testimonials: z.object({
+  meta: {
+    displayName: "Feature Grid",
+    description: "Grid of feature cards with title and description.",
+    category: "content",
+    fields: { title: f.text("Section title") },
+    listFields: {
+      features: {
+        label: "Features",
+        itemFields: { title: f.text("Feature title"), description: f.text("Feature description") }
+      }
+    }
+  }
+})
+
+registerBlock("Testimonials", {
+  schema: z.object({
     title: z.string().min(1),
     items: z.array(z.object({ quote: z.string().min(1), author: z.string().min(1) })).min(1)
   }),
-  FAQAccordion: z.object({
+  meta: {
+    displayName: "Testimonials",
+    description: "Grid of testimonial cards with quotes and authors.",
+    category: "content",
+    fields: { title: f.text("Section title") },
+    listFields: {
+      items: {
+        label: "Testimonials",
+        itemFields: { quote: f.text("Quote"), author: f.text("Author") }
+      }
+    }
+  }
+})
+
+registerBlock("FAQAccordion", {
+  schema: z.object({
     title: z.string().min(1),
     items: z.array(z.object({ q: z.string().min(1), a: z.string().min(1) })).min(1)
   }),
-  CTA: z.object({
+  meta: {
+    displayName: "FAQ Accordion",
+    description: "Expandable question-and-answer section.",
+    category: "content",
+    fields: { title: f.text("Section title") },
+    listFields: {
+      items: {
+        label: "FAQ items",
+        itemFields: { q: f.text("Question"), a: f.text("Answer") }
+      }
+    }
+  }
+})
+
+registerBlock("CTA", {
+  schema: z.object({
     title: z.string().min(1),
     description: z.string().min(1),
     ctaText: z.string().min(1),
     ctaHref: z.string().min(1)
   }),
-  Card: z.object({
+  meta: {
+    displayName: "Call to Action",
+    description: "Centered promotional section with a button.",
+    category: "conversion",
+    fields: {
+      title: f.text("Headline"),
+      description: f.text("Description"),
+      ctaText: f.text("Button text"),
+      ctaHref: f.url("Button link"),
+    }
+  }
+})
+
+registerBlock("Card", {
+  schema: z.object({
     title: z.string().min(1),
     description: z.string().min(1),
     ctaText: z.string().min(1),
     ctaHref: z.string().min(1)
   }),
-  CardGrid: z.object({
+  meta: {
+    displayName: "Card",
+    description: "Single prominent card with a CTA.",
+    category: "content",
+    fields: {
+      title: f.text("Card title"),
+      description: f.text("Card description"),
+      ctaText: f.text("Button text"),
+      ctaHref: f.url("Button link"),
+    }
+  }
+})
+
+registerBlock("CardGrid", {
+  schema: z.object({
     title: z.string().min(1),
     cards: z
       .array(
@@ -62,30 +256,76 @@ export const blockSchemas = {
       )
       .min(1)
   }),
-  RichText: z.object({
+  meta: {
+    displayName: "Card Grid",
+    description: "Grid of cards, each with title, description, and CTA.",
+    category: "content",
+    fields: { title: f.text("Section title") },
+    listFields: {
+      cards: {
+        label: "Cards",
+        itemFields: {
+          title: f.text("Card title"),
+          description: f.text("Card description"),
+          ctaText: f.text("Button text"),
+          ctaHref: f.url("Button link"),
+        }
+      }
+    }
+  }
+})
+
+registerBlock("RichText", {
+  schema: z.object({
     title: z.string(),
     body: z.string().min(1)
-  })
-} as const
-
-export type BlockType = keyof typeof blockSchemas
-export const allowedBlockTypes = Object.keys(blockSchemas) as BlockType[]
-
-const blockPropDisplayNames: Partial<Record<BlockType, Record<string, string>>> = {
-  Hero: {
-    imageUrl: "Hero block image",
-    imageAlt: "Hero image alt text"
+  }),
+  meta: {
+    displayName: "Rich Text",
+    description: "Freeform text content with markdown-style formatting.",
+    category: "content",
+    fields: {
+      title: f.text("Section title"),
+      body: f.richtext("Body"),
+    }
   }
+})
+
+// ---------------------------------------------------------------------------
+// Backwards-compatible exports
+// ---------------------------------------------------------------------------
+
+/**
+ * Block schemas keyed by type name.
+ * Prefer `registerBlock()` for new blocks; this object is kept for backwards compat.
+ */
+export const blockSchemas = _blockSchemas as Record<string, z.ZodObject<any>> & {
+  [K in "Hero" | "FeatureGrid" | "Testimonials" | "FAQAccordion" | "CTA" | "Card" | "CardGrid" | "RichText"]: z.ZodObject<any>
 }
 
-export function getPropDisplayName(blockType: BlockType | undefined, propKey: string) {
+export type BlockType = string & {}
+export const allowedBlockTypes: string[] = Object.keys(_blockSchemas)
+
+// Keep allowedBlockTypes in sync when new blocks are registered after module load
+const _origRegister = registerBlock
+export { _origRegister as _registerBlockInternal }
+
+export function getPropDisplayName(blockType: string | undefined, propKey: string) {
   if (!blockType) return propKey
-  return blockPropDisplayNames[blockType]?.[propKey] ?? propKey
+  const meta = _blockMeta[blockType]
+  if (!meta) return propKey
+  // Check scalar fields
+  const fm = meta.fields[propKey]
+  if (fm?.label) return fm.label
+  // Check list fields
+  const lm = meta.listFields?.[propKey]
+  if (lm?.label) return lm.label
+  return propKey
 }
 
 export const blockInstanceSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(allowedBlockTypes as [BlockType, ...BlockType[]]),
+  type: z.string().min(1).refine((t) => t in _blockSchemas, { message: "Unknown block type" }),
   props: z.record(z.unknown())
 })
 
@@ -239,8 +479,10 @@ export type ResetToServerMessage = {
   focusBlockId?: string
 }
 
-export function validateBlockProps(type: BlockType, props: unknown) {
-  return blockSchemas[type].safeParse(props)
+export function validateBlockProps(type: string, props: unknown) {
+  const schema = _blockSchemas[type]
+  if (!schema) return { success: false as const, error: new z.ZodError([{ code: "custom", message: `Unknown block type: ${type}`, path: [] }]) }
+  return schema.safeParse(props)
 }
 
 export function demoPublishedPages(): PageDoc[] {

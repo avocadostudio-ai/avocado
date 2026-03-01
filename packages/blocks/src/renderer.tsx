@@ -364,7 +364,7 @@ function RichText(props: Record<string, unknown>) {
   )
 }
 
-const renderers = {
+const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element | null> = {
   Hero,
   FeatureGrid,
   Testimonials,
@@ -373,7 +373,7 @@ const renderers = {
   Card,
   CardGrid,
   RichText
-} as const
+}
 
 export function SharedBlockRenderer({ block }: { block: BlockInstance }) {
   const Renderer = renderers[block.type]
