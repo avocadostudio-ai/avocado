@@ -214,6 +214,31 @@ export const editPlanSchema = z.object({
 
 export type EditPlan = z.infer<typeof editPlanSchema>
 
+// site-editor/v2 patch transport messages
+export type PatchRejectReason = "version_mismatch" | "apply_error" | "unknown_op"
+
+export type ApplyPatchMessage = {
+  type: "applyPatch"
+  txId: string
+  op: Operation           // single op to apply optimistically
+  fromVersion: number     // expected current version in iframe
+  toVersion: number       // version after this op
+  focusBlockId?: string
+}
+
+export type PatchAckMessage = {
+  type: "patchAck"
+  txId: string
+  accepted: boolean
+  reason?: PatchRejectReason
+}
+
+export type ResetToServerMessage = {
+  type: "resetToServer"
+  toVersion: number
+  focusBlockId?: string
+}
+
 export function validateBlockProps(type: BlockType, props: unknown) {
   return blockSchemas[type].safeParse(props)
 }

@@ -3,11 +3,39 @@
 import { useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
-type SiteMessage = {
-  protocol: "site-editor/v1"
-  type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility"
-  payload: Record<string, unknown>
+// site-editor/v2 patch transport message types (mirrored from @ai-site-editor/shared)
+type PatchRejectReason = "version_mismatch" | "apply_error" | "unknown_op"
+
+type ApplyPatchMessage = {
+  type: "applyPatch"
+  txId: string
+  op: Record<string, unknown>
+  fromVersion: number
+  toVersion: number
+  focusBlockId?: string
 }
+
+type PatchAckMessage = {
+  type: "patchAck"
+  txId: string
+  accepted: boolean
+  reason?: PatchRejectReason
+}
+
+type ResetToServerMessage = {
+  type: "resetToServer"
+  toVersion: number
+  focusBlockId?: string
+}
+
+type SiteMessage =
+  | {
+      protocol: "site-editor/v1"
+      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility"
+      payload: Record<string, unknown>
+    }
+  | ({ protocol: "site-editor/v1" } & ApplyPatchMessage)
+  | ({ protocol: "site-editor/v1" } & ResetToServerMessage)
 
 export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrigin: string }) {
   const router = useRouter()
@@ -28,7 +56,14 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     isMultiline: boolean
   } | null>(null)
 
+  const serverVersionRef = useRef<number>(0)
+
   useEffect(() => {
+    const emitPatchAck = (txId: string, accepted: boolean, reason?: PatchRejectReason) => {
+      const msg: PatchAckMessage = { type: "patchAck", txId, accepted, reason }
+      window.parent.postMessage({ source: "site-editor/v1", ...msg }, editorOrigin)
+    }
+
     const setNestedLabelsVisibility = (visible: boolean) => {
       document.documentElement.classList.toggle("editor-hide-nested-labels", !visible)
     }
@@ -414,10 +449,6 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       if (!editablePath) selectedEditablePathRef.current = null
       applyBlockFocus(blockId, false, editablePath)
 
-      if (childNode && editablePath) {
-        startInlineEdit({ node: childNode, blockId, blockType, editablePath })
-      }
-
       window.parent.postMessage(
         {
           protocol: "site-editor/v1",
@@ -428,10 +459,54 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       )
     }
 
+    const onDoubleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      const childNode = target?.closest<HTMLElement>("[data-editable-target]")
+      if (!childNode) return
+      const node = childNode.closest<HTMLElement>("[data-block-id]")
+      if (!node) return
+
+      const blockId = node.getAttribute("data-block-id")
+      const blockType = node.getAttribute("data-block-type")
+      const editablePath = String(childNode.getAttribute("data-editable-target") ?? "")
+      if (!blockId || !blockType || !editablePath) return
+      if (!supportsInlineEditablePath(editablePath)) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      applyBlockFocus(blockId, false, editablePath)
+      startInlineEdit({ node: childNode, blockId, blockType, editablePath })
+    }
+
     const onMessage = (event: MessageEvent<SiteMessage>) => {
       if (event.origin !== editorOrigin) return
       const msg = event.data
       if (!msg || msg.protocol !== "site-editor/v1") return
+
+      if (msg.type === "applyPatch") {
+        if (serverVersionRef.current !== msg.fromVersion) {
+          emitPatchAck(msg.txId, false, "version_mismatch")
+          return
+        }
+        serverVersionRef.current = msg.toVersion
+        if (msg.focusBlockId) {
+          pendingFocusRef.current = msg.focusBlockId
+          pendingScrollIntoViewRef.current = true
+        }
+        smoothRefresh()
+        emitPatchAck(msg.txId, true)
+        return
+      }
+
+      if (msg.type === "resetToServer") {
+        serverVersionRef.current = msg.toVersion
+        if (msg.focusBlockId) {
+          pendingFocusRef.current = msg.focusBlockId
+          pendingScrollIntoViewRef.current = true
+        }
+        smoothRefresh()
+        return
+      }
 
       if (msg.type === "draftUpdated") {
         const focusBlockId = String(msg.payload.focusBlockId ?? "")
@@ -502,6 +577,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     if (document.body) observer.observe(document.body, { childList: true, subtree: true })
 
     document.addEventListener("click", onClick, true)
+    document.addEventListener("dblclick", onDoubleClick, true)
     document.addEventListener("keydown", onKeyDown, true)
     window.addEventListener("message", onMessage)
 
@@ -511,6 +587,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       removeSelectedDeleteHandle()
       observer.disconnect()
       document.removeEventListener("click", onClick, true)
+      document.removeEventListener("dblclick", onDoubleClick, true)
       document.removeEventListener("keydown", onKeyDown, true)
       window.removeEventListener("message", onMessage)
     }

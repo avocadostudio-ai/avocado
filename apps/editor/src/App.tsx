@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
-import type { BlockInstance } from "@ai-site-editor/shared"
+import type { BlockInstance, ApplyPatchMessage, PatchAckMessage, Operation } from "@ai-site-editor/shared"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
 type PlannerSource = "openai" | "demo"
 type PlannerBadgeState = PlannerSource | "checking" | "error"
+type ChatExecutionMode = "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
 
 type AssistantResponse = {
   status?: string
@@ -18,9 +19,20 @@ type AssistantResponse = {
   modelUsed?: string
   modelKey?: string
   plannerSource?: PlannerSource
+  pendingPlanId?: string
   focusBlockId?: string
   updatedSlug?: string
   suggestions?: string[]
+  debug?: {
+    traceId?: string
+    promptHash?: string
+    promptExcerpt?: string
+    outcome?: string
+    reasonCategory?: string
+    intent?: string
+    opTypes?: string[]
+    opCount?: number
+  }
   error?: string
 }
 
@@ -46,11 +58,13 @@ type VariationResponse = {
   error?: string
 }
 
-type SiteMessage = {
-  protocol: "site-editor/v1"
-  type: "blockClicked" | "routeChanged" | "blockReordered" | "blockDeleteRequested" | "inlineTextCommitted"
-  payload: Record<string, unknown>
-}
+type SiteMessage =
+  | {
+      protocol: "site-editor/v1"
+      type: "blockClicked" | "routeChanged" | "blockReordered" | "blockDeleteRequested" | "inlineTextCommitted"
+      payload: Record<string, unknown>
+    }
+  | ({ source: "site-editor/v1" } & PatchAckMessage)
 
 type ChatEntry = {
   id: string
@@ -64,8 +78,10 @@ type ChatEntry = {
   suggestions?: string[]
   errors?: string[]
   meta?: string
+  debug?: AssistantResponse["debug"]
   aiJustification?: string
   aiPerformanceNote?: string
+  pendingPlanId?: string
 }
 
 type ApplyOpsResponse = {
@@ -125,6 +141,84 @@ type VariationModalState = {
 }
 
 type PreviewWidthPreset = "desktop" | "tablet" | "mobile"
+type SiteConfig = {
+  id: string
+  name: string
+  purpose: string
+  hosting: string
+}
+
+const AVOCADO_SITE_ID = "avocado-stories"
+const AVOCADO_SITE_NAME = "Avocado Stories"
+const SITE_LIST_STORAGE_KEY = "editor-site-list-v1"
+const DEFAULT_SITE_HOSTING = "Vercel production site (single shared project)"
+
+function sanitizeSiteId(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function resolveEditorSiteId() {
+  const fallback = sanitizeSiteId((import.meta.env.VITE_SITE_ID as string | undefined) ?? "") || AVOCADO_SITE_ID
+  if (typeof window === "undefined") return fallback
+  const fromQuery = sanitizeSiteId(new URLSearchParams(window.location.search).get("siteId") ?? "")
+  return fromQuery || fallback
+}
+
+function defaultSiteList(): SiteConfig[] {
+  return [
+    {
+      id: AVOCADO_SITE_ID,
+      name: AVOCADO_SITE_NAME,
+      purpose: "Marketing site for Avocado Stories products, recipes, and sustainability messaging.",
+      hosting: DEFAULT_SITE_HOSTING
+    }
+  ]
+}
+
+function loadSiteListFromStorage() {
+  if (typeof window === "undefined") return defaultSiteList()
+  try {
+    const raw = window.localStorage.getItem(SITE_LIST_STORAGE_KEY)
+    if (!raw) return defaultSiteList()
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return defaultSiteList()
+    const cleaned = parsed
+      .filter((site): site is { id: string; name: string; purpose?: string; hosting?: string } => {
+        return Boolean(
+          site &&
+            typeof site === "object" &&
+            typeof (site as { id?: unknown }).id === "string" &&
+            typeof (site as { name?: unknown }).name === "string"
+        )
+      })
+      .map((site) => ({
+        id: sanitizeSiteId(site.id),
+        name: site.name.trim(),
+        purpose: typeof site.purpose === "string" ? site.purpose.trim() : "",
+        hosting: typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING
+      }))
+      .filter((site) => site.id.length > 0 && site.name.length > 0)
+    const merged = [...cleaned]
+    if (!merged.some((site) => site.id === AVOCADO_SITE_ID)) {
+      merged.unshift(defaultSiteList()[0])
+    }
+    return merged
+  } catch {
+    return defaultSiteList()
+  }
+}
+
+function siteNameFromId(id: string) {
+  return id
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
 
 function resolveOrigin(value: string | undefined, fallback: string) {
   const trimmed = value?.trim()
@@ -135,8 +229,10 @@ function resolveOrigin(value: string | undefined, fallback: string) {
 const siteOrigin = resolveOrigin(import.meta.env.VITE_SITE_ORIGIN as string | undefined, "http://localhost:3000")
 const orchestrator = resolveOrigin(import.meta.env.VITE_ORCHESTRATOR_URL as string | undefined, "http://localhost:4200")
 const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
+const enablePatchTransport = import.meta.env.VITE_ENABLE_PATCH_TRANSPORT === "1"
 const AI_JUSTIFICATION_PREFIX = "__ai_justification__:"
 const AI_PERFORMANCE_PREFIX = "__ai_performance__:"
+const DEBUG_MODE_STORAGE_KEY = "editor-debug-mode-v1"
 
 const previewPresetWidths: Record<PreviewWidthPreset, number> = {
   desktop: 1200,
@@ -146,6 +242,14 @@ const previewPresetWidths: Record<PreviewWidthPreset, number> = {
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function resolveDefaultDebugMode() {
+  const envEnabled = /^(1|true|yes|on)$/i.test((import.meta.env.VITE_CHAT_DEBUG as string | undefined) ?? "")
+  if (envEnabled) return true
+  if (typeof window === "undefined") return false
+  const stored = window.localStorage.getItem(DEBUG_MODE_STORAGE_KEY)
+  return /^(1|true|yes|on)$/i.test(stored ?? "")
 }
 
 function slugLabel(route: string) {
@@ -174,6 +278,19 @@ function isVariationRequest(message: string) {
   const asksGenerate = lower.includes("generate") || lower.includes("create")
   const asksVariation = /variat/.test(lower)
   return asksGenerate && asksVariation
+}
+
+function isComplexTaskRequest(message: string) {
+  const trimmed = message.trim()
+  if (trimmed.length === 0) return false
+  const lower = trimmed.toLowerCase()
+  const actionMatches = (lower.match(/\b(add|remove|delete|replace|move|duplicate|rename|create|rewrite|update|change|reorder|insert)\b/g) ?? []).length
+  const connectorMatches = (lower.match(/\b(and|then|also|after|before|while|plus)\b/g) ?? []).length
+  const clauseMatches = (trimmed.match(/[,.!?;]/g) ?? []).length
+  if (trimmed.length >= 180) return true
+  if (actionMatches >= 2 && connectorMatches >= 1) return true
+  if (actionMatches >= 3) return true
+  return actionMatches >= 2 && clauseMatches >= 2
 }
 
 function mergedVariationProps(baseProps: Record<string, unknown>, patch: Record<string, unknown>) {
@@ -315,9 +432,54 @@ function VariationScaledPreview(args: { block: BlockInstance; virtualWidth: numb
   )
 }
 
+function SiteTileDesktopPreview(args: { title: string; src: string }) {
+  const shellRef = useRef<HTMLDivElement>(null)
+  const [shellWidth, setShellWidth] = useState(0)
+  const virtualWidth = 1200
+  const virtualHeight = 760
+
+  useEffect(() => {
+    if (!shellRef.current) return
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0
+      setShellWidth(Math.max(0, width))
+    })
+    observer.observe(shellRef.current)
+    return () => observer.disconnect()
+  }, [])
+
+  const scale = shellWidth > 0 ? Math.min(1, shellWidth / virtualWidth) : 1
+  const scaledHeight = Math.max(170, Math.ceil(virtualHeight * scale))
+
+  return (
+    <div ref={shellRef} className="site-tile-preview" style={{ height: scaledHeight }}>
+      <iframe
+        title={args.title}
+        src={args.src}
+        loading="lazy"
+        style={{
+          width: `${virtualWidth}px`,
+          height: `${virtualHeight}px`,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left"
+        }}
+      />
+    </div>
+  )
+}
+
 export function App() {
+  const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
+  const isSitesPage = pathName === "/sites" || pathName === "/sites/"
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const [session] = useState("dev")
+  const [siteId] = useState(() => resolveEditorSiteId())
+  const [siteList, setSiteList] = useState<SiteConfig[]>(() => loadSiteListFromStorage())
+  const [newSiteName, setNewSiteName] = useState("")
+  const [newSitePurpose, setNewSitePurpose] = useState("")
+  const [newSiteHosting, setNewSiteHosting] = useState(DEFAULT_SITE_HOSTING)
+  const [showSiteModal, setShowSiteModal] = useState(false)
+  const [configSiteId, setConfigSiteId] = useState<string | null>(null)
   const [slug, setSlug] = useState("/")
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
   const [isLoadingSlugs, setIsLoadingSlugs] = useState(false)
@@ -332,12 +494,15 @@ export function App() {
   const [useStreaming, setUseStreaming] = useState(true)
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showDebugDetails, setShowDebugDetails] = useState(() => resolveDefaultDebugMode())
   const [variationModal, setVariationModal] = useState<VariationModalState | null>(null)
   const [variationPreviewPreset, setVariationPreviewPreset] = useState<PreviewWidthPreset>("desktop")
   const [isApplyingVariation, setIsApplyingVariation] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
+  const [pendingPlanMessage, setPendingPlanMessage] = useState<string | null>(null)
   const [composerHeight, setComposerHeight] = useState(124)
   const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
   const [undoInFlightEntryId, setUndoInFlightEntryId] = useState<string | null>(null)
@@ -345,7 +510,7 @@ export function App() {
     {
       id: "welcome",
       role: "assistant",
-      text: "Ask for any website change. I will apply it to the preview on the right.",
+      text: "Ask for any website change. Simple edits apply immediately; complex requests pause for plan approval with a stop option.",
       status: "ready"
     }
   ])
@@ -360,6 +525,225 @@ export function App() {
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
+  const lastConfirmedVersionBySlug = useRef<Map<string, number>>(new Map())
+  const pendingTxBySlug = useRef<Map<string, { txId: string; timer: ReturnType<typeof setTimeout> }>>(new Map())
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(SITE_LIST_STORAGE_KEY, JSON.stringify(siteList))
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [siteList])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(DEBUG_MODE_STORAGE_KEY, showDebugDetails ? "1" : "0")
+  }, [showDebugDetails])
+
+  const activeSiteConfig = useMemo(() => {
+    const match = siteList.find((site) => site.id === siteId)
+    if (match) return match
+    return {
+      id: siteId,
+      name: siteNameFromId(siteId) || AVOCADO_SITE_NAME,
+      purpose: "",
+      hosting: DEFAULT_SITE_HOSTING
+    } satisfies SiteConfig
+  }, [siteId, siteList])
+
+  const openEditorForSite = (targetSiteId: string) => {
+    const url = new URL("/", window.location.origin)
+    url.searchParams.set("siteId", targetSiteId)
+    window.location.href = url.toString()
+  }
+
+  const addSiteFromName = () => {
+    const name = newSiteName.trim()
+    if (!name) return
+    const baseId = sanitizeSiteId(name) || "site"
+    const takenIds = new Set(siteList.map((site) => site.id))
+    let nextId = baseId
+    let suffix = 2
+    while (takenIds.has(nextId)) {
+      nextId = `${baseId}-${suffix}`
+      suffix += 1
+    }
+    setSiteList((prev) => [
+      ...prev,
+      {
+        id: nextId,
+        name,
+        purpose: newSitePurpose.trim(),
+        hosting: newSiteHosting.trim() || DEFAULT_SITE_HOSTING
+      }
+    ])
+    setNewSiteName("")
+    setNewSitePurpose("")
+    setNewSiteHosting(DEFAULT_SITE_HOSTING)
+    setShowSiteModal(false)
+  }
+
+  const configSite = useMemo(() => {
+    if (!configSiteId) return null
+    return siteList.find((site) => site.id === configSiteId) ?? null
+  }, [configSiteId, siteList])
+
+  const updateConfigSite = (patch: Partial<Pick<SiteConfig, "name" | "purpose" | "hosting">>) => {
+    if (!configSiteId) return
+    setSiteList((prev) =>
+      prev.map((site) =>
+        site.id === configSiteId
+          ? {
+              ...site,
+              ...(patch.name !== undefined ? { name: patch.name } : {}),
+              ...(patch.purpose !== undefined ? { purpose: patch.purpose } : {}),
+              ...(patch.hosting !== undefined ? { hosting: patch.hosting } : {})
+            }
+          : site
+      )
+    )
+  }
+
+  if (isSitesPage) {
+    const dedupedSites = siteList.filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
+    return (
+      <main className="sites-page">
+        <header className="sites-header">
+          <div>
+            <h1>Sites</h1>
+            <p>Choose a site to edit.</p>
+          </div>
+          <div className="sites-header-actions">
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={() => {
+                setNewSiteName("")
+                setNewSitePurpose("")
+                setNewSiteHosting(DEFAULT_SITE_HOSTING)
+                setShowSiteModal(true)
+              }}
+            >
+              Add site
+            </button>
+          </div>
+        </header>
+        <section className="sites-grid" aria-label="Site tiles">
+          {dedupedSites.map((site) => {
+            const previewSrc = new URL(`${siteOrigin}/`, window.location.origin)
+            previewSrc.searchParams.set("session", session)
+            previewSrc.searchParams.set("siteId", site.id)
+            previewSrc.searchParams.set("__tile", "1")
+            return (
+              <article key={site.id} className="site-tile">
+                <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc.toString()} />
+                <div className="site-tile-meta">
+                  <h2>{site.name}</h2>
+                  <p>{site.id} · {site.hosting}</p>
+                  {site.purpose ? <p className="site-purpose">{site.purpose}</p> : null}
+                  <div className="site-tile-actions">
+                    <button type="button" className="secondary-btn site-config-btn" onClick={() => setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`}>
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M8.8 2h2.4l.5 2.1a6.7 6.7 0 0 1 1.5.6l1.9-1.1 1.7 1.7-1.1 1.9c.2.5.4 1 .5 1.5l2.1.5v2.4l-2.1.5a6.7 6.7 0 0 1-.6 1.5l1.1 1.9-1.7 1.7-1.9-1.1a6.7 6.7 0 0 1-1.5.6L11.2 18H8.8l-.5-2.1a6.7 6.7 0 0 1-1.5-.6l-1.9 1.1-1.7-1.7 1.1-1.9a6.7 6.7 0 0 1-.6-1.5L2 11.2V8.8l2.1-.5c.1-.5.3-1 .6-1.5L3.6 4.9l1.7-1.7 1.9 1.1c.5-.2 1-.4 1.5-.5L8.8 2z" />
+                        <circle cx="10" cy="10" r="2.4" />
+                      </svg>
+                      <span>Config</span>
+                    </button>
+                    <button type="button" className="primary-btn" onClick={() => openEditorForSite(site.id)}>
+                      <span>Open editor</span>
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M7 5h8v8" />
+                        <path d="m7 13 8-8" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </section>
+        {showSiteModal ? (
+          <div className="sites-modal-backdrop" onClick={() => setShowSiteModal(false)}>
+            <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Add site" onClick={(event) => event.stopPropagation()}>
+              <header className="sites-modal-header">
+                <h2>Add Site</h2>
+                <button type="button" className="settings-close-btn" onClick={() => setShowSiteModal(false)} aria-label="Close">
+                  ×
+                </button>
+              </header>
+              <div className="sites-modal-body">
+                <input
+                  type="text"
+                  value={newSiteName}
+                  placeholder="Site name"
+                  onChange={(event) => setNewSiteName(event.target.value)}
+                />
+                <input
+                  type="text"
+                  value={newSiteHosting}
+                  placeholder="Hosting configuration"
+                  onChange={(event) => setNewSiteHosting(event.target.value)}
+                />
+                <textarea
+                  value={newSitePurpose}
+                  placeholder="Site purpose for AI context (e.g. lead gen for B2B SaaS founders)"
+                  onChange={(event) => setNewSitePurpose(event.target.value)}
+                  rows={3}
+                />
+              </div>
+              <footer className="sites-modal-footer">
+                <button type="button" className="secondary-btn" onClick={() => setShowSiteModal(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="primary-btn" onClick={addSiteFromName}>
+                  Create
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+        {configSite ? (
+          <div className="sites-modal-backdrop" onClick={() => setConfigSiteId(null)}>
+            <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Site config" onClick={(event) => event.stopPropagation()}>
+              <header className="sites-modal-header">
+                <h2>Site Config</h2>
+                <button type="button" className="settings-close-btn" onClick={() => setConfigSiteId(null)} aria-label="Close">
+                  ×
+                </button>
+              </header>
+              <div className="sites-modal-body">
+                <input
+                  type="text"
+                  value={configSite.name}
+                  placeholder="Site name"
+                  onChange={(event) => updateConfigSite({ name: event.target.value })}
+                />
+                <input
+                  type="text"
+                  value={configSite.hosting}
+                  placeholder="Hosting configuration"
+                  onChange={(event) => updateConfigSite({ hosting: event.target.value })}
+                />
+                <textarea
+                  value={configSite.purpose}
+                  placeholder="Site purpose for AI context"
+                  onChange={(event) => updateConfigSite({ purpose: event.target.value })}
+                  rows={3}
+                />
+              </div>
+              <footer className="sites-modal-footer">
+                <button type="button" className="primary-btn" onClick={() => setConfigSiteId(null)}>
+                  Done
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+      </main>
+    )
+  }
 
   const clampComposerHeight = (value: number) => {
     const minComposer = 124
@@ -397,9 +781,10 @@ export function App() {
     const url = new URL(`${siteOrigin}${slug === "/" ? "" : slug}`)
     url.searchParams.set("__editor", "1")
     url.searchParams.set("session", session)
+    url.searchParams.set("siteId", siteId)
     url.searchParams.set("editorOrigin", editorOrigin)
     return url.toString()
-  }, [session, slug])
+  }, [session, siteId, slug])
 
   const routeOptions = useMemo(() => {
     const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
@@ -497,6 +882,21 @@ export function App() {
     )
   }
 
+  const postPatchToSite = (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => {
+    const txId = crypto.randomUUID()
+    const msg: ApplyPatchMessage = { type: "applyPatch", txId, op, fromVersion, toVersion, focusBlockId }
+    iframeRef.current?.contentWindow?.postMessage({ source: "site-editor/v1", ...msg }, siteOrigin)
+    const pageSlug = "pageSlug" in op ? (op.pageSlug ?? "") : ""
+    // Timeout fallback: if no ack within 3s, fall back to draftUpdated
+    const timer = setTimeout(() => {
+      pendingTxBySlug.current.delete(pageSlug)
+      postToSite("draftUpdated", { focusBlockId: focusBlockId ?? null })
+    }, 3000)
+    pendingTxBySlug.current.set(pageSlug, { txId, timer })
+    lastConfirmedVersionBySlug.current.set(pageSlug, toVersion)
+    return txId
+  }
+
   useEffect(() => {
     postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })
   }, [showNestedLabels])
@@ -505,7 +905,23 @@ export function App() {
     const onMessage = (event: MessageEvent<SiteMessage>) => {
       if (event.origin !== siteOrigin) return
       const msg = event.data
-      if (!msg || msg.protocol !== "site-editor/v1") return
+      if (!msg) return
+
+      // Handle patchAck from patch transport (uses source instead of protocol)
+      if ("source" in msg && msg.source === "site-editor/v1" && msg.type === "patchAck") {
+        const pending = [...pendingTxBySlug.current.entries()].find(([, v]) => v.txId === msg.txId)
+        if (pending) {
+          clearTimeout(pending[1].timer)
+          pendingTxBySlug.current.delete(pending[0])
+          if (!msg.accepted) {
+            // version mismatch or apply error — fall back to full refresh
+            postToSite("draftUpdated", {})
+          }
+        }
+        return
+      }
+
+      if (!("protocol" in msg) || msg.protocol !== "site-editor/v1") return
 
       if (msg.type === "blockClicked") {
         setSlug(String(msg.payload.slug ?? "/"))
@@ -593,8 +1009,10 @@ export function App() {
       suggestions: data.suggestions ?? [],
       errors,
       meta: data.modelUsed ? `${data.modelUsed}${data.modelKey ? ` (${data.modelKey})` : ""}` : undefined,
+      debug: data.debug,
       aiJustification: parsedChanges.aiJustification,
-      aiPerformanceNote: parsedChanges.aiPerformanceNote
+      aiPerformanceNote: parsedChanges.aiPerformanceNote,
+      pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined
     }
 
     setChatLog((prev) => {
@@ -607,6 +1025,12 @@ export function App() {
   function applyChatResult(data: AssistantResponse) {
     if (data.plannerSource === "openai" || data.plannerSource === "demo") {
       setPlannerBadgeState(data.plannerSource)
+    }
+    if (data.status === "plan_ready" && typeof data.pendingPlanId === "string" && data.pendingPlanId.length > 0) {
+      setPendingPlanId(data.pendingPlanId)
+    } else if (data.status === "applied" || data.status === "canceled") {
+      setPendingPlanId(null)
+      setPendingPlanMessage(null)
     }
     pushAssistantFromResult(data, { canUndo: data.status === "applied" })
     if (data.status === "applied") {
@@ -634,7 +1058,7 @@ export function App() {
   async function refreshRouteSlugs() {
     setIsLoadingSlugs(true)
     try {
-      const res = await fetch(`${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}`)
+      const res = await fetch(`${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`)
       if (!res.ok) return routeOptions
       const data = (await res.json()) as { slugs?: unknown }
       const list = Array.isArray(data.slugs)
@@ -661,7 +1085,7 @@ export function App() {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, ops: [op] })
+        body: JSON.stringify({ session, siteId, ops: [op] })
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -677,7 +1101,14 @@ export function App() {
       activeBlockIdRef.current = focusBlockId
       activeEditablePathRef.current = undefined
       setActiveBlockId(focusBlockId)
-      postToSite("draftUpdated", { focusBlockId })
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = { op: "move_block" as const, pageSlug: slugForOp, blockId, ...(afterBlockId ? { afterBlockId } : {}) }
+        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -695,7 +1126,7 @@ export function App() {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, ops: [op] })
+        body: JSON.stringify({ session, siteId, ops: [op] })
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -713,7 +1144,14 @@ export function App() {
       setActiveBlockId(undefined)
       setActiveBlockType(undefined)
       setActiveEditablePath(undefined)
-      postToSite("draftUpdated", { focusBlockId: null })
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = { op: "remove_block" as const, pageSlug: slugForOp, blockId }
+        postPatchToSite(typedOp, fromVersion, toVersion)
+      } else {
+        postToSite("draftUpdated", { focusBlockId: null })
+      }
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -763,7 +1201,7 @@ export function App() {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, ops: [op] })
+        body: JSON.stringify({ session, siteId, ops: [op] })
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -780,7 +1218,22 @@ export function App() {
       activeEditablePathRef.current = editablePath
       setActiveBlockId(focusBlockId)
       setActiveEditablePath(editablePath)
-      postToSite("draftUpdated", { focusBlockId })
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        if (indexedPath) {
+          const listKey = indexedPath[1]
+          const index = Number(indexedPath[2])
+          const fieldKey = indexedPath[3]
+          const typedOp = { op: "update_item" as const, pageSlug: slugForOp, blockId, listKey: listKey!, index, patch: { [fieldKey!]: value } }
+          postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+        } else {
+          const typedOp = { op: "update_props" as const, pageSlug: slugForOp, blockId, patch: { [editablePath]: value } }
+          postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+        }
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -790,18 +1243,23 @@ export function App() {
     }
   }
 
-  async function submitChatHttp(finalMessage: string) {
+  async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string }) {
     const res = await fetch(`${orchestrator}/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         session,
+        siteId,
+        sitePurpose: activeSiteConfig.purpose || undefined,
+        siteHosting: activeSiteConfig.hosting || undefined,
         slug,
         message: finalMessage,
         modelKey,
         activeBlockId: activeBlockIdRef.current,
         activeBlockType: activeBlockTypeRef.current,
-        activeEditablePath: activeEditablePathRef.current
+        activeEditablePath: activeEditablePathRef.current,
+        executionMode: options?.executionMode ?? "auto",
+        pendingPlanId: options?.pendingPlanId
       })
     })
 
@@ -826,6 +1284,9 @@ export function App() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         session,
+        siteId,
+        sitePurpose: activeSiteConfig.purpose || undefined,
+        siteHosting: activeSiteConfig.hosting || undefined,
         slug,
         message: finalMessage,
         modelKey,
@@ -869,6 +1330,7 @@ export function App() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           session,
+          siteId,
           ops: [
             {
               op: "update_props",
@@ -894,7 +1356,14 @@ export function App() {
       activeEditablePathRef.current = undefined
       setActiveBlockId(focusBlockId)
       setActiveEditablePath(undefined)
-      postToSite("draftUpdated", { focusBlockId })
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = { op: "update_props" as const, pageSlug: variationModal.pageSlug, blockId: variationModal.blockId, patch: option.patch }
+        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
       setVariationModal(null)
       pushAssistantFromResult(
         {
@@ -919,6 +1388,9 @@ export function App() {
     return await new Promise<boolean>((resolve) => {
       const params = new URLSearchParams({
         session,
+        siteId,
+        sitePurpose: activeSiteConfig.purpose || "",
+        siteHosting: activeSiteConfig.hosting || "",
         slug,
         message: finalMessage,
         modelKey
@@ -965,6 +1437,8 @@ export function App() {
           text?: string
           index?: number
           total?: number
+          op?: Operation
+          previewVersion?: number
           focusBlockId?: string | null
           result?: AssistantResponse
         }
@@ -995,7 +1469,11 @@ export function App() {
             setStreamStatus("Applying changes...")
           }
           pendingFocusBlockId = typeof payload.focusBlockId === "string" ? payload.focusBlockId : null
-          if (total > 0 && index >= total) {
+          if (enablePatchTransport && payload.op && typeof payload.previewVersion === "number") {
+            const toVersion = payload.previewVersion
+            const fromVersion = toVersion - 1
+            postPatchToSite(payload.op, fromVersion, toVersion, pendingFocusBlockId ?? undefined)
+          } else if (total > 0 && index >= total) {
             clearOpRefreshTimer()
             flushOpRefresh()
           } else {
@@ -1063,6 +1541,12 @@ export function App() {
         await submitVariations(finalMessage)
         return
       }
+      const requiresPlanApproval = isComplexTaskRequest(finalMessage)
+      if (requiresPlanApproval) {
+        setPendingPlanMessage(finalMessage)
+        await submitChatHttp(finalMessage, { executionMode: "plan_only" })
+        return
+      }
       if (useStreaming) {
         const ok = await submitChatStream(finalMessage)
         if (!ok) await submitChatHttp(finalMessage)
@@ -1071,6 +1555,35 @@ export function App() {
       }
     } finally {
       setStreamStatus(null)
+      setIsLoading(false)
+    }
+  }
+
+  async function approvePendingPlan(planId: string) {
+    if (!planId || isLoading) return
+    const originalMessage = pendingPlanMessage?.trim() || "Approve and execute the pending plan."
+    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Approve plan and execute." }])
+    setIsLoading(true)
+    try {
+      await submitChatHttp(originalMessage, {
+        executionMode: "apply_pending_plan",
+        pendingPlanId: planId
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function stopPendingPlan(planId: string) {
+    if (!planId || isLoading) return
+    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Stop and discard this plan." }])
+    setIsLoading(true)
+    try {
+      await submitChatHttp("Stop pending plan.", {
+        executionMode: "discard_pending_plan",
+        pendingPlanId: planId
+      })
+    } finally {
       setIsLoading(false)
     }
   }
@@ -1095,6 +1608,26 @@ export function App() {
     return text
   }
 
+  async function interpretPastedImage(blob: Blob, mimeType: string) {
+    const ext = extensionFromMimeType(mimeType)
+    const file = new File([blob], `pasted-image.${ext}`, {
+      type: mimeType || blob.type || "image/png"
+    })
+    const form = new FormData()
+    form.append("image", file)
+
+    const res = await fetch(`${orchestrator}/image/interpret`, {
+      method: "POST",
+      body: form
+    })
+
+    const data = (await res.json()) as { text?: string; error?: string; detail?: string }
+    if (!res.ok) throw new Error(data.error ?? data.detail ?? "Image analysis failed.")
+    const text = (data.text ?? "").trim()
+    if (!text) throw new Error("Image analysis returned empty text.")
+    return text
+  }
+
   async function applyUndoHistory(entryId: string) {
     if (isLoading || undoInFlightEntryId) return
     setUndoInFlightEntryId(entryId)
@@ -1102,7 +1635,7 @@ export function App() {
       const res = await fetch(`${orchestrator}/history/undo`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, slug })
+        body: JSON.stringify({ session, siteId, slug })
       })
       const data = (await res.json()) as HistoryResponse
       if (!res.ok || data.status !== "applied") {
@@ -1154,7 +1687,7 @@ export function App() {
           "content-type": "application/json",
           ...(publishToken ? { "x-publish-token": publishToken } : {})
         },
-        body: JSON.stringify({ session })
+        body: JSON.stringify({ session, siteId })
       })
       const data = (await res.json()) as PublishResponse
       if (!res.ok || (data.status !== "triggered" && data.status !== "ready")) {
@@ -1215,7 +1748,7 @@ export function App() {
 
   async function fetchPublishStatus() {
     try {
-      const res = await fetch(`${orchestrator}/publish/status?session=${encodeURIComponent(session)}`)
+      const res = await fetch(`${orchestrator}/publish/status?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`)
       if (!res.ok) return
       const data = (await res.json()) as PublishStatus
       setPublishStatus(data)
@@ -1231,7 +1764,7 @@ export function App() {
 
   useEffect(() => {
     void refreshRouteSlugs()
-  }, [session])
+  }, [session, siteId])
 
   useEffect(() => {
     if (!showSettingsModal) return
@@ -1286,7 +1819,7 @@ export function App() {
       void fetchPublishStatus()
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [publishStatus, publishTerminal, session])
+  }, [publishStatus, publishTerminal, session, siteId])
 
   const streamIsError = streamStatus ? /failed|error/i.test(streamStatus) : false
   const streamLabel = streamIsError ? streamStatus : streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."
@@ -1330,6 +1863,9 @@ export function App() {
               </select>
             </label>
             <div className="chat-header-primary-actions">
+              <a className="secondary-btn" href="/sites">
+                Sites
+              </a>
               <button
                 type="button"
                 className="settings-icon-btn"
@@ -1396,6 +1932,34 @@ export function App() {
                   ))}
                 </div>
               ) : null}
+              {entry.status === "plan_ready" && entry.pendingPlanId ? (
+                <div className="msg-plan-actions">
+                  {(() => {
+                    const currentPlanId = entry.pendingPlanId
+                    const disabled = isLoading || pendingPlanId !== currentPlanId
+                    return (
+                      <>
+                  <button
+                    type="button"
+                    className="primary-btn msg-plan-btn"
+                    onClick={() => void approvePendingPlan(currentPlanId)}
+                    disabled={disabled}
+                  >
+                    Approve plan
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-btn msg-plan-btn"
+                    onClick={() => void stopPendingPlan(currentPlanId)}
+                    disabled={disabled}
+                  >
+                    Stop
+                  </button>
+                      </>
+                    )
+                  })()}
+                </div>
+              ) : null}
               {(() => {
                 const routes = (entry.mentionedSlugs ?? []).filter((route) => route !== slug)
                 if (routes.length === 0) return null
@@ -1423,6 +1987,21 @@ export function App() {
                     <li key={idx}>{line}</li>
                   ))}
                 </ul>
+              ) : null}
+              {showDebugDetails && entry.role === "assistant" && entry.debug ? (
+                <div className="msg-debug">
+                  <div className="msg-debug-title">Debug</div>
+                  <ul>
+                    {entry.debug.traceId ? <li>traceId: {entry.debug.traceId}</li> : null}
+                    {entry.debug.promptHash ? <li>promptHash: {entry.debug.promptHash}</li> : null}
+                    {entry.debug.outcome ? <li>outcome: {entry.debug.outcome}</li> : null}
+                    {entry.debug.reasonCategory ? <li>reason: {entry.debug.reasonCategory}</li> : null}
+                    {entry.debug.intent ? <li>intent: {entry.debug.intent}</li> : null}
+                    {typeof entry.debug.opCount === "number" ? <li>opCount: {entry.debug.opCount}</li> : null}
+                    {Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0 ? <li>ops: {entry.debug.opTypes.join(", ")}</li> : null}
+                    {entry.debug.promptExcerpt ? <li>prompt: {entry.debug.promptExcerpt}</li> : null}
+                  </ul>
+                </div>
               ) : null}
               {entry.canUndo || entry.wasUndone ? (
                 <div className="msg-undo-row">
@@ -1482,6 +2061,7 @@ export function App() {
             onModelChange={setModelKey}
             onSubmit={(explicitMessage) => void submitChat(explicitMessage)}
             onTranscribeAudio={transcribeAudio}
+            onInterpretImage={interpretPastedImage}
             onAutoHeightChange={handleComposerAutoHeight}
           />
         </footer>
@@ -1581,6 +2161,10 @@ export function App() {
               <label className="inline-toggle">
                 <input type="checkbox" checked={showNestedLabels} onChange={(e) => setShowNestedLabels(e.target.checked)} />
                 <span>Nested labels</span>
+              </label>
+              <label className="inline-toggle">
+                <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
+                <span>Debug mode</span>
               </label>
             </div>
           </div>
