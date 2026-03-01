@@ -786,3 +786,75 @@ describe("toErrorDetail", () => {
     assert.equal(toErrorDetail(42), "Unknown planner error")
   })
 })
+
+// ---------------------------------------------------------------------------
+// update_page_meta
+// ---------------------------------------------------------------------------
+
+describe("ops-engine: update_page_meta", () => {
+  beforeEach(resetState)
+
+  it("sets meta on page with no existing meta", () => {
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "update_page_meta", pageSlug: "/", patch: { title: "SEO Title", description: "A great page" } }
+    ])
+    const page = getDraft("/")!
+    assert.deepEqual(page.meta, { title: "SEO Title", description: "A great page" })
+  })
+
+  it("merge-patches existing meta", () => {
+    const page = makePage()
+    page.meta = { title: "Old Title", description: "Old desc" }
+    seedSession(page)
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "update_page_meta", pageSlug: "/", patch: { description: "New desc" } }
+    ])
+    const updated = getDraft("/")!
+    assert.equal(updated.meta!.title, "Old Title")
+    assert.equal(updated.meta!.description, "New desc")
+  })
+
+  it("sets ogImage", () => {
+    seedSession(makePage())
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "update_page_meta", pageSlug: "/", patch: { ogImage: "https://example.com/og.png" } }
+    ])
+    const page = getDraft("/")!
+    assert.equal(page.meta!.ogImage, "https://example.com/og.png")
+  })
+
+  it("rejects when page not found", () => {
+    seedSession(makePage())
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [
+        { op: "update_page_meta", pageSlug: "/missing", patch: { title: "Nope" } }
+      ]),
+      /Page not found/
+    )
+  })
+
+  it("rejects no-op update", () => {
+    const page = makePage()
+    page.meta = { title: "Same" }
+    seedSession(page)
+    assert.throws(
+      () => applyOpsAtomically(TEST_SESSION, [
+        { op: "update_page_meta", pageSlug: "/", patch: { title: "Same" } }
+      ]),
+      /No effective meta change/
+    )
+  })
+
+  it("clears a field with empty string", () => {
+    const page = makePage()
+    page.meta = { title: "To Remove", description: "Keep this" }
+    seedSession(page)
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "update_page_meta", pageSlug: "/", patch: { title: "" } }
+    ])
+    const updated = getDraft("/")!
+    assert.equal(updated.meta!.title, undefined)
+    assert.equal(updated.meta!.description, "Keep this")
+  })
+})

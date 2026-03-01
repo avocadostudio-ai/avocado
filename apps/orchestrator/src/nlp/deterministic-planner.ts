@@ -276,7 +276,7 @@ export function promptFromPropKey(propKey: string) {
     subheading: "Change subheading to \"...\"",
     ctaText: "Change CTA text to \"...\"",
     ctaHref: "Change CTA link to \"/...\"",
-    imageUrl: "Update hero image (e.g. from Unsplash: cherries)",
+    imageUrl: "Update hero image (e.g. cherries, sunset landscape)",
     imageAlt: "Change image alt text to \"...\"",
     secondaryCtaText: "Add secondary CTA button \"...\"",
     secondaryCtaHref: "Change secondary CTA link to \"/...\"",
@@ -555,7 +555,7 @@ export function blockContractsSummary() {
       allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
       required: ["heading", "subheading", "ctaText", "ctaHref"],
       optional: ["imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
-      notes: "Use heading for the main headline; never invent prop names. For imageUrl: prefer a semantically relevant Unsplash image URL (explicit user URL is allowed) and update imageAlt to describe the image. Avoid random placeholder services for topical hero requests. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
+      notes: "Use heading for the main headline; never invent prop names. For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
     },
     FeatureGrid: {
       allowedProps: ["title", "features"],

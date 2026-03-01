@@ -215,7 +215,7 @@ export async function generatePlanWithOpenAI(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
-    "For Hero imageUrl, prefer a semantically relevant Unsplash URL (or a URL explicitly provided by the user). Avoid random placeholder services for topical hero requests. Never invent local image paths.",
+    "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
     ...(chatStrictPrimaryOpMode
       ? [
           "STRICT MODE: choose exactly one PRIMARY operation only.",

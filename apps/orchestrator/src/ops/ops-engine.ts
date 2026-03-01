@@ -504,7 +504,24 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
         )
       }
 
-      const nextProps = { ...block.props, ...patchCandidate } as Record<string, unknown>
+      const prevProps = block.props as Record<string, unknown>
+      const nextProps = { ...prevProps } as Record<string, unknown>
+      for (const key of patchKeys) {
+        const oldVal = prevProps[key]
+        const newVal = (patchCandidate as Record<string, unknown>)[key]
+        // Deep-merge arrays of objects by index so partial items inherit existing fields
+        if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+          nextProps[key] = newVal.map((item, i) => {
+            const prev = oldVal[i]
+            if (prev && typeof prev === "object" && !Array.isArray(prev) && item && typeof item === "object" && !Array.isArray(item)) {
+              return { ...prev, ...item }
+            }
+            return item
+          })
+        } else {
+          nextProps[key] = newVal
+        }
+      }
 
       const propCheck = validateBlockProps(block.type as BlockType, nextProps)
       if (!propCheck.success) throw new Error(`Invalid props for ${block.type}: ${describeValidationIssue(propCheck.error)}`)

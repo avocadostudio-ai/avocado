@@ -2,7 +2,9 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
-import { isLikelyClarificationFollowUp, parseCreatePageRequest } from "./nlp/intent-helpers.js"
+import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
+import { extractAudienceTarget, inferAddedBlockTypeFromMessage } from "./nlp/deterministic-planner.js"
+import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 
 test("parseCreatePageRequest prompt matrix", () => {
   const cases: Array<{ prompt: string; expected: string | null }> = [
@@ -13,12 +15,44 @@ test("parseCreatePageRequest prompt matrix", () => {
     { prompt: "add a CTA corresponding to intent of this page", expected: null },
     { prompt: "improve this page", expected: null },
     { prompt: "delete this page", expected: null },
-    { prompt: "rename this page to /banana", expected: null }
+    { prompt: "rename this page to /banana", expected: null },
+    {
+      prompt:
+        "generate some more content on this page\n\n[site context]\nHosting context: Vercel production site (single shared project)\n[/site context]",
+      expected: null
+    }
   ]
 
   for (const entry of cases) {
     assert.equal(parseCreatePageRequest(entry.prompt), entry.expected, entry.prompt)
   }
+})
+
+test("parseCreatePageRequest still returns slug for content-generation requests (AI planner handles the bypass)", () => {
+  // The slug IS detected — the bypass happens in deterministicCreatePagePlan, not here
+  assert.equal(
+    parseCreatePageRequest("create a new page /about-us and add some nice content"),
+    "/about-us"
+  )
+})
+
+test("requestsContentGeneration detects content-generation requests", () => {
+  const positives = [
+    "create a new page /about-us and add some nice content",
+    "create page /team and fill it with content",
+    "make a page /services and write about our offerings",
+    "generate page /faq with content",
+    "build new page /about and describe our mission for visitors"
+  ]
+  const negatives = [
+    "create new page /test2",
+    "create a new page /intent with hero, text and cta",
+    "create page /about with a hero and cta",
+    "add new page about cherries",
+    "create landing page for startup founders"
+  ]
+  for (const prompt of positives) assert.equal(requestsContentGeneration(prompt), true, prompt)
+  for (const prompt of negatives) assert.equal(requestsContentGeneration(prompt), false, prompt)
 })
 
 test("isLikelyClarificationFollowUp prompt matrix", () => {
@@ -903,4 +937,397 @@ test("compileDeterministicPlan move asks clarification when no placement is prov
   assert.ok(plan)
   assert.equal(plan?.intent, "needs_clarification")
   assert.equal(plan?.ops.length, 0)
+})
+
+// ---------------------------------------------------------------------------
+// Step 1: createPageBlocks scaffolds more block types
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan scaffolds hero and features when creating page with features keyword", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-create-features",
+    intent: { action: "add" },
+    message: "create a new page /about with hero and features",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "create_page")
+  if (plan?.ops[0]?.op === "create_page") {
+    const types = plan.ops[0].page.blocks.map((b) => b.type)
+    assert.ok(types.includes("Hero"), "should include Hero")
+    assert.ok(types.includes("FeatureGrid"), "should include FeatureGrid")
+  }
+})
+
+test("compileDeterministicPlan scaffolds faq and testimonials blocks on create page", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-create-faq-test",
+    intent: { action: "add" },
+    message: "create page /services with hero, faq and testimonials",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.ops[0]?.op, "create_page")
+  if (plan?.ops[0]?.op === "create_page") {
+    const types = plan.ops[0].page.blocks.map((b) => b.type)
+    assert.ok(types.includes("Hero"), "should include Hero")
+    assert.ok(types.includes("FAQAccordion"), "should include FAQAccordion")
+    assert.ok(types.includes("Testimonials"), "should include Testimonials")
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Step 2: new keyword mappings
+// ---------------------------------------------------------------------------
+
+test("inferAddedBlockTypeFromMessage maps social proof to Testimonials", () => {
+  assert.equal(inferAddedBlockTypeFromMessage("add social proof section"), "Testimonials")
+  assert.equal(inferAddedBlockTypeFromMessage("add reviews"), "Testimonials")
+  assert.equal(inferAddedBlockTypeFromMessage("add quotes"), "Testimonials")
+})
+
+test("inferAddedBlockTypeFromMessage maps benefits/advantages to FeatureGrid", () => {
+  assert.equal(inferAddedBlockTypeFromMessage("add benefits section"), "FeatureGrid")
+  assert.equal(inferAddedBlockTypeFromMessage("add advantages"), "FeatureGrid")
+})
+
+test("inferAddedBlockTypeFromMessage maps section/paragraph/copy to RichText", () => {
+  assert.equal(inferAddedBlockTypeFromMessage("add a section"), "RichText")
+  assert.equal(inferAddedBlockTypeFromMessage("add paragraph"), "RichText")
+  assert.equal(inferAddedBlockTypeFromMessage("add copy"), "RichText")
+})
+
+test("inferAddedBlockTypeFromMessage maps pricing to CardGrid", () => {
+  assert.equal(inferAddedBlockTypeFromMessage("add pricing"), "CardGrid")
+})
+
+test("inferBlockTypeFromText maps new keywords", () => {
+  assert.equal(inferBlockTypeFromText("social proof"), "Testimonials")
+  assert.equal(inferBlockTypeFromText("reviews"), "Testimonials")
+  assert.equal(inferBlockTypeFromText("benefits"), "FeatureGrid")
+  assert.equal(inferBlockTypeFromText("pricing"), "CardGrid")
+  assert.equal(inferBlockTypeFromText("paragraph"), "RichText")
+})
+
+// ---------------------------------------------------------------------------
+// Step 3: extractAudienceTarget rejects non-audience phrases
+// ---------------------------------------------------------------------------
+
+test("extractAudienceTarget rejects stopword-only and non-audience phrases", () => {
+  assert.equal(extractAudienceTarget("change heading for testing"), undefined)
+  assert.equal(extractAudienceTarget("do this for me"), undefined)
+  assert.equal(extractAudienceTarget("try for free"), undefined)
+  assert.equal(extractAudienceTarget("wait for a while"), undefined)
+  assert.equal(extractAudienceTarget("change for now"), undefined)
+  assert.equal(extractAudienceTarget("improve for demo"), undefined)
+})
+
+test("extractAudienceTarget still extracts real audiences", () => {
+  assert.equal(extractAudienceTarget("create page for startup founders"), "startup")
+  assert.equal(extractAudienceTarget("targeting developer teams"), "developer teams")
+})
+
+// ---------------------------------------------------------------------------
+// Step 4: tighter asksNavMove regex
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan does not interpret 'move page block' as nav move", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+  const plan = compileDeterministicPlan({
+    session: "test-move-block-not-nav",
+    intent: { action: "move", target_block_ref: hero!.id, position: "bottom" },
+    message: "move page hero to bottom",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_block")
+})
+
+// ---------------------------------------------------------------------------
+// Step 5: page rename with single route and 'this page'
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan renames current page when single route and 'this page' mentioned", () => {
+  const currentPage = demoPublishedPages().find((p) => p.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-rename-this-page",
+    intent: { action: "update" },
+    message: "rename this page to /plans",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "rename_page")
+  if (plan?.ops[0]?.op === "rename_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+    assert.equal(plan.ops[0].newPageSlug, "/plans")
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Step 6: block removal without active selection
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan removes block by type when no selection and unique match", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-remove-no-selection",
+    intent: { action: "remove" },
+    message: "remove the cta",
+    slug: "/",
+    currentPage
+    // no activeBlockId
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "remove_block")
+  if (plan?.ops[0]?.op === "remove_block") {
+    const ctaBlock = currentPage.blocks.find((b) => b.type === "CTA")
+    assert.ok(ctaBlock)
+    assert.equal(plan.ops[0].blockId, ctaBlock!.id)
+  }
+})
+
+test("compileDeterministicPlan asks clarification when removing ambiguous block without selection", () => {
+  // A page with two CTA blocks — should not guess
+  const currentPage = {
+    id: "p_test",
+    slug: "/test",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      { id: "b_cta_1", type: "CTA" as const, props: { title: "A", description: "A", ctaText: "Go", ctaHref: "/" } },
+      { id: "b_cta_2", type: "CTA" as const, props: { title: "B", description: "B", ctaText: "Go", ctaHref: "/" } }
+    ]
+  }
+  const plan = compileDeterministicPlan({
+    session: "test-remove-ambiguous",
+    intent: { action: "remove" },
+    message: "remove the cta",
+    slug: "/test",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "needs_clarification")
+})
+
+// ---------------------------------------------------------------------------
+// Step 7: list item append without selection
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan appends FAQ item without block selection when unique FAQ exists", () => {
+  const currentPage = demoPublishedPages().find((p) => p.slug === "/pricing")
+  assert.ok(currentPage)
+  const faqBlock = currentPage!.blocks.find((b) => b.type === "FAQAccordion")
+  assert.ok(faqBlock)
+  const plan = compileDeterministicPlan({
+    session: "test-add-faq-no-selection",
+    intent: { action: "add" },
+    message: "add another question",
+    slug: "/pricing",
+    currentPage: currentPage!
+    // no activeBlockId
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "update_props")
+  if (plan?.ops[0]?.op === "update_props") {
+    assert.equal(plan.ops[0].blockId, faqBlock!.id)
+  }
+})
+
+test("compileDeterministicPlan appends testimonial without selection using 'another' keyword", () => {
+  const currentPage = {
+    id: "p_test_testimonials",
+    slug: "/test-testimonials",
+    title: "Test Testimonials",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      { id: "b_hero_t", type: "Hero" as const, props: { heading: "H", subheading: "S", ctaText: "Go", ctaHref: "/" } },
+      {
+        id: "b_testimonials_t",
+        type: "Testimonials" as const,
+        props: { title: "Reviews", items: [{ quote: "Great", author: "Bob" }] }
+      }
+    ]
+  }
+  const plan = compileDeterministicPlan({
+    session: "test-add-testimonial-no-sel",
+    intent: { action: "add" },
+    message: "add another testimonial",
+    slug: "/test-testimonials",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "update_props")
+  if (plan?.ops[0]?.op === "update_props") {
+    assert.equal(plan.ops[0].blockId, "b_testimonials_t")
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Step 8: audience page creation defers to AI when OPENAI_API_KEY is set
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan defers audience page creation to AI when OPENAI_API_KEY is set", () => {
+  const currentPage = demoPublishedPages()[0]
+  const original = process.env.OPENAI_API_KEY
+  try {
+    process.env.OPENAI_API_KEY = "sk-test-fake"
+    // Use intent "info" to bypass the earlier parseCreatePageRequest path
+    // and directly test the audience page creation code path.
+    const plan = compileDeterministicPlan({
+      session: "test-audience-defer-ai",
+      intent: { action: "info" },
+      message: "create landing page for startup founders audience",
+      slug: "/",
+      currentPage
+    })
+    assert.equal(plan, null, "should return null to defer to AI planner")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
+test("compileDeterministicPlan handles audience page in demo mode (no OPENAI_API_KEY)", () => {
+  const currentPage = demoPublishedPages()[0]
+  const original = process.env.OPENAI_API_KEY
+  try {
+    delete process.env.OPENAI_API_KEY
+    // Use intent "info" to bypass the earlier parseCreatePageRequest path
+    const plan = compileDeterministicPlan({
+      session: "test-audience-demo-mode",
+      intent: { action: "info" },
+      message: "create landing page for startup founders audience",
+      slug: "/",
+      currentPage
+    })
+    assert.ok(plan)
+    assert.equal(plan?.intent, "edit_plan")
+    assert.equal(plan?.ops[0]?.op, "create_page")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Step 9: audience retarget defers to AI when OPENAI_API_KEY is set
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan defers audience retarget to AI when OPENAI_API_KEY is set", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+  const original = process.env.OPENAI_API_KEY
+  try {
+    process.env.OPENAI_API_KEY = "sk-test-fake"
+    const plan = compileDeterministicPlan({
+      session: "test-retarget-defer-ai",
+      intent: { action: "update" },
+      message: "retarget this for developer teams audience",
+      slug: "/",
+      currentPage,
+      activeBlockId: hero!.id
+    })
+    assert.equal(plan, null, "should return null to defer to AI planner")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
+test("compileDeterministicPlan handles audience retarget in demo mode (no OPENAI_API_KEY)", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+  const original = process.env.OPENAI_API_KEY
+  try {
+    delete process.env.OPENAI_API_KEY
+    const plan = compileDeterministicPlan({
+      session: "test-retarget-demo-mode",
+      intent: { action: "update" },
+      message: "retarget this for developer teams audience",
+      slug: "/",
+      currentPage,
+      activeBlockId: hero!.id
+    })
+    assert.ok(plan)
+    assert.equal(plan?.intent, "edit_plan")
+    assert.equal(plan?.ops[0]?.op, "update_props")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Step 10: rewrite defers to AI when OPENAI_API_KEY is set (no quoted text)
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan defers rewrite to AI when OPENAI_API_KEY is set and no quoted text", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+  const original = process.env.OPENAI_API_KEY
+  try {
+    process.env.OPENAI_API_KEY = "sk-test-fake"
+    const plan = compileDeterministicPlan({
+      session: "test-rewrite-defer-ai",
+      intent: { action: "update", target_block_ref: hero!.id },
+      message: "rewrite this heading",
+      slug: "/",
+      currentPage,
+      activeBlockId: hero!.id
+    })
+    assert.equal(plan, null, "should return null to defer to AI planner")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
+test("compileDeterministicPlan keeps deterministic handling when quoted text is provided even with OPENAI_API_KEY", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+  const original = process.env.OPENAI_API_KEY
+  try {
+    process.env.OPENAI_API_KEY = "sk-test-fake"
+    const plan = compileDeterministicPlan({
+      session: "test-rewrite-quoted",
+      intent: { action: "update", target_block_ref: hero!.id, patch: { heading: "Hello World" } },
+      message: 'change heading to "Hello World"',
+      slug: "/",
+      currentPage,
+      activeBlockId: hero!.id
+    })
+    assert.ok(plan, "should NOT defer to AI when quoted text is present")
+    assert.equal(plan?.intent, "edit_plan")
+    assert.equal(plan?.ops[0]?.op, "update_props")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
 })
