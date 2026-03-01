@@ -1,8 +1,8 @@
 import dotenv from "dotenv"
 import { execFile } from "node:child_process"
-import { createHash, randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
 import { resolve } from "node:path"
 import Fastify from "fastify"
@@ -34,6 +34,7 @@ import {
   parseCreatePageRequest,
   toSeedSlug
 } from "./nlp/intent-helpers.js"
+import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
 
 const app = Fastify({ logger: true })
 
@@ -89,6 +90,19 @@ const historyRedo = new Map<string, Map<string, PageDoc[]>>()
 const versions = new Map<string, number>()
 const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
 const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()
+const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
+type PendingApprovalPlan = {
+  id: string
+  createdAt: string
+  requestedSlug: string
+  effectiveSlug: string
+  summary: string
+  source: "openai" | "demo"
+  modelUsed: string
+  modelKey: ModelKey
+  plan: EditPlan
+}
+const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
 type PublishTracker = {
   session: string
   status: "triggered" | "failed"
@@ -111,126 +125,13 @@ const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "htt
 const chatStrictPrimaryOpMode = /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
 const chatTelemetryLimit = Number(process.env.CHAT_TELEMETRY_LIMIT ?? 500)
 let persistTimer: NodeJS.Timeout | null = null
-let telemetryFlushTimer: NodeJS.Timeout | null = null
-
-type ChatTelemetryPhase =
-  | "received"
-  | "forced_plan"
-  | "plan_attempt_failed"
-  | "plan_generated"
-  | "plan_apply_failed"
-  | "repair_attempt"
-  | "repair_generated"
-  | "result"
-
-type ChatTelemetryEntry = {
-  id: string
-  at: string
-  phase: ChatTelemetryPhase
-  session: string
-  requestedSlug: string
-  effectiveSlug: string
-  plannerSource: "openai" | "demo"
-  modelKey: ModelKey
-  modelUsed: string
-  promptHash: string
-  promptExcerpt: string
-  promptLength: number
-  outcome?: string
-  reason?: string
-  reasonCategory?: GuardrailErrorCategory
-  opCount?: number
-  opTypes?: string[]
-  intent?: EditPlan["intent"]
-}
-
-const chatTelemetryBuffer: ChatTelemetryEntry[] = []
-const chatTelemetryPendingWrites: ChatTelemetryEntry[] = []
-
-function shouldPersistTelemetry() {
-  return !/^(0|false|no|off)$/i.test((process.env.CHAT_TELEMETRY_PERSIST ?? "1").trim())
-}
-
-async function flushTelemetryNow() {
-  if (!shouldPersistTelemetry()) return
-  if (chatTelemetryPendingWrites.length === 0) return
-  const pending = chatTelemetryPendingWrites.splice(0, chatTelemetryPendingWrites.length)
-  const lines = pending.map((item) => JSON.stringify(item)).join("\n")
-  await mkdir(resolve(chatTelemetryFilePath, ".."), { recursive: true })
-  await appendFile(chatTelemetryFilePath, `${lines}\n`, "utf8")
-}
-
-function scheduleTelemetryFlush() {
-  if (telemetryFlushTimer) clearTimeout(telemetryFlushTimer)
-  telemetryFlushTimer = setTimeout(() => {
-    void flushTelemetryNow().catch((error: unknown) => {
-      app.log.error({ err: toErrorDetail(error), file: chatTelemetryFilePath }, "Failed to flush chat telemetry")
-    })
-  }, 150)
-}
-
-async function loadTelemetryFromDisk() {
-  if (!shouldPersistTelemetry()) return
-  if (!existsSync(chatTelemetryFilePath)) return
-  try {
-    const raw = await readFile(chatTelemetryFilePath, "utf8")
-    const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean)
-    const tail = lines.slice(-Math.max(chatTelemetryLimit, 100))
-    chatTelemetryBuffer.length = 0
-    for (const line of tail) {
-      try {
-        const parsed = JSON.parse(line) as ChatTelemetryEntry
-        if (!parsed || typeof parsed !== "object") continue
-        if (typeof parsed.id !== "string" || typeof parsed.phase !== "string") continue
-        chatTelemetryBuffer.push(parsed)
-      } catch {
-        // Skip malformed telemetry lines.
-      }
-    }
-    app.log.info({ file: chatTelemetryFilePath, loaded: chatTelemetryBuffer.length }, "Loaded chat telemetry")
-  } catch (error) {
-    app.log.error({ err: toErrorDetail(error), file: chatTelemetryFilePath }, "Failed to load chat telemetry")
-  }
-}
-
-function telemetryPromptExcerpt(message: string) {
-  return message.replace(/\s+/g, " ").trim().slice(0, 180)
-}
-
-function telemetryPromptHash(message: string) {
-  return createHash("sha256").update(message).digest("hex").slice(0, 16)
-}
-
-function pushChatTelemetry(entry: ChatTelemetryEntry) {
-  chatTelemetryBuffer.push(entry)
-  if (chatTelemetryBuffer.length > chatTelemetryLimit) {
-    chatTelemetryBuffer.splice(0, chatTelemetryBuffer.length - chatTelemetryLimit)
-  }
-  if (shouldPersistTelemetry()) {
-    chatTelemetryPendingWrites.push(entry)
-    scheduleTelemetryFlush()
-  }
-  app.log.info(
-    {
-      event: "chat_telemetry",
-      id: entry.id,
-      phase: entry.phase,
-      session: entry.session,
-      requestedSlug: entry.requestedSlug,
-      effectiveSlug: entry.effectiveSlug,
-      plannerSource: entry.plannerSource,
-      modelKey: entry.modelKey,
-      modelUsed: entry.modelUsed,
-      promptHash: entry.promptHash,
-      promptLength: entry.promptLength,
-      outcome: entry.outcome,
-      reasonCategory: entry.reasonCategory,
-      opCount: entry.opCount,
-      opTypes: entry.opTypes
-    },
-    "Chat telemetry event"
-  )
-}
+const chatTelemetryPersistEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_TELEMETRY_PERSIST ?? "1").trim())
+const chatTelemetry = createChatTelemetryStore({
+  filePath: chatTelemetryFilePath,
+  limit: chatTelemetryLimit,
+  persistEnabled: chatTelemetryPersistEnabled,
+  logger: app.log
+})
 
 function parseJsonMaybe(text: string): unknown {
   try {
@@ -861,6 +762,8 @@ type ChatRequestBody = {
   activeBlockId?: string
   activeBlockType?: string
   activeEditablePath?: string
+  executionMode?: "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
+  pendingPlanId?: string
 }
 
 type ApplyOpsRequestBody = {
@@ -906,6 +809,7 @@ type ChatResult = {
   plannerSource: "openai" | "demo"
   modelUsed: string
   modelKey: ModelKey
+  pendingPlanId?: string
   debug?: {
     traceId: string
     promptHash: string
@@ -1219,7 +1123,106 @@ function nextAvailableSlug(session: string, baseSlug: string) {
   return `${baseSlug}-${idx}`
 }
 
-function buildCreatePagePlan(args: { session: string; requestedSlug: string; assumptions?: string[] }) {
+function stripSiteContextEnvelope(message: string) {
+  return message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
+}
+
+function extractSiteContextLineValue(message: string, label: string) {
+  const lowerLabel = label.toLowerCase()
+  const section = message.match(/\[site context\]([\s\S]*?)\[\/site context\]/i)?.[1]
+  if (!section) return undefined
+  const line = section
+    .split("\n")
+    .map((item) => item.trim())
+    .find((item) => item.toLowerCase().startsWith(`${lowerLabel}:`))
+  if (!line) return undefined
+  const value = line.slice(line.indexOf(":") + 1).trim()
+  return value || undefined
+}
+
+function titleCaseSentence(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed) return trimmed
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
+function createPageBlocks(args: { requestedSlug: string; userMessage?: string }) {
+  const seed = toSeedSlug(args.requestedSlug.replace(/^\//, "") || "new-page") || "new-page"
+  const rawMessage = typeof args.userMessage === "string" ? args.userMessage : ""
+  const cleanMessage = stripSiteContextEnvelope(rawMessage)
+  const lowerMessage = cleanMessage.toLowerCase()
+
+  const asksIntentPage = /\b(intent|purpose|mission)\b/.test(lowerMessage)
+  const asksHero = /\bhero\b/.test(lowerMessage)
+  const asksText = /\b(rich[\s-]?text|text(?:\s+section|\s+block)?|copy)\b/.test(lowerMessage)
+  const asksCta = /\bcta\b|\bcall to action\b|\baction button\b/.test(lowerMessage)
+  const asksStructuredSections = asksHero || asksText || asksCta
+  const sitePurpose = extractSiteContextLineValue(rawMessage, "Site purpose")
+  const pageTitle = pageTitleFromSlug(args.requestedSlug)
+
+  const heroHeading = asksIntentPage ? "Purpose of This Site" : pageTitle
+  const heroSubheading = sitePurpose
+    ? `This page explains ${sitePurpose}.`
+    : asksIntentPage
+      ? "This page explains what this site is for, who it helps, and the value it provides."
+      : `Use this page to introduce ${pageTitle}.`
+  const ctaText = asksIntentPage ? "Explore the site" : "Get started"
+  const ctaHref = "/"
+  const ctaTitle = asksIntentPage ? "Ready to learn more?" : `Ready to explore ${pageTitle}?`
+  const ctaDescription = sitePurpose
+    ? `Continue to discover how ${sitePurpose} translates into concrete next steps.`
+    : asksIntentPage
+      ? "Review the key points, then continue to the next step."
+      : "Continue to the next step."
+  const richTextBody = sitePurpose
+    ? `Site intent: ${titleCaseSentence(sitePurpose)}.\n\nUse this section to explain the problem the site solves, who it serves, and what users should do next.`
+    : asksIntentPage
+      ? "This page captures the site intent: why it exists, who it serves, and what outcomes it helps users achieve.\n\nUse this section to add concrete details and examples."
+      : `Use this section to describe ${pageTitle} in detail.\n\nAdd context, benefits, and a clear next step for visitors.`
+
+  const blocks: PageDoc["blocks"] = [
+    {
+      id: `b_hero_${seed}`,
+      type: "Hero",
+      props: {
+        ...defaultPropsForType("Hero"),
+        heading: heroHeading,
+        subheading: heroSubheading,
+        ctaText,
+        ctaHref
+      }
+    }
+  ]
+
+  if (asksStructuredSections && asksText) {
+    blocks.push({
+      id: `b_richtext_${seed}`,
+      type: "RichText",
+      props: {
+        ...defaultPropsForType("RichText"),
+        body: richTextBody
+      }
+    })
+  }
+
+  if (asksStructuredSections && asksCta) {
+    blocks.push({
+      id: `b_cta_${seed}`,
+      type: "CTA",
+      props: {
+        ...defaultPropsForType("CTA"),
+        title: ctaTitle,
+        description: ctaDescription,
+        ctaText,
+        ctaHref
+      }
+    })
+  }
+
+  return blocks
+}
+
+function buildCreatePagePlan(args: { session: string; requestedSlug: string; assumptions?: string[]; userMessage?: string }) {
   const normalizedRequested = normalizeRouteCandidate(args.requestedSlug)
   if (!normalizedRequested || normalizedRequested === "/") return null
   const draft = getSessionDraft(args.session)
@@ -1232,20 +1235,13 @@ function buildCreatePagePlan(args: { session: string; requestedSlug: string; ass
     } satisfies EditPlan
   }
 
-  const seed = toSeedSlug(normalizedRequested.replace(/^\//, "") || "new-page") || "new-page"
   const now = new Date().toISOString()
   const page: PageDoc = {
     id: pageIdFromSlug(normalizedRequested),
     slug: normalizedRequested,
     title: pageTitleFromSlug(normalizedRequested),
     updatedAt: now,
-    blocks: [
-      {
-        id: `b_hero_${seed}`,
-        type: "Hero",
-        props: defaultPropsForType("Hero")
-      }
-    ]
+    blocks: createPageBlocks({ requestedSlug: normalizedRequested, userMessage: args.userMessage })
   }
   return {
     intent: "edit_plan",
@@ -1457,6 +1453,15 @@ function pushRecentEdit(session: string, entry: { slug: string; summary: string;
   recentEdits.set(session, list.slice(-10))
 }
 
+const CHAT_HISTORY_MAX_TURNS = 6
+
+function pushChatHistory(session: string, userMessage: string, assistantSummary: string) {
+  const history = chatHistoryBySession.get(session) ?? []
+  history.push({ role: "user", content: userMessage })
+  history.push({ role: "assistant", content: assistantSummary })
+  chatHistoryBySession.set(session, history.slice(-CHAT_HISTORY_MAX_TURNS))
+}
+
 type PersistedState = {
   publishedPages: PageDoc[]
   draftPages: Record<string, Record<string, PageDoc>>
@@ -1464,6 +1469,7 @@ type PersistedState = {
   historyRedo: Record<string, Record<string, PageDoc[]>>
   versions: Record<string, number>
   recentEdits: Record<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>
+  chatHistory: Record<string, Array<{ role: "user" | "assistant"; content: string }>>
 }
 
 function nestedPageMapToObject(source: Map<string, Map<string, PageDoc>>) {
@@ -1521,7 +1527,8 @@ async function persistStateNow() {
     historyUndo: nestedHistoryMapToObject(historyUndo),
     historyRedo: nestedHistoryMapToObject(historyRedo),
     versions: Object.fromEntries(versions.entries()),
-    recentEdits: Object.fromEntries(recentEdits.entries())
+    recentEdits: Object.fromEntries(recentEdits.entries()),
+    chatHistory: Object.fromEntries(chatHistoryBySession.entries())
   }
   await mkdir(resolve(stateFilePath, ".."), { recursive: true })
   await writeFile(stateFilePath, JSON.stringify(payload), "utf8")
@@ -1578,6 +1585,17 @@ async function loadStateFromDisk() {
           .filter((entry) => entry && typeof entry === "object")
           .map((entry) => entry as { slug: string; summary: string; ops: Operation[]; at: string })
         recentEdits.set(session, list.slice(-10))
+      }
+    }
+
+    chatHistoryBySession.clear()
+    if (parsed.chatHistory && typeof parsed.chatHistory === "object") {
+      for (const [session, listRaw] of Object.entries(parsed.chatHistory)) {
+        if (!Array.isArray(listRaw)) continue
+        const list = listRaw
+          .filter((entry) => entry && typeof entry === "object" && (entry.role === "user" || entry.role === "assistant") && typeof entry.content === "string")
+          .map((entry) => entry as { role: "user" | "assistant"; content: string })
+        chatHistoryBySession.set(session, list.slice(-CHAT_HISTORY_MAX_TURNS))
       }
     }
 
@@ -1950,7 +1968,7 @@ function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; c
   const routeMentions = extractRouteMentions(args?.userMessage)
   const requestedCreateSlug = parseCreatePageRequest(args?.userMessage ?? "")
   const createPageIntent = Boolean(requestedCreateSlug)
-  const refersToCurrentPage = /\b(this|current|selected)\s+page\b/.test(userMessage)
+  const refersToCurrentPage = /\b(this|current|selected|the)\s+page\b/.test(userMessage)
 
   const resolvePageSlug = (candidate: unknown) => {
     const normalized = normalizeRouteCandidate(candidate)
@@ -3504,7 +3522,7 @@ function compileDeterministicPlan(args: {
 
   const requestedCreateSlug = parseCreatePageRequest(message)
   if ((intent.action === "add" || intent.action === "clarify" || intent.action === "update") && requestedCreateSlug) {
-    const createPlan = buildCreatePagePlan({ session, requestedSlug: requestedCreateSlug, assumptions })
+    const createPlan = buildCreatePagePlan({ session, requestedSlug: requestedCreateSlug, assumptions, userMessage: message })
     if (createPlan) return createPlan
   }
 
@@ -4056,6 +4074,7 @@ async function generatePlanWithOpenAI(args: {
   currentPage: PageDoc
   contextPack: ReturnType<typeof plannerContextPack>
   model: string
+  history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
 }): Promise<EditPlan> {
@@ -4134,6 +4153,7 @@ async function generatePlanWithOpenAI(args: {
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
+        ...(args.history ?? []),
         { role: "user", content: JSON.stringify(user) }
       ]
     })
@@ -4150,6 +4170,7 @@ async function generatePlanWithOpenAI(args: {
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
+        ...(args.history ?? []),
         { role: "user", content: JSON.stringify(user) }
       ]
     })
@@ -4991,7 +5012,7 @@ function buildAiInsightChanges(args: { plan: EditPlan; message: string }) {
 function deterministicCreatePagePlan(args: { session: string; message: string }) {
   const requestedSlug = parseCreatePageRequest(args.message)
   if (!requestedSlug) return null
-  return buildCreatePagePlan({ session: args.session, requestedSlug })
+  return buildCreatePagePlan({ session: args.session, requestedSlug, userMessage: args.message })
 }
 
 async function runChatPipeline(
@@ -5001,11 +5022,47 @@ async function runChatPipeline(
     onOpApplied?: (event: { index: number; total: number; op: Operation; previewVersion: number; focusBlockId?: string }) => void
   }
 ): Promise<{ code: number; payload: ChatResult | { error: string } }> {
-  if (!body.session || !body.slug || !body.message) {
-    return { code: 400, payload: { error: "session, slug, and message are required" } }
+  const executionMode = body.executionMode ?? "auto"
+  const requiresMessage = executionMode === "auto" || executionMode === "plan_only"
+  if (!body.session || !body.slug || (requiresMessage && !body.message)) {
+    return { code: 400, payload: { error: "session and slug are required; message is required for planning" } }
   }
-  const messageWithContext = withSiteContext(body.message, body.sitePurpose, body.siteHosting)
+  if (executionMode === "discard_pending_plan") {
+    const existing = pendingApprovalPlanBySession.get(body.session)
+    if (!existing) {
+      return {
+        code: 200,
+        payload: {
+          status: "canceled",
+          summary: "No pending plan to stop.",
+          changes: [],
+          previewVersion: versions.get(body.session) ?? 0,
+          plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo",
+          modelUsed: modelLookup[(process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"],
+          modelKey: (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+        }
+      }
+    }
+    if (body.pendingPlanId && body.pendingPlanId !== existing.id) {
+      return { code: 409, payload: { error: "pending plan mismatch" } }
+    }
+    pendingApprovalPlanBySession.delete(body.session)
+    return {
+      code: 200,
+      payload: {
+        status: "canceled",
+        summary: "Stopped. The pending plan was discarded and will not be executed.",
+        changes: [],
+        previewVersion: versions.get(body.session) ?? 0,
+        plannerSource: existing.source,
+        modelUsed: existing.modelUsed,
+        modelKey: existing.modelKey
+      }
+    }
+  }
+  const messageWithContext = withSiteContext(body.message ?? "", body.sitePurpose, body.siteHosting)
   const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
+  const sessionChatHistory = chatHistoryBySession.get(body.session) ?? []
   const chatRequestId = randomUUID()
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({
@@ -5030,8 +5087,8 @@ async function runChatPipeline(
   const modelKey = body.modelKey && modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
   const modelUsed = modelLookup[modelKey]
   const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
-  const promptHash = telemetryPromptHash(plannerMessage)
-  const promptExcerpt = telemetryPromptExcerpt(plannerMessage)
+  const promptHash = chatTelemetry.promptHash(plannerMessage)
+  const promptExcerpt = chatTelemetry.promptExcerpt(plannerMessage)
   const withDebugPayload = (
     payload: ChatResult,
     extra?: Partial<NonNullable<ChatResult["debug"]>>
@@ -5045,7 +5102,7 @@ async function runChatPipeline(
       ...(extra ?? {})
     }
   })
-  pushChatTelemetry({
+  chatTelemetry.push({
     id: chatRequestId,
     at: new Date().toISOString(),
     phase: "received",
@@ -5063,11 +5120,11 @@ async function runChatPipeline(
   const current = getPage(body.session, effectiveSlug)
   if (!current) return { code: 404, payload: { error: "page not found" } }
 
-  if (isInfoQuery(body.message)) {
+  if (body.message && isInfoQuery(body.message)) {
     const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: info.code, payload: withDebugPayload(info.payload, { outcome: "info" }) }
   }
-  if (isAdviceQuery(body.message)) {
+  if (body.message && isAdviceQuery(body.message)) {
     pendingClarificationBySession.delete(body.session)
     const advice = adviceResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: advice.code, payload: withDebugPayload(advice.payload, { outcome: "advice" }) }
@@ -5085,7 +5142,7 @@ async function runChatPipeline(
 
   const guardrailFailureResponse = (args: { reason: string; source: "openai" | "demo" }) => {
     const category = classifyGuardrailError(args.reason)
-    pushChatTelemetry({
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "result",
@@ -5137,8 +5194,13 @@ async function runChatPipeline(
     }
   }
 
-  const respondFromPlan = async (plan: EditPlan, source: "openai" | "demo") => {
-    pushChatTelemetry({
+  const respondFromPlan = async (
+    plan: EditPlan,
+    source: "openai" | "demo",
+    applyMode: "apply_now" | "plan_only" = "apply_now",
+    optionsOverride?: { preResolvedPlan?: boolean }
+  ) => {
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "plan_generated",
@@ -5155,40 +5217,43 @@ async function runChatPipeline(
       opCount: plan.ops.length,
       opTypes: plan.ops.map((op) => op.op)
     })
-    let resolvedPlan = normalizePlanCopyForUi(plan, current)
-    resolvedPlan = await withUnsplashHeroImage({
-      plan: resolvedPlan,
-      message: plannerMessage,
-      slug: effectiveSlug,
-      currentPage: current,
-      activeBlockId: body.activeBlockId,
-      activeEditablePath: body.activeEditablePath,
-      chatRequestId
-    })
-
-    if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
-      const focusedFallback = compileDeterministicPlan({
-        session: body.session ?? "dev",
-        intent: { action: "clarify" },
+    let resolvedPlan = plan
+    if (!optionsOverride?.preResolvedPlan) {
+      resolvedPlan = normalizePlanCopyForUi(plan, current)
+      resolvedPlan = await withUnsplashHeroImage({
+        plan: resolvedPlan,
         message: plannerMessage,
-        slug: effectiveSlug ?? "/",
+        slug: effectiveSlug,
         currentPage: current,
         activeBlockId: body.activeBlockId,
-        activeEditablePath: body.activeEditablePath
+        activeEditablePath: body.activeEditablePath,
+        chatRequestId
       })
-      if (focusedFallback?.intent === "edit_plan" && focusedFallback.ops.length > 0) {
-        resolvedPlan = focusedFallback
+
+      if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
+        const focusedFallback = compileDeterministicPlan({
+          session: body.session ?? "dev",
+          intent: { action: "clarify" },
+          message: plannerMessage,
+          slug: effectiveSlug ?? "/",
+          currentPage: current,
+          activeBlockId: body.activeBlockId,
+          activeEditablePath: body.activeEditablePath
+        })
+        if (focusedFallback?.intent === "edit_plan" && focusedFallback.ops.length > 0) {
+          resolvedPlan = focusedFallback
+        }
       }
     }
 
-    if (resolvedPlan.intent === "needs_clarification" && isBlockCatalogQuery(body.message!)) {
+    if (resolvedPlan.intent === "needs_clarification" && body.message && isBlockCatalogQuery(body.message)) {
       const forcedInfo = infoResponse({ body, current, plannerSource: source, modelUsed, modelKey })
       return { done: true as const, response: forcedInfo }
     }
 
     if (resolvedPlan.intent === "needs_clarification") {
       pendingClarificationBySession.set(body.session!, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
-      pushChatTelemetry({
+      chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
         phase: "result",
@@ -5206,6 +5271,7 @@ async function runChatPipeline(
         opCount: resolvedPlan.ops.length,
         opTypes: resolvedPlan.ops.map((op) => op.op)
       })
+      if (body.message) pushChatHistory(body.session!, body.message, resolvedPlan.summary_for_user)
       const selected =
         body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
           ? current.blocks.find((b) => b.id === body.activeBlockId)
@@ -5226,6 +5292,61 @@ async function runChatPipeline(
             modelKey
           } satisfies ChatResult, {
             outcome: "needs_clarification",
+            intent: resolvedPlan.intent,
+            opCount: resolvedPlan.ops.length,
+            opTypes: resolvedPlan.ops.map((op) => op.op)
+          })
+        }
+      }
+    }
+
+    if (applyMode === "plan_only") {
+      const pendingPlanId = randomUUID()
+      pendingApprovalPlanBySession.set(body.session!, {
+        id: pendingPlanId,
+        createdAt: new Date().toISOString(),
+        requestedSlug,
+        effectiveSlug,
+        summary: resolvedPlan.summary_for_user,
+        source,
+        modelUsed,
+        modelKey,
+        plan: structuredClone(resolvedPlan)
+      })
+      chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "plan_ready_for_approval",
+        intent: resolvedPlan.intent,
+        opCount: resolvedPlan.ops.length,
+        opTypes: resolvedPlan.ops.map((op) => op.op)
+      })
+      return {
+        done: true as const,
+        response: {
+          code: 200,
+          payload: withDebugPayload({
+            status: "plan_ready",
+            summary: resolvedPlan.summary_for_user,
+            changes: resolvedPlan.change_log,
+            mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug),
+            previewVersion: versions.get(body.session!) ?? 0,
+            plannerSource: source,
+            modelUsed,
+            modelKey,
+            pendingPlanId
+          } satisfies ChatResult, {
+            outcome: "plan_ready_for_approval",
             intent: resolvedPlan.intent,
             opCount: resolvedPlan.ops.length,
             opTypes: resolvedPlan.ops.map((op) => op.op)
@@ -5308,14 +5429,16 @@ async function runChatPipeline(
       }
       pushUndo(body.session!, effectiveSlug, previous)
       pendingClarificationBySession.delete(body.session!)
+      pendingApprovalPlanBySession.delete(body.session!)
       const planUpdatedSlug = pickUpdatedSlug(body.session!, effectiveSlug, resolvedPlan.ops)
       const updatedSlug = planUpdatedSlug ?? (effectiveSlug !== requestedSlug ? effectiveSlug : undefined)
       pushRecentEdit(body.session!, { slug: updatedSlug ?? effectiveSlug, summary: resolvedPlan.summary_for_user, ops: resolvedPlan.ops })
+      if (body.message) pushChatHistory(body.session!, body.message, resolvedPlan.summary_for_user)
       const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
       schedulePersistState()
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
-      pushChatTelemetry({
+      chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
         phase: "result",
@@ -5359,7 +5482,8 @@ async function runChatPipeline(
     } catch (error) {
       const reason = toErrorDetail(error)
       if (isNoEffectiveChangeError(reason)) {
-        pushChatTelemetry({
+        pendingApprovalPlanBySession.delete(body.session!)
+        chatTelemetry.push({
           id: chatRequestId,
           at: new Date().toISOString(),
           phase: "result",
@@ -5392,7 +5516,7 @@ async function runChatPipeline(
           }
         }
       }
-      pushChatTelemetry({
+      chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
         phase: "plan_apply_failed",
@@ -5413,9 +5537,53 @@ async function runChatPipeline(
     }
   }
 
+  if (executionMode === "apply_pending_plan") {
+    const pending = pendingApprovalPlanBySession.get(body.session)
+    if (!pending) {
+      const fallbackMessage = typeof body.message === "string" ? body.message.trim() : ""
+      if (fallbackMessage.length > 0) {
+        // Recovery path: if client tries to approve a missing plan but still sends the
+        // original request text, execute it as a regular chat request.
+        return runChatPipeline({ ...body, executionMode: "auto" }, options)
+      }
+      return {
+        code: 409,
+        payload: withDebugPayload({
+          status: "needs_clarification",
+          summary: "No pending plan is waiting for approval. Ask for a change first.",
+          changes: [],
+          previewVersion: versions.get(body.session) ?? 0,
+          plannerSource,
+          modelUsed,
+          modelKey
+        } satisfies ChatResult, { outcome: "pending_plan_missing" })
+      }
+    }
+    if (body.pendingPlanId && body.pendingPlanId !== pending.id) {
+      return {
+        code: 409,
+        payload: withDebugPayload({
+          status: "validation_error",
+          summary: "Pending plan does not match the latest reviewed plan.",
+          changes: [],
+          validationErrors: ["Pending plan id mismatch. Refresh and approve again."],
+          previewVersion: versions.get(body.session) ?? 0,
+          plannerSource,
+          modelUsed,
+          modelKey
+        } satisfies ChatResult, { outcome: "pending_plan_mismatch" })
+      }
+    }
+    const approvedOutcome = await respondFromPlan(pending.plan, pending.source, "apply_now", { preResolvedPlan: true })
+    if (approvedOutcome.done) return approvedOutcome.response
+    return guardrailFailureResponse({ reason: approvedOutcome.reason, source: pending.source })
+  }
+
+  const applyMode = executionMode === "plan_only" ? "plan_only" : "apply_now"
+
   const forcedCreatePlan = deterministicCreatePagePlan({ session: body.session, message: plannerMessage })
   if (forcedCreatePlan) {
-    pushChatTelemetry({
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "forced_plan",
@@ -5433,19 +5601,19 @@ async function runChatPipeline(
       opCount: forcedCreatePlan.ops.length,
       opTypes: forcedCreatePlan.ops.map((op) => op.op)
     })
-    const forcedOutcome = await respondFromPlan(forcedCreatePlan, plannerSource)
+    const forcedOutcome = await respondFromPlan(forcedCreatePlan, plannerSource, applyMode)
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
   if (!process.env.OPENAI_API_KEY) {
     try {
       const demoPlan = demoPlanFromMessage(plannerMessage, effectiveSlug, body.activeBlockId, body.activeBlockType)
-      const outcome = await respondFromPlan(demoPlan, "demo")
+      const outcome = await respondFromPlan(demoPlan, "demo", applyMode)
       if (outcome.done) return outcome.response
       return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
     } catch (error) {
       const reason = toErrorDetail(error)
-      pushChatTelemetry({
+      chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
         phase: "result",
@@ -5489,12 +5657,13 @@ async function runChatPipeline(
         currentPage: current,
         contextPack,
         model: modelUsed,
+        history: sessionChatHistory,
         onToken: options?.onPlanningToken
       })
       break
     } catch (error) {
       const reason = toErrorDetail(error)
-      pushChatTelemetry({
+      chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
         phase: "plan_attempt_failed",
@@ -5513,7 +5682,7 @@ async function runChatPipeline(
       })
       planningErrors.push(`Attempt ${attempt} planning failed: ${reason}`)
       if (attempt === maxPlanningAttempts) {
-        pushChatTelemetry({
+        chatTelemetry.push({
           id: chatRequestId,
           at: new Date().toISOString(),
           phase: "result",
@@ -5548,7 +5717,7 @@ async function runChatPipeline(
   }
 
   if (!initialPlan) {
-    pushChatTelemetry({
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "result",
@@ -5578,7 +5747,7 @@ async function runChatPipeline(
     }
   }
 
-  const initialOutcome = await respondFromPlan(initialPlan, "openai")
+  const initialOutcome = await respondFromPlan(initialPlan, "openai", applyMode)
   if (initialOutcome.done) return initialOutcome.response
 
   if (!isDeterministicRepairEligible(initialOutcome.reason)) {
@@ -5587,7 +5756,7 @@ async function runChatPipeline(
 
   let repairedPlan: EditPlan
   try {
-    pushChatTelemetry({
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "repair_attempt",
@@ -5610,10 +5779,11 @@ async function runChatPipeline(
       currentPage: current,
       contextPack,
       model: modelUsed,
+      history: sessionChatHistory,
       feedback: buildDeterministicRepairFeedback(initialOutcome.reason),
       onToken: options?.onPlanningToken
     })
-    pushChatTelemetry({
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "repair_generated",
@@ -5633,7 +5803,7 @@ async function runChatPipeline(
     })
   } catch (error) {
     const reason = toErrorDetail(error)
-    pushChatTelemetry({
+    chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
       phase: "result",
@@ -5665,7 +5835,7 @@ async function runChatPipeline(
     }
   }
 
-  const repairedOutcome = await respondFromPlan(repairedPlan, "openai")
+  const repairedOutcome = await respondFromPlan(repairedPlan, "openai", applyMode)
   if (repairedOutcome.done) return repairedOutcome.response
   return guardrailFailureResponse({ reason: repairedOutcome.reason, source: "openai" })
 }
@@ -6226,101 +6396,20 @@ app.get("/status/planner", async () => ({
   unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
 }))
 app.get("/telemetry/chat", async (request) => {
-  const query = request.query as { limit?: string; outcome?: string; phase?: string; session?: string }
-  const limitRaw = Number(query.limit ?? 100)
-  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 1000) : 100
-  let rows = chatTelemetryBuffer
-  if (query.outcome) rows = rows.filter((row) => row.outcome === query.outcome)
-  if (query.phase) rows = rows.filter((row) => row.phase === query.phase)
-  if (query.session) rows = rows.filter((row) => row.session === query.session)
-
-  const recent = rows.slice(Math.max(0, rows.length - limit))
-  const byOutcome: Record<string, number> = {}
-  const byReasonCategory: Record<string, number> = {}
-  for (const row of recent) {
-    if (row.outcome) byOutcome[row.outcome] = (byOutcome[row.outcome] ?? 0) + 1
-    if (row.reasonCategory) byReasonCategory[row.reasonCategory] = (byReasonCategory[row.reasonCategory] ?? 0) + 1
-  }
-
-  return {
-    totalBuffered: chatTelemetryBuffer.length,
-    returned: recent.length,
-    byOutcome,
-    byReasonCategory,
-    rows: recent
-  }
+  const raw = request.query as { limit?: string; outcome?: string; phase?: string; session?: string }
+  return chatTelemetry.list({
+    limit: raw.limit !== undefined ? Number(raw.limit) : undefined,
+    outcome: raw.outcome,
+    phase: raw.phase,
+    session: raw.session
+  })
 })
 app.get("/telemetry/chat/review", async (request) => {
-  const query = request.query as { limit?: string; session?: string }
-  const limitRaw = Number(query.limit ?? 300)
-  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 2000) : 300
-  let rows = chatTelemetryBuffer
-  if (query.session) rows = rows.filter((row) => row.session === query.session)
-  const recent = rows.slice(Math.max(0, rows.length - limit))
-
-  const failureOutcomes = new Set([
-    "guardrail_failure",
-    "apply_failed",
-    "repair_failed",
-    "planner_exception",
-    "planning_exhausted",
-    "planning_missing"
-  ])
-  const failures = recent.filter((row) => row.phase === "result" && row.outcome && failureOutcomes.has(row.outcome))
-  const success = recent.filter((row) => row.phase === "result" && row.outcome === "applied")
-
-  const failureByReasonCategory: Record<string, number> = {}
-  const failureByOutcome: Record<string, number> = {}
-  const byPromptHash = new Map<
-    string,
-    { promptExcerpt: string; count: number; outcomes: Record<string, number>; reasonCategories: Record<string, number>; lastAt: string }
-  >()
-
-  for (const row of failures) {
-    if (row.reasonCategory) failureByReasonCategory[row.reasonCategory] = (failureByReasonCategory[row.reasonCategory] ?? 0) + 1
-    if (row.outcome) failureByOutcome[row.outcome] = (failureByOutcome[row.outcome] ?? 0) + 1
-    const current =
-      byPromptHash.get(row.promptHash) ??
-      { promptExcerpt: row.promptExcerpt, count: 0, outcomes: {}, reasonCategories: {}, lastAt: row.at }
-    current.count += 1
-    if (row.outcome) current.outcomes[row.outcome] = (current.outcomes[row.outcome] ?? 0) + 1
-    if (row.reasonCategory) current.reasonCategories[row.reasonCategory] = (current.reasonCategories[row.reasonCategory] ?? 0) + 1
-    if (row.at > current.lastAt) current.lastAt = row.at
-    byPromptHash.set(row.promptHash, current)
-  }
-
-  const topFailedPrompts = Array.from(byPromptHash.entries())
-    .map(([promptHash, value]) => ({ promptHash, ...value }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 12)
-
-  const recommendations: string[] = []
-  if ((failureByReasonCategory.schema_violation ?? 0) > 0) {
-    recommendations.push("Schema violations are frequent: add stricter pre-apply normalization for missing required fields and alias keys.")
-  }
-  if ((failureByReasonCategory.not_found ?? 0) > 0) {
-    recommendations.push("Not-found failures detected: improve slug/block resolution using active selection and current page context.")
-  }
-  if ((failureByReasonCategory.ambiguity ?? 0) > 0) {
-    recommendations.push("Ambiguity is high: improve follow-up question templates with explicit selectable options.")
-  }
-  if ((failureByOutcome.planning_exhausted ?? 0) > 0) {
-    recommendations.push("Planner retries are exhausting: add deterministic fallback plans for the top failed prompt families.")
-  }
-  if (recommendations.length === 0) {
-    recommendations.push("No dominant failure mode detected in this sample. Review top failed prompts and add targeted tests for each.")
-  }
-
-  return {
-    analyzed: recent.length,
-    appliedCount: success.length,
-    failedCount: failures.length,
-    failureRate: recent.length > 0 ? Number((failures.length / recent.length).toFixed(4)) : 0,
-    failureByOutcome,
-    failureByReasonCategory,
-    topFailedPrompts,
-    recommendations
-  }
+  const raw = request.query as { limit?: string; session?: string }
+  return chatTelemetry.review({
+    limit: raw.limit !== undefined ? Number(raw.limit) : undefined,
+    session: raw.session
+  })
 })
 app.get("/favicon.ico", async (_request, reply) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -6338,7 +6427,7 @@ app.get("/favicon.ico", async (_request, reply) => {
 async function startServer() {
   const port = Number(process.env.PORT ?? 4200)
   await loadStateFromDisk()
-  await loadTelemetryFromDisk()
+  await chatTelemetry.loadFromDisk()
   await app.listen({ port, host: "0.0.0.0" })
   app.log.info(`Orchestrator listening on ${port}`)
 }
