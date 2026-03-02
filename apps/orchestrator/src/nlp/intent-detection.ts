@@ -111,7 +111,8 @@ const BATCH_ADD_PATTERNS: RegExp[] = [
 ]
 
 const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
-  /\b(?:create|generate|build|make|draft)\b[^.\n]{0,48}\bpages\b/,
+  /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bpages\b/,
+  /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bonly\b[^.\n]{0,140}\bpages\b/,
   /\bpages?\s+for\s+(?:these|those|the following|multiple|several)\b/,
   /\bfor\s+.+\b(?:and|,|&)\b.+\bpages?\b/,
   /\bfor\s+.+\b(?:and|,|&)\b.+\b(?:audiences|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/
