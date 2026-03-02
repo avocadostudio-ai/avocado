@@ -14,6 +14,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
+import { isBatchAddRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   normalizeOpName,
@@ -186,7 +187,8 @@ export async function generatePlanWithOpenAI(args: {
   client?: PlannerOpenAIClient
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
-  const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode()
+  const batchOverride = isBatchAddRequest(args.message)
+  const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
   const audienceHint = extractAudienceTarget(args.message)
   const explicitOtherReference =
@@ -220,9 +222,9 @@ export async function generatePlanWithOpenAI(args: {
     "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
     ...(chatStrictPrimaryOpMode
       ? [
-          "STRICT MODE: choose exactly one PRIMARY operation only.",
-          "In intent=edit_plan, return exactly one op in ops[].",
-          "Do not include secondary/follow-up operations."
+          "Return exactly one operation in ops[].",
+          "Pick the single most impactful operation for the user's request.",
+          "Do not include secondary or follow-up operations."
         ]
       : [
           "When the user's request involves multiple changes, include all operations in a single plan.",
@@ -230,6 +232,7 @@ export async function generatePlanWithOpenAI(args: {
           "Each operation must be valid against the page state at that point in execution order.",
           "Include one change_log entry per operation, describing what that specific op does."
         ]),
+    "Never mention internal system settings, mode names, or operation limits in summary_for_user.",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",

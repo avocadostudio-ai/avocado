@@ -1252,23 +1252,41 @@ export async function runChatPipeline(
     }
     // Run deferred image generation if the pending plan has image ops
     let approvalPlan = pending.plan
-    if (pending.pendingImageOps && pending.pendingImageOps.length > 0) {
-      const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
-      approvalPlan = await withUnsplashHeroImage({
-        plan: structuredClone(approvalPlan),
-        message: imageMessage,
-        slug: pending.effectiveSlug,
-        currentPage: current,
-        activeBlockId: body.activeBlockId,
-        activeEditablePath: body.activeEditablePath,
-        chatRequestId,
-        log: ctx.log,
-        onStatusUpdate: options?.onStatusUpdate
-      })
+    try {
+      if (pending.pendingImageOps && pending.pendingImageOps.length > 0) {
+        const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
+        approvalPlan = await withUnsplashHeroImage({
+          plan: structuredClone(approvalPlan),
+          message: imageMessage,
+          slug: pending.effectiveSlug,
+          currentPage: current,
+          activeBlockId: body.activeBlockId,
+          activeEditablePath: body.activeEditablePath,
+          chatRequestId,
+          log: ctx.log,
+          onStatusUpdate: options?.onStatusUpdate
+        })
+      }
+      const approvedOutcome = await respondFromPlan(approvalPlan, pending.source, "apply_now", { preResolvedPlan: true })
+      if (approvedOutcome.done) return approvedOutcome.response
+      return guardrailFailureResponse({ reason: approvedOutcome.reason, source: pending.source })
+    } catch (error) {
+      const reason = toErrorDetail(error)
+      ctx.log.error({ event: "apply_pending_plan_error", chatRequestId, error: reason }, "Pending plan execution failed")
+      pendingApprovalPlanBySession.delete(body.session!)
+      return {
+        code: 500,
+        payload: withDebugPayload({
+          status: "error",
+          summary: "Failed to execute the approved plan. Please try again.",
+          changes: [reason.slice(0, 300)],
+          previewVersion: versions.get(body.session!) ?? 0,
+          plannerSource: pending.source,
+          modelUsed: pending.modelUsed,
+          modelKey: pending.modelKey
+        } satisfies ChatResult, { outcome: "apply_pending_plan_error" })
+      }
     }
-    const approvedOutcome = await respondFromPlan(approvalPlan, pending.source, "apply_now", { preResolvedPlan: true })
-    if (approvedOutcome.done) return approvedOutcome.response
-    return guardrailFailureResponse({ reason: approvedOutcome.reason, source: pending.source })
   }
 
   const applyMode = executionMode === "plan_only" ? "plan_only" : "apply_now"

@@ -94,6 +94,27 @@ export function isBlockCatalogQuery(message: string) {
   return BLOCK_CATALOG_PATTERNS.some((re) => re.test(m))
 }
 
+// ---------------------------------------------------------------------------
+// Detects requests to add many/all block types at once (e.g. "add all
+// available block types", "scaffold the page", "fill out the page").
+// When detected the planner should override strict single-op mode.
+// ---------------------------------------------------------------------------
+
+const BATCH_ADD_PATTERNS: RegExp[] = [
+  new RegExp(String.raw`\badd\s+(?:all|every|each|the\s+remaining|the\s+rest\s+of(?:\s+the)?)\s+${UNIT}\b`),
+  new RegExp(String.raw`\badd\s+(?:all|every|each|the\s+remaining|the\s+rest\s+of(?:\s+the)?)\s+${UNIT_TYPE}\b`),
+  /\bscaffold\b/,
+  /\bfill\s+(?:out\s+)?(?:the\s+)?page\b/,
+  /\badd\s+(?:all|every)\s+(?:available|missing|remaining)\b/,
+  new RegExp(String.raw`\b(?:all|every)\s+(?:available|missing|remaining)\s+${UNIT}\b`),
+  /\bbuild\s+(?:out|up)\s+(?:the\s+)?(?:whole\s+)?page\b/
+]
+
+export function isBatchAddRequest(message: string) {
+  const m = normalizeForIntent(message)
+  return BATCH_ADD_PATTERNS.some((re) => re.test(m))
+}
+
 export function isInfoQuery(message: string) {
   const m = normalizeForIntent(message)
   return (

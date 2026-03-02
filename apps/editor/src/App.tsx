@@ -321,7 +321,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
       <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
           <div className="chat-header-site-name">
-            {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Change</a>
+            {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Switch</a>
             {chatEngine.plannerBadgeState === "demo" ? (
               <span className="planner-badge planner-badge-demo">Demo mode</span>
             ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
