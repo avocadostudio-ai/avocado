@@ -270,34 +270,54 @@ function promptFromPropKey(propKey: string) {
   return labels[propKey] ?? `Change ${propKey} to \"...\"`
 }
 
+const ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
+
+function humanizeArrayPath(root: string): string {
+  const match = root.match(/^([a-zA-Z_]+)\[(\d+)\]$/)
+  if (!match) return root
+  const [, listName, indexStr] = match
+  const index = Number(indexStr)
+  const ordinal = ORDINALS[index] ?? `#${index + 1}`
+  const singular: Record<string, string> = {
+    cards: "card",
+    features: "feature",
+    items: "item",
+    stats: "stat",
+    columns: "column"
+  }
+  const noun = singular[listName] ?? listName.replace(/s$/, "")
+  return `the ${ordinal} ${noun}`
+}
+
 function childSuggestions(args: { selected: PageDoc["blocks"][number]; editablePath: string }) {
   const { selected, editablePath } = args
   const path = editablePath.trim()
   if (!path) return []
   const root = path.split(".")[0] ?? path
+  const human = humanizeArrayPath(root)
 
   if (selected.type === "CardGrid" && root.startsWith("cards[")) {
     return [
-      `Update ${root}.title to \"...\"`,
-      `Update ${root}.description to \"...\"`,
-      `Update ${root}.ctaText to \"...\"`,
-      `Update ${root}.ctaHref to \"/...\"`
+      `Update ${human}'s title to \"...\"`,
+      `Update ${human}'s description to \"...\"`,
+      `Update ${human}'s CTA text to \"...\"`,
+      `Update ${human}'s CTA link to \"/...\"`
     ]
   }
 
   if (selected.type === "FeatureGrid" && root.startsWith("features[")) {
-    return [`Update ${root}.title to \"...\"`, `Update ${root}.description to \"...\"`]
+    return [`Update ${human}'s title to \"...\"`, `Update ${human}'s description to \"...\"`]
   }
 
   if (selected.type === "Testimonials" && root.startsWith("items[")) {
-    return [`Update ${root}.quote to \"...\"`, `Update ${root}.author to \"...\"`]
+    return [`Update ${human}'s quote to \"...\"`, `Update ${human}'s author to \"...\"`]
   }
 
   if (selected.type === "FAQAccordion" && root.startsWith("items[")) {
-    return [`Update ${root}.q to \"...\"`, `Update ${root}.a to \"...\"`]
+    return [`Update ${human}'s question to \"...\"`, `Update ${human}'s answer to \"...\"`]
   }
 
-  return [`Update ${root} ...`]
+  return [`Update ${human} ...`]
 }
 
 export function infoResponse(args: {
@@ -340,8 +360,9 @@ export function infoResponse(args: {
     const keys = editablePropsFromBlock(selected)
     const childPath = String(body.activeEditablePath ?? "")
     const suggestions = childPath ? childSuggestions({ selected, editablePath: childPath }) : keys.slice(0, 4).map(promptFromPropKey)
+    const humanChild = childPath ? humanizeArrayPath(childPath.split(".")[0] ?? childPath) : ""
     const summary = childPath
-      ? `Focused ${selected.type} item: ${childPath}.`
+      ? `Focused on ${humanChild} in ${selected.type}.`
       : `You can edit ${selected.type} fields: ${keys.join(", ")}.`
     return {
       code: 200,

@@ -232,7 +232,8 @@ export async function generatePlanWithOpenAI(args: {
           "Each operation must be valid against the page state at that point in execution order.",
           "Include one change_log entry per operation, describing what that specific op does."
         ]),
-    "Never mention internal system settings, mode names, or operation limits in summary_for_user.",
+    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
+    "Never mention internal block IDs (b_hero_*, b_featuregrid_*, etc.), prop names (imageUrl, imageAlt), or system settings in summary_for_user or change_log. Use human-friendly descriptions instead (e.g. 'Update the Hero image' not 'Update imageUrl on b_hero_123').",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
@@ -251,7 +252,8 @@ export async function generatePlanWithOpenAI(args: {
       intent: "edit_plan | needs_clarification",
       summary_for_user: "string",
       change_log: ["string"],
-      ops: ["Operation[]"]
+      ops: ["Operation[]"],
+      suggested_next_actions: ["string (optional, 2-4 items)"]
     },
     feedback: args.feedback ?? null
   }

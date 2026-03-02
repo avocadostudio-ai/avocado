@@ -21,6 +21,7 @@ import {
   normalizePlanCandidate
 } from "../nlp/plan-normalizer.js"
 import { isChatStrictPrimaryOpMode } from "./planner.js"
+import { editPlanJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 
 
@@ -184,7 +185,8 @@ export async function generatePlanWithAnthropic(args: {
           "Each operation must be valid against the page state at that point in execution order.",
           "Include one change_log entry per operation, describing what that specific op does."
         ]),
-    "Never mention internal system settings, mode names, or operation limits in summary_for_user.",
+    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
+    "Never mention internal block IDs (b_hero_*, b_featuregrid_*, etc.), prop names (imageUrl, imageAlt), or system settings in summary_for_user or change_log. Use human-friendly descriptions instead (e.g. 'Update the Hero image' not 'Update imageUrl on b_hero_123').",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
@@ -203,7 +205,8 @@ export async function generatePlanWithAnthropic(args: {
       intent: "edit_plan | needs_clarification",
       summary_for_user: "string",
       change_log: ["string"],
-      ops: ["Operation[]"]
+      ops: ["Operation[]"],
+      suggested_next_actions: ["string (optional, 2-4 items)"]
     },
     feedback: args.feedback ?? null
   }
@@ -213,55 +216,89 @@ export async function generatePlanWithAnthropic(args: {
     content: h.content
   }))
 
-  let raw = ""
+  const toolDef: Anthropic.Messages.Tool = {
+    name: "submit_edit_plan",
+    description: "Submit the structured EditPlan JSON.",
+    input_schema: editPlanJsonSchema
+  }
+
+  let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
   if (args.onToken) {
+    let toolJsonBuf = ""
+    let textBuf = ""
     const stream = client.messages.stream({
       model: args.model,
       max_tokens: 8192,
       system,
+      tools: [toolDef],
+      tool_choice: { type: "tool", name: "submit_edit_plan" },
       messages: [
         ...historyMessages,
         { role: "user", content: JSON.stringify(user) }
       ],
     })
     for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        raw += event.delta.text
-        args.onToken(event.delta.text)
+      if (event.type === "content_block_delta") {
+        if (event.delta.type === "input_json_delta") {
+          toolJsonBuf += event.delta.partial_json
+          args.onToken(event.delta.partial_json)
+        } else if (event.delta.type === "text_delta") {
+          textBuf += event.delta.text
+          args.onToken(event.delta.text)
+        }
       }
     }
     const finalMessage = await stream.finalMessage()
     usage = extractUsage(finalMessage)
+
+    // Prefer tool_use input; fall back to text block
+    if (toolJsonBuf.length > 0) {
+      parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
+    } else if (textBuf.length > 0) {
+      const jsonText = extractJsonObject(textBuf)
+      if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+    }
   } else {
     const response = await client.messages.create({
       model: args.model,
       max_tokens: 8192,
       system,
+      tools: [toolDef],
+      tool_choice: { type: "tool", name: "submit_edit_plan" },
       messages: [
         ...historyMessages,
         { role: "user", content: JSON.stringify(user) }
       ],
     })
-    const textBlock = response.content.find((b) => b.type === "text")
-    raw = textBlock && "text" in textBlock ? textBlock.text : ""
     usage = extractUsage(response)
+
+    // Extract from tool_use content block
+    const toolBlock = response.content.find((b) => b.type === "tool_use")
+    if (toolBlock && "input" in toolBlock && toolBlock.input && typeof toolBlock.input === "object") {
+      parsed = toolBlock.input as Record<string, unknown>
+    } else {
+      // Fallback: extract from text block
+      const textBlock = response.content.find((b) => b.type === "text")
+      const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+      const jsonText = extractJsonObject(raw)
+      if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+    }
   }
 
-  const jsonText = extractJsonObject(raw)
-  if (!jsonText) throw new Error("Model did not return JSON")
+  if (!parsed) throw new Error("Model did not return JSON")
 
-  const parsed = normalizePlanCandidate(JSON.parse(jsonText), {
+  const normalized = normalizePlanCandidate(parsed, {
     defaultSlug: args.slug,
     currentPage: args.currentPage,
     userMessage: args.message
   })
-  const planResult = editPlanSchema.safeParse(parsed)
+  const planResult = editPlanSchema.safeParse(normalized)
   if (!planResult.success) {
     const first = planResult.error.issues[0]
     const message = first?.message ?? "Invalid model output"
     const path = first?.path?.length ? ` at ${first.path.join(".")}` : ""
-    const sample = JSON.stringify(parsed).slice(0, 700)
+    const sample = JSON.stringify(normalized).slice(0, 700)
     throw new Error(`${message}${path}. Parsed sample: ${sample}`)
   }
 

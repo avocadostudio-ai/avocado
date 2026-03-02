@@ -47,6 +47,7 @@ import {
 import {
   buildCreatePagePlan,
   clarificationSuggestions,
+  postEditSuggestions,
   demoPlanFromMessage,
   plannerContextPack,
   compileDeterministicPlan
@@ -58,7 +59,9 @@ import {
   heroImageQueryFromContext,
   imageKeywordsFromQuery,
   generateVariationImageWithOpenAI,
-  resolveUnsplashImage
+  resolveUnsplashImage,
+  isExplicitImageGenRequest,
+  extractImagePromptFromMessage
 } from "../image/image-helpers.js"
 
 let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
@@ -175,6 +178,9 @@ export function normalizePlanCopyForUi(plan: EditPlan, currentPage: PageDoc): Ed
       .replace(/\bhero block imageurl\b/gi, "Hero block image")
       .replace(/\bimageurl\b/gi, "Hero block image")
       .replace(/\bimagealt\b/gi, "Hero image alt text")
+      // Strip internal block IDs like "b_hero_1772150570555" or "block b_hero_..."
+      .replace(/\s*\bon\s+(?:block\s+)?b_[a-z]+_\d+\b/gi, "")
+      .replace(/\b(?:block\s+)?b_[a-z]+_\d+\b/gi, "")
 
   const normalizedSummary = rewrite(plan.summary_for_user)
   const normalizedChangeLog = plan.change_log.map(rewrite)
@@ -227,12 +233,16 @@ export async function withUnsplashHeroImage(args: {
   if (args.plan.intent !== "edit_plan") return args.plan
 
   const explicitUnsplashRequest = lowerMessage.includes("unsplash")
+  const explicitImageGen = isExplicitImageGenRequest(args.message)
+  const userImagePrompt = extractImagePromptFromMessage(args.message)
   args.log.info(
     {
       event: "hero_image_rewrite_start",
       chatRequestId: args.chatRequestId,
       slug: args.slug,
       explicitUnsplashRequest,
+      explicitImageGen,
+      hasUserImagePrompt: Boolean(userImagePrompt),
       message: args.message
     },
     "Evaluating hero image rewrite"
@@ -240,6 +250,7 @@ export async function withUnsplashHeroImage(args: {
 
   const plan = structuredClone(args.plan)
   let changed = false
+  let placeholderSkipped = false
   let sourceQuery: string | undefined
   let imageSource: "ai-generated" | "unsplash" | "placeholder" = "placeholder"
 
@@ -260,9 +271,9 @@ export async function withUnsplashHeroImage(args: {
       args.activeEditablePath === "imageUrl" ||
       /\b(image|photo|picture)\b/.test(lowerMessage)
     const userProvidedExplicitUrl = Boolean(firstUrlFromText(args.message))
-    const shouldReplaceWithUnsplash =
-      !userProvidedExplicitUrl && touchesImage && (explicitUnsplashRequest || requestedImageUrl.length > 0)
-    if (!touchesImage || !shouldReplaceWithUnsplash) continue
+    const shouldReplace =
+      !userProvidedExplicitUrl && touchesImage && (explicitUnsplashRequest || requestedImageUrl.length > 0 || explicitImageGen)
+    if (!touchesImage || !shouldReplace) continue
 
     const query = heroImageQueryFromContext({
       message: args.message,
@@ -270,33 +281,65 @@ export async function withUnsplashHeroImage(args: {
       targetBlock: target,
       patchCandidate
     })
+    const targetProps = target.props as Record<string, unknown>
+    const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
+    const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
+    const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
+    const currentImageUrl = typeof targetProps.imageUrl === "string" ? targetProps.imageUrl : ""
+
     let resolved: UnsplashImage | null = null
     if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY) {
       args.onStatusUpdate?.("Generating image...")
-      const targetProps = target.props as Record<string, unknown>
-      const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
-      const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
-      const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
-      const generatedAlt = `AI-generated hero image featuring ${query}`
-      const generatedPrompt = [
-        "Use case: website hero image update",
-        `Page: ${args.currentPage.title} (${args.slug})`,
-        `Section: ${target.type} — ${sectionContext}`,
-        `Primary subject: ${query}`,
-        "Style: photorealistic editorial product photography",
-        "Composition: clean landscape frame with clear focal subject",
-        "Lighting: natural and vibrant",
-        "Constraints: no text, no logos, no watermark"
-      ].join("\n")
-      resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt })
+
+      // When the user provides a detailed image description (after "generate image: ..."),
+      // use it directly as the prompt. Otherwise fall back to the generic prompt.
+      let generatedPrompt: string
+      let generatedAlt: string
+      if (userImagePrompt) {
+        generatedAlt = userImagePrompt.slice(0, 200)
+        generatedPrompt = [
+          "Use case: website hero image",
+          `Page: ${args.currentPage.title} (${args.slug})`,
+          `Section: ${target.type} — ${sectionContext}`,
+          userImagePrompt,
+          "Constraints: no text, no logos, no watermark"
+        ].join("\n")
+      } else {
+        generatedAlt = `AI-generated hero image featuring ${query}`
+        generatedPrompt = [
+          "Use case: website hero image update",
+          `Page: ${args.currentPage.title} (${args.slug})`,
+          `Section: ${target.type} — ${sectionContext}`,
+          `Primary subject: ${query}`,
+          "Style: photorealistic editorial product photography",
+          "Composition: clean landscape frame with clear focal subject",
+          "Lighting: natural and vibrant",
+          "Constraints: no text, no logos, no watermark"
+        ].join("\n")
+      }
+      resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
       if (resolved) imageSource = "ai-generated"
     }
     if (!resolved) {
       args.onStatusUpdate?.("Finding a suitable image...")
-      resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4) }, { chatRequestId: args.chatRequestId, logger: args.log })
+      // Pass current imageUrl as "used" so Unsplash returns a different image
+      const usedImageUrls = currentImageUrl ? new Set([currentImageUrl]) : undefined
+      resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4), usedImageUrls }, { chatRequestId: args.chatRequestId, logger: args.log })
       if (resolved) imageSource = resolved.url.includes("unsplash") ? "unsplash" : "placeholder"
     }
-    if (!resolved) continue
+
+    // Don't insert a random placeholder — a random unrelated image is worse than keeping
+    // the current one. Remove image fields from the patch; other prop changes still apply.
+    if (!resolved || imageSource === "placeholder") {
+      delete patchCandidate.imageUrl
+      delete patchCandidate.imageAlt
+      args.log.warn(
+        { event: "hero_image_skip_placeholder", chatRequestId: args.chatRequestId, query },
+        "Skipping placeholder image — no relevant image source available"
+      )
+      placeholderSkipped = true
+      continue
+    }
 
     const nextPatch: Record<string, unknown> = { ...patchCandidate, imageUrl: resolved.url }
     if (
@@ -325,7 +368,7 @@ export async function withUnsplashHeroImage(args: {
     changed = true
   }
 
-  if (!changed && explicitUnsplashRequest && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+  if (!changed && (explicitUnsplashRequest || explicitImageGen) && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -339,22 +382,88 @@ export async function withUnsplashHeroImage(args: {
         currentPage: args.currentPage,
         targetBlock: fallbackHero
       })
-      const resolved = await resolveUnsplashImage(
-        query,
-        { subjectKeywords: imageKeywordsFromQuery(query, 4) },
-        { chatRequestId: args.chatRequestId, logger: args.log }
-      )
-      if (!resolved) return plan
 
-      plan.ops.push({
-        op: "update_props",
-        pageSlug: args.slug,
-        blockId: fallbackHero.id,
-        patch: { imageUrl: resolved.url, imageAlt: resolved.alt }
-      })
-      sourceQuery = resolved.query
-      changed = true
+      let resolved: UnsplashImage | null = null
+      if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY && (explicitImageGen || userImagePrompt)) {
+        args.onStatusUpdate?.("Generating image...")
+        const targetProps = fallbackHero.props as Record<string, unknown>
+        const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
+        const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
+        const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
+
+        let generatedPrompt: string
+        let generatedAlt: string
+        if (userImagePrompt) {
+          generatedAlt = userImagePrompt.slice(0, 200)
+          generatedPrompt = [
+            "Use case: website hero image",
+            `Page: ${args.currentPage.title} (${args.slug})`,
+            `Section: ${fallbackHero.type} — ${sectionContext}`,
+            userImagePrompt,
+            "Constraints: no text, no logos, no watermark"
+          ].join("\n")
+        } else {
+          generatedAlt = `AI-generated hero image featuring ${query}`
+          generatedPrompt = [
+            "Use case: website hero image update",
+            `Page: ${args.currentPage.title} (${args.slug})`,
+            `Section: ${fallbackHero.type} — ${sectionContext}`,
+            `Primary subject: ${query}`,
+            "Style: photorealistic editorial product photography",
+            "Composition: clean landscape frame with clear focal subject",
+            "Lighting: natural and vibrant",
+            "Constraints: no text, no logos, no watermark"
+          ].join("\n")
+        }
+        resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
+        if (resolved) imageSource = "ai-generated"
+      }
+      if (!resolved) {
+        args.onStatusUpdate?.("Finding a suitable image...")
+        const fbProps = fallbackHero.props as Record<string, unknown>
+        const fbCurrentUrl = typeof fbProps.imageUrl === "string" ? fbProps.imageUrl : ""
+        const fbUsedUrls = fbCurrentUrl ? new Set([fbCurrentUrl]) : undefined
+        resolved = await resolveUnsplashImage(
+          query,
+          { subjectKeywords: imageKeywordsFromQuery(query, 4), usedImageUrls: fbUsedUrls },
+          { chatRequestId: args.chatRequestId, logger: args.log }
+        )
+        if (resolved) imageSource = resolved.url.includes("unsplash") ? "unsplash" : "placeholder"
+      }
+      // Don't push a new op just to insert a random placeholder
+      if (!resolved || imageSource === "placeholder") {
+        placeholderSkipped = true
+      } else {
+        plan.ops.push({
+          op: "update_props",
+          pageSlug: args.slug,
+          blockId: fallbackHero.id,
+          patch: { imageUrl: resolved.url, imageAlt: resolved.alt }
+        })
+        sourceQuery = resolved.query
+        changed = true
+      }
     }
+  }
+
+  // Remove update_props ops left with empty patches after image field stripping
+  if (placeholderSkipped) {
+    plan.ops = plan.ops.filter((op) => {
+      if (op.op !== "update_props") return true
+      const patch = op.patch as Record<string, unknown>
+      const inner =
+        patch && typeof patch.props === "object" && patch.props !== null && !Array.isArray(patch.props)
+          ? (patch.props as Record<string, unknown>)
+          : patch
+      return Object.keys(inner).filter((k) => k !== "props").length > 0
+    })
+  }
+
+  if (placeholderSkipped && !changed) {
+    plan.change_log = [
+      ...plan.change_log,
+      "Could not find a matching image — configure UNSPLASH_ACCESS_KEY for relevant image search."
+    ]
   }
 
   if (changed) {
@@ -400,6 +509,7 @@ export function detectImageOps(args: {
   if (args.plan.intent !== "edit_plan") return []
 
   const explicitUnsplashRequest = lowerMessage.includes("unsplash")
+  const explicitImageGen = isExplicitImageGenRequest(args.message)
   const results: PendingImageGeneration[] = []
 
   for (const op of args.plan.ops) {
@@ -418,11 +528,12 @@ export function detectImageOps(args: {
       args.activeEditablePath === "imageUrl" ||
       /\b(image|photo|picture)\b/.test(lowerMessage)
     const userProvidedExplicitUrl = Boolean(firstUrlFromText(args.message))
-    const shouldReplaceWithUnsplash =
+    const hasImageUrlInPatch = typeof patchCandidate.imageUrl === "string" && patchCandidate.imageUrl.trim().length > 0
+    const shouldReplace =
       !userProvidedExplicitUrl &&
       touchesImage &&
-      (explicitUnsplashRequest || (typeof patchCandidate.imageUrl === "string" && patchCandidate.imageUrl.trim().length > 0))
-    if (!touchesImage || !shouldReplaceWithUnsplash) continue
+      (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
+    if (!touchesImage || !shouldReplace) continue
 
     const query = heroImageQueryFromContext({
       message: args.message,
@@ -438,8 +549,8 @@ export function detectImageOps(args: {
     results.push({ blockId: op.blockId, pageSlug: op.pageSlug, query, provider })
   }
 
-  // Fallback: explicit unsplash request targeting a Hero block when no ops matched
-  if (results.length === 0 && explicitUnsplashRequest && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+  // Fallback: explicit image request targeting a Hero block when no ops matched
+  if (results.length === 0 && (explicitUnsplashRequest || explicitImageGen) && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -453,7 +564,11 @@ export function detectImageOps(args: {
         currentPage: args.currentPage,
         targetBlock: fallbackHero
       })
-      results.push({ blockId: fallbackHero.id, pageSlug: args.slug, query, provider: "unsplash" })
+      const provider: PendingImageGeneration["provider"] =
+        explicitUnsplashRequest ? "unsplash"
+        : process.env.OPENAI_API_KEY ? "auto"
+        : "unsplash"
+      results.push({ blockId: fallbackHero.id, pageSlug: args.slug, query, provider })
     }
   }
 
@@ -949,7 +1064,7 @@ export async function runChatPipeline(
             summary: resolvedPlan.summary_for_user,
             changes: resolvedPlan.change_log,
             mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug),
-            suggestions: clarificationSuggestions({ body, current, selected }),
+            suggestions: resolvedPlan.suggested_next_actions ?? clarificationSuggestions({ body, current, selected }),
             previewVersion: versions.get(body.session!) ?? 0,
             plannerSource: source,
             modelUsed,
@@ -1142,6 +1257,7 @@ export async function runChatPipeline(
             summary: resolvedPlan.summary_for_user,
             changes: [...resolvedPlan.change_log, ...metaChangeLogEntries, ...aiInsightChanges],
             mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, updatedSlug ?? effectiveSlug),
+            suggestions: resolvedPlan.suggested_next_actions ?? postEditSuggestions({ plan: resolvedPlan, current, body }),
             previewVersion,
             focusBlockId,
             updatedSlug,
@@ -1255,8 +1371,28 @@ export async function runChatPipeline(
     try {
       if (pending.pendingImageOps && pending.pendingImageOps.length > 0) {
         const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
+        const planClone = structuredClone(approvalPlan)
+
+        // Restore placeholder imageUrl in ops that had it stripped during detection.
+        // withUnsplashHeroImage checks requestedImageUrl.length > 0 to decide whether
+        // to resolve an image — without this, the stripped patch causes it to skip.
+        for (const imgOp of pending.pendingImageOps) {
+          const op = planClone.ops.find(
+            (o) => o.op === "update_props" && o.blockId === imgOp.blockId && o.pageSlug === imgOp.pageSlug
+          )
+          if (!op || op.op !== "update_props") continue
+          const rawPatch = op.patch as Record<string, unknown>
+          const patchTarget =
+            rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
+              ? (rawPatch.props as Record<string, unknown>)
+              : rawPatch
+          if (!Object.prototype.hasOwnProperty.call(patchTarget, "imageUrl")) {
+            patchTarget.imageUrl = "pending"
+          }
+        }
+
         approvalPlan = await withUnsplashHeroImage({
-          plan: structuredClone(approvalPlan),
+          plan: planClone,
           message: imageMessage,
           slug: pending.effectiveSlug,
           currentPage: current,
