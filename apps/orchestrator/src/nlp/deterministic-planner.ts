@@ -50,7 +50,7 @@ export function extractAudienceTarget(message: string) {
 function cleanAudienceCandidate(raw: string) {
   const cleaned = raw
     .replace(/\b(?:an?|the|only|just)\b/g, " ")
-    .replace(/\b(?:audience|audiences|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/g, " ")
+    .replace(/\b(?:audience|audiences|segment|segments)\b/g, " ")
     .replace(/[.?!:;"'`()[\]{}]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
