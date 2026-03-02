@@ -537,7 +537,8 @@ export const editPlanSchema = z.object({
   intent: z.enum(["edit_plan", "needs_clarification"]),
   summary_for_user: z.string().min(1),
   change_log: z.array(z.string()),
-  ops: z.array(operationSchema)
+  ops: z.array(operationSchema),
+  suggested_next_actions: z.array(z.string()).max(5).optional()
 })
 
 export type EditPlan = z.infer<typeof editPlanSchema>

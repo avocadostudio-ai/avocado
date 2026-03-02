@@ -505,7 +505,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  async function submitChatStream(finalMessage: string) {
+  async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
     return await new Promise<boolean>((resolve) => {
       const params = new URLSearchParams({
         session,
@@ -520,6 +520,11 @@ export function useChatEngine(config: ChatEngineConfig) {
       if (activeBlockIdRef.current) params.set("activeBlockId", activeBlockIdRef.current)
       if (activeBlockTypeRef.current) params.set("activeBlockType", activeBlockTypeRef.current)
       if (activeEditablePathRef.current) params.set("activeEditablePath", activeEditablePathRef.current)
+      if (extraParams) {
+        for (const [key, value] of Object.entries(extraParams)) {
+          params.set(key, value)
+        }
+      }
 
       const source = new EventSource(`${orchestrator}/chat/stream?${params.toString()}`)
       let settled = false
@@ -697,10 +702,13 @@ export function useChatEngine(config: ChatEngineConfig) {
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Approve plan and execute." }])
     setIsLoading(true)
     try {
-      await submitChatHttp(originalMessage, {
-        executionMode: "apply_pending_plan",
-        pendingPlanId: planId
-      })
+      const approvalParams = { executionMode: "apply_pending_plan" as const, pendingPlanId: planId }
+      if (useStreaming) {
+        const ok = await submitChatStream(originalMessage, approvalParams)
+        if (!ok) await submitChatHttp(originalMessage, approvalParams)
+      } else {
+        await submitChatHttp(originalMessage, approvalParams)
+      }
     } catch (error) {
       pushAssistantFromResult({
         status: "error",
@@ -708,6 +716,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         changes: []
       })
     } finally {
+      setStreamStatus(null)
       setIsLoading(false)
     }
   }

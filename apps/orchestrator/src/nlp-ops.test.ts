@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { extractAudienceTarget, inferAddedBlockTypeFromMessage } from "./nlp/deterministic-planner.js"
+import { extractAudienceTarget, inferAddedBlockTypeFromMessage, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 
 test("parseCreatePageRequest prompt matrix", () => {
@@ -1330,4 +1330,129 @@ test("compileDeterministicPlan keeps deterministic handling when quoted text is 
     if (original === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = original
   }
+})
+
+// ---------------------------------------------------------------------------
+// suggested_next_actions schema tests
+// ---------------------------------------------------------------------------
+
+test("editPlanSchema accepts plans with suggested_next_actions", () => {
+  const plan = {
+    intent: "edit_plan",
+    summary_for_user: "Updated heading.",
+    change_log: ["Changed heading."],
+    ops: [],
+    suggested_next_actions: ["Update the subheading", "Add a CTA section"]
+  }
+  const result = editPlanSchema.safeParse(plan)
+  assert.ok(result.success, "should accept plan with suggested_next_actions")
+  assert.deepEqual(result.data.suggested_next_actions, ["Update the subheading", "Add a CTA section"])
+})
+
+test("editPlanSchema accepts plans without suggested_next_actions (backward compat)", () => {
+  const plan = {
+    intent: "edit_plan",
+    summary_for_user: "Updated heading.",
+    change_log: ["Changed heading."],
+    ops: []
+  }
+  const result = editPlanSchema.safeParse(plan)
+  assert.ok(result.success, "should accept plan without suggested_next_actions")
+  assert.equal(result.data.suggested_next_actions, undefined)
+})
+
+// ---------------------------------------------------------------------------
+// humanizeArrayPath tests
+// ---------------------------------------------------------------------------
+
+test("humanizeArrayPath converts bracket notation to ordinal text", () => {
+  assert.equal(humanizeArrayPath("cards[0]"), "the first card")
+  assert.equal(humanizeArrayPath("cards[1]"), "the second card")
+  assert.equal(humanizeArrayPath("features[2]"), "the third feature")
+  assert.equal(humanizeArrayPath("items[0]"), "the first item")
+  assert.equal(humanizeArrayPath("stats[3]"), "the fourth stat")
+  assert.equal(humanizeArrayPath("columns[0]"), "the first column")
+})
+
+test("humanizeArrayPath returns input unchanged for non-array paths", () => {
+  assert.equal(humanizeArrayPath("heading"), "heading")
+  assert.equal(humanizeArrayPath("title"), "title")
+})
+
+// ---------------------------------------------------------------------------
+// childSuggestions humanized output tests
+// ---------------------------------------------------------------------------
+
+test("childSuggestions returns humanized paths, no bracket notation", () => {
+  const block = { id: "b1", type: "CardGrid", props: { title: "Cards", cards: [{ title: "A", description: "B", ctaText: "C", ctaHref: "/" }] } }
+  const suggestions = childSuggestions({ selected: block, editablePath: "cards[0].title" })
+  assert.ok(suggestions.length > 0, "should return suggestions")
+  for (const s of suggestions) {
+    assert.ok(!s.includes("["), `suggestion should not contain brackets: ${s}`)
+    assert.ok(s.includes("the first card"), `suggestion should contain humanized path: ${s}`)
+  }
+})
+
+test("childSuggestions humanizes FAQAccordion items", () => {
+  const block = { id: "b2", type: "FAQAccordion", props: { title: "FAQ", items: [{ q: "Q1", a: "A1" }] } }
+  const suggestions = childSuggestions({ selected: block, editablePath: "items[0].q" })
+  assert.ok(suggestions.some((s) => s.includes("question")), "should use 'question' instead of 'q'")
+  assert.ok(suggestions.some((s) => s.includes("answer")), "should use 'answer' instead of 'a'")
+})
+
+// ---------------------------------------------------------------------------
+// clarificationSuggestions tests
+// ---------------------------------------------------------------------------
+
+test("clarificationSuggestions without selection doesn't include 'Remove selected block'", () => {
+  const pages = demoPublishedPages()
+  const home = pages[0]
+  const suggestions = clarificationSuggestions({ body: { message: "something" }, current: home, selected: null })
+  for (const s of suggestions) {
+    assert.ok(!s.toLowerCase().includes("remove selected block"), `should not suggest removing selected block: ${s}`)
+  }
+})
+
+test("clarificationSuggestions with selection doesn't include 'Remove selected block'", () => {
+  const pages = demoPublishedPages()
+  const home = pages[0]
+  const hero = home.blocks.find((b) => b.type === "Hero")!
+  const suggestions = clarificationSuggestions({ body: { message: "something" }, current: home, selected: hero })
+  for (const s of suggestions) {
+    assert.ok(!s.toLowerCase().includes("remove selected block"), `should not suggest removing selected block: ${s}`)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// postEditSuggestions tests
+// ---------------------------------------------------------------------------
+
+test("postEditSuggestions generates suggestions for update_props", () => {
+  const pages = demoPublishedPages()
+  const home = pages[0]
+  const hero = home.blocks.find((b) => b.type === "Hero")!
+  const plan = {
+    intent: "edit_plan" as const,
+    summary_for_user: "Updated heading.",
+    change_log: ["Changed heading."],
+    ops: [{ op: "update_props" as const, pageSlug: "/", blockId: hero.id, patch: { heading: "New" } }]
+  }
+  const suggestions = postEditSuggestions({ plan, current: home, body: { message: "change heading" } })
+  assert.ok(suggestions.length > 0, "should return at least one suggestion")
+  assert.ok(suggestions.length <= 4, "should return at most 4 suggestions")
+})
+
+test("postEditSuggestions suggests missing block types", () => {
+  const pages = demoPublishedPages()
+  const home = pages[0]
+  const plan = {
+    intent: "edit_plan" as const,
+    summary_for_user: "Updated heading.",
+    change_log: ["Changed heading."],
+    ops: [{ op: "update_props" as const, pageSlug: "/", blockId: home.blocks[0].id, patch: { heading: "New" } }]
+  }
+  const suggestions = postEditSuggestions({ plan, current: home, body: { message: "change heading" } })
+  const hasTestimonials = suggestions.some((s) => s.toLowerCase().includes("testimonials"))
+  const hasFaq = suggestions.some((s) => s.toLowerCase().includes("faq"))
+  assert.ok(hasTestimonials || hasFaq, "should suggest adding missing block types")
 })

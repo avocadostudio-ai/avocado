@@ -296,53 +296,106 @@ export function userFacingPropNames(blockType: BlockType, keys: string[]) {
   return keys.map((key) => getPropDisplayName(blockType, key))
 }
 
+const ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
+
+export function humanizeArrayPath(root: string): string {
+  const match = root.match(/^([a-zA-Z_]+)\[(\d+)\]$/)
+  if (!match) return root
+  const [, listName, indexStr] = match
+  const index = Number(indexStr)
+  const ordinal = ORDINALS[index] ?? `#${index + 1}`
+  const singular: Record<string, string> = {
+    cards: "card",
+    features: "feature",
+    items: "item",
+    stats: "stat",
+    columns: "column"
+  }
+  const noun = singular[listName] ?? listName.replace(/s$/, "")
+  return `the ${ordinal} ${noun}`
+}
+
 export function childSuggestions(args: { selected: PageDoc["blocks"][number]; editablePath: string }) {
   const { selected, editablePath } = args
   const path = editablePath.trim()
   if (!path) return []
   const root = path.split(".")[0] ?? path
+  const human = humanizeArrayPath(root)
 
   if (selected.type === "CardGrid" && root.startsWith("cards[")) {
     return [
-      `Update ${root}.title to \"...\"`,
-      `Update ${root}.description to \"...\"`,
-      `Update ${root}.ctaText to \"...\"`,
-      `Update ${root}.ctaHref to \"/...\"`
+      `Update ${human}'s title to \"...\"`,
+      `Update ${human}'s description to \"...\"`,
+      `Update ${human}'s CTA text to \"...\"`,
+      `Update ${human}'s CTA link to \"/...\"`
     ]
   }
 
   if (selected.type === "FeatureGrid" && root.startsWith("features[")) {
-    return [`Update ${root}.title to \"...\"`, `Update ${root}.description to \"...\"`]
+    return [`Update ${human}'s title to \"...\"`, `Update ${human}'s description to \"...\"`]
   }
 
   if (selected.type === "Testimonials" && root.startsWith("items[")) {
-    return [`Update ${root}.quote to \"...\"`, `Update ${root}.author to \"...\"`]
+    return [`Update ${human}'s quote to \"...\"`, `Update ${human}'s author to \"...\"`]
   }
 
   if (selected.type === "FAQAccordion" && root.startsWith("items[")) {
-    return [`Update ${root}.q to \"...\"`, `Update ${root}.a to \"...\"`]
+    return [`Update ${human}'s question to \"...\"`, `Update ${human}'s answer to \"...\"`]
   }
 
-  return [`Update ${root} ...`]
+  return [`Update ${human} ...`]
 }
 
 export function clarificationSuggestions(args: { body: ChatRequestBody; current: PageDoc; selected?: PageDoc["blocks"][number] | null }) {
-  const { selected } = args
+  const { selected, current } = args
   if (selected) {
     const keys = editablePropsFromBlock(selected)
     if (keys.length > 0) return keys.slice(0, 4).map(promptFromPropKey)
     return [
       `Update ${selected.type} title to "..."`,
-      `Move ${selected.type} to bottom`,
-      `Remove selected block`
+      `Move ${selected.type} to bottom`
     ]
   }
-  return [
-    "Change heading to \"...\"",
-    "Add Testimonials below Hero",
-    "Move FAQ to bottom",
-    "Remove selected block"
-  ]
+  const suggestions: string[] = []
+  const existingTypes = new Set(current.blocks.map((b) => b.type))
+  const first = current.blocks[0]
+  if (first) suggestions.push(`Update ${first.type} heading to "..."`)
+  if (!existingTypes.has("Testimonials")) suggestions.push("Add Testimonials section")
+  else if (!existingTypes.has("FAQAccordion")) suggestions.push("Add FAQ section")
+  else if (!existingTypes.has("CardGrid")) suggestions.push("Add Card Grid section")
+  if (existingTypes.has("FAQAccordion")) suggestions.push("Move FAQ to bottom")
+  else if (existingTypes.has("CTA")) suggestions.push("Update the CTA copy")
+  if (suggestions.length === 0) suggestions.push("Change heading to \"...\"", "Add Testimonials section")
+  return suggestions.slice(0, 4)
+}
+
+export function postEditSuggestions(args: { plan: EditPlan; current: PageDoc; body: ChatRequestBody }): string[] {
+  const { plan, current } = args
+  const suggestions: string[] = []
+  const existingTypes = new Set(current.blocks.map((b) => b.type))
+
+  for (const op of plan.ops) {
+    if (op.op === "update_props") {
+      const block = current.blocks.find((b) => b.id === op.blockId)
+      if (block) {
+        const patchKeys = Object.keys(op.patch as Record<string, unknown>)
+        const otherKeys = editablePropsFromBlock(block).filter((k) => !patchKeys.includes(k))
+        for (const key of otherKeys.slice(0, 2)) {
+          suggestions.push(promptFromPropKey(key))
+        }
+      }
+    } else if (op.op === "add_block") {
+      suggestions.push(`Update the new ${op.block.type} content`)
+    } else if (op.op === "remove_block") {
+      if (!existingTypes.has("CTA")) suggestions.push("Add a CTA section")
+    }
+  }
+
+  if (!existingTypes.has("Testimonials") && suggestions.length < 3) suggestions.push("Add a Testimonials section")
+  if (!existingTypes.has("FAQAccordion") && suggestions.length < 3) suggestions.push("Add a FAQ section")
+  if (!existingTypes.has("Stats") && suggestions.length < 4) suggestions.push("Add a Stats section")
+
+  return suggestions.slice(0, 4)
 }
 
 export function demoPlanFromMessage(message: string, slug: string, activeBlockId?: string, activeBlockType?: string): EditPlan {

@@ -380,7 +380,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
                   <blockquote>{entry.aiPerformanceNote}</blockquote>
                 </div>
               ) : null}
-              {entry.status && !entry.canUndo ? <div className="msg-status">{entry.status === "needs_clarification" ? "question" : entry.status}</div> : null}
+              {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
               {(entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line)).length > 0 ? (
                 <ul className="msg-list">
                   {(entry.changes ?? [])
