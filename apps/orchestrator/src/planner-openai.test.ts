@@ -142,6 +142,40 @@ test("generatePlanWithOpenAI enforces strict primary-op mode from env", async ()
   }
 })
 
+test("generatePlanWithOpenAI bypasses strict primary-op mode for multi-page create batch prompts", async () => {
+  const previous = process.env.CHAT_STRICT_PRIMARY_OP_MODE
+  process.env.CHAT_STRICT_PRIMARY_OP_MODE = "1"
+  try {
+    const { currentPage, contextPack } = basePlannerArgs("create pages for water explorers and wilderness survivalists")
+    const { plan } = await generatePlanWithOpenAI({
+      message: "create pages for water explorers and wilderness survivalists",
+      slug: "/",
+      currentPage,
+      contextPack,
+      model: "gpt-4o",
+      client: fakePlannerClientWithContent(
+        JSON.stringify({
+          intent: "edit_plan",
+          summary_for_user: "Will create both pages.",
+          change_log: ["Will create page for water explorers.", "Will create page for wilderness survivalists."],
+          ops: [
+            { op: "create_page", page: { slug: "/for-water-explorers", blocks: [] } },
+            { op: "create_page", page: { slug: "/for-wilderness-survivalists", blocks: [] } }
+          ]
+        })
+      )
+    })
+
+    assert.equal(plan.intent, "edit_plan")
+    assert.equal(plan.ops.length, 2)
+    assert.equal(plan.ops[0]?.op, "create_page")
+    assert.equal(plan.ops[1]?.op, "create_page")
+  } finally {
+    if (previous === undefined) delete process.env.CHAT_STRICT_PRIMARY_OP_MODE
+    else process.env.CHAT_STRICT_PRIMARY_OP_MODE = previous
+  }
+})
+
 test("generatePlanWithOpenAI rejects schema-invalid plans", async () => {
   const { currentPage, contextPack } = basePlannerArgs("change heading")
   await assert.rejects(

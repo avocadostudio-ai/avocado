@@ -44,26 +44,69 @@ import {
 } from "../state/session-state.js"
 
 export function extractAudienceTarget(message: string) {
-  const lower = message.toLowerCase()
-  const patternMatches = [
-    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,80}?)\s+(?:audience|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/),
-    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,80})$/),
-    lower.match(/\btarget(?:ing)?\s+([a-z0-9 ,&/-]{2,80})\b/)
-  ]
-  const raw = patternMatches.find(Boolean)?.[1]
-  if (!raw) return undefined
+  return extractAudienceTargets(message)[0]
+}
+
+function cleanAudienceCandidate(raw: string) {
   const cleaned = raw
-    .replace(/\b(an?|the)\b/g, " ")
+    .replace(/\b(?:an?|the|only|just)\b/g, " ")
+    .replace(/\b(?:audience|audiences|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/g, " ")
+    .replace(/[.?!:;"'`()[\]{}]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 80)
   if (cleaned.length <= 1) return undefined
-  const rejectWords = new Set(["a while", "now", "later", "free", "this", "me", "you", "testing", "demo", "it", "that", "here", "there", "sure", "fun", "good", "better", "best", "while"])
+  const rejectWords = new Set([
+    "a while",
+    "now",
+    "later",
+    "free",
+    "this",
+    "these",
+    "that",
+    "those",
+    "me",
+    "you",
+    "testing",
+    "demo",
+    "it",
+    "here",
+    "there",
+    "sure",
+    "fun",
+    "good",
+    "better",
+    "best",
+    "while"
+  ])
   if (rejectWords.has(cleaned.toLowerCase())) return undefined
   const stopwords = new Set(["a", "an", "the", "is", "it", "to", "of", "in", "on", "for", "and", "or", "so", "if"])
   const words = cleaned.toLowerCase().split(/\s+/)
   if (words.every((w) => stopwords.has(w))) return undefined
   return cleaned
+}
+
+function splitAudienceList(raw: string) {
+  return raw
+    .split(/\s*(?:,|&|\band\b|\bor\b|\/)\s*/i)
+    .map((part) => cleanAudienceCandidate(part))
+    .filter((part): part is string => Boolean(part))
+}
+
+export function extractAudienceTargets(message: string) {
+  const lower = message.toLowerCase()
+  const patternMatches = [
+    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,80}?)\s+(?:audience|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/),
+    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,160})$/),
+    lower.match(/\btarget(?:ing)?\s+([a-z0-9 ,&/-]{2,80})\b/),
+    lower.match(/\bpages?\s+for\s+([a-z0-9 ,&/-]{2,160})(?:$|[.!?])/),
+    lower.match(/\bfor\s+([a-z0-9 ,&/-]{2,160})\s+pages?\b/),
+    lower.match(/\b(?:create|generate|build|make|draft)\s+(?:only\s+)?([a-z0-9 ,&/-]{2,160})\s+pages?\b/)
+  ]
+  const raw = patternMatches.find(Boolean)?.[1]
+  if (!raw) return []
+  const candidates = splitAudienceList(raw)
+  return [...new Set(candidates)]
 }
 
 export function titleCaseWords(text: string) {
@@ -863,9 +906,24 @@ export function resolveReferencesFromMessage(args: { message: string; currentPag
 }
 
 export function arrayPropLengths(props: Record<string, unknown>) {
-  const out: Record<string, { length: number }> = {}
+  const out: Record<string, { length: number; labels?: string[] }> = {}
   for (const [key, value] of Object.entries(props)) {
-    if (Array.isArray(value)) out[key] = { length: value.length }
+    if (!Array.isArray(value)) continue
+    const labels: string[] = []
+    for (const item of value) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue
+      // Extract the first short string field as a label (title, heading, label, name, question)
+      const obj = item as Record<string, unknown>
+      const label =
+        typeof obj.title === "string" ? obj.title :
+        typeof obj.heading === "string" ? obj.heading :
+        typeof obj.label === "string" ? obj.label :
+        typeof obj.name === "string" ? obj.name :
+        typeof obj.question === "string" ? obj.question :
+        undefined
+      if (label) labels.push(label.length > 60 ? label.slice(0, 57) + "..." : label)
+    }
+    out[key] = labels.length > 0 ? { length: value.length, labels } : { length: value.length }
   }
   return out
 }
@@ -1368,78 +1426,103 @@ export function compileDeterministicPlan(args: {
     }
   }
 
-  const audience = extractAudienceTarget(message)
+  const audiences = extractAudienceTargets(message)
+  const audience = audiences[0]
   const asksAudienceCreatePage =
-    Boolean(audience) &&
+    audiences.length > 0 &&
     /\b(create|generate|build|make|draft)\b/.test(lowerMessage) &&
-    /\b(page|landing page)\b/.test(lowerMessage)
+    /\b(pages?|landing pages?)\b/.test(lowerMessage)
   if (asksAudienceCreatePage && audience) {
     if (process.env.OPENAI_API_KEY) return null
-    const seed = toSeedSlug(audience) || "audience"
-    const requestedSlug = routeMentions[0] ?? `/for-${seed}`
-    const normalizedRequested = normalizeRouteCandidate(requestedSlug) ?? `/for-${seed}`
-    const newSlug = nextAvailableSlug(session, normalizedRequested)
-    const label = titleCaseWords(audience)
     const now = new Date().toISOString()
-    const page: PageDoc = {
-      id: `p_for_${seed}`,
-      slug: newSlug,
-      title: `For ${label}`,
-      updatedAt: now,
-      blocks: [
-        {
-          id: `b_hero_${seed}`,
-          type: "Hero",
-          props: {
-            heading: `Built for ${label}`,
-            subheading: `Everything on this page is tailored for ${audience}.`,
-            ctaText: "Get Started",
-            ctaHref: "/",
-            imageUrl: `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`,
-            imageAlt: `Audience-focused hero image for ${label}`
-          }
-        },
-        {
-          id: `b_features_${seed}`,
-          type: "FeatureGrid",
-          props: {
-            title: `Why ${label} choose this`,
-            features: [
-              { title: "Relevant messaging", description: `Copy aligned to ${audience} needs and language.` },
-              { title: "Clear outcomes", description: "Benefits are framed around practical results." },
-              { title: "Focused next step", description: "CTA is tuned for this audience journey." }
-            ]
-          }
-        },
-        {
-          id: `b_faq_${seed}`,
-          type: "FAQAccordion",
-          props: {
-            title: `FAQ for ${label}`,
-            items: [
-              { q: `Is this suitable for ${audience}?`, a: `Yes, this page is tailored for ${audience}.` },
-              { q: "How quickly can I start?", a: "Most visitors can get started in minutes." },
-              { q: "Can I customize later?", a: "Yes, content and sections can be updated anytime." }
-            ]
-          }
-        },
-        {
-          id: `b_cta_${seed}`,
-          type: "CTA",
-          props: {
-            title: `Start with a plan for ${label}`,
-            description: "Take the next step with content designed for your audience.",
-            ctaText: "Start now",
-            ctaHref: "/"
-          }
-        }
-      ]
+    const reservedSlugs = new Set(getSessionDraft(session).keys())
+    const allocateSlug = (requested: string) => {
+      let candidate = requested
+      if (!reservedSlugs.has(candidate)) {
+        reservedSlugs.add(candidate)
+        return candidate
+      }
+      let idx = 2
+      while (reservedSlugs.has(`${requested}-${idx}`)) idx += 1
+      candidate = `${requested}-${idx}`
+      reservedSlugs.add(candidate)
+      return candidate
     }
+    const pages = audiences.map((aud, index) => {
+      const seed = toSeedSlug(aud) || `audience-${index + 1}`
+      const requestedSlug = routeMentions[index] ?? `/for-${seed}`
+      const normalizedRequested = normalizeRouteCandidate(requestedSlug) ?? `/for-${seed}`
+      const newSlug = allocateSlug(normalizedRequested)
+      const label = titleCaseWords(aud)
+      const page: PageDoc = {
+        id: `p_for_${seed}`,
+        slug: newSlug,
+        title: `For ${label}`,
+        updatedAt: now,
+        blocks: [
+          {
+            id: `b_hero_${seed}`,
+            type: "Hero",
+            props: {
+              heading: `Built for ${label}`,
+              subheading: `Everything on this page is tailored for ${aud}.`,
+              ctaText: "Get Started",
+              ctaHref: "/",
+              imageUrl: `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`,
+              imageAlt: `Audience-focused hero image for ${label}`
+            }
+          },
+          {
+            id: `b_features_${seed}`,
+            type: "FeatureGrid",
+            props: {
+              title: `Why ${label} choose this`,
+              features: [
+                { title: "Relevant messaging", description: `Copy aligned to ${aud} needs and language.` },
+                { title: "Clear outcomes", description: "Benefits are framed around practical results." },
+                { title: "Focused next step", description: "CTA is tuned for this audience journey." }
+              ]
+            }
+          },
+          {
+            id: `b_faq_${seed}`,
+            type: "FAQAccordion",
+            props: {
+              title: `FAQ for ${label}`,
+              items: [
+                { q: `Is this suitable for ${aud}?`, a: `Yes, this page is tailored for ${aud}.` },
+                { q: "How quickly can I start?", a: "Most visitors can get started in minutes." },
+                { q: "Can I customize later?", a: "Yes, content and sections can be updated anytime." }
+              ]
+            }
+          },
+          {
+            id: `b_cta_${seed}`,
+            type: "CTA",
+            props: {
+              title: `Start with a plan for ${label}`,
+              description: "Take the next step with content designed for your audience.",
+              ctaText: "Start now",
+              ctaHref: "/"
+            }
+          }
+        ]
+      }
+      return { page, audience: aud }
+    })
+    const createdAudienceLabels = pages.map((entry) => entry.audience)
+    const summaryAudienceList = createdAudienceLabels.join(", ")
     return {
       intent: "edit_plan",
-      summary_for_user: `Created a new page tailored for ${audience}.`,
-      change_log: [...assumptions, `Created page ${newSlug} for audience: ${audience}.`],
-      ops: [{ op: "create_page", page }]
+      summary_for_user:
+        pages.length === 1
+          ? `Created a new page tailored for ${audience}.`
+          : `Created ${pages.length} new pages tailored for ${summaryAudienceList}.`,
+      change_log: [
+        ...assumptions,
+        ...pages.map((entry) => `Created page ${entry.page.slug} for audience: ${entry.audience}.`)
+      ],
+      ops: pages.map((entry) => ({ op: "create_page", page: entry.page } satisfies Operation))
     }
   }
 

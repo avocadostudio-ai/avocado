@@ -12,6 +12,58 @@ import {
 } from "./intent-helpers.js"
 
 // ---------------------------------------------------------------------------
+// Op reordering: create_page must precede ops targeting the same slug
+// ---------------------------------------------------------------------------
+
+function reorderCreatePageFirst(ops: unknown[]): unknown[] {
+  const createOps: Array<{ index: number; slug: string }> = []
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i] as Record<string, unknown> | null
+    if (!op || typeof op !== "object") continue
+    if (op.op !== "create_page") continue
+    const page = op.page as Record<string, unknown> | undefined
+    const slug = typeof page?.slug === "string" ? page.slug : undefined
+    if (slug) createOps.push({ index: i, slug })
+  }
+  if (createOps.length === 0) return ops
+
+  const createSlugs = new Set(createOps.map((c) => c.slug))
+  const result: unknown[] = []
+  const deferred: unknown[] = []
+
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i] as Record<string, unknown> | null
+    if (!op || typeof op !== "object") { result.push(ops[i]); continue }
+
+    if (op.op === "create_page") {
+      result.push(op)
+      // Flush any deferred ops that target this page
+      const page = op.page as Record<string, unknown> | undefined
+      const slug = typeof page?.slug === "string" ? page.slug : undefined
+      if (slug) {
+        const flushed: number[] = []
+        for (let j = 0; j < deferred.length; j++) {
+          const d = deferred[j] as Record<string, unknown>
+          if (d.pageSlug === slug) { result.push(d); flushed.push(j) }
+        }
+        for (let j = flushed.length - 1; j >= 0; j--) deferred.splice(flushed[j], 1)
+      }
+    } else if (typeof op.pageSlug === "string" && createSlugs.has(op.pageSlug) && !result.some((r) => {
+      const ro = r as Record<string, unknown> | null
+      return ro && ro.op === "create_page" && (ro.page as Record<string, unknown>)?.slug === op.pageSlug
+    })) {
+      // This op targets a page that will be created later — defer it
+      deferred.push(op)
+    } else {
+      result.push(op)
+    }
+  }
+  // Append any remaining deferred ops (shouldn't happen if create_page exists)
+  result.push(...deferred)
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // JSON extraction
 // ---------------------------------------------------------------------------
 
@@ -598,9 +650,12 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     }
 
     // LLMs also emit create_page with blocks[] for existing pages. Convert to add_block sequence.
+    // But only when targeting the current page — if it's an explicit new route, let it fall
+    // through to the create_page handler that synthesizes a proper PageDoc.
     if (
       raw.op === "create_page" &&
       !raw.page &&
+      !explicitCreateTarget &&
       Array.isArray(raw.blocks) &&
       raw.blocks.length > 0
     ) {
@@ -645,8 +700,10 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
       const shouldTreatAsCurrentPageEdit =
         !requestedCreateSlug && refersToCurrentPage && !!args?.defaultSlug && slug === args.defaultSlug
 
-      if (Array.isArray(pageInput.blocks)) {
-        for (const candidate of pageInput.blocks) {
+      // Blocks may be inside pageInput.blocks (page wrapper) or raw.blocks (flat format).
+      const blocksSource = Array.isArray(pageInput.blocks) ? pageInput.blocks : Array.isArray(raw.blocks) ? raw.blocks : null
+      if (blocksSource) {
+        for (const candidate of blocksSource) {
           if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue
           const block = candidate as Record<string, unknown>
           const typeRaw = typeof block.type === "string" ? block.type : ""
@@ -770,5 +827,9 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     }
   }
 
-  return { ...root, ops: sanitizedOps }
+  // Reorder ops so create_page always precedes ops targeting the same slug.
+  // The LLM may emit add_block ops before the corresponding create_page.
+  const reorderedOps = reorderCreatePageFirst(sanitizedOps)
+
+  return { ...root, ops: reorderedOps }
 }

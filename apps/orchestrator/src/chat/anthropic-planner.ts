@@ -169,6 +169,8 @@ export async function generatePlanWithAnthropic(args: {
     "For duplicate_block, blockId is required; use optional toPageSlug when duplicating into a different page.",
     "If the user specifies an audience (e.g. 'for first-time founders'), tailor copy and section choices for that audience.",
     "If user asks to create a page for an audience, create_page with audience-specific Hero/benefits/CTA content.",
+    "If user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page. Do not ask which page to create first.",
+    "For create_page, derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",

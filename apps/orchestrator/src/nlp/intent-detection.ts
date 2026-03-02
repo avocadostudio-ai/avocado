@@ -110,9 +110,16 @@ const BATCH_ADD_PATTERNS: RegExp[] = [
   /\bbuild\s+(?:out|up)\s+(?:the\s+)?(?:whole\s+)?page\b/
 ]
 
+const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
+  /\b(?:create|generate|build|make|draft)\b[^.\n]{0,48}\bpages\b/,
+  /\bpages?\s+for\s+(?:these|those|the following|multiple|several)\b/,
+  /\bfor\s+.+\b(?:and|,|&)\b.+\bpages?\b/,
+  /\bfor\s+.+\b(?:and|,|&)\b.+\b(?:audiences|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/
+]
+
 export function isBatchAddRequest(message: string) {
   const m = normalizeForIntent(message)
-  return BATCH_ADD_PATTERNS.some((re) => re.test(m))
+  return BATCH_ADD_PATTERNS.some((re) => re.test(m)) || BATCH_PAGE_CREATE_PATTERNS.some((re) => re.test(m))
 }
 
 export function isInfoQuery(message: string) {
@@ -214,14 +221,10 @@ export function plannerMessageWithPendingContext(session: string, message: strin
   return `${pending.baseRequest}\nClarification from user: ${message}`
 }
 
-export function withSiteContext(message: string, sitePurpose?: string, siteHosting?: string) {
+export function withSiteContext(message: string, sitePurpose?: string, _siteHosting?: string) {
   const purpose = typeof sitePurpose === "string" ? sitePurpose.trim() : ""
-  const hosting = typeof siteHosting === "string" ? siteHosting.trim() : ""
-  if (!purpose && !hosting) return message
-  const lines: string[] = []
-  if (purpose) lines.push(`Site purpose: ${purpose}`)
-  if (hosting) lines.push(`Hosting context: ${hosting}`)
-  return `${message}\n\n[site context]\n${lines.join("\n")}\n[/site context]`
+  if (!purpose) return message
+  return `${message}\n\n[site context]\nSite purpose: ${purpose}\n[/site context]`
 }
 
 export function stripSiteContextEnvelope(message: string) {
