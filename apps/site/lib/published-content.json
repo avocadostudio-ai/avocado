@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-02T08:48:42.835Z",
+    "updatedAt": "2026-03-02T09:38:44.695Z",
     "blocks": [
       {
         "id": "b_hero_1772319324619",
@@ -25,6 +25,31 @@
         "props": {
           "title": "Discover Your Adventure",
           "body": "Adventure awaits! Explore the great outdoors, conquer new challenges, and create unforgettable memories. Whether you're hiking through lush forests, scaling majestic mountains, or navigating winding rivers, every adventure is a chance to discover something new about the world and yourself. Join us in embracing the spirit of adventure and let your journey begin!\n\nAs you embark on your journey, remember that every step is a story waiting to be told. Connect with nature, meet fellow adventurers, and let the thrill of exploration ignite your passion for the great outdoors."
+        }
+      },
+      {
+        "id": "b_featuregrid_1772444316157",
+        "type": "FeatureGrid",
+        "props": {
+          "title": "Why Adventure With Us",
+          "features": [
+            {
+              "title": "Expert-Led Expeditions",
+              "description": "Join seasoned guides who know the terrain, the risks, and how to make every expedition unforgettable."
+            },
+            {
+              "title": "Trails for Every Level",
+              "description": "From gentle forest walks to technical alpine routes, we have mapped 500+ trails to match your skill and ambition."
+            },
+            {
+              "title": "Gear & Safety Guidance",
+              "description": "Get expert recommendations on gear, preparation, and safety so you can focus on the thrill, not the risk."
+            },
+            {
+              "title": "A Thriving Community",
+              "description": "Connect with 10,000+ like-minded adventurers who share your passion for exploration and pushing boundaries."
+            }
+          ]
         }
       },
       {
@@ -79,7 +104,7 @@
     "id": "p_test",
     "slug": "/test",
     "title": "Test",
-    "updatedAt": "2026-03-02T09:28:11.780Z",
+    "updatedAt": "2026-03-02T09:37:57.510Z",
     "blocks": [
       {
         "id": "b_hero_1772442600081",
@@ -150,6 +175,27 @@
             {
               "q": "How does the platform keep me safe out there?",
               "a": "Every route carries community-verified hazard notes, real-time weather overlays, and emergency contact features. We also publish regular safety guides and partner with certified guides to run skills workshops — because the best adventures are the ones you come home from."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_footer_1772444277506",
+        "type": "Footer",
+        "props": {
+          "copyright": "© 2025 Adventurers. All rights reserved.",
+          "columns": [
+            {
+              "title": "Explore",
+              "links": "Adventures|/adventures\nRoutes|/routes\nCommunity|/community"
+            },
+            {
+              "title": "Company",
+              "links": "About|/about\nContact|/contact"
+            },
+            {
+              "title": "Legal",
+              "links": "Privacy|/privacy\nTerms|/terms"
             }
           ]
         }
