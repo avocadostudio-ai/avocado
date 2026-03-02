@@ -1,7 +1,9 @@
 import { z } from "zod"
 import {
   allowedBlockTypes,
+  blockSchemas,
   editPlanSchema,
+  getAllBlockMeta,
   getPropDisplayName,
   type BlockType,
   type EditPlan,
@@ -549,51 +551,72 @@ export function pageMetaContractSummary() {
   }
 }
 
+/** Per-block notes that supplement the auto-derived contract. */
+const _blockNotes: Record<string, string> = {
+  Hero: "Use heading for the main headline; never invent prop names. For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it.",
+  FeatureGrid: "features must be a non-empty array of {title, description}.",
+  Testimonials: "items must be a non-empty array of {quote, author}.",
+  FAQAccordion: "items must be a non-empty array of {q, a}.",
+  CTA: "Keep existing props unless the user asks to change them.",
+  Card: "A standalone card with one CTA.",
+  CardGrid: "cards must be a non-empty array of {title, description, ctaText, ctaHref}.",
+  RichText: "body is a string; use \\n\\n to separate paragraphs. Supported inline syntax: **word** for bold, *word* for italic, [text](url) for links, '# Heading' lines become h3 headings. title is an optional section heading. Never invent prop names.",
+  Stats: "stats must be a non-empty array of {value, label}. value is a short string like '10K+' or '99.9%'. title is an optional section heading.",
+  TwoColumn: "Image + text side-by-side layout. imagePosition is 'left' or 'right' (default 'right'). body supports inline markdown (**bold**, *italic*, [link](url)). ctaText/ctaHref are optional: set both to show a CTA button. For imageUrl: use any placeholder value (the system resolves images separately).",
+  Footer: "columns must be a non-empty array of {title, links}. links is a string with one 'Label|URL' per line (use \\n to separate). Example: 'Home|/\\nAbout|/about\\nBlog|/blog'."
+}
+
+/**
+ * Derive block contracts from the registry so new blocks are automatically
+ * included without maintaining a parallel hardcoded map.
+ */
 export function blockContractsSummary() {
-  return {
-    Hero: {
-      allowedProps: ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
-      required: ["heading", "subheading", "ctaText", "ctaHref"],
-      optional: ["imageUrl", "imageAlt", "secondaryCtaText", "secondaryCtaHref"],
-      notes: "Use heading for the main headline; never invent prop names. For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it."
-    },
-    FeatureGrid: {
-      allowedProps: ["title", "features"],
-      required: ["title", "features"],
-      notes: "features must be a non-empty array of {title, description}."
-    },
-    Testimonials: {
-      allowedProps: ["title", "items"],
-      required: ["title", "items"],
-      notes: "items must be a non-empty array of {quote, author}."
-    },
-    FAQAccordion: {
-      allowedProps: ["title", "items"],
-      required: ["title", "items"],
-      notes: "items must be a non-empty array of {q, a}."
-    },
-    CTA: {
-      allowedProps: ["title", "description", "ctaText", "ctaHref"],
-      required: ["title", "description", "ctaText", "ctaHref"],
-      notes: "Keep existing props unless the user asks to change them."
-    },
-    Card: {
-      allowedProps: ["title", "description", "ctaText", "ctaHref"],
-      required: ["title", "description", "ctaText", "ctaHref"],
-      notes: "A standalone card with one CTA."
-    },
-    CardGrid: {
-      allowedProps: ["title", "cards"],
-      required: ["title", "cards"],
-      notes: "cards must be a non-empty array of {title, description, ctaText, ctaHref}."
-    },
-    RichText: {
-      allowedProps: ["title", "body"],
-      required: ["body"],
-      optional: ["title"],
-      notes: "body is a string; use \\n\\n to separate paragraphs. Supported inline syntax: **word** for bold, *word* for italic, [text](url) for links, '# Heading' lines become h3 headings. title is an optional section heading. Never invent prop names."
+  const allMeta = getAllBlockMeta()
+  const result: Record<string, { allowedProps: string[]; required: string[]; optional?: string[]; notes: string }> = {}
+
+  for (const type of allowedBlockTypes) {
+    const schema = blockSchemas[type]
+    const meta = allMeta[type]
+    if (!schema || !meta) continue
+
+    // Derive allowed/required/optional from Zod schema shape
+    const shape = schema.shape as Record<string, z.ZodTypeAny>
+    const allProps = Object.keys(shape)
+    const required: string[] = []
+    const optional: string[] = []
+
+    for (const key of allProps) {
+      if (shape[key].isOptional() || shape[key] instanceof z.ZodDefault) {
+        optional.push(key)
+      } else {
+        required.push(key)
+      }
     }
+
+    // Append list-field item shapes to notes for array props
+    let autoNotes = ""
+    if (meta.listFields) {
+      const parts: string[] = []
+      for (const [listKey, listMeta] of Object.entries(meta.listFields)) {
+        const itemKeys = Object.keys(listMeta.itemFields).join(", ")
+        parts.push(`${listKey} must be a non-empty array of {${itemKeys}}`)
+      }
+      if (parts.length > 0) autoNotes = parts.join(". ") + "."
+    }
+
+    const notes = _blockNotes[type] ?? (autoNotes || `${meta.description ?? type} Never invent prop names.`)
+
+    const entry: { allowedProps: string[]; required: string[]; optional?: string[]; notes: string } = {
+      allowedProps: allProps,
+      required,
+      notes
+    }
+    if (optional.length > 0) entry.optional = optional
+
+    result[type] = entry
   }
+
+  return result
 }
 
 export function readPathValue(root: unknown, path: string) {
