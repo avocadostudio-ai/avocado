@@ -1,7 +1,8 @@
 import type { PatchAckMessage } from "@ai-site-editor/shared"
 
 export type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
-export type PlannerSource = "openai" | "demo"
+export type AIProvider = "openai" | "anthropic"
+export type PlannerSource = "openai" | "anthropic" | "demo"
 export type PlannerBadgeState = PlannerSource | "checking" | "error"
 export type ChatExecutionMode = "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
 

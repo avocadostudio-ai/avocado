@@ -1,4 +1,4 @@
-import OpenAI from "openai"
+import Anthropic from "@anthropic-ai/sdk"
 import {
   allowedBlockTypes,
   blockSchemas,
@@ -19,57 +19,11 @@ import {
   normalizeOpName,
   normalizePlanCandidate
 } from "../nlp/plan-normalizer.js"
+import { isChatStrictPrimaryOpMode } from "./planner.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 
-export function isChatStrictPrimaryOpMode() {
-  return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
-}
 
-export type PlannerOpenAIClient = {
-  chat: {
-    completions: {
-      create: (args: unknown) => any
-    }
-  }
-  responses: {
-    create: (args: unknown) => any
-  }
-}
-
-export function openAIChatOptionsForModel(model: string) {
-  // o-series and gpt-5 family reject temperature in chat.completions; omit to use model default.
-  const lower = model.toLowerCase()
-  if (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("gpt-5")) return {}
-  return { temperature: 0 as const }
-}
-
-export function isResponsesOnlyModel(_model: string) {
-  // No current OpenAI model requires the Responses API exclusively; all supported models
-  // use chat.completions. Update this if a future model mandates the Responses API.
-  return false
-}
-
-export function extractResponsesOutputText(response: unknown) {
-  const direct = (response as { output_text?: unknown } | null)?.output_text
-  if (typeof direct === "string" && direct.length > 0) return direct
-
-  const output = (response as { output?: unknown } | null)?.output
-  if (!Array.isArray(output)) return ""
-
-  const chunks: string[] = []
-  for (const item of output as Array<{ content?: unknown }>) {
-    if (!item || typeof item !== "object") continue
-    const content = item.content
-    if (!Array.isArray(content)) continue
-    for (const part of content as Array<{ text?: unknown; type?: unknown }>) {
-      if (!part || typeof part !== "object") continue
-      if (part.type === "output_text" && typeof part.text === "string") chunks.push(part.text)
-    }
-  }
-  return chunks.join("")
-}
-
-export async function parseIntentWithOpenAI(args: {
+export async function parseIntentWithAnthropic(args: {
   message: string
   slug: string
   currentPage: PageDoc
@@ -77,9 +31,8 @@ export async function parseIntentWithOpenAI(args: {
   activeBlockType?: string
   activeEditablePath?: string
   model: string
-  client?: PlannerOpenAIClient
 }): Promise<ParsedIntent> {
-  const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const system = [
     "You extract editing intent for a website editor.",
     "Return ONLY one JSON object. No markdown.",
@@ -101,17 +54,17 @@ export async function parseIntentWithOpenAI(args: {
     blocks: args.currentPage.blocks.map((b) => ({ id: b.id, type: b.type, props: Object.keys(b.props) }))
   }
 
-  const completion = await client.chat.completions.create({
+  const response = await client.messages.create({
     model: args.model,
-    ...openAIChatOptionsForModel(args.model),
-    response_format: { type: "json_object" },
+    max_tokens: 2048,
+    system,
     messages: [
-      { role: "system", content: system },
       { role: "user", content: JSON.stringify(user) }
-    ]
+    ],
   })
 
-  const raw = completion.choices[0]?.message?.content ?? ""
+  const textBlock = response.content.find((b) => b.type === "text")
+  const raw = textBlock && "text" in textBlock ? textBlock.text : ""
   const jsonText = extractJsonObject(raw)
   if (!jsonText) throw new Error("Intent parser did not return JSON")
   const parsedRoot = JSON.parse(jsonText) as Record<string, unknown>
@@ -174,7 +127,7 @@ export async function parseIntentWithOpenAI(args: {
   return parsed.data
 }
 
-export async function generatePlanWithOpenAI(args: {
+export async function generatePlanWithAnthropic(args: {
   message: string
   slug: string
   currentPage: PageDoc
@@ -183,9 +136,8 @@ export async function generatePlanWithOpenAI(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
-  client?: PlannerOpenAIClient
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
-  const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode()
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
   const audienceHint = extractAudienceTarget(args.message)
@@ -247,50 +199,46 @@ export async function generatePlanWithOpenAI(args: {
     feedback: args.feedback ?? null
   }
 
+  const historyMessages: Anthropic.MessageParam[] = (args.history ?? []).map((h) => ({
+    role: h.role as "user" | "assistant",
+    content: h.content
+  }))
+
   let raw = ""
   let usage: TokenUsage = { ...ZERO_USAGE }
-  if (isResponsesOnlyModel(args.model)) {
-    const response = await client.responses.create({
+  if (args.onToken) {
+    const stream = client.messages.stream({
       model: args.model,
-      instructions: system,
-      input: JSON.stringify(user)
-    })
-    raw = extractResponsesOutputText(response)
-    usage = extractUsage(response)
-    if (args.onToken && raw.length > 0) args.onToken(raw)
-  } else if (args.onToken) {
-    const stream = await client.chat.completions.create({
-      model: args.model,
-      ...openAIChatOptionsForModel(args.model),
-      stream: true,
-      response_format: { type: "json_object" },
+      max_tokens: 4096,
+      system,
       messages: [
-        { role: "system", content: system },
-        ...(args.history ?? []),
+        ...historyMessages,
         { role: "user", content: JSON.stringify(user) }
-      ]
+      ],
     })
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content
-      if (typeof delta !== "string" || delta.length === 0) continue
-      raw += delta
-      args.onToken(delta)
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        raw += event.delta.text
+        args.onToken(event.delta.text)
+      }
     }
-    // Streaming doesn't return per-chunk usage; leave as zero
+    const finalMessage = await stream.finalMessage()
+    usage = extractUsage(finalMessage)
   } else {
-    const completion = await client.chat.completions.create({
+    const response = await client.messages.create({
       model: args.model,
-      ...openAIChatOptionsForModel(args.model),
-      response_format: { type: "json_object" },
+      max_tokens: 4096,
+      system,
       messages: [
-        { role: "system", content: system },
-        ...(args.history ?? []),
+        ...historyMessages,
         { role: "user", content: JSON.stringify(user) }
-      ]
+      ],
     })
-    raw = completion.choices[0]?.message?.content ?? ""
-    usage = extractUsage(completion)
+    const textBlock = response.content.find((b) => b.type === "text")
+    raw = textBlock && "text" in textBlock ? textBlock.text : ""
+    usage = extractUsage(response)
   }
+
   const jsonText = extractJsonObject(raw)
   if (!jsonText) throw new Error("Model did not return JSON")
 

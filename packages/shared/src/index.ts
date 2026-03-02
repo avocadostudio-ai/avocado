@@ -298,6 +298,70 @@ registerBlock("RichText", {
   }
 })
 
+registerBlock("Stats", {
+  schema: z.object({
+    title: z.string().optional(),
+    stats: z.array(z.object({ value: z.string().min(1), label: z.string().min(1) })).min(1)
+  }),
+  meta: {
+    displayName: "Stats",
+    description: "Row of big numbers with labels (e.g. 10K+ Users).",
+    category: "content",
+    fields: { title: f.text("Section title") },
+    listFields: {
+      stats: {
+        label: "Stats",
+        itemFields: { value: f.text("Value"), label: f.text("Label") }
+      }
+    }
+  }
+})
+
+registerBlock("TwoColumn", {
+  schema: z.object({
+    heading: z.string().min(1),
+    body: z.string().min(1),
+    imageUrl: z.string().min(1),
+    imageAlt: z.string().min(1),
+    imagePosition: z.enum(["left", "right"]).default("right"),
+    ctaText: z.string().optional(),
+    ctaHref: z.string().optional()
+  }),
+  meta: {
+    displayName: "Two Column",
+    description: "Image + text side-by-side layout with configurable image position.",
+    category: "layout",
+    fields: {
+      heading: f.text("Heading"),
+      body: f.richtext("Body text"),
+      imageUrl: f.image("Image"),
+      imageAlt: f.imageAlt("Image alt text"),
+      imagePosition: { kind: "enum", label: "Image position", options: ["left", "right"], inlineEditable: false },
+      ctaText: f.text("CTA button text"),
+      ctaHref: f.url("CTA link"),
+    }
+  }
+})
+
+registerBlock("Footer", {
+  schema: z.object({
+    copyright: z.string().min(1),
+    columns: z.array(z.object({ title: z.string().min(1), links: z.string().min(1) })).min(1)
+  }),
+  meta: {
+    displayName: "Footer",
+    description: "Multi-column footer with link groups and copyright.",
+    category: "navigation",
+    fields: { copyright: f.text("Copyright text") },
+    listFields: {
+      columns: {
+        label: "Footer columns",
+        itemFields: { title: f.text("Column title"), links: f.richtext("Links (one label|url per line)") }
+      }
+    }
+  }
+})
+
 // ---------------------------------------------------------------------------
 // Backwards-compatible exports
 // ---------------------------------------------------------------------------
@@ -307,7 +371,7 @@ registerBlock("RichText", {
  * Prefer `registerBlock()` for new blocks; this object is kept for backwards compat.
  */
 export const blockSchemas = _blockSchemas as Record<string, z.ZodObject<any>> & {
-  [K in "Hero" | "FeatureGrid" | "Testimonials" | "FAQAccordion" | "CTA" | "Card" | "CardGrid" | "RichText"]: z.ZodObject<any>
+  [K in "Hero" | "FeatureGrid" | "Testimonials" | "FAQAccordion" | "CTA" | "Card" | "CardGrid" | "RichText" | "Stats" | "TwoColumn" | "Footer"]: z.ZodObject<any>
 }
 
 export type BlockType = string & {}

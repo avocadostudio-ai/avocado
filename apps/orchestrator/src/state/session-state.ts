@@ -13,6 +13,7 @@ import {
 // ModelKey inline type (avoids circular dependency with index.ts)
 // ---------------------------------------------------------------------------
 export type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
+export type AIProvider = "openai" | "anthropic"
 
 // ---------------------------------------------------------------------------
 // Session-key helpers
@@ -49,16 +50,25 @@ export function scopedSessionKey(session: unknown, siteId: unknown) {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+export type PendingImageGeneration = {
+  blockId: string
+  pageSlug: string
+  query: string
+  provider: "openai" | "unsplash" | "auto"
+}
+
 export type PendingApprovalPlan = {
   id: string
   createdAt: string
   requestedSlug: string
   effectiveSlug: string
   summary: string
-  source: "openai" | "demo"
+  source: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey
   plan: EditPlan
+  pendingImageOps?: PendingImageGeneration[]
+  originalMessage?: string
 }
 
 export type PublishTracker = {

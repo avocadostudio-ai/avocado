@@ -9,7 +9,7 @@ import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
 import type { BlockInstance } from "@ai-site-editor/shared"
-import type { ModelKey, PlannerSource, PreviewWidthPreset } from "./lib/editor-types"
+import type { AIProvider, ModelKey, PlannerSource, PreviewWidthPreset } from "./lib/editor-types"
 import {
   DEBUG_MODE_STORAGE_KEY,
   isRedundantChangeLine,
@@ -42,6 +42,8 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
   const [isLoadingSlugs, setIsLoadingSlugs] = useState(false)
   const [modelKey, setModelKey] = useState<ModelKey>("balanced")
+  const [provider, setProvider] = useState<AIProvider>("openai")
+  const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
   const [message, setMessage] = useState("")
   const [activeBlockId, setActiveBlockId] = useState<string | undefined>()
   const [activeBlockType, setActiveBlockType] = useState<string | undefined>()
@@ -115,6 +117,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     slug,
     setSlug,
     modelKey,
+    provider,
     useStreaming,
     activeBlockIdRef,
     activeBlockTypeRef,
@@ -167,9 +170,13 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
         for (const url of urls) {
           const res = await fetch(url)
           if (!res.ok) continue
-          const data = (await res.json()) as { plannerSource?: PlannerSource }
+          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[] }
           if (!active) return
-          if (data.plannerSource === "openai" || data.plannerSource === "demo") {
+          if (Array.isArray(data.availableProviders) && data.availableProviders.length > 0) {
+            setAvailableProviders(data.availableProviders)
+            if (!data.availableProviders.includes(provider)) setProvider(data.availableProviders[0])
+          }
+          if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "demo") {
             chatEngine.setPlannerBadgeState(data.plannerSource)
             return
           }
@@ -303,7 +310,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
             {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Change</a>
             {chatEngine.plannerBadgeState === "demo" ? (
               <span className="planner-badge planner-badge-demo">Demo mode</span>
-            ) : chatEngine.plannerBadgeState === "openai" ? (
+            ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
               <span className="planner-badge planner-badge-ai">AI</span>
             ) : null}
           </div>
@@ -508,9 +515,12 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
             message={message}
             isLoading={chatEngine.isLoading}
             modelKey={modelKey}
+            provider={provider}
+            availableProviders={availableProviders}
             hasUserEntry={hasUserEntry}
             onMessageChange={setMessage}
             onModelChange={setModelKey}
+            onProviderChange={setProvider}
             onSubmit={(explicitMessage) => {
               setMessage("")
               void chatEngine.submitChat(explicitMessage, message)

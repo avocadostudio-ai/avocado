@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import type { EditPlan } from "@ai-site-editor/shared"
 import { app } from "./index.js"
 import { setDemoPlanFromMessageForTests, setGeneratePlanWithOpenAIForTests } from "./chat/chat-pipeline.js"
+import { ZERO_USAGE } from "./telemetry/usage.js"
 
 let sessionCounter = 0
 function newSession() {
@@ -51,7 +52,7 @@ test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocke
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
   }
 
-  setGeneratePlanWithOpenAIForTests(async () => mockedPlan)
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
 
   const planReady = await app.inject({
     method: "POST",
@@ -116,7 +117,7 @@ test("chat stream emits op_applied events for mocked multi-op plan", async (t) =
       { op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { subheading: `Stream subheading ${Date.now()}` } }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => mockedPlan)
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
 
   const response = await app.inject({
     method: "GET",
@@ -150,7 +151,7 @@ test("chat telemetry includes received -> plan_generated -> result phases for mo
     change_log: ["Changed heading."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: `Telemetry ${Date.now()}` } }]
   }
-  setGeneratePlanWithOpenAIForTests(async () => mockedPlan)
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
 
   const chatResponse = await app.inject({
     method: "POST",
@@ -212,7 +213,7 @@ test("chat pending-plan lifecycle: mismatch ids for discard/apply return 409", a
     change_log: ["Prepared heading update."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: `Mismatch ${Date.now()}` } }]
   }
-  setGeneratePlanWithOpenAIForTests(async () => mockedPlan)
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
 
   const planReady = await app.inject({
     method: "POST",
@@ -316,7 +317,7 @@ test("chat returns repair_failed when deterministic repair generation throws", a
   let calls = 0
   setGeneratePlanWithOpenAIForTests(async () => {
     calls += 1
-    if (calls === 1) return invalidPlan
+    if (calls === 1) return { plan: invalidPlan, usage: { ...ZERO_USAGE } }
     throw new Error("invalid repair response")
   })
   t.after(() => {
@@ -392,7 +393,7 @@ test("chat applies repaired OpenAI plan after initial schema violation", async (
   let calls = 0
   setGeneratePlanWithOpenAIForTests(async () => {
     calls += 1
-    return calls === 1 ? invalidPlan : repairedPlan
+    return { plan: calls === 1 ? invalidPlan : repairedPlan, usage: { ...ZERO_USAGE } }
   })
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
@@ -441,7 +442,7 @@ test("chat returns guardrail failure when repaired plan still fails to apply", a
     change_log: ["Attempted patch on missing block."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "missing_block", patch: { heading: "x" } }]
   }
-  setGeneratePlanWithOpenAIForTests(async ({ feedback }) => (feedback ? stillBadRepairPlan : invalidPlan))
+  setGeneratePlanWithOpenAIForTests(async ({ feedback }) => ({ plan: feedback ? stillBadRepairPlan : invalidPlan, usage: { ...ZERO_USAGE } }))
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
@@ -469,7 +470,7 @@ test("chat returns guardrail failure when repaired plan still fails to apply", a
 test("chat returns planning_missing when planner returns null plan", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
-  setGeneratePlanWithOpenAIForTests(async () => null as unknown as EditPlan)
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: null as unknown as EditPlan, usage: { ...ZERO_USAGE } }))
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
@@ -506,7 +507,7 @@ test("chat returns direct guardrail failure when initial apply error is not repa
   let calls = 0
   setGeneratePlanWithOpenAIForTests(async () => {
     calls += 1
-    return invalidPlan
+    return { plan: invalidPlan, usage: { ...ZERO_USAGE } }
   })
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
@@ -555,7 +556,7 @@ test("chat returns no_effective_change when plan updates a prop to its current v
     change_log: ["Tried to set heading to the same value."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: currentHeading } }]
   }
-  setGeneratePlanWithOpenAIForTests(async () => noOpPlan)
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: noOpPlan, usage: { ...ZERO_USAGE } }))
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY

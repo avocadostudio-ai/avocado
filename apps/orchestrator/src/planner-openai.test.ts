@@ -77,7 +77,7 @@ test("parseIntentWithOpenAI rejects malformed non-JSON output", async () => {
 
 test("generatePlanWithOpenAI normalizes malformed one-key operations", async () => {
   const { currentPage, contextPack } = basePlannerArgs("move cta below hero")
-  const plan = await generatePlanWithOpenAI({
+  const { plan, usage } = await generatePlanWithOpenAI({
     message: "move cta below hero",
     slug: "/",
     currentPage,
@@ -104,6 +104,9 @@ test("generatePlanWithOpenAI normalizes malformed one-key operations", async () 
   assert.equal(plan.intent, "edit_plan")
   assert.equal(plan.ops.length, 1)
   assert.equal(plan.ops[0]?.op, "move_block")
+  assert.equal(typeof usage.inputTokens, "number")
+  assert.equal(typeof usage.outputTokens, "number")
+  assert.equal(typeof usage.totalTokens, "number")
 })
 
 test("generatePlanWithOpenAI enforces strict primary-op mode from env", async () => {
@@ -111,7 +114,7 @@ test("generatePlanWithOpenAI enforces strict primary-op mode from env", async ()
   process.env.CHAT_STRICT_PRIMARY_OP_MODE = "1"
   try {
     const { currentPage, contextPack } = basePlannerArgs("make two edits")
-    const plan = await generatePlanWithOpenAI({
+    const { plan } = await generatePlanWithOpenAI({
       message: "make two edits",
       slug: "/",
       currentPage,

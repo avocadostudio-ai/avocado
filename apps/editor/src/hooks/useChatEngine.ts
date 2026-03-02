@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import type { Operation } from "@ai-site-editor/shared"
 import type {
+  AIProvider,
   ApplyOpsResponse,
   AssistantResponse,
   ChatEntry,
@@ -30,6 +31,7 @@ export type ChatEngineConfig = {
   slug: string
   setSlug: (slug: string) => void
   modelKey: ModelKey
+  provider: AIProvider
   useStreaming: boolean
   activeBlockIdRef: React.RefObject<string | undefined>
   activeBlockTypeRef: React.RefObject<string | undefined>
@@ -60,6 +62,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     slug,
     setSlug,
     modelKey,
+    provider,
     useStreaming,
     activeBlockIdRef,
     activeBlockTypeRef,
@@ -97,6 +100,9 @@ export function useChatEngine(config: ChatEngineConfig) {
   const [isApplyingVariation, setIsApplyingVariation] = useState(false)
   const [undoInFlightEntryId, setUndoInFlightEntryId] = useState<string | null>(null)
 
+  // Track last sent message so server-forced plan_only can populate pendingPlanMessage
+  const lastSentMessageRef = useRef<string | null>(null)
+
   // Use refs for values accessed in closures to avoid stale captures
   const slugRef = useRef(slug)
   slugRef.current = slug
@@ -132,11 +138,14 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   function applyChatResult(data: AssistantResponse) {
-    if (data.plannerSource === "openai" || data.plannerSource === "demo") {
+    if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "demo") {
       setPlannerBadgeState(data.plannerSource)
     }
     if (data.status === "plan_ready" && typeof data.pendingPlanId === "string" && data.pendingPlanId.length > 0) {
       setPendingPlanId(data.pendingPlanId)
+      // Server may force plan_only (e.g. for image generation) on a non-complex message.
+      // Ensure pendingPlanMessage is populated so approval sends the original text.
+      setPendingPlanMessage((prev) => prev ?? lastSentMessageRef.current)
     } else if (data.status === "applied" || data.status === "canceled") {
       setPendingPlanId(null)
       setPendingPlanMessage(null)
@@ -365,6 +374,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         slug: slugRef.current,
         message: finalMessage,
         modelKey,
+        provider,
         activeBlockId: activeBlockIdRef.current,
         activeBlockType: activeBlockTypeRef.current,
         activeEditablePath: activeEditablePathRef.current,
@@ -400,6 +410,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         slug: slugRef.current,
         message: finalMessage,
         modelKey,
+        provider,
         activeBlockId: selectedBlockId,
         activeBlockType: selectedBlockType,
         activeEditablePath: activeEditablePathRef.current
@@ -503,7 +514,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         siteHosting: activeSiteConfig.hosting || "",
         slug: slugRef.current,
         message: finalMessage,
-        modelKey
+        modelKey,
+        provider
       })
       if (activeBlockIdRef.current) params.set("activeBlockId", activeBlockIdRef.current)
       if (activeBlockTypeRef.current) params.set("activeBlockType", activeBlockTypeRef.current)
@@ -641,6 +653,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     const finalMessage = (explicitMessage ?? currentMessage ?? "").trim()
     if (!finalMessage || isLoading) return
 
+    lastSentMessageRef.current = finalMessage
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: finalMessage }])
     setIsLoading(true)
     setStreamStatus(useStreaming ? "Connecting..." : null)

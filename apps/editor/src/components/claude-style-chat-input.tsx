@@ -2,32 +2,40 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import ArrowUpIcon from "./arrow-up-icon"
 
 type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
-const MODEL_LABELS: Record<ModelKey, string> = {
-  fast: "gpt-4o-mini",
-  balanced: "gpt-4o",
-  reasoning: "o1",
-  codex: "o3"
+type AIProvider = "openai" | "anthropic"
+
+const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
+  openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
+  anthropic: { fast: "haiku", balanced: "sonnet", reasoning: "sonnet+thinking", codex: "opus" },
+}
+
+const PROVIDER_LABELS: Record<AIProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Claude",
 }
 
 type Props = {
   message: string
   isLoading: boolean
   modelKey: ModelKey
+  provider: AIProvider
+  availableProviders: AIProvider[]
   hasUserEntry: boolean
   onMessageChange: (value: string) => void
   onModelChange: (value: ModelKey) => void
+  onProviderChange: (value: AIProvider) => void
   onSubmit: (explicitMessage?: string) => void
   onTranscribeAudio: (blob: Blob, mimeType: string) => Promise<string>
   onInterpretImage: (blob: Blob, mimeType: string) => Promise<string>
   onAutoHeightChange: (height: number) => void
 }
 
-function modelLabel(model: ModelKey) {
-  return MODEL_LABELS[model]
+function modelLabel(provider: AIProvider, model: ModelKey) {
+  return MODEL_LABELS[provider][model]
 }
 
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, modelKey, hasUserEntry, onMessageChange, onModelChange, onSubmit, onTranscribeAudio, onInterpretImage, onAutoHeightChange } = props
+  const { message, isLoading, modelKey, provider, availableProviders, hasUserEntry, onMessageChange, onModelChange, onProviderChange, onSubmit, onTranscribeAudio, onInterpretImage, onAutoHeightChange } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false)
@@ -281,13 +289,23 @@ export default function ClaudeStyleChatInput(props: Props) {
       </div>
       <div className="composer-actions">
         <div className="composer-actions-center">
+          {availableProviders.length > 1 ? (
+            <label className="composer-model-picker">
+              <span>{PROVIDER_LABELS[provider]}</span>
+              <select value={provider} onChange={(e) => onProviderChange(e.target.value as AIProvider)} aria-label="Select AI provider">
+                {availableProviders.map((p) => (
+                  <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="composer-model-picker">
-            <span>{modelLabel(modelKey)}</span>
+            <span>{modelLabel(provider, modelKey)}</span>
             <select value={modelKey} onChange={(e) => onModelChange(e.target.value as ModelKey)} aria-label="Select model">
-              <option value="fast">{MODEL_LABELS.fast}</option>
-              <option value="balanced">{MODEL_LABELS.balanced}</option>
-              <option value="reasoning">{MODEL_LABELS.reasoning}</option>
-              <option value="codex">{MODEL_LABELS.codex}</option>
+              <option value="fast">{MODEL_LABELS[provider].fast}</option>
+              <option value="balanced">{MODEL_LABELS[provider].balanced}</option>
+              <option value="reasoning">{MODEL_LABELS[provider].reasoning}</option>
+              <option value="codex">{MODEL_LABELS[provider].codex}</option>
             </select>
           </label>
         </div>
