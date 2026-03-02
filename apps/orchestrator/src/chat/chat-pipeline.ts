@@ -1332,7 +1332,6 @@ export async function runChatPipeline(
   const generatePlanImpl = plannerSource === "anthropic" ? generatePlanWithAnthropicImpl : generatePlanWithOpenAIImpl
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
-  let planUsage: TokenUsage | undefined
   const planningErrors: string[] = []
 
   for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
