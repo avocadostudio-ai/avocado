@@ -71,15 +71,22 @@ export function normalizeForIntent(message: string) {
 // Single source of truth for block-catalog query patterns.
 // ---------------------------------------------------------------------------
 
+// Matches "block(s)", "component(s)", "section(s)", "element(s)", "widget(s)"
+const UNIT = String.raw`(?:blocks?|components?|sections?|elements?|widgets?)`
+const UNIT_TYPE = String.raw`(?:block|component|section|element|widget)\s+types?`
+
 export const BLOCK_CATALOG_PATTERNS: RegExp[] = [
-  /\bwhat\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
-  /\bwhich\s+(other\s+)?blocks?\s+can\s+(you|i)\s+add\b/,
-  /\bwhat\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
-  /\bwhich\s+(other\s+)?block\s+types?\s+can\s+(you|i)\s+add\b/,
+  new RegExp(String.raw`\bwhat\s+(?:other\s+)?${UNIT}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
+  new RegExp(String.raw`\bwhich\s+(?:other\s+)?${UNIT}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
+  new RegExp(String.raw`\bwhat\s+(?:other\s+)?${UNIT_TYPE}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
+  new RegExp(String.raw`\bwhich\s+(?:other\s+)?${UNIT_TYPE}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
+  new RegExp(String.raw`\bwhat\s+${UNIT}\s+(?:are|is)\s+(?:available|supported)\b`),
+  new RegExp(String.raw`\bwhat\s+${UNIT}\s+are\b.{0,20}\badd\b`),
+  new RegExp(String.raw`\bavailabl\w*\s+${UNIT}\b`),
+  new RegExp(String.raw`\bavailabl\w*\s+${UNIT_TYPE}\b`),
   /\bwhat\s+else\s+can\s+i\s+add\b/,
   /\bwhat\s+other\s+content\b/,
-  /\bavailable\s+blocks?\b/,
-  /\bavailable\s+block\s+types?\b/
+  /\blist\s+(all\s+)?(the\s+)?(?:blocks?|components?|sections?)\b/
 ]
 
 export function isBlockCatalogQuery(message: string) {
