@@ -12,11 +12,15 @@ import type { BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ModelKey, PlannerSource, PreviewWidthPreset } from "./lib/editor-types"
 import {
   DEBUG_MODE_STORAGE_KEY,
+  MODEL_KEY_STORAGE_KEY,
+  PROVIDER_STORAGE_KEY,
   isRedundantChangeLine,
   mergedVariationProps,
   orchestrator,
   previewPresetWidths,
   resolveDefaultDebugMode,
+  resolveDefaultModelKey,
+  resolveDefaultProvider,
   resolveEditorSiteId,
   siteOrigin,
   slugLabel
@@ -41,8 +45,8 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   const [slug, setSlug] = useState("/")
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
   const [isLoadingSlugs, setIsLoadingSlugs] = useState(false)
-  const [modelKey, setModelKey] = useState<ModelKey>("balanced")
-  const [provider, setProvider] = useState<AIProvider>("openai")
+  const [modelKey, setModelKey] = useState<ModelKey>(() => resolveDefaultModelKey())
+  const [provider, setProvider] = useState<AIProvider>(() => resolveDefaultProvider())
   const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
   const [message, setMessage] = useState("")
   const [activeBlockId, setActiveBlockId] = useState<string | undefined>()
@@ -146,6 +150,16 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     if (typeof window === "undefined") return
     window.localStorage.setItem(DEBUG_MODE_STORAGE_KEY, showDebugDetails ? "1" : "0")
   }, [showDebugDetails])
+
+  // Persist model & provider selection
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(MODEL_KEY_STORAGE_KEY, modelKey)
+  }, [modelKey])
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(PROVIDER_STORAGE_KEY, provider)
+  }, [provider])
 
   // Preview src
   const previewSrc = useMemo(() => {
