@@ -551,20 +551,22 @@ export function pageMetaContractSummary() {
   }
 }
 
-/** Per-block notes that supplement the auto-derived contract. */
+/**
+ * Per-block notes that supplement the auto-derived contract.
+ * Only add entries here when the block needs guidance beyond what the registry
+ * metadata can auto-generate (list-field shapes are derived automatically).
+ */
 const _blockNotes: Record<string, string> = {
   Hero: "Use heading for the main headline; never invent prop names. For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it.",
-  FeatureGrid: "features must be a non-empty array of {title, description}.",
-  Testimonials: "items must be a non-empty array of {quote, author}.",
-  FAQAccordion: "items must be a non-empty array of {q, a}.",
   CTA: "Keep existing props unless the user asks to change them.",
   Card: "A standalone card with one CTA.",
-  CardGrid: "cards must be a non-empty array of {title, description, ctaText, ctaHref}.",
   RichText: "body is a string; use \\n\\n to separate paragraphs. Supported inline syntax: **word** for bold, *word* for italic, [text](url) for links, '# Heading' lines become h3 headings. title is an optional section heading. Never invent prop names.",
   Stats: "stats must be a non-empty array of {value, label}. value is a short string like '10K+' or '99.9%'. title is an optional section heading.",
   TwoColumn: "Image + text side-by-side layout. imagePosition is 'left' or 'right' (default 'right'). body supports inline markdown (**bold**, *italic*, [link](url)). ctaText/ctaHref are optional: set both to show a CTA button. For imageUrl: use any placeholder value (the system resolves images separately).",
   Footer: "columns must be a non-empty array of {title, links}. links is a string with one 'Label|URL' per line (use \\n to separate). Example: 'Home|/\\nAbout|/about\\nBlog|/blog'."
 }
+
+type BlockContract = { allowedProps: string[]; required: string[]; optional?: string[]; notes: string }
 
 /**
  * Derive block contracts from the registry so new blocks are automatically
@@ -572,7 +574,7 @@ const _blockNotes: Record<string, string> = {
  */
 export function blockContractsSummary() {
   const allMeta = getAllBlockMeta()
-  const result: Record<string, { allowedProps: string[]; required: string[]; optional?: string[]; notes: string }> = {}
+  const result: Record<string, BlockContract> = {}
 
   for (const type of allowedBlockTypes) {
     const schema = blockSchemas[type]
@@ -606,7 +608,7 @@ export function blockContractsSummary() {
 
     const notes = _blockNotes[type] ?? (autoNotes || `${meta.description ?? type} Never invent prop names.`)
 
-    const entry: { allowedProps: string[]; required: string[]; optional?: string[]; notes: string } = {
+    const entry: BlockContract = {
       allowedProps: allProps,
       required,
       notes

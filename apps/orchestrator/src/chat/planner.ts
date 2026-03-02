@@ -223,7 +223,12 @@ export async function generatePlanWithOpenAI(args: {
           "In intent=edit_plan, return exactly one op in ops[].",
           "Do not include secondary/follow-up operations."
         ]
-      : []),
+      : [
+          "When the user's request involves multiple changes, include all operations in a single plan.",
+          "Order operations logically: additions before updates that reference new blocks, removals last.",
+          "Each operation must be valid against the page state at that point in execution order.",
+          "Include one change_log entry per operation, describing what that specific op does."
+        ]),
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
