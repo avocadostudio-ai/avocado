@@ -1,6 +1,6 @@
 import { allowedBlockTypes, type BlockType, type EditPlan, type PageDoc } from "@ai-site-editor/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
-import { type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
+import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
 
 // ---------------------------------------------------------------------------
 // Shared types used by the chat pipeline and intent handlers
@@ -21,6 +21,7 @@ export type ChatRequestBody = {
   slug?: string
   message?: string
   modelKey?: ModelKey
+  provider?: AIProvider
   activeBlockId?: string
   activeBlockType?: string
   activeEditablePath?: string
@@ -38,7 +39,7 @@ export type ChatResult = {
   previewVersion: number
   focusBlockId?: string
   updatedSlug?: string
-  plannerSource: "openai" | "demo"
+  plannerSource: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey
   pendingPlanId?: string
@@ -51,6 +52,10 @@ export type ChatResult = {
     intent?: EditPlan["intent"]
     opTypes?: string[]
     opCount?: number
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    estimatedUsd?: number | null
   }
 }
 
@@ -112,7 +117,7 @@ export function isAdviceQuery(message: string) {
 export function adviceResponse(args: {
   body: ChatRequestBody
   current: PageDoc
-  plannerSource: "openai" | "demo"
+  plannerSource: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey
 }): { code: number; payload: ChatResult } {
@@ -270,7 +275,7 @@ function childSuggestions(args: { selected: PageDoc["blocks"][number]; editableP
 export function infoResponse(args: {
   body: ChatRequestBody
   current: PageDoc
-  plannerSource: "openai" | "demo"
+  plannerSource: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey
 }): { code: number; payload: ChatResult } {

@@ -12,7 +12,7 @@ import { plannerMessageWithPendingContext } from "./nlp/intent-detection.js"
 import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
 import { normalizePlanCandidate } from "./nlp/plan-normalizer.js"
 import { buildCreatePagePlan, compileDeterministicPlan } from "./nlp/deterministic-planner.js"
-import { loadStateFromDisk } from "./state/session-state.js"
+import { type AIProvider, loadStateFromDisk } from "./state/session-state.js"
 import { ensurePresetRestoreSessions } from "./publish/publish-helpers.js"
 import type { RouteContext } from "./routes/route-context.js"
 import { contentRoutes } from "./routes/content.js"
@@ -79,17 +79,29 @@ const chatTelemetry = createChatTelemetryStore({
 })
 
 const modelLookup = {
-  fast: process.env.OPENAI_MODEL_FAST ?? "gpt-4o-mini",
-  balanced: process.env.OPENAI_MODEL_BALANCED ?? "gpt-4o",
-  reasoning: process.env.OPENAI_MODEL_REASONING ?? "o1",
-  codex: process.env.OPENAI_MODEL_CODEX ?? "o3"
-} as const
+  openai: {
+    fast: process.env.OPENAI_MODEL_FAST ?? "gpt-4o-mini",
+    balanced: process.env.OPENAI_MODEL_BALANCED ?? "gpt-4o",
+    reasoning: process.env.OPENAI_MODEL_REASONING ?? "o1",
+    codex: process.env.OPENAI_MODEL_CODEX ?? "o3",
+  },
+  anthropic: {
+    fast: process.env.ANTHROPIC_MODEL_FAST ?? "claude-haiku-4-5-20251001",
+    balanced: process.env.ANTHROPIC_MODEL_BALANCED ?? "claude-sonnet-4-6",
+    reasoning: process.env.ANTHROPIC_MODEL_REASONING ?? "claude-sonnet-4-6",
+    codex: process.env.ANTHROPIC_MODEL_CODEX ?? "claude-opus-4-6",
+  },
+}
+const availableProviders: AIProvider[] = [
+  ...(process.env.OPENAI_API_KEY ? ["openai" as const] : []),
+  ...(process.env.ANTHROPIC_API_KEY ? ["anthropic" as const] : []),
+]
 
 // ---------------------------------------------------------------------------
 // Route plugins
 // ---------------------------------------------------------------------------
 
-const ctx: RouteContext = { chatTelemetry, modelLookup, generatedImageDir, orchestratorPublicOrigin }
+const ctx: RouteContext = { chatTelemetry, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin }
 
 await app.register((instance) => contentRoutes(instance, ctx))
 await app.register((instance) => publishingRoutes(instance, ctx))
@@ -104,7 +116,8 @@ await app.register((instance) => historyRoutes(instance, ctx))
 
 app.get("/health", async () => ({ ok: true }))
 app.get("/status/planner", async () => ({
-  plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo",
+  plannerSource: availableProviders.length > 0 ? availableProviders[0] : "demo",
+  availableProviders,
   unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
 }))
 app.get("/telemetry/chat", async (request) => {

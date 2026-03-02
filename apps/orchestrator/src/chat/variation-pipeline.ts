@@ -1,10 +1,13 @@
 import OpenAI from "openai"
+import Anthropic from "@anthropic-ai/sdk"
 import type { FastifyBaseLogger } from "fastify"
 import { type BlockType, type PageDoc, validateBlockProps } from "@ai-site-editor/shared"
-import { type ModelKey, getPage } from "../state/session-state.js"
+import { type AIProvider, type ModelKey, getPage } from "../state/session-state.js"
 import { withSiteContext } from "../nlp/intent-detection.js"
 import { coercePatchForBlock } from "../nlp/deterministic-planner.js"
 import { openAIChatOptionsForModel } from "./planner.js"
+import { extractJsonObject } from "../nlp/plan-normalizer.js"
+import { type TokenUsage, extractUsage, estimateUsd, ZERO_USAGE } from "../telemetry/usage.js"
 import {
   deriveVariationImageIntent,
   buildVariationImageQuery,
@@ -26,6 +29,7 @@ export type VariationRequestBody = {
   slug?: string
   message?: string
   modelKey?: ModelKey
+  provider?: AIProvider
   activeBlockId?: string
   activeBlockType?: string
   activeEditablePath?: string
@@ -47,9 +51,10 @@ export type VariationResult = {
   pageSlug: string
   baseProps: Record<string, unknown>
   variations: VariationOption[]
-  plannerSource: "openai" | "demo"
+  plannerSource: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number; estimatedUsd: number | null }
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +63,8 @@ export type VariationResult = {
 
 export type VariationPipelineContext = {
   log: FastifyBaseLogger
-  modelLookup: Record<ModelKey, string>
+  modelLookup: Record<AIProvider, Record<ModelKey, string>>
+  availableProviders: AIProvider[]
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +375,7 @@ async function generateVariationsWithOpenAI(args: {
   model: string
   modelKey: ModelKey
   count: number
-}): Promise<VariationOption[]> {
+}): Promise<{ variations: VariationOption[]; usage: TokenUsage }> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const props = args.block.props as Record<string, unknown>
   const allowedKeys = Object.keys(props)
@@ -404,6 +410,7 @@ async function generateVariationsWithOpenAI(args: {
     ]
   })
 
+  const usage = extractUsage(completion)
   const raw = completion.choices[0]?.message?.content ?? ""
   const parsed = parseJsonMaybe(raw) as { variations?: Array<{ title?: unknown; summary?: unknown; patch?: unknown }> } | null
   const list = Array.isArray(parsed?.variations) ? parsed!.variations : []
@@ -430,7 +437,83 @@ async function generateVariationsWithOpenAI(args: {
       changedKeys: Object.keys(patch)
     })
   }
-  return out
+  return { variations: out, usage }
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic variation generation
+// ---------------------------------------------------------------------------
+
+async function generateVariationsWithAnthropic(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+  model: string
+  modelKey: ModelKey
+  count: number
+}): Promise<{ variations: VariationOption[]; usage: TokenUsage }> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const props = args.block.props as Record<string, unknown>
+  const allowedKeys = Object.keys(props)
+  const constraints = variationConstraints(args.message, args.block)
+  const system = [
+    "You generate alternative content variations for one selected website block.",
+    "Return ONLY JSON object: {\"variations\":[{\"title\":\"...\",\"summary\":\"...\",\"patch\":{...}}]}",
+    `Generate exactly ${args.count} variations.`,
+    "Each patch must only include keys from the selected block props.",
+    "Each variation must be materially different from the others.",
+    "Do not include unchanged values in patch.",
+    ...(constraints.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
+    ...(constraints.cardsOnly && args.block.type === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
+    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."
+  ].join("\n")
+
+  const user = {
+    request: args.message,
+    blockId: args.block.id,
+    blockType: args.block.type,
+    currentProps: props,
+    allowedPatchKeys: allowedKeys
+  }
+
+  const response = await client.messages.create({
+    model: args.model,
+    max_tokens: 4096,
+    system,
+    messages: [
+      { role: "user", content: JSON.stringify(user) }
+    ],
+  })
+
+  const usage = extractUsage(response)
+  const textBlock = response.content.find((b) => b.type === "text")
+  const rawText = textBlock && "text" in textBlock ? textBlock.text : ""
+  const jsonText = extractJsonObject(rawText)
+  const parsed = jsonText ? parseJsonMaybe(jsonText) as { variations?: Array<{ title?: unknown; summary?: unknown; patch?: unknown }> } | null : null
+  const list = Array.isArray(parsed?.variations) ? parsed!.variations : []
+
+  const seen = new Set<string>()
+  const out: VariationOption[] = []
+  for (const item of list) {
+    if (out.length >= args.count) break
+    const constrainedPatch = applyVariationConstraints({
+      block: args.block,
+      message: args.message,
+      patch: coercePatchForBlock(args.block, item.patch)
+    })
+    const patch = sanitizeVariationPatch(args.block, constrainedPatch)
+    if (!patch) continue
+    const patchKey = JSON.stringify(patch)
+    if (seen.has(patchKey)) continue
+    seen.add(patchKey)
+    out.push({
+      id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title: typeof item.title === "string" && item.title.trim().length > 0 ? item.title.trim() : `Variation ${out.length + 1}`,
+      summary: typeof item.summary === "string" && item.summary.trim().length > 0 ? item.summary.trim() : "Alternative copy direction.",
+      patch,
+      changedKeys: Object.keys(patch)
+    })
+  }
+  return { variations: out, usage }
 }
 
 // ---------------------------------------------------------------------------
@@ -463,21 +546,44 @@ export async function runVariationPipeline(
     return { code: 404, payload: { error: "selected block not found on current page" } }
   }
 
-  const modelKey = body.modelKey && ctx.modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
-  const modelUsed = ctx.modelLookup[modelKey]
+  const requestedProvider = body.provider ?? (ctx.availableProviders[0] as AIProvider | undefined)
+  const provider: AIProvider = requestedProvider && ctx.availableProviders.includes(requestedProvider) ? requestedProvider : "openai"
+  const modelKey = body.modelKey && ctx.modelLookup[provider][body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const modelUsed = ctx.modelLookup[provider][modelKey]
   const count = requestedVariationCount(contextualMessage)
-  const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
+  const plannerSource: "openai" | "anthropic" | "demo" =
+    provider === "anthropic" && process.env.ANTHROPIC_API_KEY ? "anthropic" :
+    provider === "openai" && process.env.OPENAI_API_KEY ? "openai" :
+    process.env.OPENAI_API_KEY ? "openai" :
+    process.env.ANTHROPIC_API_KEY ? "anthropic" : "demo"
 
   let variations: VariationOption[] = []
-  if (process.env.OPENAI_API_KEY) {
+  let generatorUsage: TokenUsage | undefined
+  if (plannerSource === "anthropic") {
     try {
-      variations = await generateVariationsWithOpenAI({
+      const result = await generateVariationsWithAnthropic({
         block: selected,
         message: contextualMessage,
         model: modelUsed,
         modelKey,
         count
       })
+      variations = result.variations
+      generatorUsage = result.usage
+    } catch {
+      variations = []
+    }
+  } else if (plannerSource === "openai") {
+    try {
+      const result = await generateVariationsWithOpenAI({
+        block: selected,
+        message: contextualMessage,
+        model: modelUsed,
+        modelKey,
+        count
+      })
+      variations = result.variations
+      generatorUsage = result.usage
     } catch {
       variations = []
     }
@@ -520,7 +626,15 @@ export async function runVariationPipeline(
       variations,
       plannerSource,
       modelUsed,
-      modelKey
+      modelKey,
+      ...(generatorUsage ? {
+        usage: {
+          inputTokens: generatorUsage.inputTokens,
+          outputTokens: generatorUsage.outputTokens,
+          totalTokens: generatorUsage.totalTokens,
+          estimatedUsd: estimateUsd(modelUsed, generatorUsage)
+        }
+      } : {})
     }
   }
 }

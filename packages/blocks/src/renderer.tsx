@@ -364,6 +364,144 @@ function RichText(props: Record<string, unknown>) {
   )
 }
 
+function Stats(props: Record<string, unknown>) {
+  const title = String(props.title ?? "")
+  const items = Array.isArray(props.stats) ? props.stats : []
+  return (
+    <section className="stats-section">
+      <div className="section__inner">
+        {title.length > 0 && (
+          <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+            {title}
+          </h2>
+        )}
+        <div className="stats-grid">
+          {items.map((item, idx) => {
+            const row = (item ?? {}) as Record<string, unknown>
+            return (
+              <div key={idx} className="stat-item">
+                <span
+                  className="stat-item__value"
+                  data-editable-target={`stats[${idx}].value`}
+                  data-editable-target-label={`stats[${idx}].value`}
+                  data-editable-label={`stats[${idx}].value`}
+                >
+                  {String(row.value ?? "")}
+                </span>
+                <span
+                  className="stat-item__label"
+                  data-editable-target={`stats[${idx}].label`}
+                  data-editable-target-label={`stats[${idx}].label`}
+                  data-editable-label={`stats[${idx}].label`}
+                >
+                  {String(row.label ?? "")}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function TwoColumn(props: Record<string, unknown>) {
+  const imagePosition = String(props.imagePosition ?? "right")
+  const modifier = imagePosition === "left" ? " two-column--image-left" : ""
+  const ctaText = String(props.ctaText ?? "")
+  return (
+    <section className={`two-column${modifier}`}>
+      <div className="section__inner two-column__inner">
+        <div className="two-column__text">
+          <h2
+            data-editable-target="heading"
+            data-editable-target-label="heading"
+            data-editable-label="heading"
+          >
+            {String(props.heading ?? "")}
+          </h2>
+          <div
+            className="two-column__body"
+            data-editable-target="body"
+            data-editable-target-label="body"
+            data-editable-label="body"
+          >
+            {renderInline(String(props.body ?? ""))}
+          </div>
+          {ctaText.length > 0 && (
+            <div className="two-column__cta">
+              <PrimaryButton
+                href={String(props.ctaHref ?? "#")}
+                data-editable-target="ctaText"
+                data-editable-target-label="ctaText"
+                data-editable-label="ctaText"
+              >
+                {ctaText}
+              </PrimaryButton>
+            </div>
+          )}
+        </div>
+        <div className="two-column__media" data-editable-target="imageUrl" data-editable-target-label="Image">
+          <img
+            src={String(props.imageUrl ?? "")}
+            alt={String(props.imageAlt ?? "")}
+            data-editable-label="Image"
+          />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Footer(props: Record<string, unknown>) {
+  const columns = Array.isArray(props.columns) ? props.columns : []
+  return (
+    <footer className="site-footer">
+      <div className="section__inner">
+        <div className="site-footer__columns">
+          {columns.map((col, idx) => {
+            const row = (col ?? {}) as Record<string, unknown>
+            const linksRaw = String(row.links ?? "")
+            const links = linksRaw
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+              .map((line) => {
+                const parts = line.split("|")
+                return { label: parts[0]?.trim() ?? "", href: parts[1]?.trim() ?? "#" }
+              })
+            return (
+              <div key={idx} className="site-footer__col">
+                <h4
+                  data-editable-target={`columns[${idx}].title`}
+                  data-editable-target-label={`columns[${idx}].title`}
+                  data-editable-label={`columns[${idx}].title`}
+                >
+                  {String(row.title ?? "")}
+                </h4>
+                <ul
+                  data-editable-target={`columns[${idx}].links`}
+                  data-editable-target-label={`columns[${idx}].links`}
+                  data-editable-label={`columns[${idx}].links`}
+                >
+                  {links.map((link, linkIdx) => (
+                    <li key={linkIdx}>
+                      <a href={link.href}>{link.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+        <div className="site-footer__copyright" data-editable-target="copyright" data-editable-target-label="copyright" data-editable-label="copyright">
+          {String(props.copyright ?? "")}
+        </div>
+      </div>
+    </footer>
+  )
+}
+
 const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element | null> = {
   Hero,
   FeatureGrid,
@@ -372,7 +510,10 @@ const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element 
   CTA,
   Card,
   CardGrid,
-  RichText
+  RichText,
+  Stats,
+  TwoColumn,
+  Footer
 }
 
 export function SharedBlockRenderer({ block }: { block: BlockInstance }) {

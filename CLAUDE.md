@@ -40,51 +40,16 @@ Tests use Node's built-in test runner (`node:test`) with `tsx`. Test files live 
 
 ## Architecture
 
-This is a pnpm monorepo implementing a **chat-driven website editor with live preview**. Three apps communicate to provide an AI-assisted editing workflow:
+pnpm monorepo — chat-driven website editor with live preview. Three apps + two packages:
 
-```
-Editor UI (4100) ←→ Orchestrator API (4200) ←→ Site Renderer (3000)
-```
+- **apps/orchestrator** (Fastify :4200) — brain: in-memory session state, AI planning, operations engine, publishing
+- **apps/editor** (Vite+React :4100) — chat UI, model selection, iframe communication via postMessage
+- **apps/site** (Next.js :3000) — renders `BlockInstance` pages, fetches drafts from orchestrator, editor overlay via preview-adapter
+- **packages/shared** — Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
+- **packages/blocks** — block renderers (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText)
+- **packages/preview-adapter** — PreviewBridge component, postMessage protocol (`site-editor/v1`), CSS overlay system
 
-### apps/orchestrator (Fastify backend — core logic lives here)
-
-The orchestrator is the brain of the system. It holds all session state in-memory:
-- `publishedPages` — immutable baseline
-- `draftPages` — session-specific edits keyed by `session`
-- `historyUndo` / `historyRedo` — per-session undo/redo stacks
-
-Key endpoints:
-- `GET /draft/pages?session=&slug=` — fetch draft page for preview
-- `POST /chat` — convert user message to an `EditPlan` via OpenAI or demo planner
-- `POST /history/undo` / `POST /history/redo`
-
-If `OPENAI_API_KEY` is absent, `/chat` falls back to a deterministic demo planner.
-
-### apps/editor (Vite + React 19 — chat UI)
-
-Chat interface that sends messages to `/chat`, receives `EditPlan` responses, and renders the site in an iframe. Manages model selection (fast/balanced/reasoning/codex) and undo/redo buttons. Communicates with the iframe via `postMessage`.
-
-### apps/site (Next.js 15 — site renderer)
-
-Renders pages composed of `BlockInstance` objects. Fetches draft pages from orchestrator on each request. Activates editor mode when `?__editor=1` is present, exposing block selection/highlight UI via the `preview-adapter` package.
-
-### packages/shared (types & schemas)
-
-Zod schemas are the source of truth for all data structures:
-- `PageDoc` — a page with an array of `BlockInstance`
-- `BlockInstance` — `{ id, type, props }` where `type` maps to a registered block
-- `Operation` — discriminated union of edit operations: `create_page`, `add_block`, `update_props`, `remove_block`, `move_block`
-- `EditPlan` — AI planner output: `{ intent, summary, changelog, operations[] }`
-
-Registered block types: `Hero`, `FeatureGrid`, `Testimonials`, `FAQAccordion`, `CTA`, `Card`, `CardGrid`, `RichText`
-
-### packages/preview-adapter
-
-React component (`PreviewBridge`) and helpers that the site app uses to wire up block selection. Handles `postMessage` protocol (`site-editor/v1`) between site iframe and editor:
-- Outbound: `blockClicked`, `routeChanged`, `blockReordered`, `blockDeleteRequested`
-- Inbound: `highlightBlock`, `draftUpdated`
-
-Blocks are tagged with `data-editable-target` and `data-editable-label` attributes.
+See `.claude/skills/` for deep architecture, block system, preview-editor, and chat pipeline docs.
 
 ## Environment
 

@@ -16,7 +16,9 @@ import {
 } from "../nlp/intent-detection.js"
 import type { createChatTelemetryStore } from "../telemetry/chat-telemetry.js"
 import {
+  type AIProvider,
   type ModelKey,
+  type PendingImageGeneration,
   versions,
   pendingClarificationBySession,
   chatHistoryBySession,
@@ -50,6 +52,8 @@ import {
   compileDeterministicPlan
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI } from "./planner.js"
+import { generatePlanWithAnthropic } from "./anthropic-planner.js"
+import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import {
   heroImageQueryFromContext,
   imageKeywordsFromQuery,
@@ -60,6 +64,11 @@ import {
 let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
 export function setGeneratePlanWithOpenAIForTests(fn?: typeof generatePlanWithOpenAI) {
   generatePlanWithOpenAIImpl = fn ?? generatePlanWithOpenAI
+}
+
+let generatePlanWithAnthropicImpl = generatePlanWithAnthropic
+export function setGeneratePlanWithAnthropicForTests(fn?: typeof generatePlanWithAnthropic) {
+  generatePlanWithAnthropicImpl = fn ?? generatePlanWithAnthropic
 }
 
 let demoPlanFromMessageImpl = demoPlanFromMessage
@@ -74,7 +83,8 @@ export function setDemoPlanFromMessageForTests(fn?: typeof demoPlanFromMessage) 
 export type ChatPipelineContext = {
   log: FastifyBaseLogger
   chatTelemetry: ReturnType<typeof createChatTelemetryStore>
-  modelLookup: Record<ModelKey, string>
+  modelLookup: Record<AIProvider, Record<ModelKey, string>>
+  availableProviders: AIProvider[]
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +385,82 @@ export async function withUnsplashHeroImage(args: {
 }
 
 // ---------------------------------------------------------------------------
+// Synchronous image-op detection (no API calls)
+// ---------------------------------------------------------------------------
+
+export function detectImageOps(args: {
+  plan: EditPlan
+  message: string
+  slug: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}): PendingImageGeneration[] {
+  const lowerMessage = args.message.toLowerCase()
+  if (args.plan.intent !== "edit_plan") return []
+
+  const explicitUnsplashRequest = lowerMessage.includes("unsplash")
+  const results: PendingImageGeneration[] = []
+
+  for (const op of args.plan.ops) {
+    if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
+    const target = args.currentPage.blocks.find((block) => block.id === op.blockId)
+    if (!target || target.type !== "Hero") continue
+
+    const rawPatch = op.patch as Record<string, unknown>
+    const patchCandidate =
+      rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
+        ? (rawPatch.props as Record<string, unknown>)
+        : rawPatch
+
+    const touchesImage =
+      Object.prototype.hasOwnProperty.call(patchCandidate, "imageUrl") ||
+      args.activeEditablePath === "imageUrl" ||
+      /\b(image|photo|picture)\b/.test(lowerMessage)
+    const userProvidedExplicitUrl = Boolean(firstUrlFromText(args.message))
+    const shouldReplaceWithUnsplash =
+      !userProvidedExplicitUrl &&
+      touchesImage &&
+      (explicitUnsplashRequest || (typeof patchCandidate.imageUrl === "string" && patchCandidate.imageUrl.trim().length > 0))
+    if (!touchesImage || !shouldReplaceWithUnsplash) continue
+
+    const query = heroImageQueryFromContext({
+      message: args.message,
+      currentPage: args.currentPage,
+      targetBlock: target,
+      patchCandidate
+    })
+    const provider: PendingImageGeneration["provider"] =
+      explicitUnsplashRequest ? "unsplash"
+      : process.env.OPENAI_API_KEY ? "auto"
+      : "unsplash"
+
+    results.push({ blockId: op.blockId, pageSlug: op.pageSlug, query, provider })
+  }
+
+  // Fallback: explicit unsplash request targeting a Hero block when no ops matched
+  if (results.length === 0 && explicitUnsplashRequest && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+    const selectedBlock =
+      args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
+        ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
+        : null
+    const fallbackHero =
+      selectedBlock?.type === "Hero" ? selectedBlock : args.currentPage.blocks.find((block) => block.type === "Hero") ?? null
+
+    if (fallbackHero) {
+      const query = heroImageQueryFromContext({
+        message: args.message,
+        currentPage: args.currentPage,
+        targetBlock: fallbackHero
+      })
+      results.push({ blockId: fallbackHero.id, pageSlug: args.slug, query, provider: "unsplash" })
+    }
+  }
+
+  return results
+}
+
+// ---------------------------------------------------------------------------
 // Effective slug resolution
 // ---------------------------------------------------------------------------
 
@@ -544,6 +630,8 @@ export async function runChatPipeline(
   if (executionMode === "discard_pending_plan") {
     const existing = pendingApprovalPlanBySession.get(body.session)
     if (!existing) {
+      const defaultProvider: AIProvider = ctx.availableProviders[0] ?? "openai"
+      const defaultModelKey: ModelKey = (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
       return {
         code: 200,
         payload: {
@@ -551,9 +639,9 @@ export async function runChatPipeline(
           summary: "No pending plan to stop.",
           changes: [],
           previewVersion: versions.get(body.session) ?? 0,
-          plannerSource: process.env.OPENAI_API_KEY ? "openai" : "demo",
-          modelUsed: ctx.modelLookup[(process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"],
-          modelKey: (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+          plannerSource: ctx.availableProviders.length > 0 ? ctx.availableProviders[0] : "demo",
+          modelUsed: ctx.modelLookup[defaultProvider][defaultModelKey],
+          modelKey: defaultModelKey
         }
       }
     }
@@ -598,9 +686,15 @@ export async function runChatPipeline(
     "Chat pipeline request received"
   )
 
-  const modelKey = body.modelKey && ctx.modelLookup[body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
-  const modelUsed = ctx.modelLookup[modelKey]
-  const plannerSource: "openai" | "demo" = process.env.OPENAI_API_KEY ? "openai" : "demo"
+  const requestedProvider = body.provider ?? (ctx.availableProviders[0] as AIProvider | undefined)
+  const provider: AIProvider = requestedProvider && ctx.availableProviders.includes(requestedProvider) ? requestedProvider : "openai"
+  const modelKey = body.modelKey && ctx.modelLookup[provider][body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const modelUsed = ctx.modelLookup[provider][modelKey]
+  const plannerSource: "openai" | "anthropic" | "demo" =
+    provider === "anthropic" && process.env.ANTHROPIC_API_KEY ? "anthropic" :
+    provider === "openai" && process.env.OPENAI_API_KEY ? "openai" :
+    process.env.OPENAI_API_KEY ? "openai" :
+    process.env.ANTHROPIC_API_KEY ? "anthropic" : "demo"
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
   const withDebugPayload = (
@@ -654,7 +748,7 @@ export async function runChatPipeline(
     activeEditablePath: body.activeEditablePath
   })
 
-  const guardrailFailureResponse = (args: { reason: string; source: "openai" | "demo" }) => {
+  const guardrailFailureResponse = (args: { reason: string; source: "openai" | "anthropic" | "demo" }) => {
     const category = classifyGuardrailError(args.reason)
     ctx.chatTelemetry.push({
       id: chatRequestId,
@@ -708,12 +802,20 @@ export async function runChatPipeline(
     }
   }
 
+  let planUsage: TokenUsage | undefined
+
   const respondFromPlan = async (
     plan: EditPlan,
-    source: "openai" | "demo",
+    source: "openai" | "anthropic" | "demo",
     applyMode: "apply_now" | "plan_only" = "apply_now",
     optionsOverride?: { preResolvedPlan?: boolean }
   ) => {
+    const usageFields = planUsage ? {
+      inputTokens: planUsage.inputTokens,
+      outputTokens: planUsage.outputTokens,
+      totalTokens: planUsage.totalTokens,
+      estimatedUsd: estimateUsd(modelUsed, planUsage)
+    } : {}
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -729,22 +831,68 @@ export async function runChatPipeline(
       promptLength: plannerMessage.length,
       intent: plan.intent,
       opCount: plan.ops.length,
-      opTypes: plan.ops.map((op) => op.op)
+      opTypes: plan.ops.map((op) => op.op),
+      ...usageFields
     })
     let resolvedPlan = plan
+    let detectedImageOps: PendingImageGeneration[] = []
+    let effectiveApplyMode = applyMode
     if (!optionsOverride?.preResolvedPlan) {
       resolvedPlan = normalizePlanCopyForUi(plan, current)
-      resolvedPlan = await withUnsplashHeroImage({
+
+      // Detect image ops synchronously before making any API calls
+      detectedImageOps = detectImageOps({
         plan: resolvedPlan,
         message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
         activeBlockId: body.activeBlockId,
-        activeEditablePath: body.activeEditablePath,
-        chatRequestId,
-        log: ctx.log,
-        onStatusUpdate: options?.onStatusUpdate
+        activeEditablePath: body.activeEditablePath
       })
+
+      if (detectedImageOps.length > 0) {
+        // Force plan approval so user can review before expensive image generation
+        effectiveApplyMode = "plan_only"
+
+        // Strip placeholder imageUrl values from ops so preview shows current image
+        for (const op of resolvedPlan.ops) {
+          if (op.op !== "update_props") continue
+          const imgOp = detectedImageOps.find((io) => io.blockId === op.blockId && io.pageSlug === op.pageSlug)
+          if (!imgOp) continue
+          const rawPatch = op.patch as Record<string, unknown>
+          const patchCandidate =
+            rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
+              ? (rawPatch.props as Record<string, unknown>)
+              : rawPatch
+          delete patchCandidate.imageUrl
+          delete patchCandidate.imageAlt
+        }
+
+        // Annotate change_log with deferred image generation info
+        for (const imgOp of detectedImageOps) {
+          const providerLabel =
+            imgOp.provider === "unsplash" ? "Unsplash"
+            : imgOp.provider === "openai" ? "AI generation"
+            : "AI generation or Unsplash"
+          resolvedPlan.change_log = [
+            ...resolvedPlan.change_log,
+            `Will generate image: "${imgOp.query}" via ${providerLabel}`
+          ]
+        }
+      } else {
+        // No image ops detected — run withUnsplashHeroImage as before (will be a no-op)
+        resolvedPlan = await withUnsplashHeroImage({
+          plan: resolvedPlan,
+          message: plannerMessage,
+          slug: effectiveSlug,
+          currentPage: current,
+          activeBlockId: body.activeBlockId,
+          activeEditablePath: body.activeEditablePath,
+          chatRequestId,
+          log: ctx.log,
+          onStatusUpdate: options?.onStatusUpdate
+        })
+      }
 
       if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
         const focusedFallback = compileDeterministicPlan({
@@ -810,13 +958,14 @@ export async function runChatPipeline(
             outcome: "needs_clarification",
             intent: resolvedPlan.intent,
             opCount: resolvedPlan.ops.length,
-            opTypes: resolvedPlan.ops.map((op) => op.op)
+            opTypes: resolvedPlan.ops.map((op) => op.op),
+            ...usageFields
           })
         }
       }
     }
 
-    if (applyMode === "plan_only") {
+    if (effectiveApplyMode === "plan_only") {
       const pendingPlanId = randomUUID()
       pendingApprovalPlanBySession.set(body.session!, {
         id: pendingPlanId,
@@ -827,7 +976,8 @@ export async function runChatPipeline(
         source,
         modelUsed,
         modelKey,
-        plan: structuredClone(resolvedPlan)
+        plan: structuredClone(resolvedPlan),
+        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps, originalMessage: plannerMessage } : {})
       })
       ctx.chatTelemetry.push({
         id: chatRequestId,
@@ -865,7 +1015,8 @@ export async function runChatPipeline(
             outcome: "plan_ready_for_approval",
             intent: resolvedPlan.intent,
             opCount: resolvedPlan.ops.length,
-            opTypes: resolvedPlan.ops.map((op) => op.op)
+            opTypes: resolvedPlan.ops.map((op) => op.op),
+            ...usageFields
           })
         }
       }
@@ -971,7 +1122,8 @@ export async function runChatPipeline(
         outcome: "applied",
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
-        opTypes: resolvedPlan.ops.map((op) => op.op)
+        opTypes: resolvedPlan.ops.map((op) => op.op),
+        ...usageFields
       })
       return {
         done: true as const,
@@ -992,7 +1144,8 @@ export async function runChatPipeline(
             outcome: "applied",
             intent: resolvedPlan.intent,
             opCount: resolvedPlan.ops.length,
-            opTypes: resolvedPlan.ops.map((op) => op.op)
+            opTypes: resolvedPlan.ops.map((op) => op.op),
+            ...usageFields
           })
         }
       }
@@ -1089,7 +1242,23 @@ export async function runChatPipeline(
         } satisfies ChatResult, { outcome: "pending_plan_mismatch" })
       }
     }
-    const approvedOutcome = await respondFromPlan(pending.plan, pending.source, "apply_now", { preResolvedPlan: true })
+    // Run deferred image generation if the pending plan has image ops
+    let approvalPlan = pending.plan
+    if (pending.pendingImageOps && pending.pendingImageOps.length > 0) {
+      const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
+      approvalPlan = await withUnsplashHeroImage({
+        plan: structuredClone(approvalPlan),
+        message: imageMessage,
+        slug: pending.effectiveSlug,
+        currentPage: current,
+        activeBlockId: body.activeBlockId,
+        activeEditablePath: body.activeEditablePath,
+        chatRequestId,
+        log: ctx.log,
+        onStatusUpdate: options?.onStatusUpdate
+      })
+    }
+    const approvedOutcome = await respondFromPlan(approvalPlan, pending.source, "apply_now", { preResolvedPlan: true })
     if (approvedOutcome.done) return approvedOutcome.response
     return guardrailFailureResponse({ reason: approvedOutcome.reason, source: pending.source })
   }
@@ -1120,7 +1289,7 @@ export async function runChatPipeline(
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (plannerSource === "demo") {
     try {
       const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, body.activeBlockId, body.activeBlockType)
       const outcome = await respondFromPlan(demoPlan, "demo", applyMode)
@@ -1160,13 +1329,15 @@ export async function runChatPipeline(
     }
   }
 
+  const generatePlanImpl = plannerSource === "anthropic" ? generatePlanWithAnthropicImpl : generatePlanWithOpenAIImpl
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
+  let planUsage: TokenUsage | undefined
   const planningErrors: string[] = []
 
   for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
     try {
-      initialPlan = await generatePlanWithOpenAIImpl({
+      const result = await generatePlanImpl({
         message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
@@ -1175,6 +1346,8 @@ export async function runChatPipeline(
         history: sessionChatHistory,
         onToken: options?.onPlanningToken
       })
+      initialPlan = result.plan
+      planUsage = result.usage
       break
     } catch (error) {
       const reason = toErrorDetail(error)
@@ -1262,11 +1435,11 @@ export async function runChatPipeline(
     }
   }
 
-  const initialOutcome = await respondFromPlan(initialPlan, "openai", applyMode)
+  const initialOutcome = await respondFromPlan(initialPlan, plannerSource, applyMode)
   if (initialOutcome.done) return initialOutcome.response
 
   if (!isDeterministicRepairEligible(initialOutcome.reason)) {
-    return guardrailFailureResponse({ reason: initialOutcome.reason, source: "openai" })
+    return guardrailFailureResponse({ reason: initialOutcome.reason, source: plannerSource })
   }
 
   let repairedPlan: EditPlan
@@ -1288,7 +1461,7 @@ export async function runChatPipeline(
       reason: initialOutcome.reason.slice(0, 300),
       reasonCategory: classifyGuardrailError(initialOutcome.reason)
     })
-    repairedPlan = await generatePlanWithOpenAIImpl({
+    const repairResult = await generatePlanImpl({
       message: plannerMessage,
       slug: effectiveSlug,
       currentPage: current,
@@ -1298,6 +1471,8 @@ export async function runChatPipeline(
       feedback: buildDeterministicRepairFeedback(initialOutcome.reason),
       onToken: options?.onPlanningToken
     })
+    repairedPlan = repairResult.plan
+    planUsage = repairResult.usage
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -1350,7 +1525,7 @@ export async function runChatPipeline(
     }
   }
 
-  const repairedOutcome = await respondFromPlan(repairedPlan, "openai", applyMode)
+  const repairedOutcome = await respondFromPlan(repairedPlan, plannerSource, applyMode)
   if (repairedOutcome.done) return repairedOutcome.response
-  return guardrailFailureResponse({ reason: repairedOutcome.reason, source: "openai" })
+  return guardrailFailureResponse({ reason: repairedOutcome.reason, source: plannerSource })
 }

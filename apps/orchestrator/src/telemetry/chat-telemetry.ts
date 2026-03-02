@@ -20,7 +20,7 @@ export type ChatTelemetryEntry = {
   session: string
   requestedSlug: string
   effectiveSlug: string
-  plannerSource: "openai" | "demo"
+  plannerSource: "openai" | "anthropic" | "demo"
   modelKey: string
   modelUsed: string
   promptHash: string
@@ -32,6 +32,10 @@ export type ChatTelemetryEntry = {
   opCount?: number
   opTypes?: string[]
   intent?: string
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+  estimatedUsd?: number | null
 }
 
 type Logger = {
@@ -134,7 +138,11 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         outcome: entry.outcome,
         reasonCategory: entry.reasonCategory,
         opCount: entry.opCount,
-        opTypes: entry.opTypes
+        opTypes: entry.opTypes,
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        totalTokens: entry.totalTokens,
+        estimatedUsd: entry.estimatedUsd
       },
       "Chat telemetry event"
     )
