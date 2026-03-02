@@ -632,7 +632,10 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       source.onerror = () => {
         if (settled || gotAnyEvent) {
+          setStreamStatus(null)
+          setStreamTokenCount(0)
           clearOpRefreshTimer()
+          if (pendingFocusBlockId !== null) flushOpRefresh()
           pendingFocusBlockId = null
           source.close()
           resolve(true)

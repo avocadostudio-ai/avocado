@@ -1079,17 +1079,25 @@ export async function runChatPipeline(
         }
 
         const total = resolvedPlan.ops.length
-        for (let index = 0; index < total; index += 1) {
-          const op = resolvedPlan.ops[index]
-          applyOpsAtomically(body.session!, [op])
-          const previewVersion = bumpVersion(body.session!)
-          options.onOpApplied({
-            index: index + 1,
-            total,
-            op,
-            previewVersion,
-            focusBlockId: pickFocusBlockId([op])
-          })
+        try {
+          for (let index = 0; index < total; index += 1) {
+            const op = resolvedPlan.ops[index]
+            applyOpsAtomically(body.session!, [op])
+            const previewVersion = bumpVersion(body.session!)
+            options.onOpApplied({
+              index: index + 1,
+              total,
+              op,
+              previewVersion,
+              focusBlockId: pickFocusBlockId([op])
+            })
+          }
+        } catch (progressiveError) {
+          // Roll back to pre-plan state so we don't leave a partially-applied plan.
+          for (const [slug, snapshot] of rollbackBySlug) {
+            setPage(body.session!, { ...snapshot, slug })
+          }
+          throw progressiveError
         }
       } else {
         applyOpsAtomically(body.session!, resolvedPlan.ops)
