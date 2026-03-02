@@ -656,6 +656,13 @@ export function useChatEngine(config: ChatEngineConfig) {
     const finalMessage = (explicitMessage ?? currentMessage ?? "").trim()
     if (!finalMessage || isLoading) return
 
+    // If there's a pending plan and the user types an approval-like message,
+    // route through the plan approval flow instead of treating as a new request.
+    if (pendingPlanId && /\b(approve|execute|go\s+ahead|yes|do\s+it|apply|confirm)\b/i.test(finalMessage)) {
+      await approvePendingPlan(pendingPlanId)
+      return
+    }
+
     lastSentMessageRef.current = finalMessage
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: finalMessage }])
     setIsLoading(true)
@@ -693,6 +700,12 @@ export function useChatEngine(config: ChatEngineConfig) {
       await submitChatHttp(originalMessage, {
         executionMode: "apply_pending_plan",
         pendingPlanId: planId
+      })
+    } catch (error) {
+      pushAssistantFromResult({
+        status: "error",
+        summary: `Plan execution failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        changes: []
       })
     } finally {
       setIsLoading(false)
