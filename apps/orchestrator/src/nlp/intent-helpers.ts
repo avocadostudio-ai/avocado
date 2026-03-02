@@ -61,12 +61,12 @@ export function parseCreatePageRequest(message: string) {
   const asksNewPage = /\bnew\s+page\b/.test(lower)
   if (mentionsCurrentPage && !asksNewPage && !hasExplicitRoute) return null
 
-  const hasPageWord = /\bpage\b/.test(lower)
+  const hasPageWord = /\bpages?\b/.test(lower)
   if (!hasPageWord) return null
   const explicitCreatePhrase =
-    /\b(create|generate|make|build|draft)\b[^.\n]{0,24}\b(new\s+)?page\b/.test(lower) ||
-    /\badd\b[^.\n]{0,16}\bnew\s+page\b/.test(lower) ||
-    /\bnew\s+page\b/.test(lower)
+    /\b(create|generate|make|build|draft)\b[^.\n]{0,24}\b(new\s+)?pages?\b/.test(lower) ||
+    /\badd\b[^.\n]{0,16}\bnew\s+pages?\b/.test(lower) ||
+    /\bnew\s+pages?\b/.test(lower)
   const hasCreateVerb = /\b(create|generate|add|make|build|draft)\b/.test(lower)
   const hasRouteHint = /\/[a-z0-9/_-]*/i.test(stripped)
   if (!explicitCreatePhrase && !(hasCreateVerb && hasRouteHint && hasPageWord)) return null

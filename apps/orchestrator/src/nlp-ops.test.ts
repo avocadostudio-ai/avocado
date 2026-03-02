@@ -3,7 +3,8 @@ import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { extractAudienceTarget, inferAddedBlockTypeFromMessage, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
+import { isBatchAddRequest } from "./nlp/intent-detection.js"
+import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 
 test("parseCreatePageRequest prompt matrix", () => {
@@ -1034,6 +1035,17 @@ test("extractAudienceTarget still extracts real audiences", () => {
   assert.equal(extractAudienceTarget("targeting developer teams"), "developer teams")
 })
 
+test("extractAudienceTargets parses a list of audiences for multi-page creation", () => {
+  assert.deepEqual(
+    extractAudienceTargets("Create only Water Explorers and Wilderness Survivalists pages"),
+    ["water explorers", "wilderness survivalists"]
+  )
+})
+
+test("isBatchAddRequest treats multi-page create prompts as batch overrides", () => {
+  assert.equal(isBatchAddRequest("Create only Water Explorers and Wilderness Survivalists pages"), true)
+})
+
 // ---------------------------------------------------------------------------
 // Step 4: tighter asksNavMove regex
 // ---------------------------------------------------------------------------
@@ -1226,6 +1238,31 @@ test("compileDeterministicPlan handles audience page in demo mode (no OPENAI_API
     assert.ok(plan)
     assert.equal(plan?.intent, "edit_plan")
     assert.equal(plan?.ops[0]?.op, "create_page")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
+test("compileDeterministicPlan creates one page per audience in multi-page prompt (demo mode)", () => {
+  const currentPage = demoPublishedPages()[0]
+  const original = process.env.OPENAI_API_KEY
+  try {
+    delete process.env.OPENAI_API_KEY
+    const plan = compileDeterministicPlan({
+      session: "test-audience-multi-demo-mode",
+      intent: { action: "info" },
+      message: "Create only Water Explorers and Wilderness Survivalists pages",
+      slug: "/",
+      currentPage
+    })
+    assert.ok(plan)
+    assert.equal(plan?.intent, "edit_plan")
+    assert.equal(plan?.ops.length, 2)
+    assert.deepEqual(
+      plan?.ops.map((op) => (op.op === "create_page" ? op.page.slug : "")),
+      ["/for-water-explorers", "/for-wilderness-survivalists"]
+    )
   } finally {
     if (original === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = original

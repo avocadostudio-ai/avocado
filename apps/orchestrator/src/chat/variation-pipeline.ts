@@ -527,7 +527,7 @@ export async function runVariationPipeline(
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
-  const contextualMessage = withSiteContext(body.message, body.sitePurpose, body.siteHosting)
+  const contextualMessage = withSiteContext(body.message, body.sitePurpose)
 
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({

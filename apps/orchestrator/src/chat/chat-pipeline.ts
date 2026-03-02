@@ -368,6 +368,61 @@ export async function withUnsplashHeroImage(args: {
     changed = true
   }
 
+  // Also resolve Hero images inside create_page ops (new pages with embedded Hero blocks).
+  for (const op of plan.ops) {
+    if (op.op !== "create_page") continue
+    const page = (op as unknown as { page: PageDoc }).page
+    if (!page?.blocks) continue
+    for (const block of page.blocks) {
+      if (block.type !== "Hero") continue
+      const props = block.props as Record<string, unknown>
+      const placeholderUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
+      // Skip if the user provided an explicit URL in the message
+      if (firstUrlFromText(args.message)) continue
+      // Only resolve if there's a placeholder or made-up URL
+      if (!placeholderUrl || placeholderUrl.startsWith("http")) {
+        const heading = typeof props.heading === "string" ? props.heading : ""
+        const subheading = typeof props.subheading === "string" ? props.subheading : ""
+        const pageTitle = typeof page.title === "string" ? page.title : ""
+        const candidates = [heading, subheading, pageTitle].filter(Boolean)
+        const query = candidates.length > 0
+          ? imageKeywordsFromQuery(candidates.join(" "), 4).join(" ") || pageTitle || "hero image"
+          : "hero image"
+
+        let resolved: UnsplashImage | null = null
+        if (process.env.OPENAI_API_KEY) {
+          args.onStatusUpdate?.("Generating image for new page...")
+          const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
+          const generatedAlt = `AI-generated hero image featuring ${query}`
+          const generatedPrompt = [
+            "Use case: website hero image for a new page",
+            `Page: ${pageTitle} (${page.slug})`,
+            `Section: Hero — ${sectionContext}`,
+            `Primary subject: ${query}`,
+            "Style: photorealistic editorial product photography",
+            "Composition: clean landscape frame with clear focal subject",
+            "Lighting: natural and vibrant",
+            "Constraints: no text, no logos, no watermark"
+          ].join("\n")
+          resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
+        }
+        if (!resolved) {
+          args.onStatusUpdate?.("Finding image for new page...")
+          resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4) }, { chatRequestId: args.chatRequestId, logger: args.log })
+        }
+        if (resolved) {
+          props.imageUrl = resolved.url
+          props.imageAlt = resolved.alt
+          changed = true
+          args.log.info(
+            { event: "hero_image_create_page_resolved", chatRequestId: args.chatRequestId, pageSlug: page.slug, query, imageUrl: resolved.url },
+            "Resolved hero image for create_page"
+          )
+        }
+      }
+    }
+  }
+
   if (!changed && (explicitUnsplashRequest || explicitImageGen) && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -703,6 +758,10 @@ function deterministicCreatePagePlan(args: { session: string; message: string })
   // defer to the AI planner which can produce meaningful content.
   if (requestsContentGeneration(args.message)) return null
 
+  // When the slug is the generic fallback, defer to the LLM so it can derive
+  // a meaningful slug from the page name (e.g. "Mountain Climbers" → /mountain-climbers).
+  if (requestedSlug === "/new-page") return null
+
   return buildCreatePagePlan({ session: args.session, requestedSlug, userMessage: args.message })
 }
 
@@ -777,7 +836,7 @@ export async function runChatPipeline(
       }
     }
   }
-  const messageWithContext = withSiteContext(body.message ?? "", body.sitePurpose, body.siteHosting)
+  const messageWithContext = withSiteContext(body.message ?? "", body.sitePurpose)
   const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
   const sessionChatHistory = chatHistoryBySession.get(body.session) ?? []
   const chatRequestId = randomUUID()
