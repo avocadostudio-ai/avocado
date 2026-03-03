@@ -192,6 +192,8 @@ export function inferBlockTypeFromText(text: string): BlockType | undefined {
   if (normalized.includes("featuregrid") || normalized.includes("feature grid") || normalized.includes("features")) return "FeatureGrid"
   if (normalized.includes("testimonial") || normalized.includes("social proof") || normalized.includes("review") || normalized.includes("quote")) return "Testimonials"
   if (normalized.includes("faq")) return "FAQAccordion"
+  if (normalized.includes("twocolumn") || normalized.includes("two column") || normalized.includes("2 column")) return "TwoColumn"
+  if (normalized.includes("stats") || normalized.includes("statistics") || normalized.includes("metrics") || normalized.includes("numbers")) return "Stats"
   if (normalized.includes("cta")) return "CTA"
   if (normalized.includes("cardgrid") || normalized.includes("card grid") || normalized.includes("pricing")) return "CardGrid"
   if (normalized.includes("card")) return "Card"
@@ -319,6 +321,17 @@ export function patchObject(rawPatch: unknown) {
   return rawPatch as Record<string, unknown>
 }
 
+function parseListItemPath(path: unknown): { listKey: string; index: number } | null {
+  if (typeof path !== "string") return null
+  const trimmed = path.trim()
+  const match = trimmed.match(/^\/?([a-zA-Z0-9_]+)\[(\d+)\](?:\.[\w.-]+)?$/)
+  if (!match) return null
+  const listKey = match[1]
+  const index = Number(match[2])
+  if (!listKey || !Number.isInteger(index) || index < 0) return null
+  return { listKey, index }
+}
+
 // ---------------------------------------------------------------------------
 // Plan candidate normalisation
 // ---------------------------------------------------------------------------
@@ -398,6 +411,9 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
 
     const isListOperation = raw.op === "add_item" || raw.op === "update_item" || raw.op === "remove_item" || raw.op === "move_item"
     const pathLooksLikeListKey = typeof raw.path === "string" && !raw.path.startsWith("/")
+    const listPathParsed =
+      parseListItemPath(raw.itemPath ?? raw.item_path ?? raw.itempath ?? raw.itemPtr ?? raw.item_ptr) ??
+      parseListItemPath(raw.path)
     raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.page_slug ?? raw.slug ?? raw.page ?? (isListOperation ? undefined : raw.path) ?? raw.route ?? raw.from)
     raw.newPageSlug = normalizeRouteCandidate(
       raw.newPageSlug ?? raw.new_page_slug ?? raw.targetSlug ?? raw.target_slug ?? raw.toPageSlug ?? raw.to_page_slug ?? raw.to
@@ -416,7 +432,16 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         pathCandidate
     }
     if (!raw.listKey) {
-      raw.listKey = raw.list_key ?? raw.arrayKey ?? raw.array_key ?? raw.collection ?? raw.itemsKey ?? raw.items_key
+      raw.listKey =
+        raw.list_key ??
+        raw.arrayKey ??
+        raw.array_key ??
+        raw.arrayProp ??
+        raw.array_prop ??
+        raw.collection ??
+        raw.itemsKey ??
+        raw.items_key ??
+        listPathParsed?.listKey
       if (!raw.listKey && isListOperation && pathLooksLikeListKey) raw.listKey = raw.path
       if (!raw.listKey && isListOperation && typeof raw.path === "string") {
         const keyCandidate = raw.path.trim().replace(/^\/+/, "")
@@ -428,7 +453,7 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
       raw.pageSlug = args.defaultSlug
     }
     if (typeof raw.index !== "number") {
-      const indexRaw = raw.index ?? raw.itemIndex ?? raw.item_index ?? raw.fromIndex ?? raw.from_index
+      const indexRaw = raw.index ?? raw.itemIndex ?? raw.item_index ?? raw.fromIndex ?? raw.from_index ?? listPathParsed?.index
       const normalizedIndex = typeof indexRaw === "string" ? Number(indexRaw) : indexRaw
       if (typeof normalizedIndex === "number" && Number.isFinite(normalizedIndex)) raw.index = Math.trunc(normalizedIndex)
     }

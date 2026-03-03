@@ -8,6 +8,10 @@ export type PreviewBridgeCallbacks = {
   onRouteChanged: (slug: string) => void
   onBlockReordered: (slug: string, blockId: string, afterBlockId: string | undefined) => void
   onBlockDeleteRequested: (slug: string, blockId: string) => void
+  onBlockAddRequested: (slug: string, afterBlockId: string) => void
+  onListItemAddRequested: (slug: string, blockId: string, blockType: string, listKey: string, afterIndex: number | undefined) => void
+  onListItemRemoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number) => void
+  onListItemMoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex: number | undefined) => void
   onInlineTextCommitted: (slug: string, blockId: string, editablePath: string, value: string) => void
 }
 
@@ -93,6 +97,40 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const nextSlug = String(msg.payload.slug ?? slug)
         const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
         callbacks.onBlockDeleteRequested(nextSlug, blockId)
+      }
+
+      if (msg.type === "blockAddRequested") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const afterBlockId = typeof msg.payload.afterBlockId === "string" ? msg.payload.afterBlockId : ""
+        callbacks.onBlockAddRequested(nextSlug, afterBlockId)
+      }
+
+      if (msg.type === "listItemAddRequested") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
+        const blockType = typeof msg.payload.blockType === "string" ? msg.payload.blockType : ""
+        const listKey = typeof msg.payload.listKey === "string" ? msg.payload.listKey : ""
+        const afterIndex = typeof msg.payload.afterIndex === "number" && Number.isInteger(msg.payload.afterIndex) ? msg.payload.afterIndex : undefined
+        callbacks.onListItemAddRequested(nextSlug, blockId, blockType, listKey, afterIndex)
+      }
+
+      if (msg.type === "listItemRemoveRequested") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
+        const blockType = typeof msg.payload.blockType === "string" ? msg.payload.blockType : ""
+        const listKey = typeof msg.payload.listKey === "string" ? msg.payload.listKey : ""
+        const index = typeof msg.payload.index === "number" && Number.isInteger(msg.payload.index) ? msg.payload.index : -1
+        callbacks.onListItemRemoveRequested(nextSlug, blockId, blockType, listKey, index)
+      }
+
+      if (msg.type === "listItemMoveRequested") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
+        const blockType = typeof msg.payload.blockType === "string" ? msg.payload.blockType : ""
+        const listKey = typeof msg.payload.listKey === "string" ? msg.payload.listKey : ""
+        const index = typeof msg.payload.index === "number" && Number.isInteger(msg.payload.index) ? msg.payload.index : -1
+        const afterIndex = typeof msg.payload.afterIndex === "number" && Number.isInteger(msg.payload.afterIndex) ? msg.payload.afterIndex : undefined
+        callbacks.onListItemMoveRequested(nextSlug, blockId, blockType, listKey, index, afterIndex)
       }
 
       if (msg.type === "inlineTextCommitted") {

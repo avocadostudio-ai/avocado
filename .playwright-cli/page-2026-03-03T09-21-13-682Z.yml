@@ -1,0 +1,38 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "Unknown Brand logoUnknown Brand" [ref=e3] [cursor=pointer]:
+      - /url: /
+      - img "Unknown Brand logo" [ref=e4]
+      - text: Unknown Brand
+    - navigation "Primary" [ref=e5]:
+      - link "Home" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "Pricing" [ref=e7] [cursor=pointer]:
+        - /url: /pricing
+    - group [ref=e8]:
+      - generic "Toggle navigation menu" [ref=e9]
+  - main [ref=e10]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - heading "Build websites with plain language" [level=1] [ref=e15]
+        - paragraph [ref=e16]: Edit content instantly with chat and live preview.
+        - link "Start Editing" [ref=e18] [cursor=pointer]:
+          - /url: /pricing
+      - img "Abstract generated illustration for the hero section" [ref=e20]
+    - generic [ref=e23]:
+      - heading "Why teams use it" [level=2] [ref=e24]
+      - list [ref=e25]:
+        - listitem [ref=e26]:
+          - strong [ref=e27]: Fast edits
+          - paragraph [ref=e28]: See updates without rebuilding.
+        - listitem [ref=e29]:
+          - strong [ref=e30]: Safe changes
+          - paragraph [ref=e31]: Schema-validated structured operations.
+        - listitem [ref=e32]:
+          - strong [ref=e33]: Simple workflow
+          - paragraph [ref=e34]: Chat to edit, preview to verify.
+    - generic [ref=e37]:
+      - heading "Ready for your first change?" [level=2] [ref=e38]
+      - paragraph [ref=e39]: Use the editor to modify this page now.
+      - link "Open Pricing" [ref=e40] [cursor=pointer]:
+        - /url: /pricing

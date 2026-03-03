@@ -102,6 +102,112 @@ test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocke
   assert.equal(hero?.props.heading, targetHeading)
 })
 
+test("chat pending-plan lifecycle resolves image for TwoColumn update on approval", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const createPage = await app.inject({
+    method: "POST",
+    url: "/ops",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      ops: [
+        {
+          op: "create_page",
+          page: {
+            id: "p_adventures",
+            slug: "/adventures",
+            title: "Adventures",
+            updatedAt: new Date().toISOString(),
+            blocks: [
+              {
+                id: "b_two_col_test",
+                type: "TwoColumn",
+                props: {
+                  heading: "Rise above rest",
+                  body: "Test body",
+                  imageUrl: "/hero-generated.svg",
+                  imageAlt: "A climber ascending a rugged snow-capped mountain peak at sunrise",
+                  imagePosition: "right"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  })
+  assert.equal(createPage.statusCode, 200)
+
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Update section image.",
+    change_log: ["Updated image."],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/adventures",
+        blockId: "b_two_col_test",
+        patch: { props: { imageUrl: "pending" } } as Record<string, unknown>
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const planReady = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/adventures",
+      message: "update image to \"pending\" from unsplash matching image alt text",
+      executionMode: "plan_only",
+      activeBlockId: "b_two_col_test",
+      activeEditablePath: "imageUrl"
+    }
+  })
+  assert.equal(planReady.statusCode, 200)
+  const planPayload = planReady.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(planPayload.status, "plan_ready")
+  assert.equal(typeof planPayload.pendingPlanId, "string")
+  assert.ok(planPayload.pendingPlanId)
+
+  const applyPending = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/adventures",
+      executionMode: "apply_pending_plan",
+      pendingPlanId: planPayload.pendingPlanId
+    }
+  })
+  assert.equal(applyPending.statusCode, 200)
+  const applyPayload = applyPending.json() as { status?: string }
+  assert.equal(applyPayload.status, "applied")
+
+  const pageRes = await app.inject({
+    method: "GET",
+    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/adventures")}`
+  })
+  assert.equal(pageRes.statusCode, 200)
+  const page = pageRes.json() as { blocks: Array<{ id: string; props: Record<string, unknown> }> }
+  const twoCol = page.blocks.find((block) => block.id === "b_two_col_test")
+  assert.ok(twoCol)
+  const resolvedImageUrl = String(twoCol?.props.imageUrl ?? "")
+  assert.ok(resolvedImageUrl.length > 0)
+  assert.equal(typeof twoCol?.props.heading, "string")
+})
+
 test("shouldResolveCreatePageHeroImage returns true for local placeholder urls", () => {
   assert.equal(shouldResolveCreatePageHeroImage(""), true)
   assert.equal(shouldResolveCreatePageHeroImage("/hero-generated.svg"), true)

@@ -215,6 +215,14 @@ export function normalizePlanCopyForUi(plan: EditPlan, currentPage: PageDoc): Ed
   }
 }
 
+function blockHasImageUrlProp(
+  block: PageDoc["blocks"][number] | null | undefined
+): block is PageDoc["blocks"][number] {
+  if (!block) return false
+  const props = block.props as Record<string, unknown>
+  return typeof props === "object" && props !== null && Object.prototype.hasOwnProperty.call(props, "imageUrl")
+}
+
 // ---------------------------------------------------------------------------
 // Unsplash hero image rewrite
 // ---------------------------------------------------------------------------
@@ -258,7 +266,7 @@ export async function withUnsplashHeroImage(args: {
   for (const op of plan.ops) {
     if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
     const target = args.currentPage.blocks.find((block) => block.id === op.blockId)
-    if (!target || target.type !== "Hero") continue
+    if (!blockHasImageUrlProp(target)) continue
 
     const rawPatch = op.patch as Record<string, unknown>
     const patchCandidate =
@@ -285,7 +293,9 @@ export async function withUnsplashHeroImage(args: {
     const targetProps = target.props as Record<string, unknown>
     const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
     const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
-    const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
+    const title = typeof targetProps.title === "string" ? targetProps.title : ""
+    const body = typeof targetProps.body === "string" ? targetProps.body : ""
+    const sectionContext = [heading, subheading, title, body].filter(Boolean).join(" — ")
     const currentImageUrl = typeof targetProps.imageUrl === "string" ? targetProps.imageUrl : ""
 
     let resolved: UnsplashImage | null = null
@@ -299,16 +309,16 @@ export async function withUnsplashHeroImage(args: {
       if (userImagePrompt) {
         generatedAlt = userImagePrompt.slice(0, 200)
         generatedPrompt = [
-          "Use case: website hero image",
+          "Use case: website section image",
           `Page: ${args.currentPage.title} (${args.slug})`,
           `Section: ${target.type} — ${sectionContext}`,
           userImagePrompt,
           "Constraints: no text, no logos, no watermark"
         ].join("\n")
       } else {
-        generatedAlt = `AI-generated hero image featuring ${query}`
+        generatedAlt = `AI-generated ${target.type} image featuring ${query}`
         generatedPrompt = [
-          "Use case: website hero image update",
+          "Use case: website section image update",
           `Page: ${args.currentPage.title} (${args.slug})`,
           `Section: ${target.type} — ${sectionContext}`,
           `Primary subject: ${query}`,
@@ -335,7 +345,7 @@ export async function withUnsplashHeroImage(args: {
       delete patchCandidate.imageUrl
       delete patchCandidate.imageAlt
       args.log.warn(
-        { event: "hero_image_skip_placeholder", chatRequestId: args.chatRequestId, query },
+        { event: "image_rewrite_skip_placeholder", chatRequestId: args.chatRequestId, query },
         "Skipping placeholder image — no relevant image source available"
       )
       placeholderSkipped = true
@@ -354,7 +364,7 @@ export async function withUnsplashHeroImage(args: {
     sourceQuery = resolved.query
     args.log.info(
       {
-        event: "hero_image_rewrite_applied",
+        event: "image_rewrite_applied",
         chatRequestId: args.chatRequestId,
         slug: args.slug,
         blockId: op.blockId,
@@ -364,7 +374,7 @@ export async function withUnsplashHeroImage(args: {
         nextImageUrl: resolved.url,
         nextImageAlt: nextPatch.imageAlt
       },
-      "Applied hero image rewrite"
+      "Applied image rewrite"
     )
     changed = true
   }
@@ -431,7 +441,9 @@ export async function withUnsplashHeroImage(args: {
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         : null
     const fallbackHero =
-      selectedBlock?.type === "Hero" ? selectedBlock : args.currentPage.blocks.find((block) => block.type === "Hero") ?? null
+      blockHasImageUrlProp(selectedBlock)
+        ? selectedBlock
+        : args.currentPage.blocks.find((block) => blockHasImageUrlProp(block)) ?? null
 
     if (fallbackHero) {
       const query = heroImageQueryFromContext({
@@ -453,16 +465,16 @@ export async function withUnsplashHeroImage(args: {
         if (userImagePrompt) {
           generatedAlt = userImagePrompt.slice(0, 200)
           generatedPrompt = [
-            "Use case: website hero image",
+            "Use case: website section image",
             `Page: ${args.currentPage.title} (${args.slug})`,
             `Section: ${fallbackHero.type} — ${sectionContext}`,
             userImagePrompt,
             "Constraints: no text, no logos, no watermark"
           ].join("\n")
         } else {
-          generatedAlt = `AI-generated hero image featuring ${query}`
+          generatedAlt = `AI-generated ${fallbackHero.type} image featuring ${query}`
           generatedPrompt = [
-            "Use case: website hero image update",
+            "Use case: website section image update",
             `Page: ${args.currentPage.title} (${args.slug})`,
             `Section: ${fallbackHero.type} — ${sectionContext}`,
             `Primary subject: ${query}`,
@@ -537,13 +549,13 @@ export async function withUnsplashHeroImage(args: {
   } else {
     args.log.info(
       {
-        event: "hero_image_rewrite_skipped",
+        event: "image_rewrite_skipped",
         chatRequestId: args.chatRequestId,
         slug: args.slug,
         explicitUnsplashRequest,
         message: args.message
       },
-      "Skipped hero image rewrite"
+      "Skipped image rewrite"
     )
   }
 
@@ -578,7 +590,7 @@ export function detectImageOps(args: {
   for (const op of args.plan.ops) {
     if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
     const target = args.currentPage.blocks.find((block) => block.id === op.blockId)
-    if (!target || target.type !== "Hero") continue
+    if (!blockHasImageUrlProp(target)) continue
 
     const rawPatch = op.patch as Record<string, unknown>
     const patchCandidate =
@@ -619,7 +631,9 @@ export function detectImageOps(args: {
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         : null
     const fallbackHero =
-      selectedBlock?.type === "Hero" ? selectedBlock : args.currentPage.blocks.find((block) => block.type === "Hero") ?? null
+      blockHasImageUrlProp(selectedBlock)
+        ? selectedBlock
+        : args.currentPage.blocks.find((block) => blockHasImageUrlProp(block)) ?? null
 
     if (fallbackHero) {
       const query = heroImageQueryFromContext({
@@ -1066,14 +1080,13 @@ export async function runChatPipeline(
 
         // Annotate change_log with deferred image generation info
         for (const imgOp of detectedImageOps) {
-          const providerLabel =
-            imgOp.provider === "unsplash" ? "Unsplash"
-            : imgOp.provider === "openai" ? "AI generation"
-            : "AI generation or Unsplash"
-          resolvedPlan.change_log = [
-            ...resolvedPlan.change_log,
-            `Will generate image: "${imgOp.query}" via ${providerLabel}`
-          ]
+          const pendingImageMessage =
+            imgOp.provider === "unsplash"
+              ? `Will find an image on Unsplash: "${imgOp.query}".`
+              : imgOp.provider === "openai"
+                ? `Will generate an image with AI: "${imgOp.query}".`
+                : `Will resolve an image for: "${imgOp.query}".`
+          resolvedPlan.change_log = [...resolvedPlan.change_log, pendingImageMessage]
         }
       } else {
         // No image ops detected — run withUnsplashHeroImage as before (will be a no-op)
@@ -1223,6 +1236,27 @@ export async function runChatPipeline(
       return {
         done: true as const,
         response: { code: 404, payload: { error: "page not found" } as { error: string } }
+      }
+    }
+
+    if (resolvedPlan.ops.length === 0) {
+      pendingClarificationBySession.delete(body.session!)
+      pendingApprovalPlanBySession.delete(body.session!)
+      return {
+        done: true as const,
+        response: {
+          code: 200,
+          payload: withDebugPayload({
+            status: "applied",
+            summary: "No changes needed. That content is already up to date.",
+            changes: [],
+            mentionedSlugs: [effectiveSlug],
+            previewVersion: versions.get(body.session!) ?? 0,
+            plannerSource: source,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult, { outcome: "no_effective_change" })
+        }
       }
     }
 

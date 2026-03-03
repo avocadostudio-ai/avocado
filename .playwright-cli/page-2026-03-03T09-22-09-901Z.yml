@@ -1,0 +1,61 @@
+- generic:
+  - generic [active]:
+    - generic [ref=e5] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e6]:
+        - img [ref=e7]
+      - generic [ref=e10]:
+        - button "Open issues overlay" [ref=e11]:
+          - generic [ref=e12]:
+            - generic [ref=e13]: "0"
+            - generic [ref=e14]: "1"
+          - generic [ref=e15]: Issue
+        - button "Collapse issues badge" [ref=e16]:
+          - img [ref=e17]
+    - generic [ref=e21]:
+      - dialog "Runtime Error" [ref=e22]:
+        - generic [ref=e24]:
+          - generic [ref=e26]:
+            - generic [ref=e27]:
+              - generic [ref=e29]: Runtime Error
+              - generic [ref=e30]:
+                - button "Copy Stack Trace" [ref=e31] [cursor=pointer]:
+                  - img [ref=e32]
+                - button "No related documentation found" [disabled] [ref=e34]:
+                  - img [ref=e35]
+                - link "Learn more about enabling Node.js inspector for server code with Chrome DevTools" [ref=e37] [cursor=pointer]:
+                  - /url: https://nextjs.org/docs/app/building-your-application/configuring/debugging#server-side-code
+                  - img [ref=e38]
+            - generic [ref=e46]:
+              - paragraph [ref=e47]: "Error: Cannot find module './456.js' Require stack: - /Users/yury/Projects/ai-site-editor/apps/site/.next/server/webpack-runtime.js - /Users/yury/Projects/ai-site-editor/apps/site/.next/server/pages/_document.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/server/require.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/server/load-components.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/utils.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/swc/options.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/swc/index.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/next-config-ts/transpile-config.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/server/config.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/server/next.js - /Users/yury/Projects/ai-site-editor/node_modules/.pnpm/next@15.2.8_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/server/lib/start-server.js"
+              - button "Show More" [ref=e49] [cursor=pointer]
+          - contentinfo [ref=e52]:
+            - paragraph [ref=e53]: This error happened while generating the page. Any console logs will be displayed in the terminal window.
+            - region "Error feedback" [ref=e54]:
+              - paragraph [ref=e55]:
+                - link "Was this helpful?" [ref=e56] [cursor=pointer]:
+                  - /url: https://nextjs.org/telemetry#error-feedback
+              - button "Mark as helpful" [ref=e57] [cursor=pointer]:
+                - img [ref=e58]
+              - button "Mark as not helpful" [ref=e61] [cursor=pointer]:
+                - img [ref=e62]
+          - generic [ref=e64]:
+            - generic [ref=e65]: "1"
+            - generic [ref=e66]: "2"
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - navigation [ref=e69]:
+            - button "previous" [disabled] [ref=e70]:
+              - img "previous" [ref=e71]
+            - generic [ref=e73]:
+              - generic [ref=e74]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e75]:
+              - img "next" [ref=e76]
+          - img
+        - generic [ref=e78]:
+          - link "Next.js 15.2.8 (outdated)" [ref=e79] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e80]
+            - generic "An outdated version detected (latest is 16.1.6), upgrade is highly recommended!" [ref=e82]: Next.js 15.2.8 (outdated)
+          - img
+  - alert [ref=e83]

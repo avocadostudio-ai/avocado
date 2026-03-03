@@ -1,0 +1,5 @@
+{
+  "/[[...slug]]/page": "/[[...slug]]",
+  "/icon.svg/route": "/icon.svg",
+  "/_not-found/page": "/_not-found"
+}
