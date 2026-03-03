@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
 import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
 import type { UnsplashImage } from "../variation-images.js"
-import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
+import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import {
   type ChatRequestBody,
   type ChatResult,
@@ -51,7 +51,8 @@ import {
   demoPlanFromMessage,
   plannerContextPack,
   compileDeterministicPlan,
-  inferDeterministicIntent
+  inferDeterministicIntent,
+  rewriteFromExisting
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI } from "./planner.js"
 import { generatePlanWithAnthropic } from "./anthropic-planner.js"
@@ -223,6 +224,261 @@ function blockHasImageUrlProp(
   return typeof props === "object" && props !== null && Object.prototype.hasOwnProperty.call(props, "imageUrl")
 }
 
+function parsePath(path: string): Array<string | number> {
+  const parts: Array<string | number> = []
+  for (const match of path.matchAll(/([^[.\]]+)|\[(\d+)\]/g)) {
+    if (match[1]) parts.push(match[1])
+    if (match[2]) parts.push(Number(match[2]))
+  }
+  return parts
+}
+
+function getValueAtPath(root: unknown, path: string): unknown {
+  if (!path) return root
+  let current: unknown = root
+  for (const part of parsePath(path)) {
+    if (typeof part === "number") {
+      if (!Array.isArray(current)) return undefined
+      current = current[part]
+      continue
+    }
+    if (!current || typeof current !== "object" || Array.isArray(current)) return undefined
+    current = (current as Record<string, unknown>)[part]
+  }
+  return current
+}
+
+function setValueAtPath(root: Record<string, unknown>, path: string, value: unknown) {
+  const parts = parsePath(path)
+  if (parts.length === 0) return
+  let current: unknown = root
+  for (let idx = 0; idx < parts.length - 1; idx += 1) {
+    const part = parts[idx]
+    const next = parts[idx + 1]
+    if (typeof part === "number") {
+      if (!Array.isArray(current)) return
+      if (current[part] === undefined || current[part] === null) {
+        current[part] = typeof next === "number" ? [] : {}
+      }
+      current = current[part]
+      continue
+    }
+    if (!current || typeof current !== "object" || Array.isArray(current)) return
+    const holder = current as Record<string, unknown>
+    if (!(part in holder) || holder[part] === undefined || holder[part] === null) {
+      holder[part] = typeof next === "number" ? [] : {}
+    }
+    current = holder[part]
+  }
+  const leaf = parts[parts.length - 1]
+  if (typeof leaf === "number") {
+    if (!Array.isArray(current)) return
+    current[leaf] = value
+    return
+  }
+  if (!current || typeof current !== "object" || Array.isArray(current)) return
+  ;(current as Record<string, unknown>)[leaf] = value
+}
+
+function deleteValueAtPath(root: Record<string, unknown>, path: string) {
+  const parts = parsePath(path)
+  if (parts.length === 0) return
+  let current: unknown = root
+  for (let idx = 0; idx < parts.length - 1; idx += 1) {
+    const part = parts[idx]
+    if (typeof part === "number") {
+      if (!Array.isArray(current)) return
+      current = current[part]
+      continue
+    }
+    if (!current || typeof current !== "object" || Array.isArray(current)) return
+    current = (current as Record<string, unknown>)[part]
+  }
+  const leaf = parts[parts.length - 1]
+  if (typeof leaf === "number") {
+    if (!Array.isArray(current)) return
+    delete current[leaf]
+    return
+  }
+  if (!current || typeof current !== "object" || Array.isArray(current)) return
+  delete (current as Record<string, unknown>)[leaf]
+}
+
+function extractIndexedQueries(message: string) {
+  const out = new Map<number, string>()
+  for (const m of message.matchAll(/\b(?:card|item|feature|tile)\s*(\d+)\s*[:=]\s*"([^"]+)"/gi)) {
+    const idx = Number(m[1]) - 1
+    const value = m[2]?.trim()
+    if (Number.isFinite(idx) && idx >= 0 && value) out.set(idx, value)
+  }
+  return out
+}
+
+function detectImagePaths(value: unknown, basePath = "", acc = new Set<string>()) {
+  if (Array.isArray(value)) {
+    value.forEach((entry, idx) => detectImagePaths(entry, `${basePath}[${idx}]`, acc))
+    return acc
+  }
+  if (!value || typeof value !== "object") return acc
+  const obj = value as Record<string, unknown>
+  for (const [key, child] of Object.entries(obj)) {
+    const nextPath = basePath ? `${basePath}.${key}` : key
+    if (key === "imageUrl") acc.add(nextPath)
+    detectImagePaths(child, nextPath, acc)
+  }
+  return acc
+}
+
+function imageQueryFromItem(item: Record<string, unknown>) {
+  const candidate = [
+    item.imageAlt,
+    item.title,
+    item.heading,
+    item.name,
+    item.description,
+    item.subheading,
+    item.quote,
+    item.label,
+    item.q
+  ]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+  const terms = imageKeywordsFromQuery(candidate, 4)
+  return terms.length > 0 ? terms.join(" ") : ""
+}
+
+function shouldPopulateAllChildImages(message: string) {
+  const lower = message.toLowerCase()
+  return /\b(images?|photos?|pictures?)\b/.test(lower) && /\b(all|each|every)\b/.test(lower) && /\b(cards?|items?|features?|tiles?|children)\b/.test(lower)
+}
+
+function findImageTargets(args: {
+  message: string
+  currentPage: PageDoc
+  targetBlock: PageDoc["blocks"][number]
+  patchCandidate: Record<string, unknown>
+}) {
+  const mergedProps = {
+    ...((args.targetBlock.props as Record<string, unknown>) ?? {}),
+    ...args.patchCandidate
+  }
+  const explicitByIndex = extractIndexedQueries(args.message)
+  const defaultQuery = heroImageQueryFromContext({
+    message: args.message,
+    currentPage: args.currentPage,
+    targetBlock: args.targetBlock,
+    patchCandidate: args.patchCandidate
+  })
+
+  const imagePaths = detectImagePaths(mergedProps)
+  if (shouldPopulateAllChildImages(args.message)) {
+    for (const [key, value] of Object.entries(mergedProps)) {
+      if (!Array.isArray(value)) continue
+      value.forEach((entry, idx) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return
+        imagePaths.add(`${key}[${idx}].imageUrl`)
+      })
+    }
+  }
+
+  const targets: Array<{ path: string; altPath: string; query: string }> = []
+  for (const path of imagePaths) {
+    const itemMatch = path.match(/^(.*\[(\d+)\])\.imageUrl$/)
+    const index = itemMatch?.[2] ? Number(itemMatch[2]) : undefined
+    const itemPath = itemMatch?.[1]
+    const indexed = index !== undefined ? explicitByIndex.get(index) : undefined
+    let query = indexed ?? ""
+    if (!query && itemPath) {
+      const item = getValueAtPath(mergedProps, itemPath)
+      if (item && typeof item === "object" && !Array.isArray(item)) query = imageQueryFromItem(item as Record<string, unknown>)
+    }
+    if (!query) query = defaultQuery
+    targets.push({ path, altPath: path.replace(/imageUrl$/, "imageAlt"), query })
+  }
+  return targets
+}
+
+function rewriteAddBlockToChildImageUpdate(args: { plan: EditPlan; message: string; currentPage: PageDoc; slug: string }): EditPlan {
+  if (args.plan.intent !== "edit_plan") return args.plan
+  const lower = args.message.toLowerCase()
+  const referencesContainerChildren =
+    /\b(in|inside|within)\b/.test(lower) ||
+    /\b(?:to|for)\s+(?:all|each|every)\s+\w+/.test(lower) ||
+    /\b(?:all|each|every)\s+\w+/.test(lower)
+  const shouldRewrite =
+    /\b(images?|photos?|pictures?)\b/.test(lower) &&
+    /\b(all|each|every)\b/.test(lower) &&
+    referencesContainerChildren &&
+    !/\b(new|another)\b/.test(lower)
+  if (!shouldRewrite) return args.plan
+
+  const rewrittenOps: Operation[] = []
+  let changed = false
+  const hasObjectArrayProp = (block: PageDoc["blocks"][number]) =>
+    Object.values((block.props ?? {}) as Record<string, unknown>).some((value) =>
+      Array.isArray(value) && value.some((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+    )
+  for (const op of args.plan.ops) {
+    if (op.op !== "add_block") {
+      rewrittenOps.push(op)
+      continue
+    }
+    let existing =
+      op.block.type === "Card"
+        ? args.currentPage.blocks.find((block) => block.type === "CardGrid") ??
+          args.currentPage.blocks.find((block) => block.type === "Card")
+        : args.currentPage.blocks.find((block) => block.type === op.block.type)
+    if (!existing || !hasObjectArrayProp(existing)) {
+      existing =
+        args.currentPage.blocks.find((block) => hasObjectArrayProp(block)) ??
+        existing
+    }
+    if (!existing) {
+      rewrittenOps.push(op)
+      continue
+    }
+    const existingProps = (existing.props ?? {}) as Record<string, unknown>
+    const patch: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(existingProps)) {
+      if (!Array.isArray(value)) continue
+      const nextItems = value.map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry
+        const item = entry as Record<string, unknown>
+        const titleLike =
+          typeof item.title === "string" ? item.title :
+          typeof item.heading === "string" ? item.heading :
+          typeof item.name === "string" ? item.name :
+          "Card image"
+        return {
+          ...item,
+          imageUrl: typeof item.imageUrl === "string" && item.imageUrl.trim().length > 0 ? item.imageUrl : "pending",
+          imageAlt: typeof item.imageAlt === "string" && item.imageAlt.trim().length > 0 ? item.imageAlt : `Image for ${titleLike}`
+        }
+      })
+      patch[key] = nextItems
+    }
+    if (Object.keys(patch).length === 0) {
+      rewrittenOps.push(op)
+      continue
+    }
+    rewrittenOps.push({
+      op: "update_props",
+      pageSlug: args.slug,
+      blockId: existing.id,
+      patch
+    })
+    changed = true
+  }
+
+  if (!changed) return args.plan
+  return {
+    ...args.plan,
+    summary_for_user: "Updated images in the existing section.",
+    change_log: [...args.plan.change_log, "Updated child images in the existing component instead of adding a duplicate section."],
+    ops: rewrittenOps
+  }
+}
+
 export type TranslationScope = "page" | "component" | "none"
 
 export function sanitizeMessageForPlanning(message: string) {
@@ -286,6 +542,7 @@ export async function withUnsplashHeroImage(args: {
   message: string
   slug: string
   currentPage: PageDoc
+  preferredImageOps?: PendingImageGeneration[]
   activeBlockId?: string
   activeEditablePath?: string
   chatRequestId?: string
@@ -311,16 +568,28 @@ export async function withUnsplashHeroImage(args: {
     "Evaluating hero image rewrite"
   )
 
-  const plan = structuredClone(args.plan)
+  const plan = rewriteAddBlockToChildImageUpdate({
+    plan: structuredClone(args.plan),
+    message: args.message,
+    currentPage: args.currentPage,
+    slug: args.slug
+  })
   let changed = false
   let placeholderSkipped = false
   let sourceQuery: string | undefined
   let imageSource: "ai-generated" | "unsplash" | "placeholder" = "placeholder"
+  const preferredQueries = new Map<string, string>()
+  for (const item of args.preferredImageOps ?? []) {
+    const query = typeof item.query === "string" ? item.query.trim() : ""
+    if (!query) continue
+    const key = `${item.pageSlug}::${item.blockId}::${item.path ?? "imageUrl"}`
+    preferredQueries.set(key, query)
+  }
 
   for (const op of plan.ops) {
     if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
     const target = args.currentPage.blocks.find((block) => block.id === op.blockId)
-    if (!blockHasImageUrlProp(target)) continue
+    if (!target) continue
 
     const rawPatch = op.patch as Record<string, unknown>
     const patchCandidate =
@@ -328,109 +597,112 @@ export async function withUnsplashHeroImage(args: {
         ? (rawPatch.props as Record<string, unknown>)
         : rawPatch
 
-    const requestedImageUrl = typeof patchCandidate.imageUrl === "string" ? patchCandidate.imageUrl.trim() : ""
     const touchesImage =
-      Object.prototype.hasOwnProperty.call(patchCandidate, "imageUrl") ||
+      detectImagePaths(patchCandidate).size > 0 ||
       args.activeEditablePath === "imageUrl" ||
-      /\b(image|photo|picture)\b/.test(lowerMessage)
+      /\b(images?|photos?|pictures?)\b/.test(lowerMessage)
     const userProvidedExplicitUrl = Boolean(firstUrlFromText(args.message))
-    const shouldReplace =
-      !userProvidedExplicitUrl && touchesImage && (explicitUnsplashRequest || requestedImageUrl.length > 0 || explicitImageGen)
-    if (!touchesImage || !shouldReplace) continue
-
-    const query = heroImageQueryFromContext({
+    const targets = findImageTargets({
       message: args.message,
       currentPage: args.currentPage,
       targetBlock: target,
       patchCandidate
     })
+    const hasAnyImageTarget = targets.length > 0
+    const hasImageUrlInPatch = detectImagePaths(patchCandidate).size > 0
+    const shouldReplace =
+      !userProvidedExplicitUrl && touchesImage && hasAnyImageTarget && (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
+    if (!touchesImage || !shouldReplace || targets.length === 0) continue
+
     const targetProps = target.props as Record<string, unknown>
     const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
     const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
     const title = typeof targetProps.title === "string" ? targetProps.title : ""
     const body = typeof targetProps.body === "string" ? targetProps.body : ""
     const sectionContext = [heading, subheading, title, body].filter(Boolean).join(" — ")
-    const currentImageUrl = typeof targetProps.imageUrl === "string" ? targetProps.imageUrl : ""
 
-    let resolved: UnsplashImage | null = null
-    if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY) {
-      args.onStatusUpdate?.("Generating image...")
+    for (const targetImage of targets) {
+      const preferredKey = `${op.pageSlug}::${op.blockId}::${targetImage.path}`
+      const imageQuery = preferredQueries.get(preferredKey) ?? targetImage.query
+      const currentImageUrl = typeof getValueAtPath(targetProps, targetImage.path) === "string"
+        ? String(getValueAtPath(targetProps, targetImage.path))
+        : ""
 
-      // When the user provides a detailed image description (after "generate image: ..."),
-      // use it directly as the prompt. Otherwise fall back to the generic prompt.
-      let generatedPrompt: string
-      let generatedAlt: string
-      if (userImagePrompt) {
-        generatedAlt = userImagePrompt.slice(0, 200)
-        generatedPrompt = [
-          "Use case: website section image",
-          `Page: ${args.currentPage.title} (${args.slug})`,
-          `Section: ${target.type} — ${sectionContext}`,
-          userImagePrompt,
-          "Constraints: no text, no logos, no watermark"
-        ].join("\n")
-      } else {
-        generatedAlt = `AI-generated ${target.type} image featuring ${query}`
-        generatedPrompt = [
-          "Use case: website section image update",
-          `Page: ${args.currentPage.title} (${args.slug})`,
-          `Section: ${target.type} — ${sectionContext}`,
-          `Primary subject: ${query}`,
-          "Style: photorealistic editorial product photography",
-          "Composition: clean landscape frame with clear focal subject",
-          "Lighting: natural and vibrant",
-          "Constraints: no text, no logos, no watermark"
-        ].join("\n")
+      let resolved: UnsplashImage | null = null
+      if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY) {
+        args.onStatusUpdate?.("Generating image...")
+        let generatedPrompt: string
+        let generatedAlt: string
+        if (userImagePrompt) {
+          generatedAlt = userImagePrompt.slice(0, 200)
+          generatedPrompt = [
+            "Use case: website section image",
+            `Page: ${args.currentPage.title} (${args.slug})`,
+            `Section: ${target.type} — ${sectionContext}`,
+            userImagePrompt,
+            "Constraints: no text, no logos, no watermark"
+          ].join("\n")
+        } else {
+          generatedAlt = `AI-generated ${target.type} image featuring ${imageQuery}`
+          generatedPrompt = [
+            "Use case: website section image update",
+            `Page: ${args.currentPage.title} (${args.slug})`,
+            `Section: ${target.type} — ${sectionContext}`,
+            `Primary subject: ${imageQuery}`,
+            "Style: photorealistic editorial product photography",
+            "Composition: clean landscape frame with clear focal subject",
+            "Lighting: natural and vibrant",
+            "Constraints: no text, no logos, no watermark"
+          ].join("\n")
+        }
+        resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
+        if (resolved) imageSource = "ai-generated"
       }
-      resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
-      if (resolved) imageSource = "ai-generated"
-    }
-    if (!resolved) {
-      args.onStatusUpdate?.("Finding a suitable image...")
-      // Pass current imageUrl as "used" so Unsplash returns a different image
-      const usedImageUrls = currentImageUrl ? new Set([currentImageUrl]) : undefined
-      resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4), usedImageUrls }, { chatRequestId: args.chatRequestId, logger: args.log })
-      if (resolved) imageSource = resolved.url.includes("unsplash") ? "unsplash" : "placeholder"
-    }
+      if (!resolved) {
+        args.onStatusUpdate?.("Finding a suitable image...")
+        const usedImageUrls = currentImageUrl ? new Set([currentImageUrl]) : undefined
+        resolved = await resolveUnsplashImage(
+          imageQuery,
+          { subjectKeywords: imageKeywordsFromQuery(imageQuery, 4), usedImageUrls },
+          { chatRequestId: args.chatRequestId, logger: args.log }
+        )
+        if (resolved) imageSource = resolved.url.includes("unsplash") ? "unsplash" : "placeholder"
+      }
 
-    // Don't insert a random placeholder — a random unrelated image is worse than keeping
-    // the current one. Remove image fields from the patch; other prop changes still apply.
-    if (!resolved || imageSource === "placeholder") {
-      delete patchCandidate.imageUrl
-      delete patchCandidate.imageAlt
-      args.log.warn(
-        { event: "image_rewrite_skip_placeholder", chatRequestId: args.chatRequestId, query },
-        "Skipping placeholder image — no relevant image source available"
+      if (!resolved || imageSource === "placeholder") {
+        deleteValueAtPath(patchCandidate, targetImage.path)
+        deleteValueAtPath(patchCandidate, targetImage.altPath)
+        args.log.warn(
+          { event: "image_rewrite_skip_placeholder", chatRequestId: args.chatRequestId, query: imageQuery, path: targetImage.path },
+          "Skipping placeholder image — no relevant image source available"
+        )
+        placeholderSkipped = true
+        continue
+      }
+
+      setValueAtPath(patchCandidate, targetImage.path, resolved.url)
+      const existingAlt = getValueAtPath(patchCandidate, targetImage.altPath)
+      if (typeof existingAlt !== "string" || existingAlt.trim().length === 0) {
+        setValueAtPath(patchCandidate, targetImage.altPath, resolved.alt)
+      }
+      sourceQuery = resolved.query
+      args.log.info(
+        {
+          event: "image_rewrite_applied",
+          chatRequestId: args.chatRequestId,
+          slug: args.slug,
+          blockId: op.blockId,
+          query: imageQuery,
+          explicitUnsplashRequest,
+          path: targetImage.path,
+          nextImageUrl: resolved.url,
+          nextImageAlt: getValueAtPath(patchCandidate, targetImage.altPath)
+        },
+        "Applied image rewrite"
       )
-      placeholderSkipped = true
-      continue
+      changed = true
     }
-
-    const nextPatch: Record<string, unknown> = { ...patchCandidate, imageUrl: resolved.url }
-    if (
-      !Object.prototype.hasOwnProperty.call(nextPatch, "imageAlt") ||
-      typeof nextPatch.imageAlt !== "string" ||
-      nextPatch.imageAlt.trim().length === 0
-    ) {
-      nextPatch.imageAlt = resolved.alt
-    }
-    op.patch = nextPatch
-    sourceQuery = resolved.query
-    args.log.info(
-      {
-        event: "image_rewrite_applied",
-        chatRequestId: args.chatRequestId,
-        slug: args.slug,
-        blockId: op.blockId,
-        query,
-        explicitUnsplashRequest,
-        previousImageUrl: requestedImageUrl,
-        nextImageUrl: resolved.url,
-        nextImageAlt: nextPatch.imageAlt
-      },
-      "Applied image rewrite"
-    )
-    changed = true
+    op.patch = patchCandidate
   }
 
   // Also resolve Hero images inside create_page ops (new pages with embedded Hero blocks).
@@ -489,7 +761,7 @@ export async function withUnsplashHeroImage(args: {
     }
   }
 
-  if (!changed && (explicitUnsplashRequest || explicitImageGen) && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+  if (!changed && (explicitUnsplashRequest || explicitImageGen) && /\b(images?|photos?|pictures?|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -563,8 +835,8 @@ export async function withUnsplashHeroImage(args: {
           blockId: fallbackHero.id,
           patch: { imageUrl: resolved.url, imageAlt: resolved.alt }
         })
-        sourceQuery = resolved.query
-        changed = true
+      sourceQuery = resolved.query
+      changed = true
       }
     }
   }
@@ -644,7 +916,7 @@ export function detectImageOps(args: {
   for (const op of args.plan.ops) {
     if (op.op !== "update_props" || op.pageSlug !== args.slug) continue
     const target = args.currentPage.blocks.find((block) => block.id === op.blockId)
-    if (!blockHasImageUrlProp(target)) continue
+    if (!target) continue
 
     const rawPatch = op.patch as Record<string, unknown>
     const patchCandidate =
@@ -653,33 +925,43 @@ export function detectImageOps(args: {
         : rawPatch
 
     const touchesImage =
-      Object.prototype.hasOwnProperty.call(patchCandidate, "imageUrl") ||
+      detectImagePaths(patchCandidate).size > 0 ||
       args.activeEditablePath === "imageUrl" ||
-      /\b(image|photo|picture)\b/.test(lowerMessage)
+      /\b(images?|photos?|pictures?)\b/.test(lowerMessage)
     const userProvidedExplicitUrl = Boolean(firstUrlFromText(args.message))
-    const hasImageUrlInPatch = typeof patchCandidate.imageUrl === "string" && patchCandidate.imageUrl.trim().length > 0
-    const shouldReplace =
-      !userProvidedExplicitUrl &&
-      touchesImage &&
-      (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
-    if (!touchesImage || !shouldReplace) continue
-
-    const query = heroImageQueryFromContext({
+    const targets = findImageTargets({
       message: args.message,
       currentPage: args.currentPage,
       targetBlock: target,
       patchCandidate
     })
+    const hasImageUrlInPatch = detectImagePaths(patchCandidate).size > 0
+    const shouldReplace =
+      !userProvidedExplicitUrl &&
+      touchesImage &&
+      targets.length > 0 &&
+      (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
+    if (!touchesImage || !shouldReplace || targets.length === 0) continue
+
     const provider: PendingImageGeneration["provider"] =
       explicitUnsplashRequest ? "unsplash"
       : process.env.OPENAI_API_KEY ? "auto"
       : "unsplash"
 
-    results.push({ blockId: op.blockId, pageSlug: op.pageSlug, query, provider })
+    for (const targetImage of targets) {
+      results.push({
+        blockId: op.blockId,
+        pageSlug: op.pageSlug,
+        path: targetImage.path,
+        altPath: targetImage.altPath,
+        query: targetImage.query,
+        provider
+      })
+    }
   }
 
   // Fallback: explicit image request targeting a Hero block when no ops matched
-  if (results.length === 0 && (explicitUnsplashRequest || explicitImageGen) && /\b(image|photo|picture|hero)\b/.test(lowerMessage)) {
+  if (results.length === 0 && (explicitUnsplashRequest || explicitImageGen) && /\b(images?|photos?|pictures?|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -732,12 +1014,20 @@ const AI_PERFORMANCE_PREFIX = "__ai_performance__:"
 function isRewriteLikeMessage(message: string) {
   const lower = message.toLowerCase()
   return (
-    /\brewrite\b/.test(lower) ||
-    /\brephrase\b/.test(lower) ||
-    /\breword\b/.test(lower) ||
+    /\brewrit\w*\b/.test(lower) ||
+    /\brephras\w*\b/.test(lower) ||
+    /\breword\w*\b/.test(lower) ||
+    /\bpolish\w*\b/.test(lower) ||
+    /\brefin\w*\b/.test(lower) ||
+    /\brefresh\w*\b/.test(lower) ||
+    /\btighten\w*\b/.test(lower) ||
+    /\bclarif\w*\b/.test(lower) ||
+    /\bclean\s*up\b/.test(lower) ||
+    /\bfreshen\s*up\b/.test(lower) ||
+    /\bredo\b.*\b(copy|text|wording|messaging)\b/.test(lower) ||
     /\bmake\b.*\b(shorter|clearer|crisper|concise)\b/.test(lower) ||
     /\bimprove\b.*\b(copy|text|wording|messaging)\b/.test(lower) ||
-    /\bchange\b.*\b(tone|copy|wording)\b/.test(lower)
+    /\bchange\b.*\b(tone|copy|wording|text|messaging)\b/.test(lower)
   )
 }
 
@@ -840,6 +1130,90 @@ function deterministicCreatePagePlan(args: { session: string; message: string })
   if (requestedSlug === "/new-page") return null
 
   return buildCreatePagePlan({ session: args.session, requestedSlug, userMessage: args.message })
+}
+
+function deterministicDuplicatePagePlan(args: { session: string; message: string; effectiveSlug: string }) {
+  const parsed = parseDuplicatePageRequest(args.message, { currentSlug: args.effectiveSlug })
+  if (!parsed?.targetSlug) return null
+
+  const sourceSlug = normalizeRouteCandidate(parsed.sourceSlug ?? args.effectiveSlug)
+  const targetSlug = normalizeRouteCandidate(parsed.targetSlug)
+  if (!sourceSlug || !targetSlug) return null
+
+  if (sourceSlug === targetSlug) {
+    return {
+      intent: "needs_clarification",
+      summary_for_user: "Source and target page are the same. Provide a different target page path.",
+      change_log: [],
+      ops: []
+    } satisfies EditPlan
+  }
+
+  const sourcePage = getPage(args.session, sourceSlug)
+  if (!sourcePage) {
+    return {
+      intent: "needs_clarification",
+      summary_for_user: `I couldn't find source page ${sourceSlug}. Select a page to duplicate first.`,
+      change_log: [],
+      ops: []
+    } satisfies EditPlan
+  }
+
+  const draft = getSessionDraft(args.session)
+  if (draft.has(targetSlug)) {
+    return {
+      intent: "needs_clarification",
+      summary_for_user: `Page ${targetSlug} already exists. Choose a different target path.`,
+      change_log: [],
+      ops: []
+    } satisfies EditPlan
+  }
+
+  return {
+    intent: "edit_plan",
+    summary_for_user: `Duplicate ${sourceSlug} into ${targetSlug}.`,
+    change_log: [`Duplicate page ${sourceSlug} into ${targetSlug} with all blocks and content.`],
+    ops: [{ op: "duplicate_page", pageSlug: sourceSlug, newPageSlug: targetSlug }]
+  } satisfies EditPlan
+}
+
+function deterministicSelectedTextRewritePlan(args: {
+  slug: string
+  message: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}) {
+  const sanitizeRewriteToPlainText = (value: string) =>
+    value
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/gi, "$1")
+      .replace(/[*_`~#>]+/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+
+  if (!isRewriteLikeMessage(args.message)) return null
+  if (inferTranslationScopeFromMessage(args.message) !== "none") return null
+  if (!args.activeBlockId) return null
+  if (typeof args.activeEditablePath !== "string" || !/^[a-zA-Z0-9_]+$/.test(args.activeEditablePath)) return null
+
+  const target = args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
+  if (!target) return null
+  const props = target.props as Record<string, unknown>
+
+  const key = args.activeEditablePath
+  const existing = props[key]
+  if (typeof existing !== "string" || existing.trim().length === 0) return null
+
+  const rewritten = sanitizeRewriteToPlainText(rewriteFromExisting(existing, args.message))
+  if (rewritten === existing) return null
+
+  const changedLabel = key.replace(/([A-Z])/g, " $1").toLowerCase()
+  return {
+    intent: "edit_plan",
+    summary_for_user: "Rewrite the selected text content to match your request.",
+    change_log: [`Rewrite selected ${changedLabel}.`],
+    ops: [{ op: "update_props", pageSlug: args.slug, blockId: target.id, patch: { [key]: rewritten } }]
+  } satisfies EditPlan
 }
 
 function shouldReturnDeterministicClarification(message: string) {
@@ -966,6 +1340,55 @@ export async function runChatPipeline(
     process.env.ANTHROPIC_API_KEY ? "anthropic" : "demo"
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
+  const pipelineStartedAtMs = Date.now()
+  let planningStartedAtMs: number | null = null
+  let planningFinishedAtMs: number | null = null
+  let firstPlanningTokenMs: number | null = null
+  let planningAttempts = 0
+  let imageResolutionDurationMs = 0
+  let applyDurationMs: number | undefined
+
+  const markPlanningStart = () => {
+    if (planningStartedAtMs === null) planningStartedAtMs = Date.now()
+  }
+
+  const markPlanningFinish = () => {
+    planningFinishedAtMs = Date.now()
+  }
+
+  const onPlanningToken = (token: string) => {
+    if (firstPlanningTokenMs === null) {
+      firstPlanningTokenMs = Date.now() - pipelineStartedAtMs
+    }
+    options?.onPlanningToken?.(token)
+  }
+
+  const emitStatus = (message: string) => {
+    options?.onStatusUpdate?.(message)
+    ctx.log.info(
+      {
+        event: "chat_pipeline_status",
+        chatRequestId,
+        session: body.session,
+        message,
+        elapsedMs: Date.now() - pipelineStartedAtMs
+      },
+      "Chat pipeline status update"
+    )
+  }
+
+  const planningDurationMs = () =>
+    planningStartedAtMs !== null && planningFinishedAtMs !== null
+      ? Math.max(0, planningFinishedAtMs - planningStartedAtMs)
+      : undefined
+  const timingFields = () => ({
+    totalDurationMs: Date.now() - pipelineStartedAtMs,
+    planningDurationMs: planningDurationMs(),
+    firstPlanningTokenMs: firstPlanningTokenMs ?? undefined,
+    applyDurationMs,
+    imageResolutionDurationMs: imageResolutionDurationMs > 0 ? imageResolutionDurationMs : undefined,
+    planningAttempts: planningAttempts > 0 ? planningAttempts : undefined
+  })
   const withDebugPayload = (
     payload: ChatResult,
     extra?: Partial<NonNullable<ChatResult["debug"]>>
@@ -1026,6 +1449,8 @@ export async function runChatPipeline(
     return { code: advice.code, payload: withDebugPayload(advice.payload, { outcome: "advice" }) }
   }
 
+  emitStatus("Analyzing your request...")
+
   const contextPack = plannerContextPack({
     session: body.session,
     slug: effectiveSlug,
@@ -1053,7 +1478,8 @@ export async function runChatPipeline(
       promptLength: plannerMessage.length,
       outcome: "guardrail_failure",
       reason: args.reason.slice(0, 300),
-      reasonCategory: category
+      reasonCategory: category,
+      ...timingFields()
     })
     if (category === "ambiguity") {
       const selected =
@@ -1126,13 +1552,20 @@ export async function runChatPipeline(
       intent: plan.intent,
       opCount: plan.ops.length,
       opTypes: plan.ops.map((op) => op.op),
-      ...usageFields
+      ...usageFields,
+      ...timingFields()
     })
     let resolvedPlan = plan
     let detectedImageOps: PendingImageGeneration[] = []
     let effectiveApplyMode = applyMode
     if (!optionsOverride?.preResolvedPlan) {
       resolvedPlan = normalizePlanCopyForUi(plan, current)
+      resolvedPlan = rewriteAddBlockToChildImageUpdate({
+        plan: resolvedPlan,
+        message: plannerMessage,
+        currentPage: current,
+        slug: effectiveSlug
+      })
 
       // Detect image ops synchronously before making any API calls
       detectedImageOps = detectImageOps({
@@ -1151,15 +1584,25 @@ export async function runChatPipeline(
         // Strip placeholder imageUrl values from ops so preview shows current image
         for (const op of resolvedPlan.ops) {
           if (op.op !== "update_props") continue
-          const imgOp = detectedImageOps.find((io) => io.blockId === op.blockId && io.pageSlug === op.pageSlug)
-          if (!imgOp) continue
+          const imgOps = detectedImageOps.filter((io) => io.blockId === op.blockId && io.pageSlug === op.pageSlug)
+          if (imgOps.length === 0) continue
           const rawPatch = op.patch as Record<string, unknown>
           const patchCandidate =
             rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
               ? (rawPatch.props as Record<string, unknown>)
               : rawPatch
-          delete patchCandidate.imageUrl
-          delete patchCandidate.imageAlt
+          for (const imgOp of imgOps) {
+            if (typeof imgOp.path === "string" && imgOp.path.length > 0) {
+              deleteValueAtPath(patchCandidate, imgOp.path)
+            } else {
+              delete patchCandidate.imageUrl
+            }
+            if (typeof imgOp.altPath === "string" && imgOp.altPath.length > 0) {
+              deleteValueAtPath(patchCandidate, imgOp.altPath)
+            } else {
+              delete patchCandidate.imageAlt
+            }
+          }
         }
 
         // Annotate change_log with deferred image generation info
@@ -1174,6 +1617,8 @@ export async function runChatPipeline(
         }
       } else {
         // No image ops detected — run withUnsplashHeroImage as before (will be a no-op)
+        const imageResolutionStartMs = Date.now()
+        emitStatus("Resolving image assets...")
         resolvedPlan = await withUnsplashHeroImage({
           plan: resolvedPlan,
           message: plannerMessage,
@@ -1185,6 +1630,7 @@ export async function runChatPipeline(
           log: ctx.log,
           onStatusUpdate: options?.onStatusUpdate
         })
+        imageResolutionDurationMs += Date.now() - imageResolutionStartMs
       }
 
       if (resolvedPlan.intent === "needs_clarification" && planningActiveBlockId) {
@@ -1226,7 +1672,8 @@ export async function runChatPipeline(
         outcome: "needs_clarification",
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
-        opTypes: resolvedPlan.ops.map((op) => op.op)
+        opTypes: resolvedPlan.ops.map((op) => op.op),
+        ...timingFields()
       })
       if (body.message) pushChatHistory(body.session!, body.message, resolvedPlan.summary_for_user)
       const selected =
@@ -1290,7 +1737,8 @@ export async function runChatPipeline(
         outcome: "plan_ready_for_approval",
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
-        opTypes: resolvedPlan.ops.map((op) => op.op)
+        opTypes: resolvedPlan.ops.map((op) => op.op),
+        ...timingFields()
       })
       return {
         done: true as const,
@@ -1344,7 +1792,8 @@ export async function runChatPipeline(
         outcome: "no_effective_change",
         intent: resolvedPlan.intent,
         opCount: 0,
-        opTypes: []
+        opTypes: [],
+        ...timingFields()
       })
       return {
         done: true as const,
@@ -1364,7 +1813,10 @@ export async function runChatPipeline(
       }
     }
 
+    let applyStartedAtMs: number | null = null
     try {
+      emitStatus("Applying planned changes...")
+      applyStartedAtMs = Date.now()
       const hasPageStructuralOps = resolvedPlan.ops.some(
         (op) => op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
       )
@@ -1448,6 +1900,7 @@ export async function runChatPipeline(
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
       const metaChangeLogEntries = buildMetaChangeLogEntries(resolvedPlan.ops)
+      applyDurationMs = applyStartedAtMs !== null ? Date.now() - applyStartedAtMs : undefined
       ctx.chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
@@ -1465,7 +1918,8 @@ export async function runChatPipeline(
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
         opTypes: resolvedPlan.ops.map((op) => op.op),
-        ...usageFields
+        ...usageFields,
+        ...timingFields()
       })
       return {
         done: true as const,
@@ -1493,6 +1947,9 @@ export async function runChatPipeline(
         }
       }
     } catch (error) {
+      if (applyDurationMs === undefined && applyStartedAtMs !== null) {
+        applyDurationMs = Date.now() - applyStartedAtMs
+      }
       const reason = toErrorDetail(error)
       if (isNoEffectiveChangeError(reason)) {
         pendingApprovalPlanBySession.delete(body.session!)
@@ -1510,7 +1967,8 @@ export async function runChatPipeline(
           promptExcerpt,
           promptLength: plannerMessage.length,
           outcome: "no_effective_change",
-          reason: reason.slice(0, 300)
+          reason: reason.slice(0, 300),
+          ...timingFields()
         })
         return {
           done: true as const,
@@ -1544,7 +2002,8 @@ export async function runChatPipeline(
         promptLength: plannerMessage.length,
         outcome: "apply_failed",
         reason: reason.slice(0, 300),
-        reasonCategory: classifyGuardrailError(reason)
+        reasonCategory: classifyGuardrailError(reason),
+        ...timingFields()
       })
       return { done: false as const, reason }
     }
@@ -1589,6 +2048,8 @@ export async function runChatPipeline(
     let approvalPlan = pending.plan
     try {
       if (pending.pendingImageOps && pending.pendingImageOps.length > 0) {
+        const imageResolutionStartMs = Date.now()
+        emitStatus("Resolving image assets...")
         const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
         const planClone = structuredClone(approvalPlan)
 
@@ -1605,7 +2066,11 @@ export async function runChatPipeline(
             rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
               ? (rawPatch.props as Record<string, unknown>)
               : rawPatch
-          if (!Object.prototype.hasOwnProperty.call(patchTarget, "imageUrl")) {
+          if (typeof imgOp.path === "string" && imgOp.path.length > 0) {
+            if (getValueAtPath(patchTarget, imgOp.path) === undefined) {
+              setValueAtPath(patchTarget, imgOp.path, "pending")
+            }
+          } else if (!Object.prototype.hasOwnProperty.call(patchTarget, "imageUrl")) {
             patchTarget.imageUrl = "pending"
           }
         }
@@ -1615,12 +2080,14 @@ export async function runChatPipeline(
           message: imageMessage,
           slug: pending.effectiveSlug,
           currentPage: current,
+          preferredImageOps: pending.pendingImageOps,
           activeBlockId: body.activeBlockId,
           activeEditablePath: body.activeEditablePath,
           chatRequestId,
           log: ctx.log,
           onStatusUpdate: options?.onStatusUpdate
         })
+        imageResolutionDurationMs += Date.now() - imageResolutionStartMs
       }
       const approvedOutcome = await respondFromPlan(approvalPlan, pending.source, "apply_now", { preResolvedPlan: true })
       if (approvedOutcome.done) return approvedOutcome.response
@@ -1629,6 +2096,24 @@ export async function runChatPipeline(
       const reason = toErrorDetail(error)
       ctx.log.error({ event: "apply_pending_plan_error", chatRequestId, error: reason }, "Pending plan execution failed")
       pendingApprovalPlanBySession.delete(body.session!)
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: pending.source,
+        modelKey: pending.modelKey,
+        modelUsed: pending.modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "apply_pending_plan_error",
+        reason: reason.slice(0, 300),
+        reasonCategory: classifyGuardrailError(reason),
+        ...timingFields()
+      })
       return {
         code: 500,
         payload: withDebugPayload({
@@ -1646,8 +2131,69 @@ export async function runChatPipeline(
 
   const applyMode = executionMode === "plan_only" ? "plan_only" : "apply_now"
 
+  markPlanningStart()
+  emitStatus("Planning edits...")
+  const forcedDuplicatePlan = deterministicDuplicatePagePlan({ session: body.session, message: plannerMessage, effectiveSlug })
+  if (forcedDuplicatePlan) {
+    markPlanningFinish()
+    ctx.chatTelemetry.push({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "forced_plan",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "forced_duplicate_page",
+      intent: forcedDuplicatePlan.intent,
+      opCount: forcedDuplicatePlan.ops.length,
+      opTypes: forcedDuplicatePlan.ops.map((op) => op.op),
+      ...timingFields()
+    })
+    const forcedOutcome = await respondFromPlan(forcedDuplicatePlan, plannerSource, applyMode)
+    if (forcedOutcome.done) return forcedOutcome.response
+  }
+
+  const forcedSelectedRewritePlan = deterministicSelectedTextRewritePlan({
+    slug: effectiveSlug,
+    message: plannerMessage,
+    currentPage: current,
+    activeBlockId: planningActiveBlockId,
+    activeEditablePath: planningActiveEditablePath
+  })
+  if (forcedSelectedRewritePlan) {
+    markPlanningFinish()
+    ctx.chatTelemetry.push({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "forced_plan",
+      session: body.session,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      outcome: "forced_rewrite_selected_text",
+      intent: forcedSelectedRewritePlan.intent,
+      opCount: forcedSelectedRewritePlan.ops.length,
+      opTypes: forcedSelectedRewritePlan.ops.map((op) => op.op),
+      ...timingFields()
+    })
+    const forcedOutcome = await respondFromPlan(forcedSelectedRewritePlan, plannerSource, applyMode)
+    if (forcedOutcome.done) return forcedOutcome.response
+  }
+
   const forcedCreatePlan = deterministicCreatePagePlan({ session: body.session, message: plannerMessage })
   if (forcedCreatePlan) {
+    markPlanningFinish()
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -1664,19 +2210,24 @@ export async function runChatPipeline(
       outcome: "forced_create_page",
       intent: forcedCreatePlan.intent,
       opCount: forcedCreatePlan.ops.length,
-      opTypes: forcedCreatePlan.ops.map((op) => op.op)
+      opTypes: forcedCreatePlan.ops.map((op) => op.op),
+      ...timingFields()
     })
     const forcedOutcome = await respondFromPlan(forcedCreatePlan, plannerSource, applyMode)
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
   if (plannerSource === "demo") {
+    markPlanningStart()
     try {
+      emitStatus("Planning edits...")
       const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, planningActiveBlockId, body.activeBlockType)
+      markPlanningFinish()
       const outcome = await respondFromPlan(demoPlan, "demo", applyMode)
       if (outcome.done) return outcome.response
       return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
     } catch (error) {
+      markPlanningFinish()
       const reason = toErrorDetail(error)
       ctx.chatTelemetry.push({
         id: chatRequestId,
@@ -1693,7 +2244,8 @@ export async function runChatPipeline(
         promptLength: plannerMessage.length,
         outcome: "planner_exception",
         reason: reason.slice(0, 300),
-        reasonCategory: classifyGuardrailError(reason)
+        reasonCategory: classifyGuardrailError(reason),
+        ...timingFields()
       })
       return {
         code: 500,
@@ -1718,6 +2270,7 @@ export async function runChatPipeline(
   })
 
   if (deterministicIntent) {
+    emitStatus("Planning edits...")
     const deterministicPlan = compileDeterministicPlan({
       session: body.session,
       intent: deterministicIntent,
@@ -1729,6 +2282,7 @@ export async function runChatPipeline(
     })
 
     if (deterministicPlan?.intent === "edit_plan" && deterministicPlan.ops.length > 0) {
+      markPlanningFinish()
       ctx.chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
@@ -1755,6 +2309,7 @@ export async function runChatPipeline(
       deterministicPlan?.intent === "needs_clarification" &&
       shouldReturnDeterministicClarification(plannerMessage)
     ) {
+      markPlanningFinish()
       const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode)
       if (deterministicOutcome.done) return deterministicOutcome.response
     }
@@ -1764,9 +2319,12 @@ export async function runChatPipeline(
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
   const planningErrors: string[] = []
+  markPlanningStart()
 
   for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
+    planningAttempts = attempt
     try {
+      emitStatus(attempt === 1 ? "Planning edits..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
       const result = await generatePlanImpl({
         message: plannerMessage,
         slug: effectiveSlug,
@@ -1774,10 +2332,11 @@ export async function runChatPipeline(
         contextPack,
         model: modelUsed,
         history: sessionChatHistory,
-        onToken: options?.onPlanningToken
+        onToken: onPlanningToken
       })
       initialPlan = result.plan
       planUsage = result.usage
+      markPlanningFinish()
       break
     } catch (error) {
       const reason = toErrorDetail(error)
@@ -1796,10 +2355,12 @@ export async function runChatPipeline(
         promptLength: plannerMessage.length,
         outcome: `attempt_${attempt}_failed`,
         reason: reason.slice(0, 300),
-        reasonCategory: classifyGuardrailError(reason)
+        reasonCategory: classifyGuardrailError(reason),
+        ...timingFields()
       })
       planningErrors.push(`Attempt ${attempt} planning failed: ${reason}`)
       if (attempt === maxPlanningAttempts) {
+        markPlanningFinish()
         ctx.chatTelemetry.push({
           id: chatRequestId,
           at: new Date().toISOString(),
@@ -1815,7 +2376,8 @@ export async function runChatPipeline(
           promptLength: plannerMessage.length,
           outcome: "planning_exhausted",
           reason: reason.slice(0, 300),
-          reasonCategory: classifyGuardrailError(reason)
+          reasonCategory: classifyGuardrailError(reason),
+          ...timingFields()
         })
         return {
           code: 500,
@@ -1835,6 +2397,7 @@ export async function runChatPipeline(
   }
 
   if (!initialPlan) {
+    markPlanningFinish()
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -1848,7 +2411,8 @@ export async function runChatPipeline(
       promptHash,
       promptExcerpt,
       promptLength: plannerMessage.length,
-      outcome: "planning_missing"
+      outcome: "planning_missing",
+      ...timingFields()
     })
     return {
       code: 500,
@@ -1874,6 +2438,7 @@ export async function runChatPipeline(
 
   let repairedPlan: EditPlan
   try {
+    emitStatus("Repairing plan and retrying...")
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -1889,8 +2454,10 @@ export async function runChatPipeline(
       promptLength: plannerMessage.length,
       outcome: "repair_started",
       reason: initialOutcome.reason.slice(0, 300),
-      reasonCategory: classifyGuardrailError(initialOutcome.reason)
+      reasonCategory: classifyGuardrailError(initialOutcome.reason),
+      ...timingFields()
     })
+    planningAttempts += 1
     const repairResult = await generatePlanImpl({
       message: plannerMessage,
       slug: effectiveSlug,
@@ -1899,10 +2466,11 @@ export async function runChatPipeline(
       model: modelUsed,
       history: sessionChatHistory,
       feedback: buildDeterministicRepairFeedback(initialOutcome.reason),
-      onToken: options?.onPlanningToken
+      onToken: onPlanningToken
     })
     repairedPlan = repairResult.plan
     planUsage = repairResult.usage
+    markPlanningFinish()
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -1919,9 +2487,11 @@ export async function runChatPipeline(
       outcome: "repair_plan_generated",
       intent: repairedPlan.intent,
       opCount: repairedPlan.ops.length,
-      opTypes: repairedPlan.ops.map((op) => op.op)
+      opTypes: repairedPlan.ops.map((op) => op.op),
+      ...timingFields()
     })
   } catch (error) {
+    markPlanningFinish()
     const reason = toErrorDetail(error)
     ctx.chatTelemetry.push({
       id: chatRequestId,
@@ -1938,7 +2508,8 @@ export async function runChatPipeline(
       promptLength: plannerMessage.length,
       outcome: "repair_failed",
       reason: reason.slice(0, 300),
-      reasonCategory: classifyGuardrailError(reason)
+      reasonCategory: classifyGuardrailError(reason),
+      ...timingFields()
     })
     return {
       code: 400,
