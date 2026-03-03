@@ -6,6 +6,7 @@ import { resolve } from "node:path"
 export type ChatTelemetryPhase =
   | "received"
   | "forced_plan"
+  | "deterministic_plan_generated"
   | "plan_attempt_failed"
   | "plan_generated"
   | "plan_apply_failed"

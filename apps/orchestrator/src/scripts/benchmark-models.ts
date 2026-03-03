@@ -3,9 +3,13 @@ import { existsSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import OpenAI from "openai"
+import Anthropic from "@anthropic-ai/sdk"
 
-type EndpointMode = "auto" | "chat" | "responses"
+type EndpointMode = "auto" | "chat" | "responses" | "messages"
+type ProviderMode = "auto" | "openai" | "anthropic"
+type Provider = "openai" | "anthropic"
 type EvalMode = "text" | "ops-json"
+type OpsCardinality = "single" | "multi"
 type PromptCase = {
   id: string
   prompt: string
@@ -23,6 +27,7 @@ type RunResult = {
   promptId: string
   run: number
   endpoint: Exclude<EndpointMode, "auto">
+  provider: Provider
   latencyMs: number
   usage: Usage
   estimatedUsd: number | null
@@ -263,21 +268,24 @@ function extractChatText(source: unknown): string {
   return parts.join("\n")
 }
 
-function buildOpsJsonEvalUserPrompt(prompt: string) {
+function buildOpsJsonEvalUserPrompt(prompt: string, cardinality: OpsCardinality) {
+  const cardinalityInstruction =
+    cardinality === "single"
+      ? "Return exactly ONE op in the array. Choose the most specific primary command."
+      : "Return ONE OR MORE ops in the array when the request clearly includes multiple actions."
   return [
-    "Task: infer the single PRIMARY website-editor operation command for this request.",
+    "Task: infer website-editor operation command(s) for this request.",
     "Allowed commands only:",
     "create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page.",
     "Return strict JSON only in this exact shape: {\"ops\":[{\"op\":\"...\"}]}",
-    "Return exactly ONE op in the array.",
-    "Choose the most specific command and do not include secondary/follow-up commands.",
+    cardinalityInstruction,
     "Use only allowed command names.",
     "User request:",
     prompt
   ].join("\n")
 }
 
-function parseOpsFromJsonOutput(text: string): CanonicalOp[] {
+function parseOpsFromJsonOutput(text: string, cardinality: OpsCardinality): CanonicalOp[] {
   if (!text.trim()) return []
   let parsed: unknown
   try {
@@ -308,7 +316,8 @@ function parseOpsFromJsonOutput(text: string): CanonicalOp[] {
     const op = normalizeOp((item as { op?: unknown }).op)
     if (op) ops.push(op)
   }
-  return Array.from(new Set(ops)).slice(0, 1)
+  const unique = Array.from(new Set(ops))
+  return cardinality === "single" ? unique.slice(0, 1) : unique
 }
 
 function detectOpsFromText(text: string): CanonicalOp[] {
@@ -428,10 +437,67 @@ function parsePrompts(raw: string): PromptCase[] {
   return items
 }
 
-function chooseEndpoint(model: string, mode: EndpointMode): Exclude<EndpointMode, "auto"> {
+function expandPromptCases(baseCases: PromptCase[], variants: number): PromptCase[] {
+  if (variants <= 1) return baseCases
+  const templates = [
+    (prompt: string) => `Please apply this request: ${prompt}`,
+    (prompt: string) => `Editor task: ${prompt}`,
+    (prompt: string) => `${prompt}\n\nKeep the operation precise and minimal.`,
+    (prompt: string) => `Can you do this website update?\n${prompt}`,
+    (prompt: string) => `Need this implemented now: ${prompt}`
+  ]
+
+  const out: PromptCase[] = []
+  for (const item of baseCases) {
+    out.push(item)
+    for (let i = 1; i < variants; i += 1) {
+      const template = templates[(i - 1) % templates.length]
+      const id = `${item.id}__v${i + 1}`
+      out.push({
+        id,
+        prompt: template(item.prompt),
+        expectedOps: item.expectedOps
+      })
+    }
+  }
+  return out
+}
+
+function chooseProvider(model: string, mode: ProviderMode): Provider {
+  if (mode === "openai") return "openai"
+  if (mode === "anthropic") return "anthropic"
+  return model.toLowerCase().startsWith("claude") ? "anthropic" : "openai"
+}
+
+function chooseEndpoint(model: string, mode: EndpointMode, provider: Provider): Exclude<EndpointMode, "auto"> {
+  if (provider === "anthropic") return "messages"
   if (mode === "chat" || mode === "responses") return mode
   if (model.toLowerCase().includes("codex")) return "responses"
   return "chat"
+}
+
+function extractAnthropicText(source: unknown): string {
+  const content = (source as { content?: unknown } | null)?.content
+  if (!Array.isArray(content)) return ""
+  const parts: string[] = []
+  for (const block of content as Array<{ type?: unknown; text?: unknown }>) {
+    if (!block || typeof block !== "object") continue
+    if (block.type !== "text") continue
+    if (typeof block.text === "string" && block.text.trim().length > 0) parts.push(block.text)
+  }
+  return parts.join("\n")
+}
+
+function extractAnthropicUsage(source: unknown): Usage {
+  const usage = (source as { usage?: unknown } | null)?.usage as Record<string, unknown> | undefined
+  if (!usage) return { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  const inputTokens = typeof usage.input_tokens === "number" ? usage.input_tokens : 0
+  const outputTokens = typeof usage.output_tokens === "number" ? usage.output_tokens : 0
+  return {
+    inputTokens: Math.max(0, inputTokens),
+    outputTokens: Math.max(0, outputTokens),
+    totalTokens: Math.max(0, inputTokens + outputTokens)
+  }
 }
 
 function extractUsage(source: unknown): Usage {
@@ -594,7 +660,10 @@ Options:
   --models "gpt-4o-mini,gpt-4o,gpt-5.2,gpt-5.2-codex"
   --runs 3
   --endpoint auto|chat|responses
+  --provider auto|openai|anthropic
   --eval-mode text|ops-json
+  --ops-cardinality single|multi
+  --variants 1
   --max-output-tokens 400
   --weight-reliability 0.4
   --weight-latency 0.35
@@ -608,10 +677,6 @@ Prompts file format:
     return
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not set. Add it to your environment or .env file.")
-  }
-
   const modelArg = args.get("model")?.trim()
   const modelsArg = args.get("models")
   const rawModels = modelArg && modelArg.length > 0 ? modelArg : (modelsArg ?? DEFAULT_MODELS.join(","))
@@ -622,13 +687,24 @@ Prompts file format:
   if (models.length === 0) throw new Error("No models provided")
 
   const runs = toInt(args.get("runs"), 3)
+  const variants = toInt(args.get("variants"), 1)
   const maxOutputTokens = toInt(args.get("max-output-tokens"), 400)
   const evalMode = toEvalMode(args.get("eval-mode"))
+  const opsCardinalityRaw = (args.get("ops-cardinality") ?? "single").trim().toLowerCase()
+  const opsCardinality: OpsCardinality = opsCardinalityRaw === "multi" ? "multi" : "single"
+  const providerModeRaw = (args.get("provider") ?? "auto").trim().toLowerCase()
+  const providerMode: ProviderMode =
+    providerModeRaw === "openai" || providerModeRaw === "anthropic" || providerModeRaw === "auto"
+      ? providerModeRaw
+      : "auto"
   const endpointModeRaw = (args.get("endpoint") ?? "auto").trim()
   const endpointMode: EndpointMode =
-    endpointModeRaw === "chat" || endpointModeRaw === "responses" || endpointModeRaw === "auto" ? endpointModeRaw : "auto"
+    endpointModeRaw === "chat" || endpointModeRaw === "responses" || endpointModeRaw === "messages" || endpointModeRaw === "auto"
+      ? endpointModeRaw
+      : "auto"
   const promptsFile = args.get("prompts")
-  const prompts = promptsFile ? parsePrompts(await readFile(resolve(process.cwd(), promptsFile), "utf8")) : DEFAULT_PROMPTS
+  const basePrompts = promptsFile ? parsePrompts(await readFile(resolve(process.cwd(), promptsFile), "utf8")) : DEFAULT_PROMPTS
+  const prompts = expandPromptCases(basePrompts, variants)
   const outPath = args.get("out") ? resolve(process.cwd(), args.get("out") as string) : null
   const rawWeights = {
     reliability: Number.parseFloat(args.get("weight-reliability") ?? "0.4"),
@@ -650,44 +726,89 @@ Prompts file format:
         }
       : { reliability: 0.4, latency: 0.35, cost: 0.25 }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const needsOpenAI = models.some((model) => chooseProvider(model, providerMode) === "openai")
+  const needsAnthropic = models.some((model) => chooseProvider(model, providerMode) === "anthropic")
+  if (needsOpenAI && !process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not set. Add it to your environment or .env file.")
+  }
+  if (needsAnthropic && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY is not set. Add it to your environment or .env file.")
+  }
+
+  const openaiClient = needsOpenAI ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null
+  const anthropicClient = needsAnthropic ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null
   const startedAt = new Date().toISOString()
   const results: RunResult[] = []
   const totalRuns = models.length * prompts.length * runs
   let completed = 0
 
   for (const model of models) {
-    const endpoint = chooseEndpoint(model, endpointMode)
+    const provider = chooseProvider(model, providerMode)
+    const endpoint = chooseEndpoint(model, endpointMode, provider)
     for (const promptCase of prompts) {
       for (let runIndex = 0; runIndex < runs; runIndex += 1) {
         const label = `${model} | ${promptCase.id} | run ${runIndex + 1}/${runs}`
         const begin = Date.now()
         try {
-          if (endpoint === "responses") {
+          if (endpoint === "messages") {
+            if (!anthropicClient) throw new Error("Anthropic client is not configured.")
+            const system =
+              evalMode === "ops-json"
+                ? "You classify website editor requests into operation command(s). Output strict JSON only: {\"ops\":[{\"op\":\"...\"}]}"
+                : "You are a concise assistant."
+            const user = evalMode === "ops-json" ? buildOpsJsonEvalUserPrompt(promptCase.prompt, opsCardinality) : promptCase.prompt
+            const response = await anthropicClient.messages.create({
+              model,
+              max_tokens: maxOutputTokens,
+              system,
+              messages: [{ role: "user", content: user }]
+            })
+            const usage = extractAnthropicUsage(response)
+            const outputText = extractAnthropicText(response)
+            const predictedOps = evalMode === "ops-json" ? parseOpsFromJsonOutput(outputText, opsCardinality) : undefined
+            results.push({
+              model,
+              promptId: promptCase.id,
+              run: runIndex + 1,
+              endpoint,
+              provider,
+              latencyMs: Date.now() - begin,
+              usage,
+              estimatedUsd: estimateUsd(model, usage),
+              outputTextPreview: outputText.slice(0, 500),
+              commandEval:
+                evalMode === "ops-json"
+                  ? evaluateCommandMatchFromPredicted(promptCase.expectedOps, predictedOps ?? [])
+                  : evaluateCommandMatch(promptCase.expectedOps, outputText),
+              evalMode
+            })
+          } else if (endpoint === "responses") {
+            if (!openaiClient) throw new Error("OpenAI client is not configured.")
             const input =
               evalMode === "ops-json"
                 ? [
                     {
                       role: "system" as const,
                       content:
-                        "You classify website editor requests into exactly one primary operation command. Output strict JSON only: {\"ops\":[{\"op\":\"...\"}]}"
+                        "You classify website editor requests into operation command(s). Output strict JSON only: {\"ops\":[{\"op\":\"...\"}]}"
                     },
-                    { role: "user" as const, content: buildOpsJsonEvalUserPrompt(promptCase.prompt) }
+                    { role: "user" as const, content: buildOpsJsonEvalUserPrompt(promptCase.prompt, opsCardinality) }
                   ]
                 : promptCase.prompt
-            const response = await client.responses.create({
+            const response = await openaiClient.responses.create({
               model,
               input,
               max_output_tokens: maxOutputTokens
             })
             const usage = extractUsage(response)
             const outputText = extractResponsesText(response)
-            const predictedOps = evalMode === "ops-json" ? parseOpsFromJsonOutput(outputText) : undefined
+            const predictedOps = evalMode === "ops-json" ? parseOpsFromJsonOutput(outputText, opsCardinality) : undefined
             results.push({
               model,
               promptId: promptCase.id,
               run: runIndex + 1,
               endpoint,
+              provider,
               latencyMs: Date.now() - begin,
               usage,
               estimatedUsd: estimateUsd(model, usage),
@@ -699,15 +820,16 @@ Prompts file format:
               evalMode
             })
           } else {
+            if (!openaiClient) throw new Error("OpenAI client is not configured.")
             const messages =
               evalMode === "ops-json"
                 ? [
                     {
                       role: "system",
                       content:
-                        "You classify website editor requests into exactly one primary operation command. Output strict JSON only: {\"ops\":[{\"op\":\"...\"}]}"
+                        "You classify website editor requests into operation command(s). Output strict JSON only: {\"ops\":[{\"op\":\"...\"}]}"
                     },
-                    { role: "user", content: buildOpsJsonEvalUserPrompt(promptCase.prompt) }
+                    { role: "user", content: buildOpsJsonEvalUserPrompt(promptCase.prompt, opsCardinality) }
                   ]
                 : [{ role: "user", content: promptCase.prompt }]
             const options: Record<string, unknown> = {
@@ -722,15 +844,16 @@ Prompts file format:
             // gpt-5 family rejects temperature=0 in chat.completions.
             if (!model.startsWith("gpt-5")) options.temperature = 0
 
-            const completion = await client.chat.completions.create(options as never)
+            const completion = await openaiClient.chat.completions.create(options as never)
             const usage = extractUsage(completion)
             const outputText = extractChatText(completion)
-            const predictedOps = evalMode === "ops-json" ? parseOpsFromJsonOutput(outputText) : undefined
+            const predictedOps = evalMode === "ops-json" ? parseOpsFromJsonOutput(outputText, opsCardinality) : undefined
             results.push({
               model,
               promptId: promptCase.id,
               run: runIndex + 1,
               endpoint,
+              provider,
               latencyMs: Date.now() - begin,
               usage,
               estimatedUsd: estimateUsd(model, usage),
@@ -752,6 +875,7 @@ Prompts file format:
             promptId: promptCase.id,
             run: runIndex + 1,
             endpoint,
+            provider,
             latencyMs: Date.now() - begin,
             usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
             estimatedUsd: null,
@@ -866,6 +990,7 @@ Prompts file format:
       runs,
       endpointMode,
       evalMode,
+      opsCardinality,
       maxOutputTokens,
       scoringWeights: weights,
       prompts: prompts.map((item) => ({ id: item.id, prompt: item.prompt, expectedOps: item.expectedOps ?? [] }))

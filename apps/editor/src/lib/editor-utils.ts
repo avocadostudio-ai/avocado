@@ -61,6 +61,10 @@ export function defaultSiteList(siteId: string): SiteConfig[] {
       name: siteNameFromId(resolvedId) || "Site",
       purpose: "",
       hosting: DEFAULT_SITE_HOSTING,
+      vercelProjectId: "",
+      vercelTeamId: "",
+      vercelProductionUrl: "",
+      vercelDeployHookUrl: "",
       tone: "",
       constraints: []
     }
@@ -75,7 +79,18 @@ export function loadSiteListFromStorage(siteId: string) {
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return defaultSiteList(siteId)
     const cleaned = parsed
-      .filter((site): site is { id: string; name: string; purpose?: string; hosting?: string; tone?: string; constraints?: unknown } => {
+      .filter((site): site is {
+        id: string
+        name: string
+        purpose?: string
+        hosting?: string
+        vercelProjectId?: string
+        vercelTeamId?: string
+        vercelProductionUrl?: string
+        vercelDeployHookUrl?: string
+        tone?: string
+        constraints?: unknown
+      } => {
         return Boolean(
           site &&
             typeof site === "object" &&
@@ -88,6 +103,10 @@ export function loadSiteListFromStorage(siteId: string) {
         name: site.name.trim(),
         purpose: typeof site.purpose === "string" ? site.purpose.trim() : "",
         hosting: typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING,
+        vercelProjectId: typeof site.vercelProjectId === "string" ? site.vercelProjectId.trim() : "",
+        vercelTeamId: typeof site.vercelTeamId === "string" ? site.vercelTeamId.trim() : "",
+        vercelProductionUrl: typeof site.vercelProductionUrl === "string" ? site.vercelProductionUrl.trim() : "",
+        vercelDeployHookUrl: typeof site.vercelDeployHookUrl === "string" ? site.vercelDeployHookUrl.trim() : "",
         tone: typeof site.tone === "string" ? site.tone.trim() : "",
         constraints: Array.isArray(site.constraints)
           ? site.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)

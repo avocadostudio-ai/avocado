@@ -1,8 +1,23 @@
+import { useState } from "react"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
 import { DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID, siteOrigin } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
+function compactPurposeText(value: string) {
+  const normalized = value
+    .replace(/\s+/g, " ")
+    .replace(/\s*-\s*/g, " ")
+    .trim()
+  if (!normalized) return ""
+  const firstSentence = normalized.match(/^(.{1,220}?[.!?])(?:\s|$)/)?.[1] ?? normalized
+  if (firstSentence.length <= 220) return firstSentence
+  return `${firstSentence.slice(0, 217).trimEnd()}...`
+}
+
 export function SitesPage({ sites, session }: { sites: UseSiteListReturn; session: string }) {
+  const [addAiTab, setAddAiTab] = useState<"overview" | "tone" | "constraints">("overview")
+  const [configAiTab, setConfigAiTab] = useState<"overview" | "tone" | "constraints">("overview")
+
   const dedupedSites = sites.siteList
     .filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
     .sort((a, b) => {
@@ -28,6 +43,11 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               sites.setNewSiteTone("")
               sites.setNewSiteConstraints("")
               sites.setNewSiteHosting(DEFAULT_SITE_HOSTING)
+              sites.setNewSiteVercelProjectId("")
+              sites.setNewSiteVercelTeamId("")
+              sites.setNewSiteVercelProductionUrl("")
+              sites.setNewSiteVercelDeployHookUrl("")
+              setAddAiTab("overview")
               sites.setShowSiteModal(true)
             }}
           >
@@ -48,7 +68,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc.toString()} />
               <div className="site-tile-meta">
                 <h2>{site.name}</h2>
-                {site.purpose ? <p className="site-purpose">{site.purpose}</p> : null}
+                {site.purpose ? <p className="site-purpose">{compactPurposeText(site.purpose)}</p> : null}
                 <div className="site-tile-actions">
                   <button type="button" className="secondary-btn site-config-btn" onClick={() => sites.setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`}>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -94,43 +114,103 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     onChange={(event) => sites.setNewSiteName(event.target.value)}
                   />
                 </label>
-                <label className="sites-form-field">
-                  <span>Hosting</span>
-                  <input
-                    type="text"
-                    value={sites.newSiteHosting}
-                    placeholder="Vercel production site (single shared project)"
-                    onChange={(event) => sites.setNewSiteHosting(event.target.value)}
-                  />
-                </label>
-                <p className="sites-form-section-title">AI guidance</p>
-                <label className="sites-form-field sites-form-field-wide">
-                  <span>Site purpose</span>
-                  <textarea
-                    value={sites.newSitePurpose}
-                    placeholder="Describe business goals, audiences, and conversion intent."
-                    onChange={(event) => sites.setNewSitePurpose(event.target.value)}
-                    rows={5}
-                  />
-                </label>
-                <label className="sites-form-field sites-form-field-wide">
-                  <span>Preferred tone</span>
-                  <textarea
-                    value={sites.newSiteTone}
-                    placeholder="Bold, dynamic, motivating. Short paragraphs. Strong verbs."
-                    onChange={(event) => sites.setNewSiteTone(event.target.value)}
-                    rows={3}
-                  />
-                </label>
-                <label className="sites-form-field sites-form-field-wide">
-                  <span>AI constraints</span>
-                  <textarea
-                    value={sites.newSiteConstraints}
-                    placeholder={"Use active voice.\nAvoid generic phrases.\nAlways include a clear CTA suggestion."}
-                    onChange={(event) => sites.setNewSiteConstraints(event.target.value)}
-                    rows={5}
-                  />
-                </label>
+                <p className="sites-form-section-title">Editorial brief</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                    <button type="button" className={addAiTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setAddAiTab("overview")}>
+                      Overview
+                    </button>
+                    <button type="button" className={addAiTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setAddAiTab("tone")}>
+                      Tone
+                    </button>
+                    <button type="button" className={addAiTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setAddAiTab("constraints")}>
+                      Constraints
+                    </button>
+                  </div>
+                  {addAiTab === "overview" ? (
+                    <label className="sites-form-field">
+                      <span>Overview</span>
+                      <textarea
+                        value={sites.newSitePurpose}
+                        placeholder="What this site is for."
+                        onChange={(event) => sites.setNewSitePurpose(event.target.value)}
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                  {addAiTab === "tone" ? (
+                    <label className="sites-form-field">
+                      <span>Preferred tone</span>
+                      <textarea
+                        value={sites.newSiteTone}
+                        placeholder="How the writing should sound."
+                        onChange={(event) => sites.setNewSiteTone(event.target.value)}
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                  {addAiTab === "constraints" ? (
+                    <label className="sites-form-field">
+                      <span>Writing constraints</span>
+                      <textarea
+                        value={sites.newSiteConstraints}
+                        placeholder={"Rules for content output.\nOne per line."}
+                        onChange={(event) => sites.setNewSiteConstraints(event.target.value)}
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                <p className="sites-form-section-title">Settings</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-settings-grid">
+                    <label className="sites-form-field">
+                      <span>Hosting</span>
+                      <input
+                        type="text"
+                        value={sites.newSiteHosting}
+                        placeholder="Vercel production site (single shared project)"
+                        onChange={(event) => sites.setNewSiteHosting(event.target.value)}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel project ID</span>
+                      <input
+                        type="text"
+                        value={sites.newSiteVercelProjectId}
+                        placeholder="prj_..."
+                        onChange={(event) => sites.setNewSiteVercelProjectId(event.target.value)}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel team ID</span>
+                      <input
+                        type="text"
+                        value={sites.newSiteVercelTeamId}
+                        placeholder="team_..."
+                        onChange={(event) => sites.setNewSiteVercelTeamId(event.target.value)}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel production URL</span>
+                      <input
+                        type="url"
+                        value={sites.newSiteVercelProductionUrl}
+                        placeholder="https://example.vercel.app"
+                        onChange={(event) => sites.setNewSiteVercelProductionUrl(event.target.value)}
+                      />
+                    </label>
+                    <label className="sites-form-field sites-form-field-wide">
+                      <span>Vercel deploy hook URL</span>
+                      <input
+                        type="url"
+                        value={sites.newSiteVercelDeployHookUrl}
+                        placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                        onChange={(event) => sites.setNewSiteVercelDeployHookUrl(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
             <footer className="sites-modal-footer">
@@ -165,50 +245,110 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     onChange={(event) => sites.updateConfigSite({ name: event.target.value })}
                   />
                 </label>
-                <label className="sites-form-field">
-                  <span>Hosting</span>
-                  <input
-                    type="text"
-                    value={sites.configSite.hosting}
-                    placeholder="Hosting configuration"
-                    onChange={(event) => sites.updateConfigSite({ hosting: event.target.value })}
-                  />
-                </label>
-                <p className="sites-form-section-title">AI guidance</p>
-                <label className="sites-form-field sites-form-field-wide">
-                  <span>Site purpose</span>
-                  <textarea
-                    value={sites.configSite.purpose}
-                    placeholder="Site purpose for AI context"
-                    onChange={(event) => sites.updateConfigSite({ purpose: event.target.value })}
-                    rows={5}
-                  />
-                </label>
-                <label className="sites-form-field sites-form-field-wide">
-                  <span>Preferred tone</span>
-                  <textarea
-                    value={sites.configSite.tone ?? ""}
-                    placeholder="Preferred tone for AI"
-                    onChange={(event) => sites.updateConfigSite({ tone: event.target.value })}
-                    rows={3}
-                  />
-                </label>
-                <label className="sites-form-field sites-form-field-wide">
-                  <span>AI constraints</span>
-                  <textarea
-                    value={(sites.configSite.constraints ?? []).join("\n")}
-                    placeholder="AI constraints (one per line)"
-                    onChange={(event) =>
-                      sites.updateConfigSite({
-                        constraints: event.target.value
-                          .split(/\n|,/g)
-                          .map((item) => item.trim())
-                          .filter(Boolean)
-                      })
-                    }
-                    rows={5}
-                  />
-                </label>
+                <p className="sites-form-section-title">Editorial brief</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                    <button type="button" className={configAiTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigAiTab("overview")}>
+                      Overview
+                    </button>
+                    <button type="button" className={configAiTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigAiTab("tone")}>
+                      Tone
+                    </button>
+                    <button type="button" className={configAiTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigAiTab("constraints")}>
+                      Constraints
+                    </button>
+                  </div>
+                  {configAiTab === "overview" ? (
+                    <label className="sites-form-field">
+                      <span>Overview</span>
+                      <textarea
+                        value={sites.configSite.purpose}
+                        placeholder="What this site is for."
+                        onChange={(event) => sites.updateConfigSite({ purpose: event.target.value })}
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                  {configAiTab === "tone" ? (
+                    <label className="sites-form-field">
+                      <span>Preferred tone</span>
+                      <textarea
+                        value={sites.configSite.tone ?? ""}
+                        placeholder="How the writing should sound."
+                        onChange={(event) => sites.updateConfigSite({ tone: event.target.value })}
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                  {configAiTab === "constraints" ? (
+                    <label className="sites-form-field">
+                      <span>Writing constraints</span>
+                      <textarea
+                        value={(sites.configSite.constraints ?? []).join("\n")}
+                        placeholder={"Rules for content output.\nOne per line."}
+                        onChange={(event) =>
+                          sites.updateConfigSite({
+                            constraints: event.target.value
+                              .split(/\n|,/g)
+                              .map((item) => item.trim())
+                              .filter(Boolean)
+                          })
+                        }
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                <p className="sites-form-section-title">Settings</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-settings-grid">
+                    <label className="sites-form-field">
+                      <span>Hosting</span>
+                      <input
+                        type="text"
+                        value={sites.configSite.hosting}
+                        placeholder="Vercel production site (single shared project)"
+                        onChange={(event) => sites.updateConfigSite({ hosting: event.target.value })}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel project ID</span>
+                      <input
+                        type="text"
+                        value={sites.configSite.vercelProjectId ?? ""}
+                        placeholder="prj_..."
+                        onChange={(event) => sites.updateConfigSite({ vercelProjectId: event.target.value })}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel team ID</span>
+                      <input
+                        type="text"
+                        value={sites.configSite.vercelTeamId ?? ""}
+                        placeholder="team_..."
+                        onChange={(event) => sites.updateConfigSite({ vercelTeamId: event.target.value })}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel production URL</span>
+                      <input
+                        type="url"
+                        value={sites.configSite.vercelProductionUrl ?? ""}
+                        placeholder="https://example.vercel.app"
+                        onChange={(event) => sites.updateConfigSite({ vercelProductionUrl: event.target.value })}
+                      />
+                    </label>
+                    <label className="sites-form-field sites-form-field-wide">
+                      <span>Vercel deploy hook URL</span>
+                      <input
+                        type="url"
+                        value={sites.configSite.vercelDeployHookUrl ?? ""}
+                        placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                        onChange={(event) => sites.updateConfigSite({ vercelDeployHookUrl: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
             <footer className="sites-modal-footer">

@@ -766,6 +766,110 @@ export const intentSchema = z.object({
 })
 export type ParsedIntent = z.infer<typeof intentSchema>
 
+function inferActionFromMessage(message: string): ParsedIntent["action"] | null {
+  const lower = message.toLowerCase()
+  const hasPageCreateCue = Boolean(parseCreatePageRequest(message))
+  if (hasPageCreateCue) return "add"
+  if (/\b(remove|delete)\b/.test(lower)) return "remove"
+  if (/\b(move|reorder|re-arrange|rearrange)\b/.test(lower)) return "move"
+  if (/\b(add|insert|create|include)\b/.test(lower)) return "add"
+  if (/\b(update|change|edit|set|rewrite|reword|replace|improve|shorten)\b/.test(lower)) return "update"
+  return null
+}
+
+function inferPatchFromMessage(args: {
+  message: string
+  action: ParsedIntent["action"]
+  targetBlock?: PageDoc["blocks"][number]
+  activeEditablePath?: string
+}) {
+  const { message, action, targetBlock, activeEditablePath } = args
+  if (action !== "update") return undefined
+
+  const directPatch = inferSimpleFieldPatchFromMessage(message)
+  if (directPatch && Object.keys(directPatch).length > 0) return directPatch
+
+  const quoted = quotedText(message)
+  if (!quoted) return undefined
+
+  if (activeEditablePath && /^[a-zA-Z0-9_]+$/.test(activeEditablePath)) {
+    return { [activeEditablePath]: quoted }
+  }
+
+  const block = targetBlock
+  if (!block) return undefined
+
+  const allowedKeys = Object.keys(block.props as Record<string, unknown>)
+  if (allowedKeys.length === 0) return undefined
+  const hintedKey = inferFieldHintFromMessage(message, allowedKeys)
+  if (!hintedKey) return undefined
+  return { [hintedKey]: quoted }
+}
+
+export function inferDeterministicIntent(args: {
+  message: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}): ParsedIntent | null {
+  const raw = stripSiteContextEnvelope(args.message).trim()
+  if (!raw) return null
+
+  const action = inferActionFromMessage(raw)
+  if (!action) return null
+
+  const refs = resolveReferencesFromMessage({
+    message: raw,
+    currentPage: args.currentPage,
+    activeBlockId: args.activeBlockId
+  })
+
+  let targetBlock = refs.target
+    ? args.currentPage.blocks.find((block) => block.id === refs.target?.id) ?? null
+    : null
+  if (!targetBlock && args.activeBlockId) {
+    targetBlock = args.currentPage.blocks.find((block) => block.id === args.activeBlockId) ?? null
+  }
+
+  const inferred: ParsedIntent = { action }
+
+  if (targetBlock) {
+    inferred.target_block_ref = targetBlock.id
+    inferred.target_block_type = targetBlock.type
+  } else {
+    const typeFromMessage = inferBlockTypeFromText(raw)
+    if (typeFromMessage) inferred.target_block_type = typeFromMessage
+  }
+
+  if (action === "add") {
+    const inferredAddType =
+      inferAddedBlockTypeFromMessage(raw) ??
+      inferBlockTypeFromText(raw) ??
+      targetBlock?.type
+    if (inferredAddType) inferred.new_block_type = inferredAddType
+  }
+
+  if (action === "move" || action === "add") {
+    const lower = raw.toLowerCase()
+    if (/\b(top|first|start|beginning)\b/.test(lower)) inferred.position = "top"
+    else if (/\b(bottom|last|end)\b/.test(lower)) inferred.position = "bottom"
+    else if (/\b(before|above)\b/.test(lower)) inferred.position = "before"
+    else if (/\b(after|below|under)\b/.test(lower)) inferred.position = "after"
+
+    if (refs.anchor?.id) inferred.anchor_block_ref = refs.anchor.id
+  }
+
+  const patch = inferPatchFromMessage({
+    message: raw,
+    action,
+    targetBlock: targetBlock ?? undefined,
+    activeEditablePath: args.activeEditablePath
+  })
+  if (patch && Object.keys(patch).length > 0) inferred.patch = patch
+
+  return inferred
+}
+
 export function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined {
   const normalized = message.toLowerCase()
   const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:(?:a|an)\b)?\s*([a-z -]+)/)
@@ -1783,6 +1887,22 @@ export function compileDeterministicPlan(args: {
       inferBlockTypeFromText(intent.target_block_ref ?? "") ??
       inferBlockTypeFromText(message)
     if (!blockType) {
+      // No block type found — check if this is an image replacement request
+      // e.g. "add unsplash image", "add a new photo", "add image"
+      const isImageRequest = /\b(image|photo|picture)\b/.test(lowerMessage)
+      if (isImageRequest) {
+        const hero = selectedBlock?.type === "Hero"
+          ? selectedBlock
+          : currentPage.blocks.find((b) => b.type === "Hero") ?? null
+        if (hero) {
+          return {
+            intent: "edit_plan",
+            summary_for_user: "Updated the hero image.",
+            change_log: [...assumptions, `Updated ${hero.id}: imageUrl`],
+            ops: [{ op: "update_props", pageSlug: slug, blockId: hero.id, patch: { imageUrl: "pending" } }]
+          }
+        }
+      }
       return {
         intent: "needs_clarification",
         summary_for_user: `Please specify which block type to add (${allowedBlockTypes.join(", ")}).`,

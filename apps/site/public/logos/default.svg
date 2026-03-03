@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">Default site logo</title>
+  <desc id="desc">Simple compass mark in rounded square.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecfeff"/>
+      <stop offset="1" stop-color="#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="20" fill="url(#bg)" stroke="#0f766e" stroke-width="4"/>
+  <circle cx="48" cy="48" r="22" fill="#ffffff" stroke="#0f766e" stroke-width="4"/>
+  <path d="M48 26l8 20-8 24-8-24z" fill="#0f766e"/>
+  <circle cx="48" cy="48" r="4" fill="#0f766e"/>
+</svg>
