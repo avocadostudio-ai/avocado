@@ -273,7 +273,8 @@ export function inferTranslationScopeFromMessage(message: string): TranslationSc
     /\bselected\s+component\b/.test(lower)
   if (componentScope) return "component"
 
-  return "component"
+  // Default translation intent to page scope unless the user explicitly narrows it.
+  return "page"
 }
 
 // ---------------------------------------------------------------------------
