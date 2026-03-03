@@ -278,10 +278,17 @@ function CTA(props: Record<string, unknown>) {
 }
 
 function Card(props: Record<string, unknown>) {
+  const imageUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
+  const imageAlt = typeof props.imageAlt === "string" ? props.imageAlt.trim() : ""
   return (
     <section>
       <div className="section__inner">
         <article className="card">
+          {imageUrl.length > 0 && (
+            <div className="card__image-wrap" data-editable-target="imageUrl" data-editable-target-label="image">
+              <img src={imageUrl} alt={imageAlt.length > 0 ? imageAlt : "Card image"} className="card__image" loading="lazy" />
+            </div>
+          )}
           <h3 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
             {String(props.title ?? "")}
           </h3>
@@ -308,8 +315,25 @@ function CardGrid(props: Record<string, unknown>) {
         <div className="card-grid">
           {cards.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
+            const imageUrl = typeof row.imageUrl === "string" ? row.imageUrl.trim() : ""
+            const imageAlt = typeof row.imageAlt === "string" ? row.imageAlt.trim() : ""
             return (
               <article className="card" key={idx} data-editable-target={`cards[${idx}]`} data-editable-target-label={`cards[${idx}]`} data-editable-label={`cards[${idx}]`}>
+                {imageUrl.length > 0 && (
+                  <div
+                    className="card__image-wrap"
+                    data-editable-target={`cards[${idx}].imageUrl`}
+                    data-editable-target-label={`cards[${idx}].imageUrl`}
+                    data-editable-label={`cards[${idx}].imageUrl`}
+                  >
+                    <img
+                      src={imageUrl}
+                      alt={imageAlt.length > 0 ? imageAlt : "Card image"}
+                      className="card__image"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
                 <h3
                   data-editable-target={`cards[${idx}].title`}
                   data-editable-target-label={`cards[${idx}].title`}

@@ -54,6 +54,7 @@ test("sanitizeMessageForPlanning extracts prompt from debug payload", () => {
 
 test("inferTranslationScopeFromMessage distinguishes page and component scope", () => {
   assert.equal(inferTranslationScopeFromMessage("translate this page to german"), "page")
+  assert.equal(inferTranslationScopeFromMessage("translate to german"), "page")
   assert.equal(inferTranslationScopeFromMessage("translate this selected component to german"), "component")
   assert.equal(inferTranslationScopeFromMessage("change hero heading"), "none")
 })

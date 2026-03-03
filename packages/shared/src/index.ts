@@ -234,7 +234,9 @@ registerBlock("Card", {
     title: z.string().min(1),
     description: z.string().min(1),
     ctaText: z.string().min(1),
-    ctaHref: z.string().min(1)
+    ctaHref: z.string().min(1),
+    imageUrl: z.string().min(1).optional(),
+    imageAlt: z.string().min(1).optional()
   }),
   meta: {
     displayName: "Card",
@@ -245,6 +247,8 @@ registerBlock("Card", {
       description: f.text("Card description"),
       ctaText: f.text("Button text"),
       ctaHref: f.url("Button link"),
+      imageUrl: f.image("Card image"),
+      imageAlt: f.imageAlt("Card image alt text"),
     }
   }
 })
@@ -258,7 +262,9 @@ registerBlock("CardGrid", {
           title: z.string().min(1),
           description: z.string().min(1),
           ctaText: z.string().min(1),
-          ctaHref: z.string().min(1)
+          ctaHref: z.string().min(1),
+          imageUrl: z.string().min(1).optional(),
+          imageAlt: z.string().min(1).optional()
         })
       )
       .min(1)
@@ -276,6 +282,8 @@ registerBlock("CardGrid", {
           description: f.text("Card description"),
           ctaText: f.text("Button text"),
           ctaHref: f.url("Button link"),
+          imageUrl: f.image("Card image"),
+          imageAlt: f.imageAlt("Card image alt text"),
         }
       }
     }
