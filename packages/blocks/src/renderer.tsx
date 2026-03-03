@@ -1,6 +1,29 @@
 import type { AnchorHTMLAttributes, JSX, ReactNode } from "react"
 import type { BlockInstance } from "@ai-site-editor/shared"
 
+function decodeSoftHyphenEntities(input: string) {
+  return input
+    .replace(/&amp;shy;/gi, "&shy;")
+    .replace(/&shy;|&#0*173;|&#x0*ad;/gi, "\u00AD")
+}
+
+function normalizeSoftHyphenEntities<T>(value: T): T {
+  if (typeof value === "string") {
+    return decodeSoftHyphenEntities(value) as T
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeSoftHyphenEntities(item)) as T
+  }
+  if (value && typeof value === "object") {
+    const normalized: Record<string, unknown> = {}
+    for (const [key, nestedValue] of Object.entries(value)) {
+      normalized[key] = normalizeSoftHyphenEntities(nestedValue)
+    }
+    return normalized as T
+  }
+  return value
+}
+
 type ButtonProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   href: string
   children: ReactNode
@@ -102,6 +125,15 @@ function renderRichTextBlock(block: string, idx: number) {
   }
 
   return <p key={idx}>{renderInline(block)}</p>
+}
+
+function renderRichTextContent(input: string) {
+  const body = normalizeRichTextBody(input)
+  const blocks = body
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+  return blocks.map((block, idx) => renderRichTextBlock(block, idx))
 }
 
 function Hero(props: Record<string, unknown>) {
@@ -367,11 +399,7 @@ function CardGrid(props: Record<string, unknown>) {
 
 function RichText(props: Record<string, unknown>) {
   const title = String(props.title ?? "")
-  const body = normalizeRichTextBody(String(props.body ?? ""))
-  const blocks = body
-    .split(/\n\s*\n+/)
-    .map((block) => block.trim())
-    .filter(Boolean)
+  const renderedBody = renderRichTextContent(String(props.body ?? ""))
   return (
     <section className="rich-text">
       <div className="section__inner">
@@ -381,7 +409,7 @@ function RichText(props: Record<string, unknown>) {
           </h2>
         )}
         <div className="rich-text__body" data-editable-target="body" data-editable-target-label="body" data-editable-label="body">
-          {blocks.map((block, idx) => renderRichTextBlock(block, idx))}
+          {renderedBody}
         </div>
       </div>
     </section>
@@ -433,6 +461,7 @@ function TwoColumn(props: Record<string, unknown>) {
   const imagePosition = String(props.imagePosition ?? "right")
   const modifier = imagePosition === "left" ? " two-column--image-left" : ""
   const ctaText = String(props.ctaText ?? "")
+  const renderedBody = renderRichTextContent(String(props.body ?? ""))
   return (
     <section className={`two-column${modifier}`}>
       <div className="section__inner two-column__inner">
@@ -450,7 +479,7 @@ function TwoColumn(props: Record<string, unknown>) {
             data-editable-target-label="body"
             data-editable-label="body"
           >
-            {renderInline(String(props.body ?? ""))}
+            {renderedBody}
           </div>
           {ctaText.length > 0 && (
             <div className="two-column__cta">
@@ -543,5 +572,6 @@ const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element 
 export function SharedBlockRenderer({ block }: { block: BlockInstance }) {
   const Renderer = renderers[block.type]
   if (!Renderer) return null
-  return <Renderer {...block.props} />
+  const normalizedProps = normalizeSoftHyphenEntities(block.props)
+  return <Renderer {...normalizedProps} />
 }
