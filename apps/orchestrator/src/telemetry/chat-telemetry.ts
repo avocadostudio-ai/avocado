@@ -36,7 +36,15 @@ export type ChatTelemetryEntry = {
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
+  cacheCreationInputTokens?: number
+  cacheReadInputTokens?: number
   estimatedUsd?: number | null
+  totalDurationMs?: number
+  planningDurationMs?: number
+  firstPlanningTokenMs?: number
+  applyDurationMs?: number
+  imageResolutionDurationMs?: number
+  planningAttempts?: number
 }
 
 type Logger = {
@@ -143,7 +151,15 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         inputTokens: entry.inputTokens,
         outputTokens: entry.outputTokens,
         totalTokens: entry.totalTokens,
-        estimatedUsd: entry.estimatedUsd
+        cacheCreationInputTokens: entry.cacheCreationInputTokens,
+        cacheReadInputTokens: entry.cacheReadInputTokens,
+        estimatedUsd: entry.estimatedUsd,
+        totalDurationMs: entry.totalDurationMs,
+        planningDurationMs: entry.planningDurationMs,
+        firstPlanningTokenMs: entry.firstPlanningTokenMs,
+        applyDurationMs: entry.applyDurationMs,
+        imageResolutionDurationMs: entry.imageResolutionDurationMs,
+        planningAttempts: entry.planningAttempts
       },
       "Chat telemetry event"
     )

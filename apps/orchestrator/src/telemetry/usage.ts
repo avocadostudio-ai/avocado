@@ -6,6 +6,8 @@ export type TokenUsage = {
   inputTokens: number
   outputTokens: number
   totalTokens: number
+  cacheCreationInputTokens?: number
+  cacheReadInputTokens?: number
 }
 
 export const ZERO_USAGE: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
@@ -23,12 +25,34 @@ export function extractUsage(source: unknown): TokenUsage {
   const completionTokens = typeof usage.completion_tokens === "number" ? usage.completion_tokens : 0
   const inputTokens = typeof usage.input_tokens === "number" ? usage.input_tokens : promptTokens
   const outputTokens = typeof usage.output_tokens === "number" ? usage.output_tokens : completionTokens
+
+  const anthropicCacheCreationTokensRaw = usage.cache_creation_input_tokens
+  const anthropicCacheReadTokensRaw = usage.cache_read_input_tokens
+  const openAIPromptDetails = usage.prompt_tokens_details as Record<string, unknown> | undefined
+  const openAIInputDetails = usage.input_tokens_details as Record<string, unknown> | undefined
+  const openAICachedPromptTokensRaw = openAIPromptDetails?.cached_tokens
+  const openAICachedInputTokensRaw = openAIInputDetails?.cached_tokens
+
+  const cacheCreationInputTokens =
+    typeof anthropicCacheCreationTokensRaw === "number"
+      ? Math.max(0, anthropicCacheCreationTokensRaw)
+      : undefined
+  const cacheReadInputTokens =
+    typeof anthropicCacheReadTokensRaw === "number"
+      ? Math.max(0, anthropicCacheReadTokensRaw)
+      : typeof openAICachedPromptTokensRaw === "number"
+        ? Math.max(0, openAICachedPromptTokensRaw)
+        : typeof openAICachedInputTokensRaw === "number"
+          ? Math.max(0, openAICachedInputTokensRaw)
+          : undefined
   const totalTokens =
     typeof usage.total_tokens === "number" ? usage.total_tokens : Math.max(0, inputTokens) + Math.max(0, outputTokens)
   return {
     inputTokens: Math.max(0, inputTokens),
     outputTokens: Math.max(0, outputTokens),
-    totalTokens: Math.max(0, totalTokens)
+    totalTokens: Math.max(0, totalTokens),
+    ...(cacheCreationInputTokens !== undefined ? { cacheCreationInputTokens } : {}),
+    ...(cacheReadInputTokens !== undefined ? { cacheReadInputTokens } : {})
   }
 }
 

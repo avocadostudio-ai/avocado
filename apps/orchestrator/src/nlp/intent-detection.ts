@@ -68,6 +68,8 @@ export type ChatResult = {
     inputTokens?: number
     outputTokens?: number
     totalTokens?: number
+    cacheCreationInputTokens?: number
+    cacheReadInputTokens?: number
     estimatedUsd?: number | null
   }
 }

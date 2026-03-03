@@ -29,6 +29,12 @@ export type AssistantResponse = {
     intent?: string
     opTypes?: string[]
     opCount?: number
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    cacheCreationInputTokens?: number
+    cacheReadInputTokens?: number
+    estimatedUsd?: number | null
   }
   error?: string
 }
@@ -52,6 +58,14 @@ export type VariationResponse = {
   plannerSource?: PlannerSource
   modelUsed?: string
   modelKey?: string
+  usage?: {
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    cacheCreationInputTokens?: number
+    cacheReadInputTokens?: number
+    estimatedUsd?: number | null
+  }
   error?: string
 }
 

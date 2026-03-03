@@ -8,6 +8,7 @@ import { coercePatchForBlock } from "../nlp/deterministic-planner.js"
 import { openAIChatOptionsForModel } from "./planner.js"
 import { extractJsonObject } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, estimateUsd, ZERO_USAGE } from "../telemetry/usage.js"
+import { anthropicSystemPromptWithCache } from "./anthropic-cache.js"
 import {
   deriveVariationImageIntent,
   buildVariationImageQuery,
@@ -67,7 +68,14 @@ export type VariationResult = {
   plannerSource: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey
-  usage?: { inputTokens: number; outputTokens: number; totalTokens: number; estimatedUsd: number | null }
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    cacheCreationInputTokens?: number
+    cacheReadInputTokens?: number
+    estimatedUsd: number | null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +501,7 @@ async function generateVariationsWithAnthropic(args: {
   const response = await client.messages.create({
     model: args.model,
     max_tokens: 4096,
-    system,
+    system: anthropicSystemPromptWithCache(system),
     messages: [
       { role: "user", content: JSON.stringify(user) }
     ],
@@ -652,6 +660,12 @@ export async function runVariationPipeline(
           inputTokens: generatorUsage.inputTokens,
           outputTokens: generatorUsage.outputTokens,
           totalTokens: generatorUsage.totalTokens,
+          ...(typeof generatorUsage.cacheCreationInputTokens === "number"
+            ? { cacheCreationInputTokens: generatorUsage.cacheCreationInputTokens }
+            : {}),
+          ...(typeof generatorUsage.cacheReadInputTokens === "number"
+            ? { cacheReadInputTokens: generatorUsage.cacheReadInputTokens }
+            : {}),
           estimatedUsd: estimateUsd(modelUsed, generatorUsage)
         }
       } : {})
