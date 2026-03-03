@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">Adventures EG logo</title>
+  <desc id="desc">Mountain and trail badge.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dbeafe"/>
+      <stop offset="1" stop-color="#e0f2fe"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="20" fill="url(#sky)" stroke="#1d4ed8" stroke-width="4"/>
+  <path d="M20 66l16-24 10 13 14-20 16 31z" fill="#2563eb"/>
+  <path d="M30 74c8-8 18-13 32-14" fill="none" stroke="#1e40af" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="68" cy="22" r="6" fill="#f59e0b"/>
+</svg>

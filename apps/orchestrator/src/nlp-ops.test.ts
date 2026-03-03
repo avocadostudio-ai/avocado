@@ -4,7 +4,7 @@ import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
 import { isBatchAddRequest } from "./nlp/intent-detection.js"
-import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
+import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 
 test("parseCreatePageRequest prompt matrix", () => {
@@ -27,6 +27,34 @@ test("parseCreatePageRequest prompt matrix", () => {
   for (const entry of cases) {
     assert.equal(parseCreatePageRequest(entry.prompt), entry.expected, entry.prompt)
   }
+})
+
+test("inferDeterministicIntent infers remove action against selected block", () => {
+  const currentPage = demoPublishedPages()[0]
+  const parsed = inferDeterministicIntent({
+    message: "remove this section",
+    currentPage,
+    activeBlockId: "b_hero_home"
+  })
+
+  assert.ok(parsed)
+  assert.equal(parsed?.action, "remove")
+  assert.equal(parsed?.target_block_ref, "b_hero_home")
+})
+
+test("inferDeterministicIntent infers quoted patch for selected editable field", () => {
+  const currentPage = demoPublishedPages()[0]
+  const parsed = inferDeterministicIntent({
+    message: "change heading to \"Build your dream site\"",
+    currentPage,
+    activeBlockId: "b_hero_home",
+    activeEditablePath: "heading"
+  })
+
+  assert.ok(parsed)
+  assert.equal(parsed?.action, "update")
+  assert.equal(parsed?.target_block_ref, "b_hero_home")
+  assert.deepEqual(parsed?.patch, { heading: "Build your dream site" })
 })
 
 test("parseCreatePageRequest still returns slug for content-generation requests (AI planner handles the bypass)", () => {
@@ -763,6 +791,42 @@ test("compileDeterministicPlan asks for block type when add intent is ambiguous"
   assert.ok(plan)
   assert.equal(plan?.intent, "needs_clarification")
   assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan treats 'add unsplash image' as Hero image update", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-unsplash-image",
+    intent: { action: "add" },
+    message: "add unsplash image",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops.length, 1)
+  const op = plan?.ops[0]
+  assert.equal(op?.op, "update_props")
+  assert.equal(op?.op === "update_props" && op.blockId, currentPage.blocks.find((b) => b.type === "Hero")?.id)
+  const patch = (op as { patch?: Record<string, unknown> })?.patch
+  assert.equal(patch?.imageUrl, "pending")
+})
+
+test("compileDeterministicPlan treats 'add a new photo' as Hero image update", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-add-new-photo",
+    intent: { action: "add" },
+    message: "add a new photo",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops.length, 1)
+  assert.equal(plan?.ops[0]?.op, "update_props")
 })
 
 test("compileDeterministicPlan add-before fails with unknown anchor block", () => {

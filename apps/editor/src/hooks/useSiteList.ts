@@ -16,6 +16,10 @@ export function useSiteList(siteId: string, session: string) {
   const [newSiteTone, setNewSiteTone] = useState("")
   const [newSiteConstraints, setNewSiteConstraints] = useState("")
   const [newSiteHosting, setNewSiteHosting] = useState(DEFAULT_SITE_HOSTING)
+  const [newSiteVercelProjectId, setNewSiteVercelProjectId] = useState("")
+  const [newSiteVercelTeamId, setNewSiteVercelTeamId] = useState("")
+  const [newSiteVercelProductionUrl, setNewSiteVercelProductionUrl] = useState("")
+  const [newSiteVercelDeployHookUrl, setNewSiteVercelDeployHookUrl] = useState("")
   const [showSiteModal, setShowSiteModal] = useState(false)
   const [configSiteId, setConfigSiteId] = useState<string | null>(null)
   const [restoreSiteId, setRestoreSiteId] = useState<string | null>(null)
@@ -43,6 +47,10 @@ export function useSiteList(siteId: string, session: string) {
       name: siteNameFromId(siteId) || "Site",
       purpose: "",
       hosting: DEFAULT_SITE_HOSTING,
+      vercelProjectId: "",
+      vercelTeamId: "",
+      vercelProductionUrl: "",
+      vercelDeployHookUrl: "",
       tone: "",
       constraints: []
     } satisfies SiteConfig
@@ -132,6 +140,10 @@ export function useSiteList(siteId: string, session: string) {
         name,
         purpose: newSitePurpose.trim(),
         hosting: newSiteHosting.trim() || DEFAULT_SITE_HOSTING,
+        vercelProjectId: newSiteVercelProjectId.trim(),
+        vercelTeamId: newSiteVercelTeamId.trim(),
+        vercelProductionUrl: newSiteVercelProductionUrl.trim(),
+        vercelDeployHookUrl: newSiteVercelDeployHookUrl.trim(),
         tone: newSiteTone.trim(),
         constraints: parsedConstraints
       }
@@ -141,6 +153,10 @@ export function useSiteList(siteId: string, session: string) {
     setNewSiteTone("")
     setNewSiteConstraints("")
     setNewSiteHosting(DEFAULT_SITE_HOSTING)
+    setNewSiteVercelProjectId("")
+    setNewSiteVercelTeamId("")
+    setNewSiteVercelProductionUrl("")
+    setNewSiteVercelDeployHookUrl("")
     setShowSiteModal(false)
   }
 
@@ -149,7 +165,14 @@ export function useSiteList(siteId: string, session: string) {
     return siteList.find((site) => site.id === configSiteId) ?? null
   }, [configSiteId, siteList])
 
-  const updateConfigSite = (patch: Partial<Pick<SiteConfig, "name" | "purpose" | "hosting" | "tone" | "constraints">>) => {
+  const updateConfigSite = (
+    patch: Partial<
+      Pick<
+        SiteConfig,
+        "name" | "purpose" | "hosting" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints"
+      >
+    >
+  ) => {
     if (!configSiteId) return
     setSiteList((prev) =>
       prev.map((site) =>
@@ -159,6 +182,10 @@ export function useSiteList(siteId: string, session: string) {
               ...(patch.name !== undefined ? { name: patch.name } : {}),
               ...(patch.purpose !== undefined ? { purpose: patch.purpose } : {}),
               ...(patch.hosting !== undefined ? { hosting: patch.hosting } : {}),
+              ...(patch.vercelProjectId !== undefined ? { vercelProjectId: patch.vercelProjectId } : {}),
+              ...(patch.vercelTeamId !== undefined ? { vercelTeamId: patch.vercelTeamId } : {}),
+              ...(patch.vercelProductionUrl !== undefined ? { vercelProductionUrl: patch.vercelProductionUrl } : {}),
+              ...(patch.vercelDeployHookUrl !== undefined ? { vercelDeployHookUrl: patch.vercelDeployHookUrl } : {}),
               ...(patch.tone !== undefined ? { tone: patch.tone } : {}),
               ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {})
             }
@@ -180,6 +207,14 @@ export function useSiteList(siteId: string, session: string) {
     setNewSiteConstraints,
     newSiteHosting,
     setNewSiteHosting,
+    newSiteVercelProjectId,
+    setNewSiteVercelProjectId,
+    newSiteVercelTeamId,
+    setNewSiteVercelTeamId,
+    newSiteVercelProductionUrl,
+    setNewSiteVercelProductionUrl,
+    newSiteVercelDeployHookUrl,
+    setNewSiteVercelDeployHookUrl,
     showSiteModal,
     setShowSiteModal,
     configSiteId,

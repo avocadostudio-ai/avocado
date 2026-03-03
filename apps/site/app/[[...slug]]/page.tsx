@@ -47,6 +47,21 @@ function siteNameFromId(siteId: string) {
     .join(" ")
 }
 
+function siteLogoFromId(siteId: string) {
+  const normalized = siteId.trim().toLowerCase()
+  const available = new Set([
+    "avocado-stories",
+    "avocado-magic",
+    "avocado-odyssey",
+    "adventures-eg",
+    "adventure-echo",
+    "adventure-atlas",
+    "trailbound-expeditions"
+  ])
+  if (available.has(normalized)) return `/logos/${normalized}.svg`
+  return "/logos/default.svg"
+}
+
 export function generateStaticParams() {
   return getPublishedSlugs().map((slug) => ({
     slug:
@@ -95,6 +110,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
   const siteName = getSingleValue(resolvedSearch.siteName) ?? siteNameFromId(siteId) ?? "Site"
   const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
+  const siteLogo = siteLogoFromId(siteId)
 
   const page = await fetchDraftPage(slug, session, siteId, editorMode)
   const fetchedSlugs = await fetchDraftSlugs(session, siteId, editorMode)
@@ -131,9 +147,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
       {tileMode ? <style>{`nextjs-portal { display: none !important; }`}</style> : null}
       <header className="site-top-nav">
         <Link className="site-brand" href={`/${editorQuery}`}>
-          <span className="avocado-mark" aria-hidden="true">
-            <span className="avocado-pit" />
-          </span>
+          <img className="site-logo" src={siteLogo} alt={`${siteName} logo`} width={38} height={38} />
           <span className="site-brand-text">{siteName}</span>
         </Link>
         <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">

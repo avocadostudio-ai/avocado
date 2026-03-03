@@ -2,7 +2,11 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import type { EditPlan } from "@ai-site-editor/shared"
 import { app } from "./index.js"
-import { setDemoPlanFromMessageForTests, setGeneratePlanWithOpenAIForTests } from "./chat/chat-pipeline.js"
+import {
+  setDemoPlanFromMessageForTests,
+  setGeneratePlanWithOpenAIForTests,
+  shouldResolveCreatePageHeroImage
+} from "./chat/chat-pipeline.js"
 import { ZERO_USAGE } from "./telemetry/usage.js"
 
 let sessionCounter = 0
@@ -96,6 +100,56 @@ test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocke
   const hero = page.blocks.find((block) => block.id === "b_hero_home")
   assert.ok(hero)
   assert.equal(hero?.props.heading, targetHeading)
+})
+
+test("shouldResolveCreatePageHeroImage returns true for local placeholder urls", () => {
+  assert.equal(shouldResolveCreatePageHeroImage(""), true)
+  assert.equal(shouldResolveCreatePageHeroImage("/hero-generated.svg"), true)
+  assert.equal(shouldResolveCreatePageHeroImage("hero-generated.svg"), true)
+})
+
+test("shouldResolveCreatePageHeroImage returns false for explicit remote urls", () => {
+  assert.equal(shouldResolveCreatePageHeroImage("https://example.com/hero.jpg"), false)
+  assert.equal(shouldResolveCreatePageHeroImage("http://example.com/hero.jpg"), false)
+})
+
+test("chat applies deterministic plan for high-confidence remove request without calling model planner", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  setGeneratePlanWithOpenAIForTests(async () => {
+    throw new Error("model planner should not be called for deterministic remove")
+  })
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "remove hero section"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; summary?: string }
+  assert.equal(payload.status, "applied")
+  assert.match(String(payload.summary), /Removed/i)
+
+  const pageRes = await app.inject({
+    method: "GET",
+    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/")}`
+  })
+  assert.equal(pageRes.statusCode, 200)
+  const page = pageRes.json() as { blocks: Array<{ id: string }> }
+  assert.equal(page.blocks.some((block) => block.id === "b_hero_home"), false)
 })
 
 test("chat stream emits op_applied events for mocked multi-op plan", async (t) => {

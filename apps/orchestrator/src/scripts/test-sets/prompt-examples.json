@@ -1,0 +1,102 @@
+[
+  {
+    "id": "create_page_founders",
+    "prompt": "Create a new page at /for-founders with a Hero introducing our product for startup founders, add an FAQ section to that page, and place /for-founders after /pricing in navigation.",
+    "expectedOps": ["create_page", "add_block", "move_page"]
+  },
+  {
+    "id": "create_page_topic",
+    "prompt": "Make a new page about customer success stories at /stories.",
+    "expectedOps": ["create_page"]
+  },
+  {
+    "id": "add_block_faq_bottom",
+    "prompt": "On /pricing, add an FAQAccordion section at the bottom.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_block_after_hero",
+    "prompt": "Insert a Testimonials block right after the Hero on /.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "update_props_hero_copy",
+    "prompt": "On /, change the Hero heading to \"Ship faster\" and subheading to \"AI-assisted editing for your team\".",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "update_props_cta_link",
+    "prompt": "Update the CTA button link on /pricing to /contact-sales.",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "remove_block_testimonials",
+    "prompt": "Delete the testimonials section from /pricing.",
+    "expectedOps": ["remove_block"]
+  },
+  {
+    "id": "move_block_cta_top",
+    "prompt": "Move the CTA block to the top of the homepage.",
+    "expectedOps": ["move_block"]
+  },
+  {
+    "id": "duplicate_block_faq",
+    "prompt": "Duplicate the FAQ block on /pricing and place it after the original.",
+    "expectedOps": ["duplicate_block"]
+  },
+  {
+    "id": "add_item_faq",
+    "prompt": "In /pricing FAQ, add a question: \"Do you support SSO?\" with answer \"Yes, on Business plan.\"",
+    "expectedOps": ["add_item"]
+  },
+  {
+    "id": "update_item_faq",
+    "prompt": "On /pricing FAQ, update item 0 answer to \"Support is available 24/7 for paid plans.\"",
+    "expectedOps": ["update_item"]
+  },
+  {
+    "id": "remove_item_faq",
+    "prompt": "Remove FAQ item index 2 from /pricing.",
+    "expectedOps": ["remove_item"]
+  },
+  {
+    "id": "move_item_faq",
+    "prompt": "Move FAQ item 3 to the top on /pricing.",
+    "expectedOps": ["move_item"]
+  },
+  {
+    "id": "rename_page_pricing",
+    "prompt": "Rename page /pricing to /plans.",
+    "expectedOps": ["rename_page"]
+  },
+  {
+    "id": "remove_page_about",
+    "prompt": "Remove the page /about-us.",
+    "expectedOps": ["remove_page"]
+  },
+  {
+    "id": "move_page_nav",
+    "prompt": "In navigation, move /pricing after /about-us.",
+    "expectedOps": ["move_page"]
+  },
+  {
+    "id": "duplicate_page",
+    "prompt": "Duplicate /pricing into /pricing-2026 and keep it next to /pricing in nav.",
+    "expectedOps": ["duplicate_page"]
+  },
+  {
+    "id": "typo_update_hero",
+    "prompt": "on / pls updte hero heding to \"Grow revenue faster\"",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "natural_language_remove",
+    "prompt": "That FAQ feels noisy, can you get rid of it on the pricing page?",
+    "expectedOps": ["remove_block"]
+  },
+  {
+    "id": "natural_language_add_social_proof",
+    "prompt": "Homepage needs social proof under hero.",
+    "expectedOps": ["add_block"]
+  }
+]

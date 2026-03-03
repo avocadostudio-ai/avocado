@@ -144,6 +144,10 @@ export type SiteConfig = {
   name: string
   purpose: string
   hosting: string
+  vercelProjectId?: string
+  vercelTeamId?: string
+  vercelProductionUrl?: string
+  vercelDeployHookUrl?: string
   tone?: string
   constraints?: string[]
 }
