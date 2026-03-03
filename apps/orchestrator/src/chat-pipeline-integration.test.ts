@@ -3,10 +3,12 @@ import assert from "node:assert/strict"
 import type { EditPlan } from "@ai-site-editor/shared"
 import { app } from "./index.js"
 import {
+  detectImageOps,
   setDemoPlanFromMessageForTests,
   setGeneratePlanWithOpenAIForTests,
   shouldResolveCreatePageHeroImage
 } from "./chat/chat-pipeline.js"
+import { pendingApprovalPlanBySession } from "./state/session-state.js"
 import { ZERO_USAGE } from "./telemetry/usage.js"
 
 let sessionCounter = 0
@@ -287,6 +289,509 @@ test("chat pending-plan lifecycle resolves image for TwoColumn update on approva
   assert.equal(typeof twoCol?.props.heading, "string")
 })
 
+test("chat apply_pending_plan preserves detected image query when image fields were stripped", async (t) => {
+  const previousUnsplash = process.env.UNSPLASH_ACCESS_KEY
+  delete process.env.UNSPLASH_ACCESS_KEY
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousUnsplash === undefined) delete process.env.UNSPLASH_ACCESS_KEY
+    else process.env.UNSPLASH_ACCESS_KEY = previousUnsplash
+  })
+
+  const session = newSession()
+  const createPage = await app.inject({
+    method: "POST",
+    url: "/ops",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      ops: [
+        {
+          op: "create_page",
+          page: {
+            id: "p_test",
+            slug: "/test",
+            title: "Test",
+            updatedAt: new Date().toISOString(),
+            blocks: [
+              {
+                id: "b_hero_test",
+                type: "Hero",
+                props: {
+                  heading: "Welcome",
+                  subheading: "Discover the taste",
+                  ctaText: "Explore",
+                  ctaHref: "/",
+                  imageUrl: "/hero-generated.svg",
+                  imageAlt: "Bright yellow lemons in a bowl"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  })
+  assert.equal(createPage.statusCode, 200)
+
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Replace hero image.",
+    change_log: ["Replace hero image."],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/test",
+        blockId: "b_hero_test",
+        patch: {
+          imageUrl: "pending",
+          imageAlt: "fresh ripe avocados bright"
+        }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const planReady = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/test",
+      message: "replace this image from unsplash",
+      executionMode: "plan_only",
+      activeBlockId: "b_hero_test",
+      activeEditablePath: "imageUrl"
+    }
+  })
+  assert.equal(planReady.statusCode, 200)
+  const planPayload = planReady.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(planPayload.status, "plan_ready")
+  assert.equal(typeof planPayload.pendingPlanId, "string")
+  assert.ok(planPayload.pendingPlanId)
+
+  const applyPending = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/test",
+      executionMode: "apply_pending_plan",
+      pendingPlanId: planPayload.pendingPlanId
+    }
+  })
+  assert.equal(applyPending.statusCode, 200)
+  const applyPayload = applyPending.json() as { status?: string }
+  assert.equal(applyPayload.status, "applied")
+
+  const pageRes = await app.inject({
+    method: "GET",
+    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/test")}`
+  })
+  assert.equal(pageRes.statusCode, 200)
+  const page = pageRes.json() as { blocks: Array<{ id: string; props: Record<string, unknown> }> }
+  const hero = page.blocks.find((block) => block.id === "b_hero_test")
+  assert.ok(hero)
+  const resolvedImageUrl = String(hero?.props.imageUrl ?? "")
+  assert.match(resolvedImageUrl, /avocados/i)
+})
+
+test("detectImageOps finds nested child image targets", () => {
+  const page = {
+    id: "p_test",
+    slug: "/test",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_cardgrid_test",
+        type: "CardGrid",
+        props: {
+          title: "Cards",
+          cards: [
+            { title: "Team", description: "Collaboration", ctaText: "Learn", ctaHref: "/", imageUrl: "pending" },
+            { title: "Deploy", description: "Fast", ctaText: "Learn", ctaHref: "/", imageUrl: "pending" }
+          ]
+        }
+      }
+    ]
+  }
+  const plan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Add images",
+    change_log: ["Add images"],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/test",
+        blockId: "b_cardgrid_test",
+        patch: {
+          cards: [
+            { title: "Team", description: "Collaboration", ctaText: "Learn", ctaHref: "/", imageUrl: "pending" },
+            { title: "Deploy", description: "Fast", ctaText: "Learn", ctaHref: "/", imageUrl: "pending" }
+          ]
+        }
+      }
+    ]
+  }
+  const ops = detectImageOps({
+    plan,
+    message: "In the Card Grid, add images to all cards from Unsplash",
+    slug: "/test",
+    currentPage: page,
+    activeBlockId: "b_cardgrid_test"
+  })
+  assert.equal(ops.length, 2)
+  assert.deepEqual(
+    ops.map((op) => op.path).sort(),
+    ["cards[0].imageUrl", "cards[1].imageUrl"]
+  )
+  assert.ok(ops.every((op) => op.provider === "unsplash"))
+})
+
+test("plan_only rewrites add_block CardGrid image request to update existing block", async (t) => {
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+  })
+  const session = newSession()
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added CardGrid.",
+    change_log: ["Added CardGrid."],
+    ops: [
+      {
+        op: "add_block",
+        pageSlug: "/",
+        block: {
+          id: "b_cardgrid_new",
+          type: "CardGrid",
+          props: {
+            title: "Explore more",
+            cards: [
+              { title: "One", description: "Desc", ctaText: "Learn", ctaHref: "/" },
+              { title: "Two", description: "Desc", ctaText: "Learn", ctaHref: "/" }
+            ]
+          }
+        }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "In the Card Grid, add images to all cards from Unsplash",
+      executionMode: "plan_only"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(payload.status, "plan_ready")
+  assert.ok(payload.pendingPlanId)
+
+  const pending = pendingApprovalPlanBySession.get(session)
+  assert.ok(pending)
+  assert.equal(pending?.plan.ops[0]?.op, "update_props")
+  if (pending?.plan.ops[0]?.op === "update_props") {
+    assert.notEqual(pending.plan.ops[0].blockId, "b_cardgrid_new")
+  }
+})
+
+test("plan_only rewrites add_block CardGrid image request phrased as 'to each card'", async (t) => {
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+  })
+  const session = newSession()
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added CardGrid.",
+    change_log: ["Added CardGrid."],
+    ops: [
+      {
+        op: "add_block",
+        pageSlug: "/",
+        block: {
+          id: "b_cardgrid_new",
+          type: "CardGrid",
+          props: {
+            title: "Explore more",
+            cards: [
+              { title: "One", description: "Desc", ctaText: "Learn", ctaHref: "/" },
+              { title: "Two", description: "Desc", ctaText: "Learn", ctaHref: "/" }
+            ]
+          }
+        }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "generate and add images to each card usign unsplash and text from cards",
+      executionMode: "plan_only"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(payload.status, "plan_ready")
+  assert.ok(payload.pendingPlanId)
+
+  const pending = pendingApprovalPlanBySession.get(session)
+  assert.ok(pending)
+  assert.equal(pending?.plan.ops[0]?.op, "update_props")
+  if (pending?.plan.ops[0]?.op === "update_props") {
+    assert.notEqual(pending.plan.ops[0].blockId, "b_cardgrid_new")
+  }
+})
+
+test("plan_only does not rewrite when prompt asks for a new CardGrid", async (t) => {
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+  })
+  const session = newSession()
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added CardGrid.",
+    change_log: ["Added CardGrid."],
+    ops: [
+      {
+        op: "add_block",
+        pageSlug: "/",
+        block: {
+          id: "b_cardgrid_new",
+          type: "CardGrid",
+          props: {
+            title: "Explore more",
+            cards: [
+              { title: "One", description: "Desc", ctaText: "Learn", ctaHref: "/" },
+              { title: "Two", description: "Desc", ctaText: "Learn", ctaHref: "/" }
+            ]
+          }
+        }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "add a new card grid with images for each card from unsplash",
+      executionMode: "plan_only"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(payload.status, "plan_ready")
+  assert.ok(payload.pendingPlanId)
+
+  const pending = pendingApprovalPlanBySession.get(session)
+  assert.ok(pending)
+  assert.equal(pending?.plan.ops[0]?.op, "add_block")
+})
+
+test("plan_only rewrites add_block Card image request to existing CardGrid", async (t) => {
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+  })
+
+  const session = newSession()
+  const createPage = await app.inject({
+    method: "POST",
+    url: "/ops",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      ops: [
+        {
+          op: "create_page",
+          page: {
+            id: "p_test_cardgrid",
+            slug: "/test-cardgrid",
+            title: "Test CardGrid",
+            updatedAt: new Date().toISOString(),
+            blocks: [
+              {
+                id: "b_cardgrid_test",
+                type: "CardGrid",
+                props: {
+                  title: "Facts",
+                  cards: [
+                    { title: "One", description: "Desc", ctaText: "Learn", ctaHref: "/" },
+                    { title: "Two", description: "Desc", ctaText: "Learn", ctaHref: "/" }
+                  ]
+                }
+              },
+              {
+                id: "b_card_standalone",
+                type: "Card",
+                props: {
+                  title: "Standalone card",
+                  description: "Desc",
+                  ctaText: "Learn",
+                  ctaHref: "/"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  })
+  assert.equal(createPage.statusCode, 200)
+
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added Card.",
+    change_log: ["Added Card."],
+    ops: [
+      {
+        op: "add_block",
+        pageSlug: "/test-cardgrid",
+        block: {
+          id: "b_card_new",
+          type: "Card",
+          props: {
+            title: "New card",
+            description: "Desc",
+            ctaText: "Learn",
+            ctaHref: "/"
+          }
+        }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/test-cardgrid",
+      message: "generate and add images to each card usign unsplash and text from cards",
+      executionMode: "plan_only"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(payload.status, "plan_ready")
+  assert.ok(payload.pendingPlanId)
+
+  const pending = pendingApprovalPlanBySession.get(session)
+  assert.ok(pending)
+  assert.equal(pending?.plan.ops[0]?.op, "update_props")
+  if (pending?.plan.ops[0]?.op === "update_props") {
+    assert.equal(pending.plan.ops[0].blockId, "b_cardgrid_test")
+  }
+})
+
+test("plan_only rewrites add_block image request even when planner emits wrong pageSlug", async (t) => {
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+  })
+
+  const session = newSession()
+  const createPage = await app.inject({
+    method: "POST",
+    url: "/ops",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      ops: [
+        {
+          op: "create_page",
+          page: {
+            id: "p_test_wrong_slug",
+            slug: "/test-wrong-slug",
+            title: "Test Wrong Slug",
+            updatedAt: new Date().toISOString(),
+            blocks: [
+              {
+                id: "b_cardgrid_wrong_slug",
+                type: "CardGrid",
+                props: {
+                  title: "Facts",
+                  cards: [
+                    { title: "One", description: "Desc", ctaText: "Learn", ctaHref: "/" },
+                    { title: "Two", description: "Desc", ctaText: "Learn", ctaHref: "/" }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  })
+  assert.equal(createPage.statusCode, 200)
+
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added Card.",
+    change_log: ["Added Card."],
+    ops: [
+      {
+        op: "add_block",
+        pageSlug: "/",
+        block: {
+          id: "b_card_new_wrong_slug",
+          type: "Card",
+          props: {
+            title: "New card",
+            description: "Desc",
+            ctaText: "Learn",
+            ctaHref: "/"
+          }
+        }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/test-wrong-slug",
+      message: "generate and add images to each card usign unsplash and text from cards",
+      executionMode: "plan_only"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; pendingPlanId?: string }
+  assert.equal(payload.status, "plan_ready")
+  assert.ok(payload.pendingPlanId)
+
+  const pending = pendingApprovalPlanBySession.get(session)
+  assert.ok(pending)
+  assert.equal(pending?.plan.ops[0]?.op, "update_props")
+  if (pending?.plan.ops[0]?.op === "update_props") {
+    assert.equal(pending.plan.ops[0].pageSlug, "/test-wrong-slug")
+    assert.equal(pending.plan.ops[0].blockId, "b_cardgrid_wrong_slug")
+  }
+})
+
 test("shouldResolveCreatePageHeroImage returns true for local placeholder urls", () => {
   assert.equal(shouldResolveCreatePageHeroImage(""), true)
   assert.equal(shouldResolveCreatePageHeroImage("/hero-generated.svg"), true)
@@ -335,6 +840,134 @@ test("chat applies deterministic plan for high-confidence remove request without
   assert.equal(pageRes.statusCode, 200)
   const page = pageRes.json() as { blocks: Array<{ id: string }> }
   assert.equal(page.blocks.some((block) => block.id === "b_hero_home"), false)
+})
+
+test("rewrite without selected editable path falls back to model planner", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const targetHeading = `Model rewrite ${Date.now()}`
+  let plannerCalls = 0
+  setGeneratePlanWithOpenAIForTests(async () => {
+    plannerCalls += 1
+    return {
+      plan: {
+        intent: "edit_plan",
+        summary_for_user: "Rewrite heading.",
+        change_log: ["Rewrite heading."],
+        ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
+      },
+      usage: { ...ZERO_USAGE }
+    }
+  })
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "rewrite this copy",
+      activeBlockId: "b_hero_home"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string }
+  assert.equal(payload.status, "applied")
+  assert.equal(plannerCalls, 1)
+
+  const pageRes = await app.inject({
+    method: "GET",
+    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/")}`
+  })
+  assert.equal(pageRes.statusCode, 200)
+  const page = pageRes.json() as { blocks: Array<{ id: string; props: Record<string, unknown> }> }
+  const hero = page.blocks.find((block) => block.id === "b_hero_home")
+  assert.ok(hero)
+  assert.equal(hero?.props.heading, targetHeading)
+})
+
+test("focused deterministic rewrite sanitizes markdown emphasis", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  setGeneratePlanWithOpenAIForTests(async () => {
+    throw new Error("model planner should not be called for focused deterministic rewrite")
+  })
+
+  const createPage = await app.inject({
+    method: "POST",
+    url: "/ops",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      ops: [
+        {
+          op: "create_page",
+          page: {
+            id: "p_rewrite_test",
+            slug: "/rewrite-test",
+            title: "Rewrite Test",
+            updatedAt: new Date().toISOString(),
+            blocks: [
+              {
+                id: "b_richtext_rewrite",
+                type: "RichText",
+                props: {
+                  title: "Keep title",
+                  body: "**Amazing** [offers](https://example.com) for very teams"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  })
+  assert.equal(createPage.statusCode, 200)
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/rewrite-test",
+      message: "rewrite this copy",
+      activeBlockId: "b_richtext_rewrite",
+      activeEditablePath: "body"
+    }
+  })
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string }
+  assert.equal(payload.status, "applied")
+
+  const pageRes = await app.inject({
+    method: "GET",
+    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/rewrite-test")}`
+  })
+  assert.equal(pageRes.statusCode, 200)
+  const page = pageRes.json() as { blocks: Array<{ id: string; props: Record<string, unknown> }> }
+  const richText = page.blocks.find((block) => block.id === "b_richtext_rewrite")
+  assert.ok(richText)
+  const body = String(richText?.props.body ?? "")
+  assert.equal(body.includes("**"), false)
+  assert.equal(body.includes("["), false)
+  assert.equal(body.includes("]("), false)
+  assert.equal(richText?.props.title, "Keep title")
 })
 
 test("chat stream emits op_applied events for mocked multi-op plan", async (t) => {
