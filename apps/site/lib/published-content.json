@@ -133,7 +133,7 @@
     "id": "p_kayakers",
     "slug": "/kayakers",
     "title": "Kayakers",
-    "updatedAt": "2026-03-02T23:13:20.346Z",
+    "updatedAt": "2026-03-03T10:02:30.760Z",
     "blocks": [
       {
         "id": "b_hero_1772493161254",
@@ -170,6 +170,19 @@
               "description": "Level up your skills with guides on paddle technique, reading water, rescue procedures, and essential kayaking safety."
             }
           ]
+        }
+      },
+      {
+        "id": "b_twocolumn_1772532127537",
+        "type": "TwoColumn",
+        "props": {
+          "heading": "Expert Guides. Every Paddle.",
+          "body": "Whether you're navigating your first flatwater route or charging through whitewater rapids, our certified guides keep you safe and moving forward.\n\nSmall groups. Personalised coaching. Unforgettable water experiences — tailored to your skill level and ambition.",
+          "imageUrl": "https://images.unsplash.com/photo-1764757384903-7ec3bb0ef3a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw1fHxleHBlcnQlMjBndWlkZXMlMjBldmVyeSUyMHBhZGRsZXxlbnwxfDB8fHwxNzcyNTMyMTUwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Two people on paddleboards in the water",
+          "imagePosition": "left",
+          "ctaText": "Book a Guided Session",
+          "ctaHref": "/kayakers/routes"
         }
       },
       {
@@ -217,10 +230,10 @@
     }
   },
   {
-    "id": "p_for_summit_seekers",
-    "slug": "/for-summit-seekers",
-    "title": "For Summit Seekers",
-    "updatedAt": "2026-03-03T10:00:11.473Z",
+    "id": "p_summit_seekers",
+    "slug": "/summit-seekers",
+    "title": "Summit Seekers",
+    "updatedAt": "2026-03-03T10:01:38.227Z",
     "blocks": [
       {
         "id": "b_hero_1772493309022",
@@ -229,11 +242,11 @@
           "heading": "Rise Above the Rest",
           "subheading": "Summit Seekers are built different. Push past your limits, chase the horizon, and stand on top of the world — we have everything you need to make it happen.",
           "ctaText": "Claim Your Summit",
-          "ctaHref": "/for-summit-seekers#cta",
+          "ctaHref": "/summit-seekers#cta",
           "imageUrl": "https://images.unsplash.com/photo-1650099239459-c89de4be3f05?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxyaXNlJTIwYWJvdmUlMjByZXN0fGVufDF8MHx8fDE3NzI0OTM0NTB8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
           "imageAlt": "a round sticker on the side of a wall",
           "secondaryCtaText": "Explore the Peaks",
-          "secondaryCtaHref": "/for-summit-seekers#features"
+          "secondaryCtaHref": "/summit-seekers#features"
         }
       },
       {
@@ -271,7 +284,7 @@
           "imageAlt": "a group of people standing on top of a snow covered slope",
           "imagePosition": "right",
           "ctaText": "Book Your Climb",
-          "ctaHref": "/for-summit-seekers#cta"
+          "ctaHref": "/summit-seekers#cta"
         }
       },
       {
@@ -302,7 +315,7 @@
           "title": "Your Summit Starts Today",
           "description": "Stop planning. Start climbing. Book your guided ascent with Adventure Arena and take on the peaks with expert support every step of the way.",
           "ctaText": "Book My Climb",
-          "ctaHref": "/for-summit-seekers#cta"
+          "ctaHref": "/summit-seekers#cta"
         }
       }
     ]
