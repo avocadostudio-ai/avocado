@@ -827,7 +827,7 @@ export async function runChatPipeline(
     onStatusUpdate?: (message: string) => void
   }
 ): Promise<{ code: number; payload: ChatResult | { error: string } }> {
-  const executionMode = body.executionMode ?? "auto"
+  let executionMode = body.executionMode ?? "auto"
   const requiresMessage = executionMode === "auto" || executionMode === "plan_only"
   if (!body.session || !body.slug || (requiresMessage && !body.message)) {
     return { code: 400, payload: { error: "session and slug are required; message is required for planning" } }
@@ -934,6 +934,25 @@ export async function runChatPipeline(
     promptExcerpt,
     promptLength: plannerMessage.length
   })
+
+  if (executionMode === "auto") {
+    const existingPendingPlan = pendingApprovalPlanBySession.get(body.session)
+    const normalizedIncomingMessage = typeof body.message === "string" ? body.message.trim() : ""
+    const normalizedPendingMessage = typeof existingPendingPlan?.originalMessage === "string"
+      ? existingPendingPlan.originalMessage.trim()
+      : ""
+    const replayedPendingPrompt = Boolean(
+      existingPendingPlan &&
+      (
+        existingPendingPlan.promptHash === promptHash ||
+        (normalizedIncomingMessage.length > 0 && normalizedPendingMessage.length > 0 && normalizedIncomingMessage === normalizedPendingMessage)
+      )
+    )
+    if (replayedPendingPrompt) {
+      executionMode = "apply_pending_plan"
+      body.pendingPlanId = body.pendingPlanId ?? existingPendingPlan?.id
+    }
+  }
 
   const current = getPage(body.session, effectiveSlug)
   if (!current) return { code: 404, payload: { error: "page not found" } }
@@ -1179,6 +1198,7 @@ export async function runChatPipeline(
       pendingApprovalPlanBySession.set(body.session!, {
         id: pendingPlanId,
         createdAt: new Date().toISOString(),
+        promptHash,
         requestedSlug,
         effectiveSlug,
         summary: resolvedPlan.summary_for_user,
@@ -1186,7 +1206,8 @@ export async function runChatPipeline(
         modelUsed,
         modelKey,
         plan: structuredClone(resolvedPlan),
-        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps, originalMessage: plannerMessage } : {})
+        originalMessage: plannerMessage,
+        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps } : {})
       })
       ctx.chatTelemetry.push({
         id: chatRequestId,
@@ -1242,6 +1263,24 @@ export async function runChatPipeline(
     if (resolvedPlan.ops.length === 0) {
       pendingClarificationBySession.delete(body.session!)
       pendingApprovalPlanBySession.delete(body.session!)
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "no_effective_change",
+        intent: resolvedPlan.intent,
+        opCount: 0,
+        opTypes: []
+      })
       return {
         done: true as const,
         response: {

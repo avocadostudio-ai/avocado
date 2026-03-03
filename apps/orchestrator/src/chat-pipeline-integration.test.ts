@@ -102,6 +102,85 @@ test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocke
   assert.equal(hero?.props.heading, targetHeading)
 })
 
+test("chat auto mode reuses pending plan when the same prompt is sent again", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const message = "Change the image to match the guide-led theme."
+  const targetHeading = `Replay pending plan ${Date.now()}`
+  let plannerCalls = 0
+  setGeneratePlanWithOpenAIForTests(async () => {
+    plannerCalls += 1
+    if (plannerCalls === 1) {
+      return {
+        plan: {
+          intent: "edit_plan",
+          summary_for_user: "Updated hero heading.",
+          change_log: ["Changed hero heading."],
+          ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
+        },
+        usage: { ...ZERO_USAGE }
+      }
+    }
+    return {
+      plan: {
+        intent: "edit_plan",
+        summary_for_user: "No changes.",
+        change_log: [],
+        ops: []
+      },
+      usage: { ...ZERO_USAGE }
+    }
+  })
+
+  const planReady = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message,
+      executionMode: "plan_only"
+    }
+  })
+  assert.equal(planReady.statusCode, 200)
+  const planPayload = planReady.json() as { status?: string }
+  assert.equal(planPayload.status, "plan_ready")
+
+  const replay = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message
+    }
+  })
+  assert.equal(replay.statusCode, 200)
+  const replayPayload = replay.json() as { status?: string; summary?: string }
+  assert.equal(replayPayload.status, "applied")
+  assert.match(String(replayPayload.summary), /Updated hero heading/i)
+  assert.equal(plannerCalls, 1)
+
+  const pageRes = await app.inject({
+    method: "GET",
+    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/")}`
+  })
+  assert.equal(pageRes.statusCode, 200)
+  const page = pageRes.json() as { blocks: Array<{ id: string; props: Record<string, unknown> }> }
+  const hero = page.blocks.find((block) => block.id === "b_hero_home")
+  assert.ok(hero)
+  assert.equal(hero?.props.heading, targetHeading)
+})
+
 test("chat pending-plan lifecycle resolves image for TwoColumn update on approval", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
