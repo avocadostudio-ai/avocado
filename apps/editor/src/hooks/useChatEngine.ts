@@ -77,6 +77,30 @@ export function useChatEngine(config: ChatEngineConfig) {
     routeOptions
   } = config
 
+  const resolveContextPayload = () => {
+    const tone = typeof activeSiteConfig.tone === "string" ? activeSiteConfig.tone.trim() : ""
+    const constraints = Array.isArray(activeSiteConfig.constraints)
+      ? activeSiteConfig.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+      : []
+    const purpose = activeSiteConfig.purpose?.trim() || undefined
+
+    return {
+      sitePurpose: purpose,
+      businessContext: {
+        purpose,
+        tone: tone || undefined,
+        constraints: constraints.length > 0 ? constraints : undefined
+      },
+      siteContext: {
+        siteId,
+        siteName: activeSiteConfig.name?.trim() || undefined,
+        purpose,
+        tone: tone || undefined,
+        constraints: constraints.length > 0 ? constraints : undefined
+      }
+    }
+  }
+
   const [chatLog, setChatLog] = useState<ChatEntry[]>([
     {
       id: "welcome",
@@ -363,13 +387,14 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string }) {
+    const contextPayload = resolveContextPayload()
     const res = await fetch(`${orchestrator}/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         session,
         siteId,
-        sitePurpose: activeSiteConfig.purpose || undefined,
+        ...contextPayload,
         slug: slugRef.current,
         message: finalMessage,
         modelKey,
@@ -398,13 +423,14 @@ export function useChatEngine(config: ChatEngineConfig) {
       return
     }
 
+    const contextPayload = resolveContextPayload()
     const res = await fetch(`${orchestrator}/chat/variations`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         session,
         siteId,
-        sitePurpose: activeSiteConfig.purpose || undefined,
+        ...contextPayload,
         slug: slugRef.current,
         message: finalMessage,
         modelKey,
@@ -505,10 +531,13 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
     return await new Promise<boolean>((resolve) => {
+      const contextPayload = resolveContextPayload()
       const params = new URLSearchParams({
         session,
         siteId,
-        sitePurpose: activeSiteConfig.purpose || "",
+        sitePurpose: contextPayload.sitePurpose || "",
+        businessContext: JSON.stringify(contextPayload.businessContext),
+        siteContext: JSON.stringify(contextPayload.siteContext),
         slug: slugRef.current,
         message: finalMessage,
         modelKey,

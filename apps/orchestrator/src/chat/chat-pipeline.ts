@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
 import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
 import type { UnsplashImage } from "../variation-images.js"
-import { normalizeRouteCandidate, parseCreatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
+import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import {
   type ChatRequestBody,
   type ChatResult,
@@ -50,7 +50,8 @@ import {
   postEditSuggestions,
   demoPlanFromMessage,
   plannerContextPack,
-  compileDeterministicPlan
+  compileDeterministicPlan,
+  inferDeterministicIntent
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI } from "./planner.js"
 import { generatePlanWithAnthropic } from "./anthropic-planner.js"
@@ -379,8 +380,9 @@ export async function withUnsplashHeroImage(args: {
       const placeholderUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
       // Skip if the user provided an explicit URL in the message
       if (firstUrlFromText(args.message)) continue
-      // Only resolve if there's a placeholder or made-up URL
-      if (!placeholderUrl || placeholderUrl.startsWith("http")) {
+      // Resolve when the Hero has no image or a local placeholder path (e.g. /hero-generated.svg).
+      // Preserve explicit remote URLs that the planner/user already chose.
+      if (shouldResolveCreatePageHeroImage(placeholderUrl)) {
         const heading = typeof props.heading === "string" ? props.heading : ""
         const subheading = typeof props.subheading === "string" ? props.subheading : ""
         const pageTitle = typeof page.title === "string" ? page.title : ""
@@ -546,6 +548,12 @@ export async function withUnsplashHeroImage(args: {
   }
 
   return plan
+}
+
+export function shouldResolveCreatePageHeroImage(imageUrl: string) {
+  const normalized = imageUrl.trim()
+  if (!normalized) return true
+  return !/^https?:\/\//i.test(normalized)
 }
 
 // ---------------------------------------------------------------------------
@@ -765,6 +773,15 @@ function deterministicCreatePagePlan(args: { session: string; message: string })
   return buildCreatePagePlan({ session: args.session, requestedSlug, userMessage: args.message })
 }
 
+function shouldReturnDeterministicClarification(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    isStandalonePageOperation(message) ||
+    /\b(delete|remove)\b.*\b(page|home)\b/.test(lower) ||
+    /\b(rename|move)\b.*\bpage\b/.test(lower)
+  )
+}
+
 // ---------------------------------------------------------------------------
 // SSE write helper
 // ---------------------------------------------------------------------------
@@ -836,7 +853,12 @@ export async function runChatPipeline(
       }
     }
   }
-  const messageWithContext = withSiteContext(body.message ?? "", body.sitePurpose)
+  const messageWithContext = withSiteContext(body.message ?? "", {
+    sitePurpose: body.sitePurpose,
+    siteHosting: body.siteHosting,
+    businessContext: body.businessContext,
+    siteContext: body.siteContext
+  })
   const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
   const sessionChatHistory = chatHistoryBySession.get(body.session) ?? []
   const chatRequestId = randomUUID()
@@ -1547,6 +1569,56 @@ export async function runChatPipeline(
           modelKey
         }, { outcome: "planner_exception", reasonCategory: classifyGuardrailError(reason) })
       }
+    }
+  }
+
+  const deterministicIntent = inferDeterministicIntent({
+    message: plannerMessage,
+    currentPage: current,
+    activeBlockId: body.activeBlockId,
+    activeEditablePath: body.activeEditablePath
+  })
+
+  if (deterministicIntent) {
+    const deterministicPlan = compileDeterministicPlan({
+      session: body.session,
+      intent: deterministicIntent,
+      message: plannerMessage,
+      slug: effectiveSlug,
+      currentPage: current,
+      activeBlockId: body.activeBlockId,
+      activeEditablePath: body.activeEditablePath
+    })
+
+    if (deterministicPlan?.intent === "edit_plan" && deterministicPlan.ops.length > 0) {
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "deterministic_plan_generated",
+        session: body.session,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "deterministic_plan_ready",
+        intent: deterministicPlan.intent,
+        opCount: deterministicPlan.ops.length,
+        opTypes: deterministicPlan.ops.map((op) => op.op)
+      })
+      const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode)
+      if (deterministicOutcome.done) return deterministicOutcome.response
+    }
+
+    if (
+      deterministicPlan?.intent === "needs_clarification" &&
+      shouldReturnDeterministicClarification(plannerMessage)
+    ) {
+      const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode)
+      if (deterministicOutcome.done) return deterministicOutcome.response
     }
   }
 

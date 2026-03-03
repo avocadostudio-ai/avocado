@@ -1161,7 +1161,7 @@ textarea {
 }
 
 .sites-modal {
-  width: min(560px, 100%);
+  width: min(920px, 100%);
   background: #f8fbff;
   border: 1px solid #b5c0ca;
   border-radius: 16px;
@@ -1184,12 +1184,51 @@ textarea {
 
 .sites-modal-body {
   padding: 14px;
+  display: block;
+}
+
+.sites-form-grid {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.sites-form-field {
+  display: grid;
+  gap: 6px;
+}
+
+.sites-form-section-title {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4b6076;
+}
+
+.sites-form-field span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #2f445a;
+  text-transform: uppercase;
+}
+
+.sites-form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.sites-form-field input,
+.sites-form-field textarea {
+  width: 100%;
 }
 
 .sites-modal-body textarea {
   resize: vertical;
+  min-height: 88px;
+  line-height: 1.45;
 }
 
 .sites-modal-footer {
@@ -1198,6 +1237,16 @@ textarea {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+@media (max-width: 820px) {
+  .sites-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sites-form-field-wide {
+    grid-column: auto;
+  }
 }
 
 .settings-modal-backdrop {

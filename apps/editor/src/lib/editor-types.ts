@@ -144,6 +144,8 @@ export type SiteConfig = {
   name: string
   purpose: string
   hosting: string
+  tone?: string
+  constraints?: string[]
 }
 
 export type RestoreSnapshot = {
