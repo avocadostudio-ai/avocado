@@ -25,6 +25,8 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             onClick={() => {
               sites.setNewSiteName("")
               sites.setNewSitePurpose("")
+              sites.setNewSiteTone("")
+              sites.setNewSiteConstraints("")
               sites.setNewSiteHosting(DEFAULT_SITE_HOSTING)
               sites.setShowSiteModal(true)
             }}
@@ -81,24 +83,55 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               </button>
             </header>
             <div className="sites-modal-body">
-              <input
-                type="text"
-                value={sites.newSiteName}
-                placeholder="Site name"
-                onChange={(event) => sites.setNewSiteName(event.target.value)}
-              />
-              <input
-                type="text"
-                value={sites.newSiteHosting}
-                placeholder="Hosting configuration"
-                onChange={(event) => sites.setNewSiteHosting(event.target.value)}
-              />
-              <textarea
-                value={sites.newSitePurpose}
-                placeholder="Site purpose for AI context (e.g. lead gen for B2B SaaS founders)"
-                onChange={(event) => sites.setNewSitePurpose(event.target.value)}
-                rows={3}
-              />
+              <div className="sites-form-grid">
+                <p className="sites-form-section-title">Core settings</p>
+                <label className="sites-form-field">
+                  <span>Site name</span>
+                  <input
+                    type="text"
+                    value={sites.newSiteName}
+                    placeholder="Adventure Arena"
+                    onChange={(event) => sites.setNewSiteName(event.target.value)}
+                  />
+                </label>
+                <label className="sites-form-field">
+                  <span>Hosting</span>
+                  <input
+                    type="text"
+                    value={sites.newSiteHosting}
+                    placeholder="Vercel production site (single shared project)"
+                    onChange={(event) => sites.setNewSiteHosting(event.target.value)}
+                  />
+                </label>
+                <p className="sites-form-section-title">AI guidance</p>
+                <label className="sites-form-field sites-form-field-wide">
+                  <span>Site purpose</span>
+                  <textarea
+                    value={sites.newSitePurpose}
+                    placeholder="Describe business goals, audiences, and conversion intent."
+                    onChange={(event) => sites.setNewSitePurpose(event.target.value)}
+                    rows={5}
+                  />
+                </label>
+                <label className="sites-form-field sites-form-field-wide">
+                  <span>Preferred tone</span>
+                  <textarea
+                    value={sites.newSiteTone}
+                    placeholder="Bold, dynamic, motivating. Short paragraphs. Strong verbs."
+                    onChange={(event) => sites.setNewSiteTone(event.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label className="sites-form-field sites-form-field-wide">
+                  <span>AI constraints</span>
+                  <textarea
+                    value={sites.newSiteConstraints}
+                    placeholder={"Use active voice.\nAvoid generic phrases.\nAlways include a clear CTA suggestion."}
+                    onChange={(event) => sites.setNewSiteConstraints(event.target.value)}
+                    rows={5}
+                  />
+                </label>
+              </div>
             </div>
             <footer className="sites-modal-footer">
               <button type="button" className="secondary-btn" onClick={() => sites.setShowSiteModal(false)}>
@@ -121,24 +154,62 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               </button>
             </header>
             <div className="sites-modal-body">
-              <input
-                type="text"
-                value={sites.configSite.name}
-                placeholder="Site name"
-                onChange={(event) => sites.updateConfigSite({ name: event.target.value })}
-              />
-              <input
-                type="text"
-                value={sites.configSite.hosting}
-                placeholder="Hosting configuration"
-                onChange={(event) => sites.updateConfigSite({ hosting: event.target.value })}
-              />
-              <textarea
-                value={sites.configSite.purpose}
-                placeholder="Site purpose for AI context"
-                onChange={(event) => sites.updateConfigSite({ purpose: event.target.value })}
-                rows={3}
-              />
+              <div className="sites-form-grid">
+                <p className="sites-form-section-title">Core settings</p>
+                <label className="sites-form-field">
+                  <span>Site name</span>
+                  <input
+                    type="text"
+                    value={sites.configSite.name}
+                    placeholder="Site name"
+                    onChange={(event) => sites.updateConfigSite({ name: event.target.value })}
+                  />
+                </label>
+                <label className="sites-form-field">
+                  <span>Hosting</span>
+                  <input
+                    type="text"
+                    value={sites.configSite.hosting}
+                    placeholder="Hosting configuration"
+                    onChange={(event) => sites.updateConfigSite({ hosting: event.target.value })}
+                  />
+                </label>
+                <p className="sites-form-section-title">AI guidance</p>
+                <label className="sites-form-field sites-form-field-wide">
+                  <span>Site purpose</span>
+                  <textarea
+                    value={sites.configSite.purpose}
+                    placeholder="Site purpose for AI context"
+                    onChange={(event) => sites.updateConfigSite({ purpose: event.target.value })}
+                    rows={5}
+                  />
+                </label>
+                <label className="sites-form-field sites-form-field-wide">
+                  <span>Preferred tone</span>
+                  <textarea
+                    value={sites.configSite.tone ?? ""}
+                    placeholder="Preferred tone for AI"
+                    onChange={(event) => sites.updateConfigSite({ tone: event.target.value })}
+                    rows={3}
+                  />
+                </label>
+                <label className="sites-form-field sites-form-field-wide">
+                  <span>AI constraints</span>
+                  <textarea
+                    value={(sites.configSite.constraints ?? []).join("\n")}
+                    placeholder="AI constraints (one per line)"
+                    onChange={(event) =>
+                      sites.updateConfigSite({
+                        constraints: event.target.value
+                          .split(/\n|,/g)
+                          .map((item) => item.trim())
+                          .filter(Boolean)
+                      })
+                    }
+                    rows={5}
+                  />
+                </label>
+              </div>
             </div>
             <footer className="sites-modal-footer">
               <button type="button" className="primary-btn" onClick={() => sites.setConfigSiteId(null)}>
@@ -159,21 +230,24 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             </header>
             <div className="sites-modal-body">
               <p className="site-purpose">Restore a previous published snapshot into <strong>{sites.restoreSiteId}</strong>.</p>
-              <select
-                value={sites.restoreCommit}
-                onChange={(event) => sites.setRestoreCommit(event.target.value)}
-                disabled={sites.isLoadingRestoreOptions || sites.isRestoringSnapshot || sites.restoreOptions.length === 0}
-              >
-                {sites.restoreOptions.map((option) => {
-                  const dateLabel = new Date(option.committedAt).toLocaleString()
-                  const label = `${option.commit} · ${option.pageCount} pages · ${option.homeHeading} · ${dateLabel}`
-                  return (
-                    <option key={option.commit} value={option.commit}>
-                      {label}
-                    </option>
-                  )
-                })}
-              </select>
+              <label className="sites-form-field">
+                <span>Snapshot version</span>
+                <select
+                  value={sites.restoreCommit}
+                  onChange={(event) => sites.setRestoreCommit(event.target.value)}
+                  disabled={sites.isLoadingRestoreOptions || sites.isRestoringSnapshot || sites.restoreOptions.length === 0}
+                >
+                  {sites.restoreOptions.map((option) => {
+                    const dateLabel = new Date(option.committedAt).toLocaleString()
+                    const label = `${option.commit} · ${option.pageCount} pages · ${option.homeHeading} · ${dateLabel}`
+                    return (
+                      <option key={option.commit} value={option.commit}>
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
               {sites.restoreError ? <p className="site-purpose">{sites.restoreError}</p> : null}
             </div>
             <footer className="sites-modal-footer">

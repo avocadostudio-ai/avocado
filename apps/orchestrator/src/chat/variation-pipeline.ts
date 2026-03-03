@@ -26,6 +26,19 @@ export type VariationRequestBody = {
   siteId?: string
   sitePurpose?: string
   siteHosting?: string
+  businessContext?: {
+    purpose?: string
+    tone?: string
+    constraints?: string[]
+  } | string
+  siteContext?: {
+    siteId?: string
+    siteName?: string
+    purpose?: string
+    hosting?: string
+    tone?: string
+    constraints?: string[]
+  } | string
   slug?: string
   message?: string
   modelKey?: ModelKey
@@ -527,7 +540,12 @@ export async function runVariationPipeline(
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
-  const contextualMessage = withSiteContext(body.message, body.sitePurpose)
+  const contextualMessage = withSiteContext(body.message, {
+    sitePurpose: body.sitePurpose,
+    siteHosting: body.siteHosting,
+    businessContext: body.businessContext,
+    siteContext: body.siteContext
+  })
 
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({

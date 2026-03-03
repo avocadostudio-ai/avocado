@@ -18,6 +18,19 @@ export type ChatRequestBody = {
   siteId?: string
   sitePurpose?: string
   siteHosting?: string
+  businessContext?: {
+    purpose?: string
+    tone?: string
+    constraints?: string[]
+  } | string
+  siteContext?: {
+    siteId?: string
+    siteName?: string
+    purpose?: string
+    hosting?: string
+    tone?: string
+    constraints?: string[]
+  } | string
   slug?: string
   message?: string
   modelKey?: ModelKey
@@ -222,10 +235,62 @@ export function plannerMessageWithPendingContext(session: string, message: strin
   return `${pending.baseRequest}\nClarification from user: ${message}`
 }
 
-export function withSiteContext(message: string, sitePurpose?: string, _siteHosting?: string) {
-  const purpose = typeof sitePurpose === "string" ? sitePurpose.trim() : ""
-  if (!purpose) return message
-  return `${message}\n\n[site context]\nSite purpose: ${purpose}\n[/site context]`
+function parseJsonObjectMaybe(value: unknown): Record<string, unknown> | null {
+  if (!value) return null
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null
+    } catch {
+      return null
+    }
+  }
+  if (typeof value === "object") return value as Record<string, unknown>
+  return null
+}
+
+function normalizeConstraintList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,\n]/g)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+export function withSiteContext(message: string, args?: {
+  sitePurpose?: string
+  siteHosting?: string
+  businessContext?: ChatRequestBody["businessContext"]
+  siteContext?: ChatRequestBody["siteContext"]
+}) {
+  const businessContext = parseJsonObjectMaybe(args?.businessContext)
+  const siteContext = parseJsonObjectMaybe(args?.siteContext)
+  const purpose =
+    (typeof siteContext?.purpose === "string" ? siteContext.purpose.trim() : "") ||
+    (typeof businessContext?.purpose === "string" ? businessContext.purpose.trim() : "") ||
+    (typeof args?.sitePurpose === "string" ? args.sitePurpose.trim() : "")
+  const tone =
+    (typeof siteContext?.tone === "string" ? siteContext.tone.trim() : "") ||
+    (typeof businessContext?.tone === "string" ? businessContext.tone.trim() : "")
+  const constraints = [
+    ...normalizeConstraintList(siteContext?.constraints),
+    ...normalizeConstraintList(businessContext?.constraints)
+  ]
+  const siteName = typeof siteContext?.siteName === "string" ? siteContext.siteName.trim() : ""
+  const lines = [
+    purpose ? `Site purpose: ${purpose}` : null,
+    tone ? `Preferred tone: ${tone}` : null,
+    constraints.length > 0 ? `Constraints: ${constraints.join("; ")}` : null,
+    siteName ? `Site name: ${siteName}` : null
+  ].filter((line): line is string => Boolean(line))
+
+  if (lines.length === 0) return message
+  return `${message}\n\n[site context]\n${lines.join("\n")}\n[/site context]`
 }
 
 export function stripSiteContextEnvelope(message: string) {

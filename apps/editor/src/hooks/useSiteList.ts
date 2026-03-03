@@ -13,6 +13,8 @@ export function useSiteList(siteId: string, session: string) {
   const [siteList, setSiteList] = useState<SiteConfig[]>(() => loadSiteListFromStorage(siteId))
   const [newSiteName, setNewSiteName] = useState("")
   const [newSitePurpose, setNewSitePurpose] = useState("")
+  const [newSiteTone, setNewSiteTone] = useState("")
+  const [newSiteConstraints, setNewSiteConstraints] = useState("")
   const [newSiteHosting, setNewSiteHosting] = useState(DEFAULT_SITE_HOSTING)
   const [showSiteModal, setShowSiteModal] = useState(false)
   const [configSiteId, setConfigSiteId] = useState<string | null>(null)
@@ -40,7 +42,9 @@ export function useSiteList(siteId: string, session: string) {
       id: siteId,
       name: siteNameFromId(siteId) || "Site",
       purpose: "",
-      hosting: DEFAULT_SITE_HOSTING
+      hosting: DEFAULT_SITE_HOSTING,
+      tone: "",
+      constraints: []
     } satisfies SiteConfig
   }, [siteId, siteList])
 
@@ -117,17 +121,25 @@ export function useSiteList(siteId: string, session: string) {
       nextId = `${baseId}-${suffix}`
       suffix += 1
     }
+    const parsedConstraints = newSiteConstraints
+      .split(/\n|,/g)
+      .map((item) => item.trim())
+      .filter(Boolean)
     setSiteList((prev) => [
       ...prev,
       {
         id: nextId,
         name,
         purpose: newSitePurpose.trim(),
-        hosting: newSiteHosting.trim() || DEFAULT_SITE_HOSTING
+        hosting: newSiteHosting.trim() || DEFAULT_SITE_HOSTING,
+        tone: newSiteTone.trim(),
+        constraints: parsedConstraints
       }
     ])
     setNewSiteName("")
     setNewSitePurpose("")
+    setNewSiteTone("")
+    setNewSiteConstraints("")
     setNewSiteHosting(DEFAULT_SITE_HOSTING)
     setShowSiteModal(false)
   }
@@ -137,7 +149,7 @@ export function useSiteList(siteId: string, session: string) {
     return siteList.find((site) => site.id === configSiteId) ?? null
   }, [configSiteId, siteList])
 
-  const updateConfigSite = (patch: Partial<Pick<SiteConfig, "name" | "purpose" | "hosting">>) => {
+  const updateConfigSite = (patch: Partial<Pick<SiteConfig, "name" | "purpose" | "hosting" | "tone" | "constraints">>) => {
     if (!configSiteId) return
     setSiteList((prev) =>
       prev.map((site) =>
@@ -146,7 +158,9 @@ export function useSiteList(siteId: string, session: string) {
               ...site,
               ...(patch.name !== undefined ? { name: patch.name } : {}),
               ...(patch.purpose !== undefined ? { purpose: patch.purpose } : {}),
-              ...(patch.hosting !== undefined ? { hosting: patch.hosting } : {})
+              ...(patch.hosting !== undefined ? { hosting: patch.hosting } : {}),
+              ...(patch.tone !== undefined ? { tone: patch.tone } : {}),
+              ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {})
             }
           : site
       )
@@ -160,6 +174,10 @@ export function useSiteList(siteId: string, session: string) {
     setNewSiteName,
     newSitePurpose,
     setNewSitePurpose,
+    newSiteTone,
+    setNewSiteTone,
+    newSiteConstraints,
+    setNewSiteConstraints,
     newSiteHosting,
     setNewSiteHosting,
     showSiteModal,
