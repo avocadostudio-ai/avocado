@@ -11,7 +11,7 @@ The editor has a built-in debug overlay that shows per-message metadata.
 3. Send a chat message
 4. Each assistant response shows a **Debug** section with `traceId`, `outcome`, `intent`, `opCount`, and `ops`
 
-> **Note:** Token counts (`inputTokens`, `outputTokens`, `estimatedUsd`) are included in the debug payload but not yet rendered in the panel. To see them, use the Network tab or telemetry API (below).
+> **Note:** Token and cache counts (`inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, `estimatedUsd`) are included in the debug payload but not yet rendered in the panel. To see them, use the Network tab or telemetry API (below).
 
 ## Browser DevTools (Network Tab)
 
@@ -33,6 +33,8 @@ Every `/chat` POST response includes a `debug` object:
     "inputTokens": 1842,
     "outputTokens": 312,
     "totalTokens": 2154,
+    "cacheReadInputTokens": 640,
+    "cacheCreationInputTokens": 1200,
     "estimatedUsd": 0.00773
   }
 }
@@ -49,6 +51,8 @@ For the **variation endpoint** (`POST /chat/variations`), usage is a top-level f
     "inputTokens": 920,
     "outputTokens": 1450,
     "totalTokens": 2370,
+    "cacheReadInputTokens": 320,
+    "cacheCreationInputTokens": 610,
     "estimatedUsd": 0.0168
   }
 }
@@ -67,6 +71,8 @@ The orchestrator logs every telemetry event with token data. Look for `"event":"
   "inputTokens": 1842,
   "outputTokens": 312,
   "totalTokens": 2154,
+  "cacheReadInputTokens": 640,
+  "cacheCreationInputTokens": 1200,
   "estimatedUsd": 0.00773
 }
 ```
@@ -85,7 +91,7 @@ Two HTTP endpoints expose stored telemetry:
 GET http://localhost:4200/telemetry/chat?session=<id>&limit=50
 ```
 
-Returns recent telemetry rows with summary stats. Each row includes `inputTokens`, `outputTokens`, `totalTokens`, and `estimatedUsd` when available.
+Returns recent telemetry rows with summary stats. Each row includes `inputTokens`, `outputTokens`, `totalTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, and `estimatedUsd` when available.
 
 ### Failure review
 
@@ -116,6 +122,8 @@ To update pricing, edit `USD_PER_MTOK` in `apps/orchestrator/src/telemetry/usage
 
 - **Streaming requests** return zero token counts (OpenAI streaming doesn't include per-chunk usage data)
 - **Anthropic streaming** captures usage via `stream.finalMessage()` after the stream completes
+- `cacheReadInputTokens` maps to OpenAI `cached_tokens` and Anthropic `cache_read_input_tokens`
+- `cacheCreationInputTokens` is currently provided by Anthropic (`cache_creation_input_tokens`)
 - **Demo mode** (no API key) always returns zero usage
 - **Image generation and audio** are not tracked
 - Cost is an estimate based on list pricing; actual billing may differ

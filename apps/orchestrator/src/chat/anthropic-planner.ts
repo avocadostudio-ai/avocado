@@ -23,6 +23,7 @@ import {
 import { isChatStrictPrimaryOpMode, isPageWideTranslationRequest } from "./planner.js"
 import { editPlanJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
+import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthropic-cache.js"
 
 
 export async function parseIntentWithAnthropic(args: {
@@ -59,7 +60,7 @@ export async function parseIntentWithAnthropic(args: {
   const response = await client.messages.create({
     model: args.model,
     max_tokens: 2048,
-    system,
+    system: anthropicSystemPromptWithCache(system),
     messages: [
       { role: "user", content: JSON.stringify(user) }
     ],
@@ -226,11 +227,11 @@ export async function generatePlanWithAnthropic(args: {
     content: h.content
   }))
 
-  const toolDef: Anthropic.Messages.Tool = {
+  const toolDef: Anthropic.Messages.Tool = anthropicToolWithCache({
     name: "submit_edit_plan",
     description: "Submit the structured EditPlan JSON.",
     input_schema: editPlanJsonSchema
-  }
+  })
 
   let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
@@ -240,7 +241,7 @@ export async function generatePlanWithAnthropic(args: {
     const stream = client.messages.stream({
       model: args.model,
       max_tokens: 8192,
-      system,
+      system: anthropicSystemPromptWithCache(system),
       tools: [toolDef],
       tool_choice: { type: "tool", name: "submit_edit_plan" },
       messages: [
@@ -273,7 +274,7 @@ export async function generatePlanWithAnthropic(args: {
     const response = await client.messages.create({
       model: args.model,
       max_tokens: 8192,
-      system,
+      system: anthropicSystemPromptWithCache(system),
       tools: [toolDef],
       tool_choice: { type: "tool", name: "submit_edit_plan" },
       messages: [

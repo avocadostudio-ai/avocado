@@ -1102,6 +1102,12 @@ export async function runChatPipeline(
       inputTokens: planUsage.inputTokens,
       outputTokens: planUsage.outputTokens,
       totalTokens: planUsage.totalTokens,
+      ...(typeof planUsage.cacheCreationInputTokens === "number"
+        ? { cacheCreationInputTokens: planUsage.cacheCreationInputTokens }
+        : {}),
+      ...(typeof planUsage.cacheReadInputTokens === "number"
+        ? { cacheReadInputTokens: planUsage.cacheReadInputTokens }
+        : {}),
       estimatedUsd: estimateUsd(modelUsed, planUsage)
     } : {}
     ctx.chatTelemetry.push({
