@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { Check, Copy } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
@@ -62,6 +63,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId: string } | null>(null)
   const [addBlockSearch, setAddBlockSearch] = useState("")
   const [isAddingBlock, setIsAddingBlock] = useState(false)
+  const [copiedDebugEntryId, setCopiedDebugEntryId] = useState<string | null>(null)
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
@@ -395,6 +397,43 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   const streamLabel = streamIsError ? chatEngine.streamStatus : chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const hasUserEntry = chatEngine.chatLog.some((entry) => entry.role === "user")
+  const buildCopyPayload = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
+    const lines: string[] = []
+    if (entry.text) lines.push(entry.text)
+    if (entry.aiJustification) lines.push(`AI justification: ${entry.aiJustification}`)
+    if (entry.aiPerformanceNote) lines.push(`Performance awareness: ${entry.aiPerformanceNote}`)
+    if (entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready") lines.push(`status: ${entry.status}`)
+    const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line))
+    if (changeLines.length > 0) lines.push(`changes: ${changeLines.join("\n")}`)
+    if ((entry.errors ?? []).length > 0) lines.push(`errors: ${(entry.errors ?? []).join("\n")}`)
+    if (entry.debug) {
+      lines.push("")
+      lines.push("Debug")
+      if (entry.debug.traceId) lines.push(`traceId: ${entry.debug.traceId}`)
+      if (entry.debug.promptHash) lines.push(`promptHash: ${entry.debug.promptHash}`)
+      if (entry.debug.outcome) lines.push(`outcome: ${entry.debug.outcome}`)
+      if (entry.debug.reasonCategory) lines.push(`reason: ${entry.debug.reasonCategory}`)
+      if (entry.debug.intent) lines.push(`intent: ${entry.debug.intent}`)
+      if (typeof entry.debug.opCount === "number") lines.push(`opCount: ${entry.debug.opCount}`)
+      if (Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0) lines.push(`ops: ${entry.debug.opTypes.join(", ")}`)
+      if (entry.debug.promptExcerpt) lines.push(`prompt: ${entry.debug.promptExcerpt}`)
+    }
+    return lines.join("\n")
+  }, [])
+
+  const copyAssistantBubble = useCallback(async (entry: (typeof chatEngine.chatLog)[number]) => {
+    const text = buildCopyPayload(entry)
+    if (!text.trim()) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedDebugEntryId(entry.id)
+      window.setTimeout(() => {
+        setCopiedDebugEntryId((current) => (current === entry.id ? null : current))
+      }, 1400)
+    } catch {
+      // no-op if clipboard API is unavailable or blocked
+    }
+  }, [buildCopyPayload])
 
   return (
     <div className="layout">
@@ -543,7 +582,22 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
               ) : null}
               {showDebugDetails && entry.role === "assistant" && entry.debug ? (
                 <div className="msg-debug">
-                  <div className="msg-debug-title">Debug</div>
+                  <div className="msg-debug-title-row">
+                    <div className="msg-debug-title">Debug</div>
+                    <button
+                      type="button"
+                      className="msg-debug-copy-btn"
+                      onClick={() => void copyAssistantBubble(entry)}
+                      aria-label={copiedDebugEntryId === entry.id ? "Copied" : "Copy debug bubble"}
+                      title={copiedDebugEntryId === entry.id ? "Copied" : "Copy"}
+                    >
+                      {copiedDebugEntryId === entry.id ? (
+                        <Check aria-hidden="true" size={14} />
+                      ) : (
+                        <Copy aria-hidden="true" size={14} />
+                      )}
+                    </button>
+                  </div>
                   <ul>
                     {entry.debug.traceId ? <li>traceId: {entry.debug.traceId}</li> : null}
                     {entry.debug.promptHash ? <li>promptHash: {entry.debug.promptHash}</li> : null}
