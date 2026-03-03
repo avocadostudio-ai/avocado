@@ -815,8 +815,19 @@ export function inferDeterministicIntent(args: {
   const raw = stripSiteContextEnvelope(args.message).trim()
   if (!raw) return null
 
-  const action = inferActionFromMessage(raw)
+  let action = inferActionFromMessage(raw)
   if (!action) return null
+
+  // In focused inline-edit mode, "add image/photo" should update the selected image field,
+  // not add a new block.
+  if (
+    action === "add" &&
+    typeof args.activeEditablePath === "string" &&
+    args.activeEditablePath.trim() === "imageUrl" &&
+    /\b(image|photo|picture)\b/i.test(raw)
+  ) {
+    action = "update"
+  }
 
   const refs = resolveReferencesFromMessage({
     message: raw,
@@ -874,12 +885,16 @@ export function inferAddedBlockTypeFromMessage(message: string): BlockType | und
   const normalized = message.toLowerCase()
   const addMatch = normalized.match(/\b(add|create|insert)\b\s+(?:(?:a|an)\b)?\s*([a-z -]+)/)
   if (!addMatch?.[2]) return undefined
-  const chunk = addMatch[2].trim()
+  const chunk = addMatch[2]
+    .trim()
+    .replace(/^(?:new|another)\s+/, "")
   if (chunk.startsWith("card grid") || chunk.startsWith("cardgrid")) return "CardGrid"
   if (chunk.startsWith("card")) return "Card"
   if (chunk.startsWith("feature grid") || chunk.startsWith("featuregrid") || chunk.startsWith("features")) return "FeatureGrid"
   if (chunk.startsWith("testimonial") || chunk.startsWith("social proof") || chunk.startsWith("review") || chunk.startsWith("quote")) return "Testimonials"
   if (chunk.startsWith("faq")) return "FAQAccordion"
+  if (chunk.startsWith("two column") || chunk.startsWith("twocolumn") || chunk.startsWith("2 column")) return "TwoColumn"
+  if (chunk.startsWith("stats") || chunk.startsWith("statistics") || chunk.startsWith("metrics") || chunk.startsWith("numbers")) return "Stats"
   if (chunk.startsWith("cta")) return "CTA"
   if (chunk.startsWith("hero")) return "Hero"
   if (chunk.startsWith("rich text") || chunk.startsWith("richtext") || chunk.startsWith("rich-text") || chunk.startsWith("prose") || chunk.startsWith("text block") || chunk.startsWith("section") || chunk.startsWith("paragraph") || chunk.startsWith("copy")) return "RichText"

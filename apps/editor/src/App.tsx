@@ -8,7 +8,7 @@ import { usePreviewBridge, type PreviewBridgeCallbacks } from "./hooks/usePrevie
 import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
-import type { BlockInstance } from "@ai-site-editor/shared"
+import { allowedBlockTypes, getAllBlockMeta, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ModelKey, PlannerSource, PreviewWidthPreset } from "./lib/editor-types"
 import {
   DEBUG_MODE_STORAGE_KEY,
@@ -59,6 +59,9 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   const [variationPreviewPreset, setVariationPreviewPreset] = useState<PreviewWidthPreset>("desktop")
   const [composerHeight, setComposerHeight] = useState(124)
   const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
+  const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId: string } | null>(null)
+  const [addBlockSearch, setAddBlockSearch] = useState("")
+  const [isAddingBlock, setIsAddingBlock] = useState(false)
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
@@ -73,6 +76,47 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
     return raw.includes("/") ? ["/", ...raw.filter((route) => route !== "/")] : raw
   }, [availableSlugs, slug])
+
+  const blockTypeOptions = useMemo(() => {
+    const meta = getAllBlockMeta()
+    return [...allowedBlockTypes]
+      .map((type) => ({
+        type,
+        label: meta[type]?.displayName ?? type,
+        category: meta[type]?.category ?? "content"
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [])
+
+  const groupedBlockTypeOptions = useMemo(() => {
+    const query = addBlockSearch.trim().toLowerCase()
+    const filtered = query
+      ? blockTypeOptions.filter((option) => option.label.toLowerCase().includes(query) || option.type.toLowerCase().includes(query))
+      : blockTypeOptions
+
+    const groups = new Map<string, typeof filtered>()
+    for (const option of filtered) {
+      const key = option.category || "content"
+      const existing = groups.get(key)
+      if (existing) {
+        existing.push(option)
+      } else {
+        groups.set(key, [option])
+      }
+    }
+
+    const ordered = ["content", "layout", "conversion", "navigation", "media"]
+    return [...groups.entries()]
+      .sort((a, b) => {
+        const ai = ordered.indexOf(a[0])
+        const bi = ordered.indexOf(b[0])
+        const safeAi = ai === -1 ? Number.MAX_SAFE_INTEGER : ai
+        const safeBi = bi === -1 ? Number.MAX_SAFE_INTEGER : bi
+        if (safeAi !== safeBi) return safeAi - safeBi
+        return a[0].localeCompare(b[0])
+      })
+      .map(([category, options]) => ({ category, options }))
+  }, [addBlockSearch, blockTypeOptions])
 
   const previewCallbacks = useMemo<PreviewBridgeCallbacks>(() => ({
     onBlockClicked: (newSlug, blockId, blockType, editablePath) => {
@@ -101,6 +145,29 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.deleteBlock(newSlug, blockId)
+    },
+    onBlockAddRequested: (newSlug, afterBlockId) => {
+      if (newSlug !== slug) setSlug(newSlug)
+      if (!afterBlockId) return
+      setAddBlockPicker({ slug: newSlug, afterBlockId })
+    },
+    onListItemAddRequested: (newSlug, blockId, blockType, listKey, afterIndex) => {
+      if (newSlug !== slug) setSlug(newSlug)
+      activeEditablePathRef.current = undefined
+      setActiveEditablePath(undefined)
+      void chatEngine.addListItem(newSlug, blockId, blockType, listKey, afterIndex)
+    },
+    onListItemRemoveRequested: (newSlug, blockId, blockType, listKey, index) => {
+      if (newSlug !== slug) setSlug(newSlug)
+      activeEditablePathRef.current = undefined
+      setActiveEditablePath(undefined)
+      void chatEngine.removeListItem(newSlug, blockId, blockType, listKey, index)
+    },
+    onListItemMoveRequested: (newSlug, blockId, blockType, listKey, index, afterIndex) => {
+      if (newSlug !== slug) setSlug(newSlug)
+      activeEditablePathRef.current = undefined
+      setActiveEditablePath(undefined)
+      void chatEngine.moveListItem(newSlug, blockId, blockType, listKey, index, afterIndex)
     },
     onInlineTextCommitted: (newSlug, blockId, editablePath, value) => {
       if (newSlug !== slug) setSlug(newSlug)
@@ -310,6 +377,19 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [chatEngine.variationModal, chatEngine.isApplyingVariation])
+
+  useEffect(() => {
+    if (!addBlockPicker) setAddBlockSearch("")
+  }, [addBlockPicker])
+
+  useEffect(() => {
+    if (!addBlockPicker) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isAddingBlock) setAddBlockPicker(null)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [addBlockPicker, isAddingBlock])
 
   const streamIsError = chatEngine.streamStatus ? /failed|error/i.test(chatEngine.streamStatus) : false
   const streamLabel = streamIsError ? chatEngine.streamStatus : chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."
@@ -617,6 +697,72 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
         </div>
         )
       })() : null}
+
+      {addBlockPicker ? (
+        <div
+          className="add-block-modal-backdrop"
+          onClick={() => {
+            if (!isAddingBlock) setAddBlockPicker(null)
+          }}
+        >
+          <div className="add-block-modal" role="dialog" aria-modal="true" aria-label="Add block" onClick={(e) => e.stopPropagation()}>
+            <div className="add-block-modal-header">
+              <h2>Add block</h2>
+              <p>Select block type to insert below the selected section.</p>
+              <button
+                type="button"
+                className="settings-close-btn"
+                aria-label="Close add block picker"
+                onClick={() => setAddBlockPicker(null)}
+                disabled={isAddingBlock}
+              >
+                ×
+              </button>
+            </div>
+            <div className="add-block-modal-body">
+              <label className="add-block-search">
+                <span>Search</span>
+                <input
+                  type="search"
+                  value={addBlockSearch}
+                  onChange={(e) => setAddBlockSearch(e.target.value)}
+                  placeholder="Search block types..."
+                  disabled={isAddingBlock}
+                />
+              </label>
+              {groupedBlockTypeOptions.length === 0 ? (
+                <p className="add-block-empty">No block types match your search.</p>
+              ) : (
+                groupedBlockTypeOptions.map((group) => (
+                  <section key={group.category} className="add-block-group">
+                    <h3>{group.category}</h3>
+                    <div className="add-block-group-list">
+                      {group.options.map((option) => (
+                        <button
+                          key={option.type}
+                          type="button"
+                          className="add-block-option"
+                          disabled={isAddingBlock}
+                          onClick={async () => {
+                            if (!addBlockPicker || isAddingBlock) return
+                            setIsAddingBlock(true)
+                            const ok = await chatEngine.addBlockAfter(addBlockPicker.slug, addBlockPicker.afterBlockId, option.type)
+                            setIsAddingBlock(false)
+                            if (ok) setAddBlockPicker(null)
+                          }}
+                        >
+                          <span>{option.label}</span>
+                          <small>{option.category}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showSettingsModal ? (
         <div className="settings-popover-backdrop" onClick={() => setShowSettingsModal(false)}>

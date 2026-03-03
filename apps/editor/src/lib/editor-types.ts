@@ -58,7 +58,16 @@ export type VariationResponse = {
 export type SiteMessage =
   | {
       protocol: "site-editor/v1"
-      type: "blockClicked" | "routeChanged" | "blockReordered" | "blockDeleteRequested" | "inlineTextCommitted"
+      type:
+        | "blockClicked"
+        | "routeChanged"
+        | "blockReordered"
+        | "blockDeleteRequested"
+        | "inlineTextCommitted"
+        | "blockAddRequested"
+        | "listItemAddRequested"
+        | "listItemRemoveRequested"
+        | "listItemMoveRequested"
       payload: Record<string, unknown>
     }
   | ({ source: "site-editor/v1" } & PatchAckMessage)

@@ -1,0 +1,37 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "Adventures EG logo Adventures EG" [ref=e3] [cursor=pointer]:
+      - /url: /
+      - img "Adventures EG logo" [ref=e4]
+      - generic [ref=e5]: Adventures EG
+    - navigation "Primary" [ref=e6]:
+      - link "Home" [ref=e7] [cursor=pointer]:
+        - /url: /
+      - link "Pricing" [ref=e8] [cursor=pointer]:
+        - /url: /pricing
+  - main [ref=e9]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - heading "Build websites with plain language" [level=1] [ref=e14]
+        - paragraph [ref=e15]: Edit content instantly with chat and live preview.
+        - link "Start Editing" [ref=e17] [cursor=pointer]:
+          - /url: /pricing
+      - img "Abstract generated illustration for the hero section" [ref=e19]
+    - generic [ref=e22]:
+      - heading "Why teams use it" [level=2] [ref=e23]
+      - list [ref=e24]:
+        - listitem [ref=e25]:
+          - strong [ref=e26]: Fast edits
+          - paragraph [ref=e27]: See updates without rebuilding.
+        - listitem [ref=e28]:
+          - strong [ref=e29]: Safe changes
+          - paragraph [ref=e30]: Schema-validated structured operations.
+        - listitem [ref=e31]:
+          - strong [ref=e32]: Simple workflow
+          - paragraph [ref=e33]: Chat to edit, preview to verify.
+    - generic [ref=e36]:
+      - heading "Ready for your first change?" [level=2] [ref=e37]
+      - paragraph [ref=e38]: Use the editor to modify this page now.
+      - link "Open Pricing" [ref=e39] [cursor=pointer]:
+        - /url: /pricing
+  - alert [ref=e40]

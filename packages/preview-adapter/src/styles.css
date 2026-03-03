@@ -182,18 +182,55 @@
   fill: none;
 }
 
+.editor-selected-add {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  border: 0;
+  background: rgba(var(--editor-selected-rgb), 0.95);
+  color: #fff;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 23;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+
+.editor-selected-add svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.editor-selected-add:hover {
+  background: rgba(var(--editor-selected-rgb), 1);
+}
+
 .editor-selected-move:hover {
   background: rgba(var(--editor-selected-rgb), 1);
 }
 
 .editor-selected-move:focus,
 .editor-selected-delete:focus,
+.editor-selected-add:focus,
 .editor-delete-confirm-btn:focus {
   outline: none;
 }
 
 .editor-selected-move:focus-visible,
-.editor-selected-delete:focus-visible {
+.editor-selected-delete:focus-visible,
+.editor-selected-add:focus-visible {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
@@ -208,6 +245,91 @@
 
 .editor-selected-delete:hover {
   background: #991b1b;
+}
+
+.editor-item-has-delete {
+  position: relative;
+}
+
+.editor-list-item-delete,
+.editor-list-item-move,
+.editor-list-item-add {
+  position: absolute;
+  border: 0;
+  background: rgba(var(--editor-selected-rgb), 0.94);
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 24;
+}
+
+.editor-list-item-delete {
+  top: 6px;
+  right: 6px;
+  border-radius: 7px;
+}
+
+.editor-list-item-move {
+  border-radius: 7px;
+  right: 6px;
+}
+
+.editor-list-item-move-up {
+  top: 34px;
+}
+
+.editor-list-item-move-down {
+  top: 62px;
+}
+
+.editor-list-item-add {
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+
+.editor-list-item-delete svg,
+.editor-list-item-move svg,
+.editor-list-item-add svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.editor-list-item-delete:hover,
+.editor-list-item-move:hover,
+.editor-list-item-add:hover {
+  background: rgba(var(--editor-selected-rgb), 1);
+}
+
+.editor-list-item-delete:disabled,
+.editor-list-item-move:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.editor-list-item-delete:focus,
+.editor-list-item-move:focus,
+.editor-list-item-add:focus {
+  outline: none;
+}
+
+.editor-list-item-delete:focus-visible,
+.editor-list-item-move:focus-visible,
+.editor-list-item-add:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
 .editor-selectable [data-editable-label] {

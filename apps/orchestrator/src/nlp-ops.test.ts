@@ -57,6 +57,37 @@ test("inferDeterministicIntent infers quoted patch for selected editable field",
   assert.deepEqual(parsed?.patch, { heading: "Build your dream site" })
 })
 
+test("inferDeterministicIntent treats add-image command as update in focused image field", () => {
+  const page = demoPublishedPages()[0]
+  const currentPage = {
+    ...page,
+    blocks: [
+      ...page.blocks,
+      {
+        id: "b_two_col_test",
+        type: "TwoColumn",
+        props: {
+          heading: "Trail",
+          body: "Body",
+          imageUrl: "/hero-generated.svg",
+          imageAlt: "A climber",
+          imagePosition: "right"
+        }
+      }
+    ]
+  }
+  const parsed = inferDeterministicIntent({
+    message: "add unsplash image matching image alt text",
+    currentPage,
+    activeBlockId: "b_two_col_test",
+    activeEditablePath: "imageUrl"
+  })
+
+  assert.ok(parsed)
+  assert.equal(parsed?.action, "update")
+  assert.equal(parsed?.target_block_ref, "b_two_col_test")
+})
+
 test("parseCreatePageRequest still returns slug for content-generation requests (AI planner handles the bypass)", () => {
   // The slug IS detected — the bypass happens in deterministicCreatePagePlan, not here
   assert.equal(
@@ -145,6 +176,73 @@ test("normalizePlanCandidate maps list op aliases path->listKey for all list ope
   if (!result.success) return
   for (const op of result.data.ops) {
     if ("listKey" in op) assert.equal(op.listKey, "items")
+  }
+})
+
+test("normalizePlanCandidate parses itemPath for update_item listKey/index", () => {
+  const parsed = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      summary_for_user: "Update FAQ item",
+      change_log: [],
+      ops: [
+        {
+          op: "update_item",
+          blockId: "b_faq_1",
+          itemPath: "items[2]",
+          patch: { q: "How should I store lemons to keep them fresh?" }
+        }
+      ]
+    },
+    {
+      defaultSlug: "/",
+      currentPage: demoPublishedPages()[0],
+      userMessage: "update third faq question"
+    }
+  )
+
+  const result = editPlanSchema.safeParse(parsed)
+  assert.equal(result.success, true)
+  if (!result.success) return
+  const op = result.data.ops[0]
+  assert.equal(op.op, "update_item")
+  if (op.op === "update_item") {
+    assert.equal(op.listKey, "items")
+    assert.equal(op.index, 2)
+  }
+})
+
+test("normalizePlanCandidate maps arrayProp alias to listKey", () => {
+  const parsed = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      summary_for_user: "Update FAQ item",
+      change_log: [],
+      ops: [
+        {
+          op: "update_item",
+          blockId: "b_faq_1",
+          arrayProp: "items",
+          index: 2,
+          patch: { a: "Store lemons in the fridge." }
+        }
+      ]
+    },
+    {
+      defaultSlug: "/",
+      currentPage: demoPublishedPages()[0],
+      userMessage: "update third faq answer"
+    }
+  )
+
+  const result = editPlanSchema.safeParse(parsed)
+  assert.equal(result.success, true)
+  if (!result.success) return
+  const op = result.data.ops[0]
+  assert.equal(op.op, "update_item")
+  if (op.op === "update_item") {
+    assert.equal(op.listKey, "items")
+    assert.equal(op.index, 2)
   }
 })
 
@@ -1073,12 +1171,27 @@ test("inferAddedBlockTypeFromMessage maps pricing to CardGrid", () => {
   assert.equal(inferAddedBlockTypeFromMessage("add pricing"), "CardGrid")
 })
 
+test("inferAddedBlockTypeFromMessage maps TwoColumn and Stats explicitly", () => {
+  assert.equal(inferAddedBlockTypeFromMessage("add TwoColumn block"), "TwoColumn")
+  assert.equal(inferAddedBlockTypeFromMessage("add two column section"), "TwoColumn")
+  assert.equal(inferAddedBlockTypeFromMessage("add stats section"), "Stats")
+})
+
+test("inferAddedBlockTypeFromMessage prioritizes explicit TwoColumn over trailing CTA words", () => {
+  assert.equal(
+    inferAddedBlockTypeFromMessage("add TwoColumn block [site context] ... add cta instead"),
+    "TwoColumn"
+  )
+})
+
 test("inferBlockTypeFromText maps new keywords", () => {
   assert.equal(inferBlockTypeFromText("social proof"), "Testimonials")
   assert.equal(inferBlockTypeFromText("reviews"), "Testimonials")
   assert.equal(inferBlockTypeFromText("benefits"), "FeatureGrid")
   assert.equal(inferBlockTypeFromText("pricing"), "CardGrid")
   assert.equal(inferBlockTypeFromText("paragraph"), "RichText")
+  assert.equal(inferBlockTypeFromText("TwoColumn"), "TwoColumn")
+  assert.equal(inferBlockTypeFromText("stats"), "Stats")
 })
 
 // ---------------------------------------------------------------------------

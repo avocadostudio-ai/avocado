@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
   <title id="title">Adventure Atlas logo</title>
   <desc id="desc">Folded map with route pin.</desc>
-  <rect x="4" y="4" width="88" height="88" rx="20" fill="#f0fdf4" stroke="#166534" stroke-width="4"/>
+  <rect x="4" y="4" width="88" height="88" rx="20" fill="#f0fdf4"/>
   <path d="M20 68V32l16-5 20 6 20-6v36l-20 6-20-6z" fill="#dcfce7" stroke="#166534" stroke-width="3"/>
   <path d="M36 27v36M56 33v36" stroke="#16a34a" stroke-width="2"/>
   <path d="M48 40c-4 0-7 3-7 7 0 5 7 12 7 12s7-7 7-12c0-4-3-7-7-7z" fill="#ef4444"/>

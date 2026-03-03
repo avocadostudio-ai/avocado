@@ -185,6 +185,11 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       document.querySelectorAll(".editor-block-toolbar").forEach((node) => node.remove())
       document.querySelectorAll(".editor-selected-delete").forEach((node) => node.remove())
       document.querySelectorAll(".editor-selected-move").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-selected-add").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-list-item-delete").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-list-item-add").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-list-item-move").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-item-has-delete").forEach((node) => node.classList.remove("editor-item-has-delete"))
       document.querySelectorAll(".editor-delete-confirm").forEach((node) => node.remove())
       if (deleteConfirmTimerRef.current) {
         window.clearTimeout(deleteConfirmTimerRef.current)
@@ -275,6 +280,180 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       }
       if (idx >= order.length - 1) return { canMove: false, afterBlockId: null as string | null }
       return { canMove: true, afterBlockId: order[idx + 1] ?? null }
+    }
+
+    const groupListItemNodes = (block: HTMLElement) => {
+      const groups = new Map<string, { listKey: string; index: number; nodes: HTMLElement[] }>()
+      block.querySelectorAll<HTMLElement>("[data-editable-target]").forEach((node) => {
+        const path = String(node.getAttribute("data-editable-target") ?? "")
+        const match = /^([A-Za-z_][A-Za-z0-9_]*)\[([0-9]+)\](?:\.|$)/.exec(path)
+        if (!match) return
+        const listKey = match[1]
+        const index = Number(match[2])
+        const key = `${listKey}:${index}`
+        const existing = groups.get(key)
+        if (existing) {
+          existing.nodes.push(node)
+        } else {
+          groups.set(key, { listKey, index, nodes: [node] })
+        }
+      })
+      return [...groups.values()]
+    }
+
+    const commonItemRoot = (block: HTMLElement, nodes: HTMLElement[]) => {
+      if (nodes.length === 0) return null
+      let candidate: HTMLElement | null = nodes[0]
+      while (candidate && !nodes.every((node) => candidate?.contains(node))) {
+        candidate = candidate.parentElement
+      }
+      if (!candidate || candidate === block) return null
+      if (!block.contains(candidate)) return null
+      return candidate
+    }
+
+    const mountListItemDeleteHandles = (block: HTMLElement, blockId: string) => {
+      const blockType = block.getAttribute("data-block-type") ?? "Block"
+      const groups = groupListItemNodes(block)
+      if (groups.length === 0) return
+
+      const resolved = groups
+        .map((group) => ({ ...group, root: commonItemRoot(block, group.nodes) }))
+        .filter((group): group is { listKey: string; index: number; nodes: HTMLElement[]; root: HTMLElement } => Boolean(group.root))
+      if (resolved.length === 0) return
+
+      const perListCounts = new Map<string, number>()
+      const lastByList = new Map<string, { listKey: string; index: number; root: HTMLElement }>()
+      const sortedIndicesByList = new Map<string, number[]>()
+      for (const group of resolved) {
+        perListCounts.set(group.listKey, (perListCounts.get(group.listKey) ?? 0) + 1)
+        const currentLast = lastByList.get(group.listKey)
+        if (!currentLast || group.index > currentLast.index) {
+          lastByList.set(group.listKey, { listKey: group.listKey, index: group.index, root: group.root })
+        }
+        if (!sortedIndicesByList.has(group.listKey)) sortedIndicesByList.set(group.listKey, [])
+        sortedIndicesByList.get(group.listKey)?.push(group.index)
+      }
+      for (const [key, indices] of sortedIndicesByList.entries()) {
+        sortedIndicesByList.set(key, [...new Set(indices)].sort((a, b) => a - b))
+      }
+
+      for (const group of resolved) {
+        const root = group.root
+        if (root.querySelector(".editor-list-item-delete")) continue
+        root.classList.add("editor-item-has-delete")
+
+        const del = document.createElement("button")
+        del.type = "button"
+        del.className = "editor-list-item-delete"
+        del.setAttribute("aria-label", `Delete ${group.listKey} item`)
+        del.title = "Delete item"
+        del.innerHTML =
+          '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 3h7"/><path d="M4.5 3V2h3v1"/><path d="M3.5 3h5l-.4 6.2a.8.8 0 0 1-.8.8H4.7a.8.8 0 0 1-.8-.8z"/></svg>'
+        del.disabled = (perListCounts.get(group.listKey) ?? 0) <= 1
+        del.addEventListener("click", (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (del.disabled) return
+          window.parent.postMessage(
+            {
+              protocol: "site-editor/v1",
+              type: "listItemRemoveRequested",
+              payload: { slug, blockId, blockType, listKey: group.listKey, index: group.index }
+            },
+            editorOrigin
+          )
+        })
+        root.append(del)
+
+        const order = sortedIndicesByList.get(group.listKey) ?? []
+        const pos = order.findIndex((idx) => idx === group.index)
+        const canMoveUp = pos > 0
+        const canMoveDown = pos >= 0 && pos < order.length - 1
+        const upAfterIndex = pos - 2 >= 0 ? order[pos - 2] : undefined
+        const downAfterIndex = canMoveDown ? order[pos + 1] : undefined
+
+        const moveUp = document.createElement("button")
+        moveUp.type = "button"
+        moveUp.className = "editor-list-item-move editor-list-item-move-up"
+        moveUp.setAttribute("aria-label", `Move ${group.listKey} item up`)
+        moveUp.title = "Move item up"
+        moveUp.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 10V2"/><path d="M2.5 5.5L6 2l3.5 3.5"/></svg>'
+        moveUp.disabled = !canMoveUp
+        moveUp.addEventListener("click", (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (!canMoveUp) return
+          window.parent.postMessage(
+            {
+              protocol: "site-editor/v1",
+              type: "listItemMoveRequested",
+              payload: {
+                slug,
+                blockId,
+                blockType,
+                listKey: group.listKey,
+                index: group.index,
+                afterIndex: upAfterIndex
+              }
+            },
+            editorOrigin
+          )
+        })
+        root.append(moveUp)
+
+        const moveDown = document.createElement("button")
+        moveDown.type = "button"
+        moveDown.className = "editor-list-item-move editor-list-item-move-down"
+        moveDown.setAttribute("aria-label", `Move ${group.listKey} item down`)
+        moveDown.title = "Move item down"
+        moveDown.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2.5 6.5L6 10l3.5-3.5"/></svg>'
+        moveDown.disabled = !canMoveDown
+        moveDown.addEventListener("click", (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (!canMoveDown || typeof downAfterIndex !== "number") return
+          window.parent.postMessage(
+            {
+              protocol: "site-editor/v1",
+              type: "listItemMoveRequested",
+              payload: {
+                slug,
+                blockId,
+                blockType,
+                listKey: group.listKey,
+                index: group.index,
+                afterIndex: downAfterIndex
+              }
+            },
+            editorOrigin
+          )
+        })
+        root.append(moveDown)
+      }
+
+      for (const entry of lastByList.values()) {
+        if (entry.root.querySelector(".editor-list-item-add")) continue
+        const add = document.createElement("button")
+        add.type = "button"
+        add.className = "editor-list-item-add"
+        add.setAttribute("aria-label", `Add ${entry.listKey} item`)
+        add.title = "Add item"
+        add.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2 6h8"/></svg>'
+        add.addEventListener("click", (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          window.parent.postMessage(
+            {
+              protocol: "site-editor/v1",
+              type: "listItemAddRequested",
+              payload: { slug, blockId, blockType, listKey: entry.listKey, afterIndex: entry.index }
+            },
+            editorOrigin
+          )
+        })
+        entry.root.append(add)
+      }
     }
 
     const ensureBlockBadges = () => {
@@ -373,13 +552,34 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         )
       })
 
-      toolbar.append(moveUpBtn, moveDownBtn)
-      match.prepend(toolbar)
-      mountSelectedDeleteHandle()
+      const addBtn = document.createElement("button")
+      addBtn.type = "button"
+      addBtn.className = "editor-selected-add"
+      addBtn.setAttribute("aria-label", `Add block after ${match.getAttribute("data-block-type") ?? "block"}`)
+      addBtn.title = "Add block below"
+      addBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2 6h8"/></svg>'
+      addBtn.addEventListener("click", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        window.parent.postMessage(
+          {
+            protocol: "site-editor/v1",
+            type: "blockAddRequested",
+            payload: { slug, afterBlockId: blockId }
+          },
+          editorOrigin
+        )
+      })
+
       const previousSelectedBlockId = selectedBlockRef.current
       const previousEditablePath = selectedEditablePathRef.current
-      selectedBlockRef.current = blockId
       const effectivePath = editablePath ?? (previousSelectedBlockId === blockId ? previousEditablePath ?? undefined : undefined)
+      toolbar.append(moveUpBtn, moveDownBtn)
+      match.prepend(toolbar)
+      match.append(addBtn)
+      mountListItemDeleteHandles(match, blockId)
+      mountSelectedDeleteHandle()
+      selectedBlockRef.current = blockId
       if (!effectivePath) selectedEditablePathRef.current = null
       if (effectivePath) applyChildFocus(blockId, effectivePath)
       return true
@@ -434,6 +634,10 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         target?.closest(".editor-block-delete") ||
         target?.closest(".editor-selected-delete") ||
         target?.closest(".editor-selected-move") ||
+        target?.closest(".editor-selected-add") ||
+        target?.closest(".editor-list-item-delete") ||
+        target?.closest(".editor-list-item-add") ||
+        target?.closest(".editor-list-item-move") ||
         target?.closest(".editor-delete-confirm")
       ) {
         return

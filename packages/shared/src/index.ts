@@ -394,6 +394,153 @@ export function getPropDisplayName(blockType: string | undefined, propKey: strin
   return propKey
 }
 
+export function defaultPropsForType(type: BlockType): Record<string, unknown> {
+  if (type === "Hero") {
+    return {
+      heading: "Build with confidence",
+      subheading: "Make changes safely with instant preview.",
+      ctaText: "Get Started",
+      ctaHref: "/",
+      imageUrl: "/hero-generated.svg",
+      imageAlt: "Abstract generated illustration"
+    }
+  }
+  if (type === "FeatureGrid") {
+    return {
+      title: "Key features",
+      features: [
+        { title: "Fast setup", description: "Launch quickly with guided defaults." },
+        { title: "Safe edits", description: "Structured operations keep content valid." },
+        { title: "Live updates", description: "Preview changes immediately." }
+      ]
+    }
+  }
+  if (type === "Testimonials") {
+    return {
+      title: "What customers say",
+      items: [
+        { quote: "We launched faster than expected.", author: "Alex" },
+        { quote: "Editing is straightforward for the whole team.", author: "Jordan" }
+      ]
+    }
+  }
+  if (type === "FAQAccordion") {
+    return {
+      title: "Frequently asked questions",
+      items: [
+        { q: "How fast can we publish?", a: "Most teams ship updates in minutes." },
+        { q: "Can we revise later?", a: "Yes, every block can be updated anytime." }
+      ]
+    }
+  }
+  if (type === "Card") {
+    return {
+      title: "Launch faster",
+      description: "Go from idea to published changes in minutes.",
+      ctaText: "Learn more",
+      ctaHref: "/pricing"
+    }
+  }
+  if (type === "RichText") {
+    return {
+      title: "",
+      body: "Add your content here.\n\nUse a second paragraph to break up the text into readable sections."
+    }
+  }
+  if (type === "CardGrid") {
+    return {
+      title: "Explore more",
+      cards: [
+        {
+          title: "Fast setup",
+          description: "Create and ship updates quickly.",
+          ctaText: "Get started",
+          ctaHref: "/"
+        },
+        {
+          title: "Safe updates",
+          description: "Schema-validated edits reduce breakage.",
+          ctaText: "See how",
+          ctaHref: "/pricing"
+        },
+        {
+          title: "Team workflow",
+          description: "Collaborate with clear, reviewable changes.",
+          ctaText: "Read guide",
+          ctaHref: "/"
+        }
+      ]
+    }
+  }
+  if (type === "Stats") {
+    return {
+      title: "By the numbers",
+      stats: [
+        { value: "10k+", label: "Active users" },
+        { value: "99.9%", label: "Uptime" },
+        { value: "24/7", label: "Support" }
+      ]
+    }
+  }
+  if (type === "TwoColumn") {
+    return {
+      heading: "Built for teams",
+      body: "Ship changes quickly with a clear, reliable workflow.",
+      imageUrl: "/hero-generated.svg",
+      imageAlt: "Team collaborating on a website update",
+      imagePosition: "right",
+      ctaText: "Learn more",
+      ctaHref: "/"
+    }
+  }
+  if (type === "Footer") {
+    return {
+      copyright: "© 2026 Your Company",
+      columns: [
+        { title: "Product", links: "Features|/features\nPricing|/pricing" },
+        { title: "Company", links: "About|/about\nContact|/contact" }
+      ]
+    }
+  }
+  if (type === "CTA") {
+    return {
+      title: "Ready to get started?",
+      description: "Apply your next change in seconds.",
+      ctaText: "Start now",
+      ctaHref: "/"
+    }
+  }
+  return {
+    title: "Ready to get started?",
+    description: "Apply your next change in seconds.",
+    ctaText: "Start now",
+    ctaHref: "/"
+  }
+}
+
+function defaultScalarForField(field: FieldMeta, fieldKey: string): unknown {
+  const label = field.label?.trim() || fieldKey
+  if (field.kind === "text" || field.kind === "richtext" || field.kind === "imageAlt") return `New ${label}`
+  if (field.kind === "url") return "/"
+  if (field.kind === "image") return "/hero-generated.svg"
+  if (field.kind === "color") return "#0f766e"
+  if (field.kind === "number") return 0
+  if (field.kind === "enum") return Array.isArray(field.options) && field.options.length > 0 ? field.options[0] : ""
+  return `New ${label}`
+}
+
+export function defaultListItemForBlock(type: BlockType, listKey: string): Record<string, unknown> | null {
+  const meta = _blockMeta[type]
+  const listMeta = meta?.listFields?.[listKey]
+  if (!listMeta) return null
+
+  const item: Record<string, unknown> = {}
+  for (const [fieldKey, fieldMeta] of Object.entries(listMeta.itemFields)) {
+    item[fieldKey] = defaultScalarForField(fieldMeta, fieldKey)
+  }
+  return item
+}
+
 export const blockInstanceSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1).refine((t) => t in _blockSchemas, { message: "Unknown block type" }),

@@ -160,16 +160,40 @@ export function toErrorDetail(error: unknown) {
 // ---------------------------------------------------------------------------
 export function ensureHeroImageProps(page: PageDoc) {
   for (const block of page.blocks) {
-    if (block.type !== "Hero") continue
     const props = block.props as Record<string, unknown>
-    if (typeof props.imageUrl !== "string" || props.imageUrl.length === 0) {
-      props.imageUrl = "/hero-generated.svg"
+    if (block.type === "Hero") {
+      if (typeof props.imageUrl !== "string" || props.imageUrl.length === 0) {
+        props.imageUrl = "/hero-generated.svg"
+      }
+      if (typeof props.imageAlt !== "string" || props.imageAlt.length === 0) {
+        props.imageAlt =
+          page.slug === "/pricing"
+            ? "Abstract generated illustration for the pricing hero"
+            : "Abstract generated illustration for the hero section"
+      }
+      continue
     }
-    if (typeof props.imageAlt !== "string" || props.imageAlt.length === 0) {
-      props.imageAlt =
-        page.slug === "/pricing"
-          ? "Abstract generated illustration for the pricing hero"
-          : "Abstract generated illustration for the hero section"
+
+    if (block.type === "TwoColumn") {
+      if (typeof props.heading !== "string" || props.heading.trim().length === 0) {
+        props.heading = typeof props.title === "string" && props.title.trim().length > 0
+          ? props.title
+          : "Section heading"
+      }
+      if (typeof props.body !== "string" || props.body.trim().length === 0) {
+        props.body = typeof props.description === "string" && props.description.trim().length > 0
+          ? props.description
+          : "Section content"
+      }
+      if (typeof props.imageUrl !== "string" || props.imageUrl.trim().length === 0) {
+        props.imageUrl = "/hero-generated.svg"
+      }
+      if (typeof props.imageAlt !== "string" || props.imageAlt.trim().length === 0) {
+        props.imageAlt = `Image for ${props.heading}`
+      }
+      if (props.imagePosition !== "left" && props.imagePosition !== "right") {
+        props.imagePosition = "right"
+      }
     }
   }
 }

@@ -198,3 +198,53 @@ test("generatePlanWithOpenAI rejects schema-invalid plans", async () => {
     /(Invalid model output|Expected array|change_log)/i
   )
 })
+
+test("generatePlanWithOpenAI normalizes list aliases itemPath/arrayProp for update_item", async () => {
+  const { currentPage, contextPack } = basePlannerArgs("populate 3rd question")
+  const { plan } = await generatePlanWithOpenAI({
+    message: "populate 3rd question",
+    slug: "/",
+    currentPage,
+    contextPack,
+    model: "gpt-4o",
+    client: fakePlannerClientWithContent(
+      JSON.stringify({
+        intent: "edit_plan",
+        summary_for_user: "Will update the 3rd FAQ question.",
+        change_log: ["Will update the 3rd FAQ item content."],
+        ops: [
+          {
+            op: "update_item",
+            pageSlug: "/",
+            blockId: "b_faq_home",
+            itemPath: "items[2]",
+            patch: { q: "How should I store lemons to keep them fresh?" }
+          },
+          {
+            op: "update_item",
+            pageSlug: "/",
+            blockId: "b_faq_home",
+            arrayProp: "items",
+            index: 2,
+            patch: { a: "Store whole lemons in the refrigerator in a sealed bag." }
+          }
+        ]
+      })
+    )
+  })
+
+  assert.equal(plan.intent, "edit_plan")
+  assert.equal(plan.ops.length, 2)
+  const first = plan.ops[0]
+  const second = plan.ops[1]
+  assert.equal(first.op, "update_item")
+  assert.equal(second.op, "update_item")
+  if (first.op === "update_item") {
+    assert.equal(first.listKey, "items")
+    assert.equal(first.index, 2)
+  }
+  if (second.op === "update_item") {
+    assert.equal(second.listKey, "items")
+    assert.equal(second.index, 2)
+  }
+})

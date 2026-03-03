@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import type { Operation } from "@ai-site-editor/shared"
+import { defaultListItemForBlock, defaultPropsForType, type Operation } from "@ai-site-editor/shared"
 import type {
   AIProvider,
   ApplyOpsResponse,
@@ -219,6 +219,60 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
+  async function addBlockAfter(slugForOp: string, afterBlockId: string, blockType: string) {
+    if (!afterBlockId || !blockType) return false
+
+    const normalizedType = blockType.trim()
+    const safeType = normalizedType.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+    const block = {
+      id: `b_${safeType}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: normalizedType,
+      props: defaultPropsForType(normalizedType)
+    }
+    const op = { op: "add_block", pageSlug: slugForOp, afterBlockId, block }
+
+    try {
+      const res = await fetch(`${orchestrator}/ops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, ops: [op] })
+      })
+      const data = (await res.json()) as ApplyOpsResponse
+      if (!res.ok || data.status !== "applied") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? data.summary ?? "Could not add block.",
+          changes: data.changes ?? []
+        })
+        return false
+      }
+
+      const focusBlockId = data.focusBlockId ?? block.id
+      activeBlockIdRef.current = focusBlockId
+      activeBlockTypeRef.current = normalizedType
+      activeEditablePathRef.current = undefined
+      setActiveBlockId(focusBlockId)
+      setActiveBlockType(normalizedType)
+      setActiveEditablePath(undefined)
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = { op: "add_block" as const, pageSlug: slugForOp, afterBlockId, block }
+        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
+      return true
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Could not add block.",
+        changes: []
+      })
+      return false
+    }
+  }
+
   async function reorderBlock(slugForOp: string, blockId: string, afterBlockId?: string) {
     if (!blockId) return
     const op: Record<string, unknown> = { op: "move_block", pageSlug: slugForOp, blockId }
@@ -256,6 +310,156 @@ export function useChatEngine(config: ChatEngineConfig) {
       pushAssistantFromResult({
         status: "error",
         summary: "Could not reorder blocks.",
+        changes: []
+      })
+    }
+  }
+
+  async function addListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, afterIndex?: number) {
+    if (!blockId || !blockType || !listKey) return
+    const fallbackItem = { title: "New item", description: "Describe this item." }
+    const item = defaultListItemForBlock(blockType, listKey) ?? fallbackItem
+    const op: Record<string, unknown> = { op: "add_item", pageSlug: slugForOp, blockId, listKey, item }
+    if (typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0) op.afterIndex = afterIndex
+
+    try {
+      const res = await fetch(`${orchestrator}/ops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, ops: [op] })
+      })
+      const data = (await res.json()) as ApplyOpsResponse
+      if (!res.ok || data.status !== "applied") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? data.summary ?? "Could not add item.",
+          changes: data.changes ?? []
+        })
+        return
+      }
+
+      const focusBlockId = data.focusBlockId ?? blockId
+      activeBlockIdRef.current = focusBlockId
+      activeBlockTypeRef.current = blockType
+      activeEditablePathRef.current = undefined
+      setActiveBlockId(focusBlockId)
+      setActiveBlockType(blockType)
+      setActiveEditablePath(undefined)
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = {
+          op: "add_item" as const,
+          pageSlug: slugForOp,
+          blockId,
+          listKey,
+          item,
+          ...(typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0 ? { afterIndex } : {})
+        }
+        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Could not add item.",
+        changes: []
+      })
+    }
+  }
+
+  async function removeListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, index: number) {
+    if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
+    const op = { op: "remove_item", pageSlug: slugForOp, blockId, listKey, index }
+
+    try {
+      const res = await fetch(`${orchestrator}/ops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, ops: [op] })
+      })
+      const data = (await res.json()) as ApplyOpsResponse
+      if (!res.ok || data.status !== "applied") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? data.summary ?? "Could not remove item.",
+          changes: data.changes ?? []
+        })
+        return
+      }
+
+      const focusBlockId = data.focusBlockId ?? blockId
+      activeBlockIdRef.current = focusBlockId
+      activeBlockTypeRef.current = blockType
+      activeEditablePathRef.current = undefined
+      setActiveBlockId(focusBlockId)
+      setActiveBlockType(blockType)
+      setActiveEditablePath(undefined)
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = { op: "remove_item" as const, pageSlug: slugForOp, blockId, listKey, index }
+        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Could not remove item.",
+        changes: []
+      })
+    }
+  }
+
+  async function moveListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex?: number) {
+    if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
+    const op: Record<string, unknown> = { op: "move_item", pageSlug: slugForOp, blockId, listKey, index }
+    if (typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0) op.afterIndex = afterIndex
+
+    try {
+      const res = await fetch(`${orchestrator}/ops`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, ops: [op] })
+      })
+      const data = (await res.json()) as ApplyOpsResponse
+      if (!res.ok || data.status !== "applied") {
+        pushAssistantFromResult({
+          status: "error",
+          summary: data.error ?? data.summary ?? "Could not reorder items.",
+          changes: data.changes ?? []
+        })
+        return
+      }
+
+      const focusBlockId = data.focusBlockId ?? blockId
+      activeBlockIdRef.current = focusBlockId
+      activeBlockTypeRef.current = blockType
+      activeEditablePathRef.current = undefined
+      setActiveBlockId(focusBlockId)
+      setActiveBlockType(blockType)
+      setActiveEditablePath(undefined)
+      if (enablePatchTransport && typeof data.previewVersion === "number") {
+        const toVersion = data.previewVersion
+        const fromVersion = toVersion - 1
+        const typedOp = {
+          op: "move_item" as const,
+          pageSlug: slugForOp,
+          blockId,
+          listKey,
+          index,
+          ...(typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0 ? { afterIndex } : {})
+        }
+        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
+      } else {
+        postToSite("draftUpdated", { focusBlockId })
+      }
+    } catch {
+      pushAssistantFromResult({
+        status: "error",
+        summary: "Could not reorder items.",
         changes: []
       })
     }
@@ -829,6 +1033,10 @@ export function useChatEngine(config: ChatEngineConfig) {
     stopPendingPlan,
     applyUndoHistory,
     refreshRouteSlugs,
+    addBlockAfter,
+    addListItem,
+    removeListItem,
+    moveListItem,
     reorderBlock,
     deleteBlock,
     inlineEditCommit

@@ -8,7 +8,7 @@
       <stop offset="1" stop-color="#0f766e"/>
     </radialGradient>
   </defs>
-  <rect x="4" y="4" width="88" height="88" rx="20" fill="#f0fdfa" stroke="#99d6d0" stroke-width="4"/>
+  <rect x="4" y="4" width="88" height="88" rx="20" fill="#f0fdfa"/>
   <path d="M48 18c-13 0-24 12-24 28 0 17 10 32 24 32s24-15 24-32c0-16-11-28-24-28z" fill="url(#avobg)" stroke="#0f766e" stroke-width="3"/>
   <circle cx="48" cy="52" r="10" fill="#92400e"/>
   <circle cx="48" cy="52" r="15" fill="none" stroke="#fef3c7" stroke-width="4"/>

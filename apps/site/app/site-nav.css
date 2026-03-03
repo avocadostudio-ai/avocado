@@ -23,6 +23,7 @@
 .site-logo {
   width: 38px;
   height: 38px;
+  border: none;
   border-radius: 8px;
   object-fit: contain;
   display: block;
