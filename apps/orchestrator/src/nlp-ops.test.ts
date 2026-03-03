@@ -6,6 +6,7 @@ import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentG
 import { isBatchAddRequest } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
+import { inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
 
 test("parseCreatePageRequest prompt matrix", () => {
   const cases: Array<{ prompt: string; expected: string | null }> = [
@@ -27,6 +28,34 @@ test("parseCreatePageRequest prompt matrix", () => {
   for (const entry of cases) {
     assert.equal(parseCreatePageRequest(entry.prompt), entry.expected, entry.prompt)
   }
+})
+
+test("sanitizeMessageForPlanning extracts prompt from debug payload", () => {
+  const message = [
+    "translate this page to German",
+    "Renamed the Hero secondary CTA.",
+    "Performance awareness",
+    "This wording improves semantic relevance and supports SEO, accessibility, and conversion checks.",
+    "Debug",
+    "traceId: abc",
+    "promptHash: hash",
+    "outcome: applied",
+    "intent: edit_plan",
+    "opCount: 1",
+    "ops: update_props",
+    "prompt: translate this page to German [site context] Site purpose: Adventure Arena"
+  ].join("\n")
+
+  assert.equal(
+    sanitizeMessageForPlanning(message),
+    "translate this page to German [site context] Site purpose: Adventure Arena"
+  )
+})
+
+test("inferTranslationScopeFromMessage distinguishes page and component scope", () => {
+  assert.equal(inferTranslationScopeFromMessage("translate this page to german"), "page")
+  assert.equal(inferTranslationScopeFromMessage("translate this selected component to german"), "component")
+  assert.equal(inferTranslationScopeFromMessage("change hero heading"), "none")
 })
 
 test("inferDeterministicIntent infers remove action against selected block", () => {

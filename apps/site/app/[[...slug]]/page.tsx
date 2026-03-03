@@ -12,7 +12,7 @@ type PageProps = {
 }
 
 const DEFAULT_SESSION = "dev"
-const DEFAULT_SITE_ID = "avocado-stories"
+const DEFAULT_SITE_ID = "adventure-atlas"
 const DEFAULT_EDITOR_ORIGIN =
   process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? (process.env.NODE_ENV !== "production" ? "http://localhost:4100" : "")
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"

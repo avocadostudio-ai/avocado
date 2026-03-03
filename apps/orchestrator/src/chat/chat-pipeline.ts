@@ -223,6 +223,59 @@ function blockHasImageUrlProp(
   return typeof props === "object" && props !== null && Object.prototype.hasOwnProperty.call(props, "imageUrl")
 }
 
+export type TranslationScope = "page" | "component" | "none"
+
+export function sanitizeMessageForPlanning(message: string) {
+  const normalized = message.replace(/\r\n?/g, "\n").trim()
+  if (normalized.length === 0) return normalized
+
+  const hasDebugEcho = /(^|\n)\s*debug\s*$|(^|\n)\s*(traceid|prompthash|outcome|intent|opcount|ops)\s*:/im.test(normalized)
+  if (!hasDebugEcho) return normalized
+
+  const promptEcho = normalized.match(/(^|\n)\s*prompt\s*:\s*(.+)$/im)?.[2]?.trim()
+  if (promptEcho && promptEcho.length > 0) return promptEcho
+
+  const cleanedLines = normalized
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => {
+      if (line.trim().length === 0) return true
+      if (/^\s*debug\s*$/i.test(line)) return false
+      if (/^\s*(traceid|prompthash|outcome|intent|opcount|optypes|ops|reason|reasoncategory)\s*:/i.test(line)) return false
+      if (/^\s*renamed the hero secondary cta\.?\s*$/i.test(line)) return false
+      if (/^\s*performance awareness\b/i.test(line)) return false
+      if (/semantic relevance and supports seo,\s*accessibility,\s*and conversion checks\.?\s*$/i.test(line)) return false
+      return true
+    })
+  return cleanedLines.join("\n").trim()
+}
+
+export function inferTranslationScopeFromMessage(message: string): TranslationScope {
+  const lower = message.toLowerCase()
+  const isTranslation =
+    /\btranslate\b/.test(lower) ||
+    /\btranslation\b/.test(lower) ||
+    /\blocaliz/.test(lower) ||
+    /\bgerman\b/.test(lower) ||
+    /\bdeutsch\b/.test(lower)
+  if (!isTranslation) return "none"
+
+  const pageScope =
+    /\b(this|the|entire|whole|full)\s+page\b/.test(lower) ||
+    /\bwhole\s+site\b/.test(lower) ||
+    /\ball\s+sections?\b/.test(lower) ||
+    /\btranslate\s+page\b/.test(lower)
+  if (pageScope) return "page"
+
+  const componentScope =
+    /\b(this|selected|current)\s+(block|section|component)\b/.test(lower) ||
+    /\btranslate\s+(the\s+)?(block|section|component)\b/.test(lower) ||
+    /\bselected\s+component\b/.test(lower)
+  if (componentScope) return "component"
+
+  return "component"
+}
+
 // ---------------------------------------------------------------------------
 // Unsplash hero image rewrite
 // ---------------------------------------------------------------------------
@@ -751,6 +804,7 @@ function buildMetaChangeLogEntries(ops: Operation[]): string[] {
 
 function buildAiInsightChanges(args: { plan: EditPlan; message: string }) {
   if (args.plan.intent !== "edit_plan" || args.plan.ops.length === 0) return []
+  if (inferTranslationScopeFromMessage(args.message) !== "none") return []
 
   const textFields = collectChangedTextFields(args.plan.ops)
   if (textFields.length === 0) return []
@@ -867,20 +921,24 @@ export async function runChatPipeline(
       }
     }
   }
-  const messageWithContext = withSiteContext(body.message ?? "", {
+  const sanitizedMessage = sanitizeMessageForPlanning(body.message ?? "")
+  const messageWithContext = withSiteContext(sanitizedMessage, {
     sitePurpose: body.sitePurpose,
     siteHosting: body.siteHosting,
     businessContext: body.businessContext,
     siteContext: body.siteContext
   })
   const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
+  const translationScope = inferTranslationScopeFromMessage(plannerMessage)
+  const planningActiveBlockId = translationScope === "page" ? undefined : body.activeBlockId
+  const planningActiveEditablePath = translationScope === "page" ? undefined : body.activeEditablePath
   const sessionChatHistory = chatHistoryBySession.get(body.session) ?? []
   const chatRequestId = randomUUID()
   const requestedSlug = body.slug
   const effectiveSlug = resolveEffectiveSlug({
     session: body.session,
     requestedSlug,
-    activeBlockId: body.activeBlockId
+    activeBlockId: planningActiveBlockId
   })
   ctx.log.info(
     {
@@ -889,8 +947,8 @@ export async function runChatPipeline(
       session: body.session,
       requestedSlug,
       effectiveSlug,
-      activeBlockId: body.activeBlockId,
-      activeEditablePath: body.activeEditablePath,
+      activeBlockId: planningActiveBlockId,
+      activeEditablePath: planningActiveEditablePath,
       message: body.message
     },
     "Chat pipeline request received"
@@ -972,9 +1030,9 @@ export async function runChatPipeline(
     slug: effectiveSlug,
     message: plannerMessage,
     currentPage: current,
-    activeBlockId: body.activeBlockId,
+    activeBlockId: planningActiveBlockId,
     activeBlockType: body.activeBlockType,
-    activeEditablePath: body.activeEditablePath
+    activeEditablePath: planningActiveEditablePath
   })
 
   const guardrailFailureResponse = (args: { reason: string; source: "openai" | "anthropic" | "demo" }) => {
@@ -998,8 +1056,8 @@ export async function runChatPipeline(
     })
     if (category === "ambiguity") {
       const selected =
-        body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
-          ? current.blocks.find((b) => b.id === body.activeBlockId)
+        planningActiveBlockId && current.blocks.find((b) => b.id === planningActiveBlockId)
+          ? current.blocks.find((b) => b.id === planningActiveBlockId)
           : null
       return {
         code: 200,
@@ -1075,8 +1133,8 @@ export async function runChatPipeline(
         message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
-        activeBlockId: body.activeBlockId,
-        activeEditablePath: body.activeEditablePath
+        activeBlockId: planningActiveBlockId,
+        activeEditablePath: planningActiveEditablePath
       })
 
       if (detectedImageOps.length > 0) {
@@ -1114,23 +1172,23 @@ export async function runChatPipeline(
           message: plannerMessage,
           slug: effectiveSlug,
           currentPage: current,
-          activeBlockId: body.activeBlockId,
-          activeEditablePath: body.activeEditablePath,
+          activeBlockId: planningActiveBlockId,
+          activeEditablePath: planningActiveEditablePath,
           chatRequestId,
           log: ctx.log,
           onStatusUpdate: options?.onStatusUpdate
         })
       }
 
-      if (resolvedPlan.intent === "needs_clarification" && body.activeBlockId) {
+      if (resolvedPlan.intent === "needs_clarification" && planningActiveBlockId) {
         const focusedFallback = compileDeterministicPlan({
           session: body.session ?? "dev",
           intent: { action: "clarify" },
           message: plannerMessage,
           slug: effectiveSlug ?? "/",
           currentPage: current,
-          activeBlockId: body.activeBlockId,
-          activeEditablePath: body.activeEditablePath
+          activeBlockId: planningActiveBlockId,
+          activeEditablePath: planningActiveEditablePath
         })
         if (focusedFallback?.intent === "edit_plan" && focusedFallback.ops.length > 0) {
           resolvedPlan = focusedFallback
@@ -1165,8 +1223,8 @@ export async function runChatPipeline(
       })
       if (body.message) pushChatHistory(body.session!, body.message, resolvedPlan.summary_for_user)
       const selected =
-        body.activeBlockId && current.blocks.find((b) => b.id === body.activeBlockId)
-          ? current.blocks.find((b) => b.id === body.activeBlockId)
+        planningActiveBlockId && current.blocks.find((b) => b.id === planningActiveBlockId)
+          ? current.blocks.find((b) => b.id === planningActiveBlockId)
           : null
       return {
         done: true as const,
@@ -1607,7 +1665,7 @@ export async function runChatPipeline(
 
   if (plannerSource === "demo") {
     try {
-      const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, body.activeBlockId, body.activeBlockType)
+      const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, planningActiveBlockId, body.activeBlockType)
       const outcome = await respondFromPlan(demoPlan, "demo", applyMode)
       if (outcome.done) return outcome.response
       return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
@@ -1648,8 +1706,8 @@ export async function runChatPipeline(
   const deterministicIntent = inferDeterministicIntent({
     message: plannerMessage,
     currentPage: current,
-    activeBlockId: body.activeBlockId,
-    activeEditablePath: body.activeEditablePath
+    activeBlockId: planningActiveBlockId,
+    activeEditablePath: planningActiveEditablePath
   })
 
   if (deterministicIntent) {
@@ -1659,8 +1717,8 @@ export async function runChatPipeline(
       message: plannerMessage,
       slug: effectiveSlug,
       currentPage: current,
-      activeBlockId: body.activeBlockId,
-      activeEditablePath: body.activeEditablePath
+      activeBlockId: planningActiveBlockId,
+      activeEditablePath: planningActiveEditablePath
     })
 
     if (deterministicPlan?.intent === "edit_plan" && deterministicPlan.ops.length > 0) {
