@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-02T23:33:39.105Z",
+    "updatedAt": "2026-03-03T09:57:04.886Z",
     "blocks": [
       {
         "id": "b_hero_1772319324619",
@@ -25,6 +25,19 @@
         "props": {
           "title": "Hikers, Kayakers & Climbers",
           "body": "# Trail Blazers\nFor those who find their rhythm on rugged terrain, hiking is more than a hobby — it's a calling. From gentle woodland paths to grueling alpine ascents, hikers push their limits with every step. Feel the crunch of gravel underfoot, breathe in crisp mountain air, and earn those panoramic summit views that no photograph can truly capture.\n\n# Paddle Warriors\nKayakers know that the water is alive — always moving, always challenging. Whether you're carving through whitewater rapids or gliding silently across a glassy lake at dawn, kayaking demands focus, strength, and a deep respect for nature. Every paddle stroke carries you further into the wild, where the only sounds are rushing water and your own heartbeat.\n\n# Summit Seekers\nClimbers live for the vertical world — where every handhold is a decision and every ascent is a test of will. Whether bouldering at ground level, sport climbing sheer rock faces, or tackling a multi-day alpine route, the mountain rewards those who dare to look up. The summit is just the destination; the climb is the whole point."
+        }
+      },
+      {
+        "id": "b_twocolumn_1772531824878_981",
+        "type": "TwoColumn",
+        "props": {
+          "heading": "Built for teams",
+          "body": "Ship changes quickly with a clear, reliable workflow.",
+          "imageUrl": "/hero-generated.svg",
+          "imageAlt": "Team collaborating on a website update",
+          "imagePosition": "right",
+          "ctaText": "Learn more",
+          "ctaHref": "/"
         }
       }
     ]
@@ -207,7 +220,7 @@
     "id": "p_for_summit_seekers",
     "slug": "/for-summit-seekers",
     "title": "For Summit Seekers",
-    "updatedAt": "2026-03-02T23:19:43.869Z",
+    "updatedAt": "2026-03-03T10:00:11.473Z",
     "blocks": [
       {
         "id": "b_hero_1772493309022",
@@ -249,10 +262,23 @@
         }
       },
       {
+        "id": "b_twocolumn_1772531401708",
+        "type": "TwoColumn",
+        "props": {
+          "heading": "Your Guide to the Summit",
+          "body": "Every great ascent starts with the right team behind you. Our experienced guides know these peaks inside out — the routes, the risks, and the rewards.\n\n**Skill levels:** Beginner to advanced routes available.\n**Group sizes:** Small groups for a focused, personal experience.\n**What's included:** Full gear briefing, safety protocols, and post-climb support.\n\nYou bring the drive. We handle the rest.",
+          "imageUrl": "https://images.unsplash.com/photo-1640244671841-88a1db2b8abc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHx5b3VyJTIwZ3VpZGUlMjBzdW1taXR8ZW58MXwwfHx8MTc3MjUzMTQxNnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a group of people standing on top of a snow covered slope",
+          "imagePosition": "right",
+          "ctaText": "Book Your Climb",
+          "ctaHref": "/for-summit-seekers#cta"
+        }
+      },
+      {
         "id": "b_faqaccordion_1772493532263",
         "type": "FAQAccordion",
         "props": {
-          "title": "Summit Seeker FAQs",
+          "title": "Got Questions? We've Got Answers",
           "items": [
             {
               "q": "What gear do I need to start high-altitude climbing?",
@@ -265,26 +291,18 @@
             {
               "q": "How do I handle altitude sickness?",
               "a": "Acclimatize gradually — follow the 'climb high, sleep low' rule. Stay hydrated, ascend slowly, and give your body time to adjust. If symptoms worsen, descend immediately."
-            },
-            {
-              "q": "Is this community right for beginners?",
-              "a": "Absolutely. Whether you're tackling your first peak or chasing 8,000-metre giants, Summit Seekers welcomes all levels. We have beginner trails, mentorship, and expert guidance."
-            },
-            {
-              "q": "How do I connect with other Summit Seekers?",
-              "a": "Join our online community forums, local meetups, and guided group expeditions. Hit 'Claim Your Summit' to get started and find your crew."
             }
           ]
         }
       },
       {
-        "id": "b_cta_1772493490301",
+        "id": "b_cta_1772531219615",
         "type": "CTA",
         "props": {
-          "title": "Ready to get started?",
-          "description": "Apply your next change in seconds.",
-          "ctaText": "match the summit theme",
-          "ctaHref": "/"
+          "title": "Your Summit Starts Today",
+          "description": "Stop planning. Start climbing. Book your guided ascent with Adventure Arena and take on the peaks with expert support every step of the way.",
+          "ctaText": "Book My Climb",
+          "ctaHref": "/for-summit-seekers#cta"
         }
       }
     ]
