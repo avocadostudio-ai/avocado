@@ -60,6 +60,7 @@ export type PendingImageGeneration = {
 export type PendingApprovalPlan = {
   id: string
   createdAt: string
+  promptHash: string
   requestedSlug: string
   effectiveSlug: string
   summary: string
