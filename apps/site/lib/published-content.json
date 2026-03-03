@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-27T21:55:11.715Z",
+    "updatedAt": "2026-03-03T15:13:45.492Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -450,7 +450,7 @@
     "id": "p_about_lemons",
     "slug": "/about-lemons",
     "title": "About Lemons",
-    "updatedAt": "2026-02-27T23:31:28.707Z",
+    "updatedAt": "2026-03-03T20:25:11.542Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
@@ -460,8 +460,8 @@
           "subheading": "Discover Health and Culinary Uses",
           "ctaText": "Find Out More",
           "ctaHref": "/about-lemons",
-          "imageUrl": "http://localhost:4200/generated-images/var_1772235088704_kepgwc.png",
-          "imageAlt": "Lemon on a blue background",
+          "imageUrl": "https://images.unsplash.com/photo-1677309810617-993144900602?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxleHBsb3JlJTIwYmVuZWZpdHMlMjBsZW1vbnN8ZW58MXwwfHx8MTc3MjQ4ODkyOHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "three lemons are sitting on a wooden table",
           "secondaryCtaText": "Learn More",
           "secondaryCtaHref": "/lemons-benefits"
         }
@@ -481,22 +481,28 @@
           "title": "Interesting Lemon Facts",
           "cards": [
             {
-              "title": "Health Benefits",
-              "description": "Lemons are rich in vitamin C and antioxidants.",
-              "ctaText": "Learn More",
-              "ctaHref": "/lemons-health-benefits"
-            },
-            {
               "title": "Culinary Uses",
-              "description": "Lemons add flavor to dishes and drinks.",
-              "ctaText": "Explore Recipes",
-              "ctaHref": "/lemons-recipes"
+              "description": "From zesty marinades to refreshing lemonades, lemons transform every dish and drink into something extraordinary.",
+              "ctaText": "Get Cooking",
+              "ctaHref": "/lemons-recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1613900007918-d2075eea2393?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjbG9zZSUyMHNsaWNlZCUyMGxlbW9uJTIwcGxhdGV8ZW58MXwwfHx8MTc3MjU2OTUxMHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "sliced lemon on green textile"
             },
             {
               "title": "Lemon Varieties",
-              "description": "Discover different types of lemons around the world.",
-              "ctaText": "See Varieties",
-              "ctaHref": "/lemons-varieties"
+              "description": "From sweet Meyers to tart Lisbons, explore the fascinating world of lemon varieties grown across the globe.",
+              "ctaText": "Explore Varieties",
+              "ctaHref": "/lemons-varieties",
+              "imageUrl": "https://images.unsplash.com/photo-1763144165374-f889c7fdafbc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxiYXNrZXQlMjBmdWxsJTIwZnJlc2glMjB5ZWxsb3d8ZW58MXwwfHx8MTc3MjU2OTUxMXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "A basket full of fresh lemons with green leaves."
+            },
+            {
+              "title": "Health Benefits of Lemons",
+              "description": "Lemons are packed with vitamin C and antioxidants that boost your immunity, brighten your skin, and energize your body naturally.",
+              "ctaText": "Discover the Benefits",
+              "ctaHref": "/lemons-benefits",
+              "imageUrl": "https://images.unsplash.com/photo-1664548324330-aaf7ab44eaab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHx3b21hbiUyMGhvbGRpbmclMjB0d28lMjBmcmVzaHxlbnwxfDB8fHwxNzcyNTY5NTExfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "a group of people holding hands"
             }
           ]
         }
