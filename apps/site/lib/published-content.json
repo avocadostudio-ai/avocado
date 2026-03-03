@@ -3,434 +3,339 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-03T15:13:45.492Z",
+    "updatedAt": "2026-03-03T22:17:52.836Z",
     "blocks": [
       {
-        "id": "b_hero_1772138902220_copy",
+        "id": "b_hero_1772319324619",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Magic of Avocados 🥑",
-          "subheading": "Experience the vibrant taste and health benefits of our avocados — a delightful addition to any dish.",
-          "ctaText": "Get Started",
-          "ctaHref": "/",
-          "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
-          "imageAlt": "Close-up of avocados in natural light"
+          "heading": "Your Next Adventure Starts Here",
+          "subheading": "Hikers, kayakers & climbers — find your trail, own your water, and conquer every summit.",
+          "ctaText": "Start Your Adventure",
+          "ctaHref": "/adventures",
+          "imageUrl": "http://localhost:4200/generated-images/var_1772319461813_xw24h5.png",
+          "imageAlt": "A group of hikers exploring a mountain trail",
+          "secondaryCtaText": "Explore Your Path",
+          "secondaryCtaHref": "/"
         }
       },
       {
-        "id": "b_cardgrid_1771979444550",
-        "type": "CardGrid",
-        "props": {
-          "title": "Sustainable Avocado Adventures",
-          "cards": [
-            {
-              "title": "🥑 Avocado Culinary Delights",
-              "description": "Uncover new culinary uses for avocados.",
-              "ctaText": "Try Now",
-              "ctaHref": "/avocado-culinary"
-            },
-            {
-              "title": "🥑 Avocado Wellness",
-              "description": "Explore the wellness benefits of avocados.",
-              "ctaText": "Discover",
-              "ctaHref": "/avocado-wellness"
-            },
-            {
-              "title": "🥑 Avocado Sustainability",
-              "description": "Learn about sustainable avocado farming practices.",
-              "ctaText": "Learn More",
-              "ctaHref": "/avocado-sustainability"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_testimonials_1771979725070",
-        "type": "Testimonials",
-        "props": {
-          "title": "Testimonials from Avocado Enthusiasts",
-          "items": [
-            {
-              "quote": "Avocados are a superfood that never fails to impress! 🥑 Their creamy texture and rich flavor make every meal a delight.",
-              "author": "Emily Avocado"
-            },
-            {
-              "quote": "Avocados are my culinary secret weapon from morning to night. 🥑 They bring a luxurious touch to every meal.",
-              "author": "Michael Green"
-            },
-            {
-              "quote": "The best avocados I've ever tasted! 🥑 Perfectly ripe and full of flavor, they elevate any recipe.",
-              "author": "Sarah Chef"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_richtext_1771982675835",
+        "id": "b_richtext_1772493082062",
         "type": "RichText",
         "props": {
-          "title": "Discover the Magic of Avocados",
-          "body": "# Nutritional Benefits of Avocados\n\nAvocados are not only delicious but also packed with essential nutrients. 🥑 They are a rich source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n# Heart-Healthy Fats\n\nAdditionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. Moreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease.\n\n# Enjoy Avocados Today\n\nEnjoy the magic of avocados in your meals today!"
+          "title": "Hikers, Kayakers & Climbers",
+          "body": "# Trail Blazers\nFor those who find their rhythm on rugged terrain, hiking is more than a hobby — it's a calling. From quiet forest trails to grueling alpine ascents, hikers push their limits with every step. Feel the crunch of gravel underfoot, breathe in the crisp mountain air, and earn those summit views that no photo can ever truly capture.\n\n# Wave Warriors\nKayakers know it: water is alive — always moving, always challenging. Whether you're punching through whitewater rapids or gliding silently across a glassy lake at dawn, kayaking demands focus, strength, and deep respect for nature. Every stroke carries you further into the wild, where all you hear is rushing water and your own heartbeat.\n\n# Summit Seekers\nClimbers live in a vertical world — where every handhold is a decision and every ascent is a test of will. From bouldering at the base to sport climbing sheer rock faces or tackling a multi-day alpine route, the mountains reward those who dare to look up. The summit is just the destination; the climb itself is the whole point."
         }
       },
       {
-        "id": "b_cta_1771983958937",
-        "type": "CTA",
+        "id": "b_twocolumn_1772531824878_981",
+        "type": "TwoColumn",
         "props": {
-          "title": "Join the Avocado Revolution 🥑",
-          "description": "Experience the richness and health benefits of our premium avocados. Perfect for any meal, any time.",
-          "ctaText": "Get Started",
-          "ctaHref": "/signup"
+          "heading": "Built for teams",
+          "body": "Ship changes quickly with a clear, reliable workflow.",
+          "imageUrl": "/hero-generated.svg",
+          "imageAlt": "Team collaborating on a website update",
+          "imagePosition": "right",
+          "ctaText": "Learn more",
+          "ctaHref": "/"
         }
       }
     ]
   },
   {
-    "id": "p_bananas",
-    "slug": "/bananas",
-    "title": "Bananas",
-    "updatedAt": "2026-02-26T23:55:19.815Z",
+    "id": "p_hikers",
+    "slug": "/hikers",
+    "title": "Hikers",
+    "updatedAt": "2026-03-03T10:03:56.875Z",
     "blocks": [
       {
-        "id": "b_hero_1772016866777",
+        "id": "b_hero_1772493161254",
         "type": "Hero",
         "props": {
-          "heading": "Bananas: Nature's Energy Booster 🍌 Keep it concise and direct.",
-          "subheading": "Explore the benefits and versatility of bananas, a delicious and nutritious fruit perfect for any time of the day.",
-          "ctaText": "Learn More",
-          "ctaHref": "/banana-benefits",
-          "imageUrl": "https://images.unsplash.com/photo-1713370711464-dc1d94dc77a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxiYW5hbmFzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBzdHVkaW8lMjBiYWNrZ3JvdW5kfGVufDF8MHx8fDE3NzIxNTAxMTF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "a woman holding two bananas and a pineapple"
+          "heading": "Conquer Every Trail",
+          "subheading": "From gentle woodland paths to grueling alpine peaks — your next great hike starts here.",
+          "ctaText": "Explore Hiking Trails",
+          "ctaHref": "/hikers/trails",
+          "imageUrl": "https://images.unsplash.com/photo-1662244556200-7d242d4e9f8e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjb25xdWVyJTIwZXZlcnklMjB0cmFpbHxlbnwxfDB8fHwxNzcyNDkzMTg1fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a sign in the middle of a rocky area"
         }
       },
       {
-        "id": "b_richtext_1772016966005",
-        "type": "RichText",
-        "props": {
-          "title": "",
-          "body": "**Bananas** are not only a great source of energy but also packed with essential nutrients. They are rich in potassium, vitamin C, and vitamin B6, making them an excellent choice for a healthy diet. Whether you enjoy them as a snack, in smoothies, or as part of a dessert, bananas offer versatility and health benefits. 🍌\n\nIn addition to their nutritional value, bananas are incredibly convenient. They come in their own natural packaging, making them easy to carry and eat on the go. This makes them a perfect snack for busy individuals who need a quick energy boost without the hassle of preparation. 🚀\n\nFurthermore, bananas have been linked to various health benefits, including improved digestion and heart health. Their high fiber content aids in digestion, while the potassium helps maintain healthy blood pressure levels. Incorporating bananas into your daily diet can contribute to overall well-being. ❤️"
-        }
-      },
-      {
-        "id": "b_cardgrid_1772017308725",
-        "type": "CardGrid",
-        "props": {
-          "title": "Explore More Banana Benefits",
-          "cards": [
-            {
-              "title": "Nutritional Facts",
-              "description": "Discover the essential nutrients packed in bananas.",
-              "ctaText": "Learn More",
-              "ctaHref": "/banana-nutrition"
-            },
-            {
-              "title": "Banana Recipes",
-              "description": "Try delicious banana recipes for every meal.",
-              "ctaText": "Get Recipes",
-              "ctaHref": "/banana-recipes"
-            },
-            {
-              "title": "Health Benefits",
-              "description": "Understand how bananas contribute to your health.",
-              "ctaText": "Read More",
-              "ctaHref": "/banana-health"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_strawberries",
-    "slug": "/strawberries",
-    "title": "Strawberries",
-    "updatedAt": "2026-02-26T20:02:58.431Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772121141940",
-        "type": "Hero",
-        "props": {
-          "heading": "Discover the Sweetness of Strawberries 🍓",
-          "subheading": "Nature's candy packed with nutrients.",
-          "ctaText": "Learn More",
-          "ctaHref": "/strawberries",
-          "imageUrl": "https://images.unsplash.com/photo-1589533610925-1cffc309ebaa?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OTJ8fHN0cmF3YmVycnl8ZW58MHx8MHx8fDI%3D",
-          "imageAlt": "Fresh strawberries in a basket"
-        }
-      },
-      {
-        "id": "b_richtext_1772121141940",
-        "type": "RichText",
-        "props": {
-          "title": "Why Strawberries?",
-          "body": "Strawberries are not only delicious but also packed with vitamins, fiber, and high levels of antioxidants known as polyphenols. They are a sodium-free, fat-free, cholesterol-free, low-calorie food."
-        }
-      },
-      {
-        "id": "b_featuregrid_1772121141940",
+        "id": "b_featuregrid_1772493161254",
         "type": "FeatureGrid",
         "props": {
-          "title": "Health Benefits",
+          "title": "Why Hikers Love Adventure Arena",
           "features": [
             {
-              "title": "Rich in Nutrients",
-              "description": "Strawberries are an excellent source of vitamin C and manganese and also contain decent amounts of folate (vitamin B9) and potassium."
+              "title": "Trail Discovery",
+              "description": "Browse thousands of curated trails ranked by difficulty, terrain, and scenery — from beginner forest walks to expert-level ridge lines."
             },
             {
-              "title": "Antioxidant Powerhouse",
-              "description": "These berries are loaded with antioxidants and plant compounds, which may have benefits for heart health and blood sugar control."
+              "title": "Summit Challenges",
+              "description": "Take on our signature peak-bagging challenges and earn badges as you tick off iconic summits around the world."
+            },
+            {
+              "title": "Community of Hikers",
+              "description": "Connect with fellow trail blazers, share trip reports, and find hiking partners who match your pace and ambition."
+            },
+            {
+              "title": "Gear & Safety Guides",
+              "description": "Access expert-written guides on essential gear, navigation, weather prep, and wilderness safety before you set out."
             }
           ]
         }
       },
       {
-        "id": "b_faqaccordion_1772121275190",
-        "type": "FAQAccordion",
+        "id": "b_twocolumn_1772532200615_95",
+        "type": "TwoColumn",
         "props": {
-          "title": "Frequently Asked Questions",
-          "items": [
+          "heading": "Guided Hikes That Push You Further",
+          "body": "Our expert guides know every switchback, summit, and shortcut. Whether you're tackling your first peak or chasing a personal best, they'll pace you right and keep you safe. Small groups. Big rewards. Real adventure.\n\nAll skill levels welcome. No experience needed — just the drive to get out there.",
+          "imageUrl": "https://images.unsplash.com/photo-1623246112577-5175a46b32c5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxndWlkZWQlMjBoaWtlcyUyMHRoYXQlMjBwdXNofGVufDF8MHx8fDE3NzI1MzIyMzZ8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a couple of people that are walking down a hill",
+          "imagePosition": "left",
+          "ctaText": "Book a Guided Hike",
+          "ctaHref": "/hikers/trails"
+        }
+      },
+      {
+        "id": "b_stats_1772493161254",
+        "type": "Stats",
+        "props": {
+          "title": "The Adventure Arena Hiking Community",
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Start now",
+          "ctaHref": "/",
+          "stats": [
             {
-              "q": "What are the health benefits of strawberries?",
-              "a": "Strawberries are rich in vitamins, fiber, and antioxidants. They can help improve heart health, lower blood pressure, and reduce inflammation."
+              "value": "12,000+",
+              "label": "Trails Catalogued"
             },
             {
-              "q": "How should I store strawberries?",
-              "a": "Store strawberries in the refrigerator and wash them just before eating to keep them fresh longer."
+              "value": "85K+",
+              "label": "Active Hikers"
             },
             {
-              "q": "Can strawberries be frozen?",
-              "a": "Yes, strawberries can be frozen. Wash and dry them thoroughly, then freeze in a single layer before transferring to a container."
+              "value": "320+",
+              "label": "Summit Challenges"
+            },
+            {
+              "value": "4.9★",
+              "label": "Average Trail Rating"
             }
           ]
         }
       },
       {
-        "id": "b_cta_1772121141940",
+        "id": "b_cta_1772493161254",
         "type": "CTA",
         "props": {
-          "title": "Enjoy Strawberries Today",
-          "description": "Add strawberries to your diet and enjoy their sweet taste and health benefits.",
-          "ctaText": "Find Recipes",
-          "ctaHref": "/strawberries-recipes"
+          "title": "Ready to Hit the Trail?",
+          "description": "Join thousands of hikers who have already found their perfect trail. Your next adventure is one step away.",
+          "ctaText": "Start Hiking Today",
+          "ctaHref": "/hikers/trails"
         }
       }
-    ]
+    ],
+    "meta": {
+      "title": "Hiking Adventures | Adventure Arena",
+      "description": "Discover world-class hiking trails for every skill level. From woodland walks to alpine ascents, Adventure Arena helps you find your next great hike. Lace up and explore."
+    }
   },
   {
-    "id": "p_oranges",
-    "slug": "/oranges",
-    "title": "Oranges",
-    "updatedAt": "2026-02-26T22:40:07.960Z",
+    "id": "p_kayakers",
+    "slug": "/kayakers",
+    "title": "Kayakers",
+    "updatedAt": "2026-03-03T10:02:30.760Z",
     "blocks": [
       {
-        "id": "b_hero_1772135749521",
+        "id": "b_hero_1772493161254",
         "type": "Hero",
         "props": {
-          "heading": "Citrus Bliss",
-          "subheading": "Discover the vibrant world of citrus fruits.",
-          "ctaText": "Learn More",
-          "ctaHref": "/oranges",
-          "imageUrl": "https://images.unsplash.com/photo-1657746430182-d08f11b013fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2VzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTQ1MjIwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Oranges on a blue background"
+          "heading": "Ride the Wild Water",
+          "subheading": "Carve through whitewater rapids or glide across glassy lakes — the water is calling your name.",
+          "ctaText": "Find Your Paddle Route",
+          "ctaHref": "/kayakers/routes",
+          "imageUrl": "https://images.unsplash.com/photo-1757467105489-795d5aee2e33?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxyaWRlJTIwd2lsZCUyMHdhdGVyfGVufDF8MHx8fDE3NzI0OTMyMDB8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "A small boat navigates choppy blue waters."
         }
       },
       {
-        "id": "b_richtext_1772135749521",
-        "type": "RichText",
+        "id": "b_featuregrid_1772493161254",
+        "type": "FeatureGrid",
         "props": {
-          "title": "The Wonders of Oranges",
-          "body": "**Oranges** are among the most beloved fruits globally, cherished not only for their **delicious taste** but also for their nutritional benefits. Here are some intriguing insights about oranges:\n\n- **Rich in Vitamin C**, oranges play a crucial role in boosting the immune system and maintaining skin health.\n- The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.\n- With over **600 varieties**, oranges offer a diverse range of flavors and uses.\n- Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.\n- Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.\n\nDiscover more about the diverse benefits and culinary uses of oranges on our page."
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_olives",
-    "slug": "/olives",
-    "title": "Olives",
-    "updatedAt": "2026-02-26T23:56:20.128Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772048325072",
-        "type": "Hero",
-        "props": {
-          "heading": "Finest Olive Oils 🫒 Keep it concise and direct.",
-          "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
-          "ctaText": "Shop the Collection",
-          "ctaHref": "/shop",
-          "imageUrl": "https://images.unsplash.com/photo-1632702931182-8095478495c1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvbGl2ZXMlMjBkaWZmZXJlbnQlMjBiYWNrZ3JvdW5kcyUyMHN0dWRpbyUyMGJhY2tncm91bmR8ZW58MXwwfHx8MTc3MjE1MDE3MHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "a white bowl filled with green olives on top of a table"
-        }
-      },
-      {
-        "id": "b_cardgrid_1772048497347",
-        "type": "CardGrid",
-        "props": {
-          "title": "Key Health Benefits of Olive Oil",
-          "cards": [
+          "title": "Why Kayakers Choose Adventure Arena",
+          "features": [
             {
-              "title": "Rich in Healthy Fats",
-              "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
-              "ctaText": "Learn More",
-              "ctaHref": "/health-benefits#healthy-fats"
+              "title": "Route Library",
+              "description": "Explore a vast library of kayaking routes — from calm coastal paddles and open lakes to heart-pumping Class IV rapids."
             },
             {
-              "title": "High in Antioxidants",
-              "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
-              "ctaText": "Discover More",
-              "ctaHref": "/health-benefits#antioxidants"
+              "title": "Whitewater Ratings",
+              "description": "Every route is graded using the International Scale of River Difficulty so you always know what you're getting into."
             },
             {
-              "title": "Anti-inflammatory Properties",
-              "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
-              "ctaText": "Read More",
-              "ctaHref": "/health-benefits#anti-inflammatory"
+              "title": "Paddle Community",
+              "description": "Share your on-water stories, post water condition updates, and link up with paddlers who live for the next big rapid."
             },
             {
-              "title": "Supports Heart Health",
-              "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
-              "ctaText": "Find Out More",
-              "ctaHref": "/health-benefits#heart-health"
-            },
-            {
-              "title": "Promotes Weight Loss",
-              "description": "Incorporating olive oil into your diet can aid in weight management and promote a healthy lifestyle.",
-              "ctaText": "Get Tips",
-              "ctaHref": "/health-benefits#weight-loss"
+              "title": "Safety & Technique",
+              "description": "Level up your skills with guides on paddle technique, reading water, rescue procedures, and essential kayaking safety."
             }
           ]
         }
       },
       {
-        "id": "b_richtext_1772048420274",
-        "type": "RichText",
+        "id": "b_twocolumn_1772532127537",
+        "type": "TwoColumn",
         "props": {
-          "title": "",
-          "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
+          "heading": "Expert Guides. Every Paddle.",
+          "body": "Whether you're navigating your first flatwater route or charging through whitewater rapids, our certified guides keep you safe and moving forward.\n\nSmall groups. Personalised coaching. Unforgettable water experiences — tailored to your skill level and ambition.",
+          "imageUrl": "https://images.unsplash.com/photo-1764757384903-7ec3bb0ef3a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw1fHxleHBlcnQlMjBndWlkZXMlMjBldmVyeSUyMHBhZGRsZXxlbnwxfDB8fHwxNzcyNTMyMTUwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Two people on paddleboards in the water",
+          "imagePosition": "left",
+          "ctaText": "Book a Guided Session",
+          "ctaHref": "/kayakers/routes"
+        }
+      },
+      {
+        "id": "b_stats_1772493161254",
+        "type": "Stats",
+        "props": {
+          "title": "Paddle with the Best",
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Start now",
+          "ctaHref": "/",
+          "stats": [
+            {
+              "value": "8,500+",
+              "label": "Paddle Routes"
+            },
+            {
+              "value": "40K+",
+              "label": "Active Kayakers"
+            },
+            {
+              "value": "150+",
+              "label": "Whitewater Challenges"
+            },
+            {
+              "value": "98%",
+              "label": "Safety Record"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1772493161254",
+        "type": "CTA",
+        "props": {
+          "title": "Your Next Paddle Awaits",
+          "description": "Join a thriving community of kayakers and discover routes that match your skill and thirst for adventure. Grab your paddle — let's go.",
+          "ctaText": "Start Paddling Today",
+          "ctaHref": "/kayakers/routes"
         }
       }
-    ]
+    ],
+    "meta": {
+      "title": "Kayaking Adventures | Adventure Arena",
+      "description": "From roaring whitewater rapids to serene open-water paddles, Adventure Arena connects kayakers with unforgettable water adventures. Grab your paddle and dive in."
+    }
   },
   {
-    "id": "p_cherries",
-    "slug": "/cherries",
-    "title": "Cherries",
-    "updatedAt": "2026-02-27T23:24:35.403Z",
+    "id": "p_summiteers",
+    "slug": "/summiteers",
+    "title": "Summiteers",
+    "updatedAt": "2026-03-03T10:17:55.081Z",
     "blocks": [
       {
-        "id": "b_hero_1772137257073",
+        "id": "b_hero_1772493309022",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Delight of Cherries.",
-          "subheading": "Explore the sweet and tart flavors of our premium cherries. Perfect for desserts, snacks, and more.",
-          "ctaText": "Learn More",
-          "ctaHref": "/cherries",
-          "imageUrl": "http://localhost:4200/generated-images/var_1772234675399_j8psne.png",
-          "imageAlt": "Photorealistic pair of cherries on a bright yellow background",
-          "secondaryCtaText": "Shop Now",
-          "secondaryCtaHref": "/shop-cherries"
+          "heading": "Rise Above the Rest",
+          "subheading": "Summit Seekers are built different. Push past your limits, chase the horizon, and stand on top of the world — we have everything you need to make it happen.",
+          "ctaText": "Claim Your Summit",
+          "ctaHref": "/summiteers#cta",
+          "imageUrl": "https://images.unsplash.com/photo-1650099239459-c89de4be3f05?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxyaXNlJTIwYWJvdmUlMjByZXN0fGVufDF8MHx8fDE3NzI0OTM0NTB8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a round sticker on the side of a wall",
+          "secondaryCtaText": "Explore the Peaks",
+          "secondaryCtaHref": "/summiteers#features"
         }
       },
       {
-        "id": "b_richtext_1772137766387",
-        "type": "RichText",
+        "id": "b_featuregrid_1772493460817",
+        "type": "FeatureGrid",
         "props": {
-          "title": "Benefits of Cherries",
-          "body": "Cherries are not only delicious but also packed with nutrients. They are rich in antioxidants, which help fight free radicals in the body, reducing inflammation and potentially lowering the risk of chronic diseases. Additionally, cherries are a good source of vitamin C, potassium, and fiber, all of which contribute to overall health.\n\nConsuming cherries can also improve sleep quality due to their natural melatonin content. This hormone regulates sleep-wake cycles, making cherries a great snack for those struggling with insomnia. Furthermore, the anti-inflammatory properties of cherries can aid in muscle recovery, making them a popular choice among athletes."
+          "title": "Summit Gear & Training Essentials",
+          "features": [
+            {
+              "title": "High-Altitude Layering",
+              "description": "Master the art of layering for extreme cold and wind — base, mid, and shell choices that keep you moving when temperatures plummet."
+            },
+            {
+              "title": "Technical Footwear",
+              "description": "Choose crampons, mountaineering boots, and gaiters built for technical terrain so every step on ice and rock is sure-footed."
+            },
+            {
+              "title": "Strength & Endurance Training",
+              "description": "Build the leg power, core stability, and cardio capacity that high peaks demand with programmes designed for aspiring summiteers."
+            },
+            {
+              "title": "Acclimatization Strategies",
+              "description": "Learn proven altitude sickness prevention techniques and safe ascent schedules to perform at your best above 3,000 metres."
+            }
+          ]
         }
       },
       {
-        "id": "b_faqaccordion_1772137776777",
+        "id": "b_twocolumn_1772531401708",
+        "type": "TwoColumn",
+        "props": {
+          "heading": "Your Guide to the Summit",
+          "body": "Every great ascent starts with the right team behind you. Our experienced guides know these peaks inside out — the routes, the risks, and the rewards.\n\n**Skill levels:** Beginner to advanced routes available.\n**Group sizes:** Small groups for a focused, personal experience.\n**What's included:** Full gear briefing, safety protocols, and post-climb support.\n\nYou bring the drive. We handle the rest.",
+          "imageUrl": "https://images.unsplash.com/photo-1640244671841-88a1db2b8abc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHx5b3VyJTIwZ3VpZGUlMjBzdW1taXR8ZW58MXwwfHx8MTc3MjUzMTQxNnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "a group of people standing on top of a snow covered slope",
+          "imagePosition": "right",
+          "ctaText": "Book Your Climb",
+          "ctaHref": "/summiteers#cta"
+        }
+      },
+      {
+        "id": "b_faqaccordion_1772493532263",
         "type": "FAQAccordion",
         "props": {
-          "title": "Frequently Asked Questions about Cherries",
+          "title": "Got Questions? We've Got Answers",
           "items": [
             {
-              "q": "What are the health benefits of cherries?",
-              "a": "Cherries are rich in antioxidants, vitamin C, potassium, and fiber, which help reduce inflammation and improve overall health."
+              "q": "What gear do I need to start high-altitude climbing?",
+              "a": "Start with the essentials: insulated layering system, technical mountaineering boots, crampons, an ice axe, and a helmet. We break down exactly what to pack in our Summit Gear Guide."
             },
             {
-              "q": "Can cherries help improve sleep?",
-              "a": "Yes, cherries contain natural melatonin, which can help regulate sleep-wake cycles and improve sleep quality."
+              "q": "How do I train for a summit attempt?",
+              "a": "A solid base of cardiovascular fitness, leg strength, and weighted pack hikes is key. Our training plans ramp up progressively over 12–16 weeks to get you summit-ready."
             },
             {
-              "q": "Are cherries good for muscle recovery?",
-              "a": "Cherries have anti-inflammatory properties that can aid in muscle recovery, making them popular among athletes."
+              "q": "How do I handle altitude sickness?",
+              "a": "Acclimatize gradually — follow the 'climb high, sleep low' rule. Stay hydrated, ascend slowly, and give your body time to adjust. If symptoms worsen, descend immediately."
             }
           ]
         }
       },
       {
-        "id": "b_richtext_1772137893814",
-        "type": "RichText",
+        "id": "b_cta_1772531219615",
+        "type": "CTA",
         "props": {
-          "title": "Vitamins in Cherries",
-          "body": "**Cherries are a great source of essential vitamins, providing a delicious way to meet your daily nutritional needs.** They contain **vitamin C**, which is important for the growth and repair of tissues in the body, helping to maintain healthy skin and a strong immune system.\n\nAdditionally, cherries provide **vitamin A**, which supports vision and immune function, ensuring that your eyes remain healthy and your body can effectively fight off infections. Including cherries in your diet can help you meet your daily vitamin needs while enjoying a delicious fruit that is both sweet and nutritious."
+          "title": "Your Summit Starts Today",
+          "description": "Stop planning. Start climbing. Book your guided ascent with Adventure Arena and take on the peaks with expert support every step of the way.",
+          "ctaText": "Book My Climb",
+          "ctaHref": "/summiteers#cta"
         }
       }
-    ]
-  },
-  {
-    "id": "p_about_lemons",
-    "slug": "/about-lemons",
-    "title": "About Lemons",
-    "updatedAt": "2026-03-03T20:25:11.542Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772150570555",
-        "type": "Hero",
-        "props": {
-          "heading": "Explore the Benefits of Lemons",
-          "subheading": "Discover Health and Culinary Uses",
-          "ctaText": "Find Out More",
-          "ctaHref": "/about-lemons",
-          "imageUrl": "https://images.unsplash.com/photo-1677309810617-993144900602?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxleHBsb3JlJTIwYmVuZWZpdHMlMjBsZW1vbnN8ZW58MXwwfHx8MTc3MjQ4ODkyOHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "three lemons are sitting on a wooden table",
-          "secondaryCtaText": "Learn More",
-          "secondaryCtaHref": "/lemons-benefits"
-        }
-      },
-      {
-        "id": "b_richtext_1772228488636",
-        "type": "RichText",
-        "props": {
-          "title": "The Zesty World of Lemons",
-          "body": "🍋 **When life gives you lemons, make lemonade!** 🍋\n\nLemons are not just a fruit; they are a way of life. Embrace the zest and enjoy the tangy goodness!\n\n## Health Benefits of Lemons\n\nLemons are rich in vitamin C and have numerous health benefits. They can boost your immune system, improve skin quality, and aid digestion. Including lemons in your diet can lead to a healthier lifestyle.\n\n## Culinary Uses of Lemons\n\nLemons add a refreshing flavor to dishes and drinks. From lemon chicken to lemonade, their versatility is unmatched. Discover how lemons can enhance your culinary creations.\n\nExplore the zesty world of lemons and discover their many uses and benefits!"
-        }
-      },
-      {
-        "id": "b_cardgrid_1772228568669",
-        "type": "CardGrid",
-        "props": {
-          "title": "Interesting Lemon Facts",
-          "cards": [
-            {
-              "title": "Culinary Uses",
-              "description": "From zesty marinades to refreshing lemonades, lemons transform every dish and drink into something extraordinary.",
-              "ctaText": "Get Cooking",
-              "ctaHref": "/lemons-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1613900007918-d2075eea2393?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjbG9zZSUyMHNsaWNlZCUyMGxlbW9uJTIwcGxhdGV8ZW58MXwwfHx8MTc3MjU2OTUxMHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "sliced lemon on green textile"
-            },
-            {
-              "title": "Lemon Varieties",
-              "description": "From sweet Meyers to tart Lisbons, explore the fascinating world of lemon varieties grown across the globe.",
-              "ctaText": "Explore Varieties",
-              "ctaHref": "/lemons-varieties",
-              "imageUrl": "https://images.unsplash.com/photo-1763144165374-f889c7fdafbc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxiYXNrZXQlMjBmdWxsJTIwZnJlc2glMjB5ZWxsb3d8ZW58MXwwfHx8MTc3MjU2OTUxMXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "A basket full of fresh lemons with green leaves."
-            },
-            {
-              "title": "Health Benefits of Lemons",
-              "description": "Lemons are packed with vitamin C and antioxidants that boost your immunity, brighten your skin, and energize your body naturally.",
-              "ctaText": "Discover the Benefits",
-              "ctaHref": "/lemons-benefits",
-              "imageUrl": "https://images.unsplash.com/photo-1664548324330-aaf7ab44eaab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHx3b21hbiUyMGhvbGRpbmclMjB0d28lMjBmcmVzaHxlbnwxfDB8fHwxNzcyNTY5NTExfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "a group of people holding hands"
-            }
-          ]
-        }
-      }
-    ]
+    ],
+    "meta": {
+      "title": "Summiteers – Guided Peak Climbs | Adventure Arena",
+      "description": "Book a guided summit climb with Adventure Arena. Expert-led routes for all levels, small groups, full gear briefing, and safety support — every step up.",
+      "ogImage": "https://images.unsplash.com/photo-1640244671841-88a1db2b8abc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHx5b3VyJTIwZ3VpZGUlMjBzdW1taXR8ZW58MXwwfHx8MTc3MjUzMTQxNnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+    }
   }
 ]
