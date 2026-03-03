@@ -400,6 +400,7 @@ async function generateVariationsWithOpenAI(args: {
     "Each patch must only include keys from the selected block props.",
     "Each variation must be materially different from the others.",
     "Do not include unchanged values in patch.",
+    "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     ...(constraints.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
     ...(constraints.cardsOnly && args.block.type === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
     "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."
@@ -475,6 +476,7 @@ async function generateVariationsWithAnthropic(args: {
     "Each patch must only include keys from the selected block props.",
     "Each variation must be materially different from the others.",
     "Do not include unchanged values in patch.",
+    "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     ...(constraints.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
     ...(constraints.cardsOnly && args.block.type === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
     "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."

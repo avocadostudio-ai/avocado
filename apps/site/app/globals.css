@@ -571,42 +571,51 @@ a {
 
 .rich-text {}
 
-.rich-text__body p {
+.rich-text__body p,
+.two-column__body p {
   font-size: 1rem;
   line-height: 1.75;
   color: #334155;
   margin-bottom: 1em;
 }
 
-.rich-text__body p:last-child {
+.rich-text__body p:last-child,
+.two-column__body p:last-child {
   margin-bottom: 0;
 }
 
 .rich-text__body ul,
-.rich-text__body ol {
+.rich-text__body ol,
+.two-column__body ul,
+.two-column__body ol {
   margin: 0 0 1em;
   padding-left: 1.4em;
   color: #334155;
   line-height: 1.75;
 }
 
-.rich-text__body ul {
+.rich-text__body ul,
+.two-column__body ul {
   list-style: disc;
 }
 
-.rich-text__body ol {
+.rich-text__body ol,
+.two-column__body ol {
   list-style: decimal;
 }
 
-.rich-text__body li {
+.rich-text__body li,
+.two-column__body li {
   display: list-item;
 }
 
-.rich-text__body li + li {
+.rich-text__body li + li,
+.two-column__body li + li {
   margin-top: 0.3em;
 }
 
-.rich-text__body h3 {
+.rich-text__body h3,
+.two-column__body h3 {
   margin-top: 1.25em;
   margin-bottom: 0.45em;
   font-size: 1.25rem;

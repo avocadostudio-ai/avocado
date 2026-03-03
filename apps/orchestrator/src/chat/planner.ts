@@ -26,6 +26,23 @@ export function isChatStrictPrimaryOpMode() {
   return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
 }
 
+export function isPageWideTranslationRequest(message: string) {
+  const lower = message.toLowerCase()
+  const asksTranslation =
+    /\btranslate\b/.test(lower) ||
+    /\btranslation\b/.test(lower) ||
+    /\blocaliz/.test(lower) ||
+    /\bgerman\b/.test(lower) ||
+    /\bdeutsch\b/.test(lower)
+  if (!asksTranslation) return false
+  return (
+    /\b(this|the|entire|whole|full)\s+page\b/.test(lower) ||
+    /\bwhole\s+site\b/.test(lower) ||
+    /\ball\s+sections?\b/.test(lower) ||
+    /\btranslate\s+page\b/.test(lower)
+  )
+}
+
 export type PlannerOpenAIClient = {
   chat: {
     completions: {
@@ -188,7 +205,8 @@ export async function generatePlanWithOpenAI(args: {
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
   const batchOverride = isBatchAddRequest(args.message)
-  const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride
+  const pageWideTranslation = isPageWideTranslationRequest(args.message)
+  const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
   const audienceHint = extractAudienceTarget(args.message)
   const explicitOtherReference =
@@ -216,6 +234,7 @@ export async function generatePlanWithOpenAI(args: {
     "For duplicate_block, blockId is required; use optional toPageSlug when duplicating into a different page.",
     "If the user specifies an audience (e.g. 'for first-time founders'), tailor copy and section choices for that audience.",
     "If user asks to create a page for an audience, create_page with audience-specific Hero/benefits/CTA content.",
+    "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     "If user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page. Do not ask which page to create first.",
     "For create_page, derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
@@ -234,6 +253,12 @@ export async function generatePlanWithOpenAI(args: {
           "Each operation must be valid against the page state at that point in execution order.",
           "Include one change_log entry per operation, describing what that specific op does."
         ]),
+    ...(pageWideTranslation
+      ? [
+          "This is a full-page translation request. Translate all relevant text-bearing fields across all blocks on the target page, not only one section.",
+          "Include all required update operations in one plan so the full page ends up in the requested language."
+        ]
+      : []),
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
     "Never mention internal block IDs (b_hero_*, b_featuregrid_*, etc.), prop names (imageUrl, imageAlt), or system settings in summary_for_user or change_log. Use human-friendly descriptions instead (e.g. 'Update the Hero image' not 'Update imageUrl on b_hero_123').",
     selectedBlockId.length > 0 && !explicitOtherReference
