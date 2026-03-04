@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
-import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
+import { getAllBlockMeta, type BlockType, type EditPlan, type Operation, type PageDoc } from "@ai-site-editor/shared"
 import type { UnsplashImage } from "../variation-images.js"
 import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import {
@@ -40,6 +40,7 @@ import {
   formatValidationError,
   isDeterministicRepairEligible,
   buildDeterministicRepairFeedback,
+  type SkippedOperation,
   applyOpsAtomically,
   pickFocusBlockId,
   pickUpdatedSlug
@@ -52,10 +53,12 @@ import {
   plannerContextPack,
   compileDeterministicPlan,
   inferDeterministicIntent,
+  isHighConfidenceDeterministicCase,
+  quotedText,
   rewriteFromExisting
 } from "../nlp/deterministic-planner.js"
-import { generatePlanWithOpenAI } from "./planner.js"
-import { generatePlanWithAnthropic } from "./anthropic-planner.js"
+import { generatePlanWithOpenAI, parseIntentWithOpenAI } from "./planner.js"
+import { generatePlanWithAnthropic, parseIntentWithAnthropic } from "./anthropic-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import {
   heroImageQueryFromContext,
@@ -81,6 +84,16 @@ export function setDemoPlanFromMessageForTests(fn?: typeof demoPlanFromMessage) 
   demoPlanFromMessageImpl = fn ?? demoPlanFromMessage
 }
 
+let parseIntentWithOpenAIImpl = parseIntentWithOpenAI
+export function setParseIntentWithOpenAIForTests(fn?: typeof parseIntentWithOpenAI) {
+  parseIntentWithOpenAIImpl = fn ?? parseIntentWithOpenAI
+}
+
+let parseIntentWithAnthropicImpl = parseIntentWithAnthropic
+export function setParseIntentWithAnthropicForTests(fn?: typeof parseIntentWithAnthropic) {
+  parseIntentWithAnthropicImpl = fn ?? parseIntentWithAnthropic
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline context
 // ---------------------------------------------------------------------------
@@ -99,6 +112,155 @@ export type ChatPipelineContext = {
 export function firstUrlFromText(text: string): string | undefined {
   const match = text.match(/https?:\/\/[^\s"']+/)
   return match ? match[0] : undefined
+}
+
+function sentenceCase(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed) return trimmed
+  return trimmed[0].toUpperCase() + trimmed.slice(1)
+}
+
+function shouldPreferFastModelForMessage(message: string) {
+  if (inferTranslationScopeFromMessage(message) !== "none") return false
+  if (isStandalonePageOperation(message)) return false
+  return isRewriteLikeMessage(message)
+}
+
+function shouldUseLlmIntentRouter(message: string) {
+  if (inferTranslationScopeFromMessage(message) !== "none") return false
+  if (isStandalonePageOperation(message)) return false
+  const normalized = message.trim()
+  if (normalized.length === 0 || normalized.length > 260) return false
+  return (
+    isRewriteLikeMessage(normalized) ||
+    /\b(replace|change|update|set|edit|remove|delete|move|reorder|add)\b/.test(normalized.toLowerCase())
+  )
+}
+
+function compactPlannerContextPack(args: {
+  contextPack: ReturnType<typeof plannerContextPack>
+  message: string
+  translationScope: TranslationScope
+}) {
+  if (args.translationScope === "page") return args.contextPack
+  const lower = args.message.toLowerCase()
+  const keepsFullContext =
+    /\b(create|generate|build|duplicate)\b.*\bpage\b/.test(lower) ||
+    /\b(rename|remove|delete|move)\b.*\bpage\b/.test(lower) ||
+    /\btranslate\b/.test(lower)
+  if (keepsFullContext) return args.contextPack
+
+  const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
+  const compactOutline = args.contextPack.pageOutline.map((entry) => {
+    if (entry.id === selectedBlockId) return entry
+    return {
+      id: entry.id,
+      type: entry.type,
+      props: {},
+      arrayProps: entry.arrayProps
+    }
+  })
+
+  return {
+    ...args.contextPack,
+    pageOutline: compactOutline,
+    recentSuccessfulEdits: args.contextPack.recentSuccessfulEdits.slice(-3)
+  }
+}
+
+function minimalPlannerContextPack(args: {
+  contextPack: ReturnType<typeof plannerContextPack>
+}) {
+  const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
+  if (!selectedBlockId) return args.contextPack
+
+  const neighborIds = new Set(
+    [args.contextPack.neighbors.previous?.id, args.contextPack.neighbors.next?.id]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+  )
+
+  const compactOutline = args.contextPack.pageOutline
+    .filter((entry) => entry.id === selectedBlockId || neighborIds.has(entry.id))
+    .map((entry) => {
+      if (entry.id === selectedBlockId) return entry
+      return {
+        id: entry.id,
+        type: entry.type,
+        props: {},
+        arrayProps: entry.arrayProps
+      }
+    })
+
+  const routeSet = new Set<string>()
+  routeSet.add(args.contextPack.route)
+  for (const slug of args.contextPack.pageRoutes) {
+    if (routeSet.size >= 6) break
+    routeSet.add(slug)
+  }
+
+  return {
+    ...args.contextPack,
+    pageRoutes: Array.from(routeSet),
+    pageOutline: compactOutline,
+    recentSuccessfulEdits: args.contextPack.recentSuccessfulEdits.slice(-1),
+    resolvedReferences: {
+      target: null,
+      anchor: null,
+      mentionedBlocks: []
+    }
+  }
+}
+
+function shouldUseMinimalPlannerContext(args: {
+  message: string
+  translationScope: TranslationScope
+  activeBlockId?: string
+  activeEditablePath?: string
+}) {
+  if (args.translationScope !== "none") return false
+  if (!args.activeBlockId && !args.activeEditablePath) return false
+  if (isStandalonePageOperation(args.message)) return false
+  const lower = args.message.toLowerCase()
+  return (
+    isRewriteLikeMessage(lower) ||
+    /\b(replace|change|update|set|edit|rewrite|rephrase)\b/.test(lower)
+  )
+}
+
+function shouldPreferFocusedTranslation(args: {
+  message: string
+  inferredScope: TranslationScope
+  activeBlockId?: string
+}) {
+  if (args.inferredScope !== "page") return false
+  if (!args.activeBlockId) return false
+  const lower = args.message.toLowerCase()
+  const hasExplicitPageCue =
+    /\b(this|the|entire|whole|full)\s+page\b/.test(lower) ||
+    /\bwhole\s+site\b/.test(lower) ||
+    /\ball\s+sections?\b/.test(lower) ||
+    /\btranslate\s+page\b/.test(lower)
+  if (hasExplicitPageCue) return false
+  return true
+}
+
+export function preferredImageAltText(args: { query: string; resolvedAlt?: string; existingAlt?: string }) {
+  const existingAlt = typeof args.existingAlt === "string" ? args.existingAlt.trim() : ""
+  if (existingAlt.length > 0) return existingAlt
+
+  const resolvedAlt = typeof args.resolvedAlt === "string" ? args.resolvedAlt.trim() : ""
+  const query = typeof args.query === "string" ? args.query.trim() : ""
+  if (!query) return resolvedAlt
+  if (!resolvedAlt) return sentenceCase(`Photo of ${query}`)
+
+  const queryKeywords = imageKeywordsFromQuery(query, 6)
+  if (queryKeywords.length === 0) return resolvedAlt
+
+  const altLower = resolvedAlt.toLowerCase()
+  const overlapCount = queryKeywords.filter((keyword) => altLower.includes(keyword.toLowerCase())).length
+  // If Unsplash alt does not describe the requested subject well, prefer a query-based alt.
+  if (overlapCount === 0) return sentenceCase(`Photo of ${query}`)
+  return resolvedAlt
 }
 
 // ---------------------------------------------------------------------------
@@ -314,6 +476,42 @@ function extractIndexedQueries(message: string) {
   return out
 }
 
+function extractReferencedItemIndices(message: string) {
+  const numeric = new Set<number>()
+  let includesLast = false
+
+  for (const m of message.matchAll(/\b(?:card|item|feature|tile)\s*(\d+)(?:st|nd|rd|th)?\b/gi)) {
+    const idx = Number(m[1]) - 1
+    if (Number.isFinite(idx) && idx >= 0) numeric.add(idx)
+  }
+  for (const m of message.matchAll(/\b(\d+)(?:st|nd|rd|th)\s+(?:card|item|feature|tile)\b/gi)) {
+    const idx = Number(m[1]) - 1
+    if (Number.isFinite(idx) && idx >= 0) numeric.add(idx)
+  }
+  for (const m of message.matchAll(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)\s+(?:card|item|feature|tile)\b/gi)) {
+    const value = String(m[1] ?? "").toLowerCase()
+    if (value === "last") {
+      includesLast = true
+      continue
+    }
+    const idx =
+      value === "first" ? 0 :
+      value === "second" ? 1 :
+      value === "third" ? 2 :
+      value === "fourth" ? 3 :
+      value === "fifth" ? 4 :
+      value === "sixth" ? 5 :
+      value === "seventh" ? 6 :
+      value === "eighth" ? 7 :
+      value === "ninth" ? 8 :
+      value === "tenth" ? 9 :
+      -1
+    if (idx >= 0) numeric.add(idx)
+  }
+
+  return { numeric, includesLast, hasConstraint: numeric.size > 0 || includesLast }
+}
+
 function detectImagePaths(value: unknown, basePath = "", acc = new Set<string>()) {
   if (Array.isArray(value)) {
     value.forEach((entry, idx) => detectImagePaths(entry, `${basePath}[${idx}]`, acc))
@@ -363,6 +561,7 @@ function findImageTargets(args: {
     ...args.patchCandidate
   }
   const explicitByIndex = extractIndexedQueries(args.message)
+  const constrainedIndices = extractReferencedItemIndices(args.message)
   const defaultQuery = heroImageQueryFromContext({
     message: args.message,
     currentPage: args.currentPage,
@@ -386,6 +585,15 @@ function findImageTargets(args: {
     const itemMatch = path.match(/^(.*\[(\d+)\])\.imageUrl$/)
     const index = itemMatch?.[2] ? Number(itemMatch[2]) : undefined
     const itemPath = itemMatch?.[1]
+    if (constrainedIndices.hasConstraint && itemPath && index !== undefined) {
+      let allowed = constrainedIndices.numeric.has(index)
+      if (!allowed && constrainedIndices.includesLast) {
+        const listPath = itemPath.replace(/\[\d+\]$/, "")
+        const listValue = getValueAtPath(mergedProps, listPath)
+        if (Array.isArray(listValue) && index === listValue.length - 1) allowed = true
+      }
+      if (!allowed) continue
+    }
     const indexed = index !== undefined ? explicitByIndex.get(index) : undefined
     let query = indexed ?? ""
     if (!query && itemPath) {
@@ -473,8 +681,8 @@ function rewriteAddBlockToChildImageUpdate(args: { plan: EditPlan; message: stri
   if (!changed) return args.plan
   return {
     ...args.plan,
-    summary_for_user: "Updated images in the existing section.",
-    change_log: [...args.plan.change_log, "Updated child images in the existing component instead of adding a duplicate section."],
+    summary_for_user: "Will update images in the existing section.",
+    change_log: ["Will update child images in the existing component instead of adding a duplicate section."],
     ops: rewrittenOps
   }
 }
@@ -486,12 +694,22 @@ export function sanitizeMessageForPlanning(message: string) {
   if (normalized.length === 0) return normalized
 
   const hasDebugEcho = /(^|\n)\s*debug\s*$|(^|\n)\s*(traceid|prompthash|outcome|intent|opcount|ops)\s*:/im.test(normalized)
-  if (!hasDebugEcho) return normalized
+  const canonicalized = normalized
+    // Normalize common smart quote variants so downstream quoted-text parsing is stable.
+    .replace(/[\u2018\u2019\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u2033]/g, "\"")
+    // Light typo normalization for frequently used edit verbs/nouns.
+    .replace(/\btestomonials\b/gi, "testimonials")
+    .replace(/\bfetures\b/gi, "features")
+    .replace(/\bheding\b/gi, "heading")
+    .replace(/\bad a\b/gi, "add a")
+    .replace(/\bupdte\b/gi, "update")
+  if (!hasDebugEcho) return canonicalized
 
-  const promptEcho = normalized.match(/(^|\n)\s*prompt\s*:\s*(.+)$/im)?.[2]?.trim()
+  const promptEcho = canonicalized.match(/(^|\n)\s*prompt\s*:\s*(.+)$/im)?.[2]?.trim()
   if (promptEcho && promptEcho.length > 0) return promptEcho
 
-  const cleanedLines = normalized
+  const cleanedLines = canonicalized
     .split("\n")
     .map((line) => line.trimEnd())
     .filter((line) => {
@@ -531,6 +749,99 @@ export function inferTranslationScopeFromMessage(message: string): TranslationSc
 
   // Default translation intent to page scope unless the user explicitly narrows it.
   return "page"
+}
+
+function isNonEmptyString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+export function findFullPageTranslationCoverageGap(args: {
+  plan: EditPlan
+  message: string
+  currentPage: PageDoc
+  slug: string
+}) {
+  if (inferTranslationScopeFromMessage(args.message) !== "page") return null
+  if (args.plan.intent !== "edit_plan") return null
+
+  const blockMeta = getAllBlockMeta()
+  const touchedBlockIds = new Set(
+    args.plan.ops
+      .filter((op) => {
+        if (!(op.op === "update_props" || op.op === "update_item" || op.op === "add_item" || op.op === "remove_item" || op.op === "move_item")) return false
+        return "pageSlug" in op && op.pageSlug === args.slug
+      })
+      .map((op) => ("blockId" in op ? op.blockId : ""))
+      .filter((id) => typeof id === "string" && id.length > 0)
+  )
+  if (touchedBlockIds.size === 0) return null
+
+  const missingPaths: string[] = []
+  for (const block of args.currentPage.blocks) {
+    if (!touchedBlockIds.has(block.id)) continue
+    const meta = blockMeta[block.type as BlockType]
+    const listFields = meta?.listFields ?? {}
+    const listEntries = Object.entries(listFields)
+    if (listEntries.length === 0) continue
+
+    for (const [listKey, listMeta] of listEntries) {
+      const translatableItemFields = Object.entries(listMeta.itemFields ?? {})
+        .filter(([, fieldMeta]) => fieldMeta.kind === "text" || fieldMeta.kind === "richtext" || fieldMeta.kind === "imageAlt")
+        .map(([key]) => key)
+      if (translatableItemFields.length === 0) continue
+
+      const listValue = (block.props as Record<string, unknown>)[listKey]
+      if (!Array.isArray(listValue) || listValue.length === 0) continue
+      const perItemCoverage = new Map<number, Set<string>>()
+      const ensureCoverage = (index: number) => {
+        const existing = perItemCoverage.get(index)
+        if (existing) return existing
+        const next = new Set<string>()
+        perItemCoverage.set(index, next)
+        return next
+      }
+
+      for (const op of args.plan.ops) {
+        if (!("pageSlug" in op) || op.pageSlug !== args.slug) continue
+        if (op.op === "update_item" && op.blockId === block.id && op.listKey === listKey) {
+          const patch = op.patch as Record<string, unknown>
+          const cov = ensureCoverage(op.index)
+          for (const key of translatableItemFields) {
+            if (isNonEmptyString(patch[key])) cov.add(key)
+          }
+          continue
+        }
+        if (op.op === "update_props" && op.blockId === block.id) {
+          const patch = op.patch as Record<string, unknown>
+          if (!Array.isArray(patch[listKey])) continue
+          const rows = patch[listKey] as unknown[]
+          for (let idx = 0; idx < rows.length; idx += 1) {
+            const rowPatch = rows[idx]
+            if (!rowPatch || typeof rowPatch !== "object" || Array.isArray(rowPatch)) continue
+            const row = rowPatch as Record<string, unknown>
+            const cov = ensureCoverage(idx)
+            for (const key of translatableItemFields) {
+              if (isNonEmptyString(row[key])) cov.add(key)
+            }
+          }
+        }
+      }
+
+      for (let idx = 0; idx < listValue.length; idx += 1) {
+        const item = listValue[idx]
+        if (!item || typeof item !== "object" || Array.isArray(item)) continue
+        const row = item as Record<string, unknown>
+        const required = translatableItemFields.filter((key) => isNonEmptyString(row[key]))
+        if (required.length === 0) continue
+        const covered = perItemCoverage.get(idx) ?? new Set<string>()
+        const missing = required.filter((key) => !covered.has(key))
+        for (const field of missing) missingPaths.push(`${block.id}.${listKey}[${idx}].${field}`)
+      }
+    }
+  }
+
+  if (missingPaths.length === 0) return null
+  return `Invalid full-page translation coverage for list children. Missing translated fields: ${missingPaths.join(", ")}`
 }
 
 // ---------------------------------------------------------------------------
@@ -682,9 +993,12 @@ export async function withUnsplashHeroImage(args: {
 
       setValueAtPath(patchCandidate, targetImage.path, resolved.url)
       const existingAlt = getValueAtPath(patchCandidate, targetImage.altPath)
-      if (typeof existingAlt !== "string" || existingAlt.trim().length === 0) {
-        setValueAtPath(patchCandidate, targetImage.altPath, resolved.alt)
-      }
+      const nextAlt = preferredImageAltText({
+        query: imageQuery,
+        resolvedAlt: resolved.alt,
+        existingAlt: typeof existingAlt === "string" ? existingAlt : undefined
+      })
+      if (nextAlt.trim().length > 0) setValueAtPath(patchCandidate, targetImage.altPath, nextAlt)
       sourceQuery = resolved.query
       args.log.info(
         {
@@ -750,7 +1064,7 @@ export async function withUnsplashHeroImage(args: {
         }
         if (resolved) {
           props.imageUrl = resolved.url
-          props.imageAlt = resolved.alt
+          props.imageAlt = preferredImageAltText({ query, resolvedAlt: resolved.alt, existingAlt: typeof props.imageAlt === "string" ? props.imageAlt : undefined })
           changed = true
           args.log.info(
             { event: "hero_image_create_page_resolved", chatRequestId: args.chatRequestId, pageSlug: page.slug, query, imageUrl: resolved.url },
@@ -833,7 +1147,7 @@ export async function withUnsplashHeroImage(args: {
           op: "update_props",
           pageSlug: args.slug,
           blockId: fallbackHero.id,
-          patch: { imageUrl: resolved.url, imageAlt: resolved.alt }
+          patch: { imageUrl: resolved.url, imageAlt: preferredImageAltText({ query, resolvedAlt: resolved.alt }) }
         })
       sourceQuery = resolved.query
       changed = true
@@ -1121,6 +1435,9 @@ function deterministicCreatePagePlan(args: { session: string; message: string })
   const requestedSlug = parseCreatePageRequest(args.message)
   if (!requestedSlug) return null
 
+  // When the user specifies block content (quoted titles, descriptions), defer to AI planner
+  if (quotedText(args.message) || /'[^']{2,}'/.test(args.message)) return null
+
   // When the user asks for content generation beyond simple scaffolding,
   // defer to the AI planner which can produce meaningful content.
   if (requestsContentGeneration(args.message)) return null
@@ -1243,6 +1560,11 @@ export function sseWrite(reply: { raw: NodeJS.WritableStream }, payload: unknown
   }
 }
 
+function sleepMs(durationMs: number) {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return Promise.resolve()
+  return new Promise<void>((resolve) => setTimeout(resolve, durationMs))
+}
+
 // ---------------------------------------------------------------------------
 // Main chat pipeline
 // ---------------------------------------------------------------------------
@@ -1252,8 +1574,13 @@ export async function runChatPipeline(
   body: ChatRequestBody,
   options?: {
     onPlanningToken?: (token: string) => void
+    onPlannedOp?: (event: { index: number; op: Operation }) => void
     onOpApplied?: (event: { index: number; total: number; op: Operation; previewVersion: number; focusBlockId?: string }) => void
+    onOpSkipped?: (event: { index: number; total: number; op: Operation; reason: SkippedOperation["reason"] }) => void
     onStatusUpdate?: (message: string) => void
+    onPlanMeta?: (event: { intent: EditPlan["intent"]; summary: string; estimatedOps: number }) => void
+    onRollbackStarted?: (event: { appliedCount: number; reason: string }) => void
+    onRollbackDone?: (event: { restoredVersion: number }) => void
   }
 ): Promise<{ code: number; payload: ChatResult | { error: string } }> {
   let executionMode = body.executionMode ?? "auto"
@@ -1304,7 +1631,14 @@ export async function runChatPipeline(
     siteContext: body.siteContext
   })
   const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
-  const translationScope = inferTranslationScopeFromMessage(plannerMessage)
+  const inferredTranslationScope = inferTranslationScopeFromMessage(plannerMessage)
+  const translationScope = shouldPreferFocusedTranslation({
+    message: plannerMessage,
+    inferredScope: inferredTranslationScope,
+    activeBlockId: body.activeBlockId
+  })
+    ? "component"
+    : inferredTranslationScope
   const planningActiveBlockId = translationScope === "page" ? undefined : body.activeBlockId
   const planningActiveEditablePath = translationScope === "page" ? undefined : body.activeEditablePath
   const sessionChatHistory = chatHistoryBySession.get(body.session) ?? []
@@ -1330,8 +1664,24 @@ export async function runChatPipeline(
   )
 
   const requestedProvider = body.provider ?? (ctx.availableProviders[0] as AIProvider | undefined)
-  const provider: AIProvider = requestedProvider && ctx.availableProviders.includes(requestedProvider) ? requestedProvider : "openai"
-  const modelKey = body.modelKey && ctx.modelLookup[provider][body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const provider: AIProvider = (() => {
+    if (requestedProvider && ctx.availableProviders.includes(requestedProvider)) return requestedProvider
+    // Prefer Anthropic by default when available (user can always override via UI/provider param).
+    if (!body.provider && ctx.availableProviders.includes("anthropic") && process.env.ANTHROPIC_API_KEY) return "anthropic"
+    if (!body.provider && ctx.availableProviders.includes("openai") && process.env.OPENAI_API_KEY) return "openai"
+    return ctx.availableProviders[0] ?? "openai"
+  })()
+  const baseModelKey =
+    body.modelKey && ctx.modelLookup[provider][body.modelKey]
+      ? body.modelKey
+      : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const modelKey =
+    !body.modelKey &&
+    baseModelKey !== "fast" &&
+    ctx.modelLookup[provider].fast &&
+    shouldPreferFastModelForMessage(plannerMessage)
+      ? ("fast" as const)
+      : baseModelKey
   const modelUsed = ctx.modelLookup[provider][modelKey]
   const plannerSource: "openai" | "anthropic" | "demo" =
     provider === "anthropic" && process.env.ANTHROPIC_API_KEY ? "anthropic" :
@@ -1341,12 +1691,18 @@ export async function runChatPipeline(
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
   const pipelineStartedAtMs = Date.now()
+  const stageTimeline: Array<{
+    stage: "request_received" | "first_token" | "first_structured_progress" | "plan_ready" | "first_op_applied" | "done"
+    atMs: number
+  }> = []
   let planningStartedAtMs: number | null = null
   let planningFinishedAtMs: number | null = null
   let firstPlanningTokenMs: number | null = null
   let planningAttempts = 0
   let imageResolutionDurationMs = 0
   let applyDurationMs: number | undefined
+  let firstApplyMs: number | null = null
+  let doneStageMarked = false
 
   const markPlanningStart = () => {
     if (planningStartedAtMs === null) planningStartedAtMs = Date.now()
@@ -1359,8 +1715,49 @@ export async function runChatPipeline(
   const onPlanningToken = (token: string) => {
     if (firstPlanningTokenMs === null) {
       firstPlanningTokenMs = Date.now() - pipelineStartedAtMs
+      if (!stageTimeline.some((item) => item.stage === "first_token")) {
+        stageTimeline.push({ stage: "first_token", atMs: firstPlanningTokenMs })
+      }
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "milestone",
+        timelineStage: "first_token",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        totalDurationMs: firstPlanningTokenMs
+      })
     }
     options?.onPlanningToken?.(token)
+  }
+
+  const markFirstStructuredProgress = () => {
+    if (stageTimeline.some((item) => item.stage === "first_structured_progress")) return
+    const atMs = Date.now() - pipelineStartedAtMs
+    stageTimeline.push({ stage: "first_structured_progress", atMs })
+    ctx.chatTelemetry.push({
+      id: chatRequestId,
+      at: new Date().toISOString(),
+      phase: "milestone",
+      timelineStage: "first_structured_progress",
+      session: body.session!,
+      requestedSlug,
+      effectiveSlug,
+      plannerSource,
+      modelKey,
+      modelUsed,
+      promptHash,
+      promptExcerpt,
+      promptLength: plannerMessage.length,
+      totalDurationMs: atMs
+    })
   }
 
   const emitStatus = (message: string) => {
@@ -1389,6 +1786,13 @@ export async function runChatPipeline(
     imageResolutionDurationMs: imageResolutionDurationMs > 0 ? imageResolutionDurationMs : undefined,
     planningAttempts: planningAttempts > 0 ? planningAttempts : undefined
   })
+  const incrementalApplyEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_INCREMENTAL_APPLY ?? "1").trim())
+  const streamedApplyMinStepMsRaw = Number(process.env.CHAT_STREAM_APPLY_MIN_STEP_MS ?? 260)
+  const streamedApplyMinStepMs =
+    Number.isFinite(streamedApplyMinStepMsRaw) && streamedApplyMinStepMsRaw > 0
+      ? Math.min(Math.max(Math.trunc(streamedApplyMinStepMsRaw), 1), 2000)
+      : 0
+  const incrementalPlanStreamEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_INCREMENTAL_PLAN_STREAM ?? "1").trim())
   const withDebugPayload = (
     payload: ChatResult,
     extra?: Partial<NonNullable<ChatResult["debug"]>>
@@ -1398,10 +1802,35 @@ export async function runChatPipeline(
       traceId: chatRequestId,
       promptHash,
       promptExcerpt,
+      timeline: (() => {
+        if (!doneStageMarked) {
+          doneStageMarked = true
+          const doneAtMs = Date.now() - pipelineStartedAtMs
+          stageTimeline.push({ stage: "done", atMs: doneAtMs })
+          ctx.chatTelemetry.push({
+            id: chatRequestId,
+            at: new Date().toISOString(),
+            phase: "milestone",
+            timelineStage: "done",
+            session: body.session!,
+            requestedSlug,
+            effectiveSlug,
+            plannerSource,
+            modelKey,
+            modelUsed,
+            promptHash,
+            promptExcerpt,
+            promptLength: plannerMessage.length,
+            totalDurationMs: doneAtMs
+          })
+        }
+        return stageTimeline.slice()
+      })(),
       ...(payload.debug ?? {}),
       ...(extra ?? {})
     }
   })
+  stageTimeline.push({ stage: "request_received", atMs: 0 })
   ctx.chatTelemetry.push({
     id: chatRequestId,
     at: new Date().toISOString(),
@@ -1415,6 +1844,22 @@ export async function runChatPipeline(
     promptHash,
     promptExcerpt,
     promptLength: plannerMessage.length
+  })
+  ctx.chatTelemetry.push({
+    id: chatRequestId,
+    at: new Date().toISOString(),
+    phase: "milestone",
+    timelineStage: "request_received",
+    session: body.session,
+    requestedSlug,
+    effectiveSlug,
+    plannerSource,
+    modelKey,
+    modelUsed,
+    promptHash,
+    promptExcerpt,
+    promptLength: plannerMessage.length,
+    totalDurationMs: 0
   })
 
   if (executionMode === "auto") {
@@ -1460,6 +1905,34 @@ export async function runChatPipeline(
     activeBlockType: body.activeBlockType,
     activeEditablePath: planningActiveEditablePath
   })
+  const compactContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_COMPACT_CONTEXT_EXPERIMENT ?? "").trim())
+  const minimalContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_MINIMAL_CONTEXT_EXPERIMENT ?? "").trim())
+  const basePlannerContext =
+    compactContextExperimentEnabled
+      ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
+      : contextPack
+  const useMinimalPlannerContext = minimalContextExperimentEnabled && shouldUseMinimalPlannerContext({
+    message: plannerMessage,
+    translationScope,
+    activeBlockId: planningActiveBlockId,
+    activeEditablePath: planningActiveEditablePath
+  })
+  const plannerContext =
+    useMinimalPlannerContext
+      ? minimalPlannerContextPack({ contextPack: basePlannerContext })
+      : basePlannerContext
+  const contextPackBytes = (() => {
+    try {
+      return Buffer.byteLength(JSON.stringify(plannerContext), "utf8")
+    } catch {
+      return undefined
+    }
+  })()
+  const plannerContextTelemetryFields = {
+    ...(typeof contextPackBytes === "number" ? { contextPackBytes } : {}),
+    compactContextEnabled: compactContextExperimentEnabled,
+    minimalContextEnabled: useMinimalPlannerContext
+  }
 
   const guardrailFailureResponse = (args: { reason: string; source: "openai" | "anthropic" | "demo" }) => {
     const category = classifyGuardrailError(args.reason)
@@ -1479,6 +1952,7 @@ export async function runChatPipeline(
       outcome: "guardrail_failure",
       reason: args.reason.slice(0, 300),
       reasonCategory: category,
+      ...plannerContextTelemetryFields,
       ...timingFields()
     })
     if (category === "ambiguity") {
@@ -1522,7 +1996,8 @@ export async function runChatPipeline(
     plan: EditPlan,
     source: "openai" | "anthropic" | "demo",
     applyMode: "apply_now" | "plan_only" = "apply_now",
-    optionsOverride?: { preResolvedPlan?: boolean }
+    optionsOverride?: { preResolvedPlan?: boolean },
+    plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
   ) => {
     const usageFields = planUsage ? {
       inputTokens: planUsage.inputTokens,
@@ -1552,6 +2027,8 @@ export async function runChatPipeline(
       intent: plan.intent,
       opCount: plan.ops.length,
       opTypes: plan.ops.map((op) => op.op),
+      plannerTier,
+      ...plannerContextTelemetryFields,
       ...usageFields,
       ...timingFields()
     })
@@ -1654,6 +2131,43 @@ export async function runChatPipeline(
       return { done: true as const, response: forcedInfo }
     }
 
+    if (translationScope === "page") {
+      const translationCoverageGap = findFullPageTranslationCoverageGap({
+        plan: resolvedPlan,
+        message: plannerMessage,
+        currentPage: current,
+        slug: effectiveSlug
+      })
+      if (translationCoverageGap) return { done: false as const, reason: translationCoverageGap }
+    }
+
+    options?.onPlanMeta?.({
+      intent: resolvedPlan.intent,
+      summary: resolvedPlan.summary_for_user,
+      estimatedOps: resolvedPlan.ops.length
+    })
+    markFirstStructuredProgress()
+    if (!stageTimeline.some((item) => item.stage === "plan_ready")) {
+      const planReadyAtMs = Date.now() - pipelineStartedAtMs
+      stageTimeline.push({ stage: "plan_ready", atMs: planReadyAtMs })
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "milestone",
+        timelineStage: "plan_ready",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        totalDurationMs: planReadyAtMs
+      })
+    }
+
     if (resolvedPlan.intent === "needs_clarification") {
       pendingClarificationBySession.set(body.session!, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
       ctx.chatTelemetry.push({
@@ -1673,6 +2187,8 @@ export async function runChatPipeline(
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
         opTypes: resolvedPlan.ops.map((op) => op.op),
+        plannerTier,
+        ...plannerContextTelemetryFields,
         ...timingFields()
       })
       if (body.message) pushChatHistory(body.session!, body.message, resolvedPlan.summary_for_user)
@@ -1738,6 +2254,8 @@ export async function runChatPipeline(
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
         opTypes: resolvedPlan.ops.map((op) => op.op),
+        plannerTier,
+        ...plannerContextTelemetryFields,
         ...timingFields()
       })
       return {
@@ -1793,6 +2311,8 @@ export async function runChatPipeline(
         intent: resolvedPlan.intent,
         opCount: 0,
         opTypes: [],
+        plannerTier,
+        ...plannerContextTelemetryFields,
         ...timingFields()
       })
       return {
@@ -1814,13 +2334,14 @@ export async function runChatPipeline(
     }
 
     let applyStartedAtMs: number | null = null
+    let skippedOps: SkippedOperation[] = []
     try {
       emitStatus("Applying planned changes...")
       applyStartedAtMs = Date.now()
       const hasPageStructuralOps = resolvedPlan.ops.some(
         (op) => op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
       )
-      if (options?.onOpApplied && !hasPageStructuralOps) {
+      if (incrementalApplyEnabled && options?.onOpApplied && !hasPageStructuralOps) {
         const rollbackBySlug = new Map<string, PageDoc>()
         for (const op of resolvedPlan.ops) {
           const slugsToSnapshot: string[] = []
@@ -1838,7 +2359,8 @@ export async function runChatPipeline(
         }
 
         // Validate the whole plan from the current state before progressive apply.
-        applyOpsAtomically(body.session!, resolvedPlan.ops)
+        const preflight = applyOpsAtomically(body.session!, resolvedPlan.ops)
+        skippedOps = preflight.skippedOps
 
         // Roll back to pre-apply state so we can replay ops progressively.
         for (const [slug, snapshot] of rollbackBySlug) {
@@ -1867,8 +2389,40 @@ export async function runChatPipeline(
         const total = resolvedPlan.ops.length
         try {
           for (let index = 0; index < total; index += 1) {
+            const stepStartedAtMs = Date.now()
             const op = resolvedPlan.ops[index]
-            applyOpsAtomically(body.session!, [op])
+            const stepResult = applyOpsAtomically(body.session!, [op])
+            if (stepResult.skippedOps.length > 0) {
+              for (const skipped of stepResult.skippedOps) {
+                options?.onOpSkipped?.({
+                  index: index + 1,
+                  total,
+                  op,
+                  reason: skipped.reason
+                })
+              }
+              continue
+            }
+            if (firstApplyMs === null) {
+              firstApplyMs = Date.now() - pipelineStartedAtMs
+              stageTimeline.push({ stage: "first_op_applied", atMs: firstApplyMs })
+              ctx.chatTelemetry.push({
+                id: chatRequestId,
+                at: new Date().toISOString(),
+                phase: "milestone",
+                timelineStage: "first_op_applied",
+                session: body.session!,
+                requestedSlug,
+                effectiveSlug,
+                plannerSource: source,
+                modelKey,
+                modelUsed,
+                promptHash,
+                promptExcerpt,
+                promptLength: plannerMessage.length,
+                totalDurationMs: firstApplyMs
+              })
+            }
             const previewVersion = bumpVersion(body.session!)
             options.onOpApplied({
               index: index + 1,
@@ -1877,16 +2431,44 @@ export async function runChatPipeline(
               previewVersion,
               focusBlockId: pickFocusBlockId([op])
             })
+            if (streamedApplyMinStepMs > 0 && total > 1 && index < total - 1) {
+              const stepElapsedMs = Date.now() - stepStartedAtMs
+              const remainingMs = streamedApplyMinStepMs - stepElapsedMs
+              if (remainingMs > 0) await sleepMs(remainingMs)
+            }
           }
         } catch (progressiveError) {
+          options?.onRollbackStarted?.({ appliedCount: total, reason: toErrorDetail(progressiveError) })
           // Roll back to pre-plan state so we don't leave a partially-applied plan.
           for (const [slug, snapshot] of rollbackBySlug) {
             setPage(body.session!, { ...snapshot, slug })
           }
+          options?.onRollbackDone?.({ restoredVersion: versions.get(body.session!) ?? 0 })
           throw progressiveError
         }
       } else {
-        applyOpsAtomically(body.session!, resolvedPlan.ops)
+        const applyResult = applyOpsAtomically(body.session!, resolvedPlan.ops)
+        skippedOps = applyResult.skippedOps
+        if (applyResult.appliedCount > 0 && firstApplyMs === null) {
+          firstApplyMs = Date.now() - pipelineStartedAtMs
+          stageTimeline.push({ stage: "first_op_applied", atMs: firstApplyMs })
+          ctx.chatTelemetry.push({
+            id: chatRequestId,
+            at: new Date().toISOString(),
+            phase: "milestone",
+            timelineStage: "first_op_applied",
+            session: body.session!,
+            requestedSlug,
+            effectiveSlug,
+            plannerSource: source,
+            modelKey,
+            modelUsed,
+            promptHash,
+            promptExcerpt,
+            promptLength: plannerMessage.length,
+            totalDurationMs: firstApplyMs
+          })
+        }
       }
       pushUndo(body.session!, effectiveSlug, previous)
       pendingClarificationBySession.delete(body.session!)
@@ -1900,6 +2482,10 @@ export async function runChatPipeline(
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
       const metaChangeLogEntries = buildMetaChangeLogEntries(resolvedPlan.ops)
+      const skippedSummary =
+        skippedOps.length > 0
+          ? [`Skipped ${skippedOps.length} unchanged operation${skippedOps.length === 1 ? "" : "s"}.`]
+          : []
       applyDurationMs = applyStartedAtMs !== null ? Date.now() - applyStartedAtMs : undefined
       ctx.chatTelemetry.push({
         id: chatRequestId,
@@ -1918,6 +2504,9 @@ export async function runChatPipeline(
         intent: resolvedPlan.intent,
         opCount: resolvedPlan.ops.length,
         opTypes: resolvedPlan.ops.map((op) => op.op),
+        skippedOpCount: skippedOps.length > 0 ? skippedOps.length : undefined,
+        plannerTier,
+        ...plannerContextTelemetryFields,
         ...usageFields,
         ...timingFields()
       })
@@ -1928,7 +2517,7 @@ export async function runChatPipeline(
           payload: withDebugPayload({
             status: "applied",
             summary: resolvedPlan.summary_for_user,
-            changes: [...resolvedPlan.change_log, ...metaChangeLogEntries, ...aiInsightChanges],
+            changes: [...resolvedPlan.change_log, ...metaChangeLogEntries, ...aiInsightChanges, ...skippedSummary],
             mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, updatedSlug ?? effectiveSlug),
             suggestions: resolvedPlan.suggested_next_actions ?? postEditSuggestions({ plan: resolvedPlan, current, body }),
             previewVersion,
@@ -1942,6 +2531,8 @@ export async function runChatPipeline(
             intent: resolvedPlan.intent,
             opCount: resolvedPlan.ops.length,
             opTypes: resolvedPlan.ops.map((op) => op.op),
+            skippedOpCount: skippedOps.length,
+            skippedOps,
             ...usageFields
           })
         }
@@ -1968,6 +2559,8 @@ export async function runChatPipeline(
           promptLength: plannerMessage.length,
           outcome: "no_effective_change",
           reason: reason.slice(0, 300),
+          plannerTier,
+          ...plannerContextTelemetryFields,
           ...timingFields()
         })
         return {
@@ -2003,6 +2596,7 @@ export async function runChatPipeline(
         outcome: "apply_failed",
         reason: reason.slice(0, 300),
         reasonCategory: classifyGuardrailError(reason),
+        plannerTier,
         ...timingFields()
       })
       return { done: false as const, reason }
@@ -2112,6 +2706,7 @@ export async function runChatPipeline(
         outcome: "apply_pending_plan_error",
         reason: reason.slice(0, 300),
         reasonCategory: classifyGuardrailError(reason),
+        ...plannerContextTelemetryFields,
         ...timingFields()
       })
       return {
@@ -2153,9 +2748,10 @@ export async function runChatPipeline(
       intent: forcedDuplicatePlan.intent,
       opCount: forcedDuplicatePlan.ops.length,
       opTypes: forcedDuplicatePlan.ops.map((op) => op.op),
+      plannerTier: "forced_deterministic",
       ...timingFields()
     })
-    const forcedOutcome = await respondFromPlan(forcedDuplicatePlan, plannerSource, applyMode)
+    const forcedOutcome = await respondFromPlan(forcedDuplicatePlan, plannerSource, applyMode, undefined, "forced_deterministic")
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
@@ -2185,9 +2781,10 @@ export async function runChatPipeline(
       intent: forcedSelectedRewritePlan.intent,
       opCount: forcedSelectedRewritePlan.ops.length,
       opTypes: forcedSelectedRewritePlan.ops.map((op) => op.op),
+      plannerTier: "forced_deterministic",
       ...timingFields()
     })
-    const forcedOutcome = await respondFromPlan(forcedSelectedRewritePlan, plannerSource, applyMode)
+    const forcedOutcome = await respondFromPlan(forcedSelectedRewritePlan, plannerSource, applyMode, undefined, "forced_deterministic")
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
@@ -2211,9 +2808,10 @@ export async function runChatPipeline(
       intent: forcedCreatePlan.intent,
       opCount: forcedCreatePlan.ops.length,
       opTypes: forcedCreatePlan.ops.map((op) => op.op),
+      plannerTier: "forced_deterministic",
       ...timingFields()
     })
-    const forcedOutcome = await respondFromPlan(forcedCreatePlan, plannerSource, applyMode)
+    const forcedOutcome = await respondFromPlan(forcedCreatePlan, plannerSource, applyMode, undefined, "forced_deterministic")
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
@@ -2223,7 +2821,7 @@ export async function runChatPipeline(
       emitStatus("Planning edits...")
       const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, planningActiveBlockId, body.activeBlockType)
       markPlanningFinish()
-      const outcome = await respondFromPlan(demoPlan, "demo", applyMode)
+      const outcome = await respondFromPlan(demoPlan, "demo", applyMode, undefined, "demo")
       if (outcome.done) return outcome.response
       return guardrailFailureResponse({ reason: outcome.reason, source: "demo" })
     } catch (error) {
@@ -2245,6 +2843,8 @@ export async function runChatPipeline(
         outcome: "planner_exception",
         reason: reason.slice(0, 300),
         reasonCategory: classifyGuardrailError(reason),
+        plannerTier: "demo",
+        ...plannerContextTelemetryFields,
         ...timingFields()
       })
       return {
@@ -2262,56 +2862,168 @@ export async function runChatPipeline(
     }
   }
 
-  const deterministicIntent = inferDeterministicIntent({
+  const isHighConfidence = isHighConfidenceDeterministicCase({
     message: plannerMessage,
     currentPage: current,
     activeBlockId: planningActiveBlockId,
     activeEditablePath: planningActiveEditablePath
   })
 
-  if (deterministicIntent) {
-    emitStatus("Planning edits...")
-    const deterministicPlan = compileDeterministicPlan({
-      session: body.session,
-      intent: deterministicIntent,
+  if (isHighConfidence) {
+    const deterministicIntent = inferDeterministicIntent({
       message: plannerMessage,
-      slug: effectiveSlug,
       currentPage: current,
       activeBlockId: planningActiveBlockId,
       activeEditablePath: planningActiveEditablePath
     })
 
-    if (deterministicPlan?.intent === "edit_plan" && deterministicPlan.ops.length > 0) {
-      markPlanningFinish()
-      ctx.chatTelemetry.push({
-        id: chatRequestId,
-        at: new Date().toISOString(),
-        phase: "deterministic_plan_generated",
+    if (deterministicIntent) {
+      emitStatus("Planning edits...")
+      const deterministicPlan = compileDeterministicPlan({
         session: body.session,
-        requestedSlug,
-        effectiveSlug,
-        plannerSource,
-        modelKey,
-        modelUsed,
-        promptHash,
-        promptExcerpt,
-        promptLength: plannerMessage.length,
-        outcome: "deterministic_plan_ready",
-        intent: deterministicPlan.intent,
-        opCount: deterministicPlan.ops.length,
-        opTypes: deterministicPlan.ops.map((op) => op.op)
+        intent: deterministicIntent,
+        message: plannerMessage,
+        slug: effectiveSlug,
+        currentPage: current,
+        activeBlockId: planningActiveBlockId,
+        activeEditablePath: planningActiveEditablePath
       })
-      const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode)
-      if (deterministicOutcome.done) return deterministicOutcome.response
-    }
 
-    if (
-      deterministicPlan?.intent === "needs_clarification" &&
-      shouldReturnDeterministicClarification(plannerMessage)
-    ) {
-      markPlanningFinish()
-      const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode)
-      if (deterministicOutcome.done) return deterministicOutcome.response
+      if (deterministicPlan?.intent === "edit_plan" && deterministicPlan.ops.length > 0) {
+        markPlanningFinish()
+        ctx.chatTelemetry.push({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "deterministic_plan_generated",
+          session: body.session,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: "deterministic_plan_ready",
+          intent: deterministicPlan.intent,
+          opCount: deterministicPlan.ops.length,
+          opTypes: deterministicPlan.ops.map((op) => op.op),
+          plannerTier: "deterministic"
+        })
+        const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode, undefined, "deterministic")
+        if (deterministicOutcome.done) return deterministicOutcome.response
+      }
+
+      if (
+        deterministicPlan?.intent === "needs_clarification" &&
+        shouldReturnDeterministicClarification(plannerMessage)
+      ) {
+        markPlanningFinish()
+        const deterministicOutcome = await respondFromPlan(deterministicPlan, plannerSource, applyMode, undefined, "deterministic")
+        if (deterministicOutcome.done) return deterministicOutcome.response
+      }
+    }
+  }
+
+  const llmIntentRouterEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_LLM_INTENT_ROUTER ?? "1").trim())
+  const shouldTryLlmIntentRouter =
+    llmIntentRouterEnabled &&
+    shouldUseLlmIntentRouter(plannerMessage) &&
+    (plannerSource === "openai" || plannerSource === "anthropic")
+
+  if (shouldTryLlmIntentRouter) {
+    try {
+      emitStatus("Understanding your request...")
+      const routerModel =
+        ctx.modelLookup[provider]?.fast ??
+        ctx.modelLookup[provider]?.balanced ??
+        modelUsed
+
+      const routedIntent =
+        plannerSource === "anthropic"
+          ? await parseIntentWithAnthropicImpl({
+              message: plannerMessage,
+              slug: effectiveSlug,
+              currentPage: current,
+              activeBlockId: planningActiveBlockId,
+              activeBlockType: body.activeBlockType,
+              activeEditablePath: planningActiveEditablePath,
+              model: routerModel
+            })
+          : await parseIntentWithOpenAIImpl({
+              message: plannerMessage,
+              slug: effectiveSlug,
+              currentPage: current,
+              activeBlockId: planningActiveBlockId,
+              activeBlockType: body.activeBlockType,
+              activeEditablePath: planningActiveEditablePath,
+              model: routerModel
+            })
+
+      emitStatus("Planning edits...")
+      const routedPlan = compileDeterministicPlan({
+        session: body.session,
+        intent: routedIntent,
+        message: plannerMessage,
+        slug: effectiveSlug,
+        currentPage: current,
+        activeBlockId: planningActiveBlockId,
+        activeEditablePath: planningActiveEditablePath
+      })
+
+      if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
+        markPlanningFinish()
+        ctx.chatTelemetry.push({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "deterministic_plan_generated",
+          session: body.session,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: "llm_router_plan_ready",
+          intent: routedPlan.intent,
+          opCount: routedPlan.ops.length,
+          opTypes: routedPlan.ops.map((op) => op.op),
+          plannerTier: "llm_intent_router",
+          ...timingFields()
+        })
+        const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
+        if (routedOutcome.done) return routedOutcome.response
+      }
+
+      if (routedPlan?.intent === "needs_clarification" && shouldReturnDeterministicClarification(plannerMessage)) {
+        markPlanningFinish()
+        ctx.chatTelemetry.push({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "deterministic_plan_generated",
+          session: body.session,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: "llm_router_needs_clarification",
+          intent: routedPlan.intent,
+          opCount: 0,
+          opTypes: [],
+          plannerTier: "llm_intent_router",
+          ...timingFields()
+        })
+        const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
+        if (routedOutcome.done) return routedOutcome.response
+      }
+    } catch {
+      // If router fails, fall back to the full planner.
     }
   }
 
@@ -2329,10 +3041,16 @@ export async function runChatPipeline(
         message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
-        contextPack,
+        contextPack: plannerContext,
         model: modelUsed,
         history: sessionChatHistory,
-        onToken: onPlanningToken
+        onToken: onPlanningToken,
+        onPlannedOp: incrementalPlanStreamEnabled
+          ? (op, index) => {
+              markFirstStructuredProgress()
+              options?.onPlannedOp?.({ op, index })
+            }
+          : undefined
       })
       initialPlan = result.plan
       planUsage = result.usage
@@ -2377,6 +3095,8 @@ export async function runChatPipeline(
           outcome: "planning_exhausted",
           reason: reason.slice(0, 300),
           reasonCategory: classifyGuardrailError(reason),
+          plannerTier: "full_llm",
+          ...plannerContextTelemetryFields,
           ...timingFields()
         })
         return {
@@ -2412,6 +3132,8 @@ export async function runChatPipeline(
       promptExcerpt,
       promptLength: plannerMessage.length,
       outcome: "planning_missing",
+      plannerTier: "full_llm",
+      ...plannerContextTelemetryFields,
       ...timingFields()
     })
     return {
@@ -2429,7 +3151,7 @@ export async function runChatPipeline(
     }
   }
 
-  const initialOutcome = await respondFromPlan(initialPlan, plannerSource, applyMode)
+  const initialOutcome = await respondFromPlan(initialPlan, plannerSource, applyMode, undefined, "full_llm")
   if (initialOutcome.done) return initialOutcome.response
 
   if (!isDeterministicRepairEligible(initialOutcome.reason)) {
@@ -2458,15 +3180,24 @@ export async function runChatPipeline(
       ...timingFields()
     })
     planningAttempts += 1
+    const repairFeedback = /full-page translation coverage/i.test(initialOutcome.reason)
+      ? `${initialOutcome.reason}. Repair for translation completeness: include missing translated text fields for list children across all affected blocks. Preserve links/hrefs unchanged.`
+      : buildDeterministicRepairFeedback(initialOutcome.reason)
     const repairResult = await generatePlanImpl({
       message: plannerMessage,
       slug: effectiveSlug,
       currentPage: current,
-      contextPack,
+      contextPack: plannerContext,
       model: modelUsed,
       history: sessionChatHistory,
-      feedback: buildDeterministicRepairFeedback(initialOutcome.reason),
-      onToken: onPlanningToken
+      feedback: repairFeedback,
+      onToken: onPlanningToken,
+      onPlannedOp: incrementalPlanStreamEnabled
+        ? (op, index) => {
+            markFirstStructuredProgress()
+            options?.onPlannedOp?.({ op, index })
+          }
+        : undefined
     })
     repairedPlan = repairResult.plan
     planUsage = repairResult.usage
@@ -2509,6 +3240,7 @@ export async function runChatPipeline(
       outcome: "repair_failed",
       reason: reason.slice(0, 300),
       reasonCategory: classifyGuardrailError(reason),
+      ...plannerContextTelemetryFields,
       ...timingFields()
     })
     return {
