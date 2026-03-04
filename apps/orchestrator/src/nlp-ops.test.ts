@@ -3,10 +3,10 @@ import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, extractMentionedBlockTypes } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
-import { inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
+import { findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
 
 test("parseCreatePageRequest prompt matrix", () => {
   const cases: Array<{ prompt: string; expected: string | null }> = [
@@ -57,6 +57,117 @@ test("inferTranslationScopeFromMessage distinguishes page and component scope", 
   assert.equal(inferTranslationScopeFromMessage("translate to german"), "page")
   assert.equal(inferTranslationScopeFromMessage("translate this selected component to german"), "component")
   assert.equal(inferTranslationScopeFromMessage("change hero heading"), "none")
+})
+
+test("findFullPageTranslationCoverageGap flags missing CardGrid child fields", () => {
+  const page = {
+    id: "p_test",
+    slug: "/test",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_cards",
+        type: "CardGrid" as const,
+        props: {
+          title: "Cards",
+          cards: [
+            { title: "A", description: "Desc A", ctaText: "Learn", ctaHref: "/" },
+            { title: "B", description: "Desc B", ctaText: "Learn", ctaHref: "/" }
+          ]
+        }
+      }
+    ]
+  }
+  const gap = findFullPageTranslationCoverageGap({
+    plan: {
+      intent: "edit_plan",
+      summary_for_user: "Translate page",
+      change_log: [],
+      ops: [
+        { op: "update_item", pageSlug: "/test", blockId: "b_cards", listKey: "cards", index: 0, patch: { title: "Titel A" } },
+        { op: "update_item", pageSlug: "/test", blockId: "b_cards", listKey: "cards", index: 1, patch: { title: "Titel B" } }
+      ]
+    },
+    message: "translate whole page to dutch",
+    currentPage: page,
+    slug: "/test"
+  })
+  assert.ok(gap)
+  assert.match(String(gap), /cards\[0\]\.description/i)
+  assert.match(String(gap), /cards\[0\]\.ctaText/i)
+})
+
+test("findFullPageTranslationCoverageGap flags missing child fields for non-CardGrid list blocks", () => {
+  const page = {
+    id: "p_test",
+    slug: "/test",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_features",
+        type: "FeatureGrid" as const,
+        props: {
+          title: "Features",
+          features: [
+            { title: "Speed", description: "Fast setup" },
+            { title: "Safety", description: "Secure changes" }
+          ]
+        }
+      }
+    ]
+  }
+  const gap = findFullPageTranslationCoverageGap({
+    plan: {
+      intent: "edit_plan",
+      summary_for_user: "Translate page",
+      change_log: [],
+      ops: [{ op: "update_item", pageSlug: "/test", blockId: "b_features", listKey: "features", index: 0, patch: { title: "Snelheid" } }]
+    },
+    message: "translate whole page to dutch",
+    currentPage: page,
+    slug: "/test"
+  })
+  assert.ok(gap)
+  assert.match(String(gap), /features\[0\]\.description/i)
+})
+
+test("findFullPageTranslationCoverageGap passes when list child text coverage is complete", () => {
+  const page = {
+    id: "p_test",
+    slug: "/test",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_features",
+        type: "FeatureGrid" as const,
+        props: {
+          title: "Features",
+          features: [
+            { title: "Speed", description: "Fast setup" },
+            { title: "Safety", description: "Secure changes" }
+          ]
+        }
+      }
+    ]
+  }
+  const gap = findFullPageTranslationCoverageGap({
+    plan: {
+      intent: "edit_plan",
+      summary_for_user: "Translate page",
+      change_log: [],
+      ops: [
+        { op: "update_item", pageSlug: "/test", blockId: "b_features", listKey: "features", index: 0, patch: { title: "Snelheid", description: "Snelle opzet" } },
+        { op: "update_item", pageSlug: "/test", blockId: "b_features", listKey: "features", index: 1, patch: { title: "Veiligheid", description: "Veilige wijzigingen" } }
+      ]
+    },
+    message: "translate whole page to dutch",
+    currentPage: page,
+    slug: "/test"
+  })
+  assert.equal(gap, null)
 })
 
 test("inferDeterministicIntent infers remove action against selected block", () => {
@@ -273,6 +384,61 @@ test("normalizePlanCandidate maps arrayProp alias to listKey", () => {
   if (op.op === "update_item") {
     assert.equal(op.listKey, "items")
     assert.equal(op.index, 2)
+  }
+})
+
+test("normalizePlanCandidate remaps update_item label patch to card title", () => {
+  const currentPage = {
+    id: "p_test",
+    slug: "/test",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_cards_test",
+        type: "CardGrid" as const,
+        props: {
+          title: "Cards",
+          cards: [
+            { title: "One", description: "Desc 1", ctaText: "Read", ctaHref: "/" },
+            { title: "Two", description: "Desc 2", ctaText: "Read", ctaHref: "/" },
+            { title: "Three", description: "Desc 3", ctaText: "Read", ctaHref: "/" }
+          ]
+        }
+      }
+    ]
+  }
+
+  const parsed = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      summary_for_user: "Translate card label",
+      change_log: [],
+      ops: [
+        {
+          op: "update_item",
+          pageSlug: "/test",
+          blockId: "b_cards_test",
+          listKey: "cards",
+          index: 2,
+          patch: { label: "Beneficios para la salud de los limones" }
+        }
+      ]
+    },
+    {
+      defaultSlug: "/test",
+      currentPage,
+      userMessage: "translate card 3 label to spanish"
+    }
+  )
+
+  const result = editPlanSchema.safeParse(parsed)
+  assert.equal(result.success, true)
+  if (!result.success) return
+  const op = result.data.ops[0]
+  assert.equal(op.op, "update_item")
+  if (op.op === "update_item") {
+    assert.deepEqual(op.patch, { title: "Beneficios para la salud de los limones" })
   }
 })
 
@@ -1253,6 +1419,98 @@ test("isBatchAddRequest treats multi-page create prompts as batch overrides", ()
   assert.equal(isBatchAddRequest("Create only Water Explorers and Wilderness Survivalists pages"), true)
 })
 
+test("isBatchAddRequest treats explicit multi-block add prompts as batch overrides", () => {
+  assert.equal(isBatchAddRequest("add 3 blocks: hero, cardgrid and CTA"), true)
+  assert.equal(
+    isBatchAddRequest(
+      "add 3 blocks: hero, cardgrid and CTA [site context] Site purpose: Discover the Magic of Avocados. Site name: Avocado Magic [/site context]"
+    ),
+    true
+  )
+})
+
+test("isBatchAddRequest treats populate/update-all as batch overrides", () => {
+  assert.equal(isBatchAddRequest("populate all components with sample content"), true)
+  assert.equal(
+    isBatchAddRequest(
+      "populate all components with sample content [site context] Site purpose: Discover the Magic of Avocados. Site name: Avocado Magic [/site context]"
+    ),
+    true
+  )
+  assert.equal(isBatchAddRequest("update all blocks with real content"), true)
+  assert.equal(isBatchAddRequest("rewrite every section"), true)
+  assert.equal(isBatchAddRequest("populate the whole page"), true)
+  // Negative: single block update should not trigger
+  assert.equal(isBatchAddRequest("update the hero heading"), false)
+})
+
+test("extractMentionedBlockTypes returns all block types in order", () => {
+  assert.deepEqual(
+    extractMentionedBlockTypes("add 3 blocks: hero, cardgrid and CTA"),
+    ["Hero", "CardGrid", "CTA"]
+  )
+  assert.deepEqual(
+    extractMentionedBlockTypes("add hero, testimonials and FAQ"),
+    ["Hero", "Testimonials", "FAQAccordion"]
+  )
+})
+
+test("compileDeterministicPlan generates 3 add_block ops for batch add", () => {
+  const currentPage = demoPublishedPages()[0]
+  const intent = inferDeterministicIntent({
+    message: "add 3 blocks: hero, cardgrid and CTA",
+    currentPage,
+    activeBlockId: undefined,
+    activeEditablePath: undefined
+  })
+  assert.ok(intent)
+  assert.equal(intent!.action, "add")
+
+  const plan = compileDeterministicPlan({
+    session: "test-batch-add",
+    intent: intent!,
+    message: "add 3 blocks: hero, cardgrid and CTA",
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan!.intent, "edit_plan")
+  assert.equal(plan!.ops.length, 3)
+  assert.equal(plan!.ops[0]!.op, "add_block")
+  assert.equal(plan!.ops[1]!.op, "add_block")
+  assert.equal(plan!.ops[2]!.op, "add_block")
+  // Verify distinct block types
+  const types = plan!.ops.map((op) => "block" in op ? (op as any).block.type : null)
+  assert.deepEqual(types, ["Hero", "CardGrid", "CTA"])
+  // Verify unique block IDs
+  const ids = plan!.ops.map((op) => "block" in op ? (op as any).block.id : null)
+  assert.equal(new Set(ids).size, 3)
+})
+
+test("compileDeterministicPlan batch add with site context envelope", () => {
+  const currentPage = demoPublishedPages()[0]
+  const message = "add 3 blocks: hero, cardgrid and CTA [site context] Site purpose: Discover the Magic of Avocados. Site name: Avocado Magic [/site context]"
+  const intent = inferDeterministicIntent({
+    message,
+    currentPage,
+    activeBlockId: undefined,
+    activeEditablePath: undefined
+  })
+  assert.ok(intent)
+
+  const plan = compileDeterministicPlan({
+    session: "test-batch-add-ctx",
+    intent: intent!,
+    message,
+    slug: "/",
+    currentPage
+  })
+
+  assert.ok(plan)
+  assert.equal(plan!.ops.length, 3)
+})
+
 // ---------------------------------------------------------------------------
 // Step 4: tighter asksNavMove regex
 // ---------------------------------------------------------------------------
@@ -1699,4 +1957,17 @@ test("postEditSuggestions suggests missing block types", () => {
   const hasTestimonials = suggestions.some((s) => s.toLowerCase().includes("testimonials"))
   const hasFaq = suggestions.some((s) => s.toLowerCase().includes("faq"))
   assert.ok(hasTestimonials || hasFaq, "should suggest adding missing block types")
+})
+
+test("postEditSuggestions does not return block suggestions after remove_page", () => {
+  const pages = demoPublishedPages()
+  const home = pages[0]
+  const plan = {
+    intent: "edit_plan" as const,
+    summary_for_user: "Deleted page /test.",
+    change_log: ["Removed page /test."],
+    ops: [{ op: "remove_page" as const, pageSlug: "/test" }]
+  }
+  const suggestions = postEditSuggestions({ plan, current: home, body: { message: "remove this page" } })
+  assert.deepEqual(suggestions, [])
 })

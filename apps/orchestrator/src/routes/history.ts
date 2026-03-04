@@ -6,6 +6,7 @@ import {
   getHistoryMap,
   getPage,
   setPage,
+  removePage,
   bumpVersion,
   schedulePersistState
 } from "../state/session-state.js"
@@ -23,17 +24,23 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     if (list.length === 0) return reply.code(400).send({ error: "nothing to undo" })
 
     const current = getPage(session, body.slug)
-    if (!current) return reply.code(404).send({ error: "page not found" })
+    // current may be null if the page was deleted — that's OK, we'll restore from snapshot
 
     const prev = list.pop()
     undoMap.set(body.slug, list)
-    if (!prev) return reply.code(400).send({ error: "nothing to undo" })
+    if (prev === undefined) return reply.code(400).send({ error: "nothing to undo" })
 
     const redoList = redoMap.get(body.slug) ?? []
-    redoList.push(structuredClone(current))
+    // Push current state to redo: null means "page was deleted" (redo will re-delete)
+    redoList.push(current ? structuredClone(current) : null as any)
     redoMap.set(body.slug, redoList)
 
-    setPage(session, structuredClone(prev))
+    // null entry means "page was deleted by redo" — undo re-creates it
+    if (prev === null) {
+      removePage(session, body.slug)
+    } else {
+      setPage(session, structuredClone(prev))
+    }
     const previewVersion = bumpVersion(session)
     schedulePersistState(app.log)
     return { status: "applied", previewVersion }
@@ -50,17 +57,22 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     if (list.length === 0) return reply.code(400).send({ error: "nothing to redo" })
 
     const current = getPage(session, body.slug)
-    if (!current) return reply.code(404).send({ error: "page not found" })
+    // current may be null if the page was previously deleted and redo re-deletes it
 
     const next = list.pop()
     redoMap.set(body.slug, list)
-    if (!next) return reply.code(400).send({ error: "nothing to redo" })
+    if (next === undefined) return reply.code(400).send({ error: "nothing to redo" })
 
     const undoList = undoMap.get(body.slug) ?? []
-    undoList.push(structuredClone(current))
+    undoList.push(current ? structuredClone(current) : null as any)
     undoMap.set(body.slug, undoList)
 
-    setPage(session, structuredClone(next))
+    // null entry means "page was deleted" — redo re-deletes it
+    if (next === null) {
+      removePage(session, body.slug)
+    } else {
+      setPage(session, structuredClone(next))
+    }
     const previewVersion = bumpVersion(session)
     schedulePersistState(app.log)
     return { status: "applied", previewVersion }
