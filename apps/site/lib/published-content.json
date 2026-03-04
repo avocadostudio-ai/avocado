@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-02-27T21:55:11.715Z",
+    "updatedAt": "2026-03-04T09:19:04.296Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -499,6 +499,90 @@
               "ctaHref": "/lemons-varieties"
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_about",
+    "slug": "/about",
+    "title": "About",
+    "updatedAt": "2026-03-04T09:24:54.140Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772614336292",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover the Magic of Avocados",
+          "subheading": "Nature's most versatile superfruit — packed with flavor, nutrition, and endless possibilities for your plate and beyond.",
+          "ctaText": "Explore Avocados",
+          "ctaHref": "/",
+          "imageUrl": "https://images.unsplash.com/photo-1597658939722-145d6439f1c5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMHJpcGUlMjBhdm9jYWRvcyUyMGN1dHxlbnwxfDB8fHwxNzcyNjE1NDUwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Photo of fresh ripe avocados cut"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772614336292",
+        "type": "CardGrid",
+        "props": {
+          "title": "Why Avocados Are Amazing",
+          "cards": [
+            {
+              "title": "Skin & Beauty",
+              "description": "Rich in antioxidants and vitamin E, avocados nourish your skin from the inside out — and make a fantastic natural face mask.",
+              "ctaText": "Discover Tips",
+              "ctaHref": "/",
+              "imageUrl": "https://images.unsplash.com/photo-1594813591867-02e797aa4581?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxqYXIlMjBza2luJTIwcGFzdGUlMjBzaXR0aW5nfGVufDF8MHx8fDE3NzI2MTYyNTd8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "clear glass jar with white lid"
+            },
+            {
+              "title": "Heart Health",
+              "description": "Potassium and oleic acid work together to support healthy blood pressure and reduce bad cholesterol levels naturally.",
+              "ctaText": "Read the Science",
+              "ctaHref": "/",
+              "imageUrl": "https://images.unsplash.com/photo-1699883430258-785510b807db?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwaGVhcnQlMjBibG9vZCUyMHByZXNzdXJlfGVufDF8MHx8fDE3NzI2MTYyNTh8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "a stethoscope and a heart on a table"
+            },
+            {
+              "title": "Culinary Versatility",
+              "description": "From guacamole to smoothies, toast to sushi — avocados elevate every dish with their buttery texture and mild, rich flavor.",
+              "ctaText": "Get Recipes",
+              "ctaHref": "/",
+              "imageUrl": "https://images.unsplash.com/photo-1595531507616-1f5347ee003b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxjdWxpbmFyeSUyMHZlcnNhdGlsaXR5JTIwZ3VhY2Ftb2xlJTIwc21vb3RoaWVzfGVufDF8MHx8fDE3NzI2MTYyMTd8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Photo of culinary versatility guacamole smoothies"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_1772615584581",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Avocado FAQs",
+          "items": [
+            {
+              "q": "Are avocados really a superfood?",
+              "a": "Absolutely! Avocados are packed with heart-healthy monounsaturated fats, fiber, potassium, and vitamins C, E, K, and B-6. They help support brain health, reduce inflammation, and keep you feeling full longer — making them one of nature's most nutrient-dense foods."
+            },
+            {
+              "q": "How do I know when an avocado is ripe?",
+              "a": "Gently squeeze the avocado in your palm — it should yield slightly to pressure without feeling mushy. The skin will also darken to a deep green or near-black. If it's still firm and bright green, leave it at room temperature for 1–2 days to ripen."
+            },
+            {
+              "q": "How can I stop avocados from turning brown?",
+              "a": "Exposure to air causes browning. To slow it down, squeeze fresh lemon or lime juice over the cut surface, press plastic wrap directly against the flesh, and store it in the fridge. Keeping the pit in the unused half also helps preserve freshness."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1772614336292",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to Go Green?",
+          "description": "Join thousands of avocado lovers and unlock delicious recipes, health tips, and everything you need to make the most of every avocado.",
+          "ctaText": "Explore Recipes",
+          "ctaHref": "/"
         }
       }
     ]
