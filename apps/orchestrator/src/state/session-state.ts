@@ -53,6 +53,8 @@ export function scopedSessionKey(session: unknown, siteId: unknown) {
 export type PendingImageGeneration = {
   blockId: string
   pageSlug: string
+  path?: string
+  altPath?: string
   query: string
   provider: "openai" | "unsplash" | "auto"
 }
@@ -247,6 +249,11 @@ export function setPage(session: string, page: PageDoc) {
   const sessionDraft = getSessionDraft(session)
   ensureHeroImageProps(page)
   sessionDraft.set(page.slug, page)
+}
+
+export function removePage(session: string, slug: string) {
+  const sessionDraft = getSessionDraft(session)
+  sessionDraft.delete(slug)
 }
 
 export function pushUndo(session: string, slug: string, snapshot: PageDoc) {

@@ -21,11 +21,13 @@ import {
 import {
   type ChatRequestBody,
   isAdviceQuery,
+  isBatchAddRequest,
   isBlockCatalogQuery,
   isInfoQuery,
   normalizeForIntent,
   stripSiteContextEnvelope,
-  extractSiteContextLineValue
+  extractSiteContextLineValue,
+  extractMentionedBlockTypes
 } from "./intent-detection.js"
 import {
   defaultPropsForType,
@@ -414,6 +416,7 @@ export function clarificationSuggestions(args: { body: ChatRequestBody; current:
 
 export function postEditSuggestions(args: { plan: EditPlan; current: PageDoc; body: ChatRequestBody }): string[] {
   const { plan, current } = args
+  if (plan.ops.some((op) => op.op === "remove_page")) return []
   const suggestions: string[] = []
   const existingTypes = new Set(current.blocks.map((b) => b.type))
 
@@ -773,7 +776,7 @@ function inferActionFromMessage(message: string): ParsedIntent["action"] | null 
   if (/\b(remove|delete)\b/.test(lower)) return "remove"
   if (/\b(move|reorder|re-arrange|rearrange)\b/.test(lower)) return "move"
   if (/\b(add|insert|create|include)\b/.test(lower)) return "add"
-  if (/\b(update|change|edit|set|rewrite|reword|replace|improve|shorten)\b/.test(lower)) return "update"
+  if (/\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*)\b/.test(lower)) return "update"
   return null
 }
 
@@ -1196,12 +1199,21 @@ export function inferSimpleFieldPatchFromMessage(message: string) {
 export function isRewriteRequest(message: string) {
   const lower = message.toLowerCase()
   return (
-    lower.includes("rewrite") ||
-    lower.includes("reword") ||
-    lower.includes("improve") ||
-    lower.includes("simplif") ||
-    lower.includes("make this shorter") ||
-    lower.includes("shorten")
+    /\brewrit\w*\b/.test(lower) ||
+    /\breword\w*\b/.test(lower) ||
+    /\brephras\w*\b/.test(lower) ||
+    /\bpolish\w*\b/.test(lower) ||
+    /\brefin\w*\b/.test(lower) ||
+    /\brefresh\w*\b/.test(lower) ||
+    /\btighten\w*\b/.test(lower) ||
+    /\bclarif\w*\b/.test(lower) ||
+    /\bclean\s*up\b/.test(lower) ||
+    /\bfreshen\s*up\b/.test(lower) ||
+    /\bredo\b.*\b(copy|text|wording|messaging)\b/.test(lower) ||
+    /\bimprove\b/.test(lower) ||
+    /\bsimplif\w*\b/.test(lower) ||
+    /\bmake\b.*\b(shorter|clearer|crisper|concise)\b/.test(lower) ||
+    /\bshorten\w*\b/.test(lower)
   )
 }
 
@@ -1895,6 +1907,32 @@ export function compileDeterministicPlan(args: {
   }
 
   if (intent.action === "add") {
+    // --- Batch add: "add 3 blocks: hero, cardgrid and CTA" ----------------
+    if (isBatchAddRequest(message)) {
+      const blockTypes = extractMentionedBlockTypes(message)
+      if (blockTypes.length >= 2) {
+        const ops: Operation[] = []
+        const changeLog = [...assumptions]
+        // Track blocks as we add them so nextBlockId generates unique IDs
+        let pageSnapshot = currentPage
+        for (const bt of blockTypes) {
+          const blockId = nextBlockId(bt, pageSnapshot)
+          const props = defaultPropsForType(bt)
+          ops.push({ op: "add_block", pageSlug: slug, block: { id: blockId, type: bt, props } })
+          changeLog.push(`Added ${bt} block ${blockId}.`)
+          // Update snapshot so the next nextBlockId sees existing IDs
+          pageSnapshot = { ...pageSnapshot, blocks: [...pageSnapshot.blocks, { id: blockId, type: bt, props }] }
+        }
+        return {
+          intent: "edit_plan",
+          summary_for_user: `Added ${blockTypes.join(", ")}.`,
+          change_log: changeLog,
+          ops
+        }
+      }
+    }
+
+    // --- Single add -------------------------------------------------------
     const blockType =
       intent.new_block_type ??
       inferAddedBlockTypeFromMessage(message) ??

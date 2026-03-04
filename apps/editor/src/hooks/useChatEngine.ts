@@ -39,7 +39,7 @@ export type ChatEngineConfig = {
   setActiveBlockId: (id: string | undefined) => void
   setActiveBlockType: (type: string | undefined) => void
   setActiveEditablePath: (path: string | undefined) => void
-  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility", payload: Record<string, unknown>) => void
+  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
   setAvailableSlugs: (slugs: string[]) => void
   setIsLoadingSlugs: (loading: boolean) => void
@@ -76,6 +76,14 @@ export function useChatEngine(config: ChatEngineConfig) {
     setIsLoadingSlugs,
     routeOptions
   } = config
+
+  const blockIdFromOperation = (op?: Operation) => {
+    if (!op || typeof op !== "object") return null
+    if ("blockId" in op && typeof op.blockId === "string" && op.blockId.length > 0) return op.blockId
+    if (op.op === "add_block" && op.block && typeof op.block.id === "string" && op.block.id.length > 0) return op.block.id
+    if (op.op === "duplicate_block" && typeof op.newBlockId === "string" && op.newBlockId.length > 0) return op.newBlockId
+    return null
+  }
 
   const resolveContextPayload = () => {
     const tone = typeof activeSiteConfig.tone === "string" ? activeSiteConfig.tone.trim() : ""
@@ -117,6 +125,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const [isLoading, setIsLoading] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
+  const [latestStreamFocusBlockId, setLatestStreamFocusBlockId] = useState<string | null>(null)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
   const [pendingPlanMessage, setPendingPlanMessage] = useState<string | null>(null)
@@ -219,8 +228,8 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  async function addBlockAfter(slugForOp: string, afterBlockId: string, blockType: string) {
-    if (!afterBlockId || !blockType) return false
+  async function addBlockAfter(slugForOp: string, afterBlockId: string | undefined, blockType: string, beforeBlockId?: string) {
+    if (!blockType) return false
 
     const normalizedType = blockType.trim()
     const safeType = normalizedType.toLowerCase().replace(/[^a-z0-9]+/g, "_")
@@ -229,13 +238,18 @@ export function useChatEngine(config: ChatEngineConfig) {
       type: normalizedType,
       props: defaultPropsForType(normalizedType)
     }
-    const op = { op: "add_block", pageSlug: slugForOp, afterBlockId, block }
+    const isInsertAtTop = Boolean(beforeBlockId && !afterBlockId)
+    const addOp: Record<string, unknown> = { op: "add_block", pageSlug: slugForOp, block }
+    if (afterBlockId) addOp.afterBlockId = afterBlockId
+    const ops: Record<string, unknown>[] = isInsertAtTop
+      ? [addOp, { op: "move_block", pageSlug: slugForOp, blockId: block.id }]
+      : [addOp]
 
     try {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, siteId, ops: [op] })
+        body: JSON.stringify({ session, siteId, ops })
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -254,10 +268,10 @@ export function useChatEngine(config: ChatEngineConfig) {
       setActiveBlockId(focusBlockId)
       setActiveBlockType(normalizedType)
       setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
+      if (enablePatchTransport && typeof data.previewVersion === "number" && !isInsertAtTop) {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
-        const typedOp = { op: "add_block" as const, pageSlug: slugForOp, afterBlockId, block }
+        const typedOp = { op: "add_block" as const, pageSlug: slugForOp, ...(afterBlockId ? { afterBlockId } : {}), block }
         postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
       } else {
         postToSite("draftUpdated", { focusBlockId })
@@ -761,6 +775,46 @@ export function useChatEngine(config: ChatEngineConfig) {
       let gotAnyEvent = false
       let pendingFocusBlockId: string | null = null
       let opRefreshTimer: number | null = null
+      let lastOpAppliedAt = 0
+      let lastOpTotal = 0
+      let appliedOpCount = 0
+      let skippedOpCount = 0
+      let liveDraftBlockId: string | null = activeBlockIdRef.current ?? null
+      let liveDraftText = ""
+      let liveDraftFlushTimer: number | null = null
+      let liveDraftActive = false
+
+      const sendLiveDraft = (force = false) => {
+        if (!liveDraftBlockId) return
+        if (!force && !liveDraftActive) return
+        postToSite("liveDraft", {
+          blockId: liveDraftBlockId,
+          text: liveDraftText.slice(0, 2400),
+          active: liveDraftActive
+        })
+      }
+
+      const clearLiveDraftTimer = () => {
+        if (liveDraftFlushTimer === null) return
+        window.clearTimeout(liveDraftFlushTimer)
+        liveDraftFlushTimer = null
+      }
+
+      const scheduleLiveDraftFlush = () => {
+        clearLiveDraftTimer()
+        liveDraftFlushTimer = window.setTimeout(() => {
+          liveDraftFlushTimer = null
+          sendLiveDraft(true)
+        }, 45)
+      }
+
+      const endLiveDraft = () => {
+        clearLiveDraftTimer()
+        if (!liveDraftBlockId && !liveDraftActive) return
+        liveDraftActive = false
+        sendLiveDraft(true)
+        liveDraftText = ""
+      }
 
       const flushOpRefresh = () => {
         postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId })
@@ -789,14 +843,22 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       source.onmessage = (event) => {
         let payload: {
-          type: "status" | "token" | "op_applied" | "final" | "error"
+          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error"
           message?: string
           text?: string
+          stage?: string
+          elapsedMs?: number
+          intent?: string
+          summary?: string
+          estimatedOps?: number
           index?: number
           total?: number
           op?: Operation
+          reason?: string
           previewVersion?: number
           focusBlockId?: string | null
+          appliedCount?: number
+          restoredVersion?: number
           result?: AssistantResponse
         }
         try {
@@ -814,18 +876,61 @@ export function useChatEngine(config: ChatEngineConfig) {
           const text = payload.text ?? ""
           if (text) {
             setStreamTokenCount((prev) => prev + text.length)
+            if (liveDraftBlockId) {
+              liveDraftText += text
+              liveDraftActive = true
+              scheduleLiveDraftFlush()
+            }
           }
         }
 
+        if (payload.type === "plan_meta") {
+          const estimatedOps = Number(payload.estimatedOps ?? 0)
+          if (estimatedOps > 0) {
+            setStreamStatus(`Plan ready (${estimatedOps} change${estimatedOps === 1 ? "" : "s"})...`)
+          } else {
+            setStreamStatus("Plan ready...")
+          }
+        }
+
+        if (payload.type === "op_candidate") {
+          const idx = Number(payload.index ?? 0)
+          if (!liveDraftBlockId) {
+            const derived = blockIdFromOperation(payload.op)
+            if (derived) {
+              liveDraftBlockId = derived
+              if (liveDraftText.trim().length > 0) {
+                liveDraftActive = true
+                sendLiveDraft(true)
+              }
+            }
+          }
+          setStreamStatus(idx > 0 ? `Drafting operation ${idx}...` : "Drafting operations...")
+        }
+
+        if (payload.type === "heartbeat") {
+          const elapsedSec = Math.max(0, Math.floor(Number(payload.elapsedMs ?? 0) / 1000))
+          const stage = String(payload.stage ?? "working")
+          if (stage === "planning") setStreamStatus(`Planning… ${elapsedSec}s`)
+          if (stage === "applying") setStreamStatus(`Applying… ${elapsedSec}s`)
+        }
+
         if (payload.type === "op_applied") {
+          if (liveDraftActive) endLiveDraft()
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
+          appliedOpCount += 1
           if (total > 0 && index > 0) {
-            setStreamStatus(`Applying changes (${index}/${total})...`)
+            const suffix = skippedOpCount > 0 ? `, skipped ${skippedOpCount}` : ""
+            setStreamStatus(`Applying changes (${index}/${total}, applied ${appliedOpCount}${suffix})...`)
           } else {
-            setStreamStatus("Applying changes...")
+            const suffix = skippedOpCount > 0 ? `, skipped ${skippedOpCount}` : ""
+            setStreamStatus(`Applying changes (applied ${appliedOpCount}${suffix})...`)
           }
           pendingFocusBlockId = typeof payload.focusBlockId === "string" ? payload.focusBlockId : null
+          if (pendingFocusBlockId) setLatestStreamFocusBlockId(pendingFocusBlockId)
+          lastOpAppliedAt = Date.now()
+          lastOpTotal = total > 0 ? total : index > 0 ? index : lastOpTotal
           if (enablePatchTransport && payload.op && typeof payload.previewVersion === "number") {
             const toVersion = payload.previewVersion
             const fromVersion = toVersion - 1
@@ -838,15 +943,56 @@ export function useChatEngine(config: ChatEngineConfig) {
           }
         }
 
+        if (payload.type === "op_skipped") {
+          skippedOpCount += 1
+          const total = Number(payload.total ?? 0)
+          const index = Number(payload.index ?? 0)
+          if (total > 0 && index > 0) {
+            setStreamStatus(`Applying changes (${index}/${total}, applied ${appliedOpCount}, skipped ${skippedOpCount})...`)
+          } else {
+            setStreamStatus(`Applying changes (applied ${appliedOpCount}, skipped ${skippedOpCount})...`)
+          }
+        }
+
+        if (payload.type === "rollback_started") {
+          endLiveDraft()
+          setStreamStatus("Rolling back partial changes...")
+        }
+
+        if (payload.type === "rollback_done") {
+          setStreamStatus("Rollback complete. Syncing preview...")
+          postToSite("draftUpdated", { focusBlockId: null })
+        }
+
         if (payload.type === "final") {
-          settled = true
-          setStreamStatus(null)
-          setStreamTokenCount(0)
-          clearOpRefreshTimer()
-          if (pendingFocusBlockId !== null) flushOpRefresh()
-          if (payload.result) applyChatResult(payload.result)
-          source.close()
-          resolve(true)
+          const completeFinal = () => {
+            settled = true
+            setStreamStatus(null)
+            setStreamTokenCount(0)
+            clearOpRefreshTimer()
+            endLiveDraft()
+            if (pendingFocusBlockId !== null) flushOpRefresh()
+            if (payload.result) applyChatResult(payload.result)
+            if (payload.result?.focusBlockId) setLatestStreamFocusBlockId(payload.result.focusBlockId)
+            source.close()
+            resolve(true)
+          }
+
+          const elapsedSinceLastOp = lastOpAppliedAt > 0 ? Date.now() - lastOpAppliedAt : Number.POSITIVE_INFINITY
+          const appliedTotal = lastOpTotal > 0 ? lastOpTotal : Number(payload.result?.debug?.opCount ?? 0)
+          const minVisibleMs = appliedTotal <= 1 ? 300 : 700
+          if (lastOpAppliedAt > 0 && elapsedSinceLastOp < minVisibleMs) {
+            const skipped = Number(payload.result?.debug?.skippedOpCount ?? skippedOpCount ?? 0)
+            const applied = Math.max(0, appliedTotal - skipped)
+            if (appliedTotal > 0) {
+              setStreamStatus(`Applied ${applied}/${appliedTotal}${skipped > 0 ? `, skipped ${skipped}` : ""}...`)
+            } else {
+              setStreamStatus("Applied changes...")
+            }
+            window.setTimeout(completeFinal, minVisibleMs - elapsedSinceLastOp)
+          } else {
+            completeFinal()
+          }
         }
 
         if (payload.type === "error") {
@@ -854,6 +1000,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamStatus(null)
           setStreamTokenCount(0)
           clearOpRefreshTimer()
+          endLiveDraft()
           pendingFocusBlockId = null
           if (payload.result) {
             applyChatResult(payload.result)
@@ -870,6 +1017,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamStatus(null)
           setStreamTokenCount(0)
           clearOpRefreshTimer()
+          endLiveDraft()
           if (pendingFocusBlockId !== null) flushOpRefresh()
           pendingFocusBlockId = null
           source.close()
@@ -879,6 +1027,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         setStreamStatus("Streaming failed, retrying with standard request...")
         setStreamTokenCount(0)
         clearOpRefreshTimer()
+        endLiveDraft()
         pendingFocusBlockId = null
         settled = true
         source.close()
@@ -903,6 +1052,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     setIsLoading(true)
     setStreamStatus(useStreaming ? "Connecting..." : null)
     setStreamTokenCount(0)
+    setLatestStreamFocusBlockId(null)
     try {
       if (isVariationRequest(finalMessage)) {
         await submitVariations(finalMessage)
@@ -911,7 +1061,13 @@ export function useChatEngine(config: ChatEngineConfig) {
       const requiresPlanApproval = isComplexTaskRequest(finalMessage)
       if (requiresPlanApproval) {
         setPendingPlanMessage(finalMessage)
-        await submitChatHttp(finalMessage, { executionMode: "plan_only" })
+        const planOnlyParams = { executionMode: "plan_only" as const }
+        if (useStreaming) {
+          const ok = await submitChatStream(finalMessage, planOnlyParams)
+          if (!ok) await submitChatHttp(finalMessage, planOnlyParams)
+        } else {
+          await submitChatHttp(finalMessage, planOnlyParams)
+        }
         return
       }
       if (useStreaming) {
@@ -931,6 +1087,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     const originalMessage = pendingPlanMessage?.trim() || "Approve and execute the pending plan."
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Approve plan and execute." }])
     setIsLoading(true)
+    setLatestStreamFocusBlockId(null)
     try {
       const approvalParams = { executionMode: "apply_pending_plan" as const, pendingPlanId: planId }
       if (useStreaming) {
@@ -1019,6 +1176,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     isLoading,
     streamStatus,
     streamTokenCount,
+    latestStreamFocusBlockId,
     plannerBadgeState,
     setPlannerBadgeState,
     pendingPlanId,

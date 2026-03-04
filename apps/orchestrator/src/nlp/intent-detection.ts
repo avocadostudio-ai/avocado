@@ -71,6 +71,18 @@ export type ChatResult = {
     cacheCreationInputTokens?: number
     cacheReadInputTokens?: number
     estimatedUsd?: number | null
+    skippedOpCount?: number
+    skippedOps?: Array<{
+      index: number
+      op: string
+      reason: "empty_patch" | "unchanged_value"
+      pageSlug?: string
+      blockId?: string
+    }>
+    timeline?: Array<{
+      stage: "request_received" | "first_token" | "first_structured_progress" | "plan_ready" | "first_op_applied" | "done"
+      atMs: number
+    }>
   }
 }
 
@@ -110,8 +122,9 @@ export function isBlockCatalogQuery(message: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Detects requests to add many/all block types at once (e.g. "add all
-// available block types", "scaffold the page", "fill out the page").
+// Detects requests to add or update many/all block types at once (e.g.
+// "add all available block types", "scaffold the page", "fill out the page",
+// "populate all components with sample content").
 // When detected the planner should override strict single-op mode.
 // ---------------------------------------------------------------------------
 
@@ -125,6 +138,18 @@ const BATCH_ADD_PATTERNS: RegExp[] = [
   /\bbuild\s+(?:out|up)\s+(?:the\s+)?(?:whole\s+)?page\b/
 ]
 
+// Detects batch update requests that should also override strict single-op mode.
+// e.g. "populate all components", "update all blocks", "fill in all sections"
+const BATCH_UPDATE_PATTERNS: RegExp[] = [
+  new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT}\b`),
+  new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT_TYPE}\b`),
+  new RegExp(String.raw`\b(?:populate|fill\s+in|fill)\s+(?:all|every|each)\s+(?:the\s+)?${UNIT}\b`),
+  /\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every)\s+(?:existing\s+)?(?:content|blocks?|components?|sections?)\b/,
+  /\bpopulate\s+(?:the\s+)?(?:whole\s+)?page\b/,
+  /\b(?:sample|placeholder|demo)\s+content\s+(?:for|to|in|on)\s+(?:all|every|each)\b/,
+  new RegExp(String.raw`\b(?:all|every|each)\s+(?:the\s+)?${UNIT}\s+with\s+(?:sample|placeholder|demo|real)\s+content\b`)
+]
+
 const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
   /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bpages\b/,
   /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bonly\b[^.\n]{0,140}\bpages\b/,
@@ -133,9 +158,72 @@ const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
   /\bfor\s+.+\b(?:and|,|&)\b.+\b(?:audiences|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/
 ]
 
+const COUNTED_MULTI_BLOCK_ADD_PATTERN =
+  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:new\s+)?(?:blocks?|components?|sections?|elements?|widgets?)\b/
+
+const ADD_ACTION_PATTERN = /\b(?:add|insert|include|create|generate|build)\b/
+
+const BLOCK_TYPE_KEYWORDS: Array<{ key: string; pattern: RegExp }> = [
+  { key: "hero", pattern: /\bhero\b/ },
+  { key: "featuregrid", pattern: /\bfeature\s*grid\b|\bfeatures?\b/ },
+  { key: "testimonials", pattern: /\btestimonials?\b|\breviews?\b|\bsocial proof\b/ },
+  { key: "faq", pattern: /\bfaq\b/ },
+  { key: "cta", pattern: /\bcta\b|\bcall to action\b/ },
+  { key: "cardgrid", pattern: /\bcard\s*grid\b|\bcardgrid\b|\bpricing\b/ },
+  { key: "card", pattern: /\bcard\b/ },
+  { key: "richtext", pattern: /\brich[\s-]?text\b|\btext block\b|\bparagraph\b|\bcopy\b/ },
+  { key: "twocolumn", pattern: /\btwo\s*column\b|\btwocolumn\b|\b2\s*column\b/ },
+  { key: "stats", pattern: /\bstats?\b|\bstatistics\b|\bmetrics\b|\bnumbers\b/ }
+]
+
+const KEYWORD_TO_BLOCK_TYPE: Record<string, BlockType> = {
+  hero: "Hero",
+  featuregrid: "FeatureGrid",
+  testimonials: "Testimonials",
+  faq: "FAQAccordion",
+  cta: "CTA",
+  cardgrid: "CardGrid",
+  card: "Card",
+  richtext: "RichText",
+  twocolumn: "TwoColumn",
+  stats: "Stats"
+}
+
+function countMentionedBlockTypes(message: string) {
+  const matched = new Set<string>()
+  for (const entry of BLOCK_TYPE_KEYWORDS) {
+    if (entry.pattern.test(message)) matched.add(entry.key)
+  }
+  return matched.size
+}
+
+/** Return the ordered list of BlockType values mentioned in the message. */
+export function extractMentionedBlockTypes(message: string): BlockType[] {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  const found: Array<{ key: string; index: number }> = []
+  for (const entry of BLOCK_TYPE_KEYWORDS) {
+    const match = m.match(entry.pattern)
+    if (match && match.index !== undefined) {
+      // Avoid double-counting "card" when "cardgrid" already matched at the same position
+      if (entry.key === "card" && found.some((f) => f.key === "cardgrid" && Math.abs(f.index - match.index!) <= 4)) continue
+      found.push({ key: entry.key, index: match.index })
+    }
+  }
+  // Return in order of appearance in the message
+  found.sort((a, b) => a.index - b.index)
+  return found.map((f) => KEYWORD_TO_BLOCK_TYPE[f.key]!)
+}
+
 export function isBatchAddRequest(message: string) {
-  const m = normalizeForIntent(message)
-  return BATCH_ADD_PATTERNS.some((re) => re.test(m)) || BATCH_PAGE_CREATE_PATTERNS.some((re) => re.test(m))
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  if (BATCH_ADD_PATTERNS.some((re) => re.test(m)) || BATCH_PAGE_CREATE_PATTERNS.some((re) => re.test(m))) return true
+  if (BATCH_UPDATE_PATTERNS.some((re) => re.test(m))) return true
+  if (COUNTED_MULTI_BLOCK_ADD_PATTERN.test(m)) return true
+
+  const mentionedBlockTypes = countMentionedBlockTypes(m)
+  const hasListSeparator = /,|\band\b|&|\bplus\b/.test(m)
+  const refersToBlocks = /\b(?:blocks?|components?|sections?|elements?|widgets?)\b/.test(m)
+  return ADD_ACTION_PATTERN.test(m) && mentionedBlockTypes >= 2 && (hasListSeparator || refersToBlocks)
 }
 
 export function isInfoQuery(message: string) {
