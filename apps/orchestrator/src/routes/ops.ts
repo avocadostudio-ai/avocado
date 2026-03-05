@@ -11,18 +11,21 @@ import {
 } from "../state/session-state.js"
 import {
   applyOpsAtomically,
+  isStructuralOperation,
   pickFocusBlockId,
   pickUpdatedSlug,
   toErrorDetail,
   classifyGuardrailError
 } from "../ops/ops-engine.js"
 import { collectMentionedSlugsFromOps } from "../chat/chat-pipeline.js"
+import { siteCapabilitiesSchema, type SiteCapabilities } from "../nlp/intent-detection.js"
 import type { RouteContext } from "./route-context.js"
 
 type ApplyOpsRequestBody = {
   session?: string
   siteId?: string
   componentsManifest?: EditorComponentsManifest | string
+  siteCapabilities?: SiteCapabilities | string
   ops?: unknown
 }
 
@@ -49,6 +52,28 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
           ? editorComponentsManifestSchema.safeParse(manifestPayload)
           : { success: true as const, data: undefined }
     if (!parsedManifest.success) return reply.code(400).send({ error: "invalid componentsManifest payload" })
+    const capabilitiesPayload = (() => {
+      if (!body.siteCapabilities) return undefined
+      if (typeof body.siteCapabilities !== "string") return body.siteCapabilities
+      try {
+        return JSON.parse(body.siteCapabilities) as unknown
+      } catch {
+        return "__invalid_json__"
+      }
+    })()
+    const parsedCapabilities =
+      capabilitiesPayload === "__invalid_json__"
+        ? { success: false as const }
+        : capabilitiesPayload
+          ? siteCapabilitiesSchema.safeParse(capabilitiesPayload)
+          : { success: true as const, data: undefined }
+    if (!parsedCapabilities.success) return reply.code(400).send({ error: "invalid siteCapabilities payload" })
+    if (
+      parsedCapabilities.data?.allowStructuralEdits === false &&
+      parsedOps.data.some((op) => isStructuralOperation(op))
+    ) {
+      return reply.code(400).send({ error: "Structural edits are disabled for this site context." })
+    }
 
     const snapshots = new Map<string, PageDoc>()
     for (const op of parsedOps.data) {

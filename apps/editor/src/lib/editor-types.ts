@@ -6,6 +6,15 @@ export type PlannerSource = "openai" | "anthropic" | "demo"
 export type PlannerBadgeState = PlannerSource | "checking" | "error"
 export type ChatExecutionMode = "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
 
+export type SiteCapabilities = {
+  allowStructuralEdits: boolean
+  manifestStatus: "loading" | "ready" | "degraded"
+  reason?: string
+  manifestVersion?: number
+  componentCount?: number
+  checkedAt: string
+}
+
 export type AssistantResponse = {
   status?: string
   summary?: string

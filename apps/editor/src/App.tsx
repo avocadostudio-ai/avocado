@@ -101,6 +101,7 @@ function EditorPage({
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
+  const lastStructuralNoticeAtRef = useRef(0)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
 
   const routeOptions = useMemo(() => {
@@ -160,10 +161,17 @@ function EditorPage({
   }, [addBlockSearch, blockTypeOptions])
 
   const notifyStructuralUnavailable = () => {
+    const now = Date.now()
+    if (now - lastStructuralNoticeAtRef.current < 1200) return
+    lastStructuralNoticeAtRef.current = now
+    const reason = componentManifest.reason?.trim()
     chatEngine.pushAssistantFromResult({
       status: "needs_clarification",
-      summary: "Structural edits are disabled because component manifest is unavailable or invalid.",
-      changes: ["Expose GET /api/editor/components and return a valid manifest to enable structural edits."]
+      summary: "Structural edits are disabled for this site context.",
+      changes: [
+        reason && reason.length > 0 ? `Manifest issue: ${reason}` : "Component manifest is unavailable or invalid.",
+        "Expose GET /api/editor/components and return a valid manifest to enable structural edits."
+      ]
     })
   }
 
@@ -275,6 +283,7 @@ function EditorPage({
     setIsLoadingSlugs,
     routeOptions,
     componentManifest: componentManifest.manifest,
+    siteCapabilities: componentManifest.siteCapabilities,
     allowStructuralEdits: componentManifest.allowStructuralEdits,
     getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null
   })
