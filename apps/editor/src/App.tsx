@@ -9,6 +9,7 @@ import { usePreviewBridge, type PreviewBridgeCallbacks } from "./hooks/usePrevie
 import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
+import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ModelKey, PlannerSource } from "./lib/editor-types"
@@ -70,6 +71,7 @@ function EditorPage({
 }) {
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const { activeSiteConfig } = sites
+  const componentManifest = useComponentManifest()
 
   const [slug, setSlug] = useState("/")
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
@@ -107,6 +109,16 @@ function EditorPage({
   }, [availableSlugs, slug])
 
   const blockTypeOptions = useMemo(() => {
+    if (!componentManifest.allowStructuralEdits) return []
+    if (componentManifest.components.length > 0) {
+      return componentManifest.components
+        .map((item) => ({
+          type: item.type,
+          label: item.displayName ?? item.type,
+          category: "content" as const
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    }
     const meta = getAllBlockMeta()
     return [...allowedBlockTypes]
       .map((type) => ({
@@ -115,7 +127,7 @@ function EditorPage({
         category: meta[type]?.category ?? "content"
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [])
+  }, [componentManifest.allowStructuralEdits, componentManifest.components])
 
   const groupedBlockTypeOptions = useMemo(() => {
     const query = addBlockSearch.trim().toLowerCase()
@@ -147,6 +159,14 @@ function EditorPage({
       .map(([category, options]) => ({ category, options }))
   }, [addBlockSearch, blockTypeOptions])
 
+  const notifyStructuralUnavailable = () => {
+    chatEngine.pushAssistantFromResult({
+      status: "needs_clarification",
+      summary: "Structural edits are disabled because component manifest is unavailable or invalid.",
+      changes: ["Expose GET /api/editor/components and return a valid manifest to enable structural edits."]
+    })
+  }
+
   const previewCallbacks = useMemo<PreviewBridgeCallbacks>(() => ({
     onBlockClicked: (newSlug, blockId, blockType, editablePath) => {
       setSlug(newSlug)
@@ -164,35 +184,59 @@ function EditorPage({
       setActiveEditablePath(undefined)
     },
     onBlockReordered: (newSlug, blockId, afterBlockId) => {
+      if (!componentManifest.allowStructuralEdits) {
+        notifyStructuralUnavailable()
+        return
+      }
       if (newSlug !== slug) setSlug(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.reorderBlock(newSlug, blockId, afterBlockId)
     },
     onBlockDeleteRequested: (newSlug, blockId) => {
+      if (!componentManifest.allowStructuralEdits) {
+        notifyStructuralUnavailable()
+        return
+      }
       if (newSlug !== slug) setSlug(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.deleteBlock(newSlug, blockId)
     },
     onBlockAddRequested: (newSlug, args) => {
+      if (!componentManifest.allowStructuralEdits) {
+        notifyStructuralUnavailable()
+        return
+      }
       if (newSlug !== slug) setSlug(newSlug)
       if (!args.afterBlockId && !args.beforeBlockId) return
       setAddBlockPicker({ slug: newSlug, afterBlockId: args.afterBlockId, beforeBlockId: args.beforeBlockId })
     },
     onListItemAddRequested: (newSlug, blockId, blockType, listKey, afterIndex) => {
+      if (!componentManifest.allowStructuralEdits) {
+        notifyStructuralUnavailable()
+        return
+      }
       if (newSlug !== slug) setSlug(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.addListItem(newSlug, blockId, blockType, listKey, afterIndex)
     },
     onListItemRemoveRequested: (newSlug, blockId, blockType, listKey, index) => {
+      if (!componentManifest.allowStructuralEdits) {
+        notifyStructuralUnavailable()
+        return
+      }
       if (newSlug !== slug) setSlug(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.removeListItem(newSlug, blockId, blockType, listKey, index)
     },
     onListItemMoveRequested: (newSlug, blockId, blockType, listKey, index, afterIndex) => {
+      if (!componentManifest.allowStructuralEdits) {
+        notifyStructuralUnavailable()
+        return
+      }
       if (newSlug !== slug) setSlug(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
@@ -206,7 +250,7 @@ function EditorPage({
       }
       void chatEngine.inlineEditCommit(newSlug, blockId, editablePath, value)
     }
-  }), [slug])
+  }), [componentManifest.allowStructuralEdits, slug])
 
   const preview = usePreviewBridge(slug, previewCallbacks)
 
@@ -229,7 +273,9 @@ function EditorPage({
     postPatchToSite: preview.postPatchToSite,
     setAvailableSlugs,
     setIsLoadingSlugs,
-    routeOptions
+    routeOptions,
+    allowStructuralEdits: componentManifest.allowStructuralEdits,
+    getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null
   })
 
   const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult)
@@ -495,6 +541,13 @@ function EditorPage({
               <span className="planner-badge planner-badge-demo">Demo mode</span>
             ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
               <span className="planner-badge planner-badge-ai">AI</span>
+            ) : null}
+            {componentManifest.status === "degraded" ? (
+              <span className="planner-badge" title={componentManifest.reason ?? "Manifest unavailable"}>
+                Degraded
+              </span>
+            ) : componentManifest.status === "ready" ? (
+              <span className="planner-badge planner-badge-ai">Manifest</span>
             ) : null}
           </div>
           <div className="chat-header-controls">
@@ -870,11 +923,13 @@ function EditorPage({
                       onClick={async () => {
                         if (!addBlockPicker || isAddingBlock) return
                         setIsAddingBlock(true)
+                        const defaultProps = componentManifest.byType.get(option.type)?.defaultProps
                         const ok = await chatEngine.addBlockAfter(
                           addBlockPicker.slug,
                           addBlockPicker.afterBlockId,
                           option.type,
-                          addBlockPicker.beforeBlockId
+                          addBlockPicker.beforeBlockId,
+                          defaultProps
                         )
                         setIsAddingBlock(false)
                         if (ok) setAddBlockPicker(null)

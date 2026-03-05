@@ -88,3 +88,22 @@ const url = buildDraftEntryUrl({
 - Existing pages stay in place.
 - Draft cookie toggles draft vs published data source.
 - Component manifest endpoint (`/api/editor/components`) defines safely editable components.
+
+## Type Mapping Example (Customer Site)
+
+Manifest type IDs must match block model and renderer keys:
+
+```ts
+// content blocks from your CMS/store
+type Block = { id: string; type: "Hero" | "FeatureGrid"; props: Record<string, unknown> }
+```
+
+```ts
+// renderer mapping in your Next.js site
+const componentByType = {
+  Hero: HeroSection,
+  FeatureGrid: FeatureGridSection
+} as const
+```
+
+When manifest + content + renderer share the same type IDs, editor ops stay deterministic.
