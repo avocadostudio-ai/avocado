@@ -1,5 +1,9 @@
 # Next.js Embedded Draft Templates
 
+Entry docs:
+- `docs/integration/README.md`
+- `docs/integration/nextjs-mvp-embedded.md`
+
 Copy these files into your Next.js app:
 
 - `app/api/draft/helpers.ts`
