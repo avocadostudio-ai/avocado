@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
-import { DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID, siteOrigin } from "../lib/editor-utils"
+import { buildSiteDraftEnableUrl, DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 function compactPurposeText(value: string) {
@@ -57,15 +57,15 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       </header>
       <section className="sites-grid" aria-label="Site tiles">
         {dedupedSites.map((site) => {
-          const previewSrc = new URL(`${siteOrigin}/`, window.location.origin)
-          previewSrc.searchParams.set("session", session)
-          previewSrc.searchParams.set("siteId", site.id)
-          previewSrc.searchParams.set("siteName", site.name)
-          previewSrc.searchParams.set("__tile", "1")
-          previewSrc.searchParams.set("__refresh", String(sites.siteTileRefreshToken))
+          const previewSrc = buildSiteDraftEnableUrl("/", {
+            session,
+            siteId: site.id,
+            __tile: "1",
+            __refresh: String(sites.siteTileRefreshToken)
+          })
           return (
             <article key={site.id} className="site-tile">
-              <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc.toString()} />
+              <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc} />
               <div className="site-tile-meta">
                 <h2>{site.name}</h2>
                 {site.purpose ? <p className="site-purpose">{compactPurposeText(site.purpose)}</p> : null}

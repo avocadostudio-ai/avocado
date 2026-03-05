@@ -39,6 +39,14 @@ Alternative (recommended for repeated restarts without opening new terminals):
 
 ## Notes
 
+- Next.js onboarding default is embedded Draft Mode (no required `/preview` route):
+  - `docs/integration/nextjs-mvp-embedded.md`
+  - `docs/integration/nextjs-mvp-adoption-example.md`
+- Editor URL/bootstrap quickstart:
+  - `docs/integration/editor-quickstart.md`
+- Copy-paste Next.js API route templates:
+  - `docs/integration/templates/nextjs-embedded/`
+  - includes MVP component manifest route (`/api/editor/components`)
 - If `OPENAI_API_KEY` is missing, `/chat` uses deterministic demo planning.
 - `CHAT_STRICT_PRIMARY_OP_MODE=1` makes `/chat` planner choose one primary operation in `ops` (strict mode).
 - Speech transcription model defaults to `gpt-4o-mini-transcribe`.
@@ -89,6 +97,7 @@ Environment variables:
 - `ORCHESTRATOR_URL` (optional): if set, site reads draft content from orchestrator; if missing or unavailable, site falls back to built-in published pages.
 - `SITE_RENDER_MODE` (`static` or `dynamic`): controls whether this route prebuilds known published slugs (`static`) or skips static slug generation (`dynamic`).
 - `SITE_PUBLISH_SESSION` (default `dev`): session that static build sync pulls from orchestrator.
+- `DRAFT_MODE_SECRET` (required for draft preview entry via `/api/draft`)
 - `NEXT_PUBLIC_ENABLE_EDITOR=0` (recommended for public site)
 - `NEXT_PUBLIC_EDITOR_ORIGIN` (optional; only relevant when editor mode is enabled)
 - `PUBLISH_MODE` (`git` or `deploy_hook`) on orchestrator
@@ -98,6 +107,7 @@ Environment variables:
 - `VERCEL_DEPLOY_HOOK_URL` only for `PUBLISH_MODE=deploy_hook`
 - `ORCHESTRATOR_CORS_ORIGINS` (comma-separated): required for hosted orchestrator; include deployed `site` and `editor` origins
 - `VITE_SITE_ORIGIN` in editor build (for iframe target)
+- `VITE_SITE_DRAFT_SECRET` in editor build (must match site `DRAFT_MODE_SECRET` for draft bootstrap)
 - `VITE_ORCHESTRATOR_URL` in editor build (for API requests)
 
 Recommended Vercel split:
@@ -111,7 +121,7 @@ Recommended Vercel split:
   - `NEXT_PUBLIC_ENABLE_EDITOR=1`
   - `ORCHESTRATOR_URL=https://<preview-orchestrator-host>`
 
-Note: if you need true force-dynamic SSR on every request for preview/editor, use a separate preview app/project variant with route config `export const dynamic = "force-dynamic"`.
+Note: a dedicated preview route/project is optional. MVP onboarding supports embedded mode without requiring `/preview` paths.
 
 ### Publish flow (editor -> Vercel)
 

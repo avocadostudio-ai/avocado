@@ -38,6 +38,38 @@ export const siteOrigin = resolveOrigin(import.meta.env.VITE_SITE_ORIGIN as stri
 export const orchestrator = resolveOrigin(import.meta.env.VITE_ORCHESTRATOR_URL as string | undefined, "http://localhost:4200")
 export const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
 export const enablePatchTransport = import.meta.env.VITE_ENABLE_PATCH_TRANSPORT === "1"
+export const siteDraftSecret = (import.meta.env.VITE_SITE_DRAFT_SECRET as string | undefined)?.trim() ?? ""
+
+export function buildSitePathWithQuery(pathname: string, params: Record<string, string | undefined>) {
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (!value) continue
+    query.set(key, value)
+  }
+  const queryString = query.toString()
+  return queryString.length > 0 ? `${normalizedPath}?${queryString}` : normalizedPath
+}
+
+export function buildSiteDraftEnableUrl(pathname: string, params: Record<string, string | undefined>) {
+  const redirectPath = buildSitePathWithQuery(pathname, params)
+  if (!siteDraftSecret) {
+    const direct = new URL(`${siteOrigin}${redirectPath}`)
+    if (!direct.searchParams.has("__editor")) direct.searchParams.set("__editor", "1")
+    return direct.toString()
+  }
+  const entry = new URL(`${siteOrigin}/api/draft`)
+  entry.searchParams.set("secret", siteDraftSecret)
+  entry.searchParams.set("redirect", redirectPath)
+  return entry.toString()
+}
+
+export function buildSiteDraftDisableUrl(pathname: string, params: Record<string, string | undefined>) {
+  const redirectPath = buildSitePathWithQuery(pathname, params)
+  const entry = new URL(`${siteOrigin}/api/draft/disable`)
+  entry.searchParams.set("redirect", redirectPath)
+  return entry.toString()
+}
 
 export function sanitizeSiteId(value: string) {
   return value

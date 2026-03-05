@@ -1,0 +1,82 @@
+# Next.js MVP Onboarding (Embedded Mode)
+
+This is the default onboarding path for any Next.js site.
+
+Goal:
+- Keep existing site routes.
+- Do not require a `/preview` route.
+- Enable editor preview through Next.js Draft Mode cookies.
+
+Related:
+- `docs/integration/editor-quickstart.md` for editor iframe/bootstrap URL templates.
+- `docs/integration/templates/nextjs-embedded/` for copy-paste API route files.
+- `docs/integration/nextjs-mvp-adoption-example.md` for a full page wiring example.
+
+## Required contract
+
+1. Add component manifest endpoint:
+- `GET /api/editor/components`
+- returns available component types and prop schemas for safe ops
+
+2. Add Draft Mode entry and exit endpoints:
+- `GET /api/draft?secret=...&redirect=/target-path`
+- `GET /api/draft/disable?redirect=/target-path`
+
+3. Add secret validation and safe redirect behavior:
+- reject missing/invalid secrets
+- only allow internal redirects (paths starting with `/`)
+
+4. In page data loading:
+- when Draft Mode is disabled, read published data only
+- when Draft Mode is enabled, read draft source (CMS/orchestrator/etc.)
+  - starter snippets: `docs/integration/templates/nextjs-embedded/lib/`
+
+5. Editor iframe/bootstrap URL pattern:
+- `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>?<context>`
+  - starter helper: `docs/integration/templates/nextjs-embedded/editor/build-draft-url.ts`
+
+## Component manifest shape (MVP)
+
+Example response:
+
+```json
+{
+  "version": 1,
+  "components": [
+    {
+      "type": "Hero",
+      "displayName": "Hero",
+      "editablePaths": ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt"],
+      "propsSchema": { "type": "object", "properties": { "heading": { "type": "string" } } },
+      "defaultProps": { "heading": "New hero heading" }
+    }
+  ]
+}
+```
+
+Behavior:
+- manifest present: enable structural operations (add/remove/reorder/update props)
+- manifest missing: degraded mode only (read-only preview or text-only edits)
+
+## Environment variables
+
+- Site:
+  - `DRAFT_MODE_SECRET`
+  - `ORCHESTRATOR_URL` (or your draft backend origin)
+- Editor:
+  - `VITE_SITE_ORIGIN`
+  - `VITE_SITE_DRAFT_SECRET` (must match `DRAFT_MODE_SECRET`)
+
+## 30-minute checklist
+
+1. Implement `/api/draft` and `/api/draft/disable`.
+2. Implement `/api/editor/components`.
+3. Verify `/api/draft?secret=wrong` returns `401`.
+4. Verify `/api/draft?secret=valid&redirect=/` returns redirect + draft cookie.
+5. Verify public route (no draft cookie) does not call draft backend.
+6. Point editor iframe to draft entry URL.
+
+## Optional later upgrade
+
+If you want stronger isolation later, add a dedicated `/preview/*` route group.
+This is optional and not part of MVP onboarding.

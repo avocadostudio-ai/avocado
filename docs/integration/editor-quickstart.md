@@ -1,0 +1,61 @@
+# Editor Integration Quickstart (Embedded Draft Mode)
+
+Use this when integrating the editor with any existing Next.js site.
+
+MVP requirement:
+- Expose `GET /api/editor/components` so the editor/orchestrator knows which components are safely editable.
+- Without this manifest, run in degraded mode (read-only preview or text-only edits).
+
+If you need starter route files, copy from:
+- `docs/integration/templates/nextjs-embedded/`
+- `docs/integration/templates/nextjs-embedded/editor/build-draft-url.ts` provides URL helper functions.
+
+## Required env vars
+
+- Site:
+  - `DRAFT_MODE_SECRET`
+- Editor:
+  - `VITE_SITE_ORIGIN`
+  - `VITE_SITE_DRAFT_SECRET` (same value as site `DRAFT_MODE_SECRET`)
+
+## Iframe bootstrap URL (enter draft mode)
+
+Pattern:
+
+```text
+${VITE_SITE_ORIGIN}/api/draft?secret=${VITE_SITE_DRAFT_SECRET}&redirect=${encodeURIComponent(pathWithQuery)}
+```
+
+Where `pathWithQuery` is your target site path plus context query params, for example:
+
+```text
+/pricing?session=dev&siteId=adventure-atlas
+```
+
+Full example:
+
+```text
+http://localhost:3000/api/draft?secret=top-secret&redirect=%2Fpricing%3Fsession%3Ddev%26siteId%3Dadventure-atlas
+```
+
+## Exit draft mode (view live page)
+
+Pattern:
+
+```text
+${VITE_SITE_ORIGIN}/api/draft/disable?redirect=${encodeURIComponent(path)}
+```
+
+Example:
+
+```text
+http://localhost:3000/api/draft/disable?redirect=%2Fpricing
+```
+
+## Minimal behavior checks
+
+1. `GET /api/editor/components` returns valid component manifest JSON.
+2. Wrong secret returns `401` from `/api/draft`.
+3. Valid secret redirects and sets draft cookie.
+4. `/api/draft/disable` clears draft cookie and redirects.
+5. Same page renders published content when draft cookie is absent.

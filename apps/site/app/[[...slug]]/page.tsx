@@ -1,11 +1,15 @@
 import Link from "next/link"
 import { unstable_noStore as noStore } from "next/cache"
+import { draftMode } from "next/headers"
 import type { Metadata } from "next"
 import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
 import { EditorPreviewBridge } from "../../components/editor-harness"
 import { SiteThemeToggle } from "../../components/theme-toggle"
-import { fetchDraftPage, fetchDraftSlugs, getPublishedSlugs } from "../../lib/content-api"
+import { fetchDraftPage } from "../../lib/content-api"
+import { resolveSiteContentSource } from "../../lib/content-source"
+import { resolveRuntimePageAndNav } from "../../lib/content-resolver-runtime"
+import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -17,8 +21,6 @@ const DEFAULT_SITE_ID = "adventure-atlas"
 const DEFAULT_EDITOR_ORIGIN =
   process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? (process.env.NODE_ENV !== "production" ? "http://localhost:4100" : "")
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
-export const dynamic = "force-dynamic"
-export const revalidate = 0
 
 function buildSlug(parts?: string[]) {
   if (!parts || parts.length === 0) return "/"
@@ -27,6 +29,18 @@ function buildSlug(parts?: string[]) {
 
 function getSingleValue(value: string | string[] | undefined): string | undefined {
   return typeof value === "string" ? value : undefined
+}
+
+function resolveContentSourceWithDevFallback({
+  draftModeEnabled,
+  search
+}: {
+  draftModeEnabled: boolean
+  search: Record<string, string | string[] | undefined>
+}) {
+  if (draftModeEnabled) return resolveSiteContentSource({ draftModeEnabled: true })
+  const devEditorFallback = process.env.NODE_ENV !== "production" && getSingleValue(search.__editor) === "1"
+  return resolveSiteContentSource({ draftModeEnabled: devEditorFallback })
 }
 
 function slugToLabel(route: string) {
@@ -76,15 +90,19 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
-  noStore()
+  const draft = await draftMode()
   const resolvedParams = await params
   const resolvedSearch = await searchParams
   const slug = buildSlug(resolvedParams.slug)
-  const editorMode = EDITOR_ENABLED && resolvedSearch.__editor === "1"
+  const contentSource = resolveContentSourceWithDevFallback({ draftModeEnabled: draft.isEnabled, search: resolvedSearch })
   const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
   const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
 
-  const page = await fetchDraftPage(slug, session, siteId, editorMode)
+  if (contentSource === "draft") noStore()
+  const page =
+    contentSource === "draft"
+      ? await fetchDraftPage(slug, session, siteId, true)
+      : getPublishedPage(slug)
   if (!page) return {}
 
   const meta: Metadata = {
@@ -100,27 +118,32 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 }
 
 export default async function SitePage({ params, searchParams }: PageProps) {
-  noStore()
+  const draft = await draftMode()
   const resolvedParams = await params
   const resolvedSearch = await searchParams
   const slug = buildSlug(resolvedParams.slug)
 
-  const editorMode = EDITOR_ENABLED && resolvedSearch.__editor === "1"
-  const tileMode = getSingleValue(resolvedSearch.__tile) === "1"
+  const contentSource = resolveContentSourceWithDevFallback({ draftModeEnabled: draft.isEnabled, search: resolvedSearch })
+  if (contentSource === "draft") noStore()
+  const editorMode = EDITOR_ENABLED && contentSource === "draft"
+  const tileMode = editorMode && getSingleValue(resolvedSearch.__tile) === "1"
   const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
   const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
-  const siteName = getSingleValue(resolvedSearch.siteName) ?? siteNameFromId(siteId) ?? "Site"
+  const siteName = siteNameFromId(siteId) || "Site"
   const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
   const siteLogo = siteLogoFromId(siteId)
 
-  const page = await fetchDraftPage(slug, session, siteId, editorMode)
-  const fetchedSlugs = await fetchDraftSlugs(session, siteId, editorMode)
+  const { page, slugs: fetchedSlugs } = await resolveRuntimePageAndNav({
+    source: contentSource,
+    slug,
+    session,
+    siteId
+  })
   const navRaw = Array.from(new Set([...(fetchedSlugs.length > 0 ? fetchedSlugs : ["/", "/pricing"]), slug]))
   const navSlugs = navRaw.includes("/") ? ["/", ...navRaw.filter((route) => route !== "/")] : navRaw
-  const editorQuery = editorMode
-      ? (() => {
-        const params = new URLSearchParams({ __editor: "1", session, siteId })
-        params.set("siteName", siteName)
+  const editorQuery = contentSource === "draft"
+    ? (() => {
+        const params = new URLSearchParams({ session, siteId })
         if (editorOrigin) params.set("editorOrigin", editorOrigin)
         return `?${params.toString()}`
       })()
