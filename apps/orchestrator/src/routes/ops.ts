@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify"
 import { z } from "zod"
-import { operationSchema, type PageDoc } from "@ai-site-editor/shared"
+import { editorComponentsManifestSchema, operationSchema, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
 import {
   scopedSessionKey,
   getPage,
@@ -22,6 +22,7 @@ import type { RouteContext } from "./route-context.js"
 type ApplyOpsRequestBody = {
   session?: string
   siteId?: string
+  componentsManifest?: EditorComponentsManifest | string
   ops?: unknown
 }
 
@@ -32,6 +33,22 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
     const parsedOps = z.array(operationSchema).safeParse(body.ops)
     if (!parsedOps.success) return reply.code(400).send({ error: "invalid ops payload" })
     if (parsedOps.data.length === 0) return reply.code(400).send({ error: "ops must not be empty" })
+    const manifestPayload = (() => {
+      if (!body.componentsManifest) return undefined
+      if (typeof body.componentsManifest !== "string") return body.componentsManifest
+      try {
+        return JSON.parse(body.componentsManifest) as unknown
+      } catch {
+        return "__invalid_json__"
+      }
+    })()
+    const parsedManifest =
+      manifestPayload === "__invalid_json__"
+        ? { success: false as const }
+        : manifestPayload
+          ? editorComponentsManifestSchema.safeParse(manifestPayload)
+          : { success: true as const, data: undefined }
+    if (!parsedManifest.success) return reply.code(400).send({ error: "invalid componentsManifest payload" })
 
     const snapshots = new Map<string, PageDoc>()
     for (const op of parsedOps.data) {
@@ -43,7 +60,7 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
     }
 
     try {
-      applyOpsAtomically(session, parsedOps.data)
+      applyOpsAtomically(session, parsedOps.data, { componentsManifest: parsedManifest.data })
       for (const [slug, snapshot] of snapshots) pushUndo(session, slug, snapshot)
       const firstSlugOp = parsedOps.data.find((op) => "pageSlug" in op && typeof op.pageSlug === "string")
       const firstSlug = firstSlugOp && "pageSlug" in firstSlugOp && typeof firstSlugOp.pageSlug === "string" ? firstSlugOp.pageSlug : undefined

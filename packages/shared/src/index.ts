@@ -4,6 +4,8 @@ export {
   editorComponentSchema,
   editorComponentsManifestSchema,
   jsonSchemaLikeSchema,
+  validateByJsonSchemaLike,
+  validateManifestDefaultProps,
   type EditorComponentDefinition,
   type EditorComponentsManifest
 } from "./editor-components-manifest.ts"

@@ -31,3 +31,44 @@ export const editorComponentsManifestSchema = z.object({
 export type EditorComponentDefinition = z.infer<typeof editorComponentSchema>
 export type EditorComponentsManifest = z.infer<typeof editorComponentsManifestSchema>
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export function validateByJsonSchemaLike(schema: Record<string, unknown>, value: unknown): boolean {
+  const type = typeof schema.type === "string" ? schema.type : undefined
+  if (type === "object") {
+    if (!isObject(value)) return false
+    const props = isObject(schema.properties) ? schema.properties : {}
+    const required = Array.isArray(schema.required) ? schema.required.filter((item): item is string => typeof item === "string") : []
+    for (const key of required) {
+      if (!(key in value)) return false
+    }
+    for (const [key, propSchema] of Object.entries(props)) {
+      if (!(key in value)) continue
+      if (!isObject(propSchema)) continue
+      if (!validateByJsonSchemaLike(propSchema, value[key])) return false
+    }
+    return true
+  }
+  if (type === "array") {
+    if (!Array.isArray(value)) return false
+    const items = schema.items
+    if (isObject(items)) return value.every((item) => validateByJsonSchemaLike(items, item))
+    return true
+  }
+  if (type === "string") return typeof value === "string"
+  if (type === "number" || type === "integer") return typeof value === "number" && Number.isFinite(value)
+  if (type === "boolean") return typeof value === "boolean"
+  return true
+}
+
+export function validateManifestDefaultProps(components: EditorComponentDefinition[]) {
+  for (const component of components) {
+    if (!component.defaultProps) continue
+    if (!validateByJsonSchemaLike(component.propsSchema, component.defaultProps)) {
+      return `defaultProps do not match propsSchema for component "${component.type}"`
+    }
+  }
+  return null
+}

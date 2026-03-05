@@ -1,4 +1,4 @@
-import { allowedBlockTypes, type BlockType, type EditPlan, type PageDoc } from "@ai-site-editor/shared"
+import { allowedBlockTypes, type BlockType, type EditPlan, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
 import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
 
@@ -16,6 +16,7 @@ export type GuardrailErrorCategory =
 export type ChatRequestBody = {
   session?: string
   siteId?: string
+  componentsManifest?: EditorComponentsManifest | string
   sitePurpose?: string
   siteHosting?: string
   businessContext?: {

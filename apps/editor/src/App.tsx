@@ -274,6 +274,7 @@ function EditorPage({
     setAvailableSlugs,
     setIsLoadingSlugs,
     routeOptions,
+    componentManifest: componentManifest.manifest,
     allowStructuralEdits: componentManifest.allowStructuralEdits,
     getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null
   })
