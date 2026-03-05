@@ -8,6 +8,7 @@ import {
 import { siteOrigin } from "../lib/editor-utils"
 
 type ManifestStatus = "loading" | "ready" | "degraded"
+const MANIFEST_RETRY_MS = 3000
 
 export type ComponentManifestState = {
   status: ManifestStatus
@@ -26,6 +27,7 @@ export function useComponentManifest() {
 
   useEffect(() => {
     let active = true
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
 
     const run = async () => {
       try {
@@ -38,6 +40,9 @@ export function useComponentManifest() {
             manifest: null,
             reason: `Manifest endpoint returned ${res.status}`
           })
+          retryTimer = setTimeout(() => {
+            if (active) void run()
+          }, MANIFEST_RETRY_MS)
           return
         }
         const payload = (await res.json()) as unknown
@@ -50,6 +55,9 @@ export function useComponentManifest() {
             manifest: null,
             reason: "Manifest response shape is invalid"
           })
+          retryTimer = setTimeout(() => {
+            if (active) void run()
+          }, MANIFEST_RETRY_MS)
           return
         }
 
@@ -62,6 +70,9 @@ export function useComponentManifest() {
             manifest: null,
             reason: defaultValidationError
           })
+          retryTimer = setTimeout(() => {
+            if (active) void run()
+          }, MANIFEST_RETRY_MS)
           return
         }
 
@@ -80,12 +91,16 @@ export function useComponentManifest() {
           manifest: null,
           reason: error instanceof Error ? error.message : "Manifest fetch failed"
         })
+        retryTimer = setTimeout(() => {
+          if (active) void run()
+        }, MANIFEST_RETRY_MS)
       }
     }
 
     void run()
     return () => {
       active = false
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [])
 
