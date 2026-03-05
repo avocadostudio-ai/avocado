@@ -5,6 +5,7 @@ import { resolve } from "node:path"
 
 export type ChatTelemetryPhase =
   | "received"
+  | "milestone"
   | "forced_plan"
   | "deterministic_plan_generated"
   | "plan_attempt_failed"
@@ -28,10 +29,12 @@ export type ChatTelemetryEntry = {
   promptExcerpt: string
   promptLength: number
   outcome?: string
+  timelineStage?: "request_received" | "first_token" | "first_structured_progress" | "plan_ready" | "first_op_applied" | "done"
   reason?: string
   reasonCategory?: string
   opCount?: number
   opTypes?: string[]
+  skippedOpCount?: number
   intent?: string
   inputTokens?: number
   outputTokens?: number
@@ -45,6 +48,10 @@ export type ChatTelemetryEntry = {
   applyDurationMs?: number
   imageResolutionDurationMs?: number
   planningAttempts?: number
+  contextPackBytes?: number
+  compactContextEnabled?: boolean
+  minimalContextEnabled?: boolean
+  plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
 }
 
 type Logger = {
@@ -145,9 +152,11 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         promptHash: entry.promptHash,
         promptLength: entry.promptLength,
         outcome: entry.outcome,
+        timelineStage: entry.timelineStage,
         reasonCategory: entry.reasonCategory,
         opCount: entry.opCount,
         opTypes: entry.opTypes,
+        skippedOpCount: entry.skippedOpCount,
         inputTokens: entry.inputTokens,
         outputTokens: entry.outputTokens,
         totalTokens: entry.totalTokens,
@@ -159,7 +168,11 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         firstPlanningTokenMs: entry.firstPlanningTokenMs,
         applyDurationMs: entry.applyDurationMs,
         imageResolutionDurationMs: entry.imageResolutionDurationMs,
-        planningAttempts: entry.planningAttempts
+        planningAttempts: entry.planningAttempts,
+        contextPackBytes: entry.contextPackBytes,
+        compactContextEnabled: entry.compactContextEnabled,
+        minimalContextEnabled: entry.minimalContextEnabled,
+        plannerTier: entry.plannerTier
       },
       "Chat telemetry event"
     )
