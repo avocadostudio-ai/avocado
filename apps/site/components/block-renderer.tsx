@@ -1,4 +1,4 @@
-import type { BlockInstance } from "@ai-site-editor/shared"
+import type { BlockInstance } from "../lib/site-contract"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
 import { getEditorBlockWrapperProps } from "../lib/editor-block-wrapper"
 import { BlockErrorBoundary } from "./block-error-boundary"

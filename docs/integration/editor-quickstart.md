@@ -59,3 +59,17 @@ http://localhost:3000/api/draft/disable?redirect=%2Fpricing
 3. Valid secret redirects and sets draft cookie.
 4. `/api/draft/disable` clears draft cookie and redirects.
 5. Same page renders published content when draft cookie is absent.
+
+## Contract self-check (recommended before onboarding)
+
+Run these in the site project:
+
+```bash
+pnpm typecheck
+pnpm test
+curl -s http://localhost:3000/api/editor/components | jq '.version, (.components | length)'
+```
+
+Expected:
+- manifest route returns `version` and non-zero component count
+- editor header shows `Manifest` (not `Degraded`)

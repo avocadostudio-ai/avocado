@@ -1,4 +1,8 @@
-import { getConfiguredDraftSecret as resolveConfiguredSecret, getSafeInternalRedirectPath, validateDraftSecret } from "@ai-site-editor/shared"
+import {
+  getConfiguredDraftSecret as resolveConfiguredSecret,
+  getSafeInternalRedirectPath,
+  validateDraftSecret
+} from "../../../lib/draft-mode.ts"
 
 export function getConfiguredDraftSecret(env: Record<string, string | undefined> = process.env) {
   return resolveConfiguredSecret(env)

@@ -1,4 +1,4 @@
-import { pageDocSchema, type PageDoc } from "@ai-site-editor/shared"
+import { pageDocSchema, type PageDoc } from "./site-contract"
 
 function getConfiguredOrchestratorUrl() {
   const value = process.env.ORCHESTRATOR_URL?.trim()
@@ -73,4 +73,3 @@ export async function fetchDraftSlugsOnly(session: string, siteId: string): Prom
 
   return []
 }
-

@@ -1,4 +1,4 @@
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "./site-contract"
 import { fetchDraftPageOnly, fetchDraftSlugsOnly } from "./draft-content-api"
 import { getPublishedPage, getPublishedSlugs } from "./published-content-api"
 
