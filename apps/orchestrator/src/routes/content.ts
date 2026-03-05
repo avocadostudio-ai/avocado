@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { FastifyInstance } from "fastify"
+import { pageDocSchema, type PageDoc } from "@ai-site-editor/shared"
 import {
   publishedPages,
   scopedSessionKey,
@@ -8,7 +9,8 @@ import {
   orderSlugsHomeFirst,
   getSessionDraft,
   getPage,
-  getSessionPages
+  getSessionPages,
+  ensureHeroImageProps
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
 
@@ -39,6 +41,50 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     const draft = getSessionDraft(session)
     const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
     return { slugs }
+  })
+
+  app.post("/draft/bootstrap", async (request, reply) => {
+    const body = (request.body ?? {}) as {
+      session?: string
+      siteId?: string
+      pages?: unknown
+      overwrite?: boolean
+    }
+    const scopedSession = scopedSessionKey(body.session, body.siteId)
+    const overwrite = body.overwrite === true
+    const draft = getSessionDraft(scopedSession)
+
+    if (!overwrite && draft.size > 0) {
+      return { status: "skipped", reason: "already_initialized", slugs: orderSlugsHomeFirst(Array.from(draft.keys())) }
+    }
+
+    let sourcePages: PageDoc[] = []
+    if (Array.isArray(body.pages) && body.pages.length > 0) {
+      const parsed = body.pages
+        .map((candidate) => pageDocSchema.safeParse(candidate))
+        .filter((result): result is { success: true; data: PageDoc } => result.success)
+        .map((result) => result.data)
+      sourcePages = parsed
+    } else {
+      sourcePages = Array.from(publishedPages.values()).map((page) => structuredClone(page))
+    }
+
+    if (sourcePages.length === 0) {
+      return reply.code(400).send({ error: "No valid pages to bootstrap." })
+    }
+
+    if (overwrite) draft.clear()
+    for (const page of sourcePages) {
+      const copy = structuredClone(page)
+      ensureHeroImageProps(copy)
+      draft.set(copy.slug, copy)
+    }
+
+    return {
+      status: "bootstrapped",
+      count: sourcePages.length,
+      slugs: orderSlugsHomeFirst(Array.from(draft.keys()))
+    }
   })
 
   app.get("/generated-images/:fileName", async (request, reply) => {

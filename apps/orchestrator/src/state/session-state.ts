@@ -215,10 +215,14 @@ export function getSessionDraft(session: string) {
   let sessionMap = draftPages.get(session)
   if (!sessionMap) {
     sessionMap = new Map<string, PageDoc>()
-    for (const [slug, page] of publishedPages) {
-      const copy = structuredClone(page)
-      ensureHeroImageProps(copy)
-      sessionMap.set(slug, copy)
+    // Keep legacy/default sessions seeded from published pages for demo compatibility.
+    // Site-scoped sessions (<siteId>::<session>) start empty and are expected to be bootstrapped explicitly.
+    if (!session.includes("::")) {
+      for (const [slug, page] of publishedPages) {
+        const copy = structuredClone(page)
+        ensureHeroImageProps(copy)
+        sessionMap.set(slug, copy)
+      }
     }
     draftPages.set(session, sessionMap)
   }
