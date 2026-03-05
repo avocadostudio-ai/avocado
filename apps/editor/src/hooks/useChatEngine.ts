@@ -27,8 +27,10 @@ import {
   isComplexTaskRequest,
   isVariationRequest,
   orchestrator,
+  siteOrigin,
   splitAiInsightChanges
 } from "../lib/editor-utils"
+import { buildSiteContextPayload, manifestUnavailableChanges, withIntegrationContext } from "../lib/integration-context"
 
 export type ChatEngineConfig = {
   session: string
@@ -91,12 +93,6 @@ export function useChatEngine(config: ChatEngineConfig) {
     getBlockDefaultProps
   } = config
 
-  const withIntegrationContext = <T extends Record<string, unknown>>(payload: T) => ({
-    ...payload,
-    ...(componentManifest ? { componentsManifest: componentManifest } : {}),
-    ...(siteCapabilities ? { siteCapabilities } : {})
-  })
-
   const lastStructuralNoticeRef = useRef<number>(0)
 
   const pushStructuralDisabledNotice = (action: string) => {
@@ -107,10 +103,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     pushAssistantFromResult({
       status: "needs_clarification",
       summary: `Cannot ${action} because structural editing is currently disabled.`,
-      changes: [
-        reason && reason.length > 0 ? `Manifest issue: ${reason}` : "Component manifest is unavailable or invalid.",
-        "Expose GET /api/editor/components and return a valid manifest to enable structural edits."
-      ]
+      changes: manifestUnavailableChanges(reason)
     })
   }
 
@@ -120,30 +113,6 @@ export function useChatEngine(config: ChatEngineConfig) {
     if (op.op === "add_block" && op.block && typeof op.block.id === "string" && op.block.id.length > 0) return op.block.id
     if (op.op === "duplicate_block" && typeof op.newBlockId === "string" && op.newBlockId.length > 0) return op.newBlockId
     return null
-  }
-
-  const resolveContextPayload = () => {
-    const tone = typeof activeSiteConfig.tone === "string" ? activeSiteConfig.tone.trim() : ""
-    const constraints = Array.isArray(activeSiteConfig.constraints)
-      ? activeSiteConfig.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
-      : []
-    const purpose = activeSiteConfig.purpose?.trim() || undefined
-
-    return {
-      sitePurpose: purpose,
-      businessContext: {
-        purpose,
-        tone: tone || undefined,
-        constraints: constraints.length > 0 ? constraints : undefined
-      },
-      siteContext: {
-        siteId,
-        siteName: activeSiteConfig.name?.trim() || undefined,
-        purpose,
-        tone: tone || undefined,
-        constraints: constraints.length > 0 ? constraints : undefined
-      }
-    }
   }
 
   const [chatLog, setChatLog] = useState<ChatEntry[]>([
@@ -247,7 +216,8 @@ export function useChatEngine(config: ChatEngineConfig) {
   async function refreshRouteSlugs() {
     setIsLoadingSlugs(true)
     try {
-      const res = await fetch(`${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`)
+      const slugsUrl = `${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`
+      const res = await fetch(slugsUrl)
       if (!res.ok) return routeOptionsRef.current
       const data = (await res.json()) as { slugs?: unknown }
       const list = Array.isArray(data.slugs)
@@ -257,6 +227,40 @@ export function useChatEngine(config: ChatEngineConfig) {
         setAvailableSlugs(list)
         return list
       }
+
+      // Auto-bootstrap for new site namespaces with no draft pages.
+      try {
+        const bootstrapSourceRes = await fetch(`${siteOrigin}/api/editor/bootstrap-pages?siteId=${encodeURIComponent(siteId)}`)
+        if (bootstrapSourceRes.ok) {
+          const bootstrapSource = (await bootstrapSourceRes.json()) as { pages?: unknown }
+          if (Array.isArray(bootstrapSource.pages) && bootstrapSource.pages.length > 0) {
+            await fetch(`${orchestrator}/draft/bootstrap`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                session,
+                siteId,
+                pages: bootstrapSource.pages,
+                overwrite: false
+              })
+            })
+            const second = await fetch(slugsUrl)
+            if (second.ok) {
+              const secondData = (await second.json()) as { slugs?: unknown }
+              const secondList = Array.isArray(secondData.slugs)
+                ? secondData.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
+                : []
+              if (secondList.length > 0) {
+                setAvailableSlugs(secondList)
+                return secondList
+              }
+            }
+          }
+        }
+      } catch {
+        // Keep fallback route options when bootstrap is unavailable.
+      }
+
       return routeOptionsRef.current
     } catch {
       return routeOptionsRef.current
@@ -296,7 +300,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -347,7 +351,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -395,7 +399,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -450,7 +454,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -499,7 +503,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -554,7 +558,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -629,7 +633,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const res = await fetch(`${orchestrator}/ops`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }))
+        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -672,7 +676,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string }) {
-    const contextPayload = resolveContextPayload()
+    const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
     const res = await fetch(`${orchestrator}/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -689,7 +693,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         activeEditablePath: activeEditablePathRef.current,
         executionMode: options?.executionMode ?? "auto",
         pendingPlanId: options?.pendingPlanId
-      }))
+      }, componentManifest, siteCapabilities))
     })
 
     const data = (await res.json()) as AssistantResponse
@@ -708,7 +712,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       return
     }
 
-    const contextPayload = resolveContextPayload()
+    const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
     const res = await fetch(`${orchestrator}/chat/variations`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -723,7 +727,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         activeBlockId: selectedBlockId,
         activeBlockType: selectedBlockType,
         activeEditablePath: activeEditablePathRef.current
-      }))
+      }, componentManifest, siteCapabilities))
     })
 
     const data = (await res.json()) as VariationResponse
@@ -769,7 +773,7 @@ export function useChatEngine(config: ChatEngineConfig) {
               patch: option.patch
             }
           ]
-        }))
+        }, componentManifest, siteCapabilities))
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
@@ -816,7 +820,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
     return await new Promise<boolean>((resolve) => {
-      const contextPayload = resolveContextPayload()
+      const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
       const params = new URLSearchParams({
         session,
         siteId,
