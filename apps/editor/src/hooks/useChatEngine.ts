@@ -44,6 +44,8 @@ export type ChatEngineConfig = {
   setAvailableSlugs: (slugs: string[]) => void
   setIsLoadingSlugs: (loading: boolean) => void
   routeOptions: string[]
+  allowStructuralEdits: boolean
+  getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
 }
 
 function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
@@ -74,8 +76,18 @@ export function useChatEngine(config: ChatEngineConfig) {
     postPatchToSite,
     setAvailableSlugs,
     setIsLoadingSlugs,
-    routeOptions
+    routeOptions,
+    allowStructuralEdits,
+    getBlockDefaultProps
   } = config
+
+  const pushStructuralDisabledNotice = (action: string) => {
+    pushAssistantFromResult({
+      status: "needs_clarification",
+      summary: `Cannot ${action} because component manifest is unavailable or invalid.`,
+      changes: ["Enable /api/editor/components to unlock structural edits."]
+    })
+  }
 
   const blockIdFromOperation = (op?: Operation) => {
     if (!op || typeof op !== "object") return null
@@ -228,7 +240,17 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  async function addBlockAfter(slugForOp: string, afterBlockId: string | undefined, blockType: string, beforeBlockId?: string) {
+  async function addBlockAfter(
+    slugForOp: string,
+    afterBlockId: string | undefined,
+    blockType: string,
+    beforeBlockId?: string,
+    defaultPropsOverride?: Record<string, unknown>
+  ) {
+    if (!allowStructuralEdits) {
+      pushStructuralDisabledNotice("add a block")
+      return false
+    }
     if (!blockType) return false
 
     const normalizedType = blockType.trim()
@@ -236,7 +258,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     const block = {
       id: `b_${safeType}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: normalizedType,
-      props: defaultPropsForType(normalizedType)
+      props: defaultPropsOverride ?? getBlockDefaultProps?.(normalizedType) ?? defaultPropsForType(normalizedType)
     }
     const isInsertAtTop = Boolean(beforeBlockId && !afterBlockId)
     const addOp: Record<string, unknown> = { op: "add_block", pageSlug: slugForOp, block }
@@ -288,6 +310,10 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function reorderBlock(slugForOp: string, blockId: string, afterBlockId?: string) {
+    if (!allowStructuralEdits) {
+      pushStructuralDisabledNotice("reorder blocks")
+      return
+    }
     if (!blockId) return
     const op: Record<string, unknown> = { op: "move_block", pageSlug: slugForOp, blockId }
     if (afterBlockId) op.afterBlockId = afterBlockId
@@ -330,6 +356,10 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function addListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, afterIndex?: number) {
+    if (!allowStructuralEdits) {
+      pushStructuralDisabledNotice("add list items")
+      return
+    }
     if (!blockId || !blockType || !listKey) return
     const fallbackItem = { title: "New item", description: "Describe this item." }
     const item = defaultListItemForBlock(blockType, listKey) ?? fallbackItem
@@ -384,6 +414,10 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function removeListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, index: number) {
+    if (!allowStructuralEdits) {
+      pushStructuralDisabledNotice("remove list items")
+      return
+    }
     if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
     const op = { op: "remove_item", pageSlug: slugForOp, blockId, listKey, index }
 
@@ -428,6 +462,10 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function moveListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex?: number) {
+    if (!allowStructuralEdits) {
+      pushStructuralDisabledNotice("reorder list items")
+      return
+    }
     if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
     const op: Record<string, unknown> = { op: "move_item", pageSlug: slugForOp, blockId, listKey, index }
     if (typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0) op.afterIndex = afterIndex
@@ -480,6 +518,10 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function deleteBlock(slugForOp: string, blockId: string) {
+    if (!allowStructuralEdits) {
+      pushStructuralDisabledNotice("delete blocks")
+      return
+    }
     if (!blockId) return
     const op = { op: "remove_block", pageSlug: slugForOp, blockId }
 

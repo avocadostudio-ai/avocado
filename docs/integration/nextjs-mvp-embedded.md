@@ -58,6 +58,49 @@ Behavior:
 - manifest present: enable structural operations (add/remove/reorder/update props)
 - manifest missing: degraded mode only (read-only preview or text-only edits)
 
+## How Component Matching Works
+
+The editor does not infer components from DOM class names.
+It matches by stable component `type` IDs.
+
+Contract:
+1. Manifest entry: `components[].type`
+2. Content block: `block.type`
+3. Site renderer registry key: same `type`
+
+Example:
+
+```json
+{
+  "components": [
+    { "type": "Hero", "propsSchema": { "type": "object" } },
+    { "type": "FeatureGrid", "propsSchema": { "type": "object" } }
+  ]
+}
+```
+
+```json
+{
+  "id": "p_home",
+  "slug": "/",
+  "blocks": [
+    { "id": "b1", "type": "Hero", "props": { "heading": "Hello" } },
+    { "id": "b2", "type": "FeatureGrid", "props": { "title": "Why us" } }
+  ]
+}
+```
+
+```ts
+const rendererRegistry = {
+  Hero: HeroSection,
+  FeatureGrid: FeatureGridSection
+}
+```
+
+If a block type exists in content but not in manifest:
+- block can still render on site
+- editor must not run structural ops for that type (degraded mode for that block/type)
+
 ## Environment variables
 
 - Site:

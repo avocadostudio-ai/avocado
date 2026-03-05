@@ -1,5 +1,12 @@
 import { z } from "zod"
 export { getConfiguredDraftSecret, getSafeInternalRedirectPath, validateDraftSecret, type DraftSecretValidationResult } from "./draft-mode.ts"
+export {
+  editorComponentSchema,
+  editorComponentsManifestSchema,
+  jsonSchemaLikeSchema,
+  type EditorComponentDefinition,
+  type EditorComponentsManifest
+} from "./editor-components-manifest.ts"
 
 export type PageMeta = {
   title?: string
