@@ -579,6 +579,26 @@ describe("ops-engine: list item operations", () => {
     assert.equal(features[2].title, "Safe")
   })
 
+  it("move_item accepts pre-move afterIndex when moving down", () => {
+    seedSession(makeFeaturePage())
+    applyOpsAtomically(TEST_SESSION, [
+      {
+        op: "move_item",
+        pageSlug: "/features",
+        blockId: "b_grid",
+        listKey: "features",
+        index: 0,
+        afterIndex: 1
+      }
+    ])
+    const features = (getDraft("/features")!.blocks[0].props as Record<string, unknown>).features as Array<{
+      title: string
+    }>
+    assert.equal(features[0].title, "Safe")
+    assert.equal(features[1].title, "Fast")
+    assert.equal(features[2].title, "Simple")
+  })
+
   it("rejects out-of-range index for update_item", () => {
     seedSession(makeFeaturePage())
     assert.throws(

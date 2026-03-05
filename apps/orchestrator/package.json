@@ -11,6 +11,7 @@
     "test": "NODE_ENV=test tsx --test src/**/*.test.ts",
     "coverage": "NODE_ENV=test c8 --reporter=text-summary --reporter=text tsx --test src/**/*.test.ts",
     "benchmark:models": "tsx src/scripts/benchmark-models.ts",
+    "benchmark:compact-context": "tsx src/scripts/benchmark-compact-context.ts",
     "benchmark:ops": "tsx src/scripts/benchmark-models.ts --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
     "benchmark:ops:multi": "tsx src/scripts/benchmark-models.ts --eval-mode ops-json --ops-cardinality multi --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
     "benchmark:ops:sonnet": "tsx src/scripts/benchmark-models.ts --provider anthropic --model claude-sonnet-4-20250514 --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5"

@@ -52,7 +52,7 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
     const body = (request.body ?? {}) as { session?: string; siteId?: string }
     const session = normalizeSession(body.session)
     const scopedSession = scopedSessionKey(session, body.siteId)
-    const publishMode = (process.env.PUBLISH_MODE?.trim().toLowerCase() || "deploy_hook") as "deploy_hook" | "git"
+    const publishMode = (process.env.PUBLISH_MODE?.trim().toLowerCase() || "git") as "deploy_hook" | "git"
 
     if (publishMode === "git") {
       const result = await publishViaGit(scopedSession)

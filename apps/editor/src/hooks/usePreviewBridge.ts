@@ -8,7 +8,7 @@ export type PreviewBridgeCallbacks = {
   onRouteChanged: (slug: string) => void
   onBlockReordered: (slug: string, blockId: string, afterBlockId: string | undefined) => void
   onBlockDeleteRequested: (slug: string, blockId: string) => void
-  onBlockAddRequested: (slug: string, afterBlockId: string) => void
+  onBlockAddRequested: (slug: string, args: { afterBlockId?: string; beforeBlockId?: string }) => void
   onListItemAddRequested: (slug: string, blockId: string, blockType: string, listKey: string, afterIndex: number | undefined) => void
   onListItemRemoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number) => void
   onListItemMoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex: number | undefined) => void
@@ -21,7 +21,7 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
   const pendingTxBySlug = useRef<Map<string, { txId: string; timer: ReturnType<typeof setTimeout> }>>(new Map())
 
   const postToSite = (
-    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility",
+    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft",
     payload: Record<string, unknown>
   ) => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -101,8 +101,11 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
 
       if (msg.type === "blockAddRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const afterBlockId = typeof msg.payload.afterBlockId === "string" ? msg.payload.afterBlockId : ""
-        callbacks.onBlockAddRequested(nextSlug, afterBlockId)
+        const afterBlockId =
+          typeof msg.payload.afterBlockId === "string" && msg.payload.afterBlockId.length > 0 ? msg.payload.afterBlockId : undefined
+        const beforeBlockId =
+          typeof msg.payload.beforeBlockId === "string" && msg.payload.beforeBlockId.length > 0 ? msg.payload.beforeBlockId : undefined
+        callbacks.onBlockAddRequested(nextSlug, { afterBlockId, beforeBlockId })
       }
 
       if (msg.type === "listItemAddRequested") {

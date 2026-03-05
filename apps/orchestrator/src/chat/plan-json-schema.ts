@@ -9,6 +9,7 @@
 
 export const editPlanJsonSchema = {
   type: "object" as const,
+  additionalProperties: false,
   properties: {
     intent: {
       type: "string",

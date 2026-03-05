@@ -189,7 +189,9 @@ export function createPageBlocks(args: { requestedSlug: string; userMessage?: st
   const sitePurpose = extractSiteContextLineValue(rawMessage, "Site purpose")
   const pageTitle = pageTitleFromSlug(args.requestedSlug)
 
-  const heroHeading = asksIntentPage ? "Purpose of This Site" : pageTitle
+  // Extract explicit hero heading from message (e.g. "hero titled 'About Us'")
+  const heroTitleMatch = cleanMessage.match(/hero\s+(?:titled?|called|named|with\s+(?:the\s+)?(?:title|heading))\s+['"]([^'"]+)['"]/i)
+  const heroHeading = heroTitleMatch?.[1] ?? (asksIntentPage ? "Purpose of This Site" : pageTitle)
   const heroSubheading = sitePurpose
     ? `This page explains ${sitePurpose}.`
     : asksIntentPage
@@ -775,7 +777,8 @@ function inferActionFromMessage(message: string): ParsedIntent["action"] | null 
   if (hasPageCreateCue) return "add"
   if (/\b(remove|delete)\b/.test(lower)) return "remove"
   if (/\b(move|reorder|re-arrange|rearrange)\b/.test(lower)) return "move"
-  if (/\b(add|insert|create|include)\b/.test(lower)) return "add"
+  if (/\b(add|insert|create|include|put)\b/.test(lower)) return "add"
+  if (/\bad\b/.test(lower) && inferBlockTypeFromText(lower)) return "add"
   if (/\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*)\b/.test(lower)) return "update"
   return null
 }
@@ -882,6 +885,41 @@ export function inferDeterministicIntent(args: {
   if (patch && Object.keys(patch).length > 0) inferred.patch = patch
 
   return inferred
+}
+
+/**
+ * Returns true only when UI context makes the intent completely unambiguous,
+ * so the deterministic planner can handle it without an LLM call.
+ */
+export function isHighConfidenceDeterministicCase(args: {
+  message: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}): boolean {
+  const raw = stripSiteContextEnvelope(args.message).trim()
+  if (!raw) return false
+
+  // Case 1: Inline edit — user clicked a field, typed a quoted value
+  if (args.activeBlockId && args.activeEditablePath && quotedText(raw)) return true
+
+  // Case 2: Inline list append — "add another item" with block selected
+  if (args.activeBlockId) {
+    const block = args.currentPage.blocks.find(b => b.id === args.activeBlockId)
+    if (block && /\b(add|insert)\b/i.test(raw) && /\b(another|more|new)\b/i.test(raw)) {
+      if (buildListAppendPatch(block, raw)) return true
+    }
+  }
+
+  // Case 3: Simple add/remove with clear block type — no LLM needed
+  const action = inferActionFromMessage(raw)
+  if (action === "remove" && inferBlockTypeFromText(raw)) return true
+  if (action === "add" && inferBlockTypeFromText(raw)) return true
+
+  // Case 4: Simple update with clear block type reference and quoted value
+  if (action === "update" && inferBlockTypeFromText(raw) && quotedText(raw)) return true
+
+  return false
 }
 
 export function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined {
@@ -1170,17 +1208,26 @@ export function parseIndexedPath(path: string) {
 }
 
 export function inferSimpleFieldPatchFromMessage(message: string) {
-  const m = message
-    .replace(/[“”]/g, '"')
-    .match(/\b(?:change|set|update|edit)\b[\s\w]*?\b(title|description|cta\s*text|cta|link|href|quote|author|question|answer|q|a)\b[\s\w]*?\b(?:to|as)\b\s+"?([^"\n]+)"?/i)
+  const normalized = message
+    .replace(/\u201c|\u201d/g, '"')
+    .replace(/\u2018|\u2019/g, "'")
+  const m = normalized
+    .match(/\b(?:change|set|update|edit|replace)\b[\s\w]*?\b(heading|subheading|title|description|image(?:\s*url)?|photo|picture|cta\s*text|button\s*text|cta|link|href|quote|author|question|answer|q|a)\b[\s\w]*?\b(?:to|as|with)\b\s+['"]?([^'"\n]+)['"]?/i)
   if (!m) return null
   const rawField = m[1].toLowerCase().replace(/\s+/g, "")
   const value = m[2]?.trim()
   if (!value) return null
   const map: Record<string, string> = {
+    heading: "heading",
+    subheading: "subheading",
     title: "title",
     description: "description",
+    image: "imageUrl",
+    imageurl: "imageUrl",
+    photo: "imageUrl",
+    picture: "imageUrl",
     ctatext: "ctaText",
+    buttontext: "ctaText",
     cta: "ctaText",
     link: "ctaHref",
     href: "ctaHref",
@@ -1298,6 +1345,10 @@ export function coercePatchForEditablePath(block: PageDoc["blocks"][number], edi
       const existing = blockProps[directKey]
       if (typeof existing === "string" && existing.trim().length > 0) value = rewriteFromExisting(existing, message)
     }
+    if (value === undefined && /(?:imageurl|href|url|ogimage)/i.test(directKey)) {
+      const match = message.match(/https?:\/\/[^\s<>"')]+/i)
+      if (match?.[0]) value = match[0].trim()
+    }
     if (value === undefined) return null
 
     return {
@@ -1358,16 +1409,19 @@ export function coercePatchForEditablePath(block: PageDoc["blocks"][number], edi
 
 export function quotedText(message: string) {
   return /"([^"]+)"/.exec(message)?.[1]?.trim()
+    ?? /'([^']+)'/.exec(message)?.[1]?.trim()
 }
 
 export function buildListAppendPatch(block: PageDoc["blocks"][number], message: string) {
   const lower = message.toLowerCase()
-  const quoted = quotedText(message)
+  const allQuoted = [...message.matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]!.trim()).filter(Boolean)
+  const quoted = allQuoted[0] ?? null
 
   if (block.type === "FAQAccordion") {
     const existing = Array.isArray(block.props.items) ? (block.props.items as Array<Record<string, unknown>>) : []
     const q = quoted ?? (lower.includes("question") ? "New question" : "How does this work?")
-    const next = [...existing, { q, a: "Add answer here." }]
+    const a = allQuoted[1] ?? "Add answer here."
+    const next = [...existing, { q, a }]
     return { items: next }
   }
 
@@ -1458,7 +1512,7 @@ export function compileDeterministicPlan(args: {
     }
   }
 
-  const asksPageDelete = /\b(delete|remove)\b.*\bpage\b/.test(lowerMessage)
+  const asksPageDelete = /\b(delete|remove)\b.*\bpage\b/.test(lowerMessage) && !inferBlockTypeFromText(cleanMessage)
   if ((intent.action === "remove" || intent.action === "clarify") && asksPageDelete) {
     const targetSlug = routeMentions[0] ?? slug
     if (targetSlug === "/") {
@@ -1783,6 +1837,26 @@ export function compileDeterministicPlan(args: {
         ops: []
       }
     }
+    // Detect item-level removal (e.g., "remove the first question from the FAQ")
+    const asksRemoveItem = /\b(question|item|entry|testimonial|card|feature|first|second|third|last)\b/i.test(lowerMessage)
+    if (asksRemoveItem) {
+      const bProps = target.props as Record<string, unknown> | undefined
+      if (bProps) {
+        for (const [key, val] of Object.entries(bProps)) {
+          if (!Array.isArray(val) || val.length === 0) continue
+          let idx = 0
+          if (/\blast\b/i.test(lowerMessage)) idx = val.length - 1
+          else if (/\bsecond\b/i.test(lowerMessage)) idx = 1
+          else if (/\bthird\b/i.test(lowerMessage)) idx = 2
+          return {
+            intent: "edit_plan",
+            summary_for_user: intent.summary ?? `Removed an item from ${target.type}.`,
+            change_log: [...assumptions, `Removed item at index ${idx} from ${target.id}.${key}.`],
+            ops: [{ op: "remove_item", pageSlug: slug, blockId: target.id, listKey: key, index: idx }]
+          }
+        }
+      }
+    }
     return {
       intent: "edit_plan",
       summary_for_user: intent.summary ?? `Removed ${target.type}.`,
@@ -1961,6 +2035,21 @@ export function compileDeterministicPlan(args: {
         summary_for_user: `Please specify which block type to add (${allowedBlockTypes.join(", ")}).`,
         change_log: assumptions,
         ops: []
+      }
+    }
+
+    // Check if this is an item-level addition to an existing list block
+    const existingOfType = currentPage.blocks.filter((b) => b.type === blockType)
+    if (existingOfType.length === 1) {
+      const existing = existingOfType[0]!
+      const listPatch = buildListAppendPatch(existing, message)
+      if (listPatch) {
+        return {
+          intent: "edit_plan",
+          summary_for_user: intent.summary ?? `Added an item to ${existing.type}.`,
+          change_log: [...assumptions, `Appended item to ${existing.id}.`],
+          ops: [{ op: "update_props", pageSlug: slug, blockId: existing.id, patch: listPatch }]
+        }
       }
     }
 

@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
 import { EditorPreviewBridge } from "../../components/editor-harness"
+import { SiteThemeToggle } from "../../components/theme-toggle"
 import { fetchDraftPage, fetchDraftSlugs, getPublishedSlugs } from "../../lib/content-api"
 
 type PageProps = {
@@ -173,6 +174,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
             ))}
           </nav>
         </details>
+        <SiteThemeToggle />
       </header>
       <main className={editorMode ? "editor-mode" : undefined}>
         {page.blocks.map((block) => (

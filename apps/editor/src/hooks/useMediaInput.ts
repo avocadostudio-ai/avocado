@@ -41,5 +41,25 @@ export function useMediaInput() {
     return text
   }
 
-  return { transcribeAudio, interpretPastedImage }
+  async function uploadPastedImage(blob: Blob, mimeType: string) {
+    const ext = extensionFromMimeType(mimeType)
+    const file = new File([blob], `pasted-image.${ext}`, {
+      type: mimeType || blob.type || "image/png"
+    })
+    const form = new FormData()
+    form.append("image", file)
+
+    const res = await fetch(`${orchestrator}/image/upload`, {
+      method: "POST",
+      body: form
+    })
+
+    const data = (await res.json()) as { url?: string; error?: string; detail?: string }
+    if (!res.ok) throw new Error(data.error ?? data.detail ?? "Image upload failed.")
+    const url = (data.url ?? "").trim()
+    if (!url) throw new Error("Image upload returned an empty URL.")
+    return url
+  }
+
+  return { transcribeAudio, interpretPastedImage, uploadPastedImage }
 }

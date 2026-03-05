@@ -21,23 +21,38 @@ export type ImageLogger = {
 export function normalizeUnsplashQuery(raw: string) {
   return raw
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 80)
 }
 
 export function extractUnsplashQuery(message: string) {
-  const aboutBeforeFromUnsplash = message.match(/\b(?:about|of|with|for)\s+([^,.!?;\n]+?)\s+(?:from|using|via)\s+unsplash\b/i)
-  const fromUnsplashMatch = message.match(/\b(?:from|using|via)\s+unsplash\b[^.?!\n]*?(?:showing|of|with|for)?[^\S\n]*([^,.!?;\n]+)/i)
-  const unsplashMatch = message.match(/\bunsplash\b[^.?!\n]*?(?:showing|of|with|for)\s+([^,.!?;\n]+)/i)
-  const quoted = /"([^"]+)"/.exec(message)?.[1]
-  const candidate = aboutBeforeFromUnsplash?.[1] ?? fromUnsplashMatch?.[1] ?? unsplashMatch?.[1] ?? quoted
+  const cleanMessage = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
+  const aboutBeforeFromUnsplash = cleanMessage.match(/\b(?:about|of|with|for)\s+([^,.!?;\n]+?)\s+(?:from|using|via)\s+unsplash\b/i)
+  const fromUnsplashMatch = cleanMessage.match(/\b(?:from|using|via)\s+unsplash\b[^.?!\n]*?(?:showing|of|with|for)?[^\S\n]*([^,.!?;\n]+)/i)
+  const unsplashMatch = cleanMessage.match(/\bunsplash\b[^.?!\n]*?(?:showing|of|with|for)\s+([^,.!?;\n]+)/i)
+  const replaceImageWith = cleanMessage.match(
+    /\b(?:replace|swap|change|update|set)\s+(?:the\s+)?(?:hero\s+)?(?:image|photo|picture)\s+(?:to|with)\s+([^,.!?;\n]+)/i
+  )
+  const replaceImageWithGerman = cleanMessage.match(
+    /\b(?:ersetze|ersetzen|aendere|ändere|tausche|tauschen)\s+(?:das|die|den)?\s*(?:hero\s*)?(?:bild|foto|image)\s+(?:durch|mit|zu)\s+([^,.!?;\n]+)/i
+  )
+  const quotedWithImageContext =
+    cleanMessage.match(/\b(?:image|photo|picture|bild|foto)\b[^"\n]{0,60}"([^"]+)"/i)?.[1] ??
+    cleanMessage.match(/^"([^"]+)"$/)?.[1]
+  const candidate =
+    aboutBeforeFromUnsplash?.[1] ??
+    fromUnsplashMatch?.[1] ??
+    unsplashMatch?.[1] ??
+    replaceImageWith?.[1] ??
+    replaceImageWithGerman?.[1] ??
+    quotedWithImageContext
   if (!candidate) return undefined
   const cleaned = candidate
-    .replace(/\b(an?|the)\s+/gi, "")
+    .replace(/\b(an?|the|ein(?:e|en|em|er|es)?|der|die|das|den|dem|des)\s+/gi, "")
     .replace(/\b(image|photo|picture)\b/gi, "")
-    .replace(/\b(of|with|showing|for)\b/gi, " ")
+    .replace(/\b(of|with|showing|for|mit|von|fuer|für)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim()
   const normalized = normalizeUnsplashQuery(cleaned)

@@ -41,27 +41,75 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
 
     reply.raw.write("retry: 60000\n\n")
     sseWrite(reply, { type: "status", message: "Crafting your update..." })
-    const result = await runChatPipeline(pipelineCtx, scopedQuery, {
-      onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token }),
-      onOpApplied: (event) =>
-        sseWrite(reply, {
-          type: "op_applied",
-          index: event.index,
-          total: event.total,
-          op: event.op,
-          previewVersion: event.previewVersion,
-          focusBlockId: event.focusBlockId ?? null
-        }),
-      onStatusUpdate: (message) => sseWrite(reply, { type: "status", message })
-    })
-    if (result.code >= 400) {
-      sseWrite(reply, { type: "error", result: result.payload, code: result.code })
+    const streamStartedAt = Date.now()
+    let heartbeatStage: "planning" | "applying" = "planning"
+    const heartbeatTimer = setInterval(() => {
+      sseWrite(reply, {
+        type: "heartbeat",
+        stage: heartbeatStage,
+        elapsedMs: Date.now() - streamStartedAt
+      })
+    }, 1000)
+    try {
+      const result = await runChatPipeline(pipelineCtx, scopedQuery, {
+        onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token }),
+        onPlannedOp: (event) =>
+          sseWrite(reply, {
+            type: "op_candidate",
+            index: event.index,
+            op: event.op
+          }),
+        onOpSkipped: (event) =>
+          sseWrite(reply, {
+            type: "op_skipped",
+            index: event.index,
+            total: event.total,
+            op: event.op,
+            reason: event.reason
+          }),
+        onPlanMeta: (event) => {
+          sseWrite(reply, {
+            type: "plan_meta",
+            intent: event.intent,
+            summary: event.summary,
+            estimatedOps: event.estimatedOps
+          })
+        },
+        onOpApplied: (event) => {
+          heartbeatStage = "applying"
+          sseWrite(reply, {
+            type: "op_applied",
+            index: event.index,
+            total: event.total,
+            op: event.op,
+            previewVersion: event.previewVersion,
+            focusBlockId: event.focusBlockId ?? null
+          })
+        },
+        onRollbackStarted: (event) =>
+          sseWrite(reply, {
+            type: "rollback_started",
+            appliedCount: event.appliedCount,
+            reason: event.reason
+          }),
+        onRollbackDone: (event) =>
+          sseWrite(reply, {
+            type: "rollback_done",
+            restoredVersion: event.restoredVersion
+          }),
+        onStatusUpdate: (message) => sseWrite(reply, { type: "status", message })
+      })
+      if (result.code >= 400) {
+        sseWrite(reply, { type: "error", result: result.payload, code: result.code })
+        reply.raw.end()
+        return reply
+      }
+
+      sseWrite(reply, { type: "final", result: result.payload })
       reply.raw.end()
       return reply
+    } finally {
+      clearInterval(heartbeatTimer)
     }
-
-    sseWrite(reply, { type: "final", result: result.payload })
-    reply.raw.end()
-    return reply
   })
 }

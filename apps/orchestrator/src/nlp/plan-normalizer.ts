@@ -189,15 +189,15 @@ export function pageTitleFromSlug(slug: string) {
 export function inferBlockTypeFromText(text: string): BlockType | undefined {
   const normalized = text.toLowerCase()
   if (normalized.includes("hero")) return "Hero"
-  if (normalized.includes("featuregrid") || normalized.includes("feature grid") || normalized.includes("features")) return "FeatureGrid"
-  if (normalized.includes("testimonial") || normalized.includes("social proof") || normalized.includes("review") || normalized.includes("quote")) return "Testimonials"
+  if (normalized.includes("featuregrid") || normalized.includes("feature grid") || normalized.includes("features") || /\bfeture/.test(normalized)) return "FeatureGrid"
+  if (normalized.includes("testimonial") || normalized.includes("testomonial") || normalized.includes("social proof") || normalized.includes("review") || normalized.includes("quote")) return "Testimonials"
   if (normalized.includes("faq")) return "FAQAccordion"
   if (normalized.includes("twocolumn") || normalized.includes("two column") || normalized.includes("2 column")) return "TwoColumn"
   if (normalized.includes("stats") || normalized.includes("statistics") || normalized.includes("metrics") || normalized.includes("numbers")) return "Stats"
-  if (normalized.includes("cta")) return "CTA"
+  if (normalized.includes("cta") || normalized.includes("call-to-action") || normalized.includes("call to action")) return "CTA"
   if (normalized.includes("cardgrid") || normalized.includes("card grid") || normalized.includes("pricing")) return "CardGrid"
   if (normalized.includes("card")) return "Card"
-  if (normalized.includes("richtext") || normalized.includes("rich text") || normalized.includes("rich-text") || normalized.includes("prose") || normalized.includes("text block") || normalized.includes("section") || normalized.includes("paragraph") || normalized.includes("copy")) return "RichText"
+  if (normalized.includes("richtext") || normalized.includes("rich text") || normalized.includes("rich-text") || normalized.includes("prose") || normalized.includes("text block") || normalized.includes("paragraph") || normalized.includes("copy")) return "RichText"
   if (normalized.includes("benefit") || normalized.includes("advantage")) return "FeatureGrid"
   return undefined
 }
@@ -296,6 +296,16 @@ export function defaultPropsForType(type: BlockType) {
       ]
     }
   }
+  if (type === "Stats") {
+    return {
+      title: "By the numbers",
+      stats: [
+        { value: "10k+", label: "Active users" },
+        { value: "99.9%", label: "Uptime" },
+        { value: "24/7", label: "Support" }
+      ]
+    }
+  }
   return {
     title: "Ready to get started?",
     description: "Apply your next change in seconds.",
@@ -330,6 +340,37 @@ function parseListItemPath(path: unknown): { listKey: string; index: number } | 
   const index = Number(match[2])
   if (!listKey || !Number.isInteger(index) || index < 0) return null
   return { listKey, index }
+}
+
+function inferPreferredListItemTextKey(allowedKeys: string[]) {
+  const lowered = new Map(allowedKeys.map((key) => [key.toLowerCase(), key] as const))
+  const preference = ["title", "label", "q", "quote", "heading", "description", "author", "value"]
+  for (const candidate of preference) {
+    const mapped = lowered.get(candidate)
+    if (mapped) return mapped
+  }
+  return allowedKeys[0]
+}
+
+function remapListItemPatchKeys(args: { patchRaw: unknown; allowedKeys: string[] }) {
+  const patch = patchObject(args.patchRaw)
+  if (!patch || args.allowedKeys.length === 0) return patch
+
+  const loweredToAllowed = new Map<string, string>()
+  for (const key of args.allowedKeys) loweredToAllowed.set(key.toLowerCase(), key)
+  const preferredTextKey = inferPreferredListItemTextKey(args.allowedKeys)
+
+  const aliasToPreferred = new Set(["label", "name", "text", "heading", "headline"])
+  const out: Record<string, unknown> = {}
+  for (const [rawKey, value] of Object.entries(patch)) {
+    const trimmed = rawKey.trim()
+    const lowered = trimmed.toLowerCase()
+    const mapped =
+      loweredToAllowed.get(lowered) ??
+      (aliasToPreferred.has(lowered) ? preferredTextKey : undefined)
+    out[mapped ?? trimmed] = value
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -431,6 +472,34 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         raw.id ??
         pathCandidate
     }
+    // Infer blockId from currentPage when op needs it but model omitted it
+    if (!raw.blockId && args?.currentPage) {
+      const needsBlockId =
+        raw.op === "update_props" || raw.op === "remove_block" || raw.op === "move_block" || raw.op === "duplicate_block"
+      if (needsBlockId) {
+        // Try type from explicit op fields first, then from user message keywords
+        const typeHint = normalizedType ?? inferBlockTypeFromText(userMessage)
+        if (typeHint) {
+          const matches = args.currentPage.blocks.filter((b) => b.type === typeHint)
+          if (matches.length === 1) {
+            raw.blockId = matches[0].id
+          }
+        }
+        // Fallback: if patch keys clearly map to only one block's props
+        if (!raw.blockId && raw.op === "update_props") {
+          const patch = patchObject(raw.patch ?? raw.props ?? raw.changes)
+          if (patch) {
+            const patchKeys = Object.keys(patch)
+            const candidates = args.currentPage.blocks.filter((b) => {
+              const bProps = b.props as Record<string, unknown> | undefined
+              if (!bProps) return false
+              return patchKeys.some((k) => k in bProps)
+            })
+            if (candidates.length === 1) raw.blockId = candidates[0].id
+          }
+        }
+      }
+    }
     if (!raw.listKey) {
       raw.listKey =
         raw.list_key ??
@@ -507,6 +576,22 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     if (!raw.patch) {
       raw.patch = raw.props ?? raw.changes
     }
+    if (raw.op === "update_item" && typeof raw.blockId === "string" && typeof raw.listKey === "string") {
+      const block = args?.currentPage?.blocks.find((candidate) => candidate.id === raw.blockId)
+      const blockProps = block?.props as Record<string, unknown> | undefined
+      const list = blockProps?.[raw.listKey]
+      if (Array.isArray(list)) {
+        const index = typeof raw.index === "number" ? raw.index : -1
+        const itemAtIndex = index >= 0 ? list[index] : undefined
+        const referenceItem =
+          itemAtIndex && typeof itemAtIndex === "object" && !Array.isArray(itemAtIndex)
+            ? (itemAtIndex as Record<string, unknown>)
+            : (list.find((entry) => entry && typeof entry === "object" && !Array.isArray(entry)) as Record<string, unknown> | undefined)
+        const allowedKeys = referenceItem ? Object.keys(referenceItem) : []
+        const remapped = remapListItemPatchKeys({ patchRaw: raw.patch, allowedKeys })
+        if (remapped) raw.patch = remapped
+      }
+    }
 
     if (
       raw.op === "update_props" &&
@@ -533,6 +618,31 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
       if (asksDeletePage) {
         raw.op = "remove_page"
         raw.pageSlug = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? raw.route ?? routeMentions[0] ?? args?.defaultSlug)
+      }
+    }
+
+    // Convert remove_block → remove_item when user is removing a list item (e.g., "remove the first question")
+    if (raw.op === "remove_block" && typeof raw.blockId === "string" && args?.currentPage) {
+      const asksRemoveItem = /\b(question|item|faq|entry|testimonial|card|feature|first|second|third|last)\b/i.test(userMessage)
+      if (asksRemoveItem) {
+        const block = args.currentPage.blocks.find((b) => b.id === raw.blockId)
+        if (block) {
+          const bProps = block.props as Record<string, unknown> | undefined
+          if (bProps) {
+            for (const [key, val] of Object.entries(bProps)) {
+              if (!Array.isArray(val) || val.length === 0) continue
+              // Determine which index to remove
+              let idx = 0
+              if (/\blast\b/i.test(userMessage)) idx = val.length - 1
+              else if (/\bsecond\b/i.test(userMessage)) idx = 1
+              else if (/\bthird\b/i.test(userMessage)) idx = 2
+              raw.op = "remove_item"
+              raw.listKey = key
+              raw.index = idx
+              break
+            }
+          }
+        }
       }
     }
 
@@ -614,6 +724,37 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         block.id = `b_${String(block.type).toLowerCase()}_${Date.now()}`
       }
       raw.block = block
+    }
+
+    // Convert add_block → add_item when targeting an existing single-instance block with list items
+    if (raw.op === "add_block" && raw.block && typeof raw.block === "object" && !Array.isArray(raw.block) && args?.currentPage) {
+      const block = raw.block as Record<string, unknown>
+      const blockType = typeof block.type === "string" ? block.type : undefined
+      if (blockType) {
+        const existingBlocks = args.currentPage.blocks.filter((b) => b.type === blockType)
+        if (existingBlocks.length === 1) {
+          const existing = existingBlocks[0]
+          const existingProps = existing.props as Record<string, unknown> | undefined
+          const newProps = block.props as Record<string, unknown> | undefined
+          if (existingProps && newProps) {
+            for (const [key, val] of Object.entries(existingProps)) {
+              if (!Array.isArray(val)) continue
+              const newVal = newProps[key]
+              if (!Array.isArray(newVal) || newVal.length === 0) continue
+              const newItem = newVal[0]
+              if (newItem && typeof newItem === "object" && !Array.isArray(newItem)) {
+                raw.op = "add_item"
+                raw.blockId = existing.id
+                raw.listKey = key
+                raw.item = newItem
+                raw.pageSlug = raw.pageSlug ?? args?.defaultSlug
+                delete raw.block
+                break
+              }
+            }
+          }
+        }
+      }
     }
 
     const createSlugCandidate = resolvePageSlug(raw.pageSlug ?? raw.path ?? raw.slug ?? requestedRoute)
@@ -818,6 +959,38 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
       if (tail) raw.afterBlockId = tail.id
     }
 
+    // Remap add_item item keys to match existing schema (e.g., question→q, answer→a)
+    if (raw.op === "add_item" && raw.item && typeof raw.item === "object" && !Array.isArray(raw.item) && typeof raw.blockId === "string") {
+      const targetBlock = args?.currentPage?.blocks.find((b) => b.id === raw.blockId)
+      if (targetBlock) {
+        const bProps = targetBlock.props as Record<string, unknown> | undefined
+        const lk = typeof raw.listKey === "string" ? raw.listKey : undefined
+        const list = lk ? bProps?.[lk] : undefined
+        const refItem = Array.isArray(list)
+          ? (list.find((e) => e && typeof e === "object" && !Array.isArray(e)) as Record<string, unknown> | undefined)
+          : undefined
+        if (refItem) {
+          const allowedKeys = Object.keys(refItem)
+          const remapped = remapListItemPatchKeys({ patchRaw: raw.item, allowedKeys })
+          if (remapped) {
+            // Semantic aliases for common key alternatives
+            const extraAliases: Record<string, string> = { question: "q", answer: "a", testimonial: "quote", review: "quote" }
+            const allowedSet = new Set(allowedKeys)
+            const final: Record<string, unknown> = {}
+            for (const [k, v] of Object.entries(remapped)) {
+              const alias = extraAliases[k.toLowerCase()]
+              if (alias && allowedSet.has(alias) && !(alias in remapped)) {
+                final[alias] = v
+              } else {
+                final[k] = v
+              }
+            }
+            raw.item = final
+          }
+        }
+      }
+    }
+
     return raw
   })
 
@@ -855,6 +1028,20 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
   // Reorder ops so create_page always precedes ops targeting the same slug.
   // The LLM may emit add_block ops before the corresponding create_page.
   const reorderedOps = reorderCreatePageFirst(sanitizedOps)
+
+  // Ensure required EditPlan fields exist — smaller models sometimes omit them
+  if (!root.intent) {
+    root.intent = reorderedOps.length > 0 ? "edit_plan" : "needs_clarification"
+  }
+  if (!root.summary_for_user && typeof root.summary === "string") {
+    root.summary_for_user = root.summary // common model alias
+  }
+  if (!Array.isArray(root.change_log)) {
+    root.change_log = reorderedOps.map((op: any) => {
+      const verb = op.op?.replace(/_/g, " ") ?? "modify"
+      return `${verb} on ${op.pageSlug ?? "page"}`
+    })
+  }
 
   return { ...root, ops: reorderedOps }
 }

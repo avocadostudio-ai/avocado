@@ -26,6 +26,7 @@ export const AI_PERFORMANCE_PREFIX = "__ai_performance__:"
 export const DEBUG_MODE_STORAGE_KEY = "editor-debug-mode-v1"
 export const MODEL_KEY_STORAGE_KEY = "editor-model-key-v1"
 export const PROVIDER_STORAGE_KEY = "editor-provider-v1"
+export const CHAT_THEME_STORAGE_KEY = "editor-chat-theme-v1"
 
 export const previewPresetWidths: Record<PreviewWidthPreset, number> = {
   desktop: 1200,
@@ -186,6 +187,14 @@ export function resolveDefaultProvider(): import("./editor-types").AIProvider {
   return "openai"
 }
 
+export function resolveDefaultChatDarkMode() {
+  if (typeof window === "undefined") return false
+  const stored = window.sessionStorage.getItem(CHAT_THEME_STORAGE_KEY) ?? window.localStorage.getItem(CHAT_THEME_STORAGE_KEY)
+  if (stored === "dark") return true
+  if (stored === "light") return false
+  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false
+}
+
 export function slugLabel(route: string) {
   if (route === "/") return "Home (/)"
   const pretty = route
@@ -200,6 +209,10 @@ export function slugLabel(route: string) {
 
 export function extensionFromMimeType(mimeType: string) {
   const normalized = mimeType.toLowerCase()
+  if (normalized.includes("png")) return "png"
+  if (normalized.includes("jpeg") || normalized.includes("jpg")) return "jpg"
+  if (normalized.includes("webp")) return "webp"
+  if (normalized.includes("gif")) return "gif"
   if (normalized.includes("webm")) return "webm"
   if (normalized.includes("wav")) return "wav"
   if (normalized.includes("mpeg") || normalized.includes("mp3")) return "mp3"

@@ -93,6 +93,42 @@ export function parseCreatePageRequest(message: string) {
   return "/new-page"
 }
 
+export function parseDuplicatePageRequest(message: string, args?: { currentSlug?: string }) {
+  const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
+  const lower = stripped.toLowerCase().replace(/\s+/g, " ").trim()
+  if (!/\b(duplicate|copy|clone)\b/.test(lower)) return null
+  if (!/\bpage\b/.test(lower) && !/\b(this|current|selected)\b/.test(lower) && !/\/[a-z0-9/_-]+/i.test(stripped)) return null
+
+  const routeMentions = extractRouteMentions(stripped)
+  const byCommandRoute = stripped.match(/\b(?:duplicate|copy|clone)\s+(?:the\s+)?(?:page\s+)?(\/[a-z0-9/_-]+)/i)?.[1]
+  const byToRoute = stripped.match(/\b(?:to|into|as)\s+(\/[a-z0-9/_-]+)/i)?.[1]
+
+  const usesCurrentPage = /\b(this|current|selected)\s+page\b/.test(lower)
+  let sourceSlug = normalizeRouteCandidate(byCommandRoute ?? routeMentions[0] ?? null)
+  if (!sourceSlug && usesCurrentPage) sourceSlug = normalizeRouteCandidate(args?.currentSlug ?? null)
+
+  let targetSlug = normalizeRouteCandidate(byToRoute ?? null)
+  if (!targetSlug) {
+    const secondRoute = routeMentions.length >= 2 ? normalizeRouteCandidate(routeMentions[1] ?? null) : null
+    if (secondRoute && secondRoute !== sourceSlug) targetSlug = secondRoute
+  }
+  if (!targetSlug) {
+    const nameMatch = stripped.match(/\b(?:called|named)\s+["']?([a-z0-9][a-z0-9 _-]{1,60})["']?/i)?.[1]?.trim()
+    if (nameMatch) {
+      const seed = toSeedSlug(nameMatch)
+      if (seed) targetSlug = `/${seed}`
+    }
+  }
+
+  if (!targetSlug || targetSlug === "/") return null
+  if (!sourceSlug) sourceSlug = normalizeRouteCandidate(args?.currentSlug ?? null)
+  if (!sourceSlug || sourceSlug === "/") return {
+    sourceSlug: sourceSlug ?? null,
+    targetSlug
+  }
+  return { sourceSlug, targetSlug }
+}
+
 /** Returns true when the message asks for AI-generated content alongside a page create. */
 export function requestsContentGeneration(message: string) {
   const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
