@@ -13,14 +13,14 @@
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
     "@tailwindcss/postcss": "^4.2.1",
     "lucide-react": "^0.575.0",
     "next": "15.2.8",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "tailwindcss": "^4.2.1",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

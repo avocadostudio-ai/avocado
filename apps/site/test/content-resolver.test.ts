@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "../lib/site-contract"
 import { resolvePageAndNav } from "../lib/content-resolver.ts"
 
 const samplePage: PageDoc = {

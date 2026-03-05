@@ -1,4 +1,4 @@
-import { pageDocSchema, type PageDoc } from "@ai-site-editor/shared"
+import { pageDocSchema, type PageDoc } from "./site-contract"
 import publishedContent from "./published-content.json"
 
 function loadPublishedPages() {
@@ -23,4 +23,3 @@ export function getPublishedPage(slug: string): PageDoc | null {
   const page = publishedPagesBySlug.get(slug)
   return page ? structuredClone(page) : null
 }
-

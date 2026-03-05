@@ -1,4 +1,4 @@
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "./site-contract"
 import { type SiteContentSource } from "./content-source.ts"
 
 export type ContentResolverDeps = {

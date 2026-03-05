@@ -4,20 +4,17 @@ import { getSafeRedirectPath, isValidDraftSecret } from "../app/api/draft/helper
 
 test("isValidDraftSecret returns missing_config when no secret is configured", () => {
   const result = isValidDraftSecret("anything", {})
-  assert.equal(result.ok, false)
-  assert.equal(result.reason, "missing_config")
+  assert.deepEqual(result, { ok: false, reason: "missing_config" })
 })
 
 test("isValidDraftSecret validates exact configured secret", () => {
   const env = { DRAFT_MODE_SECRET: "top-secret" }
 
   const invalid = isValidDraftSecret("wrong", env)
-  assert.equal(invalid.ok, false)
-  assert.equal(invalid.reason, "invalid_secret")
+  assert.deepEqual(invalid, { ok: false, reason: "invalid_secret" })
 
   const valid = isValidDraftSecret("top-secret", env)
-  assert.equal(valid.ok, true)
-  assert.equal(valid.reason, null)
+  assert.deepEqual(valid, { ok: true })
 })
 
 test("getSafeRedirectPath allows internal paths and blocks external redirects", () => {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import {
   editorComponentsManifestSchema,
   validateManifestDefaultProps
-} from "@ai-site-editor/shared"
+} from "../lib/editor-components-contract.ts"
 import { buildEditorComponentsManifest } from "../lib/editor-components-manifest.ts"
 
 test("buildEditorComponentsManifest returns schema-valid manifest with valid defaults", () => {
