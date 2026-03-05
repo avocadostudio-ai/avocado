@@ -6,7 +6,12 @@ export const DEFAULT_SITE_HOSTING = "Vercel production site (single shared proje
 export const LEGACY_AVOCADO_SITE_ID = "avocado-stories"
 export const LEGACY_AVOCADO_SITE_NAME = "Avocado Stories"
 export const LEGACY_AVOCADO_SITE_PURPOSE = "Marketing site for Avocado Stories products, recipes, and sustainability messaging."
-export const AUTO_SITE_PRESETS: SiteConfig[] = [
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
+const ENABLE_AUTO_SITE_PRESETS = IS_DEMO_MODE || import.meta.env.VITE_ENABLE_AUTO_SITE_PRESETS === "1"
+
+const AUTO_SITE_PRESET_IDS = new Set(["avocado-magic", "avocado-odyssey", LEGACY_AVOCADO_SITE_ID])
+
+export const AUTO_SITE_PRESETS: SiteConfig[] = ENABLE_AUTO_SITE_PRESETS ? [
   {
     id: "avocado-magic",
     name: "Avocado Magic",
@@ -19,7 +24,52 @@ export const AUTO_SITE_PRESETS: SiteConfig[] = [
     purpose: "Restored site snapshot: Embark on an Avocado Odyssey.",
     hosting: DEFAULT_SITE_HOSTING
   }
-]
+] : []
+
+function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
+  const trimmed = raw?.trim()
+  if (!trimmed) return []
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((site): site is Record<string, unknown> => Boolean(site && typeof site === "object"))
+      .map((site) => {
+        const id = sanitizeSiteId(typeof site.id === "string" ? site.id : "")
+        const name = typeof site.name === "string" ? site.name.trim() : ""
+        const purpose = typeof site.purpose === "string" ? site.purpose.trim() : ""
+        const hosting = typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING
+        const vercelProjectId = typeof site.vercelProjectId === "string" ? site.vercelProjectId.trim() : ""
+        const vercelTeamId = typeof site.vercelTeamId === "string" ? site.vercelTeamId.trim() : ""
+        const vercelProductionUrl = typeof site.vercelProductionUrl === "string" ? site.vercelProductionUrl.trim() : ""
+        const vercelDeployHookUrl = typeof site.vercelDeployHookUrl === "string" ? site.vercelDeployHookUrl.trim() : ""
+        const tone = typeof site.tone === "string" ? site.tone.trim() : ""
+        const constraints = Array.isArray(site.constraints)
+          ? site.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+          : []
+        return {
+          id,
+          name,
+          purpose,
+          hosting,
+          vercelProjectId,
+          vercelTeamId,
+          vercelProductionUrl,
+          vercelDeployHookUrl,
+          tone,
+          constraints
+        } satisfies SiteConfig
+      })
+      .filter((site) => site.id.length > 0 && site.name.length > 0)
+  } catch {
+    return []
+  }
+}
+
+const CONFIGURED_SITE_PRESETS = parseConfiguredSitePresets(import.meta.env.VITE_SITE_PRESETS_JSON as string | undefined)
+
+const DEFAULT_SITE_PRESETS: SiteConfig[] = [...CONFIGURED_SITE_PRESETS, ...AUTO_SITE_PRESETS]
 
 export const AI_JUSTIFICATION_PREFIX = "__ai_justification__:"
 export const AI_PERFORMANCE_PREFIX = "__ai_performance__:"
@@ -88,7 +138,7 @@ export function resolveEditorSiteId() {
 
 export function defaultSiteList(siteId: string): SiteConfig[] {
   const resolvedId = sanitizeSiteId(siteId) || "dev-site"
-  return [
+  const defaults: SiteConfig[] = [
     {
       id: resolvedId,
       name: siteNameFromId(resolvedId) || "Site",
@@ -102,6 +152,13 @@ export function defaultSiteList(siteId: string): SiteConfig[] {
       constraints: []
     }
   ]
+  const existing = new Set(defaults.map((site) => site.id))
+  for (const preset of DEFAULT_SITE_PRESETS) {
+    if (existing.has(preset.id)) continue
+    defaults.push(preset)
+    existing.add(preset.id)
+  }
+  return defaults
 }
 
 export function loadSiteListFromStorage(siteId: string) {
@@ -146,10 +203,12 @@ export function loadSiteListFromStorage(siteId: string) {
           : []
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
+      .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))
     const mergePresets = (list: SiteConfig[]) => {
+      if (DEFAULT_SITE_PRESETS.length === 0) return list
       const existingIds = new Set(list.map((site) => site.id))
       const merged = [...list]
-      for (const preset of AUTO_SITE_PRESETS) {
+      for (const preset of DEFAULT_SITE_PRESETS) {
         if (existingIds.has(preset.id)) continue
         merged.push(preset)
       }
@@ -172,7 +231,7 @@ export function loadSiteListFromStorage(siteId: string) {
     }
     return mergePresets(defaultSiteList(siteId))
   } catch {
-    return [...defaultSiteList(siteId), ...AUTO_SITE_PRESETS]
+    return defaultSiteList(siteId)
   }
 }
 
