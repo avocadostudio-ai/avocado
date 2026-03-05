@@ -22,6 +22,11 @@ Related:
 - returns available component types and prop schemas for safe ops
 - generated from adopter-owned component registry (recommended)
 
+Template files for this:
+- `lib/site-component-registry.ts`
+- `lib/editor-components-manifest.ts`
+- `lib/editor-components-contract.ts`
+
 2. Add Draft Mode entry and exit endpoints:
 - `GET /api/draft?secret=...&redirect=/target-path`
 - `GET /api/draft/disable?redirect=/target-path`

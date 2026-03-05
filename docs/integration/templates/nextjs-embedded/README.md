@@ -10,6 +10,10 @@ Copy these files into your Next.js app:
 - `app/api/draft/route.ts`
 - `app/api/draft/disable/route.ts`
 - `app/api/editor/components/route.ts`
+- `lib/editor-components-contract.ts`
+- `lib/site-component-registry.ts`
+- `lib/editor-components-manifest.ts`
+- `lib/site-contract.ts`
 - `lib/draft-content-source.ts`
 - `lib/page-data.ts`
 - `editor/build-draft-url.ts` (or equivalent editor helper)
