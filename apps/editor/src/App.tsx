@@ -11,7 +11,7 @@ import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, type BlockInstance } from "@ai-site-editor/shared"
-import type { AIProvider, ModelKey, PlannerSource, PreviewWidthPreset } from "./lib/editor-types"
+import type { AIProvider, ModelKey, PlannerSource } from "./lib/editor-types"
 import {
   DEBUG_MODE_STORAGE_KEY,
   MODEL_KEY_STORAGE_KEY,
@@ -21,6 +21,8 @@ import {
   mergedVariationProps,
   orchestrator,
   previewPresetWidths,
+  buildSiteDraftDisableUrl,
+  buildSiteDraftEnableUrl,
   resolveDefaultChatDarkMode,
   resolveDefaultDebugMode,
   resolveDefaultModelKey,
@@ -83,7 +85,6 @@ function EditorPage({
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showDebugDetails, setShowDebugDetails] = useState(() => resolveDefaultDebugMode())
-  const [variationPreviewPreset, setVariationPreviewPreset] = useState<PreviewWidthPreset>("desktop")
   const [composerHeight, setComposerHeight] = useState(124)
   const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
   const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId?: string; beforeBlockId?: string } | null>(null)
@@ -258,20 +259,21 @@ function EditorPage({
 
   // Preview src
   const previewSrc = useMemo(() => {
-    const url = new URL(`${siteOrigin}${slug === "/" ? "" : slug}`)
-    url.searchParams.set("__editor", "1")
-    url.searchParams.set("session", session)
-    url.searchParams.set("siteId", siteId)
-    url.searchParams.set("siteName", activeSiteConfig.name)
-    url.searchParams.set("editorOrigin", editorOrigin)
-    return url.toString()
-  }, [activeSiteConfig.name, editorOrigin, session, siteId, slug])
+    return buildSiteDraftEnableUrl(slug, {
+      session,
+      siteId,
+      editorOrigin
+    })
+  }, [editorOrigin, session, siteId, slug])
 
   const liveSiteUrl = useMemo(() => {
     const configured = activeSiteConfig.vercelProductionUrl?.trim()
     const base = configured && /^https?:\/\//i.test(configured) ? configured : siteOrigin
     try {
       const url = new URL(base)
+      if (url.origin === siteOrigin) {
+        return buildSiteDraftDisableUrl(slug, {})
+      }
       url.pathname = slug === "/" ? "/" : slug
       url.search = ""
       url.hash = ""
@@ -783,20 +785,6 @@ function EditorPage({
           <div className="variation-modal" role="dialog" aria-modal="true" aria-label="Choose a variation" onClick={(e) => e.stopPropagation()}>
             <div className="variation-modal-header">
               <h2>Choose a Variation</h2>
-              <p>{vm.blockType} · {vm.blockId}</p>
-              <div className="variation-preview-presets" role="group" aria-label="Preview width">
-                {(["desktop", "tablet", "mobile"] as PreviewWidthPreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`variation-preview-preset-btn${variationPreviewPreset === preset ? " is-active" : ""}`}
-                    onClick={() => setVariationPreviewPreset(preset)}
-                    disabled={chatEngine.isApplyingVariation}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
               <button
                 type="button"
                 className="settings-close-btn"
@@ -816,7 +804,7 @@ function EditorPage({
                   </header>
                   <p>{option.summary}</p>
                   <VariationScaledPreview
-                    virtualWidth={previewPresetWidths[variationPreviewPreset]}
+                    virtualWidth={previewPresetWidths.desktop}
                     block={{
                       id: vm.blockId,
                       type: vm.blockType as BlockInstance["type"],

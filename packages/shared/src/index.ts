@@ -1,4 +1,5 @@
 import { z } from "zod"
+export { getConfiguredDraftSecret, getSafeInternalRedirectPath, validateDraftSecret, type DraftSecretValidationResult } from "./draft-mode.ts"
 
 export type PageMeta = {
   title?: string
