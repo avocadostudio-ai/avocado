@@ -176,6 +176,123 @@ test("generatePlanWithOpenAI bypasses strict primary-op mode for multi-page crea
   }
 })
 
+test("generatePlanWithOpenAI bypasses strict primary-op mode for explicit multi-block add prompts", async () => {
+  const previous = process.env.CHAT_STRICT_PRIMARY_OP_MODE
+  process.env.CHAT_STRICT_PRIMARY_OP_MODE = "1"
+  try {
+    const message = "add 3 blocks: hero, cardgrid and CTA"
+    const { currentPage, contextPack } = basePlannerArgs(message)
+    const { plan } = await generatePlanWithOpenAI({
+      message,
+      slug: "/",
+      currentPage,
+      contextPack,
+      model: "gpt-4o",
+      client: fakePlannerClientWithContent(
+        JSON.stringify({
+          intent: "edit_plan",
+          summary_for_user: "Will add three sections.",
+          change_log: ["Will add a Hero.", "Will add a CardGrid.", "Will add a CTA."],
+          ops: [
+            { op: "add_block", pageSlug: "/", block: { id: "b_hero_1", type: "Hero", props: {} } },
+            { op: "add_block", pageSlug: "/", block: { id: "b_cardgrid_1", type: "CardGrid", props: {} } },
+            { op: "add_block", pageSlug: "/", block: { id: "b_cta_1", type: "CTA", props: {} } }
+          ]
+        })
+      )
+    })
+
+    assert.equal(plan.intent, "edit_plan")
+    assert.equal(plan.ops.length, 3)
+    assert.equal(plan.ops[0]?.op, "add_block")
+    assert.equal(plan.ops[1]?.op, "add_block")
+    assert.equal(plan.ops[2]?.op, "add_block")
+  } finally {
+    if (previous === undefined) delete process.env.CHAT_STRICT_PRIMARY_OP_MODE
+    else process.env.CHAT_STRICT_PRIMARY_OP_MODE = previous
+  }
+})
+
+test("generatePlanWithOpenAI bypasses strict primary-op mode for full-page translation prompts", async () => {
+  const previous = process.env.CHAT_STRICT_PRIMARY_OP_MODE
+  process.env.CHAT_STRICT_PRIMARY_OP_MODE = "1"
+  try {
+    const { currentPage, contextPack } = basePlannerArgs("Translate the full page to German")
+    const { plan } = await generatePlanWithOpenAI({
+      message: "Translate the full page to German",
+      slug: "/",
+      currentPage,
+      contextPack,
+      model: "gpt-4o",
+      client: fakePlannerClientWithContent(
+        JSON.stringify({
+          intent: "edit_plan",
+          summary_for_user: "Will translate the page.",
+          change_log: ["Will translate Hero.", "Will translate Feature Grid."],
+          ops: [
+            { op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: "Hallo Welt" } },
+            { op: "update_props", pageSlug: "/", blockId: "b_features_home", patch: { title: "Warum Teams es nutzen" } }
+          ]
+        })
+      )
+    })
+
+    assert.equal(plan.intent, "edit_plan")
+    assert.equal(plan.ops.length, 2)
+    assert.equal(plan.ops[0]?.op, "update_props")
+    assert.equal(plan.ops[1]?.op, "update_props")
+  } finally {
+    if (previous === undefined) delete process.env.CHAT_STRICT_PRIMARY_OP_MODE
+    else process.env.CHAT_STRICT_PRIMARY_OP_MODE = previous
+  }
+})
+
+test("generatePlanWithOpenAI includes explicit list-child coverage instructions for full-page translation", async () => {
+  const { currentPage, contextPack } = basePlannerArgs("Translate the whole page to Greek")
+  let sawListChildTranslationInstruction = false
+  const client: PlannerOpenAIClient = {
+    chat: {
+      completions: {
+        create: async (request: unknown) => {
+          const typed = request as { messages?: Array<{ role?: string; content?: string }> }
+          const systemMessage = typed.messages?.find((m) => m.role === "system")?.content ?? ""
+          sawListChildTranslationInstruction = systemMessage.includes(
+            "For list-based child items across all blocks"
+          )
+          return {
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    intent: "edit_plan",
+                    summary_for_user: "Will translate the page.",
+                    change_log: ["Will translate all requested content."],
+                    ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: "Γεια" } }]
+                  })
+                }
+              }
+            ]
+          } as unknown
+        }
+      }
+    },
+    responses: {
+      create: async () => ({ output_text: "" }) as unknown
+    }
+  }
+
+  await generatePlanWithOpenAI({
+    message: "Translate the whole page to Greek",
+    slug: "/",
+    currentPage,
+    contextPack,
+    model: "gpt-4o",
+    client
+  })
+
+  assert.equal(sawListChildTranslationInstruction, true)
+})
+
 test("generatePlanWithOpenAI rejects schema-invalid plans", async () => {
   const { currentPage, contextPack } = basePlannerArgs("change heading")
   await assert.rejects(

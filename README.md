@@ -49,11 +49,11 @@ Alternative (recommended for repeated restarts without opening new terminals):
   - `UNSPLASH_ACCESS_KEY` (if set, orchestrator uses Unsplash Search API; otherwise it falls back to a deterministic Picsum URL to avoid broken `source.unsplash.com` links)
 - Site preview refresh is triggered by editor `postMessage` with `draftUpdated`.
 - Chat troubleshooting playbook:
-  - `docs/chat-behavior-troubleshooting.md`
+  - `docs/observability/chat-behavior-troubleshooting.md`
 - Dev server runbook (start/restart/status/logs/health checks):
-  - `docs/dev-server-runbook.md`
+  - `docs/operations/dev-server-runbook.md`
 - Product improvement backlog:
-  - `docs/things-to-improve.md`
+  - `docs/planning/things-to-improve.md`
 - Editor debug mode:
   - Enable in Settings -> `Debug mode` to show trace/debug data per assistant response.
   - Optional default-on via `VITE_CHAT_DEBUG=1`.
@@ -74,7 +74,7 @@ Alternative (recommended for repeated restarts without opening new terminals):
 
 ## Deployment
 
-- Vercel deployment plan: `docs/vercel-deployment.md`
+- Vercel deployment plan: `docs/operations/vercel-deployment.md`
 
 ### Public site on Vercel (current-ready path)
 

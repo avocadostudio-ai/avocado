@@ -52,6 +52,17 @@ test("sanitizeMessageForPlanning extracts prompt from debug payload", () => {
   )
 })
 
+test("sanitizeMessageForPlanning normalizes smart quotes and common typos", () => {
+  assert.equal(
+    sanitizeMessageForPlanning("ad a fetures section and change hero heding to “Ship faster”"),
+    "add a features section and change hero heading to \"Ship faster\""
+  )
+  assert.equal(
+    sanitizeMessageForPlanning("remove the testomonials section"),
+    "remove the testimonials section"
+  )
+})
+
 test("inferTranslationScopeFromMessage distinguishes page and component scope", () => {
   assert.equal(inferTranslationScopeFromMessage("translate this page to german"), "page")
   assert.equal(inferTranslationScopeFromMessage("translate to german"), "page")

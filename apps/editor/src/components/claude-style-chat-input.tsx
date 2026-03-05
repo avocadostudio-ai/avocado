@@ -6,7 +6,7 @@ type AIProvider = "openai" | "anthropic"
 
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
-  anthropic: { fast: "haiku", balanced: "sonnet", reasoning: "sonnet+thinking", codex: "opus" },
+  anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
 }
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
@@ -27,6 +27,7 @@ type Props = {
   onSubmit: (explicitMessage?: string) => void
   onTranscribeAudio: (blob: Blob, mimeType: string) => Promise<string>
   onInterpretImage: (blob: Blob, mimeType: string) => Promise<string>
+  onUploadImage: (blob: Blob, mimeType: string) => Promise<string>
   onAutoHeightChange: (height: number) => void
 }
 
@@ -34,15 +35,21 @@ function modelLabel(provider: AIProvider, model: ModelKey) {
   return MODEL_LABELS[provider][model]
 }
 
+function selectionValue(provider: AIProvider, model: ModelKey) {
+  return `${provider}:${model}`
+}
+
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, modelKey, provider, availableProviders, hasUserEntry, onMessageChange, onModelChange, onProviderChange, onSubmit, onTranscribeAudio, onInterpretImage, onAutoHeightChange } = props
+  const { message, isLoading, modelKey, provider, availableProviders, onMessageChange, onModelChange, onProviderChange, onSubmit, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false)
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null)
   const [imagePasteError, setImagePasteError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const shellRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -118,7 +125,7 @@ export default function ClaudeStyleChatInput(props: Props) {
 
   useLayoutEffect(() => {
     syncComposerHeight()
-  }, [message, isRecording, isTranscribing, isAnalyzingImage, transcriptionError, imagePasteError, onAutoHeightChange])
+  }, [message, isRecording, isTranscribing, isUploadingImage, isAnalyzingImage, transcriptionError, imagePasteError, onAutoHeightChange])
 
   useEffect(() => {
     const onResize = () => syncComposerHeight()
@@ -137,29 +144,45 @@ export default function ClaudeStyleChatInput(props: Props) {
     onMessageChange(`${prefix}${transcript}`.trim())
   }
 
-  function appendImageContext(text: string) {
-    const context = text.trim()
-    if (!context) return
-    const line = `Image context: ${context}`
-    const nextMessage = [message.trim(), line].filter(Boolean).join("\n")
-    onMessageChange(nextMessage)
-  }
-
   async function handleImagePaste(blob: Blob, mimeType: string) {
     setImagePasteError(null)
+    setIsUploadingImage(true)
     setIsAnalyzingImage(true)
     try {
-      const interpreted = await onInterpretImage(blob, mimeType)
-      const context = interpreted.trim()
-      if (!context) {
-        setImagePasteError("Could not extract context from the pasted image.")
-        return
+      const [uploadedResult, interpretedResult] = await Promise.allSettled([
+        onUploadImage(blob, mimeType),
+        onInterpretImage(blob, mimeType)
+      ])
+
+      let uploadedUrl = ""
+      if (uploadedResult.status === "fulfilled") {
+        uploadedUrl = uploadedResult.value.trim()
       }
-      appendImageContext(context)
+
+      let interpretedContext = ""
+      if (interpretedResult.status === "fulfilled") {
+        interpretedContext = interpretedResult.value.trim()
+      }
+
+      const nextLines = [message.trim()]
+      if (uploadedUrl) nextLines.push(`Pasted image URL: ${uploadedUrl}`)
+      if (interpretedContext) nextLines.push(`Image context: ${interpretedContext}`)
+      onMessageChange(nextLines.filter(Boolean).join("\n"))
+
+      if (!uploadedUrl && interpretedResult.status === "rejected") {
+        const detail = interpretedResult.reason instanceof Error ? interpretedResult.reason.message : "Failed to analyze pasted image."
+        setImagePasteError(detail)
+      } else if (!uploadedUrl && interpretedResult.status === "fulfilled") {
+        setImagePasteError("Image uploaded failed. Try again or use drag-and-drop upload.")
+      } else if (uploadedUrl && interpretedResult.status === "rejected") {
+        // URL is the critical part for image replacement; keep this non-fatal.
+        setImagePasteError(null)
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Failed to analyze pasted image."
       setImagePasteError(detail)
     } finally {
+      setIsUploadingImage(false)
       setIsAnalyzingImage(false)
     }
   }
@@ -247,10 +270,28 @@ export default function ClaudeStyleChatInput(props: Props) {
   }
 
   const micBusy = isRecording || isTranscribing
-  const canSubmit = !isLoading && !micBusy && !isAnalyzingImage && message.trim().length > 0
+  const canSubmit = !isLoading && !micBusy && !isUploadingImage && !isAnalyzingImage && message.trim().length > 0
+  const providersForModels = availableProviders.length > 0 ? availableProviders : [provider]
+  const selectedOption = selectionValue(provider, modelKey)
 
   return (
     <div className={`composer-shell${isLoading ? " is-loading" : ""}`} ref={shellRef}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = ""
+          if (!file) return
+          if (!file.type.startsWith("image/")) {
+            setImagePasteError("Only image files are supported here.")
+            return
+          }
+          void handleImagePaste(file, file.type || "image/png")
+        }}
+      />
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}
@@ -273,39 +314,40 @@ export default function ClaudeStyleChatInput(props: Props) {
             }
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !micBusy) {
+            if (e.key === "Enter" && !e.shiftKey && !micBusy && !isUploadingImage && !isAnalyzingImage) {
               e.preventDefault()
               onSubmit()
             }
           }}
-          placeholder={hasUserEntry ? "" : "Try: Add testimonials below hero"}
           rows={1}
         />
         {isRecording ? <div className="composer-input-note">Listening... click ✓ to send or X to cancel.</div> : null}
         {isTranscribing ? <div className="composer-input-note">Transcribing...</div> : null}
+        {isUploadingImage ? <div className="composer-input-note">Uploading pasted image...</div> : null}
         {isAnalyzingImage ? <div className="composer-input-note">Analyzing pasted image...</div> : null}
         {transcriptionError ? <div className="composer-input-note composer-input-note-error">{transcriptionError}</div> : null}
         {imagePasteError ? <div className="composer-input-note composer-input-note-error">{imagePasteError}</div> : null}
       </div>
       <div className="composer-actions">
         <div className="composer-actions-center">
-          {availableProviders.length > 1 ? (
-            <label className="composer-model-picker">
-              <span>{PROVIDER_LABELS[provider]}</span>
-              <select value={provider} onChange={(e) => onProviderChange(e.target.value as AIProvider)} aria-label="Select AI provider">
-                {availableProviders.map((p) => (
-                  <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           <label className="composer-model-picker">
-            <span>{modelLabel(provider, modelKey)}</span>
-            <select value={modelKey} onChange={(e) => onModelChange(e.target.value as ModelKey)} aria-label="Select model">
-              <option value="fast">{MODEL_LABELS[provider].fast}</option>
-              <option value="balanced">{MODEL_LABELS[provider].balanced}</option>
-              <option value="reasoning">{MODEL_LABELS[provider].reasoning}</option>
-              <option value="codex">{MODEL_LABELS[provider].codex}</option>
+            <span>{`${PROVIDER_LABELS[provider]} ${modelLabel(provider, modelKey)}`}</span>
+            <select
+              value={selectedOption}
+              onChange={(e) => {
+                const [nextProvider, nextModel] = e.target.value.split(":") as [AIProvider, ModelKey]
+                onProviderChange(nextProvider)
+                onModelChange(nextModel)
+              }}
+              aria-label="Select AI model"
+            >
+              {providersForModels.flatMap((p) =>
+                (Object.keys(MODEL_LABELS[p]) as ModelKey[]).map((m) => (
+                  <option key={selectionValue(p, m)} value={selectionValue(p, m)}>
+                    {PROVIDER_LABELS[p]} {MODEL_LABELS[p][m]}
+                  </option>
+                ))
+              )}
             </select>
           </label>
         </div>
@@ -326,6 +368,18 @@ export default function ClaudeStyleChatInput(props: Props) {
             </>
           ) : (
             <>
+              <button
+                type="button"
+                className="composer-ghost-btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || isUploadingImage || isAnalyzingImage}
+                aria-label="Add image"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+              </button>
               <button
                 type="button"
                 className="composer-ghost-btn"

@@ -1,6 +1,7 @@
 .editor-selectable {
   --editor-accent-rgb: 14, 116, 144;
   --editor-selected-rgb: 37, 99, 235;
+  --editor-selected-border-width: 2px;
   --editor-focus-rgb: 217, 119, 6;
   --editor-accent-strong: rgb(var(--editor-accent-rgb));
   --editor-accent-soft: rgba(var(--editor-accent-rgb), 0.35);
@@ -32,7 +33,7 @@
 .editor-selectable:hover::before {
   opacity: 1;
   inset: 0;
-  border: 2px solid rgba(var(--editor-accent-rgb), 0.5);
+  border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
   background: none;
   mix-blend-mode: normal;
 }
@@ -60,8 +61,9 @@
 
 .editor-block-badge {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: 0;
+  left: 0;
+  transform: translateY(calc(-100% + var(--editor-selected-border-width)));
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -90,20 +92,90 @@
   opacity: 1;
 }
 
+.editor-selectable:hover > .editor-block-badge .editor-block-badge-label {
+  background: rgba(var(--editor-selected-rgb), 0.97);
+}
+
 .editor-selectable:hover::after {
   opacity: 1;
+  background: rgba(var(--editor-selected-rgb), 0.97);
 }
 
 .editor-highlight {
   overflow: visible !important;
 }
 
+.editor-live-draft-active {
+  position: relative;
+}
+
+.editor-live-draft-active [data-editable-target] {
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-live-draft-active [data-editable-target]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    rgba(var(--editor-selected-rgb), 0.02) 0%,
+    rgba(var(--editor-selected-rgb), 0.09) 46%,
+    rgba(var(--editor-selected-rgb), 0.02) 100%
+  );
+  background-size: 210% 100%;
+  animation: editor-live-draft-shimmer 1.45s linear infinite;
+}
+
+.editor-block-badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.editor-block-badge-status::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f8fafc;
+  opacity: 0.9;
+  animation: editor-live-draft-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes editor-live-draft-shimmer {
+  from { background-position: 180% 0; }
+  to { background-position: -20% 0; }
+}
+
+@keyframes editor-live-draft-pulse {
+  from { transform: scale(0.7); opacity: 0.45; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 .editor-highlight::before {
   opacity: 1;
   inset: 0;
-  border: 3px solid rgb(var(--editor-selected-rgb));
+  border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
   background: none;
   mix-blend-mode: normal;
+}
+
+.editor-highlight.editor-child-hovering::before,
+.editor-highlight.editor-child-selected::before {
+  opacity: 1;
+  inset: 0;
+  border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
 }
 
 .editor-highlight > .editor-block-badge {
@@ -117,16 +189,22 @@
 
 .editor-highlight > .editor-block-badge .editor-block-badge-label {
   background: rgba(var(--editor-selected-rgb), 0.97);
+  border-radius: 8px 8px 0 0;
+  padding: 5px 10px;
 }
 
 .editor-block-toolbar {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 8px;
+  right: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   z-index: 23;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
 }
 
 .editor-selected-delete {
@@ -143,6 +221,10 @@
   align-items: center;
   justify-content: center;
   z-index: 23;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
 }
 
 .editor-selected-delete svg {
@@ -170,6 +252,10 @@
   align-items: center;
   justify-content: center;
   z-index: 23;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
 }
 
 .editor-selected-move svg {
@@ -185,14 +271,13 @@
 .editor-selected-add {
   position: absolute;
   left: 50%;
-  bottom: -14px;
   transform: translateX(-50%);
   border: 0;
   background: rgba(var(--editor-selected-rgb), 0.95);
   color: #fff;
   border-radius: 999px;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   line-height: 1;
   cursor: pointer;
@@ -201,13 +286,25 @@
   justify-content: center;
   z-index: 23;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.editor-selected-add-bottom {
+  bottom: -17px;
+}
+
+.editor-selected-add-top {
+  top: -17px;
 }
 
 .editor-selected-add svg {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
-  stroke-width: 2.2;
+  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
@@ -251,10 +348,24 @@
   position: relative;
 }
 
+.editor-list-item-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 24;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
 .editor-list-item-delete,
 .editor-list-item-move,
 .editor-list-item-add {
-  position: absolute;
+  position: static;
   border: 0;
   background: rgba(var(--editor-selected-rgb), 0.94);
   color: #fff;
@@ -267,42 +378,81 @@
   align-items: center;
   justify-content: center;
   z-index: 24;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
 }
 
-.editor-list-item-delete {
-  top: 6px;
-  right: 6px;
-  border-radius: 7px;
+.editor-list-item-controls > .editor-list-item-delete {
+  margin-left: 6px;
+}
+
+.editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) > .editor-block-toolbar,
+.editor-highlight:focus-within > .editor-block-toolbar,
+.editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) > .editor-selected-add,
+.editor-highlight:focus-within > .editor-selected-add,
+.editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) .editor-selected-delete,
+.editor-highlight:focus-within .editor-selected-delete,
+.editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) .editor-selected-move,
+.editor-highlight:focus-within .editor-selected-move {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.editor-item-has-delete:hover > .editor-list-item-controls,
+.editor-item-has-delete:focus-within > .editor-list-item-controls,
+.editor-item-has-delete.editor-item-selected > .editor-list-item-controls,
+.editor-item-has-delete:hover > .editor-list-item-add,
+.editor-item-has-delete:focus-within > .editor-list-item-add,
+.editor-item-has-delete.editor-item-selected > .editor-list-item-add,
+.editor-item-has-delete:hover .editor-list-item-delete,
+.editor-item-has-delete:focus-within .editor-list-item-delete,
+.editor-item-has-delete.editor-item-selected .editor-list-item-delete,
+.editor-item-has-delete:hover .editor-list-item-move,
+.editor-item-has-delete:focus-within .editor-list-item-move,
+.editor-item-has-delete.editor-item-selected .editor-list-item-move {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.editor-highlight.editor-child-selected > .editor-block-toolbar,
+.editor-highlight.editor-child-selected > .editor-selected-add,
+.editor-highlight.editor-child-selected > .editor-selected-delete,
+.editor-highlight.editor-child-selected > .editor-selected-move,
+.editor-highlight.editor-child-hovering > .editor-block-toolbar,
+.editor-highlight.editor-child-hovering > .editor-selected-add,
+.editor-highlight.editor-child-hovering > .editor-selected-delete,
+.editor-highlight.editor-child-hovering > .editor-selected-move {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .editor-list-item-move {
   border-radius: 7px;
-  right: 6px;
-}
-
-.editor-list-item-move-up {
-  top: 34px;
-}
-
-.editor-list-item-move-down {
-  top: 62px;
 }
 
 .editor-list-item-add {
+  position: absolute;
   top: 50%;
-  right: -12px;
+  right: -17px;
   transform: translateY(-50%);
   border-radius: 999px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  width: 34px;
+  height: 34px;
 }
 
 .editor-list-item-delete svg,
 .editor-list-item-move svg,
 .editor-list-item-add svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
-  stroke-width: 2.1;
+  stroke-width: 2.3;
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
@@ -456,6 +606,49 @@
 
 .editor-delete-confirm-btn:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .editor-block-toolbar,
+  .editor-selected-add,
+  .editor-selected-delete,
+  .editor-selected-move {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .editor-list-item-controls,
+  .editor-list-item-delete,
+  .editor-list-item-move,
+  .editor-list-item-add {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .editor-item-has-delete.editor-item-selected > .editor-list-item-controls,
+  .editor-item-has-delete.editor-item-selected > .editor-list-item-add,
+  .editor-item-has-delete.editor-item-selected .editor-list-item-delete,
+  .editor-item-has-delete.editor-item-selected .editor-list-item-move {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .editor-selected-add,
+  .editor-list-item-add {
+    width: 44px;
+    height: 44px;
+  }
+
+  .editor-selected-add-bottom {
+    bottom: -22px;
+  }
+
+  .editor-selected-add-top {
+    top: -22px;
+  }
 }
 
 .editor-flash {

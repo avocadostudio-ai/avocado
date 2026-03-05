@@ -44,13 +44,22 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
   app.get("/generated-images/:fileName", async (request, reply) => {
     const params = request.params as { fileName?: string }
     const fileName = typeof params.fileName === "string" ? params.fileName.trim() : ""
-    if (!/^[a-zA-Z0-9_-]+\.png$/.test(fileName)) {
+    const match = fileName.match(/^([a-zA-Z0-9_-]+)\.(png|jpg|jpeg|webp|gif)$/i)
+    if (!match) {
       return reply.code(400).send({ error: "invalid filename" })
     }
 
     try {
       const bytes = await readFile(resolve(ctx.generatedImageDir, fileName))
-      reply.header("content-type", "image/png")
+      const ext = match[2].toLowerCase()
+      const contentType = ext === "jpg" || ext === "jpeg"
+        ? "image/jpeg"
+        : ext === "webp"
+          ? "image/webp"
+          : ext === "gif"
+            ? "image/gif"
+            : "image/png"
+      reply.header("content-type", contentType)
       reply.header("cache-control", "public, max-age=31536000, immutable")
       return reply.send(bytes)
     } catch {

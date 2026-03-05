@@ -1,4 +1,7 @@
-import type { FastifyInstance } from "fastify"
+import { mkdir, writeFile } from "node:fs/promises"
+import { resolve } from "node:path"
+import { randomUUID } from "node:crypto"
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import OpenAI from "openai"
 import { toFile } from "openai/uploads"
 import { toErrorDetail } from "../ops/ops-engine.js"
@@ -30,7 +33,44 @@ function parseTranscriptionModelList(raw: string | undefined) {
     .filter((item) => item.length > 0)
 }
 
-export async function mediaRoutes(app: FastifyInstance, _ctx: RouteContext) {
+function extensionFromImageMimeType(mimeType: string) {
+  switch (mimeType) {
+    case "image/png":
+      return "png"
+    case "image/jpeg":
+      return "jpg"
+    case "image/webp":
+      return "webp"
+    case "image/gif":
+      return "gif"
+    default:
+      return "png"
+  }
+}
+
+async function readMultipartImageFile(request: FastifyRequest, reply: FastifyReply) {
+  const inputFile = await request.file()
+  if (!inputFile) return { ok: false as const, response: reply.code(400).send({ error: "image file is required" }) }
+  if (inputFile.fieldname !== "image") return { ok: false as const, response: reply.code(400).send({ error: "image field must be named 'image'" }) }
+  if (!allowedImageAnalysisMimeTypes.has(inputFile.mimetype)) {
+    return { ok: false as const, response: reply.code(415).send({ error: `unsupported image type: ${inputFile.mimetype}` }) }
+  }
+
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+  for await (const chunk of inputFile.file) {
+    const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    totalBytes += data.byteLength
+    if (totalBytes > 10 * 1024 * 1024) {
+      return { ok: false as const, response: reply.code(413).send({ error: "image file is too large (max 10MB)" }) }
+    }
+    chunks.push(data)
+  }
+  if (totalBytes === 0) return { ok: false as const, response: reply.code(400).send({ error: "image file is empty" }) }
+  return { ok: true as const, inputFile, totalBytes, buffer: Buffer.concat(chunks) }
+}
+
+export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
   app.post("/audio/transcribe", async (request, reply) => {
     if (!process.env.OPENAI_API_KEY) {
       return reply.code(503).send({ error: "OPENAI_API_KEY is not configured" })
@@ -102,28 +142,13 @@ export async function mediaRoutes(app: FastifyInstance, _ctx: RouteContext) {
       return reply.code(503).send({ error: "OPENAI_API_KEY is not configured" })
     }
 
-    const inputFile = await request.file()
-    if (!inputFile) return reply.code(400).send({ error: "image file is required" })
-    if (inputFile.fieldname !== "image") return reply.code(400).send({ error: "image field must be named 'image'" })
-    if (!allowedImageAnalysisMimeTypes.has(inputFile.mimetype)) {
-      return reply.code(415).send({ error: `unsupported image type: ${inputFile.mimetype}` })
-    }
-
-    const chunks: Buffer[] = []
-    let totalBytes = 0
-    for await (const chunk of inputFile.file) {
-      const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-      totalBytes += data.byteLength
-      if (totalBytes > 10 * 1024 * 1024) {
-        return reply.code(413).send({ error: "image file is too large (max 10MB)" })
-      }
-      chunks.push(data)
-    }
-    if (totalBytes === 0) return reply.code(400).send({ error: "image file is empty" })
+    const parsed = await readMultipartImageFile(request, reply)
+    if (!parsed.ok) return parsed.response
+    const { inputFile, totalBytes, buffer } = parsed
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const model = process.env.OPENAI_VISION_MODEL?.trim() || "gpt-4o"
-    const base64 = Buffer.concat(chunks).toString("base64")
+    const base64 = buffer.toString("base64")
     const dataUrl = `data:${inputFile.mimetype};base64,${base64}`
 
     try {
@@ -158,6 +183,28 @@ export async function mediaRoutes(app: FastifyInstance, _ctx: RouteContext) {
       }
     } catch (error) {
       return reply.code(502).send({ error: "image interpretation failed", detail: toErrorDetail(error) })
+    }
+  })
+
+  app.post("/image/upload", async (request, reply) => {
+    const parsed = await readMultipartImageFile(request, reply)
+    if (!parsed.ok) return parsed.response
+    const { inputFile, totalBytes, buffer } = parsed
+
+    const ext = extensionFromImageMimeType(inputFile.mimetype)
+    const fileName = `upload_${Date.now()}_${randomUUID().slice(0, 8)}.${ext}`
+    const targetPath = resolve(ctx.generatedImageDir, fileName)
+
+    try {
+      await mkdir(ctx.generatedImageDir, { recursive: true })
+      await writeFile(targetPath, buffer)
+      return {
+        url: `${ctx.orchestratorPublicOrigin}/generated-images/${fileName}`,
+        bytes: totalBytes,
+        mimeType: inputFile.mimetype
+      }
+    } catch (error) {
+      return reply.code(500).send({ error: "image upload failed", detail: toErrorDetail(error) })
     }
   })
 }

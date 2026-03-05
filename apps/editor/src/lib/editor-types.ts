@@ -35,6 +35,18 @@ export type AssistantResponse = {
     cacheCreationInputTokens?: number
     cacheReadInputTokens?: number
     estimatedUsd?: number | null
+    skippedOpCount?: number
+    skippedOps?: Array<{
+      index: number
+      op: string
+      reason: "empty_patch" | "unchanged_value"
+      pageSlug?: string
+      blockId?: string
+    }>
+    timeline?: Array<{
+      stage: "request_received" | "first_token" | "first_structured_progress" | "plan_ready" | "first_op_applied" | "done"
+      atMs: number
+    }>
   }
   error?: string
 }

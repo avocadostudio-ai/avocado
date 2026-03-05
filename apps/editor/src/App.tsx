@@ -9,16 +9,19 @@ import { usePreviewBridge, type PreviewBridgeCallbacks } from "./hooks/usePrevie
 import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
+import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ModelKey, PlannerSource, PreviewWidthPreset } from "./lib/editor-types"
 import {
   DEBUG_MODE_STORAGE_KEY,
   MODEL_KEY_STORAGE_KEY,
   PROVIDER_STORAGE_KEY,
+  CHAT_THEME_STORAGE_KEY,
   isRedundantChangeLine,
   mergedVariationProps,
   orchestrator,
   previewPresetWidths,
+  resolveDefaultChatDarkMode,
   resolveDefaultDebugMode,
   resolveDefaultModelKey,
   resolveDefaultProvider,
@@ -27,19 +30,42 @@ import {
   slugLabel
 } from "./lib/editor-utils"
 
+const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
+
 export function App() {
   const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
   const isSitesPage = pathName === "/sites" || pathName === "/sites/"
+  const [chatDarkMode, setChatDarkMode] = useState(() => resolveDefaultChatDarkMode())
   const [session] = useState("dev")
   const [siteId] = useState(() => resolveEditorSiteId())
   const sites = useSiteList(siteId, session)
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const root = window.document.documentElement
+    root.classList.toggle("editor-dark", chatDarkMode)
+    window.sessionStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
+    window.localStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
+  }, [chatDarkMode])
+
   if (isSitesPage) return <SitesPage sites={sites} session={session} />
 
-  return <EditorPage siteId={siteId} session={session} sites={sites} />
+  return <EditorPage siteId={siteId} session={session} sites={sites} chatDarkMode={chatDarkMode} onSetChatDarkMode={setChatDarkMode} />
 }
 
-function EditorPage({ siteId, session, sites }: { siteId: string; session: string; sites: ReturnType<typeof useSiteList> }) {
+function EditorPage({
+  siteId,
+  session,
+  sites,
+  chatDarkMode,
+  onSetChatDarkMode
+}: {
+  siteId: string
+  session: string
+  sites: ReturnType<typeof useSiteList>
+  chatDarkMode: boolean
+  onSetChatDarkMode: (value: boolean) => void
+}) {
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const { activeSiteConfig } = sites
 
@@ -60,7 +86,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   const [variationPreviewPreset, setVariationPreviewPreset] = useState<PreviewWidthPreset>("desktop")
   const [composerHeight, setComposerHeight] = useState(124)
   const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
-  const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId: string } | null>(null)
+  const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId?: string; beforeBlockId?: string } | null>(null)
   const [addBlockSearch, setAddBlockSearch] = useState("")
   const [isAddingBlock, setIsAddingBlock] = useState(false)
   const [copiedDebugEntryId, setCopiedDebugEntryId] = useState<string | null>(null)
@@ -148,10 +174,10 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
       setActiveEditablePath(undefined)
       void chatEngine.deleteBlock(newSlug, blockId)
     },
-    onBlockAddRequested: (newSlug, afterBlockId) => {
+    onBlockAddRequested: (newSlug, args) => {
       if (newSlug !== slug) setSlug(newSlug)
-      if (!afterBlockId) return
-      setAddBlockPicker({ slug: newSlug, afterBlockId })
+      if (!args.afterBlockId && !args.beforeBlockId) return
+      setAddBlockPicker({ slug: newSlug, afterBlockId: args.afterBlockId, beforeBlockId: args.beforeBlockId })
     },
     onListItemAddRequested: (newSlug, blockId, blockType, listKey, afterIndex) => {
       if (newSlug !== slug) setSlug(newSlug)
@@ -240,6 +266,20 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     url.searchParams.set("editorOrigin", editorOrigin)
     return url.toString()
   }, [activeSiteConfig.name, editorOrigin, session, siteId, slug])
+
+  const liveSiteUrl = useMemo(() => {
+    const configured = activeSiteConfig.vercelProductionUrl?.trim()
+    const base = configured && /^https?:\/\//i.test(configured) ? configured : siteOrigin
+    try {
+      const url = new URL(base)
+      url.pathname = slug === "/" ? "/" : slug
+      url.search = ""
+      url.hash = ""
+      return url.toString()
+    } catch {
+      return undefined
+    }
+  }, [activeSiteConfig.vercelProductionUrl, slug])
 
   // Planner status check
   useEffect(() => {
@@ -394,7 +434,8 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
   }, [addBlockPicker, isAddingBlock])
 
   const streamIsError = chatEngine.streamStatus ? /failed|error/i.test(chatEngine.streamStatus) : false
-  const streamLabel = streamIsError ? chatEngine.streamStatus : chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."
+  const streamLabel = chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready...")
+  const streamTextLabel = chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Updating..." : "Thinking")
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const hasUserEntry = chatEngine.chatLog.some((entry) => entry.role === "user")
   const buildCopyPayload = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
@@ -415,7 +456,12 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
       if (entry.debug.reasonCategory) lines.push(`reason: ${entry.debug.reasonCategory}`)
       if (entry.debug.intent) lines.push(`intent: ${entry.debug.intent}`)
       if (typeof entry.debug.opCount === "number") lines.push(`opCount: ${entry.debug.opCount}`)
+      if (typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0) lines.push(`skippedOps: ${entry.debug.skippedOpCount}`)
       if (Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0) lines.push(`ops: ${entry.debug.opTypes.join(", ")}`)
+      if (Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0) {
+        const compact = entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")
+        lines.push(`timeline: ${compact}`)
+      }
       if (entry.debug.promptExcerpt) lines.push(`prompt: ${entry.debug.promptExcerpt}`)
     }
     return lines.join("\n")
@@ -439,8 +485,10 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
     <div className="layout">
       <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
-          <div className="chat-header-site-name">
-            {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Switch</a>
+          <div className="chat-header-top">
+            <div className="chat-header-site-name">
+              {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Switch</a>
+            </div>
             {chatEngine.plannerBadgeState === "demo" ? (
               <span className="planner-badge planner-badge-demo">Demo mode</span>
             ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
@@ -472,10 +520,19 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
                 {publish.publishInProgress ? "Publishing" : "Publish"}
               </button>
             </div>
-            {publish.publishStatus?.inspectUrl ? (
-              <a className="publish-view-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
-                View deploy
-              </a>
+            {publish.publishStatus ? (
+              <>
+                {publish.publishStatus.inspectUrl ? (
+                  <a className="publish-view-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
+                    View deploy
+                  </a>
+                ) : null}
+                {liveSiteUrl ? (
+                  <a className="publish-view-link" href={liveSiteUrl} target="_blank" rel="noreferrer">
+                    Open live site
+                  </a>
+                ) : null}
+              </>
             ) : null}
           </div>
         </header>
@@ -605,7 +662,11 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
                     {entry.debug.reasonCategory ? <li>reason: {entry.debug.reasonCategory}</li> : null}
                     {entry.debug.intent ? <li>intent: {entry.debug.intent}</li> : null}
                     {typeof entry.debug.opCount === "number" ? <li>opCount: {entry.debug.opCount}</li> : null}
+                    {typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0 ? <li>skippedOps: {entry.debug.skippedOpCount}</li> : null}
                     {Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0 ? <li>ops: {entry.debug.opTypes.join(", ")}</li> : null}
+                    {Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0 ? (
+                      <li>timeline: {entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")}</li>
+                    ) : null}
                     {entry.debug.promptExcerpt ? <li>prompt: {entry.debug.promptExcerpt}</li> : null}
                   </ul>
                 </div>
@@ -629,17 +690,37 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
             </article>
           ))}
           {chatEngine.streamStatus ? (
-            <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"}`}>
-              <span className="streaming-pill-title">
-                <span className="streaming-pill-sparkle">✦</span>
-              </span>
-              <span className="streaming-pill-status">{streamLabel}</span>
-              {!streamIsError ? (
-                <span className="streaming-dots" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
+            <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"} ${STREAMING_INDICATOR_STYLE === "text" ? "is-text" : "is-legacy"}`}>
+              {STREAMING_INDICATOR_STYLE === "text" ? (
+                <span className="streaming-pill-status streaming-pill-status-text">{streamTextLabel}</span>
+              ) : (
+                <>
+                  <span className="streaming-pill-title">
+                    <span className="streaming-pill-sparkle">✦</span>
+                  </span>
+                  <span className="streaming-pill-status">{streamLabel}</span>
+                  {!streamIsError ? (
+                    <span className="streaming-dots" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  ) : null}
+                </>
+              )}
+              {chatEngine.latestStreamFocusBlockId ? (
+                <button
+                  type="button"
+                  className="streaming-jump-btn"
+                  onClick={() =>
+                    preview.postToSite("highlightBlock", {
+                      blockId: chatEngine.latestStreamFocusBlockId,
+                      editablePath: null
+                    })
+                  }
+                >
+                  Jump to latest change
+                </button>
               ) : null}
             </div>
           ) : null}
@@ -675,6 +756,7 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
             }}
             onTranscribeAudio={media.transcribeAudio}
             onInterpretImage={media.interpretPastedImage}
+            onUploadImage={media.uploadPastedImage}
             onAutoHeightChange={handleComposerAutoHeight}
           />
         </footer>
@@ -762,7 +844,11 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
           <div className="add-block-modal" role="dialog" aria-modal="true" aria-label="Add block" onClick={(e) => e.stopPropagation()}>
             <div className="add-block-modal-header">
               <h2>Add block</h2>
-              <p>Select block type to insert below the selected section.</p>
+              <p>
+                {addBlockPicker.beforeBlockId && !addBlockPicker.afterBlockId
+                  ? "Select block type to insert above the selected section."
+                  : "Select block type to insert below the selected section."}
+              </p>
               <button
                 type="button"
                 className="settings-close-btn"
@@ -775,43 +861,44 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
             </div>
             <div className="add-block-modal-body">
               <label className="add-block-search">
-                <span>Search</span>
                 <input
                   type="search"
                   value={addBlockSearch}
                   onChange={(e) => setAddBlockSearch(e.target.value)}
-                  placeholder="Search block types..."
+                  placeholder="Search block types"
                   disabled={isAddingBlock}
                 />
               </label>
               {groupedBlockTypeOptions.length === 0 ? (
                 <p className="add-block-empty">No block types match your search.</p>
               ) : (
-                groupedBlockTypeOptions.map((group) => (
-                  <section key={group.category} className="add-block-group">
-                    <h3>{group.category}</h3>
-                    <div className="add-block-group-list">
-                      {group.options.map((option) => (
-                        <button
-                          key={option.type}
-                          type="button"
-                          className="add-block-option"
-                          disabled={isAddingBlock}
-                          onClick={async () => {
-                            if (!addBlockPicker || isAddingBlock) return
-                            setIsAddingBlock(true)
-                            const ok = await chatEngine.addBlockAfter(addBlockPicker.slug, addBlockPicker.afterBlockId, option.type)
-                            setIsAddingBlock(false)
-                            if (ok) setAddBlockPicker(null)
-                          }}
-                        >
-                          <span>{option.label}</span>
-                          <small>{option.category}</small>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ))
+                <div className="add-block-flat-list">
+                  {groupedBlockTypeOptions.flatMap((group) => group.options).map((option) => (
+                    <button
+                      key={option.type}
+                      type="button"
+                      className="add-block-option"
+                      disabled={isAddingBlock}
+                      onClick={async () => {
+                        if (!addBlockPicker || isAddingBlock) return
+                        setIsAddingBlock(true)
+                        const ok = await chatEngine.addBlockAfter(
+                          addBlockPicker.slug,
+                          addBlockPicker.afterBlockId,
+                          option.type,
+                          addBlockPicker.beforeBlockId
+                        )
+                        setIsAddingBlock(false)
+                        if (ok) setAddBlockPicker(null)
+                      }}
+                    >
+                      <span className="add-block-option-label">{option.label}</span>
+                      <span className="add-block-option-actions" aria-hidden="true">
+                        <span className="add-block-option-plus">+</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -843,6 +930,10 @@ function EditorPage({ siteId, session, sites }: { siteId: string; session: strin
               <label className="inline-toggle">
                 <input type="checkbox" checked={showNestedLabels} onChange={(e) => setShowNestedLabels(e.target.checked)} />
                 <span>Nested labels</span>
+              </label>
+              <label className="inline-toggle">
+                <input type="checkbox" checked={chatDarkMode} onChange={(e) => onSetChatDarkMode(e.target.checked)} />
+                <span>Dark mode</span>
               </label>
               <label className="inline-toggle">
                 <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />

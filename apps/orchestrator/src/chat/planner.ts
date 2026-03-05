@@ -4,6 +4,7 @@ import {
   blockSchemas,
   editPlanSchema,
   type EditPlan,
+  type Operation,
   type PageDoc
 } from "@ai-site-editor/shared"
 import {
@@ -21,6 +22,7 @@ import {
   normalizePlanCandidate
 } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
+import { editPlanJsonSchema } from "./plan-json-schema.js"
 
 export function isChatStrictPrimaryOpMode() {
   return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
@@ -85,6 +87,74 @@ export function extractResponsesOutputText(response: unknown) {
     }
   }
   return chunks.join("")
+}
+
+export function extractOpsFromPlanBuffer(raw: string, emittedCount: number) {
+  const opsKeyIdx = raw.indexOf('"ops"')
+  if (opsKeyIdx < 0) return { nextEmittedCount: emittedCount, newOps: [] as Operation[] }
+  const arrStart = raw.indexOf("[", opsKeyIdx)
+  if (arrStart < 0) return { nextEmittedCount: emittedCount, newOps: [] as Operation[] }
+
+  const extracted: Operation[] = []
+  let inString = false
+  let escape = false
+  let arrDepth = 0
+  let objDepth = 0
+  let objStart = -1
+
+  for (let i = arrStart; i < raw.length; i += 1) {
+    const ch = raw[i]!
+    if (inString) {
+      if (escape) {
+        escape = false
+      } else if (ch === "\\") {
+        escape = true
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (ch === '"') {
+      inString = true
+      continue
+    }
+    if (ch === "[") {
+      arrDepth += 1
+      continue
+    }
+    if (ch === "]") {
+      if (arrDepth > 0) arrDepth -= 1
+      if (arrDepth === 0) break
+      continue
+    }
+    if (arrDepth !== 1) continue
+    if (ch === "{") {
+      if (objDepth === 0) objStart = i
+      objDepth += 1
+      continue
+    }
+    if (ch === "}") {
+      if (objDepth > 0) objDepth -= 1
+      if (objDepth === 0 && objStart >= 0) {
+        const json = raw.slice(objStart, i + 1)
+        try {
+          const parsed = JSON.parse(json) as Operation
+          extracted.push(parsed)
+        } catch {
+          // Ignore partial/invalid object fragments while streaming.
+        }
+        objStart = -1
+      }
+    }
+  }
+
+  if (extracted.length <= emittedCount) {
+    return { nextEmittedCount: emittedCount, newOps: [] as Operation[] }
+  }
+  return {
+    nextEmittedCount: extracted.length,
+    newOps: extracted.slice(emittedCount)
+  }
 }
 
 export async function parseIntentWithOpenAI(args: {
@@ -201,6 +271,7 @@ export async function generatePlanWithOpenAI(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
+  onPlannedOp?: (op: Operation, index: number) => void
   client?: PlannerOpenAIClient
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
@@ -240,6 +311,9 @@ export async function generatePlanWithOpenAI(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
+    "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
+    "If rewrite/rephrase is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first.",
+    "When rewriting text, return plain text unless the user explicitly asks for markdown formatting. Do not wrap the entire rewrite in **bold** markers.",
     "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
     ...(chatStrictPrimaryOpMode
       ? [
@@ -256,7 +330,8 @@ export async function generatePlanWithOpenAI(args: {
     ...(pageWideTranslation
       ? [
           "This is a full-page translation request. Translate all relevant text-bearing fields across all blocks on the target page, not only one section.",
-          "Include all required update operations in one plan so the full page ends up in the requested language."
+          "Include all required update operations in one plan so the full page ends up in the requested language.",
+          "For list-based child items across all blocks (e.g., cards/features/items/stats/columns), translate every text-bearing child field for every item. Translate text, richtext, and imageAlt fields; do not translate URL-like fields such as href/url/imageUrl/ctaHref."
         ]
       : []),
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
@@ -267,26 +342,37 @@ export async function generatePlanWithOpenAI(args: {
     `Allowed block types: ${allowedBlockTypes.join(", ")}.`
   ].join("\n")
 
+  const includeContracts =
+    batchOverride ||
+    pageWideTranslation ||
+    /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
+    /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/.test(args.message.toLowerCase())
+
   const user = {
     request: args.message,
     audienceHint: audienceHint ?? null,
     slug: args.slug,
     contextPack: args.contextPack,
-    blockContracts: blockContractsSummary(),
-    pageMetaContract: pageMetaContractSummary(),
-    knownBlockTypes: Object.keys(blockSchemas),
-    editPlanShape: {
-      intent: "edit_plan | needs_clarification",
-      summary_for_user: "string",
-      change_log: ["string"],
-      ops: ["Operation[]"],
-      suggested_next_actions: ["string (optional, 2-4 items)"]
-    },
+    ...(includeContracts
+      ? {
+          blockContracts: blockContractsSummary(),
+          pageMetaContract: pageMetaContractSummary(),
+          knownBlockTypes: Object.keys(blockSchemas),
+          editPlanShape: {
+            intent: "edit_plan | needs_clarification",
+            summary_for_user: "string",
+            change_log: ["string"],
+            ops: ["Operation[]"],
+            suggested_next_actions: ["string (optional, 2-4 items)"]
+          }
+        }
+      : {}),
     feedback: args.feedback ?? null
   }
 
   let raw = ""
   let usage: TokenUsage = { ...ZERO_USAGE }
+  let streamedOpsCount = 0
   if (isResponsesOnlyModel(args.model)) {
     const response = await client.responses.create({
       model: args.model,
@@ -301,7 +387,10 @@ export async function generatePlanWithOpenAI(args: {
       model: args.model,
       ...openAIChatOptionsForModel(args.model),
       stream: true,
-      response_format: { type: "json_object" },
+      response_format: {
+        type: "json_schema" as const,
+        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: false }
+      },
       messages: [
         { role: "system", content: system },
         ...(args.history ?? []),
@@ -313,13 +402,23 @@ export async function generatePlanWithOpenAI(args: {
       if (typeof delta !== "string" || delta.length === 0) continue
       raw += delta
       args.onToken(delta)
+      if (args.onPlannedOp) {
+        const next = extractOpsFromPlanBuffer(raw, streamedOpsCount)
+        streamedOpsCount = next.nextEmittedCount
+        for (let idx = 0; idx < next.newOps.length; idx += 1) {
+          args.onPlannedOp(next.newOps[idx]!, streamedOpsCount - next.newOps.length + idx + 1)
+        }
+      }
     }
     // Streaming doesn't return per-chunk usage; leave as zero
   } else {
     const completion = await client.chat.completions.create({
       model: args.model,
       ...openAIChatOptionsForModel(args.model),
-      response_format: { type: "json_object" },
+      response_format: {
+        type: "json_schema" as const,
+        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: false }
+      },
       messages: [
         { role: "system", content: system },
         ...(args.history ?? []),

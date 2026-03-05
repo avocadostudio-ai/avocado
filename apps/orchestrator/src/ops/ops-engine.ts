@@ -156,6 +156,14 @@ export function buildDeterministicRepairFeedback(reason: string) {
   return `Repair strictly for schema compliance only: ${reason}. Do not change user intent or rewrite copy semantics.`
 }
 
+export type SkippedOperation = {
+  index: number
+  op: Operation["op"]
+  reason: "empty_patch" | "unchanged_value"
+  pageSlug?: string
+  blockId?: string
+}
+
 // ---------------------------------------------------------------------------
 // Atomic operation application
 // ---------------------------------------------------------------------------
@@ -218,9 +226,11 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
   for (const [slug, page] of sessionDraft) staged.set(slug, structuredClone(page))
   const touchedSlugs = new Set<string>()
   const deletedSlugs = new Set<string>()
+  const skippedOps: SkippedOperation[] = []
   let orderChanged = false
 
-  for (const op of ops) {
+  for (let opIndex = 0; opIndex < ops.length; opIndex += 1) {
+    const op = ops[opIndex]
     if (op.op === "create_page") {
       staged.set(op.page.slug, structuredClone(op.page))
       touchedSlugs.add(op.page.slug)
@@ -372,7 +382,17 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       if (!op.afterBlockId) {
         page.blocks.push({ ...op.block, props: propCheck.data })
       } else {
-        const idx = page.blocks.findIndex((b) => b.id === op.afterBlockId)
+        let idx = page.blocks.findIndex((b) => b.id === op.afterBlockId)
+        // Fuzzy fallback: LLM batch plans sometimes use inconsistent IDs for
+        // blocks added in earlier ops (e.g. "b_testimonials_about" vs
+        // "b_testimonials_1772…"). Match by block type when exact ID fails.
+        if (idx === -1) {
+          const typeMatch = op.afterBlockId.match(/^b_([a-z]+)/i)
+          if (typeMatch) {
+            const typePrefix = `b_${typeMatch[1].toLowerCase()}_`
+            idx = page.blocks.findLastIndex((b) => b.id.startsWith(typePrefix))
+          }
+        }
         if (idx === -1) throw new Error(`afterBlockId ${op.afterBlockId} not found`)
         page.blocks.splice(idx + 1, 0, { ...op.block, props: propCheck.data })
       }
@@ -468,7 +488,9 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const nextList = [...list]
       const [item] = nextList.splice(op.index, 1)
       if (item === undefined) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
-      const insertIndex = typeof op.afterIndex === "number" ? op.afterIndex + 1 : 0
+      const normalizedAfterIndex =
+        typeof op.afterIndex === "number" && op.afterIndex > op.index ? op.afterIndex - 1 : op.afterIndex
+      const insertIndex = typeof normalizedAfterIndex === "number" ? normalizedAfterIndex + 1 : 0
       if (insertIndex < 0 || insertIndex > nextList.length) {
         throw new Error(`afterIndex ${op.afterIndex} is out of range for ${op.listKey}`)
       }
@@ -525,8 +547,30 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
 
       const propCheck = validateBlockProps(block.type as BlockType, nextProps)
       if (!propCheck.success) throw new Error(`Invalid props for ${block.type}: ${describeValidationIssue(propCheck.error)}`)
-      if (JSON.stringify(block.props) === JSON.stringify(propCheck.data)) {
-        throw new Error(`No effective prop change for ${block.id}. Patch keys: ${patchKeys.join(", ") || "(none)"}`)
+      if (patchKeys.length === 0) {
+        skippedOps.push({
+          index: opIndex + 1,
+          op: op.op,
+          reason: "empty_patch",
+          pageSlug: op.pageSlug,
+          blockId: op.blockId
+        })
+        continue
+      }
+
+      const hasEffectivePatchKey = patchKeys.some(
+        (key) => JSON.stringify((block.props as Record<string, unknown>)[key]) !== JSON.stringify((propCheck.data as Record<string, unknown>)[key])
+      )
+      if (!hasEffectivePatchKey) {
+        // Treat unchanged patch values as no-op so one stale field does not fail the whole plan.
+        skippedOps.push({
+          index: opIndex + 1,
+          op: op.op,
+          reason: "unchanged_value",
+          pageSlug: op.pageSlug,
+          blockId: op.blockId
+        })
+        continue
       }
       page.blocks[idx] = { ...block, props: propCheck.data }
       page.updatedAt = new Date().toISOString()
@@ -562,12 +606,19 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
   }
 
   if (touchedSlugs.size === 0 && deletedSlugs.size === 0 && !orderChanged) {
+    if (skippedOps.length > 0 && skippedOps.length === ops.length) {
+      throw new Error("No effective prop change across plan. All update patches matched existing values.")
+    }
     throw new Error("Edit plan produced no changes")
   }
 
   sessionDraft.clear()
   for (const [route, page] of staged) {
     setPage(session, page)
+  }
+  return {
+    appliedCount: Math.max(0, ops.length - skippedOps.length),
+    skippedOps
   }
 }
 

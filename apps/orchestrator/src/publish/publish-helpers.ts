@@ -279,7 +279,9 @@ export async function publishViaGit(session: string) {
   }
 
   try {
-    await runGit(["push", "origin", branch], repoRoot)
+    // Push current HEAD to the configured remote branch so publish works
+    // even when orchestrator runs from a non-main local branch.
+    await runGit(["push", "origin", `HEAD:${branch}`], repoRoot)
     return {
       status: "triggered" as const,
       session,
