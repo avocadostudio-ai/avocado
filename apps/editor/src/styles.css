@@ -715,7 +715,7 @@ textarea {
   border: 1.5px solid #d1d5db;
   border-radius: 32px;
   background: #fff;
-  padding: 12px 12px 11px;
+  padding: 16px 12px 11px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -758,16 +758,16 @@ textarea {
 .composer textarea {
   width: 100%;
   height: auto;
-  min-height: 24px;
+  min-height: 26px;
   flex: 1 1 auto;
   resize: none;
   overflow-y: hidden;
   font-size: 14px;
-  line-height: 1.32;
+  line-height: 1.4;
   letter-spacing: -0.02em;
   border: 0;
   border-radius: 0;
-  padding: 0;
+  padding: 2px 0 0;
   background: transparent;
 }
 
@@ -871,11 +871,12 @@ textarea {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #5f6674;
+  color: #6c7484;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.02em;
   padding: 0 26px 0 12px;
+  margin-left: -12px;
   flex: 0 0 auto;
   transition: background-color 140ms ease, color 140ms ease;
 }
@@ -1481,17 +1482,17 @@ textarea {
   display: grid;
   place-items: center;
   z-index: 1200;
-  padding: 0;
+  padding: 16px;
 }
 
 .variation-modal {
-  width: min(1120px, 100vw);
-  height: 100vh;
-  max-height: 100vh;
-  min-height: 100vh;
+  width: min(1120px, calc(100vw - 32px));
+  height: min(calc(100vh - 32px), 920px);
+  max-height: min(calc(100vh - 32px), 920px);
+  min-height: min(calc(100vh - 32px), 920px);
   background: #f8fbff;
   border: 1px solid #b5c0ca;
-  border-radius: 0;
+  border-radius: 14px;
   box-shadow: 0 24px 52px rgb(15 23 42 / 0.34);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1509,6 +1510,7 @@ textarea {
   margin: 0;
   font-size: 19px;
   font-weight: 700;
+  color: #0f172a;
 }
 
 .variation-modal-header p {
@@ -1577,11 +1579,12 @@ textarea {
 .variation-card-header h3 {
   margin: 0;
   font-size: 14px;
+  color: #0f172a;
 }
 
 .variation-card-header span {
   font-size: 11px;
-  color: #48617c;
+  color: #415c78;
 }
 
 .variation-card > p {
@@ -1967,7 +1970,11 @@ textarea {
   }
 
   .variation-modal {
-    max-height: 92vh;
+    width: calc(100vw - 16px);
+    height: min(calc(100vh - 16px), 920px);
+    max-height: min(calc(100vh - 16px), 920px);
+    min-height: min(calc(100vh - 16px), 920px);
+    border-radius: 12px;
   }
 
   .variation-preview-presets {
@@ -2018,12 +2025,12 @@ textarea {
 
   .composer textarea {
     font-size: 13px;
-    padding: 0;
+    padding: 2px 0 0;
   }
 
   .composer-shell {
     border-radius: 24px;
-    padding: 11px 11px 10px;
+    padding: 14px 11px 10px;
     gap: 8px;
   }
 }
@@ -2229,7 +2236,10 @@ textarea {
   color: #9fb3cf;
 }
 
-.editor-dark .composer-model-picker,
+.editor-dark .composer-model-picker {
+  color: #9fb3cf;
+}
+
 .editor-dark .composer-ghost-btn {
   color: #c7d6ea;
 }
@@ -2272,4 +2282,70 @@ textarea {
   background: #111827;
   border-color: #334155;
   color: #e2e8f0;
+}
+
+.editor-dark .variation-modal-backdrop {
+  background: rgb(2 6 23 / 0.68);
+}
+
+.editor-dark .variation-modal-header {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+
+.editor-dark .variation-modal-header p {
+  color: #94a3b8;
+}
+
+.editor-dark .variation-modal-header h2,
+.editor-dark .variation-card-header h3 {
+  color: #f8fafc;
+}
+
+.editor-dark .variation-preview-preset-btn {
+  background: #0f172a;
+  border-color: #475569;
+  color: #cbd5e1;
+}
+
+.editor-dark .variation-preview-preset-btn:hover:not(:disabled) {
+  background: #1e293b;
+  border-color: #64748b;
+  color: #f1f5f9;
+}
+
+.editor-dark .variation-preview-preset-btn.is-active {
+  border-color: #14b8a6;
+  background: #0f766e;
+  color: #f8fafc;
+}
+
+.editor-dark .variation-modal .settings-close-btn {
+  background: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.editor-dark .variation-modal .settings-close-btn:hover:not(:disabled) {
+  background: #334155;
+  border-color: #64748b;
+}
+
+.editor-dark .variation-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.editor-dark .variation-card-header span,
+.editor-dark .variation-card > p {
+  color: #94a3b8;
+}
+
+.editor-dark .variation-live-preview {
+  background: #020617;
+  border-color: #334155;
+}
+
+.editor-dark .variation-live-preview-shell {
+  background: #020617;
 }
