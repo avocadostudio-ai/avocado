@@ -5,6 +5,10 @@ This shows a minimal embedded-mode wiring for an existing `app/[[...slug]]/page.
 Assumes you already copied:
 - `docs/integration/templates/nextjs-embedded/app/api/draft/*`
 - `docs/integration/templates/nextjs-embedded/app/api/editor/components/route.ts`
+- `docs/integration/templates/nextjs-embedded/lib/editor-components-contract.ts`
+- `docs/integration/templates/nextjs-embedded/lib/site-component-registry.ts`
+- `docs/integration/templates/nextjs-embedded/lib/editor-components-manifest.ts`
+- `docs/integration/templates/nextjs-embedded/lib/site-contract.ts`
 - `docs/integration/templates/nextjs-embedded/lib/draft-content-source.ts`
 - `docs/integration/templates/nextjs-embedded/lib/page-data.ts`
 
@@ -87,7 +91,7 @@ const url = buildDraftEntryUrl({
 - No required `/preview` route.
 - Existing pages stay in place.
 - Draft cookie toggles draft vs published data source.
-- Component manifest endpoint (`/api/editor/components`) defines safely editable components.
+- Local component registry drives `/api/editor/components` manifest.
 
 ## Type Mapping Example (Customer Site)
 

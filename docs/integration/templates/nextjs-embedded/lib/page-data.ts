@@ -1,4 +1,4 @@
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "./site-contract"
 import { resolveContentSource } from "./draft-content-source"
 
 type DraftFetcher = (slug: string, context: { session?: string; siteId?: string }) => Promise<PageDoc | null>
@@ -24,4 +24,3 @@ export async function loadPageData(
   }
   return args.fetchPublishedPage(slug)
 }
-
