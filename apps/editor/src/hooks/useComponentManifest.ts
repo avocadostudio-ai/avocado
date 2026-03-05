@@ -100,6 +100,14 @@ export function useComponentManifest() {
   return {
     ...state,
     byType,
+    siteCapabilities: {
+      allowStructuralEdits: state.status === "ready",
+      manifestStatus: state.status,
+      reason: state.reason,
+      manifestVersion: state.version,
+      componentCount: state.components.length,
+      checkedAt: new Date().toISOString()
+    },
     allowStructuralEdits: state.status === "ready"
   }
 }

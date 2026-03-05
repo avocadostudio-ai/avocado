@@ -171,6 +171,18 @@ export type ApplyOpsOptions = {
   componentsManifest?: EditorComponentsManifest
 }
 
+export function isStructuralOperation(op: Operation) {
+  return (
+    op.op === "add_block" ||
+    op.op === "remove_block" ||
+    op.op === "move_block" ||
+    op.op === "duplicate_block" ||
+    op.op === "add_item" ||
+    op.op === "remove_item" ||
+    op.op === "move_item"
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Atomic operation application
 // ---------------------------------------------------------------------------

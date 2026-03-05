@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { editorComponentsManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
-import { buildSiteDraftEnableUrl, DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID } from "../lib/editor-utils"
+import { buildSiteDraftEnableUrl, DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID, siteOrigin } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 function compactPurposeText(value: string) {
@@ -18,13 +19,101 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
   const [addAiTab, setAddAiTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configAiTab, setConfigAiTab] = useState<"overview" | "tone" | "constraints">("overview")
 
-  const dedupedSites = sites.siteList
+  const dedupedSites = useMemo(() => sites.siteList
     .filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
     .sort((a, b) => {
       const aLegacy = a.id === LEGACY_AVOCADO_SITE_ID ? 1 : 0
       const bLegacy = b.id === LEGACY_AVOCADO_SITE_ID ? 1 : 0
       return aLegacy - bLegacy
-    })
+    }), [sites.siteList])
+
+  const [capabilityBySiteId, setCapabilityBySiteId] = useState<Record<string, {
+    status: "loading" | "ready" | "degraded"
+    summary: string
+    reason?: string
+  }>>({})
+
+  useEffect(() => {
+    let active = true
+    const run = async () => {
+      const loadingMap: Record<string, { status: "loading"; summary: string }> = {}
+      for (const site of dedupedSites) {
+        loadingMap[site.id] = { status: "loading", summary: "Checking manifest..." }
+      }
+      if (active) setCapabilityBySiteId(loadingMap)
+
+      await Promise.all(
+        dedupedSites.map(async (site) => {
+          const url = new URL(`${siteOrigin}/api/editor/components`)
+          url.searchParams.set("siteId", site.id)
+          try {
+            const res = await fetch(url.toString())
+            if (!res.ok) {
+              if (!active) return
+              setCapabilityBySiteId((prev) => ({
+                ...prev,
+                [site.id]: {
+                  status: "degraded",
+                  summary: "Degraded mode",
+                  reason: `Manifest endpoint returned ${res.status}`
+                }
+              }))
+              return
+            }
+            const json = (await res.json()) as unknown
+            const parsed = editorComponentsManifestSchema.safeParse(json)
+            if (!parsed.success) {
+              if (!active) return
+              setCapabilityBySiteId((prev) => ({
+                ...prev,
+                [site.id]: {
+                  status: "degraded",
+                  summary: "Degraded mode",
+                  reason: "Manifest response shape is invalid"
+                }
+              }))
+              return
+            }
+            const defaultsError = validateManifestDefaultProps(parsed.data.components)
+            if (defaultsError) {
+              if (!active) return
+              setCapabilityBySiteId((prev) => ({
+                ...prev,
+                [site.id]: {
+                  status: "degraded",
+                  summary: "Degraded mode",
+                  reason: defaultsError
+                }
+              }))
+              return
+            }
+            if (!active) return
+            setCapabilityBySiteId((prev) => ({
+              ...prev,
+              [site.id]: {
+                status: "ready",
+                summary: `Manifest ready (${parsed.data.components.length} components)`
+              }
+            }))
+          } catch (error) {
+            if (!active) return
+            setCapabilityBySiteId((prev) => ({
+              ...prev,
+              [site.id]: {
+                status: "degraded",
+                summary: "Degraded mode",
+                reason: error instanceof Error ? error.message : "Manifest fetch failed"
+              }
+            }))
+          }
+        })
+      )
+    }
+    void run()
+    return () => {
+      active = false
+    }
+  }, [dedupedSites])
 
   return (
     <main className="sites-page">
@@ -57,6 +146,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       </header>
       <section className="sites-grid" aria-label="Site tiles">
         {dedupedSites.map((site) => {
+          const capability = capabilityBySiteId[site.id]
           const previewSrc = buildSiteDraftEnableUrl("/", {
             session,
             siteId: site.id,
@@ -69,6 +159,20 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               <div className="site-tile-meta">
                 <h2>{site.name}</h2>
                 {site.purpose ? <p className="site-purpose">{compactPurposeText(site.purpose)}</p> : null}
+                {capability ? (
+                  <p
+                    className={
+                      capability.status === "ready"
+                        ? "site-capability site-capability-ready"
+                        : capability.status === "degraded"
+                          ? "site-capability site-capability-degraded"
+                          : "site-capability"
+                    }
+                    title={capability.reason}
+                  >
+                    {capability.summary}
+                  </p>
+                ) : null}
                 <div className="site-tile-actions">
                   <button type="button" className="secondary-btn site-config-btn" onClick={() => sites.setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`}>
                     <svg viewBox="0 0 20 20" aria-hidden="true">

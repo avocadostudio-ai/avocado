@@ -14,6 +14,7 @@ import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequ
 import {
   type ChatRequestBody,
   type ChatResult,
+  siteCapabilitiesSchema,
   isBlockCatalogQuery,
   isInfoQuery,
   isAdviceQuery,
@@ -50,6 +51,7 @@ import {
   buildDeterministicRepairFeedback,
   type SkippedOperation,
   applyOpsAtomically,
+  isStructuralOperation,
   pickFocusBlockId,
   pickUpdatedSlug
 } from "../ops/ops-engine.js"
@@ -1615,6 +1617,25 @@ export async function runChatPipeline(
     return { code: 400, payload: { error: "invalid componentsManifest payload" } }
   }
   const componentsManifest: EditorComponentsManifest | undefined = parsedManifest.data
+  const capabilitiesPayload = (() => {
+    if (!body.siteCapabilities) return undefined
+    if (typeof body.siteCapabilities !== "string") return body.siteCapabilities
+    try {
+      return JSON.parse(body.siteCapabilities) as unknown
+    } catch {
+      return "__invalid_json__"
+    }
+  })()
+  const parsedCapabilities =
+    capabilitiesPayload === "__invalid_json__"
+      ? { success: false as const }
+      : capabilitiesPayload
+        ? siteCapabilitiesSchema.safeParse(capabilitiesPayload)
+        : { success: true as const, data: undefined }
+  if (!parsedCapabilities.success) {
+    return { code: 400, payload: { error: "invalid siteCapabilities payload" } }
+  }
+  const siteCapabilities = parsedCapabilities.data
   if (executionMode === "discard_pending_plan") {
     const existing = pendingApprovalPlanBySession.get(body.session)
     if (!existing) {
@@ -2356,6 +2377,29 @@ export async function runChatPipeline(
             modelUsed,
             modelKey
           } satisfies ChatResult, { outcome: "no_effective_change" })
+        }
+      }
+    }
+
+    if (siteCapabilities?.allowStructuralEdits === false && resolvedPlan.ops.some((op) => isStructuralOperation(op))) {
+      const reason =
+        typeof siteCapabilities.reason === "string" && siteCapabilities.reason.trim().length > 0
+          ? ` ${siteCapabilities.reason.trim()}`
+          : ""
+      return {
+        done: true as const,
+        response: {
+          code: 200,
+          payload: withDebugPayload({
+            status: "needs_clarification",
+            summary: `Structural edits are disabled for this site context.${reason}`,
+            changes: ["Expose GET /api/editor/components with a valid manifest to enable structural operations."],
+            mentionedSlugs: [effectiveSlug],
+            previewVersion: versions.get(body.session!) ?? 0,
+            plannerSource: source,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult, { outcome: "blocked_structural_capability" })
         }
       }
     }

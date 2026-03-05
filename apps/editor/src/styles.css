@@ -1171,6 +1171,21 @@ textarea {
   overflow: hidden;
 }
 
+.site-capability {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #516277;
+}
+
+.site-capability-ready {
+  color: #0f7a49;
+}
+
+.site-capability-degraded {
+  color: #a14b00;
+}
+
 .site-tile-actions {
   display: flex;
   align-items: center;
@@ -2282,6 +2297,18 @@ textarea {
   background: #111827;
   border-color: #334155;
   color: #e2e8f0;
+}
+
+.editor-dark .site-capability {
+  color: #9fb3cf;
+}
+
+.editor-dark .site-capability-ready {
+  color: #5dd39e;
+}
+
+.editor-dark .site-capability-degraded {
+  color: #f7b267;
 }
 
 .editor-dark .variation-modal-backdrop {
