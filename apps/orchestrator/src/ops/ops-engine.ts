@@ -390,7 +390,9 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
           const typeMatch = op.afterBlockId.match(/^b_([a-z]+)/i)
           if (typeMatch) {
             const typePrefix = `b_${typeMatch[1].toLowerCase()}_`
-            idx = page.blocks.findLastIndex((b) => b.id.startsWith(typePrefix))
+            for (let i = page.blocks.length - 1; i >= 0; i--) {
+              if (page.blocks[i].id.startsWith(typePrefix)) { idx = i; break }
+            }
           }
         }
         if (idx === -1) throw new Error(`afterBlockId ${op.afterBlockId} not found`)
