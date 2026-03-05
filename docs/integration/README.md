@@ -37,3 +37,14 @@ Use this page as the entry point for onboarding any Next.js site.
 3. Add draft mode routes and secret validation.
 4. Verify CORS for editor origin on `/api/editor/components` in local/dev.
 5. Confirm editor header shows `Manifest` (not `Degraded`).
+
+## Quick validation script
+
+Run:
+
+```bash
+./docs/integration/scripts/check-manifest.sh http://localhost:3000
+```
+
+Expected:
+- prints `PASS: version=..., components=...`
