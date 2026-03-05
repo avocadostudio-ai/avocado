@@ -8,6 +8,7 @@ export const LEGACY_AVOCADO_SITE_NAME = "Avocado Stories"
 export const LEGACY_AVOCADO_SITE_PURPOSE = "Marketing site for Avocado Stories products, recipes, and sustainability messaging."
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
 const ENABLE_AUTO_SITE_PRESETS = IS_DEMO_MODE || import.meta.env.VITE_ENABLE_AUTO_SITE_PRESETS === "1"
+const LOCK_SITE_ID = import.meta.env.VITE_LOCK_SITE_ID === "1"
 
 const AUTO_SITE_PRESET_IDS = new Set(["avocado-magic", "avocado-odyssey", LEGACY_AVOCADO_SITE_ID])
 
@@ -131,6 +132,7 @@ export function sanitizeSiteId(value: string) {
 
 export function resolveEditorSiteId() {
   const fallback = sanitizeSiteId((import.meta.env.VITE_SITE_ID as string | undefined) ?? "") || "dev-site"
+  if (LOCK_SITE_ID) return fallback
   if (typeof window === "undefined") return fallback
   const fromQuery = sanitizeSiteId(new URLSearchParams(window.location.search).get("siteId") ?? "")
   return fromQuery || fallback
