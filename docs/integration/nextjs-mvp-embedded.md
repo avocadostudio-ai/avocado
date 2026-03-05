@@ -2,6 +2,9 @@
 
 This is the default onboarding path for any Next.js site.
 
+Central entry:
+- `docs/integration/README.md`
+
 Goal:
 - Keep existing site routes.
 - Do not require a `/preview` route.
@@ -17,6 +20,7 @@ Related:
 1. Add component manifest endpoint:
 - `GET /api/editor/components`
 - returns available component types and prop schemas for safe ops
+- generated from adopter-owned component registry (recommended)
 
 2. Add Draft Mode entry and exit endpoints:
 - `GET /api/draft?secret=...&redirect=/target-path`

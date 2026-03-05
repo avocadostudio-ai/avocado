@@ -39,9 +39,10 @@ Alternative (recommended for repeated restarts without opening new terminals):
 
 ## Notes
 
+- Integration docs start here:
+  - `docs/integration/README.md`
 - Next.js onboarding default is embedded Draft Mode (no required `/preview` route):
   - `docs/integration/nextjs-mvp-embedded.md`
-  - `docs/integration/nextjs-mvp-adoption-example.md`
 - Editor URL/bootstrap quickstart:
   - `docs/integration/editor-quickstart.md`
 - Copy-paste Next.js API route templates:

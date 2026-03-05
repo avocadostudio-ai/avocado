@@ -2,9 +2,15 @@
 
 Use this when integrating the editor with any existing Next.js site.
 
+Start here first:
+- `docs/integration/README.md`
+
 MVP requirement:
 - Expose `GET /api/editor/components` so the editor/orchestrator knows which components are safely editable.
 - Without this manifest, run in degraded mode (read-only preview or text-only edits).
+
+Recommended:
+- keep a local component registry in site code and generate manifest from it.
 
 If you need starter route files, copy from:
 - `docs/integration/templates/nextjs-embedded/`
