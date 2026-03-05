@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from "node:test"
 import assert from "node:assert/strict"
-import type { PageDoc, Operation } from "@ai-site-editor/shared"
+import type { EditorComponentsManifest, PageDoc, Operation } from "@ai-site-editor/shared"
 import {
   draftPages,
   publishedPages,
@@ -123,6 +123,25 @@ function resetState() {
   recentEdits.delete(TEST_SESSION)
 }
 
+const CTA_ONLY_MANIFEST: EditorComponentsManifest = {
+  version: 1,
+  components: [
+    {
+      type: "CTA",
+      propsSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          ctaText: { type: "string" },
+          ctaHref: { type: "string" }
+        },
+        required: ["title", "description", "ctaText", "ctaHref"]
+      }
+    }
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -222,6 +241,41 @@ describe("ops-engine: add_block", () => {
       }
     }
     assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /Page not found/)
+  })
+
+  it("enforces manifest block type allow-list when provided", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      block: {
+        id: "b_hero_new",
+        type: "Hero",
+        props: {
+          heading: "Hello",
+          subheading: "World",
+          ctaText: "Go",
+          ctaHref: "/",
+          imageUrl: "/hero.svg",
+          imageAlt: "Hero"
+        }
+      }
+    }
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /not declared in components manifest/)
+  })
+
+  it("validates props against manifest schema for known types", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      block: {
+        id: "b_cta_missing_href",
+        type: "CTA",
+        props: { title: "T", description: "D", ctaText: "Go" } as Record<string, unknown>
+      }
+    }
+    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /does not match component manifest schema/)
   })
 })
 
@@ -337,6 +391,19 @@ describe("ops-engine: update_props", () => {
     ])
     const block = getDraft("/")!.blocks.find((b) => b.id === "b_cta")!
     assert.equal((block.props as Record<string, unknown>).title, "Unwrapped")
+  })
+
+  it("rejects updates to block types missing from provided manifest", () => {
+    seedSession(makePage())
+    assert.throws(
+      () =>
+        applyOpsAtomically(
+          TEST_SESSION,
+          [{ op: "update_props", pageSlug: "/", blockId: "b_hero", patch: { heading: "Updated" } }],
+          { componentsManifest: CTA_ONLY_MANIFEST }
+        ),
+      /not declared in components manifest/
+    )
   })
 })
 

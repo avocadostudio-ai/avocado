@@ -1,10 +1,13 @@
 import { z } from "zod"
 import {
   blockSchemas,
+  type EditorComponentDefinition,
+  type EditorComponentsManifest,
   type BlockType,
   type Operation,
   type PageDoc,
-  validateBlockProps
+  validateBlockProps,
+  validateByJsonSchemaLike
 } from "@ai-site-editor/shared"
 import { normalizeRouteCandidate } from "../nlp/intent-helpers.js"
 import { pageIdFromSlug, pageTitleFromSlug } from "../nlp/plan-normalizer.js"
@@ -164,11 +167,15 @@ export type SkippedOperation = {
   blockId?: string
 }
 
+export type ApplyOpsOptions = {
+  componentsManifest?: EditorComponentsManifest
+}
+
 // ---------------------------------------------------------------------------
 // Atomic operation application
 // ---------------------------------------------------------------------------
 
-export function applyOpsAtomically(session: string, ops: Operation[]) {
+export function applyOpsAtomically(session: string, ops: Operation[], options?: ApplyOpsOptions) {
   const nextUniqueBlockId = (blocks: Array<{ id: string }>, preferred: string) => {
     const base = preferred.trim()
     if (base.length > 0 && !blocks.some((b) => b.id === base)) return base
@@ -215,10 +222,45 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
     return path ? `${path}: ${message}` : message
   }
 
-  const withValidatedBlockProps = (block: PageDoc["blocks"][number], nextProps: Record<string, unknown>) => {
-    const propCheck = validateBlockProps(block.type as BlockType, nextProps)
-    if (!propCheck.success) throw new Error(`Invalid props for ${block.type}: ${describeValidationIssue(propCheck.error)}`)
+  const manifestByType = new Map<string, EditorComponentDefinition>()
+  if (options?.componentsManifest) {
+    for (const component of options.componentsManifest.components) {
+      manifestByType.set(component.type, component)
+    }
+  }
+
+  const validateWithManifestIfPresent = (blockType: string, nextProps: Record<string, unknown>) => {
+    const manifestComponent = manifestByType.get(blockType)
+    if (manifestComponent) {
+      if (!validateByJsonSchemaLike(manifestComponent.propsSchema, nextProps)) {
+        throw new Error(`Invalid props for ${blockType}: does not match component manifest schema`)
+      }
+      return nextProps
+    }
+    const propCheck = validateBlockProps(blockType as BlockType, nextProps)
+    if (!propCheck.success) throw new Error(`Invalid props for ${blockType}: ${describeValidationIssue(propCheck.error)}`)
     return propCheck.data
+  }
+
+  const requireManifestComponent = (blockType: string, operationName: string) => {
+    if (manifestByType.size === 0) return
+    if (manifestByType.has(blockType)) return
+    throw new Error(`Cannot ${operationName} for "${blockType}" because it is not declared in components manifest`)
+  }
+
+  const allowedPatchKeysFromManifest = (blockType: string, fallbackKeys: string[]) => {
+    const manifestComponent = manifestByType.get(blockType)
+    if (!manifestComponent) return fallbackKeys
+    const schema = manifestComponent.propsSchema
+    const schemaType = typeof schema.type === "string" ? schema.type : "object"
+    if (schemaType !== "object") return fallbackKeys
+    const properties = schema.properties
+    if (!properties || typeof properties !== "object" || Array.isArray(properties)) return fallbackKeys
+    return Object.keys(properties)
+  }
+
+  const withValidatedBlockProps = (block: PageDoc["blocks"][number], nextProps: Record<string, unknown>) => {
+    return validateWithManifestIfPresent(block.type, nextProps)
   }
 
   const sessionDraft = getSessionDraft(session)
@@ -373,14 +415,14 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
     if (!page) throw new Error(`Page not found for slug ${op.pageSlug}`)
 
     if (op.op === "add_block") {
-      const propCheck = validateBlockProps(op.block.type, op.block.props)
-      if (!propCheck.success) throw new Error(`Invalid props for ${op.block.type}: ${describeValidationIssue(propCheck.error)}`)
+      requireManifestComponent(op.block.type, "add block")
+      const validatedProps = validateWithManifestIfPresent(op.block.type, op.block.props)
 
       const alreadyExists = page.blocks.some((b) => b.id === op.block.id)
       if (alreadyExists) throw new Error(`Block id ${op.block.id} already exists`)
 
       if (!op.afterBlockId) {
-        page.blocks.push({ ...op.block, props: propCheck.data })
+        page.blocks.push({ ...op.block, props: validatedProps })
       } else {
         let idx = page.blocks.findIndex((b) => b.id === op.afterBlockId)
         // Fuzzy fallback: LLM batch plans sometimes use inconsistent IDs for
@@ -390,13 +432,16 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
           const typeMatch = op.afterBlockId.match(/^b_([a-z]+)/i)
           if (typeMatch) {
             const typePrefix = `b_${typeMatch[1].toLowerCase()}_`
-            for (let i = page.blocks.length - 1; i >= 0; i--) {
-              if (page.blocks[i].id.startsWith(typePrefix)) { idx = i; break }
+            for (let i = page.blocks.length - 1; i >= 0; i -= 1) {
+              if (page.blocks[i].id.startsWith(typePrefix)) {
+                idx = i
+                break
+              }
             }
           }
         }
         if (idx === -1) throw new Error(`afterBlockId ${op.afterBlockId} not found`)
-        page.blocks.splice(idx + 1, 0, { ...op.block, props: propCheck.data })
+        page.blocks.splice(idx + 1, 0, { ...op.block, props: validatedProps })
       }
       page.updatedAt = new Date().toISOString()
       touchedSlugs.add(page.slug)
@@ -407,6 +452,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const source = page.blocks[idx]
+      requireManifestComponent(source.type, "duplicate block")
       const targetPageSlug = typeof op.toPageSlug === "string" && op.toPageSlug.length > 0 ? op.toPageSlug : op.pageSlug
       const targetPage = staged.get(targetPageSlug)
       if (!targetPage) throw new Error(`Target page not found for slug ${targetPageSlug}`)
@@ -431,6 +477,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const block = page.blocks[blockIdx]
+      requireManifestComponent(block.type, "add list items")
       const list = listValueForOp(block, op.listKey)
       const nextList = [...list]
       const insertIndex = typeof op.afterIndex === "number" ? op.afterIndex + 1 : nextList.length
@@ -449,6 +496,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const block = page.blocks[blockIdx]
+      requireManifestComponent(block.type, "update list items")
       const list = listValueForOp(block, op.listKey)
       if (op.index < 0 || op.index >= list.length) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
       const currentItem = list[op.index]
@@ -470,6 +518,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const block = page.blocks[blockIdx]
+      requireManifestComponent(block.type, "remove list items")
       const list = listValueForOp(block, op.listKey)
       if (op.index < 0 || op.index >= list.length) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
       const nextList = [...list]
@@ -485,6 +534,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (blockIdx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const block = page.blocks[blockIdx]
+      requireManifestComponent(block.type, "reorder list items")
       const list = listValueForOp(block, op.listKey)
       if (op.index < 0 || op.index >= list.length) throw new Error(`index ${op.index} is out of range for ${op.listKey}`)
       const nextList = [...list]
@@ -508,6 +558,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
       const block = page.blocks[idx]
+      requireManifestComponent(block.type, "update props")
       const rawPatch = op.patch as Record<string, unknown>
       const patchCandidate =
         rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
@@ -520,7 +571,8 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
         schemaForType && typeof schemaForType === "object" && "shape" in schemaForType
           ? (schemaForType.shape as Record<string, unknown>)
           : null
-      const allowedPatchKeys = schemaShape ? Object.keys(schemaShape) : Object.keys(block.props as Record<string, unknown>)
+      const fallbackAllowedKeys = schemaShape ? Object.keys(schemaShape) : Object.keys(block.props as Record<string, unknown>)
+      const allowedPatchKeys = allowedPatchKeysFromManifest(block.type, fallbackAllowedKeys)
       const invalidPatchKeys = patchKeys.filter((key) => !allowedPatchKeys.includes(key))
       if (invalidPatchKeys.length > 0) {
         throw new Error(
@@ -547,8 +599,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
         }
       }
 
-      const propCheck = validateBlockProps(block.type as BlockType, nextProps)
-      if (!propCheck.success) throw new Error(`Invalid props for ${block.type}: ${describeValidationIssue(propCheck.error)}`)
+      const validatedProps = validateWithManifestIfPresent(block.type, nextProps)
       if (patchKeys.length === 0) {
         skippedOps.push({
           index: opIndex + 1,
@@ -561,7 +612,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
       }
 
       const hasEffectivePatchKey = patchKeys.some(
-        (key) => JSON.stringify((block.props as Record<string, unknown>)[key]) !== JSON.stringify((propCheck.data as Record<string, unknown>)[key])
+        (key) => JSON.stringify((block.props as Record<string, unknown>)[key]) !== JSON.stringify((validatedProps as Record<string, unknown>)[key])
       )
       if (!hasEffectivePatchKey) {
         // Treat unchanged patch values as no-op so one stale field does not fail the whole plan.
@@ -574,7 +625,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
         })
         continue
       }
-      page.blocks[idx] = { ...block, props: propCheck.data }
+      page.blocks[idx] = { ...block, props: validatedProps }
       page.updatedAt = new Date().toISOString()
       touchedSlugs.add(page.slug)
       continue
@@ -583,6 +634,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
     if (op.op === "remove_block") {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      requireManifestComponent(page.blocks[idx].type, "remove block")
       page.blocks.splice(idx, 1)
       page.updatedAt = new Date().toISOString()
       touchedSlugs.add(page.slug)
@@ -592,6 +644,7 @@ export function applyOpsAtomically(session: string, ops: Operation[]) {
     if (op.op === "move_block") {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new Error(`blockId ${op.blockId} not found`)
+      requireManifestComponent(page.blocks[idx].type, "move block")
       const [block] = page.blocks.splice(idx, 1)
 
       if (!op.afterBlockId) {

@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
-import { getAllBlockMeta, type BlockType, type EditPlan, type Operation, type PageDoc } from "@ai-site-editor/shared"
+import {
+  editorComponentsManifestSchema,
+  getAllBlockMeta,
+  type BlockType,
+  type EditPlan,
+  type EditorComponentsManifest,
+  type Operation,
+  type PageDoc
+} from "@ai-site-editor/shared"
 import type { UnsplashImage } from "../variation-images.js"
 import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import {
@@ -1588,6 +1596,25 @@ export async function runChatPipeline(
   if (!body.session || !body.slug || (requiresMessage && !body.message)) {
     return { code: 400, payload: { error: "session and slug are required; message is required for planning" } }
   }
+  const manifestPayload = (() => {
+    if (!body.componentsManifest) return undefined
+    if (typeof body.componentsManifest !== "string") return body.componentsManifest
+    try {
+      return JSON.parse(body.componentsManifest) as unknown
+    } catch {
+      return "__invalid_json__"
+    }
+  })()
+  const parsedManifest =
+    manifestPayload === "__invalid_json__"
+      ? { success: false as const }
+      : manifestPayload
+        ? editorComponentsManifestSchema.safeParse(manifestPayload)
+        : { success: true as const, data: undefined }
+  if (!parsedManifest.success) {
+    return { code: 400, payload: { error: "invalid componentsManifest payload" } }
+  }
+  const componentsManifest: EditorComponentsManifest | undefined = parsedManifest.data
   if (executionMode === "discard_pending_plan") {
     const existing = pendingApprovalPlanBySession.get(body.session)
     if (!existing) {
@@ -2359,7 +2386,7 @@ export async function runChatPipeline(
         }
 
         // Validate the whole plan from the current state before progressive apply.
-        const preflight = applyOpsAtomically(body.session!, resolvedPlan.ops)
+        const preflight = applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
         skippedOps = preflight.skippedOps
 
         // Roll back to pre-apply state so we can replay ops progressively.
@@ -2391,7 +2418,7 @@ export async function runChatPipeline(
           for (let index = 0; index < total; index += 1) {
             const stepStartedAtMs = Date.now()
             const op = resolvedPlan.ops[index]
-            const stepResult = applyOpsAtomically(body.session!, [op])
+            const stepResult = applyOpsAtomically(body.session!, [op], { componentsManifest })
             if (stepResult.skippedOps.length > 0) {
               for (const skipped of stepResult.skippedOps) {
                 options?.onOpSkipped?.({
@@ -2447,7 +2474,7 @@ export async function runChatPipeline(
           throw progressiveError
         }
       } else {
-        const applyResult = applyOpsAtomically(body.session!, resolvedPlan.ops)
+        const applyResult = applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
         skippedOps = applyResult.skippedOps
         if (applyResult.appliedCount > 0 && firstApplyMs === null) {
           firstApplyMs = Date.now() - pipelineStartedAtMs
