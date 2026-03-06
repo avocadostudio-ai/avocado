@@ -196,23 +196,49 @@ const COMPONENTS: EditorComponentDefinition[] = [
     propsSchema: {
       type: "object",
       properties: {
-        heading: { type: "string" },
-        body: { type: "string" },
-        imageUrl: { type: "string" },
-        imageAlt: { type: "string" },
-        imagePosition: { type: "string", enum: ["left", "right"] },
-        ctaText: { type: "string" },
-        ctaHref: { type: "string" }
+        variant: { type: "string", enum: ["default", "accent"] },
+        left: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["heading", "paragraph", "cta", "image", "video"] },
+              text: { type: "string" },
+              label: { type: "string" },
+              href: { type: "string" },
+              src: { type: "string" },
+              alt: { type: "string" },
+              poster: { type: "string" }
+            }
+          }
+        },
+        right: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["heading", "paragraph", "cta", "image", "video"] },
+              text: { type: "string" },
+              label: { type: "string" },
+              href: { type: "string" },
+              src: { type: "string" },
+              alt: { type: "string" },
+              poster: { type: "string" }
+            }
+          }
+        }
       }
     },
     defaultProps: {
-      heading: "Built for teams",
-      body: "Ship changes quickly with a clear, reliable workflow.",
-      imageUrl: "/hero-generated.svg",
-      imageAlt: "Team collaborating on a website update",
-      imagePosition: "right",
-      ctaText: "Learn more",
-      ctaHref: "/"
+      variant: "default",
+      left: [
+        { type: "heading", text: "Built for teams" },
+        { type: "paragraph", text: "Ship changes quickly with a clear, reliable workflow." },
+        { type: "cta", label: "Learn more", href: "/" }
+      ],
+      right: [
+        { type: "image", src: "/hero-generated.svg", alt: "Team collaborating on a website update" }
+      ]
     }
   },
   {

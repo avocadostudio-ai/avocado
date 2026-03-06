@@ -335,28 +335,54 @@ registerBlock("Stats", {
   }
 })
 
+const twoColumnChild = z.object({
+  type: z.enum(["heading", "paragraph", "cta", "image", "video"]),
+  text: z.string().optional(),
+  label: z.string().optional(),
+  href: z.string().optional(),
+  src: z.string().optional(),
+  alt: z.string().optional(),
+  poster: z.string().optional()
+})
+
 registerBlock("TwoColumn", {
   schema: z.object({
-    heading: z.string().min(1),
-    body: z.string().min(1),
-    imageUrl: z.string().min(1),
-    imageAlt: z.string().min(1),
-    imagePosition: z.enum(["left", "right"]).default("right"),
-    ctaText: z.string().optional(),
-    ctaHref: z.string().optional()
+    variant: z.enum(["default", "accent"]).default("default"),
+    left: z.array(twoColumnChild).min(1),
+    right: z.array(twoColumnChild).min(1)
   }),
   meta: {
     displayName: "Two Column",
-    description: "Image + text side-by-side layout with configurable image position.",
+    description: "Composite two-column layout with typed child components in each column.",
     category: "layout",
     fields: {
-      heading: f.text("Heading"),
-      body: f.richtext("Body text"),
-      imageUrl: f.image("Image"),
-      imageAlt: f.imageAlt("Image alt text"),
-      imagePosition: { kind: "enum", label: "Image position", options: ["left", "right"], inlineEditable: false },
-      ctaText: f.text("CTA button text"),
-      ctaHref: f.url("CTA link"),
+      variant: { kind: "enum", label: "Style variant", options: ["default", "accent"], inlineEditable: false },
+    },
+    listFields: {
+      left: {
+        label: "Left column items",
+        itemFields: {
+          type: { kind: "enum", label: "Component type", options: ["heading", "paragraph", "cta", "image", "video"] },
+          text: f.text("Text content"),
+          label: f.text("Button label"),
+          href: f.url("Link URL"),
+          src: f.image("Media source"),
+          alt: f.imageAlt("Alt text"),
+          poster: f.image("Video poster image"),
+        }
+      },
+      right: {
+        label: "Right column items",
+        itemFields: {
+          type: { kind: "enum", label: "Component type", options: ["heading", "paragraph", "cta", "image", "video"] },
+          text: f.text("Text content"),
+          label: f.text("Button label"),
+          href: f.url("Link URL"),
+          src: f.image("Media source"),
+          alt: f.imageAlt("Alt text"),
+          poster: f.image("Video poster image"),
+        }
+      }
     }
   }
 })
@@ -502,13 +528,15 @@ export function defaultPropsForType(type: BlockType): Record<string, unknown> {
   }
   if (type === "TwoColumn") {
     return {
-      heading: "Built for teams",
-      body: "Ship changes quickly with a clear, reliable workflow.",
-      imageUrl: "/hero-generated.svg",
-      imageAlt: "Team collaborating on a website update",
-      imagePosition: "right",
-      ctaText: "Learn more",
-      ctaHref: "/"
+      variant: "default",
+      left: [
+        { type: "heading", text: "Built for teams" },
+        { type: "paragraph", text: "Ship changes quickly with a clear, reliable workflow." },
+        { type: "cta", label: "Learn more", href: "/" }
+      ],
+      right: [
+        { type: "image", src: "/hero-generated.svg", alt: "Team collaborating on a website update" }
+      ]
     }
   }
   if (type === "Footer") {
