@@ -54,7 +54,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 ...prev,
                 [site.id]: {
                   status: "degraded",
-                  summary: "Degraded mode",
+                  summary: "Limited editing",
                   reason: `Manifest endpoint returned ${res.status}`
                 }
               }))
@@ -68,7 +68,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 ...prev,
                 [site.id]: {
                   status: "degraded",
-                  summary: "Degraded mode",
+                  summary: "Limited editing",
                   reason: "Manifest response shape is invalid"
                 }
               }))
@@ -81,7 +81,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 ...prev,
                 [site.id]: {
                   status: "degraded",
-                  summary: "Degraded mode",
+                  summary: "Limited editing",
                   reason: defaultsError
                 }
               }))
@@ -92,7 +92,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               ...prev,
               [site.id]: {
                 status: "ready",
-                summary: `Manifest ready (${parsed.data.components.length} components)`
+                summary: `${parsed.data.components.length} components found`
               }
             }))
           } catch (error) {
@@ -101,7 +101,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               ...prev,
               [site.id]: {
                 status: "degraded",
-                summary: "Degraded mode",
+                summary: "Limited editing",
                 reason: error instanceof Error ? error.message : "Manifest fetch failed"
               }
             }))

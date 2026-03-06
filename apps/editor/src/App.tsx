@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Check, Copy } from "lucide-react"
+import { Check, Copy, Sparkles } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
@@ -13,6 +13,7 @@ import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ModelKey, PlannerSource } from "./lib/editor-types"
+import { manifestUnavailableChanges } from "./lib/integration-context"
 import {
   DEBUG_MODE_STORAGE_KEY,
   MODEL_KEY_STORAGE_KEY,
@@ -24,12 +25,12 @@ import {
   previewPresetWidths,
   buildSiteDraftDisableUrl,
   buildSiteDraftEnableUrl,
+  resolveSiteOrigin,
   resolveDefaultChatDarkMode,
   resolveDefaultDebugMode,
   resolveDefaultModelKey,
   resolveDefaultProvider,
   resolveEditorSiteId,
-  siteOrigin,
   slugLabel
 } from "./lib/editor-utils"
 
@@ -71,7 +72,8 @@ function EditorPage({
 }) {
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const { activeSiteConfig } = sites
-  const componentManifest = useComponentManifest()
+  const activeSiteOrigin = useMemo(() => resolveSiteOrigin(activeSiteConfig), [activeSiteConfig])
+  const componentManifest = useComponentManifest(activeSiteOrigin)
 
   const [slug, setSlug] = useState("/")
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
@@ -164,14 +166,10 @@ function EditorPage({
     const now = Date.now()
     if (now - lastStructuralNoticeAtRef.current < 1200) return
     lastStructuralNoticeAtRef.current = now
-    const reason = componentManifest.reason?.trim()
     chatEngine.pushAssistantFromResult({
       status: "needs_clarification",
       summary: "Structural edits are disabled for this site context.",
-      changes: [
-        reason && reason.length > 0 ? `Manifest issue: ${reason}` : "Component manifest is unavailable or invalid.",
-        "Expose GET /api/editor/components and return a valid manifest to enable structural edits."
-      ]
+      changes: manifestUnavailableChanges(componentManifest.reason)
     })
   }
 
@@ -313,22 +311,22 @@ function EditorPage({
     window.localStorage.setItem(PROVIDER_STORAGE_KEY, provider)
   }, [provider])
 
-  // Preview src
+  // Preview src — uses per-site previewUrl when available, falls back to VITE_SITE_ORIGIN
   const previewSrc = useMemo(() => {
     return buildSiteDraftEnableUrl(slug, {
       session,
       siteId,
       editorOrigin
-    })
-  }, [editorOrigin, session, siteId, slug])
+    }, activeSiteOrigin)
+  }, [activeSiteOrigin, editorOrigin, session, siteId, slug])
 
   const liveSiteUrl = useMemo(() => {
     const configured = activeSiteConfig.vercelProductionUrl?.trim()
-    const base = configured && /^https?:\/\//i.test(configured) ? configured : siteOrigin
+    const base = configured && /^https?:\/\//i.test(configured) ? configured : activeSiteOrigin
     try {
       const url = new URL(base)
-      if (url.origin === siteOrigin) {
-        return buildSiteDraftDisableUrl(slug, {})
+      if (url.origin === activeSiteOrigin) {
+        return buildSiteDraftDisableUrl(slug, {}, activeSiteOrigin)
       }
       url.pathname = slug === "/" ? "/" : slug
       url.search = ""
@@ -337,7 +335,7 @@ function EditorPage({
     } catch {
       return undefined
     }
-  }, [activeSiteConfig.vercelProductionUrl, slug])
+  }, [activeSiteConfig.vercelProductionUrl, activeSiteOrigin, slug])
 
   // Planner status check
   useEffect(() => {
@@ -547,18 +545,20 @@ function EditorPage({
             <div className="chat-header-site-name">
               {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Switch</a>
             </div>
-            {chatEngine.plannerBadgeState === "demo" ? (
-              <span className="planner-badge planner-badge-demo">Demo mode</span>
-            ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
-              <span className="planner-badge planner-badge-ai">AI</span>
-            ) : null}
-            {componentManifest.status === "degraded" ? (
-              <span className="planner-badge" title={componentManifest.reason ?? "Manifest unavailable"}>
-                Degraded
-              </span>
-            ) : componentManifest.status === "ready" ? (
-              <span className="planner-badge planner-badge-ai">Manifest</span>
-            ) : null}
+            <div className="chat-header-badges">
+              {componentManifest.status === "degraded" ? (
+                <span className="planner-badge" title={componentManifest.reason ?? "Components unavailable"}>
+                  Limited
+                </span>
+              ) : componentManifest.status === "ready" ? (
+                <span className="planner-badge planner-badge-outline">Edit on</span>
+              ) : null}
+              {chatEngine.plannerBadgeState === "demo" ? (
+                <span className="planner-badge planner-badge-demo">Demo mode</span>
+              ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
+                <Sparkles size={16} className="chat-header-sparkle" />
+              ) : null}
+            </div>
           </div>
           <div className="chat-header-controls">
             <label className="chat-header-slug">
