@@ -9,6 +9,7 @@ export const LEGACY_AVOCADO_SITE_PURPOSE = "Marketing site for Avocado Stories p
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
 const ENABLE_AUTO_SITE_PRESETS = IS_DEMO_MODE || import.meta.env.VITE_ENABLE_AUTO_SITE_PRESETS === "1"
 const LOCK_SITE_ID = import.meta.env.VITE_LOCK_SITE_ID === "1"
+export const isSiteIdLocked = LOCK_SITE_ID
 
 const AUTO_SITE_PRESET_IDS = new Set(["avocado-magic", "avocado-odyssey", LEGACY_AVOCADO_SITE_ID])
 
@@ -49,6 +50,7 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
         const constraints = Array.isArray(site.constraints)
           ? site.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
           : []
+        const previewUrl = typeof site.previewUrl === "string" ? site.previewUrl.trim() : ""
         return {
           id,
           name,
@@ -59,7 +61,8 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
           vercelProductionUrl,
           vercelDeployHookUrl,
           tone,
-          constraints
+          constraints,
+          ...(previewUrl ? { previewUrl } : {})
         } satisfies SiteConfig
       })
       .filter((site) => site.id.length > 0 && site.name.length > 0)
@@ -102,22 +105,29 @@ export function buildSitePathWithQuery(pathname: string, params: Record<string, 
   return queryString.length > 0 ? `${normalizedPath}?${queryString}` : normalizedPath
 }
 
-export function buildSiteDraftEnableUrl(pathname: string, params: Record<string, string | undefined>) {
+export function resolveSiteOrigin(config?: { previewUrl?: string }) {
+  const override = config?.previewUrl?.trim()?.replace(/\/+$/, "")
+  return override || siteOrigin
+}
+
+export function buildSiteDraftEnableUrl(pathname: string, params: Record<string, string | undefined>, origin?: string) {
+  const base = origin || siteOrigin
   const redirectPath = buildSitePathWithQuery(pathname, params)
   if (!siteDraftSecret) {
-    const direct = new URL(`${siteOrigin}${redirectPath}`)
+    const direct = new URL(`${base}${redirectPath}`)
     if (!direct.searchParams.has("__editor")) direct.searchParams.set("__editor", "1")
     return direct.toString()
   }
-  const entry = new URL(`${siteOrigin}/api/draft`)
+  const entry = new URL(`${base}/api/draft`)
   entry.searchParams.set("secret", siteDraftSecret)
   entry.searchParams.set("redirect", redirectPath)
   return entry.toString()
 }
 
-export function buildSiteDraftDisableUrl(pathname: string, params: Record<string, string | undefined>) {
+export function buildSiteDraftDisableUrl(pathname: string, params: Record<string, string | undefined>, origin?: string) {
+  const base = origin || siteOrigin
   const redirectPath = buildSitePathWithQuery(pathname, params)
-  const entry = new URL(`${siteOrigin}/api/draft/disable`)
+  const entry = new URL(`${base}/api/draft/disable`)
   entry.searchParams.set("redirect", redirectPath)
   return entry.toString()
 }
@@ -164,6 +174,7 @@ export function defaultSiteList(siteId: string): SiteConfig[] {
 }
 
 export function loadSiteListFromStorage(siteId: string) {
+  if (LOCK_SITE_ID) return defaultSiteList(siteId)
   if (typeof window === "undefined") return defaultSiteList(siteId)
   try {
     const raw = window.localStorage.getItem(SITE_LIST_STORAGE_KEY)
@@ -182,6 +193,7 @@ export function loadSiteListFromStorage(siteId: string) {
         vercelDeployHookUrl?: string
         tone?: string
         constraints?: unknown
+        previewUrl?: string
       } => {
         return Boolean(
           site &&
@@ -202,14 +214,20 @@ export function loadSiteListFromStorage(siteId: string) {
         tone: typeof site.tone === "string" ? site.tone.trim() : "",
         constraints: Array.isArray(site.constraints)
           ? site.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
-          : []
+          : [],
+        ...(typeof site.previewUrl === "string" && site.previewUrl.trim() ? { previewUrl: site.previewUrl.trim() } : {})
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
       .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))
     const mergePresets = (list: SiteConfig[]) => {
       if (DEFAULT_SITE_PRESETS.length === 0) return list
+      const presetById = new Map(DEFAULT_SITE_PRESETS.map((p) => [p.id, p]))
       const existingIds = new Set(list.map((site) => site.id))
-      const merged = [...list]
+      const merged = list.map((site) => {
+        const preset = presetById.get(site.id)
+        if (!preset?.previewUrl || site.previewUrl) return site
+        return { ...site, previewUrl: preset.previewUrl }
+      })
       for (const preset of DEFAULT_SITE_PRESETS) {
         if (existingIds.has(preset.id)) continue
         merged.push(preset)

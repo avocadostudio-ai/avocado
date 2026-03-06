@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { editorComponentsManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
-import { buildSiteDraftEnableUrl, DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID, siteOrigin } from "../lib/editor-utils"
+import { buildSiteDraftEnableUrl, DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID, resolveSiteOrigin } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 function compactPurposeText(value: string) {
@@ -44,7 +44,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
 
       await Promise.all(
         dedupedSites.map(async (site) => {
-          const url = new URL(`${siteOrigin}/api/editor/components`)
+          const url = new URL(`${resolveSiteOrigin(site)}/api/editor/components`)
           url.searchParams.set("siteId", site.id)
           try {
             const res = await fetch(url.toString())
@@ -152,7 +152,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             siteId: site.id,
             __tile: "1",
             __refresh: String(sites.siteTileRefreshToken)
-          })
+          }, resolveSiteOrigin(site))
           return (
             <article key={site.id} className="site-tile">
               <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc} />
