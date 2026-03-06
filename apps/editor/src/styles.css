@@ -72,6 +72,14 @@ body {
   gap: 10px;
 }
 
+.chat-header-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .chat-header-site-name {
   font-size: 13px;
   font-weight: 700;
@@ -99,6 +107,15 @@ body {
 .planner-badge-ai {
   background: #f0fdf4;
   color: #166534;
+}
+.planner-badge-outline {
+  background: transparent;
+  color: #a3a3a3;
+  border: 1px solid #525252;
+}
+.chat-header-sparkle {
+  color: #34d399;
+  flex-shrink: 0;
 }
 
 .chat-header-switch-site {
