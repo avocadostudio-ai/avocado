@@ -219,11 +219,14 @@ test("inferDeterministicIntent treats add-image command as update in focused ima
         id: "b_two_col_test",
         type: "TwoColumn",
         props: {
-          heading: "Trail",
-          body: "Body",
-          imageUrl: "/hero-generated.svg",
-          imageAlt: "A climber",
-          imagePosition: "right"
+          variant: "default",
+          left: [
+            { type: "heading", text: "Trail" },
+            { type: "paragraph", text: "Body" }
+          ],
+          right: [
+            { type: "image", src: "/hero-generated.svg", alt: "A climber" }
+          ]
         }
       }
     ]

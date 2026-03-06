@@ -214,11 +214,14 @@ test("chat pending-plan lifecycle resolves image for TwoColumn update on approva
                 id: "b_two_col_test",
                 type: "TwoColumn",
                 props: {
-                  heading: "Rise above rest",
-                  body: "Test body",
-                  imageUrl: "/hero-generated.svg",
-                  imageAlt: "A climber ascending a rugged snow-capped mountain peak at sunrise",
-                  imagePosition: "right"
+                  variant: "default",
+                  left: [
+                    { type: "heading", text: "Rise above rest" },
+                    { type: "paragraph", text: "Test body" }
+                  ],
+                  right: [
+                    { type: "image", src: "/hero-generated.svg", alt: "A climber ascending a rugged snow-capped mountain peak at sunrise" }
+                  ]
                 }
               }
             ]

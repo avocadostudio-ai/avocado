@@ -178,24 +178,24 @@ export function ensureHeroImageProps(page: PageDoc) {
     }
 
     if (block.type === "TwoColumn") {
-      if (typeof props.heading !== "string" || props.heading.trim().length === 0) {
-        props.heading = typeof props.title === "string" && props.title.trim().length > 0
-          ? props.title
-          : "Section heading"
+      if (!Array.isArray(props.left) || props.left.length === 0) {
+        // Migrate from legacy flat props if present
+        const heading = typeof props.heading === "string" ? props.heading
+          : typeof props.title === "string" ? props.title : "Section heading"
+        const body = typeof props.body === "string" ? props.body
+          : typeof props.description === "string" ? props.description : "Section content"
+        props.left = [
+          { type: "heading", text: heading },
+          { type: "paragraph", text: body }
+        ]
       }
-      if (typeof props.body !== "string" || props.body.trim().length === 0) {
-        props.body = typeof props.description === "string" && props.description.trim().length > 0
-          ? props.description
-          : "Section content"
+      if (!Array.isArray(props.right) || props.right.length === 0) {
+        const src = typeof props.imageUrl === "string" ? props.imageUrl : "/hero-generated.svg"
+        const alt = typeof props.imageAlt === "string" ? props.imageAlt : "Section image"
+        props.right = [{ type: "image", src, alt }]
       }
-      if (typeof props.imageUrl !== "string" || props.imageUrl.trim().length === 0) {
-        props.imageUrl = "/hero-generated.svg"
-      }
-      if (typeof props.imageAlt !== "string" || props.imageAlt.trim().length === 0) {
-        props.imageAlt = `Image for ${props.heading}`
-      }
-      if (props.imagePosition !== "left" && props.imagePosition !== "right") {
-        props.imagePosition = "right"
+      if (props.variant !== "default" && props.variant !== "accent") {
+        props.variant = "default"
       }
     }
   }
