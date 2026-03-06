@@ -335,6 +335,42 @@ registerBlock("Stats", {
   }
 })
 
+const contactFormField = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  type: z.enum(["text", "email", "date", "number", "textarea"]).default("text"),
+  placeholder: z.string().optional(),
+  required: z.boolean().optional()
+})
+
+registerBlock("ContactForm", {
+  schema: z.object({
+    title: z.string().min(1),
+    subtitle: z.string().optional(),
+    submitLabel: z.string().min(1),
+    fields: z.array(contactFormField).min(1)
+  }),
+  meta: {
+    displayName: "Contact Form",
+    description: "Contact or booking inquiry form with configurable fields.",
+    category: "conversion",
+    fields: {
+      title: f.text("Heading"),
+      subtitle: f.text("Subtitle"),
+      submitLabel: f.text("Submit button text"),
+    },
+    listFields: {
+      fields: {
+        label: "Form fields",
+        itemFields: {
+          label: f.text("Field label"),
+          placeholder: f.text("Placeholder"),
+        }
+      }
+    }
+  }
+})
+
 const twoColumnChild = z.object({
   type: z.enum(["heading", "paragraph", "cta", "image", "video"]),
   text: z.string().optional(),
