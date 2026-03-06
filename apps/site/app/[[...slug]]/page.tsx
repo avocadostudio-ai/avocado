@@ -204,7 +204,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
           <BlockRenderer key={block.id} block={block} editorMode={editorMode} />
         ))}
       </main>
-      {editorMode ? <EditorPreviewBridgeLoader slug={slug} editorOrigin={editorOrigin} /> : null}
+      {editorMode && !tileMode ? <EditorPreviewBridgeLoader slug={slug} editorOrigin={editorOrigin} /> : null}
     </>
   )
 }
