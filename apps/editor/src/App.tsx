@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Check, Copy, Sparkles } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
@@ -35,6 +35,56 @@ import {
 } from "./lib/editor-utils"
 
 const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
+
+function renderSimpleMarkdown(text: string) {
+  const lines = text.split("\n")
+  const elements: (React.ReactNode)[] = []
+  let listItems: string[] = []
+
+  const flushList = () => {
+    if (listItems.length === 0) return
+    elements.push(
+      <ul key={`ul-${elements.length}`}>
+        {listItems.map((item, i) => (
+          <li key={i}>{inlineMarkdown(item)}</li>
+        ))}
+      </ul>
+    )
+    listItems = []
+  }
+
+  const inlineMarkdown = (line: string) => {
+    const parts: (React.ReactNode)[] = []
+    const regex = /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`/g
+    let last = 0
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(line)) !== null) {
+      if (match.index > last) parts.push(line.slice(last, match.index))
+      if (match[1] !== undefined) parts.push(<strong key={match.index}>{match[1]}</strong>)
+      else if (match[2] !== undefined) parts.push(<em key={match.index}>{match[2]}</em>)
+      else if (match[3] !== undefined) parts.push(<code key={match.index}>{match[3]}</code>)
+      last = match.index + match[0].length
+    }
+    if (last < line.length) parts.push(line.slice(last))
+    return parts.length === 1 ? parts[0] : <>{parts}</>
+  }
+
+  for (const line of lines) {
+    const listMatch = /^\s*[-*•]\s+(.+)$/.exec(line)
+    if (listMatch) {
+      listItems.push(listMatch[1])
+      continue
+    }
+    flushList()
+    if (line.trim() === "") {
+      continue
+    }
+    elements.push(<p key={`p-${elements.length}`}>{inlineMarkdown(line)}</p>)
+  }
+  flushList()
+
+  return <>{elements}</>
+}
 
 export function App() {
   const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
@@ -95,6 +145,7 @@ function EditorPage({
   const [addBlockSearch, setAddBlockSearch] = useState("")
   const [isAddingBlock, setIsAddingBlock] = useState(false)
   const [copiedDebugEntryId, setCopiedDebugEntryId] = useState<string | null>(null)
+  const [selectedVariationId, setSelectedVariationId] = useState<string | null>(null)
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
@@ -477,6 +528,14 @@ function EditorPage({
   }, [chatEngine.variationModal, chatEngine.isApplyingVariation])
 
   useEffect(() => {
+    if (chatEngine.variationModal?.options.length) {
+      setSelectedVariationId(chatEngine.variationModal.options[0].id)
+    } else {
+      setSelectedVariationId(null)
+    }
+  }, [chatEngine.variationModal])
+
+  useEffect(() => {
     if (!addBlockPicker) setAddBlockSearch("")
   }, [addBlockPicker])
 
@@ -497,8 +556,6 @@ function EditorPage({
   const buildCopyPayload = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
     const lines: string[] = []
     if (entry.text) lines.push(entry.text)
-    if (entry.aiJustification) lines.push(`AI justification: ${entry.aiJustification}`)
-    if (entry.aiPerformanceNote) lines.push(`Performance awareness: ${entry.aiPerformanceNote}`)
     if (entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready") lines.push(`status: ${entry.status}`)
     const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line))
     if (changeLines.length > 0) lines.push(`changes: ${changeLines.join("\n")}`)
@@ -608,19 +665,7 @@ function EditorPage({
               key={entry.id}
               className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""}`}
             >
-              <div className="msg-main">{entry.text}</div>
-              {entry.aiJustification ? (
-                <div className="msg-ai-insight">
-                  <div className="msg-ai-insight-label">AI justification</div>
-                  <blockquote>{entry.aiJustification}</blockquote>
-                </div>
-              ) : null}
-              {entry.aiPerformanceNote ? (
-                <div className="msg-ai-insight">
-                  <div className="msg-ai-insight-label">Performance awareness</div>
-                  <blockquote>{entry.aiPerformanceNote}</blockquote>
-                </div>
-              ) : null}
+              <div className="msg-main">{entry.role === "assistant" ? renderSimpleMarkdown(entry.text) : entry.text}</div>
               {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
               {(entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line)).length > 0 ? (
                 <ul className="msg-list">
@@ -838,6 +883,7 @@ function EditorPage({
 
       {chatEngine.variationModal ? (() => {
         const vm = chatEngine.variationModal
+        const selectedOption = vm.options.find((o) => o.id === selectedVariationId) ?? null
         return (
         <div
           className="variation-modal-backdrop"
@@ -859,26 +905,37 @@ function EditorPage({
               </button>
             </div>
             <div className="variation-modal-body">
-              {vm.options.map((option) => (
-                <article key={option.id} className="variation-card">
-                  <header className="variation-card-header">
-                    <h3>{option.title}</h3>
-                    <span>{option.changedKeys.join(", ") || "patch"}</span>
-                  </header>
-                  <p>{option.summary}</p>
-                  <VariationScaledPreview
-                    virtualWidth={previewPresetWidths.desktop}
-                    block={{
-                      id: vm.blockId,
-                      type: vm.blockType as BlockInstance["type"],
-                      props: mergedVariationProps(vm.baseProps, option.patch)
-                    }}
-                  />
-                  <button type="button" className="publish-preview-btn variation-apply-btn" onClick={() => void chatEngine.applyVariation(option)} disabled={chatEngine.isApplyingVariation}>
-                    {chatEngine.isApplyingVariation ? "Applying..." : "Apply this variation"}
-                  </button>
+              {vm.options.map((option, idx) => (
+                <article
+                  key={option.id}
+                  className={`variation-card${option.id === selectedVariationId ? " is-selected" : ""}`}
+                  onClick={() => setSelectedVariationId(option.id)}
+                >
+                  <div className="variation-card-preview-wrap">
+                    <span className="variation-card-badge">{String.fromCharCode(65 + idx)}</span>
+                    <VariationScaledPreview
+                      virtualWidth={previewPresetWidths.desktop}
+                      block={{
+                        id: vm.blockId,
+                        type: vm.blockType as BlockInstance["type"],
+                        props: mergedVariationProps(vm.baseProps, option.patch)
+                      }}
+                    />
+                  </div>
+                  <h3 className="variation-card-title">{option.title}</h3>
+                  <p className="variation-card-summary">{option.summary}</p>
                 </article>
               ))}
+            </div>
+            <div className="variation-modal-footer">
+              <button
+                type="button"
+                className="publish-preview-btn variation-apply-btn"
+                onClick={() => { if (selectedOption) void chatEngine.applyVariation(selectedOption) }}
+                disabled={chatEngine.isApplyingVariation || !selectedOption}
+              >
+                {chatEngine.isApplyingVariation ? "Applying..." : `Apply "${selectedOption?.title ?? ""}"`}
+              </button>
             </div>
           </div>
         </div>
