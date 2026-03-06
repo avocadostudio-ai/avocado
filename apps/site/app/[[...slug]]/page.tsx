@@ -4,8 +4,9 @@ import { draftMode } from "next/headers"
 import type { Metadata } from "next"
 import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
-import { EditorPreviewBridge } from "../../components/editor-harness"
 import { SiteThemeToggle } from "../../components/theme-toggle"
+
+import { EditorPreviewBridgeLoader } from "../../components/editor-preview-bridge-loader"
 import { fetchDraftPage } from "../../lib/content-api"
 import { resolveSiteContentSource } from "../../lib/content-source"
 import { resolveRuntimePageAndNav } from "../../lib/content-resolver-runtime"
@@ -18,8 +19,7 @@ type PageProps = {
 
 const DEFAULT_SESSION = "dev"
 const DEFAULT_SITE_ID = "adventure-atlas"
-const DEFAULT_EDITOR_ORIGIN =
-  process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? (process.env.NODE_ENV !== "production" ? "http://localhost:4100" : "")
+const DEFAULT_EDITOR_ORIGIN = process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? ""
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
 
 function buildSlug(parts?: string[]) {
@@ -204,7 +204,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
           <BlockRenderer key={block.id} block={block} editorMode={editorMode} />
         ))}
       </main>
-      {editorMode ? <EditorPreviewBridge slug={slug} editorOrigin={editorOrigin} /> : null}
+      {editorMode ? <EditorPreviewBridgeLoader slug={slug} editorOrigin={editorOrigin} /> : null}
     </>
   )
 }
