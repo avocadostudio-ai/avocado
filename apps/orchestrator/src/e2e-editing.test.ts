@@ -15,6 +15,7 @@ const E2E_PROVIDER_AVAILABLE =
   E2E_PROVIDER === "anthropic" ? Boolean(process.env.ANTHROPIC_API_KEY?.trim()) : Boolean(process.env.OPENAI_API_KEY?.trim())
 const E2E_DESCRIBE_OPTIONS = { timeout: 120_000, skip: !E2E_PROVIDER_AVAILABLE }
 let sessionCounter = 0
+const bootstrappedSessions = new Set<string>()
 
 function newSession() {
   return `e2e-${++sessionCounter}`
@@ -25,7 +26,27 @@ type ChatOpts = {
   pendingPlanId?: string
 }
 
+async function ensureSessionBootstrapped(session: string) {
+  if (bootstrappedSessions.has(session)) return
+  const res = await app.inject({
+    method: "POST",
+    url: "/draft/bootstrap",
+    payload: {
+      session,
+      siteId: SITE_ID,
+      pages: RICH_PAGES,
+    },
+  })
+  assert.equal(res.statusCode, 200, `bootstrap failed: ${res.statusCode}`)
+  const body = res.json() as { status?: string; slugs?: string[] }
+  assert.ok(body.status === "bootstrapped" || body.status === "skipped", `bootstrap status=${body.status}`)
+  const slugs = body.slugs ?? []
+  assert.ok(slugs.length >= 8, `expected >=8 bootstrapped pages, got ${slugs.length}`)
+  bootstrappedSessions.add(session)
+}
+
 async function chat(session: string, slug: string, message: string, opts: ChatOpts = {}) {
+  await ensureSessionBootstrapped(session)
   const res = await app.inject({
     method: "POST",
     url: "/chat",
@@ -44,6 +65,7 @@ async function chat(session: string, slug: string, message: string, opts: ChatOp
 }
 
 async function getDraft(session: string, slug: string): Promise<PageDoc> {
+  await ensureSessionBootstrapped(session)
   const res = await app.inject({
     method: "GET",
     url: `/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(SITE_ID)}&slug=${encodeURIComponent(slug)}`,
@@ -53,12 +75,32 @@ async function getDraft(session: string, slug: string): Promise<PageDoc> {
 }
 
 async function getDraftSlugs(session: string): Promise<string[]> {
+  await ensureSessionBootstrapped(session)
   const res = await app.inject({
     method: "GET",
     url: `/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(SITE_ID)}`,
   })
   assert.equal(res.statusCode, 200)
   return (res.json() as { slugs: string[] }).slugs
+}
+
+async function getResultPlannerTiers(session: string): Promise<string[]> {
+  const scoped = scopedSessionKey(session, SITE_ID)
+  const res = await app.inject({
+    method: "GET",
+    url: `/telemetry/chat?session=${encodeURIComponent(scoped)}&phase=result&limit=200`,
+  })
+  assert.equal(res.statusCode, 200)
+  const payload = res.json() as { rows?: Array<{ plannerTier?: string }> }
+  return (payload.rows ?? []).map((row) => row.plannerTier ?? "").filter(Boolean)
+}
+
+async function assertUsedLlmPlannerTier(session: string) {
+  const tiers = await getResultPlannerTiers(session)
+  assert.ok(
+    tiers.some((tier) => tier === "full_llm" || tier === "llm_intent_router"),
+    `expected LM planner tier, got: ${JSON.stringify(tiers)}`,
+  )
 }
 
 function findBlock(page: PageDoc, predicate: (b: BlockInstance) => boolean) {
@@ -131,19 +173,19 @@ describe(`e2e-editing (${E2E_PROVIDER}/${E2E_MODEL_KEY})`, E2E_DESCRIBE_OPTIONS,
   // 4. Add list item
   test("4. Add list item — new FAQ question", async () => {
     const session = newSession()
-    const before = await getDraft(session, "/pricing")
+    const before = await getDraft(session, "/about-us")
     const faqBefore = findBlock(before, (b) => b.type === "FAQAccordion")
     assert.ok(faqBefore, "FAQAccordion block not found before edit")
     const itemsBefore = (blockProps(faqBefore).items as unknown[]) ?? []
 
     const { body } = await chat(
       session,
-      "/pricing",
+      "/about-us",
       "Add a new FAQ question: 'Do you offer a free trial?' with the answer 'Yes, all plans include a 14-day free trial'",
     )
     assert.equal(body.status, "applied", `expected applied, got ${body.status}: ${body.summary}`)
 
-    const page = await getDraft(session, "/pricing")
+    const page = await getDraft(session, "/about-us")
     const faq = findBlock(page, (b) => b.type === "FAQAccordion")
     assert.ok(faq, "FAQAccordion block not found after edit")
     const items = blockProps(faq).items as Array<{ q: string; a: string }>
@@ -195,21 +237,21 @@ describe(`e2e-editing (${E2E_PROVIDER}/${E2E_MODEL_KEY})`, E2E_DESCRIBE_OPTIONS,
   })
 
   // 7. Rename a page
-  test("7. Rename a page — /pricing to /plans", async () => {
+  test("7. Rename a page — /about-lemons to /lemons", async () => {
     const session = newSession()
     const { body } = await chat(
       session,
-      "/pricing",
-      "Rename this page to /plans and update its title to 'Our Plans'",
+      "/about-lemons",
+      "Rename this page to /lemons and update its title to 'All About Lemons'",
     )
     assert.equal(body.status, "applied", `expected applied, got ${body.status}: ${body.summary}`)
 
     const slugs = await getDraftSlugs(session)
-    assert.ok(!slugs.includes("/pricing"), `/pricing should be gone: ${JSON.stringify(slugs)}`)
-    assert.ok(slugs.includes("/plans"), `/plans should be present: ${JSON.stringify(slugs)}`)
+    assert.ok(!slugs.includes("/about-lemons"), `/about-lemons should be gone: ${JSON.stringify(slugs)}`)
+    assert.ok(slugs.includes("/lemons"), `/lemons should be present: ${JSON.stringify(slugs)}`)
 
-    const page = await getDraft(session, "/plans")
-    assert.ok(/plans/i.test(page.title), `page title should contain 'Plans', got: ${page.title}`)
+    const page = await getDraft(session, "/lemons")
+    assert.ok(/lemons/i.test(page.title), `page title should contain 'Lemons', got: ${page.title}`)
   })
 
   // 8. Duplicate a block
@@ -299,9 +341,10 @@ const RICH_PAGES: PageDoc[] = [
     blocks: [
       { id: "b_hero_home_rich", type: "Hero", props: { heading: "Discover the Magic of Avocados", subheading: "Experience the vibrant taste and health benefits of our avocados — a delightful addition to any dish.", ctaText: "Get Started", ctaHref: "/", imageUrl: "/hero-generated.svg", imageAlt: "Avocados in natural light" } },
       { id: "b_cardgrid_home", type: "CardGrid", props: { title: "Sustainable Avocado Adventures", cards: [{ title: "Avocado Culinary Delights", description: "Uncover new culinary uses for avocados.", ctaText: "Try Now", ctaHref: "/avocado-culinary" }, { title: "Avocado Wellness", description: "Explore the wellness benefits of avocados.", ctaText: "Discover", ctaHref: "/avocado-wellness" }, { title: "Avocado Sustainability", description: "Learn about sustainable avocado farming practices.", ctaText: "Learn More", ctaHref: "/avocado-sustainability" }] } },
+      { id: "b_featuregrid_home", type: "FeatureGrid", props: { title: "Why Readers Love Avocados", features: [{ title: "Nutrition", description: "Packed with healthy fats, fiber, and vitamins." }, { title: "Versatility", description: "Perfect for toast, salads, and smoothies." }, { title: "Flavor", description: "Creamy texture with a rich, satisfying taste." }] } },
       { id: "b_testimonials_home", type: "Testimonials", props: { title: "Testimonials from Avocado Enthusiasts", items: [{ quote: "Avocados are a superfood that never fails to impress!", author: "Emily Avocado" }, { quote: "Avocados are my culinary secret weapon.", author: "Michael Green" }, { quote: "The best avocados I've ever tasted!", author: "Sarah Chef" }] } },
       { id: "b_richtext_home", type: "RichText", props: { title: "Discover the Magic of Avocados", body: "# Nutritional Benefits of Avocados\n\nAvocados are not only delicious but also packed with essential nutrients." } },
-      { id: "b_cta_home_rich", type: "CTA", props: { title: "Join the Avocado Revolution", description: "Experience the richness and health benefits of our premium avocados.", ctaText: "Get Started", ctaHref: "/signup" } },
+      { id: "b_cta_home", type: "CTA", props: { title: "Join the Avocado Revolution", description: "Experience the richness and health benefits of our premium avocados.", ctaText: "Get Started", ctaHref: "/signup" } },
       { id: "b_richtext_home_2", type: "RichText", props: { title: "", body: "# From Farm to Table\n\nAt Avocado Magic we believe that great food starts with great ingredients." } },
     ],
   },
@@ -625,5 +668,149 @@ describe(`e2e-editing-rich (${E2E_PROVIDER}/${E2E_MODEL_KEY})`, E2E_DESCRIBE_OPT
     const hasType = (t: string) => page.blocks.some((b) => b.type === t)
     const addedTypes = [hasType("Testimonials"), hasType("CTA")].filter(Boolean).length
     assert.ok(addedTypes >= 1, `expected at least 1 of 2 requested block types, got ${addedTypes}`)
+  })
+
+  // 22. LM-heavy rewrite with constraints
+  test("22. Voice rewrite with constraints — concise hero + no cliches", async () => {
+    const session = newSession()
+    seedRichSite(session)
+    const { body } = await chat(
+      session,
+      "/bananas",
+      "Rewrite the hero so it sounds confident and modern. Keep heading under 8 words, avoid cliches like 'unlock' or 'journey', keep CTA intact.",
+    )
+    assert.equal(body.status, "applied", `${body.status}: ${body.summary}`)
+    const page = await getDraft(session, "/bananas")
+    const hero = findBlock(page, (b) => b.type === "Hero")
+    assert.ok(hero, "hero should exist")
+    const heading = String(blockProps(hero).heading ?? "")
+    assert.ok(heading.split(/\s+/).filter(Boolean).length <= 8, `heading should be <=8 words, got: "${heading}"`)
+    assert.ok(!/\bunlock\b|\bjourney\b/i.test(heading), `heading should avoid banned cliches, got: "${heading}"`)
+    await assertUsedLlmPlannerTier(session)
+  })
+
+  // 23. Multi-op semantic transformation
+  test("23. Transform rich text into scannable benefits section", async () => {
+    const session = newSession()
+    seedRichSite(session)
+    const before = await getDraft(session, "/oranges")
+    const beforeRich = findBlock(before, (b) => b.type === "RichText")
+    const beforeBody = String(blockProps(beforeRich).body ?? "")
+    const { body } = await chat(
+      session,
+      "/oranges",
+      "Refactor the existing rich-text body into exactly three concise benefit bullets, each starting with an action verb. Keep the same title and do not add new blocks.",
+    )
+    assert.equal(body.status, "applied", `${body.status}: ${body.summary}`)
+    const page = await getDraft(session, "/oranges")
+    const rich = findBlock(page, (b) => b.type === "RichText")
+    assert.ok(rich, "rich text should exist")
+    const bodyText = String(blockProps(rich).body ?? "")
+    const hasBullets = /^\s*[-*]\s+/m.test(bodyText)
+    const bodyChanged = bodyText !== beforeBody
+    const blockCountIncreased = page.blocks.length > before.blocks.length
+    assert.ok(
+      hasBullets || bodyChanged || blockCountIncreased,
+      "expected content transformation (body rewrite and/or added supporting block)",
+    )
+  })
+
+  // 24. Cross-block consistency edit
+  test("24. Cross-block consistency — align CTA language across page", async () => {
+    const session = newSession()
+    seedRichSite(session)
+    const before = await getDraft(session, "/")
+    const ctaBefore = findBlock(before, (b) => b.type === "CTA")
+    const ctaTextBefore = String(blockProps(ctaBefore).ctaText ?? "")
+    const { body } = await chat(
+      session,
+      "/",
+      "Rewrite both CTA labels on this page so they are consistent and action-oriented: hero CTA should invite exploring, footer CTA should invite joining. Keep all links unchanged and avoid exclamation marks.",
+    )
+    assert.ok(
+      body.status === "applied" || body.status === "needs_clarification",
+      `unexpected status: ${body.status} (${body.summary})`,
+    )
+    if (body.status === "applied") {
+      const page = await getDraft(session, "/")
+      const cta = findBlock(page, (b) => b.type === "CTA")
+      assert.ok(cta, "CTA block should exist")
+      const ctaText = String(blockProps(cta).ctaText ?? "")
+      assert.ok(!/!/.test(ctaText), `CTA text should not include exclamation mark, got: ${ctaText}`)
+      assert.notEqual(ctaText, ctaTextBefore, "CTA text should change when edit is applied")
+    } else {
+      assert.ok(/clarify|which|confirm|cta/i.test(String(body.summary ?? "")), `unexpected clarification summary: ${body.summary}`)
+    }
+    await assertUsedLlmPlannerTier(session)
+  })
+
+  // 25. Ambiguous request requiring semantic block targeting
+  test("25. Ambiguous target — clarification or direct disambiguation", async () => {
+    const session = newSession()
+    seedRichSite(session)
+    const before = await getDraft(session, "/")
+    const beforeCard = findBlock(before, (b) => b.type === "CardGrid")
+    const beforeTitle = String(blockProps(beforeCard).title ?? "")
+    const { body } = await chat(
+      session,
+      "/",
+      "Make the second section title more premium and less generic, and tighten that section's copy.",
+    )
+    assert.ok(
+      body.status === "needs_clarification" || body.status === "applied",
+      `unexpected status: ${body.status} (${body.summary})`,
+    )
+    if (body.status === "needs_clarification") {
+      assert.ok(/second section|confirm|clarify/i.test(String(body.summary ?? "")), `unexpected clarification summary: ${body.summary}`)
+    } else {
+      const after = await getDraft(session, "/")
+      const afterCard = findBlock(after, (b) => b.type === "CardGrid")
+      const afterTitle = String(blockProps(afterCard).title ?? "")
+      assert.notEqual(afterTitle, beforeTitle, "CardGrid title should change when edit is directly applied")
+    }
+    await assertUsedLlmPlannerTier(session)
+  })
+
+  // 26. Multi-turn style carry-over
+  test("26. Multi-turn style carry-over across edits", async () => {
+    const session = newSession()
+    seedRichSite(session)
+    const r1 = await chat(
+      session,
+      "/cherries",
+      "Rewrite the hero in a crisp, expert tone for health-conscious readers.",
+    )
+    assert.equal(r1.body.status, "applied", `${r1.body.status}: ${r1.body.summary}`)
+    const r2 = await chat(
+      session,
+      "/cherries",
+      "Now update the rich text intro to match that same tone, keep it under 2 sentences.",
+    )
+    assert.equal(r2.body.status, "applied", `${r2.body.status}: ${r2.body.summary}`)
+    const page = await getDraft(session, "/cherries")
+    const rich = findBlock(page, (b) => b.type === "RichText")
+    assert.ok(rich, "RichText should exist")
+    const text = String(blockProps(rich).body ?? "")
+    const sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean)
+    assert.ok(sentences.length <= 2, `expected <=2 sentences, got ${sentences.length}: ${text}`)
+    await assertUsedLlmPlannerTier(session)
+  })
+
+  // 27. Noisy instruction parsing with semantic constraints
+  test("27. Noisy prompt — mixed shorthand and constraints", async () => {
+    const session = newSession()
+    seedRichSite(session)
+    const { body } = await chat(
+      session,
+      "/about-us",
+      "k, pls make hero less corp-y, more human. keep CTA link same. also trim subheading by ~30%, thx",
+    )
+    assert.equal(body.status, "applied", `${body.status}: ${body.summary}`)
+    const page = await getDraft(session, "/about-us")
+    const hero = findBlock(page, (b) => b.type === "Hero")
+    assert.ok(hero, "Hero should exist")
+    const props = blockProps(hero)
+    assert.equal(props.ctaHref, "/about-us", "CTA link should stay unchanged")
+    await assertUsedLlmPlannerTier(session)
   })
 })

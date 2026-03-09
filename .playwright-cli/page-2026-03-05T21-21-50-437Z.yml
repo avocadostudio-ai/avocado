@@ -1,0 +1,136 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - text: Villa Pura Vida
+          - link "Switch" [ref=e8] [cursor=pointer]:
+            - /url: /sites
+        - generic [ref=e9]: AI
+        - generic [ref=e10]: Manifest
+      - generic [ref=e11]:
+        - combobox [ref=e13]:
+          - option "Home (/)" [selected]
+          - option "Buchung (/buchung)"
+          - option "Aussenbereiche (/aussenbereiche)"
+          - option "Aktivitaeten (/aktivitaeten)"
+          - option "Services (/services)"
+          - option "Information (/information)"
+          - option "Wellness (/wellness)"
+          - option "Region (/region)"
+        - generic [ref=e14]:
+          - button "Open settings" [ref=e15] [cursor=pointer]:
+            - img [ref=e16]
+          - button "Publish" [ref=e21] [cursor=pointer]
+    - article [ref=e23]:
+      - generic [ref=e24]: I can add sections, edit text, rearrange blocks, create new pages, and more. Click anything in the preview or describe what you'd like to change.
+      - generic [ref=e25]:
+        - button "Add testimonials below hero" [ref=e26] [cursor=pointer]
+        - button "Change the hero headline" [ref=e27] [cursor=pointer]
+        - button "Create a new /about page" [ref=e28] [cursor=pointer]
+        - button "Add a FAQ section" [ref=e29] [cursor=pointer]
+    - separator "Resize input panel"
+    - generic [ref=e31]:
+      - textbox [ref=e33]
+      - generic [ref=e34]:
+        - generic [ref=e36]:
+          - generic: OpenAI gpt-4o
+          - combobox "Select AI model" [ref=e37] [cursor=pointer]:
+            - option "OpenAI gpt-4o-mini"
+            - option "OpenAI gpt-4o" [selected]
+            - option "OpenAI o1"
+            - option "OpenAI o3"
+            - option "Claude Haiku"
+            - option "Claude Sonnet"
+            - option "Claude Sonnet+Thinking"
+            - option "Claude Opus"
+        - group "Voice and send actions" [ref=e38]:
+          - button "Add image" [ref=e39] [cursor=pointer]:
+            - img [ref=e40]
+          - button "Start voice input" [ref=e41] [cursor=pointer]:
+            - img [ref=e42]
+          - button "Send message" [disabled] [ref=e45]:
+            - img [ref=e46]
+  - iframe [ref=e49]:
+    - generic [active] [ref=f3e1]:
+      - banner [ref=f3e2]:
+        - generic [ref=f3e4]:
+          - link "Villa Pura Vida Logo" [ref=f3e5] [cursor=pointer]:
+            - /url: /
+            - img "Villa Pura Vida Logo" [ref=f3e6]
+          - button "Toggle mobile menu" [ref=f3e7] [cursor=pointer]
+      - main [ref=f3e12]:
+        - generic [ref=f3e13]:
+          - generic [ref=f3e17] [cursor=pointer]:
+            - heading "Villa Pura Vida" [level=1] [ref=f3e18]
+            - paragraph [ref=f3e19]: Ihr privates Luxus-Refugium an der Costa Blanca
+            - link "Villa entdecken" [ref=f3e20]:
+              - /url: /buchung
+          - generic [ref=f3e22]:
+            - heading "Highlights & Ausstattung" [level=2] [ref=f3e23]
+            - generic [ref=f3e24]:
+              - generic [ref=f3e25]:
+                - heading "Wellness & Pool" [level=3] [ref=f3e26]
+                - paragraph [ref=f3e27]: Infinity Panorama Pool, Sauna und Whirlpool.
+              - generic [ref=f3e28]:
+                - heading "Sport & Aktivitäten" [level=3] [ref=f3e29]
+                - paragraph [ref=f3e30]: Fitness, Billard, Tischtennis und mehr.
+              - generic [ref=f3e31]:
+                - heading "Atemberaubende Aussicht" [level=3] [ref=f3e32]
+                - paragraph [ref=f3e33]: Panoramablick auf Berge und Meer.
+          - generic [ref=f3e35]:
+            - heading "Ihr Traumurlaub beginnt hier" [level=2] [ref=f3e36]
+            - paragraph [ref=f3e37]: Kontaktieren Sie uns für Ihren Aufenthalt in der Villa Pura Vida.
+            - generic [ref=f3e38]:
+              - link "Jetzt anfragen" [ref=f3e39] [cursor=pointer]:
+                - /url: /buchung
+              - link "Mehr entdecken" [ref=f3e40] [cursor=pointer]:
+                - /url: /aussenbereiche
+      - contentinfo [ref=f3e41]:
+        - generic [ref=f3e42]:
+          - generic [ref=f3e43]:
+            - generic [ref=f3e44]:
+              - img "Villa Pura Vida Logo" [ref=f3e45]
+              - paragraph [ref=f3e46]: Ihr privates Paradies an der Costa Blanca
+            - generic [ref=f3e47]:
+              - heading "Navigation" [level=4] [ref=f3e48]
+              - list [ref=f3e49]:
+                - listitem [ref=f3e50]:
+                  - link "Die Villa" [ref=f3e51] [cursor=pointer]:
+                    - /url: /
+                - listitem [ref=f3e52]:
+                  - link "Außenbereiche" [ref=f3e53] [cursor=pointer]:
+                    - /url: /aussenbereiche
+                - listitem [ref=f3e54]:
+                  - link "Wellness & Spa" [ref=f3e55] [cursor=pointer]:
+                    - /url: /wellness
+                - listitem [ref=f3e56]:
+                  - link "Aktivitäten" [ref=f3e57] [cursor=pointer]:
+                    - /url: /aktivitaeten
+                - listitem [ref=f3e58]:
+                  - link "Region" [ref=f3e59] [cursor=pointer]:
+                    - /url: /region
+                - listitem [ref=f3e60]:
+                  - link "Buchung & Preise" [ref=f3e61] [cursor=pointer]:
+                    - /url: /buchung
+            - generic [ref=f3e62]:
+              - heading "Kontakt" [level=4] [ref=f3e63]
+              - list [ref=f3e64]:
+                - listitem [ref=f3e65]:
+                  - link "+41 79 200 00 40 🇨🇭 🇩🇪 🇪🇸" [ref=f3e66] [cursor=pointer]:
+                    - /url: tel:+41792000040
+                - listitem [ref=f3e67]:
+                  - link "+49 176 63399922 🇩🇪 🇬🇧" [ref=f3e68] [cursor=pointer]:
+                    - /url: tel:+4917663399922
+                - listitem [ref=f3e69]:
+                  - link "WhatsApp Gruppe" [ref=f3e70] [cursor=pointer]:
+                    - /url: https://chat.whatsapp.com/KgOzpKRIlQxFNobfuTzNPs?mode=wwt
+                    - img [ref=f3e71]
+                    - generic [ref=f3e73]: WhatsApp Gruppe
+                - listitem [ref=f3e74]:
+                  - text: Pedreguer, Denia
+                  - text: Costa Blanca, Spanien
+          - paragraph [ref=f3e76]: © 2026 Villa Pura Vida. Alle Rechte vorbehalten.
+      - button "Scroll to top":
+        - img
+      - alert [ref=f3e77]
