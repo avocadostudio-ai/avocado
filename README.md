@@ -150,8 +150,12 @@ Required settings:
 - Site:
   - `ORCHESTRATOR_URL=https://<orchestrator-host>` (preview/editor mode)
   - `NEXT_PUBLIC_ENABLE_EDITOR=1` (for demo environments)
-  - `NEXT_PUBLIC_EDITOR_ORIGIN=https://<editor-host>`
+  - `NEXT_PUBLIC_EDITOR_ORIGIN=https://<editor-host>` (no trailing slash)
+  - `DRAFT_MODE_SECRET=<shared-secret>` (required for draft preview entry)
 - Editor:
   - `VITE_SITE_ORIGIN=https://<site-host>`
+  - `VITE_SITE_DRAFT_SECRET=<shared-secret>` (must match site `DRAFT_MODE_SECRET`)
   - `VITE_ORCHESTRATOR_URL=https://<orchestrator-host>`
   - `VITE_PUBLISH_TOKEN=<same as orchestrator PUBLISH_TOKEN>` (if publish auth enabled)
+
+**Important:** Origin env vars (`NEXT_PUBLIC_EDITOR_ORIGIN`, `VITE_SITE_ORIGIN`, `ORCHESTRATOR_CORS_ORIGINS`) must **not** have a trailing slash. `event.origin` in postMessage never includes a trailing slash, so a mismatch silently drops all messages.
