@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import type { ApplyPatchMessage, Operation } from "@ai-site-editor/shared"
 import type { SiteMessage } from "../lib/editor-types"
-import { siteOrigin } from "../lib/editor-utils"
+import { siteOrigin as defaultSiteOrigin } from "../lib/editor-utils"
 
 export type PreviewBridgeCallbacks = {
   onBlockClicked: (slug: string, blockId: string | undefined, blockType: string | undefined, editablePath: string | undefined) => void
@@ -15,7 +15,8 @@ export type PreviewBridgeCallbacks = {
   onInlineTextCommitted: (slug: string, blockId: string, editablePath: string, value: string) => void
 }
 
-export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks) {
+export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks, targetOrigin?: string) {
+  const siteOrigin = targetOrigin || defaultSiteOrigin
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const lastConfirmedVersionBySlug = useRef<Map<string, number>>(new Map())
   const pendingTxBySlug = useRef<Map<string, { txId: string; timer: ReturnType<typeof setTimeout> }>>(new Map())
@@ -147,7 +148,7 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
 
     window.addEventListener("message", onMessage)
     return () => window.removeEventListener("message", onMessage)
-  }, [slug, callbacks])
+  }, [slug, callbacks, siteOrigin])
 
   return { iframeRef, postToSite, postPatchToSite }
 }
