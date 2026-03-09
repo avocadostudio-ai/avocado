@@ -27,6 +27,7 @@ import {
   isComplexTaskRequest,
   isVariationRequest,
   orchestrator,
+  resolveSiteOrigin,
   siteOrigin,
   splitAiInsightChanges
 } from "../lib/editor-utils"
@@ -93,6 +94,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     getBlockDefaultProps
   } = config
 
+  const activeSiteOrigin = resolveSiteOrigin(activeSiteConfig)
   const lastStructuralNoticeRef = useRef<number>(0)
 
   const pushStructuralDisabledNotice = (action: string) => {
@@ -230,7 +232,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       // Auto-bootstrap for new site namespaces with no draft pages.
       try {
-        const bootstrapSourceRes = await fetch(`${siteOrigin}/api/editor/bootstrap-pages?siteId=${encodeURIComponent(siteId)}`)
+        const bootstrapSourceRes = await fetch(`${activeSiteOrigin}/api/editor/bootstrap-pages?siteId=${encodeURIComponent(siteId)}`)
         if (bootstrapSourceRes.ok) {
           const bootstrapSource = (await bootstrapSourceRes.json()) as { pages?: unknown }
           if (Array.isArray(bootstrapSource.pages) && bootstrapSource.pages.length > 0) {
