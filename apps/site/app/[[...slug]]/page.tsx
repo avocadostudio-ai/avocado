@@ -19,7 +19,7 @@ type PageProps = {
 
 const DEFAULT_SESSION = "dev"
 const DEFAULT_SITE_ID = "adventure-atlas"
-const DEFAULT_EDITOR_ORIGIN = process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? ""
+const DEFAULT_EDITOR_ORIGIN = (process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? "").replace(/\/+$/, "")
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
 
 function buildSlug(parts?: string[]) {
@@ -130,7 +130,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const session = getSingleValue(resolvedSearch.session) ?? DEFAULT_SESSION
   const siteId = getSingleValue(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
   const siteName = siteNameFromId(siteId) || "Site"
-  const editorOrigin = getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN
+  const editorOrigin = (getSingleValue(resolvedSearch.editorOrigin) ?? DEFAULT_EDITOR_ORIGIN).replace(/\/+$/, "")
   const siteLogo = siteLogoFromId(siteId)
 
   const { page, slugs: fetchedSlugs } = await resolveRuntimePageAndNav({
