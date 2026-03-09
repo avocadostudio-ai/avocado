@@ -69,7 +69,7 @@ export function isExplicitImageGenRequest(message: string): boolean {
   return (
     /\b(?:generate|create)\b[^.!?\n]*\b(?:image|photo|picture)\b/i.test(lower) ||
     /\bnew\s+(?:hero\s+)?(?:image|photo|picture)\b/i.test(lower) ||
-    /\breplace\s+(?:the\s+)?(?:hero\s+)?(?:image|photo|picture)\b/i.test(lower)
+    /\breplace\b[^.!?\n]*\b(?:image|photo|picture)\b/i.test(lower)
   )
 }
 
