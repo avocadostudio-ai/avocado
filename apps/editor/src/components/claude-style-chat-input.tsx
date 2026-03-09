@@ -329,7 +329,21 @@ export default function ClaudeStyleChatInput(props: Props) {
         {imagePasteError ? <div className="composer-input-note composer-input-note-error">{imagePasteError}</div> : null}
       </div>
       <div className="composer-actions">
-        <div className="composer-actions-center">
+        <div className="composer-actions-left">
+          {!isRecording && (
+            <button
+              type="button"
+              className="composer-ghost-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploadingImage || isAnalyzingImage}
+              aria-label="Add image"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+          )}
           <label className="composer-model-picker">
             <span>{`${PROVIDER_LABELS[provider]} ${modelLabel(provider, modelKey)}`}</span>
             <select
@@ -368,18 +382,6 @@ export default function ClaudeStyleChatInput(props: Props) {
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className="composer-ghost-btn"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading || isUploadingImage || isAnalyzingImage}
-                aria-label="Add image"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
-                </svg>
-              </button>
               <button
                 type="button"
                 className="composer-ghost-btn"

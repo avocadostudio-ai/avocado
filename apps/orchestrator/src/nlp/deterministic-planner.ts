@@ -422,14 +422,33 @@ export function postEditSuggestions(args: { plan: EditPlan; current: PageDoc; bo
   const suggestions: string[] = []
   const existingTypes = new Set(current.blocks.map((b) => b.type))
 
+  // Detect if this was primarily an image update
+  const isImageUpdate = plan.change_log.some((entry) =>
+    /\b(image|images|unsplash|photo)\b/i.test(entry)
+  )
+
   for (const op of plan.ops) {
     if (op.op === "update_props") {
       const block = current.blocks.find((b) => b.id === op.blockId)
       if (block) {
-        const patchKeys = Object.keys(op.patch as Record<string, unknown>)
-        const otherKeys = editablePropsFromBlock(block).filter((k) => !patchKeys.includes(k))
-        for (const key of otherKeys.slice(0, 2)) {
-          suggestions.push(promptFromPropKey(key))
+        if (isImageUpdate) {
+          // After image updates, suggest content edits relevant to the block
+          const blockType = block.type
+          if (blockType === "CardGrid" || blockType === "Card") {
+            suggestions.push("Update card descriptions", "Change card CTA links")
+          } else if (blockType === "FeatureGrid") {
+            suggestions.push("Update feature descriptions")
+          } else if (blockType === "Hero") {
+            suggestions.push("Rewrite the hero headline", "Update the CTA text")
+          } else {
+            suggestions.push(`Update the ${blockType} text`)
+          }
+        } else {
+          const patchKeys = Object.keys(op.patch as Record<string, unknown>)
+          const otherKeys = editablePropsFromBlock(block).filter((k) => !patchKeys.includes(k))
+          for (const key of otherKeys.slice(0, 2)) {
+            suggestions.push(promptFromPropKey(key))
+          }
         }
       }
     } else if (op.op === "add_block") {
@@ -912,6 +931,10 @@ export function isHighConfidenceDeterministicCase(args: {
   }
 
   // Case 3: Simple add/remove with clear block type — no LLM needed
+  // Bail out for compound requests ("remove X and add Y") — these need the LLM
+  const hasCompoundAction = /\b(remove|delete|clear)\b.+\band\b.+\b(add|insert|create)\b/i.test(raw)
+    || /\b(add|insert|create)\b.+\band\b.+\b(remove|delete|clear)\b/i.test(raw)
+  if (hasCompoundAction) return false
   const action = inferActionFromMessage(raw)
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
   if (action === "add" && inferBlockTypeFromText(raw)) return true
@@ -1838,7 +1861,9 @@ export function compileDeterministicPlan(args: {
       }
     }
     // Detect item-level removal (e.g., "remove the first question from the FAQ")
-    const asksRemoveItem = /\b(question|item|entry|testimonial|card|feature|first|second|third|last)\b/i.test(lowerMessage)
+    // Skip when the user wants to remove image *properties* (e.g. "remove images from cards")
+    const asksRemoveImageProps = /\bremove\b.*\b(images?|photos?|pictures?)\b.*\b(from|in|on)\b/i.test(lowerMessage)
+    const asksRemoveItem = !asksRemoveImageProps && /\b(question|item|entry|testimonial|card|feature|first|second|third|last)\b/i.test(lowerMessage)
     if (asksRemoveItem) {
       const bProps = target.props as Record<string, unknown> | undefined
       if (bProps) {

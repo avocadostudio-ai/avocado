@@ -597,6 +597,13 @@ textarea {
   animation: streaming-pulse 2s ease-in-out infinite;
 }
 
+.streaming-pill.is-active.is-text {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  animation: none;
+}
+
 .streaming-pill.is-error {
   color: #7f1d1d;
   background: #fee2e2;
@@ -637,13 +644,18 @@ textarea {
   letter-spacing: 0;
   font-weight: 500;
   color: #667085;
-  background-image: linear-gradient(110deg, #667085 20%, #909db0 40%, #c5cfdb 50%, #909db0 60%, #667085 80%);
-  background-size: 210% 100%;
+  background-image: linear-gradient(
+    110deg,
+    #7888a0 0%, #5b9bd5 20%, #93c5fd 40%,
+    #bddcff 50%, #93c5fd 60%, #5b9bd5 80%,
+    #7888a0 100%
+  );
+  background-size: 300% 100%;
   background-position: 100% 50%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: stream-text-ripple 2.6s ease-in-out infinite;
+  animation: stream-text-ripple 3s ease-in-out infinite;
   opacity: 1;
 }
 
@@ -708,8 +720,8 @@ textarea {
 }
 
 @keyframes stream-text-ripple {
-  0% { background-position: 120% 50%; }
-  100% { background-position: -120% 50%; }
+  0% { background-position: 100% 50%; }
+  100% { background-position: -100% 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -734,36 +746,57 @@ textarea {
   height: 100%;
   min-height: 0;
   border: 1.5px solid #d1d5db;
-  border-radius: 32px;
+  border-radius: 18px;
   background: #fff;
   padding: 16px 12px 11px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 200ms ease;
 }
 
 .composer-shell.is-loading {
-  border-color: #67c9bf;
+  border-color: transparent;
+  isolation: isolate;
+}
+
+.composer-shell.is-loading::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 20px;
+  z-index: -2;
+  background: conic-gradient(
+    from var(--rainbow-angle, 0deg),
+    #ff2d55, #ff6b00, #ffdd00, #00ff88, #00d4ff, #7b61ff, #ff44cc, #ff2d55
+  );
+  filter: blur(0px);
+  box-shadow:
+    0 0 8px 1px rgba(248, 113, 113, 0.25),
+    0 0 8px 1px rgba(251, 191, 36, 0.2),
+    0 0 8px 1px rgba(56, 189, 248, 0.2),
+    0 0 8px 1px rgba(196, 132, 252, 0.2);
+  animation: rainbow-spin 1.5s linear infinite;
 }
 
 .composer-shell.is-loading::after {
   content: "";
   position: absolute;
-  bottom: 0;
-  left: 14px;
-  right: 14px;
-  height: 2px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, transparent, #0f766e, transparent);
-  animation: composer-loading-bar 1.5s ease-in-out infinite;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -1;
+  background: inherit;
 }
 
-@keyframes composer-loading-bar {
-  0% { transform: translateX(-100%); opacity: 0; }
-  50% { opacity: 1; }
-  100% { transform: translateX(100%); opacity: 0; }
+@property --rainbow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes rainbow-spin {
+  to { --rainbow-angle: 360deg; }
 }
 
 .composer-input-area {
@@ -820,22 +853,23 @@ textarea {
   min-width: 0;
 }
 
-.composer-actions-center {
+.composer-actions-left {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: flex-start;
   gap: 3px;
   flex: 1 1 auto;
   min-width: 0;
   padding: 0 2px 0 0;
+  margin-left: -9px;
   flex-wrap: nowrap;
 }
 
 .composer-actions-right {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 4px;
   margin-left: 6px;
   flex: 0 0 auto;
   min-width: max-content;
@@ -2174,7 +2208,7 @@ textarea {
   }
 
   .composer-shell {
-    border-radius: 24px;
+    border-radius: 16px;
     padding: 14px 11px 10px;
     gap: 8px;
   }
@@ -2254,7 +2288,7 @@ textarea {
     align-items: flex-end;
   }
 
-  .composer-actions-center {
+  .composer-actions-left {
     flex-wrap: wrap;
     row-gap: 6px;
   }
