@@ -897,6 +897,9 @@ export async function withUnsplashHeroImage(args: {
   })
   let changed = false
   let placeholderSkipped = false
+  let resolvedImageCount = 0
+  let skippedImageCount = 0
+  const globalUsedImageUrls = new Set<string>()
   let sourceQuery: string | undefined
   let imageSource: "ai-generated" | "unsplash" | "placeholder" = "placeholder"
   const preferredQueries = new Map<string, string>()
@@ -981,7 +984,8 @@ export async function withUnsplashHeroImage(args: {
       }
       if (!resolved) {
         args.onStatusUpdate?.("Finding a suitable image...")
-        const usedImageUrls = currentImageUrl ? new Set([currentImageUrl]) : undefined
+        if (currentImageUrl) globalUsedImageUrls.add(currentImageUrl)
+        const usedImageUrls = globalUsedImageUrls.size > 0 ? globalUsedImageUrls : undefined
         resolved = await resolveUnsplashImage(
           imageQuery,
           { subjectKeywords: imageKeywordsFromQuery(imageQuery, 4), usedImageUrls },
@@ -998,6 +1002,7 @@ export async function withUnsplashHeroImage(args: {
           "Skipping placeholder image — no relevant image source available"
         )
         placeholderSkipped = true
+        skippedImageCount++
         continue
       }
 
@@ -1025,6 +1030,8 @@ export async function withUnsplashHeroImage(args: {
         "Applied image rewrite"
       )
       changed = true
+      resolvedImageCount++
+      globalUsedImageUrls.add(resolved.url)
     }
     op.patch = patchCandidate
   }
@@ -1186,11 +1193,17 @@ export async function withUnsplashHeroImage(args: {
   }
 
   if (changed) {
+    const countLabel = resolvedImageCount > 1 ? `${resolvedImageCount} matching images` : "a matching image"
     const sourceLabel =
-      imageSource === "ai-generated" ? "Generated a new image with AI"
-      : imageSource === "unsplash" ? "Found a matching image from Unsplash"
-      : "Set Hero image from placeholder"
+      imageSource === "ai-generated"
+        ? (resolvedImageCount > 1 ? `Generated ${resolvedImageCount} images with AI` : "Generated a new image with AI")
+        : imageSource === "unsplash"
+          ? `Found ${countLabel} from Unsplash`
+          : "Set Hero image from placeholder"
     plan.change_log = [...plan.change_log, `${sourceLabel}.`]
+    if (skippedImageCount > 0) {
+      plan.change_log = [...plan.change_log, `${skippedImageCount} image${skippedImageCount > 1 ? "s" : ""} could not be resolved.`]
+    }
     // Rewrite summary to not mislead about the actual image source
     plan.summary_for_user = plan.summary_for_user
       .replace(/\bUnsplash\s+/gi, "")
