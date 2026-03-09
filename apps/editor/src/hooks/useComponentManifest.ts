@@ -18,7 +18,7 @@ export type ComponentManifestState = {
   reason?: string
 }
 
-export function useComponentManifest() {
+export function useComponentManifest(origin?: string) {
   const [state, setState] = useState<ComponentManifestState>({
     status: "loading",
     components: [],
@@ -31,7 +31,8 @@ export function useComponentManifest() {
 
     const run = async () => {
       try {
-        const res = await fetch(`${siteOrigin}/api/editor/components`)
+        const base = origin || siteOrigin
+        const res = await fetch(`${base}/api/editor/components`)
         if (!res.ok) {
           if (!active) return
           setState({
@@ -102,7 +103,7 @@ export function useComponentManifest() {
       active = false
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [])
+  }, [origin])
 
   const byType = useMemo(() => {
     const map = new Map<string, EditorComponentDefinition>()

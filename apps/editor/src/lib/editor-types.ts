@@ -194,6 +194,7 @@ export type SiteConfig = {
   vercelDeployHookUrl?: string
   tone?: string
   constraints?: string[]
+  previewUrl?: string
 }
 
 export type RestoreSnapshot = {
