@@ -309,7 +309,7 @@ function EditorPage({
     }
   }), [componentManifest.allowStructuralEdits, slug])
 
-  const preview = usePreviewBridge(slug, previewCallbacks)
+  const preview = usePreviewBridge(slug, previewCallbacks, activeSiteOrigin)
 
   const chatEngine = useChatEngine({
     session,
