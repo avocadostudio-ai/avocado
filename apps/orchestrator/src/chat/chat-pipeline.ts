@@ -994,7 +994,7 @@ export async function withUnsplashHeroImage(args: {
         if (resolved) imageSource = resolved.url.includes("unsplash") ? "unsplash" : "placeholder"
       }
 
-      if (!resolved || imageSource === "placeholder") {
+      if (!resolved || (imageSource === "placeholder" && !explicitUnsplashRequest && !explicitImageGen && !userImagePrompt)) {
         deleteValueAtPath(patchCandidate, targetImage.path)
         deleteValueAtPath(patchCandidate, targetImage.altPath)
         args.log.warn(
