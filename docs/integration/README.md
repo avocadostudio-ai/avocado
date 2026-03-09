@@ -18,9 +18,10 @@ Use this page as the entry point for onboarding any Next.js site.
 
 ## Required endpoints
 
-- `GET /api/editor/components`
-- `GET /api/draft?secret=...&redirect=...`
-- `GET /api/draft/disable?redirect=...`
+- `GET /api/editor/components` — component manifest for structural edits
+- `GET /api/editor/bootstrap-pages` — returns `{ pages: PageDoc[] }` of published content; the editor calls this to seed the orchestrator with initial draft content when a session has no pages yet
+- `GET /api/draft?secret=...&redirect=...` — enables Next.js draft mode and redirects
+- `GET /api/draft/disable?redirect=...` — disables draft mode and redirects
 
 ## Required environment variables
 

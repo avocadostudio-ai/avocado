@@ -2,11 +2,15 @@
 
 This document summarizes the changes needed to publish this project on Vercel.
 
-## Current decision (Feb 25, 2026)
+## Current state (Mar 2026)
 
-Current scope is **Phase 1 only: public site on Vercel**.
+Full demo deployment is live: site + editor on Vercel, orchestrator on Render.
 
-Phase 2 (editor + orchestrator on Vercel) is explicitly deferred.
+- Site: `https://avocado-site.vercel.app`
+- Editor: `https://avocado-editor.vercel.app`
+- Orchestrator: Render (long-running Node process via `tsx`)
+
+Phase 1 (public site only) and Phase 2 (full stack) are both supported.
 
 ### Required now (Phase 1)
 
@@ -189,3 +193,40 @@ Behavior: can read live draft content from orchestrator for demo/editing.
   - `ORCHESTRATOR_CORS_ORIGINS=https://<staging-site-host>,https://<editor-host>`
 
 Behavior: publish writes to beta branch, preventing accidental updates to production `main`.
+
+---
+
+## Production troubleshooting
+
+### Block selector / overlay not working
+
+The block selector requires a working postMessage channel between editor iframe and site. Check these in order:
+
+1. **Draft mode not enabled** — without `VITE_SITE_DRAFT_SECRET` on the editor, the iframe URL uses `__editor=1` which is ignored in production. Set `VITE_SITE_DRAFT_SECRET` on editor and `DRAFT_MODE_SECRET` on site (matching values).
+
+2. **`NEXT_PUBLIC_ENABLE_EDITOR` not set** — the site's `editorMode` is `false` in production unless `NEXT_PUBLIC_ENABLE_EDITOR=1` is set. Without it, `PreviewBridge` never mounts and blocks have no click handlers.
+
+3. **Origin mismatch in postMessage** — `event.origin` never has a trailing slash. If `NEXT_PUBLIC_EDITOR_ORIGIN` or `VITE_SITE_ORIGIN` has a trailing slash, all messages are silently dropped. Always omit trailing slashes.
+
+4. **Missing `/api/editor/bootstrap-pages`** — the editor calls this on the site to seed the orchestrator with initial content. Without it, the orchestrator has no draft pages and the site shows "Draft unavailable".
+
+5. **CORS on orchestrator** — `ORCHESTRATOR_CORS_ORIGINS` must include both the editor and site origins.
+
+### Required env vars (full demo)
+
+| Component | Variable | Notes |
+|-----------|----------|-------|
+| **Orchestrator** | `OPENAI_API_KEY` | or `ANTHROPIC_API_KEY` |
+| | `ORCHESTRATOR_PUBLIC_ORIGIN` | its own public URL |
+| | `ORCHESTRATOR_CORS_ORIGINS` | comma-separated editor + site origins |
+| **Site** | `ORCHESTRATOR_URL` | orchestrator public URL |
+| | `NEXT_PUBLIC_ENABLE_EDITOR=1` | enables editor mode |
+| | `NEXT_PUBLIC_EDITOR_ORIGIN` | editor URL, **no trailing slash** |
+| | `DRAFT_MODE_SECRET` | shared secret with editor |
+| **Editor** | `VITE_SITE_ORIGIN` | site URL, **no trailing slash** |
+| | `VITE_SITE_DRAFT_SECRET` | must match site `DRAFT_MODE_SECRET` |
+| | `VITE_ORCHESTRATOR_URL` | orchestrator public URL |
+
+### Orchestrator on Render
+
+The orchestrator runs via `tsx src/index.ts` (not compiled JS). `tsx` is a production dependency. The build step is `tsc --noEmit` (typecheck only). Render build command: `pnpm install --frozen-lockfile && pnpm --filter @ai-site-editor/orchestrator build`.

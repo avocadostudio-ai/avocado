@@ -61,10 +61,11 @@ http://localhost:3000/api/draft/disable?redirect=%2Fpricing
 ## Minimal behavior checks
 
 1. `GET /api/editor/components` returns valid component manifest JSON.
-2. Wrong secret returns `401` from `/api/draft`.
-3. Valid secret redirects and sets draft cookie.
-4. `/api/draft/disable` clears draft cookie and redirects.
-5. Same page renders published content when draft cookie is absent.
+2. `GET /api/editor/bootstrap-pages` returns `{ pages: [...] }` with published pages.
+3. Wrong secret returns `401` from `/api/draft`.
+4. Valid secret redirects and sets draft cookie.
+5. `/api/draft/disable` clears draft cookie and redirects.
+6. Same page renders published content when draft cookie is absent.
 
 ## Contract self-check (recommended before onboarding)
 
