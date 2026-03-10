@@ -124,6 +124,20 @@ export function firstUrlFromText(text: string): string | undefined {
   return match ? match[0] : undefined
 }
 
+/** Build a compact page directory from the session draft for the system prompt. */
+function buildPageDirectory(session: string): string {
+  const draft = getSessionDraft(session)
+  if (draft.size === 0) return ""
+  const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
+  return slugs
+    .map((slug) => {
+      const page = draft.get(slug)!
+      const blockTypes = page.blocks.map((b) => b.type).join(", ")
+      return `  ${slug} "${page.title}" (${blockTypes})`
+    })
+    .join("\n")
+}
+
 function sentenceCase(text: string) {
   const trimmed = text.trim()
   if (!trimmed) return trimmed
@@ -1693,11 +1707,13 @@ export async function runChatPipeline(
     }
   }
   const sanitizedMessage = sanitizeMessageForPlanning(body.message ?? "")
+  const pageDirectory = buildPageDirectory(body.session)
   const siteContextBlock = buildSiteContextBlock({
     sitePurpose: body.sitePurpose,
     siteHosting: body.siteHosting,
     businessContext: body.businessContext,
-    siteContext: body.siteContext
+    siteContext: body.siteContext,
+    pageDirectory: pageDirectory || undefined
   })
   // Site context is now passed to the LLM system prompt (cacheable) instead of the user message.
   const plannerMessage = plannerMessageWithPendingContext(body.session, sanitizedMessage)
