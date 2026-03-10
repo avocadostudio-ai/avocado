@@ -821,31 +821,38 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
-    return await new Promise<boolean>((resolve) => {
-      const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
-      const params = new URLSearchParams({
-        session,
-        siteId,
-        sitePurpose: contextPayload.sitePurpose || "",
-        businessContext: JSON.stringify(contextPayload.businessContext),
-        siteContext: JSON.stringify(contextPayload.siteContext),
-        slug: slugRef.current,
-        message: finalMessage,
-        modelKey,
-        provider
-      })
-      if (activeBlockIdRef.current) params.set("activeBlockId", activeBlockIdRef.current)
-      if (activeBlockTypeRef.current) params.set("activeBlockType", activeBlockTypeRef.current)
-      if (activeEditablePathRef.current) params.set("activeEditablePath", activeEditablePathRef.current)
-      if (componentManifest) params.set("componentsManifest", JSON.stringify(componentManifest))
-      if (siteCapabilities) params.set("siteCapabilities", JSON.stringify(siteCapabilities))
-      if (extraParams) {
-        for (const [key, value] of Object.entries(extraParams)) {
-          params.set(key, value)
-        }
-      }
+    const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
+    const payload = withIntegrationContext({
+      session,
+      siteId,
+      ...contextPayload,
+      slug: slugRef.current,
+      message: finalMessage,
+      modelKey,
+      provider,
+      activeBlockId: activeBlockIdRef.current,
+      activeBlockType: activeBlockTypeRef.current,
+      activeEditablePath: activeEditablePathRef.current,
+      ...(extraParams ?? {})
+    }, componentManifest, siteCapabilities)
 
-      const source = new EventSource(`${orchestrator}/chat/stream?${params.toString()}`)
+    let streamId: string
+    try {
+      const res = await fetch(`${orchestrator}/chat/start`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) return false
+      const data = await res.json() as { streamId?: string }
+      if (!data.streamId) return false
+      streamId = data.streamId
+    } catch {
+      return false
+    }
+
+    return await new Promise<boolean>((resolve) => {
+      const source = new EventSource(`${orchestrator}/chat/stream?streamId=${streamId}`)
       let settled = false
       let gotAnyEvent = false
       let pendingFocusBlockId: string | null = null

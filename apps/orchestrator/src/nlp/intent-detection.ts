@@ -270,6 +270,8 @@ export function isInfoQuery(message: string) {
 
 export function isAdviceQuery(message: string) {
   const m = normalizeForIntent(message)
+  // Exclude structural action requests that happen to contain "should we/I"
+  if (/\b(reorder|reorganize|restructure|rearrange|sort|move)\b/.test(m) && /\bpages?\b/.test(m)) return false
   return (
     /\b(is it good|is this good|should (we|i)|do you recommend|would you recommend)\b/.test(m) ||
     /\bwhat do you think\b/.test(m) ||

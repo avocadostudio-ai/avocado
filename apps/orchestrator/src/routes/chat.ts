@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import type { FastifyInstance } from "fastify"
 import type { ChatRequestBody } from "../nlp/intent-detection.js"
 import {
@@ -11,6 +12,36 @@ import {
 } from "../chat/variation-pipeline.js"
 import { scopedSessionKey } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
+
+const STREAM_CONTEXT_TTL_MS = 60_000
+const MAX_PENDING_PER_SESSION = 3
+const MAX_BODY_SIZE_BYTES = 512 * 1024 // 512 KB
+
+type StreamState = "pending" | "active" | "done"
+type StreamEntry = {
+  body: ChatRequestBody
+  session: string
+  siteId: string
+  origin: string
+  createdAt: number
+  state: StreamState
+}
+const streamContexts = new Map<string, StreamEntry>()
+
+function cleanExpiredStreamContexts() {
+  const now = Date.now()
+  for (const [id, entry] of streamContexts) {
+    if (now - entry.createdAt > STREAM_CONTEXT_TTL_MS) streamContexts.delete(id)
+  }
+}
+
+function countPendingForSession(session: string, siteId?: string): number {
+  let count = 0
+  for (const entry of streamContexts.values()) {
+    if (entry.session === session && entry.siteId === (siteId ?? "") && entry.state !== "done") count++
+  }
+  return count
+}
 
 export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
   const pipelineCtx: ChatPipelineContext = { log: app.log, chatTelemetry: ctx.chatTelemetry, modelLookup: ctx.modelLookup, availableProviders: ctx.availableProviders }
@@ -27,10 +58,82 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
     return reply.code(result.code).send(result.payload)
   })
 
-  app.get("/chat/stream", async (request, reply) => {
-    const query = request.query as ChatRequestBody
-    const scopedQuery: ChatRequestBody = { ...query, session: scopedSessionKey(query.session, query.siteId) }
+  app.post("/chat/start", async (request, reply) => {
+    cleanExpiredStreamContexts()
+
+    const rawLength = request.headers["content-length"]
+    if (rawLength && Number(rawLength) > MAX_BODY_SIZE_BYTES) {
+      return reply.code(413).send({ error: "Request body too large" })
+    }
+
+    const body = request.body as ChatRequestBody
+    if (!body.session) {
+      return reply.code(400).send({ error: "session is required" })
+    }
+
+    if (countPendingForSession(body.session, body.siteId ?? "") >= MAX_PENDING_PER_SESSION) {
+      return reply.code(429).send({ error: "Too many pending streams for this session" })
+    }
+
+    const streamId = randomUUID()
     const origin = request.headers.origin ?? "*"
+    streamContexts.set(streamId, {
+      body,
+      session: body.session,
+      siteId: body.siteId ?? "",
+      origin,
+      createdAt: Date.now(),
+      state: "pending"
+    })
+    return reply.code(200).send({ streamId })
+  })
+
+  app.get("/chat/stream", async (request, reply) => {
+    const rawQuery = request.query as Record<string, string>
+    let query: ChatRequestBody
+    let streamEntry: StreamEntry | undefined
+    const reqOrigin = request.headers.origin ?? "*"
+
+    if (rawQuery.streamId) {
+      streamEntry = streamContexts.get(rawQuery.streamId)
+      if (!streamEntry || Date.now() - streamEntry.createdAt > STREAM_CONTEXT_TTL_MS) {
+        streamContexts.delete(rawQuery.streamId)
+        return reply
+          .code(410)
+          .header("Access-Control-Allow-Origin", reqOrigin)
+          .send({ error: "Stream context expired or not found" })
+      }
+      if (streamEntry.state === "done") {
+        streamContexts.delete(rawQuery.streamId)
+        return reply
+          .code(410)
+          .header("Access-Control-Allow-Origin", reqOrigin)
+          .send({ error: "Stream already completed" })
+      }
+      if (streamEntry.origin !== "*" && reqOrigin !== "*" && streamEntry.origin !== reqOrigin) {
+        return reply
+          .code(403)
+          .header("Access-Control-Allow-Origin", reqOrigin)
+          .send({ error: "Origin mismatch" })
+      }
+      if (streamEntry.state === "active") {
+        // Pipeline is already running on the original socket; we cannot
+        // replay events to a new connection. Return plain HTTP 409 (not SSE)
+        // so EventSource triggers onerror — not onmessage — and the client
+        // falls back to POST /chat without polluting gotAnyEvent.
+        return reply
+          .code(409)
+          .header("Access-Control-Allow-Origin", reqOrigin)
+          .send({ error: "Pipeline already running" })
+      }
+      streamEntry.state = "active"
+      query = streamEntry.body
+    } else {
+      query = rawQuery as unknown as ChatRequestBody
+    }
+
+    const scopedQuery: ChatRequestBody = { ...query, session: scopedSessionKey(query.session, query.siteId) }
+    const origin = streamEntry?.origin !== "*" ? (streamEntry?.origin ?? reqOrigin) : reqOrigin
 
     reply.raw.setHeader("Content-Type", "text/event-stream")
     reply.raw.setHeader("Cache-Control", "no-cache, no-transform")
@@ -110,6 +213,11 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       return reply
     } finally {
       clearInterval(heartbeatTimer)
+      if (streamEntry) {
+        streamEntry.state = "done"
+        // Clean up after a short delay to handle any final reconnects
+        setTimeout(() => streamContexts.delete(rawQuery.streamId), 5_000)
+      }
     }
   })
 }

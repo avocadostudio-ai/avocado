@@ -345,7 +345,7 @@ export async function resolveUnsplashImage(
   )
   if (accessKey) {
     try {
-      const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(safeQuery)}&orientation=landscape&per_page=8&page=1&content_filter=high`
+      const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(safeQuery)}&orientation=landscape&per_page=8&page=${page}&content_filter=high`
       const res = await fetch(endpoint, {
         headers: {
           Authorization: `Client-ID ${accessKey}`,

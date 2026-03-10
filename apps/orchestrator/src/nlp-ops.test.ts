@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, extractMentionedBlockTypes } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, extractMentionedBlockTypes, isAdviceQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 import { findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
@@ -298,10 +298,45 @@ test("requestsContentGeneration detects content-generation requests", () => {
 })
 
 test("isLikelyClarificationFollowUp prompt matrix", () => {
-  const positives = ["the selected one", "same", "this one", "the first", "it"]
+  const positives = [
+    "the selected one", "same", "this one", "the first", "it",
+    "I mean all pages in the site nav menu",
+    "I meant the pricing page",
+    "no, I want all of them",
+    "sorry, the home page",
+    "what I mean is the whole site",
+    "not that, the other one",
+    "I was talking about the footer",
+    // Confirmation / go-ahead patterns
+    "Show me all 3 so I can choose",
+    "yes please",
+    "yes, show me",
+    "yeah do that",
+    "sure",
+    "go ahead",
+    "do it",
+    "let's see",
+    "let's go",
+    "show me",
+    "sounds good",
+    "ok",
+    "okay let's do it"
+  ]
   const negatives = ["create new page /test2", "remove page /pricing", "add faq section", "change heading to hello world"]
   for (const prompt of positives) assert.equal(isLikelyClarificationFollowUp(prompt), true, prompt)
   for (const prompt of negatives) assert.equal(isLikelyClarificationFollowUp(prompt), false, prompt)
+})
+
+test("isAdviceQuery excludes structural page reorder requests", () => {
+  const positives = ["should we add FAQ?", "is this good?", "what do you think", "improvements"]
+  const negatives = [
+    "how should we reorder pages of this website in the top nav menu?",
+    "should we reorganize the pages?",
+    "should I rearrange pages for better discoverability?",
+    "should we move pages around?"
+  ]
+  for (const prompt of positives) assert.equal(isAdviceQuery(prompt), true, prompt)
+  for (const prompt of negatives) assert.equal(isAdviceQuery(prompt), false, prompt)
 })
 
 test("normalizePlanCandidate maps list op path to listKey and keeps pageSlug", () => {

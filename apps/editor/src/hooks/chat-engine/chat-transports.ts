@@ -129,31 +129,38 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
   }
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
-    return await new Promise<boolean>((resolve) => {
-      const contextPayload = buildSiteContextPayload(args.siteId, args.activeSiteConfig)
-      const params = new URLSearchParams({
-        session: args.session,
-        siteId: args.siteId,
-        sitePurpose: contextPayload.sitePurpose || "",
-        businessContext: JSON.stringify(contextPayload.businessContext),
-        siteContext: JSON.stringify(contextPayload.siteContext),
-        slug: args.slugRef.current,
-        message: finalMessage,
-        modelKey: args.modelKey,
-        provider: args.provider
-      })
-      if (args.activeBlockIdRef.current) params.set("activeBlockId", args.activeBlockIdRef.current)
-      if (args.activeBlockTypeRef.current) params.set("activeBlockType", args.activeBlockTypeRef.current)
-      if (args.activeEditablePathRef.current) params.set("activeEditablePath", args.activeEditablePathRef.current)
-      if (args.componentManifest) params.set("componentsManifest", JSON.stringify(args.componentManifest))
-      if (args.siteCapabilities) params.set("siteCapabilities", JSON.stringify(args.siteCapabilities))
-      if (extraParams) {
-        for (const [key, value] of Object.entries(extraParams)) {
-          params.set(key, value)
-        }
-      }
+    const contextPayload = buildSiteContextPayload(args.siteId, args.activeSiteConfig)
+    const payload = withIntegrationContext({
+      session: args.session,
+      siteId: args.siteId,
+      ...contextPayload,
+      slug: args.slugRef.current,
+      message: finalMessage,
+      modelKey: args.modelKey,
+      provider: args.provider,
+      activeBlockId: args.activeBlockIdRef.current,
+      activeBlockType: args.activeBlockTypeRef.current,
+      activeEditablePath: args.activeEditablePathRef.current,
+      ...(extraParams ?? {})
+    }, args.componentManifest, args.siteCapabilities)
 
-      const source = new EventSource(`${args.orchestrator}/chat/stream?${params.toString()}`)
+    let streamId: string
+    try {
+      const res = await fetch(`${args.orchestrator}/chat/start`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) return false
+      const data = await res.json() as { streamId?: string }
+      if (!data.streamId) return false
+      streamId = data.streamId
+    } catch {
+      return false
+    }
+
+    return await new Promise<boolean>((resolve) => {
+      const source = new EventSource(`${args.orchestrator}/chat/stream?streamId=${streamId}`)
       let settled = false
       let gotAnyEvent = false
       let pendingFocusBlockId: string | null = null
