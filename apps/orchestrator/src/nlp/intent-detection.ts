@@ -366,12 +366,13 @@ function normalizeConstraintList(value: unknown): string[] {
   return []
 }
 
-export function withSiteContext(message: string, args?: {
+/** Build the site context lines without wrapping in a message. Returns null if empty. */
+export function buildSiteContextBlock(args?: {
   sitePurpose?: string
   siteHosting?: string
   businessContext?: ChatRequestBody["businessContext"]
   siteContext?: ChatRequestBody["siteContext"]
-}) {
+}): string | null {
   const businessContext = parseJsonObjectMaybe(args?.businessContext)
   const siteContext = parseJsonObjectMaybe(args?.siteContext)
   const purpose =
@@ -393,8 +394,19 @@ export function withSiteContext(message: string, args?: {
     siteName ? `Site name: ${siteName}` : null
   ].filter((line): line is string => Boolean(line))
 
-  if (lines.length === 0) return message
-  return `${message}\n\n[site context]\n${lines.join("\n")}\n[/site context]`
+  if (lines.length === 0) return null
+  return lines.join("\n")
+}
+
+export function withSiteContext(message: string, args?: {
+  sitePurpose?: string
+  siteHosting?: string
+  businessContext?: ChatRequestBody["businessContext"]
+  siteContext?: ChatRequestBody["siteContext"]
+}) {
+  const block = buildSiteContextBlock(args)
+  if (!block) return message
+  return `${message}\n\n[site context]\n${block}\n[/site context]`
 }
 
 export function stripSiteContextEnvelope(message: string) {

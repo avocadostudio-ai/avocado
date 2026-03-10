@@ -273,6 +273,7 @@ export async function generatePlanWithOpenAI(args: {
   onToken?: (token: string) => void
   onPlannedOp?: (op: Operation, index: number) => void
   client?: PlannerOpenAIClient
+  siteContextBlock?: string | null
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
   const batchOverride = isBatchAddRequest(args.message)
@@ -339,7 +340,8 @@ export async function generatePlanWithOpenAI(args: {
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
-    `Allowed block types: ${allowedBlockTypes.join(", ")}.`
+    `Allowed block types: ${allowedBlockTypes.join(", ")}.`,
+    ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : [])
   ].join("\n")
 
   const includeContracts =

@@ -20,7 +20,7 @@ import {
   isAdviceQuery,
   adviceResponse,
   plannerMessageWithPendingContext,
-  withSiteContext,
+  buildSiteContextBlock,
   infoResponse
 } from "../nlp/intent-detection.js"
 import type { createChatTelemetryStore } from "../telemetry/chat-telemetry.js"
@@ -1500,20 +1500,28 @@ function deterministicDuplicatePagePlan(args: { session: string; message: string
   }
 
   const draft = getSessionDraft(args.session)
-  if (draft.has(targetSlug)) {
-    return {
-      intent: "needs_clarification",
-      summary_for_user: `Page ${targetSlug} already exists. Choose a different target path.`,
-      change_log: [],
-      ops: []
-    } satisfies EditPlan
+  let finalTarget = targetSlug
+  if (draft.has(finalTarget)) {
+    // Auto-suffix to find an available slug (e.g. /test -> /test-2, /test-3, ...)
+    for (let i = 2; i <= 99; i++) {
+      const candidate = `${targetSlug}-${i}`
+      if (!draft.has(candidate)) { finalTarget = candidate; break }
+    }
+    if (finalTarget === targetSlug) {
+      return {
+        intent: "needs_clarification",
+        summary_for_user: `Page ${targetSlug} already exists. Choose a different target path.`,
+        change_log: [],
+        ops: []
+      } satisfies EditPlan
+    }
   }
 
   return {
     intent: "edit_plan",
-    summary_for_user: `Duplicate ${sourceSlug} into ${targetSlug}.`,
-    change_log: [`Duplicate page ${sourceSlug} into ${targetSlug} with all blocks and content.`],
-    ops: [{ op: "duplicate_page", pageSlug: sourceSlug, newPageSlug: targetSlug }]
+    summary_for_user: `Duplicate ${sourceSlug} into ${finalTarget}.`,
+    change_log: [`Duplicate page ${sourceSlug} into ${finalTarget} with all blocks and content.`],
+    ops: [{ op: "duplicate_page", pageSlug: sourceSlug, newPageSlug: finalTarget }]
   } satisfies EditPlan
 }
 
@@ -1685,13 +1693,14 @@ export async function runChatPipeline(
     }
   }
   const sanitizedMessage = sanitizeMessageForPlanning(body.message ?? "")
-  const messageWithContext = withSiteContext(sanitizedMessage, {
+  const siteContextBlock = buildSiteContextBlock({
     sitePurpose: body.sitePurpose,
     siteHosting: body.siteHosting,
     businessContext: body.businessContext,
     siteContext: body.siteContext
   })
-  const plannerMessage = plannerMessageWithPendingContext(body.session, messageWithContext)
+  // Site context is now passed to the LLM system prompt (cacheable) instead of the user message.
+  const plannerMessage = plannerMessageWithPendingContext(body.session, sanitizedMessage)
   const inferredTranslationScope = inferTranslationScopeFromMessage(plannerMessage)
   const translationScope = shouldPreferFocusedTranslation({
     message: plannerMessage,
@@ -3128,6 +3137,7 @@ export async function runChatPipeline(
         contextPack: plannerContext,
         model: modelUsed,
         history: sessionChatHistory,
+        siteContextBlock,
         onToken: onPlanningToken,
         onPlannedOp: incrementalPlanStreamEnabled
           ? (op, index) => {
@@ -3275,6 +3285,7 @@ export async function runChatPipeline(
       model: modelUsed,
       history: sessionChatHistory,
       feedback: repairFeedback,
+      siteContextBlock,
       onToken: onPlanningToken,
       onPlannedOp: incrementalPlanStreamEnabled
         ? (op, index) => {

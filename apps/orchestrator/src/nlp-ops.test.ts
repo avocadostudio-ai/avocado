@@ -2,9 +2,9 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
-import { isLikelyClarificationFollowUp, parseCreatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
+import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
 import { isBatchAddRequest, extractMentionedBlockTypes } from "./nlp/intent-detection.js"
-import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
+import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 import { findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
 
@@ -192,6 +192,31 @@ test("inferDeterministicIntent infers remove action against selected block", () 
   assert.ok(parsed)
   assert.equal(parsed?.action, "remove")
   assert.equal(parsed?.target_block_ref, "b_hero_home")
+})
+
+test("isHighConfidenceDeterministicCase returns false for 'remove all blocks except hero'", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "remove all blocks except hero", currentPage }),
+    false
+  )
+})
+
+test("isHighConfidenceDeterministicCase returns false for 'delete everything but the CTA'", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "delete everything but the CTA", currentPage }),
+    false
+  )
+})
+
+test("inferDeterministicIntent returns null for 'remove all blocks except hero'", () => {
+  const currentPage = demoPublishedPages()[0]
+  const parsed = inferDeterministicIntent({
+    message: "remove all blocks except hero",
+    currentPage
+  })
+  assert.equal(parsed, null)
 })
 
 test("inferDeterministicIntent infers quoted patch for selected editable field", () => {
@@ -1984,4 +2009,29 @@ test("postEditSuggestions does not return block suggestions after remove_page", 
   }
   const suggestions = postEditSuggestions({ plan, current: home, body: { message: "remove this page" } })
   assert.deepEqual(suggestions, [])
+})
+
+// ---------------------------------------------------------------------------
+// parseDuplicatePageRequest
+// ---------------------------------------------------------------------------
+
+test("parseDuplicatePageRequest: 'copy this to /test page' uses currentSlug as source", () => {
+  const result = parseDuplicatePageRequest("copy this to /test page", { currentSlug: "/" })
+  assert.ok(result, "should parse as a duplicate request")
+  assert.equal(result.sourceSlug, "/")
+  assert.equal(result.targetSlug, "/test")
+})
+
+test("parseDuplicatePageRequest: 'copy this to /test page' with currentSlug /about", () => {
+  const result = parseDuplicatePageRequest("copy this to /test page", { currentSlug: "/about" })
+  assert.ok(result, "should parse as a duplicate request")
+  assert.equal(result.sourceSlug, "/about")
+  assert.equal(result.targetSlug, "/test")
+})
+
+test("parseDuplicatePageRequest: 'duplicate /about to /backup'", () => {
+  const result = parseDuplicatePageRequest("duplicate /about to /backup", { currentSlug: "/" })
+  assert.ok(result, "should parse as a duplicate request")
+  assert.equal(result.sourceSlug, "/about")
+  assert.equal(result.targetSlug, "/backup")
 })
