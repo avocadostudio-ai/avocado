@@ -978,6 +978,8 @@ export function isHighConfidenceDeterministicCase(args: {
     return false
   }
   const action = inferActionFromMessage(raw)
+  // "add X to each/every card" = bulk item update — needs LLM for content generation
+  if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
   if (action === "add" && inferBlockTypeFromText(raw)) return true
 
@@ -1832,7 +1834,10 @@ export function compileDeterministicPlan(args: {
     }
   }
 
+  // "each/every/all" signals a bulk update across items — needs LLM, not inline append
+  const asksBulkUpdate = /\b(each|every|all)\b/.test(lowerMessage)
   const asksInlineAdd =
+    !asksBulkUpdate &&
     lowerMessage.includes("add") &&
     (lowerMessage.includes("inside") ||
       lowerMessage.includes("within") ||

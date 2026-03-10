@@ -651,6 +651,42 @@ function rewriteAddBlockToChildImageUpdate(args: { plan: EditPlan; message: stri
       Array.isArray(value) && value.some((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
     )
   for (const op of args.plan.ops) {
+    // Handle update_props on container blocks — expand to include per-item images
+    if (op.op === "update_props") {
+      const existing = args.currentPage.blocks.find((block) => block.id === op.blockId)
+      if (existing && hasObjectArrayProp(existing)) {
+        const existingProps = (existing.props ?? {}) as Record<string, unknown>
+        const patch: Record<string, unknown> = { ...((op.patch ?? {}) as Record<string, unknown>) }
+        let expanded = false
+        for (const [key, value] of Object.entries(existingProps)) {
+          if (!Array.isArray(value)) continue
+          const nextItems = value.map((entry) => {
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry
+            const item = entry as Record<string, unknown>
+            const titleLike =
+              typeof item.title === "string" ? item.title :
+              typeof item.heading === "string" ? item.heading :
+              typeof item.name === "string" ? item.name :
+              "Card image"
+            return {
+              ...item,
+              imageUrl: typeof item.imageUrl === "string" && item.imageUrl.trim().length > 0 ? item.imageUrl : "pending",
+              imageAlt: typeof item.imageAlt === "string" && item.imageAlt.trim().length > 0 ? item.imageAlt : `Image for ${titleLike}`
+            }
+          })
+          patch[key] = nextItems
+          expanded = true
+        }
+        if (expanded) {
+          rewrittenOps.push({ op: "update_props", pageSlug: op.pageSlug, blockId: op.blockId, patch })
+          changed = true
+          continue
+        }
+      }
+      rewrittenOps.push(op)
+      continue
+    }
+
     if (op.op !== "add_block") {
       rewrittenOps.push(op)
       continue

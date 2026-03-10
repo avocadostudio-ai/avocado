@@ -556,6 +556,19 @@ test("isHighConfidenceDeterministicCase handles 'remove all but this' with activ
   )
 })
 
+test("isHighConfidenceDeterministicCase returns false for 'add images to each card' (needs LLM)", () => {
+  const currentPage = demoPublishedPages()[0]
+  const cardGridBlock = currentPage.blocks.find((b) => b.type === "CardGrid")
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "add images to each card aligned with the text inside it",
+      currentPage,
+      activeBlockId: cardGridBlock?.id
+    }),
+    false
+  )
+})
+
 test("inferDeterministicIntent resolves 'remove all but this' to activeBlockId", () => {
   const currentPage = demoPublishedPages()[0]
   const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
