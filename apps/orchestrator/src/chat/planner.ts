@@ -15,7 +15,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   normalizeOpName,
@@ -276,7 +276,7 @@ export async function generatePlanWithOpenAI(args: {
   siteContextBlock?: string | null
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
-  const batchOverride = isBatchAddRequest(args.message)
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")

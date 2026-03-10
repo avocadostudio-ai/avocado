@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, extractMentionedBlockTypes } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, extractMentionedBlockTypes } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
 import { findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
@@ -194,29 +194,31 @@ test("inferDeterministicIntent infers remove action against selected block", () 
   assert.equal(parsed?.target_block_ref, "b_hero_home")
 })
 
-test("isHighConfidenceDeterministicCase returns false for 'remove all blocks except hero'", () => {
+test("isHighConfidenceDeterministicCase returns true for 'remove all blocks except hero'", () => {
   const currentPage = demoPublishedPages()[0]
   assert.equal(
     isHighConfidenceDeterministicCase({ message: "remove all blocks except hero", currentPage }),
-    false
+    true
   )
 })
 
-test("isHighConfidenceDeterministicCase returns false for 'delete everything but the CTA'", () => {
+test("isHighConfidenceDeterministicCase returns true for 'delete everything but the CTA'", () => {
   const currentPage = demoPublishedPages()[0]
   assert.equal(
     isHighConfidenceDeterministicCase({ message: "delete everything but the CTA", currentPage }),
-    false
+    true
   )
 })
 
-test("inferDeterministicIntent returns null for 'remove all blocks except hero'", () => {
+test("inferDeterministicIntent returns remove intent with kept type for 'remove all blocks except hero'", () => {
   const currentPage = demoPublishedPages()[0]
   const parsed = inferDeterministicIntent({
     message: "remove all blocks except hero",
     currentPage
   })
-  assert.equal(parsed, null)
+  assert.ok(parsed)
+  assert.equal(parsed.action, "remove")
+  assert.equal(parsed.target_block_type, "Hero")
 })
 
 test("inferDeterministicIntent infers quoted patch for selected editable field", () => {
@@ -509,6 +511,92 @@ test("normalizePlanCandidate handles add_item with path '/items' and missing ite
     assert.equal(typeof op.item.q, "string")
     assert.equal(typeof op.item.a, "string")
   }
+})
+
+test("compileDeterministicPlan generates remove ops for all blocks except kept type", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-suite",
+    intent: { action: "remove", target_block_type: "Hero", summary: "Removed all blocks except Hero." },
+    message: "remove all components except hero",
+    slug: "/",
+    currentPage
+  })
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  const removeOps = plan!.ops.filter((op) => op.op === "remove_block")
+  // Should remove every block that is NOT Hero
+  const nonHeroBlocks = currentPage.blocks.filter((b) => b.type !== "Hero")
+  assert.equal(removeOps.length, nonHeroBlocks.length)
+  // Hero should NOT be in the removed set
+  for (const op of removeOps) {
+    if ("blockId" in op) {
+      const block = currentPage.blocks.find((b) => b.id === op.blockId)
+      assert.ok(block, `block ${op.blockId} should exist`)
+      assert.notEqual(block!.type, "Hero", `should not remove Hero block`)
+    }
+  }
+})
+
+test("isHighConfidenceDeterministicCase handles 'remove all blocks except this one' with activeBlockId", () => {
+  const currentPage = demoPublishedPages()[0]
+  const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "remove all blocks except this one", currentPage, activeBlockId: heroBlock.id }),
+    true
+  )
+})
+
+test("isHighConfidenceDeterministicCase handles 'remove all but this' with activeBlockId", () => {
+  const currentPage = demoPublishedPages()[0]
+  const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "remove all but this", currentPage, activeBlockId: heroBlock.id }),
+    true
+  )
+})
+
+test("inferDeterministicIntent resolves 'remove all but this' to activeBlockId", () => {
+  const currentPage = demoPublishedPages()[0]
+  const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
+  const parsed = inferDeterministicIntent({
+    message: "remove all but this",
+    currentPage,
+    activeBlockId: heroBlock.id
+  })
+  assert.ok(parsed)
+  assert.equal(parsed?.action, "remove")
+  assert.equal(parsed?.target_block_type, "Hero")
+})
+
+test("inferDeterministicIntent resolves 'this one' to activeBlockId for remove-all-except", () => {
+  const currentPage = demoPublishedPages()[0]
+  const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
+  const parsed = inferDeterministicIntent({
+    message: "remove all blocks except this one",
+    currentPage,
+    activeBlockId: heroBlock.id
+  })
+  assert.ok(parsed)
+  assert.equal(parsed?.action, "remove")
+  assert.equal(parsed?.target_block_type, "Hero")
+})
+
+test("compileDeterministicPlan removes all except active block for 'this one' reference", () => {
+  const currentPage = demoPublishedPages()[0]
+  const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
+  const plan = compileDeterministicPlan({
+    session: "test-suite",
+    intent: { action: "remove", target_block_type: "Hero", summary: "Removed all blocks except Hero." },
+    message: "remove all blocks except this one",
+    slug: "/",
+    currentPage
+  })
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  const removeOps = plan!.ops.filter((op) => op.op === "remove_block")
+  const nonHeroBlocks = currentPage.blocks.filter((b) => b.type !== "Hero")
+  assert.equal(removeOps.length, nonHeroBlocks.length)
 })
 
 test("compileDeterministicPlan creates page on create-page prompts", () => {
@@ -1481,6 +1569,21 @@ test("isBatchAddRequest treats populate/update-all as batch overrides", () => {
   assert.equal(isBatchAddRequest("populate the whole page"), true)
   // Negative: single block update should not trigger
   assert.equal(isBatchAddRequest("update the hero heading"), false)
+})
+
+test("isBatchRemoveRequest detects batch remove patterns", () => {
+  assert.equal(isBatchRemoveRequest("remove all blocks except this one"), true)
+  assert.equal(isBatchRemoveRequest("delete everything but the hero"), true)
+  assert.equal(isBatchRemoveRequest("remove all blocks"), true)
+  assert.equal(isBatchRemoveRequest("delete every section"), true)
+  assert.equal(isBatchRemoveRequest("clear all blocks except CTA"), true)
+  assert.equal(isBatchRemoveRequest("remove all but this"), true)
+  assert.equal(isBatchRemoveRequest("remove all but hero"), true)
+  // Typos in "except" still trigger because "all" + remove is enough
+  assert.equal(isBatchRemoveRequest("remove all blocks exceopt this one"), true)
+  // Negative: single block remove
+  assert.equal(isBatchRemoveRequest("remove the hero"), false)
+  assert.equal(isBatchRemoveRequest("delete this block"), false)
 })
 
 test("extractMentionedBlockTypes returns all block types in order", () => {
