@@ -40,9 +40,18 @@ export function isLikelyClarificationFollowUp(message: string) {
   const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
   if (!normalized) return false
   const words = normalized.split(" ").filter(Boolean)
+  // Detect common clarification openers regardless of length
+  const hasClarificationOpener =
+    /^(i mean\b|i meant\b|no[,.]|sorry[,.]|what i mean|not that[,.]|i was (?:talking|asking) about\b)/.test(normalized)
+  if (hasClarificationOpener) return true
+  // Detect confirmation / go-ahead responses to a previous clarification offer
+  const hasConfirmationOpener =
+    /^(yes\b|yeah\b|yep\b|sure\b|ok\b|okay\b|go ahead\b|do it\b|let'?s (?:see|go|do)\b|show me\b|sounds good\b|please\b)/.test(normalized)
+  if (hasConfirmationOpener) return true
   const hasReferenceCue =
     /\b(selected|this|that|it|them|those|these|one|ones|same)\b/.test(normalized) ||
-    /\bfirst|second|third|last\b/.test(normalized)
+    /\bfirst|second|third|last\b/.test(normalized) ||
+    /\b(?:all|the|both)\s+\d+\b/.test(normalized)
   const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace)\b/.test(normalized)
   return (words.length <= 8 && hasReferenceCue) || (!hasActionVerb && words.length <= 5)
 }
