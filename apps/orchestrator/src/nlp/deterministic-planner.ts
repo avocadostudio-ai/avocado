@@ -45,6 +45,12 @@ import {
   orderSlugsHomeFirst
 } from "../state/session-state.js"
 
+// "except", "but not", "other than", "all but", etc. — exact spelling only; typos fall through to LLM
+const EXCEPT_PATTERN = /\b(except|but not|other than|besides|everything but)\b|\ball\s+but\b/i
+
+// "this one", "this block", "the selected one/block", bare "this" at word boundary
+const THIS_ONE_PATTERN = /\b(this\s+(?:one|block|section|component)|the\s+(?:selected|current|active)\s+(?:one|block|section|component))\b|\bthis\s*$/i
+
 export function extractAudienceTarget(message: string) {
   return extractAudienceTargets(message)[0]
 }
@@ -843,8 +849,25 @@ export function inferDeterministicIntent(args: {
   let action = inferActionFromMessage(raw)
   if (!action) return null
 
-  // "remove all except hero" / "delete everything but CTA" — needs LLM
-  if ((action === "remove" || action === "add") && /\b(except|but not|other than|besides|everything but)\b/i.test(raw)) {
+  // "remove all except hero" / "delete everything but CTA" — handle deterministically for remove
+  if (action === "remove" && EXCEPT_PATTERN.test(raw)) {
+    let keepType = inferBlockTypeFromText(raw)
+    // "this one" / "this block" / "the selected" → resolve from activeBlockId
+    if (!keepType && args.activeBlockId && THIS_ONE_PATTERN.test(raw)) {
+      const activeBlock = args.currentPage.blocks.find((b) => b.id === args.activeBlockId)
+      if (activeBlock) keepType = activeBlock.type
+    }
+    if (keepType && args.currentPage.blocks.some((b) => b.type === keepType)) {
+      return {
+        action: "remove",
+        target_block_type: keepType,
+        summary: `Removed all blocks except ${keepType}.`
+      }
+    }
+    return null
+  }
+  // "add all except ..." — needs LLM
+  if (action === "add" && EXCEPT_PATTERN.test(raw)) {
     return null
   }
 
@@ -940,8 +963,20 @@ export function isHighConfidenceDeterministicCase(args: {
   const hasCompoundAction = /\b(remove|delete|clear)\b.+\band\b.+\b(add|insert|create)\b/i.test(raw)
     || /\b(add|insert|create)\b.+\band\b.+\b(remove|delete|clear)\b/i.test(raw)
   if (hasCompoundAction) return false
-  const hasExceptionModifier = /\b(except|but not|other than|besides|everything but)\b/i.test(raw)
-  if (hasExceptionModifier) return false
+  const hasExceptionModifier = EXCEPT_PATTERN.test(raw)
+  if (hasExceptionModifier) {
+    // "remove all except X" can be handled deterministically when X resolves to a block type on the page
+    const action = inferActionFromMessage(raw)
+    if (action === "remove") {
+      let keepType = inferBlockTypeFromText(raw)
+      if (!keepType && args.activeBlockId && THIS_ONE_PATTERN.test(raw)) {
+        const activeBlock = args.currentPage.blocks.find((b) => b.id === args.activeBlockId)
+        if (activeBlock) keepType = activeBlock.type
+      }
+      if (keepType && args.currentPage.blocks.some((b) => b.type === keepType)) return true
+    }
+    return false
+  }
   const action = inferActionFromMessage(raw)
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
   if (action === "add" && inferBlockTypeFromText(raw)) return true
@@ -1842,6 +1877,31 @@ export function compileDeterministicPlan(args: {
       summary_for_user: intent.summary ?? "Please specify the section and exact change you want.",
       change_log: assumptions,
       ops: []
+    }
+  }
+
+  // "remove all except X" — generate remove ops for every block NOT matching the kept type
+  if (intent.action === "remove" && EXCEPT_PATTERN.test(cleanMessage)) {
+    const keepType = intent.target_block_type
+    if (keepType) {
+      const toRemove = currentPage.blocks.filter((b) => b.type !== keepType)
+      if (toRemove.length === 0) {
+        return {
+          intent: "edit_plan",
+          summary_for_user: `All blocks are already ${keepType} — nothing to remove.`,
+          change_log: assumptions,
+          ops: []
+        }
+      }
+      return {
+        intent: "edit_plan",
+        summary_for_user: intent.summary ?? `Removed all blocks except ${keepType}.`,
+        change_log: [
+          ...assumptions,
+          ...toRemove.map((b) => `Removed ${b.type} (${b.id}).`)
+        ],
+        ops: toRemove.map((b) => ({ op: "remove_block" as const, pageSlug: slug, blockId: b.id }))
+      }
     }
   }
 

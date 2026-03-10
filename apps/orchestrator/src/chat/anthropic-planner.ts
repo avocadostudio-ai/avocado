@@ -15,7 +15,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   normalizeOpName,
@@ -144,7 +144,7 @@ export async function generatePlanWithAnthropic(args: {
   siteContextBlock?: string | null
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const batchOverride = isBatchAddRequest(args.message)
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")

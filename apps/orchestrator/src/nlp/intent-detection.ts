@@ -240,6 +240,22 @@ export function isBatchAddRequest(message: string) {
   return ADD_ACTION_PATTERN.test(m) && mentionedBlockTypes >= 2 && (hasListSeparator || refersToBlocks)
 }
 
+/**
+ * Detects batch remove requests — any remove/delete/clear that implies
+ * multiple blocks should be affected. Broadly matches so the LLM can
+ * handle the nuance (typos, "this one", etc.) without strict single-op limits.
+ */
+export function isBatchRemoveRequest(message: string) {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  const hasRemoveAction = /\b(?:remove|delete|clear)\b/.test(m)
+  if (!hasRemoveAction) return false
+  // Any "all/every/everything" + remove → batch
+  if (/\b(?:all|every|everything)\b/.test(m)) return true
+  // "delete every section", "remove all blocks"
+  if (new RegExp(String.raw`\b(?:all|every)\s+${UNIT}\b`).test(m)) return true
+  return false
+}
+
 export function isInfoQuery(message: string) {
   const m = normalizeForIntent(message)
   return (
