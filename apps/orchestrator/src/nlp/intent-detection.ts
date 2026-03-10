@@ -372,6 +372,7 @@ export function buildSiteContextBlock(args?: {
   siteHosting?: string
   businessContext?: ChatRequestBody["businessContext"]
   siteContext?: ChatRequestBody["siteContext"]
+  pageDirectory?: string
 }): string | null {
   const businessContext = parseJsonObjectMaybe(args?.businessContext)
   const siteContext = parseJsonObjectMaybe(args?.siteContext)
@@ -391,7 +392,8 @@ export function buildSiteContextBlock(args?: {
     purpose ? `Site purpose: ${purpose}` : null,
     tone ? `Preferred tone: ${tone}` : null,
     constraints.length > 0 ? `Constraints: ${constraints.join("; ")}` : null,
-    siteName ? `Site name: ${siteName}` : null
+    siteName ? `Site name: ${siteName}` : null,
+    args?.pageDirectory ? `Pages:\n${args.pageDirectory}` : null
   ].filter((line): line is string => Boolean(line))
 
   if (lines.length === 0) return null
