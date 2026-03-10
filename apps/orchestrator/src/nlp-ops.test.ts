@@ -2138,3 +2138,17 @@ test("parseDuplicatePageRequest: 'duplicate /about to /backup'", () => {
   assert.equal(result.sourceSlug, "/about")
   assert.equal(result.targetSlug, "/backup")
 })
+
+test("parseDuplicatePageRequest: 'clone this page into a new one called Testers with url /testers'", () => {
+  const result = parseDuplicatePageRequest("clone this page into a new one called Testers with url /testers", { currentSlug: "/" })
+  assert.ok(result, "should parse as a duplicate request")
+  assert.equal(result.sourceSlug, "/", "source should be current page, not /testers")
+  assert.equal(result.targetSlug, "/testers")
+})
+
+test("parseDuplicatePageRequest: 'clone this page with url /about-us'", () => {
+  const result = parseDuplicatePageRequest("clone this page with url /about-us", { currentSlug: "/services" })
+  assert.ok(result, "should parse as a duplicate request")
+  assert.equal(result.sourceSlug, "/services")
+  assert.equal(result.targetSlug, "/about-us")
+})

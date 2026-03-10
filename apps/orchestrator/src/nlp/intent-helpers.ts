@@ -102,13 +102,16 @@ export function parseDuplicatePageRequest(message: string, args?: { currentSlug?
   const routeMentions = extractRouteMentions(stripped)
   const byCommandRoute = stripped.match(/\b(?:duplicate|copy|clone)\s+(?:the\s+)?(?:page\s+)?(\/[a-z0-9/_-]+)/i)?.[1]
   const byToRoute = stripped.match(/\b(?:to|into|as)\s+(\/[a-z0-9/_-]+)/i)?.[1]
+    ?? stripped.match(/\b(?:with\s+)?(?:url|path|route|slug)\s+(\/[a-z0-9/_-]+)/i)?.[1]
 
   const usesCurrentPage =
     /\b(this|current|selected)\s+page\b/.test(lower) ||
     /\b(?:duplicate|copy|clone)\s+(this|current|selected)\b/.test(lower)
-  // When byToRoute already claims a route, don't reuse it as the source
+  // When user says "this page", source is the current page — don't grab route mentions as source
   const normalizedByTo = normalizeRouteCandidate(byToRoute ?? null)
-  const sourceRouteCandidate = byCommandRoute ?? routeMentions.find((r) => normalizeRouteCandidate(r) !== normalizedByTo) ?? null
+  const sourceRouteCandidate = usesCurrentPage
+    ? null
+    : byCommandRoute ?? routeMentions.find((r) => normalizeRouteCandidate(r) !== normalizedByTo) ?? null
   let sourceSlug = normalizeRouteCandidate(sourceRouteCandidate)
   if (!sourceSlug && usesCurrentPage) sourceSlug = normalizeRouteCandidate(args?.currentSlug ?? null)
 
