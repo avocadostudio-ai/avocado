@@ -843,6 +843,11 @@ export function inferDeterministicIntent(args: {
   let action = inferActionFromMessage(raw)
   if (!action) return null
 
+  // "remove all except hero" / "delete everything but CTA" — needs LLM
+  if ((action === "remove" || action === "add") && /\b(except|but not|other than|besides|everything but)\b/i.test(raw)) {
+    return null
+  }
+
   // In focused inline-edit mode, "add image/photo" should update the selected image field,
   // not add a new block.
   if (
@@ -935,6 +940,8 @@ export function isHighConfidenceDeterministicCase(args: {
   const hasCompoundAction = /\b(remove|delete|clear)\b.+\band\b.+\b(add|insert|create)\b/i.test(raw)
     || /\b(add|insert|create)\b.+\band\b.+\b(remove|delete|clear)\b/i.test(raw)
   if (hasCompoundAction) return false
+  const hasExceptionModifier = /\b(except|but not|other than|besides|everything but)\b/i.test(raw)
+  if (hasExceptionModifier) return false
   const action = inferActionFromMessage(raw)
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
   if (action === "add" && inferBlockTypeFromText(raw)) return true
