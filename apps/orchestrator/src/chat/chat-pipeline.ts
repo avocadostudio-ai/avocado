@@ -126,6 +126,10 @@ export function firstUrlFromText(text: string): string | undefined {
   return match ? match[0] : undefined
 }
 
+function isRemoteHttpUrl(value: unknown) {
+  return typeof value === "string" && /^https?:\/\//i.test(value.trim())
+}
+
 /** Build a compact page directory from the session draft for the system prompt. */
 function buildPageDirectory(session: string): string {
   const draft = getSessionDraft(session)
@@ -579,6 +583,14 @@ function detectImagePaths(value: unknown, basePath = "", acc = new Set<string>()
   return acc
 }
 
+function patchContainsResolvedImageUrl(patch: Record<string, unknown>) {
+  const imagePaths = detectImagePaths(patch)
+  for (const path of imagePaths) {
+    if (isRemoteHttpUrl(getValueAtPath(patch, path))) return true
+  }
+  return false
+}
+
 function imageQueryFromItem(item: Record<string, unknown>) {
   const candidate = [
     item.imageAlt,
@@ -1012,11 +1024,12 @@ export async function withUnsplashHeroImage(args: {
     })
     // Filter out targets whose block schema doesn't support imageUrl at that path
     const supportedTargets = targets.filter((t) => blockSupportsImageAtPath(target.type, t.path))
+    const unresolvedTargets = supportedTargets.filter((t) => !isRemoteHttpUrl(getValueAtPath(patchCandidate, t.path)))
     const hasAnyImageTarget = supportedTargets.length > 0
     const hasImageUrlInPatch = detectImagePaths(patchCandidate).size > 0
     const shouldReplace =
-      !userProvidedExplicitUrl && touchesImage && hasAnyImageTarget && (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
-    if (!touchesImage || !shouldReplace || supportedTargets.length === 0) continue
+      !userProvidedExplicitUrl && touchesImage && hasAnyImageTarget && unresolvedTargets.length > 0 && (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
+    if (!touchesImage || !shouldReplace || unresolvedTargets.length === 0) continue
 
     const targetProps = target.props as Record<string, unknown>
     const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
@@ -1025,7 +1038,7 @@ export async function withUnsplashHeroImage(args: {
     const body = typeof targetProps.body === "string" ? targetProps.body : ""
     const sectionContext = [heading, subheading, title, body].filter(Boolean).join(" — ")
 
-    for (const targetImage of supportedTargets) {
+    for (const targetImage of unresolvedTargets) {
       const preferredKey = `${op.pageSlug}::${op.blockId}::${targetImage.path}`
       const imageQuery = preferredQueries.get(preferredKey) ?? targetImage.query
       const currentImageUrl = typeof getValueAtPath(targetProps, targetImage.path) === "string"
@@ -1172,7 +1185,17 @@ export async function withUnsplashHeroImage(args: {
     }
   }
 
-  if (!changed && (explicitUnsplashRequest || explicitImageGen) && /\b(images?|photos?|pictures?|hero)\b/.test(lowerMessage)) {
+  const planAlreadyHasResolvedImage = plan.ops.some((op) => {
+    if (op.op !== "update_props") return false
+    const patch = op.patch as Record<string, unknown>
+    const patchCandidate =
+      patch && typeof patch.props === "object" && patch.props !== null && !Array.isArray(patch.props)
+        ? (patch.props as Record<string, unknown>)
+        : patch
+    return patchContainsResolvedImageUrl(patchCandidate)
+  })
+
+  if (!changed && !planAlreadyHasResolvedImage && (explicitUnsplashRequest || explicitImageGen) && /\b(images?|photos?|pictures?|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -1367,6 +1390,7 @@ export function detectImageOps(args: {
 
     for (const targetImage of targets) {
       if (!blockSupportsImageAtPath(target.type, targetImage.path)) continue
+      if (isRemoteHttpUrl(getValueAtPath(patchCandidate, targetImage.path))) continue
       results.push({
         blockId: op.blockId,
         pageSlug: op.pageSlug,
@@ -1379,7 +1403,17 @@ export function detectImageOps(args: {
   }
 
   // Fallback: explicit image request targeting a Hero block when no ops matched
-  if (results.length === 0 && (explicitUnsplashRequest || explicitImageGen) && /\b(images?|photos?|pictures?|hero)\b/.test(lowerMessage)) {
+  const planAlreadyHasResolvedImage = args.plan.ops.some((op) => {
+    if (op.op !== "update_props") return false
+    const patch = op.patch as Record<string, unknown>
+    const patchCandidate =
+      patch && typeof patch.props === "object" && patch.props !== null && !Array.isArray(patch.props)
+        ? (patch.props as Record<string, unknown>)
+        : patch
+    return patchContainsResolvedImageUrl(patchCandidate)
+  })
+
+  if (results.length === 0 && !planAlreadyHasResolvedImage && (explicitUnsplashRequest || explicitImageGen) && /\b(images?|photos?|pictures?|hero)\b/.test(lowerMessage)) {
     const selectedBlock =
       args.activeBlockId && args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
         ? args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
@@ -2145,6 +2179,7 @@ export async function runChatPipeline(
   }
 
   let planUsage: TokenUsage | undefined
+  let usedNativeUnsplashTool = false
 
   const respondFromPlan = async (
     plan: EditPlan,
@@ -2281,21 +2316,23 @@ export async function runChatPipeline(
           resolvedPlan.change_log = [...resolvedPlan.change_log, pendingImageMessage]
         }
       } else {
-        // No image ops detected — run withUnsplashHeroImage as before (will be a no-op)
-        const imageResolutionStartMs = Date.now()
-        emitStatus("Resolving image assets...")
-        resolvedPlan = await withUnsplashHeroImage({
-          plan: resolvedPlan,
-          message: plannerMessage,
-          slug: effectiveSlug,
-          currentPage: current,
-          activeBlockId: planningActiveBlockId,
-          activeEditablePath: planningActiveEditablePath,
-          chatRequestId,
-          log: ctx.log,
-          onStatusUpdate: options?.onStatusUpdate
-        })
-        imageResolutionDurationMs += Date.now() - imageResolutionStartMs
+        // Keep legacy rewrite path as fallback only when native tool path did not already resolve image candidates.
+        if (!usedNativeUnsplashTool) {
+          const imageResolutionStartMs = Date.now()
+          emitStatus("Resolving image assets...")
+          resolvedPlan = await withUnsplashHeroImage({
+            plan: resolvedPlan,
+            message: plannerMessage,
+            slug: effectiveSlug,
+            currentPage: current,
+            activeBlockId: planningActiveBlockId,
+            activeEditablePath: planningActiveEditablePath,
+            chatRequestId,
+            log: ctx.log,
+            onStatusUpdate: options?.onStatusUpdate
+          })
+          imageResolutionDurationMs += Date.now() - imageResolutionStartMs
+        }
       }
 
       if (resolvedPlan.intent === "needs_clarification" && planningActiveBlockId) {
@@ -3266,6 +3303,7 @@ export async function runChatPipeline(
           : undefined,
         onToolExecution: plannerSource === "anthropic"
           ? (event) => {
+              if (event.ok && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
               ctx.chatTelemetry.push({
                 id: chatRequestId,
                 at: new Date().toISOString(),
