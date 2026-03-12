@@ -572,9 +572,9 @@
 
 .editor-delete-confirm {
   position: absolute;
-  top: 4px;
-  right: 34px;
-  background: #7f1d1d;
+  top: 8px;
+  right: 40px;
+  background: #dc2626;
   color: #fff;
   border-radius: 6px;
   height: 26px;
@@ -605,7 +605,7 @@
 }
 
 .editor-delete-confirm-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 @media (hover: none), (pointer: coarse) {

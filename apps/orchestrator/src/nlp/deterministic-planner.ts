@@ -803,6 +803,7 @@ function hasContentDirective(message: string): boolean {
   return /\b(about|featuring|directing|promoting|highlighting|linking to|that\s+(links?|points?|directs?|promotes?|describes?|shows?|explains?))\b/i.test(lower)
     || /\bfor\b.*\b(audience|users?|visitors?|customers?|readers?)\b/i.test(lower)
     || /\bwith\b.*\b(content|text|copy|images?|questions?|items?|cards?|testimonials?|features?)\b/i.test(lower)
+    || /\b(proper|real|good|relevant|meaningful|appropriate|custom|tailored|compelling|engaging)\b/i.test(lower)
 }
 
 function isHeroLayoutRequest(message: string) {
