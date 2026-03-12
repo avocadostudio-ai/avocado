@@ -18,6 +18,7 @@ import {
 import { isBatchAddRequest, isBatchRemoveRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
+  inferBlockTypeFromText,
   normalizeOpName,
   normalizePlanCandidate
 } from "../nlp/plan-normalizer.js"
@@ -40,11 +41,231 @@ export function isPageWideTranslationRequest(message: string) {
     /\bdeutsch\b/.test(lower)
   if (!asksTranslation) return false
   return (
-    /\b(this|the|entire|whole|full)\s+page\b/.test(lower) ||
+    /\b(this|the|entire|whole|full)\s+(\w+\s+)*page\b/.test(lower) ||
     /\bwhole\s+site\b/.test(lower) ||
     /\ball\s+sections?\b/.test(lower) ||
-    /\btranslate\s+page\b/.test(lower)
+    /\btranslate\s+(\w+\s+)*page\b/.test(lower)
   )
+}
+
+export type PlannerContractMode = "minimal" | "targeted" | "full"
+
+export type PlannerSchemaContextMeta = {
+  contractMode: PlannerContractMode
+  contractBytes: number
+  contractBlockCount: number
+  targetBlockTypes: string[]
+  strictJsonEnabled: boolean
+}
+
+type PlannerSchemaContextPayload = {
+  blockContracts?: ReturnType<typeof blockContractsSummary>
+  pageMetaContract?: ReturnType<typeof pageMetaContractSummary>
+  knownBlockTypes?: string[]
+  editPlanShape?: {
+    intent: string
+    summary_for_user: string
+    change_log: string[]
+    ops: string[]
+    suggested_next_actions: string[]
+  }
+}
+
+const EDIT_PLAN_SHAPE_HINT = {
+  intent: "edit_plan | needs_clarification",
+  summary_for_user: "string",
+  change_log: ["string"],
+  ops: ["Operation[]"],
+  suggested_next_actions: ["string (optional, 2-4 items)"]
+}
+
+export function isStrictJsonResponseEnabled() {
+  return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_JSON_RESPONSE ?? "").trim())
+}
+
+export function isAdaptiveSchemaContextEnabled() {
+  return /^(1|true|yes|on)$/i.test((process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT ?? "").trim())
+}
+
+function schemaBudgetBytes() {
+  const parsed = Number(process.env.CHAT_SCHEMA_BUDGET_BYTES ?? "9000")
+  if (!Number.isFinite(parsed) || parsed <= 0) return 9000
+  return Math.max(512, Math.trunc(parsed))
+}
+
+function bytesForPayload(value: unknown) {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8")
+  } catch {
+    return Number.MAX_SAFE_INTEGER
+  }
+}
+
+function uniqueBlockTypes(values: unknown[]) {
+  const known = new Set(allowedBlockTypes.map((type) => type.toLowerCase()))
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (typeof value !== "string" || value.length === 0) continue
+    const normalized = value.toLowerCase()
+    if (!known.has(normalized) || seen.has(normalized)) continue
+    seen.add(normalized)
+    const canonical = allowedBlockTypes.find((type) => type.toLowerCase() === normalized)
+    if (canonical) out.push(canonical)
+  }
+  return out
+}
+
+function pickTargetBlockTypes(args: {
+  message: string
+  contextPack: ReturnType<typeof plannerContextPack>
+}) {
+  const selectedType = typeof args.contextPack.selected.blockType === "string" ? args.contextPack.selected.blockType : null
+  const inferredFromMessage = inferBlockTypeFromText(args.message)
+  const referencedTypes = [
+    args.contextPack.resolvedReferences.target?.type,
+    args.contextPack.resolvedReferences.anchor?.type,
+    ...args.contextPack.resolvedReferences.mentionedBlocks.map((item) => item.type)
+  ]
+  return uniqueBlockTypes([selectedType, inferredFromMessage, ...referencedTypes])
+}
+
+function shouldUseMinimalContracts(message: string) {
+  const lower = message.toLowerCase()
+  if (/\b(seo|meta|metadata|og\s*image|open\s*graph)\b/.test(lower)) return false
+  if (/\b(translate|translation|localiz)\b/.test(lower)) return false
+  if (/\b(create|add|insert|build|generate|update|change|edit|rewrite|rephrase)\b/.test(lower)) return false
+  return (
+    /\b(remove|delete|move|reorder|rename)\b/.test(lower) ||
+    /\b(remove|delete|move|reorder|rename)\b.*\bpage\b/.test(lower)
+  )
+}
+
+function shouldUseFullContracts(args: {
+  message: string
+  batchOverride: boolean
+  pageWideTranslation: boolean
+  forceFullContracts: boolean
+  targetBlockTypes: string[]
+}) {
+  if (args.forceFullContracts) return true
+  if (args.pageWideTranslation || args.batchOverride) return true
+  const lower = args.message.toLowerCase()
+  const structuralGeneration =
+    /\b(create|add|insert|build|generate)\b/.test(lower) &&
+    !/\b(page|meta|seo)\b/.test(lower) &&
+    args.targetBlockTypes.length === 0
+  if (structuralGeneration) return true
+  return false
+}
+
+function buildContractsForMode(args: {
+  mode: PlannerContractMode
+  targetBlockTypes: string[]
+  includePageMetaContract: boolean
+}): PlannerSchemaContextPayload {
+  const allContracts = blockContractsSummary()
+  const payload: PlannerSchemaContextPayload = {
+    knownBlockTypes: Object.keys(blockSchemas),
+    editPlanShape: EDIT_PLAN_SHAPE_HINT
+  }
+
+  if (args.mode === "full") {
+    payload.blockContracts = allContracts
+  } else if (args.mode === "targeted") {
+    const filtered: Record<string, ReturnType<typeof blockContractsSummary>[string]> = {}
+    for (const type of args.targetBlockTypes) {
+      if (type in allContracts) filtered[type] = allContracts[type]!
+    }
+    if (Object.keys(filtered).length > 0) payload.blockContracts = filtered
+  }
+
+  if (args.includePageMetaContract) payload.pageMetaContract = pageMetaContractSummary()
+  return payload
+}
+
+export function buildPlannerSchemaContext(args: {
+  message: string
+  contextPack: ReturnType<typeof plannerContextPack>
+  batchOverride: boolean
+  pageWideTranslation: boolean
+  legacyIncludeContracts: boolean
+  forceFullContracts?: boolean
+}): { payload: PlannerSchemaContextPayload; meta: PlannerSchemaContextMeta } {
+  const strictJsonEnabled = isStrictJsonResponseEnabled()
+  const targetBlockTypes = pickTargetBlockTypes({ message: args.message, contextPack: args.contextPack })
+  const includePageMetaContract = /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/i.test(args.message)
+
+  if (!isAdaptiveSchemaContextEnabled()) {
+    const payload: PlannerSchemaContextPayload = args.legacyIncludeContracts
+      ? {
+          blockContracts: blockContractsSummary(),
+          pageMetaContract: pageMetaContractSummary(),
+          knownBlockTypes: Object.keys(blockSchemas),
+          editPlanShape: EDIT_PLAN_SHAPE_HINT
+        }
+      : {}
+    const contractBlockCount = payload.blockContracts ? Object.keys(payload.blockContracts).length : 0
+    return {
+      payload,
+      meta: {
+        contractMode: args.legacyIncludeContracts ? "full" : "minimal",
+        contractBytes: bytesForPayload(payload),
+        contractBlockCount,
+        targetBlockTypes,
+        strictJsonEnabled
+      }
+    }
+  }
+
+  const forceFullContracts = args.forceFullContracts === true
+  const preferredMode: PlannerContractMode = shouldUseFullContracts({
+    message: args.message,
+    batchOverride: args.batchOverride,
+    pageWideTranslation: args.pageWideTranslation,
+    forceFullContracts,
+    targetBlockTypes
+  })
+    ? "full"
+    : shouldUseMinimalContracts(args.message)
+      ? "minimal"
+      : "targeted"
+  const fallbackOrder: PlannerContractMode[] =
+    preferredMode === "full"
+      ? ["full", "targeted", "minimal"]
+      : preferredMode === "targeted"
+        ? ["targeted", "minimal"]
+        : ["minimal"]
+
+  const budget = schemaBudgetBytes()
+  let selectedMode = fallbackOrder[0]!
+  let selectedPayload = buildContractsForMode({
+    mode: selectedMode,
+    targetBlockTypes,
+    includePageMetaContract
+  })
+  let selectedBytes = bytesForPayload(selectedPayload)
+
+  for (const mode of fallbackOrder) {
+    const payload = buildContractsForMode({ mode, targetBlockTypes, includePageMetaContract })
+    const bytes = bytesForPayload(payload)
+    selectedMode = mode
+    selectedPayload = payload
+    selectedBytes = bytes
+    if (bytes <= budget) break
+  }
+
+  const contractBlockCount = selectedPayload.blockContracts ? Object.keys(selectedPayload.blockContracts).length : 0
+  return {
+    payload: selectedPayload,
+    meta: {
+      contractMode: selectedMode,
+      contractBytes: selectedBytes,
+      contractBlockCount,
+      targetBlockTypes,
+      strictJsonEnabled
+    }
+  }
 }
 
 export type PlannerOpenAIClient = {
@@ -279,7 +500,8 @@ export async function generatePlanWithOpenAI(args: {
   toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
   client?: PlannerOpenAIClient
   siteContextBlock?: string | null
-}): Promise<{ plan: EditPlan; usage: TokenUsage }> {
+  forceFullSchemaContracts?: boolean
+}): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
@@ -298,6 +520,7 @@ export async function generatePlanWithOpenAI(args: {
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
     "If request is ambiguous, return intent=needs_clarification and no ops.",
+    "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
     "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
@@ -314,6 +537,7 @@ export async function generatePlanWithOpenAI(args: {
     "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     "If user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page. Do not ask which page to create first.",
     "For create_page, derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page.",
+    "For add_block, use exact prop names from blockContracts. Common mistakes: use 'title' not 'heading' for section titles (except Hero which uses 'heading'), use 'q'/'a' not 'question'/'answer' for FAQ items, use 'quote' not 'testimonial' for Testimonials items.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
@@ -354,28 +578,24 @@ export async function generatePlanWithOpenAI(args: {
     pageWideTranslation ||
     /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
     /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/.test(args.message.toLowerCase())
+  const schemaContext = buildPlannerSchemaContext({
+    message: args.message,
+    contextPack: args.contextPack,
+    batchOverride,
+    pageWideTranslation,
+    legacyIncludeContracts: includeContracts,
+    forceFullContracts: args.forceFullSchemaContracts
+  })
 
   const user = {
     request: args.message,
     audienceHint: audienceHint ?? null,
     slug: args.slug,
     contextPack: args.contextPack,
-    ...(includeContracts
-      ? {
-          blockContracts: blockContractsSummary(),
-          pageMetaContract: pageMetaContractSummary(),
-          knownBlockTypes: Object.keys(blockSchemas),
-          editPlanShape: {
-            intent: "edit_plan | needs_clarification",
-            summary_for_user: "string",
-            change_log: ["string"],
-            ops: ["Operation[]"],
-            suggested_next_actions: ["string (optional, 2-4 items)"]
-          }
-        }
-      : {}),
+    ...schemaContext.payload,
     feedback: args.feedback ?? null
   }
+  const strictJson = schemaContext.meta.strictJsonEnabled
 
   let raw = ""
   let usage: TokenUsage = { ...ZERO_USAGE }
@@ -396,7 +616,7 @@ export async function generatePlanWithOpenAI(args: {
       stream: true,
       response_format: {
         type: "json_schema" as const,
-        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: false }
+        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: strictJson }
       },
       messages: [
         { role: "system", content: system },
@@ -424,7 +644,7 @@ export async function generatePlanWithOpenAI(args: {
       ...openAIChatOptionsForModel(args.model),
       response_format: {
         type: "json_schema" as const,
-        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: false }
+        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: strictJson }
       },
       messages: [
         { role: "system", content: system },
@@ -458,8 +678,9 @@ export async function generatePlanWithOpenAI(args: {
         ...planResult.data,
         ops: [planResult.data.ops[0]]
       },
-      usage
+      usage,
+      schemaContext: schemaContext.meta
     }
   }
-  return { plan: planResult.data, usage }
+  return { plan: planResult.data, usage, schemaContext: schemaContext.meta }
 }

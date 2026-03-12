@@ -50,6 +50,11 @@ export type ChatTelemetryEntry = {
   imageResolutionDurationMs?: number
   planningAttempts?: number
   contextPackBytes?: number
+  contractMode?: "minimal" | "targeted" | "full"
+  contractBytes?: number
+  contractBlockCount?: number
+  strictJsonEnabled?: boolean
+  schemaRetryUsed?: boolean
   compactContextEnabled?: boolean
   minimalContextEnabled?: boolean
   plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
@@ -177,6 +182,11 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         imageResolutionDurationMs: entry.imageResolutionDurationMs,
         planningAttempts: entry.planningAttempts,
         contextPackBytes: entry.contextPackBytes,
+        contractMode: entry.contractMode,
+        contractBytes: entry.contractBytes,
+        contractBlockCount: entry.contractBlockCount,
+        strictJsonEnabled: entry.strictJsonEnabled,
+        schemaRetryUsed: entry.schemaRetryUsed,
         compactContextEnabled: entry.compactContextEnabled,
         minimalContextEnabled: entry.minimalContextEnabled,
         plannerTier: entry.plannerTier

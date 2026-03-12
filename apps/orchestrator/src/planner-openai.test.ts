@@ -2,7 +2,12 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { demoPublishedPages } from "@ai-site-editor/shared"
 import { plannerContextPack } from "./nlp/deterministic-planner.js"
-import { generatePlanWithOpenAI, parseIntentWithOpenAI, type PlannerOpenAIClient } from "./chat/planner.js"
+import {
+  buildPlannerSchemaContext,
+  generatePlanWithOpenAI,
+  parseIntentWithOpenAI,
+  type PlannerOpenAIClient
+} from "./chat/planner.js"
 
 function fakePlannerClientWithContent(content: string): PlannerOpenAIClient {
   return {
@@ -293,7 +298,10 @@ test("generatePlanWithOpenAI includes explicit list-child coverage instructions 
   assert.equal(sawListChildTranslationInstruction, true)
 })
 
-test("generatePlanWithOpenAI rejects schema-invalid plans", async () => {
+test("generatePlanWithOpenAI rejects non-JSON planner output", async () => {
+  const previousStrict = process.env.CHAT_STRICT_JSON_RESPONSE
+  process.env.CHAT_STRICT_JSON_RESPONSE = "0"
+  try {
   const { currentPage, contextPack } = basePlannerArgs("change heading")
   await assert.rejects(
     () =>
@@ -303,17 +311,14 @@ test("generatePlanWithOpenAI rejects schema-invalid plans", async () => {
         currentPage,
         contextPack,
         model: "gpt-4o",
-        client: fakePlannerClientWithContent(
-          JSON.stringify({
-            intent: "edit_plan",
-            summary_for_user: "Bad payload",
-            change_log: "not-an-array",
-            ops: []
-          })
-        )
+        client: fakePlannerClientWithContent("not-json")
       }),
-    /(Invalid model output|Expected array|change_log)/i
+    /Model did not return JSON/i
   )
+  } finally {
+    if (previousStrict === undefined) delete process.env.CHAT_STRICT_JSON_RESPONSE
+    else process.env.CHAT_STRICT_JSON_RESPONSE = previousStrict
+  }
 })
 
 test("generatePlanWithOpenAI normalizes list aliases itemPath/arrayProp for update_item", async () => {
@@ -406,5 +411,178 @@ test("plannerContextPack without includeFullProps strips array props from non-se
           `Block ${outlineBlock.id} should NOT include array prop "${key}" without includeFullProps`)
       }
     }
+  }
+})
+
+test("buildPlannerSchemaContext uses targeted contracts for selected block edit", () => {
+  const previousAdaptive = process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+  process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = "1"
+  try {
+  const currentPage = demoPublishedPages()[0]
+  const selected = currentPage.blocks.find((block) => block.type === "Hero")
+  assert.ok(selected)
+  const contextPack = plannerContextPack({
+    session: "planner-openai-test",
+    slug: "/",
+    message: "change the hero heading",
+    currentPage,
+    activeBlockId: selected?.id,
+    activeBlockType: "Hero"
+  })
+
+  const result = buildPlannerSchemaContext({
+    message: "change the hero heading",
+    contextPack,
+    batchOverride: false,
+    pageWideTranslation: false,
+    legacyIncludeContracts: true
+  })
+
+  assert.equal(result.meta.contractMode, "targeted")
+  assert.ok(result.payload.blockContracts)
+  assert.deepEqual(Object.keys(result.payload.blockContracts ?? {}), ["Hero"])
+  } finally {
+    if (previousAdaptive === undefined) delete process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+    else process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = previousAdaptive
+  }
+})
+
+test("buildPlannerSchemaContext uses full contracts for full-page translation", () => {
+  const previousAdaptive = process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+  process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = "1"
+  try {
+  const currentPage = demoPublishedPages()[0]
+  const contextPack = plannerContextPack({
+    session: "planner-openai-test",
+    slug: "/",
+    message: "translate the whole page to German",
+    currentPage,
+    includeFullProps: true
+  })
+
+  const result = buildPlannerSchemaContext({
+    message: "translate the whole page to German",
+    contextPack,
+    batchOverride: false,
+    pageWideTranslation: true,
+    legacyIncludeContracts: true
+  })
+
+  assert.equal(result.meta.contractMode, "full")
+  assert.equal(Object.keys(result.payload.blockContracts ?? {}).length > 1, true)
+  } finally {
+    if (previousAdaptive === undefined) delete process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+    else process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = previousAdaptive
+  }
+})
+
+test("buildPlannerSchemaContext uses minimal contracts for straightforward move/remove", () => {
+  const previousAdaptive = process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+  process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = "1"
+  try {
+    const currentPage = demoPublishedPages()[0]
+    const contextPack = plannerContextPack({
+      session: "planner-openai-test",
+      slug: "/",
+      message: "move this section to bottom",
+      currentPage
+    })
+
+    const result = buildPlannerSchemaContext({
+      message: "move this section to bottom",
+      contextPack,
+      batchOverride: false,
+      pageWideTranslation: false,
+      legacyIncludeContracts: false
+    })
+
+    assert.equal(result.meta.contractMode, "minimal")
+    assert.equal(result.payload.blockContracts, undefined)
+  } finally {
+    if (previousAdaptive === undefined) delete process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+    else process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = previousAdaptive
+  }
+})
+
+test("buildPlannerSchemaContext downgrades from full when schema budget is tiny", () => {
+  const previousAdaptive = process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+  const previousBudget = process.env.CHAT_SCHEMA_BUDGET_BYTES
+  process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = "1"
+  process.env.CHAT_SCHEMA_BUDGET_BYTES = "300"
+  try {
+    const currentPage = demoPublishedPages()[0]
+    const contextPack = plannerContextPack({
+      session: "planner-openai-test",
+      slug: "/",
+      message: "translate the whole page to German",
+      currentPage
+    })
+
+    const result = buildPlannerSchemaContext({
+      message: "translate the whole page to German",
+      contextPack,
+      batchOverride: false,
+      pageWideTranslation: true,
+      legacyIncludeContracts: true
+    })
+
+    assert.notEqual(result.meta.contractMode, "full")
+  } finally {
+    if (previousAdaptive === undefined) delete process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+    else process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = previousAdaptive
+    if (previousBudget === undefined) delete process.env.CHAT_SCHEMA_BUDGET_BYTES
+    else process.env.CHAT_SCHEMA_BUDGET_BYTES = previousBudget
+  }
+})
+
+test("generatePlanWithOpenAI uses strict response_format when CHAT_STRICT_JSON_RESPONSE is enabled", async () => {
+  const previous = process.env.CHAT_STRICT_JSON_RESPONSE
+  process.env.CHAT_STRICT_JSON_RESPONSE = "1"
+  try {
+    const { currentPage, contextPack } = basePlannerArgs("change heading")
+    let strictValue: unknown
+    const client: PlannerOpenAIClient = {
+      chat: {
+        completions: {
+          create: async (request: unknown) => {
+            const typed = request as {
+              response_format?: { type?: string; json_schema?: { strict?: unknown } }
+            }
+            strictValue = typed.response_format?.json_schema?.strict
+            return {
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      intent: "edit_plan",
+                      summary_for_user: "Will update the heading.",
+                      change_log: ["Will update hero heading."],
+                      ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: "Hi" } }]
+                    })
+                  }
+                }
+              ]
+            } as unknown
+          }
+        }
+      },
+      responses: {
+        create: async () => ({ output_text: "" }) as unknown
+      }
+    }
+
+    await generatePlanWithOpenAI({
+      message: "change heading",
+      slug: "/",
+      currentPage,
+      contextPack,
+      model: "gpt-4o",
+      client
+    })
+
+    assert.equal(strictValue, true)
+  } finally {
+    if (previous === undefined) delete process.env.CHAT_STRICT_JSON_RESPONSE
+    else process.env.CHAT_STRICT_JSON_RESPONSE = previous
   }
 })
