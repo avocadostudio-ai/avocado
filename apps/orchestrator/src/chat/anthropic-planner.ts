@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import {
   allowedBlockTypes,
-  blockSchemas,
   editPlanSchema,
   type EditPlan,
   type Operation,
@@ -10,8 +9,6 @@ import {
 import {
   type ParsedIntent,
   extractAudienceTarget,
-  blockContractsSummary,
-  pageMetaContractSummary,
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
@@ -21,7 +18,13 @@ import {
   normalizeOpName,
   normalizePlanCandidate
 } from "../nlp/plan-normalizer.js"
-import { extractOpsFromPlanBuffer, isChatStrictPrimaryOpMode, isPageWideTranslationRequest } from "./planner.js"
+import {
+  buildPlannerSchemaContext,
+  extractOpsFromPlanBuffer,
+  isChatStrictPrimaryOpMode,
+  isPageWideTranslationRequest,
+  type PlannerSchemaContextMeta
+} from "./planner.js"
 import { editPlanJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthropic-cache.js"
@@ -209,7 +212,8 @@ export async function generatePlanWithAnthropic(args: {
   client?: PlannerAnthropicClient
   siteContextBlock?: string | null
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
-}): Promise<{ plan: EditPlan; usage: TokenUsage }> {
+  forceFullSchemaContracts?: boolean
+}): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
@@ -228,6 +232,7 @@ export async function generatePlanWithAnthropic(args: {
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
     "If request is ambiguous, return intent=needs_clarification and no ops.",
+    "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
     "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
@@ -244,6 +249,7 @@ export async function generatePlanWithAnthropic(args: {
     "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     "If user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page. Do not ask which page to create first.",
     "For create_page, derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page.",
+    "For add_block, use exact prop names from blockContracts. Common mistakes: use 'title' not 'heading' for section titles (except Hero which uses 'heading'), use 'q'/'a' not 'question'/'answer' for FAQ items, use 'quote' not 'testimonial' for Testimonials items.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
@@ -286,26 +292,21 @@ export async function generatePlanWithAnthropic(args: {
     pageWideTranslation ||
     /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
     /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/.test(args.message.toLowerCase())
+  const schemaContext = buildPlannerSchemaContext({
+    message: args.message,
+    contextPack: args.contextPack,
+    batchOverride,
+    pageWideTranslation,
+    legacyIncludeContracts: includeContracts,
+    forceFullContracts: args.forceFullSchemaContracts
+  })
 
   const user = {
     request: args.message,
     audienceHint: audienceHint ?? null,
     slug: args.slug,
     contextPack: args.contextPack,
-    ...(includeContracts
-      ? {
-          blockContracts: blockContractsSummary(),
-          pageMetaContract: pageMetaContractSummary(),
-          knownBlockTypes: Object.keys(blockSchemas),
-          editPlanShape: {
-            intent: "edit_plan | needs_clarification",
-            summary_for_user: "string",
-            change_log: ["string"],
-            ops: ["Operation[]"],
-            suggested_next_actions: ["string (optional, 2-4 items)"]
-          }
-        }
-      : {}),
+    ...schemaContext.payload,
     feedback: args.feedback ?? null
   }
 
@@ -404,7 +405,8 @@ export async function generatePlanWithAnthropic(args: {
               "Describe exactly what to update."
             ]
           },
-          usage
+          usage,
+          schemaContext: schemaContext.meta
         }
       }
 
@@ -624,8 +626,9 @@ export async function generatePlanWithAnthropic(args: {
         ...planResult.data,
         ops: [planResult.data.ops[0]]
       },
-      usage
+      usage,
+      schemaContext: schemaContext.meta
     }
   }
-  return { plan: planResult.data, usage }
+  return { plan: planResult.data, usage, schemaContext: schemaContext.meta }
 }

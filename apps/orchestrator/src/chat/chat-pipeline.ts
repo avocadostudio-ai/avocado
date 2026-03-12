@@ -17,8 +17,6 @@ import {
   siteCapabilitiesSchema,
   isBlockCatalogQuery,
   isInfoQuery,
-  isAdviceQuery,
-  adviceResponse,
   plannerMessageWithPendingContext,
   buildSiteContextBlock,
   infoResponse
@@ -67,7 +65,7 @@ import {
   quotedText,
   rewriteFromExisting
 } from "../nlp/deterministic-planner.js"
-import { generatePlanWithOpenAI, parseIntentWithOpenAI } from "./planner.js"
+import { generatePlanWithOpenAI, isStrictJsonResponseEnabled, parseIntentWithOpenAI } from "./planner.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic } from "./anthropic-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import type { ToolRuntime } from "../tools/runtime.js"
@@ -2090,11 +2088,6 @@ export async function runChatPipeline(
     const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: info.code, payload: withDebugPayload(info.payload, { outcome: "info" }) }
   }
-  if (body.message && isAdviceQuery(body.message)) {
-    pendingClarificationBySession.delete(body.session)
-    const advice = adviceResponse({ body, current, plannerSource, modelUsed, modelKey })
-    return { code: advice.code, payload: withDebugPayload(advice.payload, { outcome: "advice" }) }
-  }
   if (body.message && isVariationRequestMessage(body.message)) {
     const suggestions = [
       "Use the Variations action after selecting the target block.",
@@ -2151,10 +2144,11 @@ export async function runChatPipeline(
       return undefined
     }
   })()
-  const plannerContextTelemetryFields = {
+  const plannerContextTelemetryFields: Record<string, unknown> = {
     ...(typeof contextPackBytes === "number" ? { contextPackBytes } : {}),
     compactContextEnabled: compactContextExperimentEnabled,
-    minimalContextEnabled: useMinimalPlannerContext
+    minimalContextEnabled: useMinimalPlannerContext,
+    strictJsonEnabled: isStrictJsonResponseEnabled()
   }
 
   const guardrailFailureResponse = (args: { reason: string; source: "openai" | "anthropic" | "demo" }) => {
@@ -3375,6 +3369,12 @@ export async function runChatPipeline(
       })
       initialPlan = result.plan
       planUsage = result.usage
+      if (result.schemaContext) {
+        plannerContextTelemetryFields.contractMode = result.schemaContext.contractMode
+        plannerContextTelemetryFields.contractBytes = result.schemaContext.contractBytes
+        plannerContextTelemetryFields.contractBlockCount = result.schemaContext.contractBlockCount
+        plannerContextTelemetryFields.strictJsonEnabled = result.schemaContext.strictJsonEnabled
+      }
       markPlanningFinish()
       break
     } catch (error) {
@@ -3503,6 +3503,7 @@ export async function runChatPipeline(
       ...timingFields()
     })
     planningAttempts += 1
+    plannerContextTelemetryFields.schemaRetryUsed = true
     const repairFeedback = /full-page translation coverage/i.test(initialOutcome.reason)
       ? `${initialOutcome.reason}. Repair for translation completeness: include missing translated text fields for list children across all affected blocks. Preserve links/hrefs unchanged.`
       : buildDeterministicRepairFeedback(initialOutcome.reason)
@@ -3514,6 +3515,7 @@ export async function runChatPipeline(
       model: modelUsed,
       history: sessionChatHistory,
       feedback: repairFeedback,
+      forceFullSchemaContracts: true,
       siteContextBlock,
       onToken: onPlanningToken,
       onPlannedOp: incrementalPlanStreamEnabled
@@ -3525,6 +3527,12 @@ export async function runChatPipeline(
     })
     repairedPlan = repairResult.plan
     planUsage = repairResult.usage
+    if (repairResult.schemaContext) {
+      plannerContextTelemetryFields.contractMode = repairResult.schemaContext.contractMode
+      plannerContextTelemetryFields.contractBytes = repairResult.schemaContext.contractBytes
+      plannerContextTelemetryFields.contractBlockCount = repairResult.schemaContext.contractBlockCount
+      plannerContextTelemetryFields.strictJsonEnabled = repairResult.schemaContext.strictJsonEnabled
+    }
     markPlanningFinish()
     ctx.chatTelemetry.push({
       id: chatRequestId,
@@ -3584,5 +3592,37 @@ export async function runChatPipeline(
 
   const repairedOutcome = await respondFromPlan(repairedPlan, plannerSource, applyMode)
   if (repairedOutcome.done) return repairedOutcome.response
-  return guardrailFailureResponse({ reason: repairedOutcome.reason, source: plannerSource })
+  const repairedReason = repairedOutcome.reason
+  ctx.chatTelemetry.push({
+    id: chatRequestId,
+    at: new Date().toISOString(),
+    phase: "result",
+    session: body.session,
+    requestedSlug,
+    effectiveSlug,
+    plannerSource,
+    modelKey,
+    modelUsed,
+    promptHash,
+    promptExcerpt,
+    promptLength: plannerMessage.length,
+    outcome: "repair_failed",
+    reason: repairedReason.slice(0, 300),
+    reasonCategory: "schema_violation",
+    ...plannerContextTelemetryFields,
+    ...timingFields()
+  })
+  return {
+    code: 400,
+    payload: withDebugPayload({
+      status: "validation_error",
+      summary: "I could not apply that change safely.",
+      changes: [],
+      validationErrors: [formatValidationError(repairedReason)],
+      previewVersion: versions.get(body.session) ?? 0,
+      plannerSource,
+      modelUsed,
+      modelKey
+    }, { outcome: "repair_failed", reasonCategory: "schema_violation" })
+  }
 }
