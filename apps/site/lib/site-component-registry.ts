@@ -13,6 +13,7 @@ const COMPONENTS: EditorComponentDefinition[] = [
         ctaHref: { type: "string" },
         imageUrl: { type: "string" },
         imageAlt: { type: "string" },
+        imagePosition: { type: "string", enum: ["left", "right"] },
         secondaryCtaText: { type: "string" },
         secondaryCtaHref: { type: "string" }
       }
@@ -23,7 +24,8 @@ const COMPONENTS: EditorComponentDefinition[] = [
       ctaText: "Get Started",
       ctaHref: "/",
       imageUrl: "/hero-generated.svg",
-      imageAlt: "Abstract generated illustration"
+      imageAlt: "Abstract generated illustration",
+      imagePosition: "right"
     }
   },
   {

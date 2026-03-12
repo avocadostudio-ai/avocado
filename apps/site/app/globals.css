@@ -269,6 +269,14 @@ section {
   align-items: center;
 }
 
+.hero--image-left .hero__content {
+  order: 2;
+}
+
+.hero--image-left .hero__media {
+  order: 1;
+}
+
 .hero__content {
   min-width: 0;
 }

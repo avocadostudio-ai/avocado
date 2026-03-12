@@ -137,8 +137,10 @@ function renderRichTextContent(input: string) {
 }
 
 function Hero(props: Record<string, unknown>) {
+  const imagePosition = String(props.imagePosition ?? "right") === "left" ? "left" : "right"
+  const heroClass = imagePosition === "left" ? "hero hero--image-left" : "hero hero--image-right"
   return (
-    <section className="hero">
+    <section className={heroClass}>
       <div className="section__inner hero__inner">
         <div className="hero__content">
           <h1 data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">

@@ -1913,6 +1913,14 @@ textarea {
   align-items: center;
 }
 
+.variation-live-preview-canvas .hero--image-left .hero__content {
+  order: 2;
+}
+
+.variation-live-preview-canvas .hero--image-left .hero__media {
+  order: 1;
+}
+
 .variation-live-preview-canvas .hero__content h1 {
   margin: 0 0 14px;
   font-size: clamp(2rem, 4.2vw, 3.35rem);

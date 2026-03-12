@@ -15,4 +15,12 @@ test("buildEditorComponentsManifest returns schema-valid manifest with valid def
   const defaultsError = validateManifestDefaultProps(parsed.data.components)
   assert.equal(defaultsError, null)
   assert.ok(parsed.data.components.length > 0)
+
+  const hero = parsed.data.components.find((component) => component.type === "Hero")
+  assert.ok(hero)
+  const heroProps = (hero?.propsSchema.properties ?? {}) as Record<string, unknown>
+  const imagePosition = heroProps.imagePosition as Record<string, unknown> | undefined
+  assert.equal(imagePosition?.type, "string")
+  assert.deepEqual(imagePosition?.enum, ["left", "right"])
+  assert.equal(hero?.defaultProps?.imagePosition, "right")
 })
