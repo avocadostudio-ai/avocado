@@ -18,6 +18,11 @@ test("extractUnsplashQuery ignores unrelated quoted debug values", () => {
   assert.equal(query, "große gelbe zitrone wassertropfen und kind")
 })
 
+test("extractUnsplashQuery parses 'replace image by' phrasing", () => {
+  const query = extractUnsplashQuery("replace image by ripe grapes")
+  assert.equal(query, "ripe grapes")
+})
+
 test("heroImageQueryFromContext prefers explicit request over fallback page title", () => {
   const query = heroImageQueryFromContext({
     message: "replace the hero image with a large yellow lemon with water droplets and a child",

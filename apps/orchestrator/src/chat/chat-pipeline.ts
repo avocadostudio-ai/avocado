@@ -536,6 +536,32 @@ function extractReferencedItemIndices(message: string) {
   return { numeric, includesLast, hasConstraint: numeric.size > 0 || includesLast }
 }
 
+/**
+ * Check whether a block type's schema supports imageUrl at a given path.
+ * E.g. "imageUrl" → true for Hero, "features[0].imageUrl" → false for FeatureGrid.
+ */
+export function blockSupportsImageAtPath(blockType: string, imagePath: string): boolean {
+  const meta = getAllBlockMeta()[blockType]
+  if (!meta) return true // unknown block type → optimistic
+
+  // Top-level imageUrl (e.g. Hero)
+  if (imagePath === "imageUrl") {
+    return "imageUrl" in meta.fields
+  }
+
+  // Nested: e.g. "features[0].imageUrl" or "items[2].imageUrl"
+  const listMatch = imagePath.match(/^([a-zA-Z_]+)\[\d+\]\.imageUrl$/)
+  if (listMatch) {
+    const listName = listMatch[1]
+    const listMeta = meta.listFields?.[listName]
+    if (!listMeta) return false
+    return "imageUrl" in listMeta.itemFields
+  }
+
+  // Deeper nesting we can't check — be optimistic
+  return true
+}
+
 function detectImagePaths(value: unknown, basePath = "", acc = new Set<string>()) {
   if (Array.isArray(value)) {
     value.forEach((entry, idx) => detectImagePaths(entry, `${basePath}[${idx}]`, acc))
@@ -982,11 +1008,13 @@ export async function withUnsplashHeroImage(args: {
       targetBlock: target,
       patchCandidate
     })
-    const hasAnyImageTarget = targets.length > 0
+    // Filter out targets whose block schema doesn't support imageUrl at that path
+    const supportedTargets = targets.filter((t) => blockSupportsImageAtPath(target.type, t.path))
+    const hasAnyImageTarget = supportedTargets.length > 0
     const hasImageUrlInPatch = detectImagePaths(patchCandidate).size > 0
     const shouldReplace =
       !userProvidedExplicitUrl && touchesImage && hasAnyImageTarget && (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
-    if (!touchesImage || !shouldReplace || targets.length === 0) continue
+    if (!touchesImage || !shouldReplace || supportedTargets.length === 0) continue
 
     const targetProps = target.props as Record<string, unknown>
     const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
@@ -995,7 +1023,7 @@ export async function withUnsplashHeroImage(args: {
     const body = typeof targetProps.body === "string" ? targetProps.body : ""
     const sectionContext = [heading, subheading, title, body].filter(Boolean).join(" — ")
 
-    for (const targetImage of targets) {
+    for (const targetImage of supportedTargets) {
       const preferredKey = `${op.pageSlug}::${op.blockId}::${targetImage.path}`
       const imageQuery = preferredQueries.get(preferredKey) ?? targetImage.query
       const currentImageUrl = typeof getValueAtPath(targetProps, targetImage.path) === "string"
@@ -1336,6 +1364,7 @@ export function detectImageOps(args: {
       : "unsplash"
 
     for (const targetImage of targets) {
+      if (!blockSupportsImageAtPath(target.type, targetImage.path)) continue
       results.push({
         blockId: op.blockId,
         pageSlug: op.pageSlug,
@@ -2175,6 +2204,40 @@ export async function runChatPipeline(
         activeBlockId: planningActiveBlockId,
         activeEditablePath: planningActiveEditablePath
       })
+
+      // Filter out image ops targeting blocks whose schema doesn't support imageUrl
+      if (detectedImageOps.length > 0) {
+        const unsupportedBlocks = new Set<string>()
+        const unsupportedImagePaths: Array<{ blockId: string; pageSlug: string; path: string; altPath?: string }> = []
+        detectedImageOps = detectedImageOps.filter((imgOp) => {
+          const block = current.blocks.find((b) => b.id === imgOp.blockId)
+          if (!block) return true
+          const path = imgOp.path || "imageUrl"
+          if (blockSupportsImageAtPath(block.type, path)) return true
+          unsupportedBlocks.add(block.type)
+          unsupportedImagePaths.push({ blockId: imgOp.blockId, pageSlug: imgOp.pageSlug, path, altPath: imgOp.altPath })
+          return false
+        })
+        // Strip unsupported imageUrl values from ops patches so they don't leak through
+        for (const removed of unsupportedImagePaths) {
+          const op = resolvedPlan.ops.find((o) => o.op === "update_props" && o.blockId === removed.blockId && o.pageSlug === removed.pageSlug)
+          if (!op || op.op !== "update_props") continue
+          const rawPatch = op.patch as Record<string, unknown>
+          const patchCandidate =
+            rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
+              ? (rawPatch.props as Record<string, unknown>)
+              : rawPatch
+          deleteValueAtPath(patchCandidate, removed.path)
+          if (removed.altPath) deleteValueAtPath(patchCandidate, removed.altPath)
+        }
+        if (unsupportedBlocks.size > 0) {
+          const names = Array.from(unsupportedBlocks).join(", ")
+          resolvedPlan.change_log = [
+            ...resolvedPlan.change_log,
+            `Note: ${names} blocks do not support images. Consider using CardGrid instead.`
+          ]
+        }
+      }
 
       if (detectedImageOps.length > 0) {
         // Force plan approval so user can review before expensive image generation

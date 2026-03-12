@@ -228,11 +228,20 @@ export function extractMentionedBlockTypes(message: string): BlockType[] {
   return found.map((f) => KEYWORD_TO_BLOCK_TYPE[f.key]!)
 }
 
+// Matches "each card", "every feature", "all testimonials" — specific block type targets
+// that imply a batch operation across multiple items.
+const EACH_BLOCK_TYPE_PATTERN = new RegExp(
+  String.raw`\b(?:each|every|all)\s+(?:` +
+    BLOCK_TYPE_KEYWORDS.map((entry) => entry.pattern.source).join("|") +
+    String.raw`)\b`
+)
+
 export function isBatchAddRequest(message: string) {
   const m = normalizeForIntent(stripSiteContextEnvelope(message))
   if (BATCH_ADD_PATTERNS.some((re) => re.test(m)) || BATCH_PAGE_CREATE_PATTERNS.some((re) => re.test(m))) return true
   if (BATCH_UPDATE_PATTERNS.some((re) => re.test(m))) return true
   if (COUNTED_MULTI_BLOCK_ADD_PATTERN.test(m)) return true
+  if (EACH_BLOCK_TYPE_PATTERN.test(m)) return true
 
   const mentionedBlockTypes = countMentionedBlockTypes(m)
   const hasListSeparator = /,|\band\b|&|\bplus\b/.test(m)

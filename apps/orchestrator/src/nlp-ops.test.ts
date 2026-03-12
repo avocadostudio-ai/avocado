@@ -6,7 +6,18 @@ import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePa
 import { isBatchAddRequest, isBatchRemoveRequest, extractMentionedBlockTypes, isAdviceQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
-import { findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
+import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
+
+test("blockSupportsImageAtPath checks schema support", () => {
+  // Hero has top-level imageUrl
+  assert.equal(blockSupportsImageAtPath("Hero", "imageUrl"), true)
+  // FeatureGrid features do NOT have imageUrl
+  assert.equal(blockSupportsImageAtPath("FeatureGrid", "features[0].imageUrl"), false)
+  // CardGrid items DO have imageUrl
+  assert.equal(blockSupportsImageAtPath("CardGrid", "cards[0].imageUrl"), true)
+  // Unknown block → optimistic
+  assert.equal(blockSupportsImageAtPath("UnknownBlock", "imageUrl"), true)
+})
 
 test("parseCreatePageRequest prompt matrix", () => {
   const cases: Array<{ prompt: string; expected: string | null }> = [
@@ -1617,6 +1628,15 @@ test("isBatchAddRequest treats populate/update-all as batch overrides", () => {
   assert.equal(isBatchAddRequest("populate the whole page"), true)
   // Negative: single block update should not trigger
   assert.equal(isBatchAddRequest("update the hero heading"), false)
+})
+
+test("isBatchAddRequest detects 'each/every' + block type as batch override", () => {
+  assert.equal(isBatchAddRequest("insert unsplash images to each card - they should not repeat"), true)
+  assert.equal(isBatchAddRequest("add images to every card"), true)
+  assert.equal(isBatchAddRequest("update each feature with an icon"), true)
+  assert.equal(isBatchAddRequest("change every testimonial's quote"), true)
+  // Negative: single target should not trigger
+  assert.equal(isBatchAddRequest("update the card title"), false)
 })
 
 test("isBatchRemoveRequest detects batch remove patterns", () => {
