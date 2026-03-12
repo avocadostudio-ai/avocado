@@ -192,3 +192,13 @@ These should ideally share a single `extractQuotedStrings(message)` utility.
 ### 6. No Regression Safety Net for Provider Switching
 
 There's no automated test that runs the same suite against both Anthropic and OpenAI to catch provider-specific regressions. The e2e test file has `provider: "openai"` hardcoded. Consider parameterizing it or running both in CI.
+
+## Follow-up Hardening (Structured Outputs)
+
+The planner now explicitly distinguishes three non-success model-output paths before normalization:
+
+- `planner_refusal`: model refuses to provide plan content.
+- `incomplete_output`: model returns empty/incomplete plan output.
+- `malformed_output`: output is non-JSON or fails the raw-plan shape gate.
+
+`malformed_output` remains retryable in the planning loop, while refusal/incomplete are treated as non-repairable planner outcomes. The pipeline emits dedicated telemetry outcome/reason-category pairs for these states so they can be tracked independently from schema guardrail failures.
