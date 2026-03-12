@@ -33,7 +33,7 @@ export function extractUnsplashQuery(message: string) {
   const fromUnsplashMatch = cleanMessage.match(/\b(?:from|using|via)\s+unsplash\b[^.?!\n]*?(?:showing|of|with|for)?[^\S\n]*([^,.!?;\n]+)/i)
   const unsplashMatch = cleanMessage.match(/\bunsplash\b[^.?!\n]*?(?:showing|of|with|for)\s+([^,.!?;\n]+)/i)
   const replaceImageWith = cleanMessage.match(
-    /\b(?:replace|swap|change|update|set)\s+(?:the\s+)?(?:hero\s+)?(?:image|photo|picture)\s+(?:to|with)\s+([^,.!?;\n]+)/i
+    /\b(?:replace|swap|change|update|set)\s+(?:the\s+)?(?:hero\s+)?(?:image|photo|picture)\s+(?:to|with|by)\s+([^,.!?;\n]+)/i
   )
   const replaceImageWithGerman = cleanMessage.match(
     /\b(?:ersetze|ersetzen|aendere|ändere|tausche|tauschen)\s+(?:das|die|den)?\s*(?:hero\s*)?(?:bild|foto|image)\s+(?:durch|mit|zu)\s+([^,.!?;\n]+)/i
