@@ -44,7 +44,13 @@ function countPendingForSession(session: string, siteId?: string): number {
 }
 
 export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
-  const pipelineCtx: ChatPipelineContext = { log: app.log, chatTelemetry: ctx.chatTelemetry, modelLookup: ctx.modelLookup, availableProviders: ctx.availableProviders }
+  const pipelineCtx: ChatPipelineContext = {
+    log: app.log,
+    chatTelemetry: ctx.chatTelemetry,
+    modelLookup: ctx.modelLookup,
+    availableProviders: ctx.availableProviders,
+    toolRuntime: ctx.toolRuntime
+  }
 
   app.post("/chat", async (request, reply) => {
     const body = request.body as ChatRequestBody

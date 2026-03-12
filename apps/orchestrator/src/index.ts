@@ -21,6 +21,8 @@ import { chatRoutes } from "./routes/chat.js"
 import { opsRoutes } from "./routes/ops.js"
 import { mediaRoutes } from "./routes/media.js"
 import { historyRoutes } from "./routes/history.js"
+import { toolsRoutes } from "./routes/tools.js"
+import { createToolRuntime } from "./tools/runtime.js"
 
 const app = Fastify({ logger: true })
 
@@ -77,6 +79,7 @@ const chatTelemetry = createChatTelemetryStore({
   persistEnabled: chatTelemetryPersistEnabled,
   logger: app.log
 })
+const toolRuntime = await createToolRuntime({ logger: app.log })
 
 const modelLookup = {
   openai: {
@@ -101,7 +104,7 @@ const availableProviders: AIProvider[] = [
 // Route plugins
 // ---------------------------------------------------------------------------
 
-const ctx: RouteContext = { chatTelemetry, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin }
+const ctx: RouteContext = { chatTelemetry, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin, toolRuntime }
 
 await app.register((instance) => contentRoutes(instance, ctx))
 await app.register((instance) => publishingRoutes(instance, ctx))
@@ -109,6 +112,7 @@ await app.register((instance) => chatRoutes(instance, ctx))
 await app.register((instance) => opsRoutes(instance, ctx))
 await app.register((instance) => mediaRoutes(instance, ctx))
 await app.register((instance) => historyRoutes(instance, ctx))
+await app.register((instance) => toolsRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)
@@ -118,7 +122,8 @@ app.get("/health", async () => ({ ok: true }))
 app.get("/status/planner", async () => ({
   plannerSource: availableProviders.length > 0 ? availableProviders[0] : "demo",
   availableProviders,
-  unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
+  unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
+  enabledTools: ctx.toolRuntime.registry.listManifests().map((tool) => tool.name)
 }))
 app.get("/telemetry/chat", async (request) => {
   const raw = request.query as { limit?: string; outcome?: string; phase?: string; session?: string }

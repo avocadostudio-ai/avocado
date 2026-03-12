@@ -2,6 +2,11 @@
 
 Use this page as the entry point for onboarding any Next.js site.
 
+Related planning:
+- `docs/planning/reduce-nextjs-coupling-plan.md` — how we reduce framework coupling while keeping Next.js onboarding as default.
+- `docs/site-provider-spi.md` — advanced provider/SPI mode for enterprise-style integrations.
+- `docs/integration/tools-mvp.md` — Anthropic-first native tool contract, runtime policy, and adopter onboarding.
+
 ## Recommended reading order
 
 1. `docs/integration/nextjs-mvp-embedded.md`

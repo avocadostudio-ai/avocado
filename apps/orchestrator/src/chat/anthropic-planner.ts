@@ -25,6 +25,8 @@ import { extractOpsFromPlanBuffer, isChatStrictPrimaryOpMode, isPageWideTranslat
 import { editPlanJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthropic-cache.js"
+import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
+import type { ToolExecutionEvent } from "../tools/types.js"
 
 
 export async function parseIntentWithAnthropic(args: {
@@ -131,6 +133,32 @@ export async function parseIntentWithAnthropic(args: {
   return parsed.data
 }
 
+export type PlannerAnthropicClient = {
+  messages: {
+    create: (args: unknown) => Promise<Anthropic.Messages.Message>
+    stream?: (args: unknown) => AsyncIterable<unknown> & { finalMessage: () => Promise<unknown> }
+  }
+}
+
+function sumTokenUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    ...(a.cacheCreationInputTokens !== undefined || b.cacheCreationInputTokens !== undefined
+      ? { cacheCreationInputTokens: (a.cacheCreationInputTokens ?? 0) + (b.cacheCreationInputTokens ?? 0) }
+      : {}),
+    ...(a.cacheReadInputTokens !== undefined || b.cacheReadInputTokens !== undefined
+      ? { cacheReadInputTokens: (a.cacheReadInputTokens ?? 0) + (b.cacheReadInputTokens ?? 0) }
+      : {})
+  }
+}
+
+function asToolUseBlock(block: Anthropic.Messages.ContentBlock) {
+  if (block.type !== "tool_use") return null
+  return block as unknown as { type: "tool_use"; id: string; name: string; input: unknown }
+}
+
 export async function generatePlanWithAnthropic(args: {
   message: string
   slug: string
@@ -141,9 +169,13 @@ export async function generatePlanWithAnthropic(args: {
   feedback?: string
   onToken?: (token: string) => void
   onPlannedOp?: (op: Operation, index: number) => void
+  onToolExecution?: (event: ToolExecutionEvent) => void
+  toolRuntime?: ToolRuntime
+  toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
+  client?: PlannerAnthropicClient
   siteContextBlock?: string | null
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
@@ -184,6 +216,8 @@ export async function generatePlanWithAnthropic(args: {
     "If rewrite/rephrase is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first.",
     "When rewriting text, return plain text unless the user explicitly asks for markdown formatting. Do not wrap the entire rewrite in **bold** markers.",
     "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
+    "For image search requests (e.g. Unsplash, stock photo, hero image replacement), call tool unsplash.search with a concise search query and choose an imageUrl from tool results.",
+    "When using unsplash.search, write the selected image URL into the relevant imageUrl field and set imageAlt to a concise accessible description.",
     ...(chatStrictPrimaryOpMode
       ? [
           "Return exactly one operation in ops[].",
@@ -245,62 +279,192 @@ export async function generatePlanWithAnthropic(args: {
     content: h.content
   }))
 
-  const toolDef: Anthropic.Messages.Tool = anthropicToolWithCache({
+  const submitPlanToolDef: Anthropic.Messages.Tool = anthropicToolWithCache({
     name: "submit_edit_plan",
     description: "Submit the structured EditPlan JSON.",
     input_schema: editPlanJsonSchema
   })
+  const runtimeTools: Anthropic.Messages.Tool[] =
+    args.toolRuntime
+      ? args.toolRuntime.registry.listEnabled().map((entry) =>
+          anthropicToolWithCache({
+            name: entry.manifest.name,
+            description: entry.manifest.description,
+            input_schema: entry.manifest.inputSchema as unknown as { type: "object" }
+          })
+        )
+      : []
+  const toolDefs: Anthropic.Messages.Tool[] = [submitPlanToolDef, ...runtimeTools].map((tool) => anthropicToolWithCache(tool))
 
   let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
   let streamedOpsCount = 0
-  if (args.onToken) {
-    let toolJsonBuf = ""
-    let textBuf = ""
-    const stream = client.messages.stream({
-      model: args.model,
-      max_tokens: 8192,
-      system: anthropicSystemPromptWithCache(system),
-      tools: [toolDef],
-      tool_choice: { type: "tool", name: "submit_edit_plan" },
-      messages: [
-        ...historyMessages,
-        { role: "user", content: JSON.stringify(user) }
-      ],
-    })
-    for await (const event of stream) {
-      if (event.type === "content_block_delta") {
-        if (event.delta.type === "input_json_delta") {
-          toolJsonBuf += event.delta.partial_json
-          if (args.onPlannedOp) {
-            const next = extractOpsFromPlanBuffer(toolJsonBuf, streamedOpsCount)
-            streamedOpsCount = next.nextEmittedCount
-            for (let idx = 0; idx < next.newOps.length; idx += 1) {
-              args.onPlannedOp(next.newOps[idx]!, streamedOpsCount - next.newOps.length + idx + 1)
-            }
-          }
-        } else if (event.delta.type === "text_delta") {
-          textBuf += event.delta.text
-          args.onToken(event.delta.text)
+  const maxToolTurns = 6
+
+  if (runtimeTools.length > 0) {
+    const loopMessages: Anthropic.MessageParam[] = [
+      ...historyMessages,
+      { role: "user", content: JSON.stringify(user) }
+    ]
+
+    for (let turn = 0; turn < maxToolTurns; turn += 1) {
+      const response = await client.messages.create({
+        model: args.model,
+        max_tokens: 8192,
+        system: anthropicSystemPromptWithCache(system),
+        tools: toolDefs,
+        tool_choice: { type: "auto" },
+        messages: loopMessages
+      })
+      usage = sumTokenUsage(usage, extractUsage(response))
+
+      for (const block of response.content) {
+        if (block.type === "text" && "text" in block && typeof block.text === "string" && args.onToken) {
+          args.onToken(block.text)
         }
       }
-    }
-    const finalMessage = await stream.finalMessage()
-    usage = extractUsage(finalMessage)
 
-    // Prefer tool_use input; fall back to text block
-    if (toolJsonBuf.length > 0) {
-      parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
-    } else if (textBuf.length > 0) {
-      const jsonText = extractJsonObject(textBuf)
-      if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+      const submitToolUse = response.content
+        .map((block) => asToolUseBlock(block))
+        .find((block) => block?.name === "submit_edit_plan")
+      if (submitToolUse && submitToolUse.input && typeof submitToolUse.input === "object") {
+        parsed = submitToolUse.input as Record<string, unknown>
+        break
+      }
+
+      const runtimeToolCalls = response.content
+        .map((block) => asToolUseBlock(block))
+        .filter((block): block is { type: "tool_use"; id: string; name: string; input: unknown } => Boolean(block && block.name !== "submit_edit_plan"))
+      if (runtimeToolCalls.length === 0) {
+        const textBlock = response.content.find((block) => block.type === "text")
+        const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+        const jsonText = extractJsonObject(raw)
+        if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+        break
+      }
+
+      loopMessages.push({ role: "assistant", content: response.content })
+
+      const toolResults: Array<{
+        type: "tool_result"
+        tool_use_id: string
+        content: string
+        is_error?: boolean
+      }> = []
+
+      for (const toolCall of runtimeToolCalls) {
+        const input = "input" in toolCall ? toolCall.input : {}
+        const result = await executeToolCall({
+          runtime: args.toolRuntime!,
+          toolName: toolCall.name,
+          input,
+          context: {
+            siteId: args.toolCallContext?.siteId ?? "default",
+            sessionId: args.toolCallContext?.sessionId ?? "dev",
+            userId: args.toolCallContext?.userId,
+            traceId: args.toolCallContext?.traceId ?? "tool-call",
+            plannerProvider: "anthropic"
+          },
+          policy: args.toolRuntime?.defaultPolicy
+        })
+        args.onToolExecution?.({
+          toolName: toolCall.name,
+          ok: result.ok,
+          latencyMs: result.latencyMs,
+          attempts: result.attempts,
+          errorCode: result.error?.code,
+          traceId: args.toolCallContext?.traceId ?? "tool-call",
+          sessionId: args.toolCallContext?.sessionId ?? "dev",
+          siteId: args.toolCallContext?.siteId ?? "default",
+          plannerProvider: "anthropic"
+        })
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolCall.id,
+          content: JSON.stringify(result.ok ? result.data : { error: result.error }),
+          ...(result.ok ? {} : { is_error: true })
+        })
+      }
+
+      loopMessages.push({
+        role: "user",
+        content: toolResults as unknown as string
+      } as unknown as Anthropic.MessageParam)
+    }
+  } else if (args.onToken) {
+    let toolJsonBuf = ""
+    let textBuf = ""
+    if (client.messages.stream) {
+      const stream = client.messages.stream({
+        model: args.model,
+        max_tokens: 8192,
+        system: anthropicSystemPromptWithCache(system),
+        tools: [submitPlanToolDef],
+        tool_choice: { type: "tool", name: "submit_edit_plan" },
+        messages: [
+          ...historyMessages,
+          { role: "user", content: JSON.stringify(user) }
+        ],
+      })
+      for await (const event of stream as AsyncIterable<{
+        type?: string
+        delta?: { type?: string; partial_json?: string; text?: string }
+      }>) {
+        if (event.type === "content_block_delta") {
+          if (event.delta?.type === "input_json_delta") {
+            toolJsonBuf += event.delta.partial_json ?? ""
+            if (args.onPlannedOp) {
+              const next = extractOpsFromPlanBuffer(toolJsonBuf, streamedOpsCount)
+              streamedOpsCount = next.nextEmittedCount
+              for (let idx = 0; idx < next.newOps.length; idx += 1) {
+                args.onPlannedOp(next.newOps[idx]!, streamedOpsCount - next.newOps.length + idx + 1)
+              }
+            }
+          } else if (event.delta?.type === "text_delta") {
+            textBuf += event.delta.text ?? ""
+            args.onToken(event.delta.text ?? "")
+          }
+        }
+      }
+      const finalMessage = await stream.finalMessage()
+      usage = extractUsage(finalMessage)
+
+      // Prefer tool_use input; fall back to text block
+      if (toolJsonBuf.length > 0) {
+        parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
+      } else if (textBuf.length > 0) {
+        const jsonText = extractJsonObject(textBuf)
+        if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+      }
+    } else {
+      const response = await client.messages.create({
+        model: args.model,
+        max_tokens: 8192,
+        system: anthropicSystemPromptWithCache(system),
+        tools: [submitPlanToolDef],
+        tool_choice: { type: "tool", name: "submit_edit_plan" },
+        messages: [
+          ...historyMessages,
+          { role: "user", content: JSON.stringify(user) }
+        ],
+      })
+      usage = extractUsage(response)
+      const toolBlock = response.content.find((b) => b.type === "tool_use")
+      if (toolBlock && "input" in toolBlock && toolBlock.input && typeof toolBlock.input === "object") {
+        parsed = toolBlock.input as Record<string, unknown>
+      } else {
+        const textBlock = response.content.find((b) => b.type === "text")
+        const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+        const jsonText = extractJsonObject(raw)
+        if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+      }
     }
   } else {
     const response = await client.messages.create({
       model: args.model,
       max_tokens: 8192,
       system: anthropicSystemPromptWithCache(system),
-      tools: [toolDef],
+      tools: [submitPlanToolDef],
       tool_choice: { type: "tool", name: "submit_edit_plan" },
       messages: [
         ...historyMessages,
