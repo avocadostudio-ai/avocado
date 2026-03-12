@@ -2054,7 +2054,8 @@ export async function runChatPipeline(
     currentPage: current,
     activeBlockId: planningActiveBlockId,
     activeBlockType: body.activeBlockType,
-    activeEditablePath: planningActiveEditablePath
+    activeEditablePath: planningActiveEditablePath,
+    includeFullProps: translationScope === "page"
   })
   const compactContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_COMPACT_CONTEXT_EXPERIMENT ?? "").trim())
   const minimalContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_MINIMAL_CONTEXT_EXPERIMENT ?? "").trim())

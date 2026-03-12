@@ -1179,6 +1179,7 @@ export function plannerContextPack(args: {
   activeBlockId?: string
   activeBlockType?: string
   activeEditablePath?: string
+  includeFullProps?: boolean
 }) {
   const { session, slug, message, currentPage, activeBlockId, activeBlockType, activeEditablePath } = args
   const pageRoutes = orderSlugsHomeFirst(Array.from(getSessionDraft(session).keys()))
@@ -1209,7 +1210,7 @@ export function plannerContextPack(args: {
       const bProps = b.props as Record<string, unknown>
       const arrProps = arrayPropLengths(bProps)
       // Selected block: send full props for precise editing context
-      if (b.id === activeBlockId) {
+      if (b.id === activeBlockId || args.includeFullProps) {
         return { id: b.id, type: b.type, props: structuredClone(bProps), arrayProps: arrProps }
       }
       // Other blocks: scalar props only — keeps token count low

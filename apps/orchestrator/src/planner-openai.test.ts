@@ -365,3 +365,46 @@ test("generatePlanWithOpenAI normalizes list aliases itemPath/arrayProp for upda
     assert.equal(second.index, 2)
   }
 })
+
+test("plannerContextPack with includeFullProps sends array props for all blocks", () => {
+  const currentPage = demoPublishedPages()[0]
+  const contextPack = plannerContextPack({
+    session: "planner-openai-test",
+    slug: "/",
+    message: "translate this page to German",
+    currentPage,
+    includeFullProps: true
+  })
+  // Every block with array props should have them included in the outline
+  for (const outlineBlock of contextPack.pageOutline) {
+    const original = currentPage.blocks.find((b) => b.id === outlineBlock.id)!
+    const originalProps = original.props as Record<string, unknown>
+    for (const [key, value] of Object.entries(originalProps)) {
+      if (Array.isArray(value)) {
+        assert.ok(Array.isArray((outlineBlock.props as Record<string, unknown>)[key]),
+          `Block ${outlineBlock.id} should include array prop "${key}" when includeFullProps is true`)
+      }
+    }
+  }
+})
+
+test("plannerContextPack without includeFullProps strips array props from non-selected blocks", () => {
+  const currentPage = demoPublishedPages()[0]
+  const contextPack = plannerContextPack({
+    session: "planner-openai-test",
+    slug: "/",
+    message: "change the heading",
+    currentPage
+  })
+  // Non-selected blocks should have array props stripped (only scalars kept)
+  for (const outlineBlock of contextPack.pageOutline) {
+    const original = currentPage.blocks.find((b) => b.id === outlineBlock.id)!
+    const originalProps = original.props as Record<string, unknown>
+    for (const [key, value] of Object.entries(originalProps)) {
+      if (Array.isArray(value)) {
+        assert.ok(!Array.isArray((outlineBlock.props as Record<string, unknown>)[key]),
+          `Block ${outlineBlock.id} should NOT include array prop "${key}" without includeFullProps`)
+      }
+    }
+  }
+})
