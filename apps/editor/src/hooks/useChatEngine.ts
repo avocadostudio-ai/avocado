@@ -121,7 +121,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     {
       id: "welcome",
       role: "assistant",
-      text: "I can add sections, edit text, rearrange blocks, create new pages, and more. Click anything in the preview or describe what you'd like to change.",
+      text: "Let’s shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.",
       suggestions: [
         "Add testimonials below hero",
         "Change the hero headline",
