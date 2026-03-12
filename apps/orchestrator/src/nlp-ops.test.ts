@@ -57,6 +57,7 @@ test("parseCreatePageRequest prompt matrix", () => {
     { prompt: "generate a new page /about-us", expected: "/about-us" },
     { prompt: "add new page about cherries", expected: "/cherries" },
     { prompt: "create page for startup founders", expected: "/for-startup-founders" },
+    { prompt: "add a page for pomegranates", expected: "/pomegranates" },
     { prompt: "add a CTA corresponding to intent of this page", expected: null },
     { prompt: "improve this page", expected: null },
     { prompt: "delete this page", expected: null },
@@ -2429,4 +2430,62 @@ test("parseDuplicatePageRequest: 'clone this page with url /about-us'", () => {
   assert.ok(result, "should parse as a duplicate request")
   assert.equal(result.sourceSlug, "/services")
   assert.equal(result.targetSlug, "/about-us")
+})
+
+test("normalizePlanCandidate converts update_props with appended array items to add_item ops", () => {
+  const currentPage = demoPublishedPages()[0]
+  const faqBlock = currentPage.blocks.find((b) => b.type === "FAQAccordion")
+  assert.ok(faqBlock, "demo page should have FAQAccordion")
+  const existingItems = (faqBlock.props as Record<string, unknown>).items as unknown[]
+  assert.ok(Array.isArray(existingItems) && existingItems.length > 0, "FAQAccordion should have existing items")
+
+  const newItems = [
+    { q: "How should I store avocados?", a: "Keep unripe avocados at room temperature." },
+    { q: "Can I freeze avocados?", a: "Yes, peel and pit them first." },
+    { q: "How long do avocados last in the fridge?", a: "About 3-5 days when ripe." }
+  ]
+
+  const plan = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      summary_for_user: "Added 3 FAQ questions about storage.",
+      change_log: ["Added 3 questions about storage"],
+      ops: [
+        {
+          op: "update_props",
+          pageSlug: "/",
+          blockId: faqBlock.id,
+          patch: { items: [...existingItems, ...newItems] }
+        }
+      ]
+    },
+    { defaultSlug: "/", currentPage, userMessage: "add 3 questions about storage" }
+  ) as { ops: Array<Record<string, unknown>> }
+
+  // Should be converted to 3 add_item ops (not 1 update_props)
+  assert.equal(plan.ops.length, 3, `expected 3 add_item ops, got ${plan.ops.length}: ${JSON.stringify(plan.ops.map((o: any) => o.op))}`)
+  for (const op of plan.ops) {
+    assert.equal(op.op, "add_item")
+    assert.equal(op.blockId, faqBlock.id)
+    assert.equal(op.listKey, "items")
+    assert.ok(op.item && typeof op.item === "object", "each add_item should have an item")
+  }
+})
+
+test("isHighConfidenceDeterministicCase returns false for 'add a proper CTA' (needs LLM for content)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "add a proper CTA", currentPage }),
+    false,
+    "quality-signaling words like 'proper' should defer to LLM for content generation"
+  )
+})
+
+test("isHighConfidenceDeterministicCase still returns true for plain 'add a CTA'", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "add a CTA", currentPage }),
+    true,
+    "plain add block requests should use the deterministic path"
+  )
 })

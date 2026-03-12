@@ -516,6 +516,15 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         const keyCandidate = raw.path.trim().replace(/^\/+/, "")
         if (keyCandidate && !keyCandidate.includes("/")) raw.listKey = keyCandidate
       }
+      // Infer listKey from the target block's props when there is exactly one array field
+      if (!raw.listKey && isListOperation && typeof raw.blockId === "string" && args?.currentPage) {
+        const targetBlock = args.currentPage.blocks.find((b) => b.id === raw.blockId)
+        const targetProps = targetBlock?.props as Record<string, unknown> | undefined
+        if (targetProps) {
+          const arrayKeys = Object.keys(targetProps).filter((k) => Array.isArray(targetProps[k]))
+          if (arrayKeys.length === 1) raw.listKey = arrayKeys[0]
+        }
+      }
     }
     if (isListOperation && typeof raw.listKey === "string") raw.listKey = raw.listKey.replace(/^\/+/, "")
     if (isListOperation && typeof raw.listKey === "string" && typeof raw.pageSlug === "string" && raw.pageSlug === `/${raw.listKey}` && args?.defaultSlug) {
@@ -576,6 +585,74 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     if (!raw.patch) {
       raw.patch = raw.props ?? raw.changes
     }
+    // Remap update_props patch keys: heading→title for non-Hero, question→q/answer→a in list items
+    if (raw.op === "update_props" && raw.patch && typeof raw.patch === "object" && !Array.isArray(raw.patch) && typeof raw.blockId === "string") {
+      const patch = raw.patch as Record<string, unknown>
+      const targetBlock = args?.currentPage?.blocks.find((b) => b.id === raw.blockId)
+      const blockType = targetBlock?.type ?? ""
+      if (blockType !== "Hero" && "heading" in patch && !("title" in patch)) {
+        patch.title = patch.heading
+        delete patch.heading
+      }
+      const itemKeyAliases: Record<string, string> = { question: "q", answer: "a", testimonial: "quote", review: "quote" }
+      for (const [propKey, propVal] of Object.entries(patch)) {
+        if (!Array.isArray(propVal)) continue
+        patch[propKey] = propVal.map((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return item
+          const entry = item as Record<string, unknown>
+          let changed = false
+          const mapped: Record<string, unknown> = {}
+          for (const [k, v] of Object.entries(entry)) {
+            const alias = itemKeyAliases[k.toLowerCase()]
+            if (alias && !(alias in entry)) {
+              mapped[alias] = v
+              changed = true
+            } else {
+              mapped[k] = v
+            }
+          }
+          return changed ? mapped : entry
+        })
+      }
+    }
+
+    // Convert update_props with appended array items → add_item ops.
+    // When the LLM returns the full array (existing + new), extract only the new items as add_item ops
+    // to avoid overwriting existing items with potentially stale copies.
+    if (raw.op === "update_props" && typeof raw.blockId === "string" && raw.patch && typeof raw.patch === "object" && !Array.isArray(raw.patch) && args?.currentPage) {
+      const patch = raw.patch as Record<string, unknown>
+      const targetBlock = args.currentPage.blocks.find((b) => b.id === raw.blockId)
+      if (targetBlock) {
+        const blockProps = targetBlock.props as Record<string, unknown>
+        for (const [key, patchVal] of Object.entries(patch)) {
+          if (!Array.isArray(patchVal)) continue
+          const existing = blockProps[key]
+          if (!Array.isArray(existing) || existing.length === 0) continue
+          if (patchVal.length <= existing.length) continue
+          // The patch array is longer — likely existing items + new appended items.
+          // Convert new tail items to add_item ops.
+          const newItems = patchVal.slice(existing.length)
+          if (newItems.length > 0 && newItems.every((it: unknown) => it && typeof it === "object" && !Array.isArray(it))) {
+            delete patch[key]
+            const slug = raw.pageSlug ?? args.defaultSlug ?? "/"
+            const addItemOps = newItems.map((item: unknown) => ({
+              op: "add_item",
+              pageSlug: slug,
+              blockId: raw.blockId,
+              listKey: key,
+              item
+            }))
+            // If patch has no remaining keys, replace this op entirely with add_item ops
+            if (Object.keys(patch).length === 0) {
+              return addItemOps
+            }
+            // Otherwise keep the update_props for scalar changes and append add_item ops
+            return [raw, ...addItemOps]
+          }
+        }
+      }
+    }
+
     if (raw.op === "update_item" && typeof raw.blockId === "string" && typeof raw.listKey === "string") {
       const block = args?.currentPage?.blocks.find((candidate) => candidate.id === raw.blockId)
       const blockProps = block?.props as Record<string, unknown> | undefined
@@ -724,6 +801,41 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         block.id = `b_${String(block.type).toLowerCase()}_${Date.now()}`
       }
       raw.block = block
+
+      // Remap heading→title for non-Hero blocks (LLMs often confuse heading/title)
+      if (block.props && typeof block.props === "object" && !Array.isArray(block.props)) {
+        const bProps = block.props as Record<string, unknown>
+        const blockType = typeof block.type === "string" ? block.type : ""
+        if (blockType !== "Hero" && "heading" in bProps && !("title" in bProps)) {
+          bProps.title = bProps.heading
+          delete bProps.heading
+        }
+      }
+
+      // Remap list item keys inside add_block props (e.g., question→q, answer→a)
+      if (block.props && typeof block.props === "object" && !Array.isArray(block.props)) {
+        const bProps = block.props as Record<string, unknown>
+        const itemKeyAliases: Record<string, string> = { question: "q", answer: "a", testimonial: "quote", review: "quote" }
+        for (const [propKey, propVal] of Object.entries(bProps)) {
+          if (!Array.isArray(propVal)) continue
+          bProps[propKey] = propVal.map((item) => {
+            if (!item || typeof item !== "object" || Array.isArray(item)) return item
+            const entry = item as Record<string, unknown>
+            let changed = false
+            const mapped: Record<string, unknown> = {}
+            for (const [k, v] of Object.entries(entry)) {
+              const alias = itemKeyAliases[k.toLowerCase()]
+              if (alias && !(alias in entry)) {
+                mapped[alias] = v
+                changed = true
+              } else {
+                mapped[k] = v
+              }
+            }
+            return changed ? mapped : entry
+          })
+        }
+      }
     }
 
     // Convert add_block → add_item when targeting an existing single-instance block with list items
