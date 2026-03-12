@@ -399,20 +399,21 @@
     "id": "p_about_lemons",
     "slug": "/about-lemons",
     "title": "About Lemons",
-    "updatedAt": "2026-02-27T23:31:28.707Z",
+    "updatedAt": "2026-03-12T22:29:47.452Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
         "type": "Hero",
         "props": {
-          "heading": "Explore the Benefits of Lemons",
-          "subheading": "Discover Health and Culinary Uses",
-          "ctaText": "Find Out More",
-          "ctaHref": "/about-lemons",
-          "imageUrl": "http://localhost:4200/generated-images/var_1772235088704_kepgwc.png",
-          "imageAlt": "Lemon on a blue background",
-          "secondaryCtaText": "Learn More",
-          "secondaryCtaHref": "/lemons-benefits"
+          "heading": "Good for You. Better for the Planet.",
+          "subheading": "Explore how responsible avocado farming supports sustainable living and nourishes your wellbeing",
+          "ctaText": "Discover Sustainability",
+          "ctaHref": "/sustainable-farming",
+          "imageUrl": "https://images.unsplash.com/photo-1652284916670-2adf1ec4c8dc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8ZXhwbG9yZSUyMHRoZSUyMGJlbmVmaXRzJTIwb2YlMjBsZW1vbnMlMjBoZXJvJTIwZm9vZCUyMHBob3RvZ3JhcGh5JTIwbmF0dXJhbCUyMGxpZ2h0fGVufDF8MHx8fDE3NzMzNTAyMDJ8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Avocado growing on a tree in a lush, sustainable farm",
+          "secondaryCtaText": "Explore Recipes",
+          "secondaryCtaHref": "/avocado-recipes",
+          "imagePosition": "left"
         }
       },
       {
@@ -446,6 +447,31 @@
               "description": "Discover different types of lemons around the world.",
               "ctaText": "See Varieties",
               "ctaHref": "/lemons-varieties"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773354509519",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Lemon Storage Tips",
+          "items": [
+            {
+              "q": "What's the best way to store lemons?",
+              "a": "Keep lemons at room temperature in a cool, dry spot away from direct sunlight for short-term use. For longer storage, refrigerate them in a sealed container or plastic bag—this can extend their life to 2-3 weeks. The cool temperature slows down ripening and keeps them fresher longer."
+            },
+            {
+              "q": "How long do lemons stay fresh?",
+              "a": "At room temperature, lemons typically stay fresh for about 1 week. In the refrigerator, they can last 2-3 weeks or even up to a month if stored properly in a sealed container. Check them occasionally and remove any that show signs of mold or decay."
+            },
+            {
+              "q": "Can you freeze lemons?",
+              "a": "Yes! Freeze whole lemons, sliced lemons, or freshly squeezed lemon juice. Whole lemons can be frozen for up to 4 months and work well in recipes or infused water. For juice, freeze it in ice cube trays for convenient portions. Frozen lemons are perfect for cooking, baking, or future use."
+            },
+            {
+              "q": "Should I store lemons in the fridge?",
+              "a": "Absolutely! The refrigerator is ideal for keeping lemons fresh longer. Store them in a sealed plastic bag or airtight container to prevent moisture loss and keep them away from other foods. The crisper drawer is perfect—it maintains the right humidity level. Lemons stored this way can last 2-3 weeks or longer, making it a great option if you're not using them immediately."
             }
           ]
         }
