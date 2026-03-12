@@ -80,7 +80,7 @@ test("generatePlanWithAnthropic executes runtime tool calls before submit_edit_p
               {
                 type: "tool_use",
                 id: "toolu_1",
-                name: "unsplash.search",
+                name: "unsplash_search",
                 input: { query: "mountain sunset" }
               }
             ],
