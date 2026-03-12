@@ -399,7 +399,7 @@
     "id": "p_about_lemons",
     "slug": "/about-lemons",
     "title": "About Lemons",
-    "updatedAt": "2026-03-12T22:29:47.452Z",
+    "updatedAt": "2026-03-12T22:35:46.959Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
@@ -452,28 +452,13 @@
         }
       },
       {
-        "id": "b_faqaccordion_1773354509519",
-        "type": "FAQAccordion",
+        "id": "b_cta_1773354932967",
+        "type": "CTA",
         "props": {
-          "title": "Lemon Storage Tips",
-          "items": [
-            {
-              "q": "What's the best way to store lemons?",
-              "a": "Keep lemons at room temperature in a cool, dry spot away from direct sunlight for short-term use. For longer storage, refrigerate them in a sealed container or plastic bag—this can extend their life to 2-3 weeks. The cool temperature slows down ripening and keeps them fresher longer."
-            },
-            {
-              "q": "How long do lemons stay fresh?",
-              "a": "At room temperature, lemons typically stay fresh for about 1 week. In the refrigerator, they can last 2-3 weeks or even up to a month if stored properly in a sealed container. Check them occasionally and remove any that show signs of mold or decay."
-            },
-            {
-              "q": "Can you freeze lemons?",
-              "a": "Yes! Freeze whole lemons, sliced lemons, or freshly squeezed lemon juice. Whole lemons can be frozen for up to 4 months and work well in recipes or infused water. For juice, freeze it in ice cube trays for convenient portions. Frozen lemons are perfect for cooking, baking, or future use."
-            },
-            {
-              "q": "Should I store lemons in the fridge?",
-              "a": "Absolutely! The refrigerator is ideal for keeping lemons fresh longer. Store them in a sealed plastic bag or airtight container to prevent moisture loss and keep them away from other foods. The crisper drawer is perfect—it maintains the right humidity level. Lemons stored this way can last 2-3 weeks or longer, making it a great option if you're not using them immediately."
-            }
-          ]
+          "title": "Discover Lemons in Every Bite",
+          "description": "Ready to bring fresh, zesty lemons into your kitchen? Explore our favorite recipes and learn how sustainable sourcing makes every squeeze count.",
+          "ctaText": "Explore Recipes",
+          "ctaHref": "/avocado-recipes"
         }
       }
     ]
@@ -550,6 +535,69 @@
               "a": "Yes, we offer international shipping to select countries. Please check our shipping policy for more details."
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_avocado_recipes",
+    "slug": "/avocado-recipes",
+    "title": "Avocado Recipes",
+    "updatedAt": "2026-03-12T22:39:07.592Z",
+    "blocks": [
+      {
+        "id": "b_hero_avocado-recipes",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover Delicious Avocado Recipes",
+          "subheading": "From creamy dips to fresh salads and vibrant pastas—explore easy, inspiring ways to bring avocados to your table.",
+          "ctaText": "Explore Recipes",
+          "ctaHref": "#featured-recipes",
+          "imageUrl": "https://images.unsplash.com/photo-1616485828923-2640a1ee48b4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxkaXNjb3ZlciUyMGRlbGljaW91cyUyMGF2b2NhZG8lMjByZWNpcGVzfGVufDF8MHx8fDE3NzMzNTUxMjF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Photo of discover delicious avocado recipes"
+        }
+      },
+      {
+        "id": "b_cardgrid_avocado-recipes",
+        "type": "CardGrid",
+        "props": {
+          "title": "Featured Recipes",
+          "cards": [
+            {
+              "title": "Creamy Guacamole",
+              "description": "Classic avocado dip blended with lime, cilantro, and fresh tomatoes. Perfect for snacks, appetizers, or game day.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/avocado-recipes/guacamole",
+              "imageUrl": "https://images.unsplash.com/photo-1761243743989-726fb70af78d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxndWFjYW1vbGUlMjBmcmVzaCUyMGF2b2NhZG8lMjByZWNpcGV8ZW58MXwwfHx8MTc3MzM1NTAxMnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Fried pastries arranged around a guacamole dip"
+            },
+            {
+              "title": "Avocado Toast",
+              "description": "Creamy avocado spread on toasted bread, topped with sea salt, red pepper flakes, and a drizzle of olive oil.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/avocado-recipes/avocado-toast",
+              "imageUrl": "https://images.unsplash.com/photo-1608330557791-8dff6a434bbf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwdG9hc3QlMjBvbiUyMGJyZWFkfGVufDF8MHx8fDE3NzMzNTUwMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Sandwich on red ceramic plate"
+            },
+            {
+              "title": "Avocado Pasta",
+              "description": "Silky avocado sauce tossed with fresh pasta, garlic, and lemon. Light, satisfying, and ready in 15 minutes.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/avocado-recipes/avocado-pasta",
+              "imageUrl": "https://images.unsplash.com/photo-1698307190839-1e02b37d3441?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxOXx8YXZvY2FkbyUyMHBhc3RhJTIwZnJlc2glMjBncmVlbiUyMHNhdWNlJTIwbm9vZGxlc3xlbnwxfDB8fHwxNzczMzU1MTExfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Bowls of creamy avocado pasta with fresh green sauce"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773355043811",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to get started?",
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Start now",
+          "ctaHref": "/"
         }
       }
     ]
