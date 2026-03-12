@@ -13,6 +13,7 @@ export type ChatTelemetryPhase =
   | "plan_apply_failed"
   | "repair_attempt"
   | "repair_generated"
+  | "tool_call"
   | "result"
 
 export type ChatTelemetryEntry = {
@@ -52,6 +53,12 @@ export type ChatTelemetryEntry = {
   compactContextEnabled?: boolean
   minimalContextEnabled?: boolean
   plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
+  toolName?: string
+  toolOk?: boolean
+  toolLatencyMs?: number
+  toolAttempts?: number
+  toolErrorCode?: string
+  correlationId?: string
 }
 
 type Logger = {
@@ -173,6 +180,13 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         compactContextEnabled: entry.compactContextEnabled,
         minimalContextEnabled: entry.minimalContextEnabled,
         plannerTier: entry.plannerTier
+        ,
+        toolName: entry.toolName,
+        toolOk: entry.toolOk,
+        toolLatencyMs: entry.toolLatencyMs,
+        toolAttempts: entry.toolAttempts,
+        toolErrorCode: entry.toolErrorCode,
+        correlationId: entry.correlationId
       },
       "Chat telemetry event"
     )

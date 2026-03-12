@@ -23,6 +23,8 @@ import {
 } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 import { editPlanJsonSchema } from "./plan-json-schema.js"
+import type { ToolRuntime } from "../tools/runtime.js"
+import type { ToolExecutionEvent } from "../tools/types.js"
 
 export function isChatStrictPrimaryOpMode() {
   return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
@@ -272,6 +274,9 @@ export async function generatePlanWithOpenAI(args: {
   feedback?: string
   onToken?: (token: string) => void
   onPlannedOp?: (op: Operation, index: number) => void
+  onToolExecution?: (event: ToolExecutionEvent) => void
+  toolRuntime?: ToolRuntime
+  toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
   client?: PlannerOpenAIClient
   siteContextBlock?: string | null
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {

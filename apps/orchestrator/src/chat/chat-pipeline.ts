@@ -70,6 +70,7 @@ import {
 import { generatePlanWithOpenAI, parseIntentWithOpenAI } from "./planner.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic } from "./anthropic-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
+import type { ToolRuntime } from "../tools/runtime.js"
 import {
   heroImageQueryFromContext,
   imageKeywordsFromQuery,
@@ -113,6 +114,7 @@ export type ChatPipelineContext = {
   chatTelemetry: ReturnType<typeof createChatTelemetryStore>
   modelLookup: Record<AIProvider, Record<ModelKey, string>>
   availableProviders: AIProvider[]
+  toolRuntime: ToolRuntime
 }
 
 // ---------------------------------------------------------------------------
@@ -3254,6 +3256,40 @@ export async function runChatPipeline(
         model: modelUsed,
         history: sessionChatHistory,
         siteContextBlock,
+        toolRuntime: plannerSource === "anthropic" ? ctx.toolRuntime : undefined,
+        toolCallContext: plannerSource === "anthropic"
+          ? {
+              siteId: body.siteId ?? "default",
+              sessionId: body.session ?? "dev",
+              traceId: chatRequestId
+            }
+          : undefined,
+        onToolExecution: plannerSource === "anthropic"
+          ? (event) => {
+              ctx.chatTelemetry.push({
+                id: chatRequestId,
+                at: new Date().toISOString(),
+                phase: "tool_call",
+                session: body.session ?? "dev",
+                requestedSlug,
+                effectiveSlug,
+                plannerSource,
+                modelKey,
+                modelUsed,
+                promptHash,
+                promptExcerpt,
+                promptLength: plannerMessage.length,
+                toolName: event.toolName,
+                toolOk: event.ok,
+                toolLatencyMs: event.latencyMs,
+                toolAttempts: event.attempts,
+                toolErrorCode: event.errorCode,
+                correlationId: event.traceId,
+                outcome: event.ok ? "tool_ok" : "tool_error",
+                ...timingFields()
+              })
+            }
+          : undefined,
         onToken: onPlanningToken,
         onPlannedOp: incrementalPlanStreamEnabled
           ? (op, index) => {
