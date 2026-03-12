@@ -5,6 +5,7 @@ import { plannerContextPack } from "./nlp/deterministic-planner.js"
 import {
   buildPlannerSchemaContext,
   generatePlanWithOpenAI,
+  isPlannerOutputError,
   parseIntentWithOpenAI,
   type PlannerOpenAIClient
 } from "./chat/planner.js"
@@ -313,12 +314,60 @@ test("generatePlanWithOpenAI rejects non-JSON planner output", async () => {
         model: "gpt-4o",
         client: fakePlannerClientWithContent("not-json")
       }),
-    /Model did not return JSON/i
+    (error: unknown) => isPlannerOutputError(error) && error.reasonCategory === "malformed_output"
   )
   } finally {
     if (previousStrict === undefined) delete process.env.CHAT_STRICT_JSON_RESPONSE
     else process.env.CHAT_STRICT_JSON_RESPONSE = previousStrict
   }
+})
+
+test("generatePlanWithOpenAI classifies empty completion content as incomplete output", async () => {
+  const { currentPage, contextPack } = basePlannerArgs("change heading")
+  await assert.rejects(
+    () =>
+      generatePlanWithOpenAI({
+        message: "change heading",
+        slug: "/",
+        currentPage,
+        contextPack,
+        model: "gpt-4o",
+        client: fakePlannerClientWithContent("")
+      }),
+    (error: unknown) => isPlannerOutputError(error) && error.reasonCategory === "incomplete_output"
+  )
+})
+
+test("generatePlanWithOpenAI classifies explicit refusal output", async () => {
+  const { currentPage, contextPack } = basePlannerArgs("change heading")
+  const client: PlannerOpenAIClient = {
+    chat: {
+      completions: {
+        create: async () =>
+          ({
+            choices: [{ message: { content: "", refusal: "I can't comply with this request." } }]
+          }) as unknown
+      }
+    },
+    responses: {
+      create: async () =>
+        ({
+          output_text: ""
+        }) as unknown
+    }
+  }
+  await assert.rejects(
+    () =>
+      generatePlanWithOpenAI({
+        message: "change heading",
+        slug: "/",
+        currentPage,
+        contextPack,
+        model: "gpt-4o",
+        client
+      }),
+    (error: unknown) => isPlannerOutputError(error) && error.reasonCategory === "planner_refusal"
+  )
 })
 
 test("generatePlanWithOpenAI normalizes list aliases itemPath/arrayProp for update_item", async () => {

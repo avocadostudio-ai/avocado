@@ -10,6 +10,7 @@ import {
   setParseIntentWithAnthropicForTests,
   shouldResolveCreatePageHeroImage
 } from "./chat/chat-pipeline.js"
+import { PlannerOutputError } from "./chat/planner.js"
 import { pendingApprovalPlanBySession } from "./state/session-state.js"
 import { ZERO_USAGE } from "./telemetry/usage.js"
 
@@ -1685,6 +1686,80 @@ test("chat returns planning_missing when planner returns null plan", async (t) =
   const payload = response.json() as { status?: string; debug?: { outcome?: string } }
   assert.equal(payload.status, "error")
   assert.equal(payload.debug?.outcome, "planning_missing")
+})
+
+test("chat returns needs_clarification without repair when planner refuses output", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  let calls = 0
+  setGeneratePlanWithOpenAIForTests(async () => {
+    calls += 1
+    throw new PlannerOutputError("Model refused planning output: unsafe request", {
+      reasonCategory: "planner_refusal",
+      retryable: false
+    })
+  })
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "change hero heading"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  assert.equal(calls, 1)
+  const payload = response.json() as { status?: string; debug?: { outcome?: string; reasonCategory?: string } }
+  assert.equal(payload.status, "needs_clarification")
+  assert.equal(payload.debug?.outcome, "planning_refusal")
+  assert.equal(payload.debug?.reasonCategory, "planner_refusal")
+})
+
+test("chat returns error without repair when planner output is incomplete", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  let calls = 0
+  setGeneratePlanWithOpenAIForTests(async () => {
+    calls += 1
+    throw new PlannerOutputError("Model returned incomplete planning output", {
+      reasonCategory: "incomplete_output",
+      retryable: false
+    })
+  })
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "change hero heading"
+    }
+  })
+
+  assert.equal(response.statusCode, 500)
+  assert.equal(calls, 1)
+  const payload = response.json() as { status?: string; debug?: { outcome?: string; reasonCategory?: string } }
+  assert.equal(payload.status, "error")
+  assert.equal(payload.debug?.outcome, "planning_incomplete")
+  assert.equal(payload.debug?.reasonCategory, "incomplete_output")
 })
 
 test("chat returns direct guardrail failure when initial apply error is not repair-eligible", async (t) => {

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { allowedBlockTypes, type BlockType, type EditPlan, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
+import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
 import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
 
@@ -12,6 +12,9 @@ export type GuardrailErrorCategory =
   | "ambiguity"
   | "not_found"
   | "no_effective_change"
+  | "planner_refusal"
+  | "incomplete_output"
+  | "malformed_output"
   | "internal_error"
 
 export const siteCapabilitiesSchema = z.object({
@@ -333,22 +336,55 @@ export function adviceResponse(args: {
     }
   }
 
-  const summary = `It depends on the page goal. For ${pageLabel}, prioritize a clear Hero, supporting proof, and one strong CTA before adding extra sections.`
-  const changes = [
-    hasHero ? "Hero is present." : "Hero is missing.",
-    hasCta ? "CTA is present." : "CTA is missing."
+  // Analyze existing blocks on the page
+  const existingTypes = new Set(current.blocks.map((b) => b.type))
+  const presentList = current.blocks.map((b) => {
+    const meta = getBlockMeta(b.type)
+    return meta ? `${meta.displayName}` : b.type
+  })
+  const missingTypes = allowedBlockTypes.filter((t) => !existingTypes.has(t))
+
+  const changes: string[] = []
+  changes.push(`Current blocks (${current.blocks.length}): ${presentList.join(", ") || "none"}.`)
+  if (!hasHero) changes.push("Missing: Hero — consider adding a headline section at the top.")
+  if (!hasCta) changes.push("Missing: CTA — add a call-to-action to drive conversions.")
+  if (!existingTypes.has("Testimonials") && !existingTypes.has("Stats"))
+    changes.push("Missing: social proof (Testimonials or Stats) — builds trust.")
+  if (!existingTypes.has("FAQAccordion"))
+    changes.push("Missing: FAQ — addresses objections and improves SEO.")
+
+  // Build contextual suggestions based on what's actually missing
+  const suggestions: string[] = []
+  const suggestionPriority: Array<{ type: string; label: string }> = [
+    { type: "Hero", label: "Add a Hero section at the top" },
+    { type: "CTA", label: "Add a CTA section to drive conversions" },
+    { type: "Testimonials", label: "Add Testimonials for social proof" },
+    { type: "Stats", label: "Add Stats to highlight key numbers" },
+    { type: "FAQAccordion", label: "Add FAQ at the bottom" },
+    { type: "FeatureGrid", label: "Add a Feature Grid to list benefits" },
+    { type: "CardGrid", label: "Add a Card Grid for related content" },
+    { type: "ContactForm", label: "Add a Contact Form" },
+    { type: "Footer", label: "Add a Footer with links" }
   ]
+  for (const item of suggestionPriority) {
+    if (!existingTypes.has(item.type) && suggestions.length < 4) suggestions.push(item.label)
+  }
+  // If page has all common blocks, suggest content improvements instead
+  if (suggestions.length === 0) {
+    if (hasHero) suggestions.push("Rewrite the hero headline")
+    if (hasCta) suggestions.push("Strengthen the CTA copy")
+    suggestions.push("Update section content for this audience")
+  }
+
+  const summary = `For ${pageLabel} with ${current.blocks.length} block${current.blocks.length === 1 ? "" : "s"}: ${missingTypes.length > 0 ? `consider adding ${missingTypes.slice(0, 3).join(", ")}` : "all major sections are covered — focus on refining content"}.`
+
   return {
     code: 200,
     payload: {
       status: "advice",
       summary,
       changes,
-      suggestions: [
-        "Add testimonials below Hero",
-        "Add FAQ at the bottom",
-        "Strengthen the main CTA copy"
-      ],
+      suggestions,
       mentionedSlugs: [current.slug],
       previewVersion: versions.get(body.session ?? "dev") ?? 0,
       plannerSource,

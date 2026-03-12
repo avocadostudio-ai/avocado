@@ -65,7 +65,7 @@ import {
   quotedText,
   rewriteFromExisting
 } from "../nlp/deterministic-planner.js"
-import { generatePlanWithOpenAI, isStrictJsonResponseEnabled, parseIntentWithOpenAI } from "./planner.js"
+import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI } from "./planner.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic } from "./anthropic-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import type { ToolRuntime } from "../tools/runtime.js"
@@ -3379,6 +3379,7 @@ export async function runChatPipeline(
       break
     } catch (error) {
       const reason = toErrorDetail(error)
+      const reasonCategory = isPlannerOutputError(error) ? error.reasonCategory : classifyGuardrailError(reason)
       ctx.log.warn({ event: "plan_attempt_failed", attempt, model: modelUsed, reason: reason.slice(0, 300) },
         `Planning attempt ${attempt} failed`)
       ctx.chatTelemetry.push({
@@ -3396,9 +3397,68 @@ export async function runChatPipeline(
         promptLength: plannerMessage.length,
         outcome: `attempt_${attempt}_failed`,
         reason: reason.slice(0, 300),
-        reasonCategory: classifyGuardrailError(reason),
+        reasonCategory,
+        plannerRefusal: reasonCategory === "planner_refusal" ? true : undefined,
+        plannerIncomplete: reasonCategory === "incomplete_output" ? true : undefined,
         ...timingFields()
       })
+      if (isPlannerOutputError(error) && !error.retryable) {
+        markPlanningFinish()
+        ctx.chatTelemetry.push({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "result",
+          session: body.session,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: reasonCategory === "planner_refusal" ? "planning_refusal" : "planning_incomplete",
+          reason: reason.slice(0, 300),
+          reasonCategory,
+          plannerRefusal: reasonCategory === "planner_refusal" ? true : undefined,
+          plannerIncomplete: reasonCategory === "incomplete_output" ? true : undefined,
+          plannerTier: "full_llm",
+          ...plannerContextTelemetryFields,
+          ...timingFields()
+        })
+        if (reasonCategory === "planner_refusal") {
+          return {
+            code: 200,
+            payload: withDebugPayload({
+              status: "needs_clarification",
+              summary: "I can’t help with that request as written. Please rephrase and I can try a safe alternative.",
+              changes: [],
+              suggestions: [
+                "Describe the same goal in safer, neutral terms.",
+                "Limit the request to website content edits only.",
+                "Ask for a high-level rewrite without sensitive details."
+              ],
+              previewVersion: versions.get(body.session) ?? 0,
+              plannerSource,
+              modelUsed,
+              modelKey
+            }, { outcome: "planning_refusal", reasonCategory })
+          }
+        }
+        return {
+          code: 500,
+          payload: withDebugPayload({
+            status: "error",
+            summary: "I couldn’t finish generating a plan. Please try again.",
+            changes: [],
+            validationErrors: [reason.slice(0, 300)],
+            previewVersion: versions.get(body.session) ?? 0,
+            plannerSource,
+            modelUsed,
+            modelKey
+          }, { outcome: "planning_incomplete", reasonCategory })
+        }
+      }
       planningErrors.push(`Attempt ${attempt} planning failed: ${reason}`)
       if (attempt === maxPlanningAttempts) {
         markPlanningFinish()
@@ -3417,7 +3477,9 @@ export async function runChatPipeline(
           promptLength: plannerMessage.length,
           outcome: "planning_exhausted",
           reason: reason.slice(0, 300),
-          reasonCategory: classifyGuardrailError(reason),
+          reasonCategory,
+          plannerRefusal: reasonCategory === "planner_refusal" ? true : undefined,
+          plannerIncomplete: reasonCategory === "incomplete_output" ? true : undefined,
           plannerTier: "full_llm",
           ...plannerContextTelemetryFields,
           ...timingFields()
@@ -3433,7 +3495,7 @@ export async function runChatPipeline(
             plannerSource,
             modelUsed,
             modelKey
-          }, { outcome: "planning_exhausted", reasonCategory: classifyGuardrailError(reason) })
+          }, { outcome: "planning_exhausted", reasonCategory })
         }
       }
     }

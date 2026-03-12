@@ -124,6 +124,11 @@ export function isNoEffectiveChangeError(reason: string) {
 export function classifyGuardrailError(reason: string): GuardrailErrorCategory {
   const lower = reason.toLowerCase()
   if (isNoEffectiveChangeError(reason)) return "no_effective_change"
+  if (lower.includes("refused planning output")) return "planner_refusal"
+  if (lower.includes("incomplete planning output") || lower.includes("returned no planning output")) return "incomplete_output"
+  if (lower.includes("did not return json") || lower.includes("malformed json") || lower.includes("raw planner output shape is invalid")) {
+    return "malformed_output"
+  }
   if (
     lower.includes("page not found") ||
     lower.includes("blockid") ||

@@ -55,6 +55,8 @@ export type ChatTelemetryEntry = {
   contractBlockCount?: number
   strictJsonEnabled?: boolean
   schemaRetryUsed?: boolean
+  plannerRefusal?: boolean
+  plannerIncomplete?: boolean
   compactContextEnabled?: boolean
   minimalContextEnabled?: boolean
   plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
@@ -187,6 +189,8 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
         contractBlockCount: entry.contractBlockCount,
         strictJsonEnabled: entry.strictJsonEnabled,
         schemaRetryUsed: entry.schemaRetryUsed,
+        plannerRefusal: entry.plannerRefusal,
+        plannerIncomplete: entry.plannerIncomplete,
         compactContextEnabled: entry.compactContextEnabled,
         minimalContextEnabled: entry.minimalContextEnabled,
         plannerTier: entry.plannerTier
@@ -239,6 +243,8 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
       "repair_failed",
       "planner_exception",
       "planning_exhausted",
+      "planning_refusal",
+      "planning_incomplete",
       "planning_missing"
     ])
     const failures = recent.filter((row) => row.phase === "result" && row.outcome && failureOutcomes.has(row.outcome))
@@ -246,12 +252,16 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
 
     const failureByReasonCategory: Record<string, number> = {}
     const failureByOutcome: Record<string, number> = {}
+    let plannerRefusalCount = 0
+    let plannerIncompleteCount = 0
     const byPromptHash = new Map<
       string,
       { promptExcerpt: string; count: number; outcomes: Record<string, number>; reasonCategories: Record<string, number>; lastAt: string }
     >()
 
     for (const row of failures) {
+      if (row.plannerRefusal) plannerRefusalCount += 1
+      if (row.plannerIncomplete) plannerIncompleteCount += 1
       if (row.reasonCategory) failureByReasonCategory[row.reasonCategory] = (failureByReasonCategory[row.reasonCategory] ?? 0) + 1
       if (row.outcome) failureByOutcome[row.outcome] = (failureByOutcome[row.outcome] ?? 0) + 1
       const current =
@@ -291,6 +301,8 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
       appliedCount: success.length,
       failedCount: failures.length,
       failureRate: recent.length > 0 ? Number((failures.length / recent.length).toFixed(4)) : 0,
+      plannerRefusalCount,
+      plannerIncompleteCount,
       failureByOutcome,
       failureByReasonCategory,
       topFailedPrompts,

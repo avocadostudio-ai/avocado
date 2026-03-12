@@ -29,6 +29,7 @@ export const editPlanJsonSchema = {
       type: "array",
       items: {
         type: "object",
+        additionalProperties: false,
         properties: {
           op: {
             type: "string",

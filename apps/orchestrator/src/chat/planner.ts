@@ -1,4 +1,5 @@
 import OpenAI from "openai"
+import { z } from "zod"
 import {
   allowedBlockTypes,
   blockSchemas,
@@ -26,6 +27,68 @@ import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js
 import { editPlanJsonSchema } from "./plan-json-schema.js"
 import type { ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
+
+export type PlannerFailureReasonCategory = "schema_violation" | "planner_refusal" | "incomplete_output" | "malformed_output" | "internal_error"
+
+export class PlannerOutputError extends Error {
+  reasonCategory: PlannerFailureReasonCategory
+  retryable: boolean
+
+  constructor(message: string, options: { reasonCategory: PlannerFailureReasonCategory; retryable?: boolean }) {
+    super(message)
+    this.name = "PlannerOutputError"
+    this.reasonCategory = options.reasonCategory
+    this.retryable = options.retryable ?? false
+  }
+}
+
+export function isPlannerOutputError(error: unknown): error is PlannerOutputError {
+  return error instanceof PlannerOutputError
+}
+
+const rawPlanCandidateSchema = z.object({
+  intent: z.enum(["edit_plan", "needs_clarification"]).optional(),
+  summary_for_user: z.string().optional(),
+  change_log: z.array(z.string()).optional(),
+  ops: z.array(z.record(z.unknown())).optional(),
+  suggested_next_actions: z.array(z.string()).optional()
+}).passthrough()
+
+function asObject(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null
+}
+
+function toPlannerError(category: PlannerFailureReasonCategory, message: string, retryable = false) {
+  return new PlannerOutputError(message, { reasonCategory: category, retryable })
+}
+
+function extractCompletionRefusal(completion: unknown): string | null {
+  const choices = asObject(completion)?.choices
+  if (!Array.isArray(choices) || choices.length === 0) return null
+  const choice = asObject(choices[0])
+  const message = asObject(choice?.message)
+  const refusal = message?.refusal
+  return typeof refusal === "string" && refusal.trim().length > 0 ? refusal.trim() : null
+}
+
+function extractResponsesOutcome(response: unknown): { refusal: string | null; incomplete: boolean } {
+  const directRefusal = asObject(response)?.refusal
+  if (typeof directRefusal === "string" && directRefusal.trim().length > 0) {
+    return { refusal: directRefusal.trim(), incomplete: false }
+  }
+  const status = asObject(response)?.status
+  if (status === "incomplete") return { refusal: null, incomplete: true }
+  const output = asObject(response)?.output
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      const refusal = asObject(item)?.refusal
+      if (typeof refusal === "string" && refusal.trim().length > 0) return { refusal: refusal.trim(), incomplete: false }
+      const itemStatus = asObject(item)?.status
+      if (itemStatus === "incomplete") return { refusal: null, incomplete: true }
+    }
+  }
+  return { refusal: null, incomplete: false }
+}
 
 export function isChatStrictPrimaryOpMode() {
   return /^(1|true|yes|on)$/i.test((process.env.CHAT_STRICT_PRIMARY_OP_MODE ?? "").trim())
@@ -606,6 +669,13 @@ export async function generatePlanWithOpenAI(args: {
       instructions: system,
       input: JSON.stringify(user)
     })
+    const responsesOutcome = extractResponsesOutcome(response)
+    if (responsesOutcome.refusal) {
+      throw toPlannerError("planner_refusal", `Model refused planning output: ${responsesOutcome.refusal}`)
+    }
+    if (responsesOutcome.incomplete) {
+      throw toPlannerError("incomplete_output", "Model returned incomplete planning output")
+    }
     raw = extractResponsesOutputText(response)
     usage = extractUsage(response)
     if (args.onToken && raw.length > 0) args.onToken(raw)
@@ -624,7 +694,14 @@ export async function generatePlanWithOpenAI(args: {
         { role: "user", content: JSON.stringify(user) }
       ]
     })
+    let sawRefusal = false
     for await (const chunk of stream) {
+      const deltaRefusal = (chunk as { choices?: Array<{ delta?: { refusal?: unknown } }> })?.choices?.[0]?.delta?.refusal
+      if (typeof deltaRefusal === "string" && deltaRefusal.trim().length > 0) {
+        sawRefusal = true
+        raw += deltaRefusal
+        continue
+      }
       const delta = chunk.choices[0]?.delta?.content
       if (typeof delta !== "string" || delta.length === 0) continue
       raw += delta
@@ -636,6 +713,12 @@ export async function generatePlanWithOpenAI(args: {
           args.onPlannedOp(next.newOps[idx]!, streamedOpsCount - next.newOps.length + idx + 1)
         }
       }
+    }
+    if (sawRefusal) {
+      throw toPlannerError("planner_refusal", `Model refused planning output: ${raw.slice(0, 300)}`)
+    }
+    if (raw.trim().length === 0) {
+      throw toPlannerError("incomplete_output", "Model returned no planning output")
     }
     // Streaming doesn't return per-chunk usage; leave as zero
   } else {
@@ -652,13 +735,37 @@ export async function generatePlanWithOpenAI(args: {
         { role: "user", content: JSON.stringify(user) }
       ]
     })
+    const refusal = extractCompletionRefusal(completion)
+    if (refusal) {
+      throw toPlannerError("planner_refusal", `Model refused planning output: ${refusal}`)
+    }
     raw = completion.choices[0]?.message?.content ?? ""
+    if (raw.trim().length === 0) {
+      throw toPlannerError("incomplete_output", "Model returned no planning output")
+    }
     usage = extractUsage(completion)
   }
   const jsonText = extractJsonObject(raw)
-  if (!jsonText) throw new Error("Model did not return JSON")
+  if (!jsonText) {
+    throw toPlannerError("malformed_output", "Model did not return JSON", true)
+  }
 
-  const parsed = normalizePlanCandidate(JSON.parse(jsonText), {
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(jsonText)
+  } catch {
+    throw toPlannerError("malformed_output", "Model returned malformed JSON", true)
+  }
+
+  const rawCandidateResult = rawPlanCandidateSchema.safeParse(parsedJson)
+  if (!rawCandidateResult.success) {
+    const first = rawCandidateResult.error.issues[0]
+    const at = first?.path?.length ? ` at ${first.path.join(".")}` : ""
+    const detail = first?.message ?? "Raw planner output shape is invalid"
+    throw toPlannerError("malformed_output", `${detail}${at}`, true)
+  }
+
+  const parsed = normalizePlanCandidate(rawCandidateResult.data, {
     defaultSlug: args.slug,
     currentPage: args.currentPage,
     userMessage: args.message
@@ -669,7 +776,7 @@ export async function generatePlanWithOpenAI(args: {
     const message = first?.message ?? "Invalid model output"
     const path = first?.path?.length ? ` at ${first.path.join(".")}` : ""
     const sample = JSON.stringify(parsed).slice(0, 700)
-    throw new Error(`${message}${path}. Parsed sample: ${sample}`)
+    throw toPlannerError("schema_violation", `${message}${path}. Parsed sample: ${sample}`, true)
   }
 
   if (chatStrictPrimaryOpMode && planResult.data.intent === "edit_plan" && planResult.data.ops.length > 1) {

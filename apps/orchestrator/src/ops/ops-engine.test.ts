@@ -833,6 +833,12 @@ describe("classifyGuardrailError", () => {
     assert.equal(classifyGuardrailError("No effective prop change for b_1"), "no_effective_change")
   })
 
+  it("classifies planner refusal/incomplete/malformed output", () => {
+    assert.equal(classifyGuardrailError("Model refused planning output: blocked"), "planner_refusal")
+    assert.equal(classifyGuardrailError("Model returned incomplete planning output"), "incomplete_output")
+    assert.equal(classifyGuardrailError("Model did not return JSON"), "malformed_output")
+  })
+
   it("falls back to internal_error", () => {
     assert.equal(classifyGuardrailError("something weird happened"), "internal_error")
   })
