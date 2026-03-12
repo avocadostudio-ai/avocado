@@ -512,6 +512,56 @@ test("detectImageOps honors ordinal card targeting for image replacement", () =>
   assert.equal(ops[0]?.provider, "unsplash")
 })
 
+test("detectImageOps skips already-resolved remote image urls", () => {
+  const page = {
+    id: "p_test",
+    slug: "/test",
+    title: "Gallery",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_cardgrid_test",
+        type: "CardGrid",
+        props: {
+          title: "Cards",
+          cards: [
+            { title: "A", description: "One", ctaText: "Learn", ctaHref: "/", imageUrl: "https://images.unsplash.com/photo-a" },
+            { title: "B", description: "Two", ctaText: "Learn", ctaHref: "/", imageUrl: "https://images.unsplash.com/photo-b" }
+          ]
+        }
+      }
+    ]
+  }
+  const plan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Use selected images",
+    change_log: ["Use selected images"],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/test",
+        blockId: "b_cardgrid_test",
+        patch: {
+          cards: [
+            { title: "A", description: "One", ctaText: "Learn", ctaHref: "/", imageUrl: "https://images.unsplash.com/photo-a" },
+            { title: "B", description: "Two", ctaText: "Learn", ctaHref: "/", imageUrl: "https://images.unsplash.com/photo-b" }
+          ]
+        }
+      }
+    ]
+  }
+
+  const ops = detectImageOps({
+    plan,
+    message: "Replace all card images from Unsplash",
+    slug: "/test",
+    currentPage: page,
+    activeBlockId: "b_cardgrid_test"
+  })
+
+  assert.equal(ops.length, 0)
+})
+
 test("plan_only rewrites add_block CardGrid image request to update existing block", async (t) => {
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
