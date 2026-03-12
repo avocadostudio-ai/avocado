@@ -17,6 +17,7 @@ import {
   resolveUnsplashImage
 } from "../image/image-helpers.js"
 import { firstUrlFromText, resolveEffectiveSlug } from "./chat-pipeline.js"
+import { resolveDistinctUnsplashImage } from "../variation-images.js"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +87,11 @@ export type VariationPipelineContext = {
   log: FastifyBaseLogger
   modelLookup: Record<AIProvider, Record<ModelKey, string>>
   availableProviders: AIProvider[]
+}
+
+let resolveUnsplashImageImpl = resolveUnsplashImage
+export function setResolveUnsplashImageForTests(fn?: typeof resolveUnsplashImage) {
+  resolveUnsplashImageImpl = fn ?? resolveUnsplashImage
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +164,18 @@ function supportsImageVariation(block: PageDoc["blocks"][number]) {
   return Object.prototype.hasOwnProperty.call(block.props, "imageUrl")
 }
 
-async function withDefaultImageVariations(args: {
+function prefersSameImageAcrossVariations(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    /\bsame\s+image\b/.test(lower) ||
+    /\bsame\s+photo\b/.test(lower) ||
+    /\bkeep\s+(the\s+)?same\s+image\b/.test(lower) ||
+    /\buse\s+one\s+image\b/.test(lower) ||
+    /\bsingle\s+image\b/.test(lower)
+  )
+}
+
+export async function withDefaultImageVariations(args: {
   block: PageDoc["blocks"][number]
   message: string
   variations: VariationOption[]
@@ -172,6 +189,7 @@ async function withDefaultImageVariations(args: {
     /\bno\s+duplicates?\b/i.test(args.message) ||
     /\bdo\s+not\s+reuse\b/i.test(args.message) ||
     /\bunique\s+images?\b/i.test(args.message)
+  const enforceUniqueImages = !explicitUrl && !prefersSameImageAcrossVariations(args.message)
   const usedImageUrls = new Set<string>()
 
   const out: VariationOption[] = []
@@ -207,11 +225,28 @@ async function withDefaultImageVariations(args: {
       }
     } else {
       const query = buildVariationImageQuery(imageIntent, variationIndex)
-      const resolved = await resolveUnsplashImage(query, {
-        variationIndex,
-        subjectKeywords: imageIntent.subjectKeywords,
-        usedImageUrls: noDuplicateRequested ? usedImageUrls : undefined
-      }, { logger: args.log })
+      const resolved = enforceUniqueImages
+        ? await resolveDistinctUnsplashImage({
+            query,
+            variationIndex,
+            usedImageUrls,
+            resolveImage: async (queryValue, options) =>
+              resolveUnsplashImageImpl(queryValue, {
+                variationIndex: options?.variationIndex,
+                subjectKeywords: imageIntent.subjectKeywords,
+                usedImageUrls
+              }, { logger: args.log }),
+            maxAttempts: noDuplicateRequested ? 8 : 5
+          })
+        : await resolveUnsplashImageImpl(
+            query,
+            {
+              variationIndex,
+              subjectKeywords: imageIntent.subjectKeywords,
+              usedImageUrls: noDuplicateRequested ? usedImageUrls : undefined
+            },
+            { logger: args.log }
+          )
       if (resolved) {
         patch.imageUrl = resolved.url
         usedImageUrls.add(resolved.url)

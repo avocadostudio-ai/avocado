@@ -159,6 +159,21 @@ function asToolUseBlock(block: Anthropic.Messages.ContentBlock) {
   return block as unknown as { type: "tool_use"; id: string; name: string; input: unknown }
 }
 
+function toAnthropicToolAlias(name: string, used: Set<string>) {
+  let alias = name.replace(/[^a-zA-Z0-9_-]/g, "_")
+  if (!alias) alias = "tool"
+  if (/^[0-9]/.test(alias)) alias = `tool_${alias}`
+  alias = alias.slice(0, 120)
+  let unique = alias
+  let counter = 1
+  while (used.has(unique)) {
+    unique = `${alias}_${counter}`
+    counter += 1
+  }
+  used.add(unique)
+  return unique
+}
+
 export async function generatePlanWithAnthropic(args: {
   message: string
   slug: string
@@ -284,15 +299,19 @@ export async function generatePlanWithAnthropic(args: {
     description: "Submit the structured EditPlan JSON.",
     input_schema: editPlanJsonSchema
   })
+  const runtimeToolNameByAlias = new Map<string, string>()
+  const usedAliases = new Set<string>(["submit_edit_plan"])
   const runtimeTools: Anthropic.Messages.Tool[] =
     args.toolRuntime
-      ? args.toolRuntime.registry.listEnabled().map((entry) =>
-          anthropicToolWithCache({
-            name: entry.manifest.name,
+      ? args.toolRuntime.registry.listEnabled().map((entry) => {
+          const alias = toAnthropicToolAlias(entry.manifest.name, usedAliases)
+          runtimeToolNameByAlias.set(alias, entry.manifest.name)
+          return anthropicToolWithCache({
+            name: alias,
             description: entry.manifest.description,
             input_schema: entry.manifest.inputSchema as unknown as { type: "object" }
           })
-        )
+        })
       : []
   const toolDefs: Anthropic.Messages.Tool[] = [submitPlanToolDef, ...runtimeTools].map((tool) => anthropicToolWithCache(tool))
 
@@ -354,9 +373,10 @@ export async function generatePlanWithAnthropic(args: {
 
       for (const toolCall of runtimeToolCalls) {
         const input = "input" in toolCall ? toolCall.input : {}
+        const runtimeToolName = runtimeToolNameByAlias.get(toolCall.name) ?? toolCall.name
         const result = await executeToolCall({
           runtime: args.toolRuntime!,
-          toolName: toolCall.name,
+          toolName: runtimeToolName,
           input,
           context: {
             siteId: args.toolCallContext?.siteId ?? "default",
@@ -368,7 +388,7 @@ export async function generatePlanWithAnthropic(args: {
           policy: args.toolRuntime?.defaultPolicy
         })
         args.onToolExecution?.({
-          toolName: toolCall.name,
+          toolName: runtimeToolName,
           ok: result.ok,
           latencyMs: result.latencyMs,
           attempts: result.attempts,
