@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { demoPublishedPages, editPlanSchema } from "@ai-site-editor/shared"
+import { defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
 import { isBatchAddRequest, isBatchRemoveRequest, extractMentionedBlockTypes, isAdviceQuery } from "./nlp/intent-detection.js"
@@ -17,6 +17,38 @@ test("blockSupportsImageAtPath checks schema support", () => {
   assert.equal(blockSupportsImageAtPath("CardGrid", "cards[0].imageUrl"), true)
   // Unknown block → optimistic
   assert.equal(blockSupportsImageAtPath("UnknownBlock", "imageUrl"), true)
+})
+
+test("Hero schema supports imagePosition and defaults to right", () => {
+  const heroDefaults = defaultPropsForType("Hero")
+  assert.equal(heroDefaults.imagePosition, "right")
+
+  const parsedWithoutPosition = validateBlockProps("Hero", {
+    heading: "H",
+    subheading: "S",
+    ctaText: "Go",
+    ctaHref: "/",
+    imageUrl: "/hero-generated.svg",
+    imageAlt: "Alt"
+  })
+  assert.equal(parsedWithoutPosition.success, true)
+  if (parsedWithoutPosition.success) {
+    assert.equal(parsedWithoutPosition.data.imagePosition, "right")
+  }
+
+  const parsedLeft = validateBlockProps("Hero", {
+    heading: "H",
+    subheading: "S",
+    ctaText: "Go",
+    ctaHref: "/",
+    imageUrl: "/hero-generated.svg",
+    imageAlt: "Alt",
+    imagePosition: "left"
+  })
+  assert.equal(parsedLeft.success, true)
+  if (parsedLeft.success) {
+    assert.equal(parsedLeft.data.imagePosition, "left")
+  }
 })
 
 test("parseCreatePageRequest prompt matrix", () => {
@@ -350,6 +382,7 @@ test("isAdviceQuery excludes structural page reorder requests", () => {
   for (const prompt of negatives) assert.equal(isAdviceQuery(prompt), false, prompt)
 })
 
+
 test("normalizePlanCandidate maps list op path to listKey and keeps pageSlug", () => {
   const parsed = normalizePlanCandidate(
     {
@@ -471,6 +504,80 @@ test("normalizePlanCandidate maps arrayProp alias to listKey", () => {
   if (op.op === "update_item") {
     assert.equal(op.listKey, "items")
     assert.equal(op.index, 2)
+  }
+})
+
+test("normalizePlanCandidate remaps question/answer to q/a in add_block FAQ items", () => {
+  const parsed = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      summary_for_user: "Add FAQ",
+      change_log: [],
+      ops: [
+        {
+          op: "add_block",
+          pageSlug: "/",
+          block: {
+            id: "b_faqaccordion_1",
+            type: "FAQAccordion",
+            props: {
+              title: "Lemon Storage FAQ",
+              items: [
+                { question: "How to store lemons?", answer: "In the fridge." },
+                { question: "How long do they last?", answer: "2-3 weeks refrigerated." }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    { defaultSlug: "/", currentPage: demoPublishedPages()[0], userMessage: "add faq" }
+  )
+  const result = editPlanSchema.safeParse(parsed)
+  assert.equal(result.success, true, `schema validation failed: ${JSON.stringify(result.error?.issues)}`)
+  if (!result.success) return
+  const op = result.data.ops[0]
+  assert.equal(op.op, "add_block")
+  if (op.op === "add_block") {
+    const items = (op.block.props as Record<string, unknown>).items as Array<Record<string, unknown>>
+    assert.equal(items.length, 2)
+    assert.equal(items[0].q, "How to store lemons?")
+    assert.equal(items[0].a, "In the fridge.")
+    assert.equal(items[0].question, undefined, "question key should be remapped to q")
+  }
+})
+
+test("normalizePlanCandidate infers listKey from block props when LLM omits it", () => {
+  const currentPage = demoPublishedPages()[0]
+  const cardGrid = currentPage.blocks.find((b) => b.type === "CardGrid")!
+  const parsed = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      summary_for_user: "Add images to each card",
+      change_log: [],
+      ops: [
+        {
+          op: "update_item",
+          blockId: cardGrid.id,
+          index: 0,
+          patch: { imageUrl: "https://example.com/img.jpg", imageAlt: "avocado dish" }
+        }
+      ]
+    },
+    {
+      defaultSlug: "/",
+      currentPage,
+      userMessage: "add images to each card"
+    }
+  )
+  const result = editPlanSchema.safeParse(parsed)
+  assert.equal(result.success, true, `schema validation failed: ${JSON.stringify(result.error?.issues)}`)
+  if (!result.success) return
+  const op = result.data.ops[0]
+  assert.equal(op.op, "update_item")
+  if (op.op === "update_item") {
+    assert.equal(op.listKey, "cards")
+    assert.equal(op.index, 0)
   }
 })
 
@@ -602,6 +709,20 @@ test("isHighConfidenceDeterministicCase handles 'remove all but this' with activ
   )
 })
 
+test("isHighConfidenceDeterministicCase handles 'remove this' with activeBlockId", () => {
+  const currentPage = demoPublishedPages()[0]
+  const heroBlock = currentPage.blocks.find((b) => b.type === "Hero")!
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "remove this", currentPage, activeBlockId: heroBlock.id }),
+    true
+  )
+  // Without activeBlockId, should return false
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "remove this", currentPage }),
+    false
+  )
+})
+
 test("isHighConfidenceDeterministicCase returns false for 'add images to each card' (needs LLM)", () => {
   const currentPage = demoPublishedPages()[0]
   const cardGridBlock = currentPage.blocks.find((b) => b.type === "CardGrid")
@@ -612,6 +733,50 @@ test("isHighConfidenceDeterministicCase returns false for 'add images to each ca
       activeBlockId: cardGridBlock?.id
     }),
     false
+  )
+})
+
+test("isHighConfidenceDeterministicCase returns false for add with content directive (needs LLM)", () => {
+  const currentPage = demoPublishedPages()[0]
+  // "directing to recipes" is content direction — LLM should generate tailored props
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "Add a CTA block directing to recipes or wellness content",
+      currentPage
+    }),
+    false
+  )
+  // "about our pricing" is content direction
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "add a FAQ section about our pricing",
+      currentPage
+    }),
+    false
+  )
+  // "with 3 questions" specifies content items — needs LLM
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "add faq with 3 questions",
+      currentPage
+    }),
+    false
+  )
+  // Plain "add a CTA" should still be deterministic
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "add a CTA",
+      currentPage
+    }),
+    true
+  )
+  // "with rounded corners" is styling, not content — should stay deterministic
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "add a Hero with a blue background",
+      currentPage
+    }),
+    true
   )
 })
 
@@ -1307,6 +1472,51 @@ test("compileDeterministicPlan treats 'add a new photo' as Hero image update", (
   assert.equal(plan?.intent, "edit_plan")
   assert.equal(plan?.ops.length, 1)
   assert.equal(plan?.ops[0]?.op, "update_props")
+})
+
+test("inferDeterministicIntent maps hero image-left phrasing to imagePosition", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+
+  const parsed = inferDeterministicIntent({
+    message: "set hero image on the left",
+    currentPage
+  })
+
+  assert.equal(parsed?.action, "update")
+  assert.equal(parsed?.target_block_ref, hero?.id)
+  assert.deepEqual(parsed?.patch, { imagePosition: "left" })
+})
+
+test("inferDeterministicIntent maps hero text-right phrasing to imagePosition", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+
+  const parsed = inferDeterministicIntent({
+    message: "move hero text to the right",
+    currentPage
+  })
+
+  assert.equal(parsed?.action, "update")
+  assert.equal(parsed?.target_block_ref, hero?.id)
+  assert.deepEqual(parsed?.patch, { imagePosition: "left" })
+})
+
+test("inferDeterministicIntent maps swap image/text to toggled imagePosition", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+
+  const parsed = inferDeterministicIntent({
+    message: "swap hero image and text",
+    currentPage
+  })
+
+  assert.equal(parsed?.action, "update")
+  assert.equal(parsed?.target_block_ref, hero?.id)
+  assert.deepEqual(parsed?.patch, { imagePosition: "left" })
 })
 
 test("compileDeterministicPlan add-before fails with unknown anchor block", () => {

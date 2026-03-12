@@ -142,6 +142,7 @@ registerBlock("Hero", {
     ctaHref: z.string().min(1),
     imageUrl: z.string().min(1),
     imageAlt: z.string().min(1),
+    imagePosition: z.enum(["left", "right"]).default("right"),
     secondaryCtaText: z.string().optional(),
     secondaryCtaHref: z.string().optional()
   }),
@@ -156,6 +157,7 @@ registerBlock("Hero", {
       ctaHref: f.url("CTA link"),
       imageUrl: f.image("Hero image"),
       imageAlt: f.imageAlt("Hero image alt text"),
+      imagePosition: { kind: "enum", label: "Image position", options: ["left", "right"], inlineEditable: false },
       secondaryCtaText: f.text("Secondary CTA text"),
       secondaryCtaHref: f.url("Secondary CTA link"),
     }
@@ -482,7 +484,8 @@ export function defaultPropsForType(type: BlockType): Record<string, unknown> {
       ctaText: "Get Started",
       ctaHref: "/",
       imageUrl: "/hero-generated.svg",
-      imageAlt: "Abstract generated illustration"
+      imageAlt: "Abstract generated illustration",
+      imagePosition: "right"
     }
   }
   if (type === "FeatureGrid") {
@@ -821,7 +824,8 @@ export function demoPublishedPages(): PageDoc[] {
             ctaText: "Start Editing",
             ctaHref: "/pricing",
             imageUrl: "/hero-generated.svg",
-            imageAlt: "Abstract generated illustration for the hero section"
+            imageAlt: "Abstract generated illustration for the hero section",
+            imagePosition: "right"
           }
         },
         {
@@ -863,7 +867,8 @@ export function demoPublishedPages(): PageDoc[] {
             ctaText: "Choose Plan",
             ctaHref: "/",
             imageUrl: "/hero-generated.svg",
-            imageAlt: "Abstract generated illustration for the pricing hero"
+            imageAlt: "Abstract generated illustration for the pricing hero",
+            imagePosition: "right"
           }
         },
         {

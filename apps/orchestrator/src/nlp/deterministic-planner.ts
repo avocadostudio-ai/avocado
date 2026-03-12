@@ -683,7 +683,7 @@ export function pageMetaContractSummary() {
  * metadata can auto-generate (list-field shapes are derived automatically).
  */
 const _blockNotes: Record<string, string> = {
-  Hero: "Use heading for the main headline; never invent prop names. For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it.",
+  Hero: "Use heading for the main headline; never invent prop names. imagePosition controls layout and must be 'left' or 'right' (default 'right'). For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it.",
   CTA: "Keep existing props unless the user asks to change them.",
   Card: "A standalone card with one CTA.",
   RichText: "body is a string; use \\n\\n to separate paragraphs. Supported inline syntax: **word** for bold, *word* for italic, [text](url) for links, '# Heading' lines become h3 headings. title is an optional section heading. Never invent prop names.",
@@ -796,9 +796,28 @@ export const intentSchema = z.object({
 })
 export type ParsedIntent = z.infer<typeof intentSchema>
 
+/** Returns true when an add-block message carries content direction beyond the block type name. */
+function hasContentDirective(message: string): boolean {
+  const lower = message.toLowerCase()
+  // Phrases that signal the user wants specific content, not just a default block
+  return /\b(about|featuring|directing|promoting|highlighting|linking to|that\s+(links?|points?|directs?|promotes?|describes?|shows?|explains?))\b/i.test(lower)
+    || /\bfor\b.*\b(audience|users?|visitors?|customers?|readers?)\b/i.test(lower)
+    || /\bwith\b.*\b(content|text|copy|images?|questions?|items?|cards?|testimonials?|features?)\b/i.test(lower)
+}
+
+function isHeroLayoutRequest(message: string) {
+  const lower = message.toLowerCase()
+  if (!/\b(hero|banner)\b/.test(lower)) return false
+  const mentionsVisual = /\b(image|photo|picture|text|copy|content)\b/.test(lower)
+  const mentionsSide = /\b(left|right|left-side|right-side)\b/.test(lower)
+  const mentionsSwap = /\b(swap|flip|reverse)\b/.test(lower) && /\b(image|photo|picture)\b/.test(lower) && /\b(text|copy|content)\b/.test(lower)
+  return (mentionsVisual && mentionsSide) || mentionsSwap
+}
+
 function inferActionFromMessage(message: string): ParsedIntent["action"] | null {
   const lower = message.toLowerCase()
   const hasPageCreateCue = Boolean(parseCreatePageRequest(message))
+  if (isHeroLayoutRequest(lower)) return "update"
   if (hasPageCreateCue) return "add"
   if (/\b(remove|delete)\b/.test(lower)) return "remove"
   if (/\b(move|reorder|re-arrange|rearrange)\b/.test(lower)) return "move"
@@ -816,6 +835,9 @@ function inferPatchFromMessage(args: {
 }) {
   const { message, action, targetBlock, activeEditablePath } = args
   if (action !== "update") return undefined
+
+  const heroImagePositionPatch = inferHeroImagePositionPatch(message, targetBlock)
+  if (heroImagePositionPatch) return heroImagePositionPatch
 
   const directPatch = inferSimpleFieldPatchFromMessage(message)
   if (directPatch && Object.keys(directPatch).length > 0) return directPatch
@@ -835,6 +857,53 @@ function inferPatchFromMessage(args: {
   const hintedKey = inferFieldHintFromMessage(message, allowedKeys)
   if (!hintedKey) return undefined
   return { [hintedKey]: quoted }
+}
+
+function inferHeroImagePositionPatch(message: string, targetBlock?: PageDoc["blocks"][number]) {
+  if (!targetBlock || targetBlock.type !== "Hero") return null
+  const lower = message.toLowerCase()
+
+  const asksSwapImageAndText =
+    (/\bswap\b/.test(lower) || /\bflip\b/.test(lower) || /\breverse\b/.test(lower)) &&
+    /\b(image|photo|picture)\b/.test(lower) &&
+    /\b(text|copy|content)\b/.test(lower)
+
+  if (asksSwapImageAndText) {
+    const current = String((targetBlock.props as Record<string, unknown>).imagePosition ?? "right")
+    return { imagePosition: current === "left" ? "right" : "left" }
+  }
+
+  if (
+    /\b(image|photo|picture)\b[\s\w-]*\b(?:on|to)\s+the\s+left\b/.test(lower) ||
+    /\b(?:left|left-side)\s+(?:image|photo|picture)\b/.test(lower) ||
+    /\b(?:image|photo|picture)\s+(?:left|left-side)\b/.test(lower)
+  ) {
+    return { imagePosition: "left" as const }
+  }
+  if (
+    /\b(image|photo|picture)\b[\s\w-]*\b(?:on|to)\s+the\s+right\b/.test(lower) ||
+    /\b(?:right|right-side)\s+(?:image|photo|picture)\b/.test(lower) ||
+    /\b(?:image|photo|picture)\s+(?:right|right-side)\b/.test(lower)
+  ) {
+    return { imagePosition: "right" as const }
+  }
+
+  if (
+    /\b(text|copy|content)\b[\s\w-]*\b(?:on|to)\s+the\s+left\b/.test(lower) ||
+    /\b(?:left|left-side)\s+(?:text|copy|content)\b/.test(lower) ||
+    /\b(?:text|copy|content)\s+(?:left|left-side)\b/.test(lower)
+  ) {
+    return { imagePosition: "right" as const }
+  }
+  if (
+    /\b(text|copy|content)\b[\s\w-]*\b(?:on|to)\s+the\s+right\b/.test(lower) ||
+    /\b(?:right|right-side)\s+(?:text|copy|content)\b/.test(lower) ||
+    /\b(?:text|copy|content)\s+(?:right|right-side)\b/.test(lower)
+  ) {
+    return { imagePosition: "left" as const }
+  }
+
+  return null
 }
 
 export function inferDeterministicIntent(args: {
@@ -903,6 +972,13 @@ export function inferDeterministicIntent(args: {
   } else {
     const typeFromMessage = inferBlockTypeFromText(raw)
     if (typeFromMessage) inferred.target_block_type = typeFromMessage
+    if (typeFromMessage) {
+      const byType = args.currentPage.blocks.filter((block) => block.type === typeFromMessage)
+      if (byType.length === 1) {
+        targetBlock = byType[0] ?? null
+        if (targetBlock) inferred.target_block_ref = targetBlock.id
+      }
+    }
   }
 
   if (action === "add") {
@@ -981,6 +1057,9 @@ export function isHighConfidenceDeterministicCase(args: {
   // "add X to each/every card" = bulk item update — needs LLM for content generation
   if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
+  if (action === "remove" && args.activeBlockId && /\b(this|selected|it)\b/i.test(raw)) return true
+  // "add CTA directing to recipes" = needs LLM for content-aware props
+  if (action === "add" && inferBlockTypeFromText(raw) && hasContentDirective(raw)) return false
   if (action === "add" && inferBlockTypeFromText(raw)) return true
 
   // Case 4: Simple update with clear block type reference and quoted value
