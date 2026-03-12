@@ -150,6 +150,21 @@ function sentenceCase(text: string) {
   return trimmed[0].toUpperCase() + trimmed.slice(1)
 }
 
+function normalizeVariationTypos(text: string) {
+  return text
+    .replace(/\bvariaqtions?\b/gi, "variations")
+    .replace(/\bvariatons?\b/gi, "variations")
+    .replace(/\bvaritions?\b/gi, "variations")
+}
+
+function isVariationRequestMessage(message: string) {
+  const normalized = normalizeVariationTypos(message.toLowerCase())
+  return (
+    /\bvariations?\b/.test(normalized) &&
+    /\b(generate|create|make|show|give|produce|draft)\b/.test(normalized)
+  )
+}
+
 function shouldPreferFastModelForMessage(message: string) {
   if (inferTranslationScopeFromMessage(message) !== "none") return false
   if (isStandalonePageOperation(message)) return false
@@ -790,7 +805,7 @@ function rewriteAddBlockToChildImageUpdate(args: { plan: EditPlan; message: stri
 export type TranslationScope = "page" | "component" | "none"
 
 export function sanitizeMessageForPlanning(message: string) {
-  const normalized = message.replace(/\r\n?/g, "\n").trim()
+  const normalized = normalizeVariationTypos(message.replace(/\r\n?/g, "\n")).trim()
   if (normalized.length === 0) return normalized
 
   const hasDebugEcho = /(^|\n)\s*debug\s*$|(^|\n)\s*(traceid|prompthash|outcome|intent|opcount|ops)\s*:/im.test(normalized)
@@ -2080,6 +2095,26 @@ export async function runChatPipeline(
     const advice = adviceResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: advice.code, payload: withDebugPayload(advice.payload, { outcome: "advice" }) }
   }
+  if (body.message && isVariationRequestMessage(body.message)) {
+    const suggestions = [
+      "Use the Variations action after selecting the target block.",
+      "Example: select Hero, then generate 4 variations."
+    ]
+    pendingClarificationBySession.set(body.session, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
+    return {
+      code: 200,
+      payload: withDebugPayload({
+        status: "needs_clarification",
+        summary: "Variation requests are handled in block variations mode.",
+        changes: [],
+        suggestions,
+        previewVersion: versions.get(body.session) ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      } satisfies ChatResult, { outcome: "variation_request_redirect", reasonCategory: "ambiguity" })
+    }
+  }
 
   emitStatus("Analyzing your request...")
 
@@ -3196,7 +3231,8 @@ export async function runChatPipeline(
               activeBlockId: planningActiveBlockId,
               activeBlockType: body.activeBlockType,
               activeEditablePath: planningActiveEditablePath,
-              model: routerModel
+              model: routerModel,
+              log: ctx.log
             })
           : await parseIntentWithOpenAIImpl({
               message: plannerMessage,
@@ -3328,6 +3364,7 @@ export async function runChatPipeline(
               })
             }
           : undefined,
+        log: ctx.log,
         onToken: onPlanningToken,
         onPlannedOp: incrementalPlanStreamEnabled
           ? (op, index) => {
@@ -3342,6 +3379,8 @@ export async function runChatPipeline(
       break
     } catch (error) {
       const reason = toErrorDetail(error)
+      ctx.log.warn({ event: "plan_attempt_failed", attempt, model: modelUsed, reason: reason.slice(0, 300) },
+        `Planning attempt ${attempt} failed`)
       ctx.chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),

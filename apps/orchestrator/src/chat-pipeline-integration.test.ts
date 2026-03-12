@@ -1454,6 +1454,33 @@ test("chat returns planning_exhausted after three failed OpenAI planning attempt
   assert.equal(payload.validationErrors?.length, 3)
 })
 
+test("chat redirects variation-like typo prompt to clarification instead of planner exhaustion", async () => {
+  const session = newSession()
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "generate 4 content variaqtions"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as {
+    status?: string
+    summary?: string
+    debug?: { outcome?: string; reasonCategory?: string }
+    suggestions?: string[]
+  }
+  assert.equal(payload.status, "needs_clarification")
+  assert.equal(payload.debug?.outcome, "variation_request_redirect")
+  assert.equal(payload.debug?.reasonCategory, "ambiguity")
+  assert.match(String(payload.summary), /variations mode/i)
+  assert.ok(Array.isArray(payload.suggestions))
+})
+
 test("chat returns repair_failed when deterministic repair generation throws", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"

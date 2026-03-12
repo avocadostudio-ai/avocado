@@ -37,6 +37,7 @@ export async function parseIntentWithAnthropic(args: {
   activeBlockType?: string
   activeEditablePath?: string
   model: string
+  log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
 }): Promise<ParsedIntent> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const system = [
@@ -71,8 +72,26 @@ export async function parseIntentWithAnthropic(args: {
 
   const textBlock = response.content.find((b) => b.type === "text")
   const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+  if (response.stop_reason === "max_tokens") {
+    args.log?.warn({
+      event: "anthropic_intent_truncated",
+      model: args.model,
+      stopReason: response.stop_reason,
+      rawPreview: raw.slice(0, 500)
+    }, "Anthropic intent parser: response truncated (max_tokens)")
+    throw new Error("Intent parser response was truncated (max_tokens reached)")
+  }
   const jsonText = extractJsonObject(raw)
-  if (!jsonText) throw new Error("Intent parser did not return JSON")
+  if (!jsonText) {
+    args.log?.warn({
+      event: "anthropic_intent_no_json",
+      model: args.model,
+      stopReason: response.stop_reason ?? "unknown",
+      rawPreview: raw.slice(0, 500),
+      contentBlockTypes: response.content.map((b) => b.type)
+    }, "Anthropic intent parser: model did not return parseable JSON")
+    throw new Error("Intent parser did not return JSON")
+  }
   const parsedRoot = JSON.parse(jsonText) as Record<string, unknown>
   const normalized = { ...parsedRoot } as Record<string, unknown>
 
@@ -189,6 +208,7 @@ export async function generatePlanWithAnthropic(args: {
   toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
   client?: PlannerAnthropicClient
   siteContextBlock?: string | null
+  log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
 }): Promise<{ plan: EditPlan; usage: TokenUsage }> {
   const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
@@ -337,6 +357,17 @@ export async function generatePlanWithAnthropic(args: {
       })
       usage = sumTokenUsage(usage, extractUsage(response))
 
+      if ((response as { stop_reason?: string }).stop_reason === "max_tokens") {
+        args.log?.warn({
+          event: "anthropic_planner_truncated",
+          model: args.model,
+          stopReason: "max_tokens",
+          turn,
+          contentBlockTypes: response.content.map((b) => b.type)
+        }, "Anthropic planner: response truncated (max_tokens) during tool loop")
+        throw new Error("Model response was truncated (max_tokens reached)")
+      }
+
       for (const block of response.content) {
         if (block.type === "text" && "text" in block && typeof block.text === "string" && args.onToken) {
           args.onToken(block.text)
@@ -358,8 +389,23 @@ export async function generatePlanWithAnthropic(args: {
         const textBlock = response.content.find((block) => block.type === "text")
         const raw = textBlock && "text" in textBlock ? textBlock.text : ""
         const jsonText = extractJsonObject(raw)
-        if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
-        break
+        if (jsonText) {
+          parsed = JSON.parse(jsonText) as Record<string, unknown>
+          break
+        }
+        return {
+          plan: {
+            intent: "needs_clarification",
+            summary_for_user: "I need a more specific edit request to produce a valid plan.",
+            change_log: [],
+            ops: [],
+            suggested_next_actions: [
+              "Specify the page section to change.",
+              "Describe exactly what to update."
+            ]
+          },
+          usage
+        }
       }
 
       loopMessages.push({ role: "assistant", content: response.content })
@@ -449,10 +495,33 @@ export async function generatePlanWithAnthropic(args: {
       const finalMessage = await stream.finalMessage()
       usage = extractUsage(finalMessage)
 
+      const streamStopReason = (finalMessage as { stop_reason?: string })?.stop_reason
+      if (streamStopReason === "max_tokens") {
+        args.log?.warn({
+          event: "anthropic_planner_truncated",
+          model: args.model,
+          stopReason: streamStopReason,
+          toolJsonBufLength: toolJsonBuf.length,
+          textBufLength: textBuf.length
+        }, "Anthropic planner: response truncated (max_tokens)")
+        throw new Error("Model response was truncated (max_tokens reached)")
+      }
+
       // Prefer tool_use input; fall back to text block
       if (toolJsonBuf.length > 0) {
-        parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
-      } else if (textBuf.length > 0) {
+        try {
+          parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
+        } catch {
+          args.log?.warn({
+            event: "anthropic_planner_malformed_tool_json",
+            model: args.model,
+            toolJsonBufPreview: toolJsonBuf.slice(0, 500),
+            toolJsonBufLength: toolJsonBuf.length
+          }, "Anthropic planner: malformed JSON from tool stream, falling through to text extraction")
+          // Fall through to text extraction
+        }
+      }
+      if (!parsed && textBuf.length > 0) {
         const jsonText = extractJsonObject(textBuf)
         if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
       }
@@ -469,6 +538,15 @@ export async function generatePlanWithAnthropic(args: {
         ],
       })
       usage = extractUsage(response)
+      if (response.stop_reason === "max_tokens") {
+        args.log?.warn({
+          event: "anthropic_planner_truncated",
+          model: args.model,
+          stopReason: response.stop_reason,
+          contentBlockTypes: response.content.map((b) => b.type)
+        }, "Anthropic planner: response truncated (max_tokens)")
+        throw new Error("Model response was truncated (max_tokens reached)")
+      }
       const toolBlock = response.content.find((b) => b.type === "tool_use")
       if (toolBlock && "input" in toolBlock && toolBlock.input && typeof toolBlock.input === "object") {
         parsed = toolBlock.input as Record<string, unknown>
@@ -493,6 +571,16 @@ export async function generatePlanWithAnthropic(args: {
     })
     usage = extractUsage(response)
 
+    if (response.stop_reason === "max_tokens") {
+      args.log?.warn({
+        event: "anthropic_planner_truncated",
+        model: args.model,
+        stopReason: response.stop_reason,
+        contentBlockTypes: response.content.map((b) => b.type)
+      }, "Anthropic planner: response truncated (max_tokens)")
+      throw new Error("Model response was truncated (max_tokens reached)")
+    }
+
     // Extract from tool_use content block
     const toolBlock = response.content.find((b) => b.type === "tool_use")
     if (toolBlock && "input" in toolBlock && toolBlock.input && typeof toolBlock.input === "object") {
@@ -506,7 +594,15 @@ export async function generatePlanWithAnthropic(args: {
     }
   }
 
-  if (!parsed) throw new Error("Model did not return JSON")
+  if (!parsed) {
+    args.log?.warn({
+      event: "anthropic_planner_no_json",
+      model: args.model,
+      hasHistory: (args.history?.length ?? 0) > 0,
+      hasFeedback: !!args.feedback
+    }, "Anthropic planner: model did not return parseable JSON")
+    throw new Error(`Model did not return JSON (model=${args.model})`)
+  }
 
   const normalized = normalizePlanCandidate(parsed, {
     defaultSlug: args.slug,
