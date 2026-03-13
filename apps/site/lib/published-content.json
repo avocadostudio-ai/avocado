@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-13T19:08:06.932Z",
+    "updatedAt": "2026-03-13T19:25:13.445Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -35,7 +35,7 @@
               "title": "🥑 Avocado Sustainability",
               "description": "Learn about sustainable avocado farming practices.",
               "ctaText": "Learn More",
-              "ctaHref": "/avocado-sustainability",
+              "ctaHref": "/sustainable-avocado-adventures",
               "imageUrl": "http://localhost:4200/generated-images/var_1773425814424_5b2e0y.png",
               "imageAlt": "AI-generated CardGrid image featuring avocado sustainability learn about"
             },
