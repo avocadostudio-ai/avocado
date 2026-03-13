@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-13T19:25:45.879Z",
+    "updatedAt": "2026-03-13T19:44:41.916Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -35,7 +35,7 @@
               "title": "🥑 Avocado Sustainability",
               "description": "Learn about sustainable avocado farming practices.",
               "ctaText": "Learn More",
-              "ctaHref": "/sustainable-adventures",
+              "ctaHref": "/avocado-sustainability",
               "imageUrl": "http://localhost:4200/generated-images/var_1773425814424_5b2e0y.png",
               "imageAlt": "AI-generated CardGrid image featuring avocado sustainability learn about"
             },
@@ -601,38 +601,114 @@
     ]
   },
   {
-    "id": "p_sustainable_adventures",
-    "slug": "/sustainable-adventures",
-    "title": "Sustainable Adventures",
-    "updatedAt": "2026-03-13T19:25:45.879Z",
+    "id": "p_avocado_wellness",
+    "slug": "/avocado-wellness",
+    "title": "Avocado Wellness",
+    "updatedAt": "2026-03-13T19:44:41.907Z",
     "blocks": [
       {
-        "id": "b_hero_sustainable-avocado-adventures",
+        "id": "b_hero_1773431081907",
         "type": "Hero",
         "props": {
-          "heading": "Sustainable Avocado Adventures",
-          "subheading": "Use this page to introduce Sustainable Avocado Adventures.",
-          "ctaText": "Get started",
-          "ctaHref": "/",
-          "imageUrl": "http://localhost:4200/generated-images/var_1773429619964_s8uv91.png",
-          "imageAlt": "Abstract generated illustration"
+          "heading": "Nourish Your Body with Avocado Wellness 🥑",
+          "subheading": "Discover why avocados are one of nature's most nutrient-dense foods. From heart health to glowing skin, explore the wellness benefits that make avocados a staple of healthy living.",
+          "ctaText": "Explore Benefits",
+          "ctaHref": "/#wellness",
+          "imageUrl": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
+          "imageAlt": "Fresh avocado cut in half with pit, showcasing creamy green flesh"
         }
       },
       {
-        "id": "b_richtext_sustainable-avocado-adventures",
+        "id": "b_richtext_1773431081907",
         "type": "RichText",
         "props": {
-          "title": "Why Sustainable Avocado Farming Matters",
-          "body": "Avocados thrive when grown with care for the land. Sustainable farming practices protect water resources, build healthy soil, and support the communities that grow this beloved fruit.\n\nKey practices include smart irrigation that conserves water, crop rotation to maintain soil vitality, and fair-trade partnerships that ensure farmers are valued for their work. When you choose sustainably grown avocados, you're not just enjoying delicious flavor—you're helping protect ecosystems and livelihoods.\n\nExplore how small choices in what we eat can create meaningful impact. Every avocado tells a story of responsible growth and positive change."
+          "title": "Why Avocados Are a Wellness Powerhouse",
+          "body": "# Packed with Essential Nutrients\n\nAvocados are loaded with vitamins C, E, K, B-6, and folate. They also contain magnesium, potassium, and pantothenic acid—nutrients your body needs to thrive. One avocado provides about 20% of your daily fiber intake, supporting digestion and overall gut health.\n\n# Heart-Healthy Fats\n\nThe monounsaturated fats in avocados help lower bad cholesterol and reduce the risk of heart disease. These healthy fats also support brain function and help your body absorb vitamins from other foods.\n\n# Skin, Eyes, and More\n\nAvocados contain lutein and beta-carotene, which protect your eyes and skin from damage. They're also rich in antioxidants that help fight inflammation and keep you looking and feeling your best.\n\n# Make Wellness a Daily Habit\n\nAdd avocados to your morning toast, blend them into smoothies, or enjoy them in salads. With so many ways to enjoy them, wellness has never tasted better."
         }
       },
       {
-        "id": "b_cta_sustainable-avocado-adventures",
+        "id": "b_cta_1773431081907",
         "type": "CTA",
         "props": {
-          "title": "Ready to explore Sustainable Avocado Adventures?",
-          "description": "Continue to the next step.",
-          "ctaText": "Get started",
+          "title": "Ready to Transform Your Wellness Routine? 🥑",
+          "description": "Start incorporating avocados into your daily diet and feel the difference. Your body will thank you.",
+          "ctaText": "Get Wellness Tips",
+          "ctaHref": "/"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_avocado_sustainability",
+    "slug": "/avocado-sustainability",
+    "title": "Avocado Sustainability",
+    "updatedAt": "2026-03-13T19:44:41.907Z",
+    "blocks": [
+      {
+        "id": "b_hero_1773431081907",
+        "type": "Hero",
+        "props": {
+          "heading": "Sustainable Avocado Farming for a Healthier Planet 🌍",
+          "subheading": "Learn how responsible farming practices protect the environment while growing the avocados you love. Discover what makes truly sustainable avocados different.",
+          "ctaText": "Learn Our Practices",
+          "ctaHref": "/#practices",
+          "imageUrl": "https://images.unsplash.com/photo-1574943320219-553eb213f72d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
+          "imageAlt": "Lush avocado orchard with trees in natural landscape"
+        }
+      },
+      {
+        "id": "b_richtext_1773431081907",
+        "type": "RichText",
+        "props": {
+          "title": "Growing Avocados Responsibly",
+          "body": "# Water Stewardship\n\nSustainable avocado farming starts with smart water use. Forward-thinking growers use efficient irrigation systems, rainwater harvesting, and soil management to minimize waste. Protecting water resources ensures avocados can be grown for generations to come.\n\n# Soil Health and Biodiversity\n\nHealthy soil is the foundation of thriving farms. Sustainable practices include crop rotation, composting, and avoiding harmful pesticides. This approach builds fertile soil while protecting the plants and animals that share the land.\n\n# Fair Labor and Community Support\n\nTrue sustainability includes treating workers fairly and supporting the communities where avocados are grown. Responsible farms offer good wages, safe working conditions, and invest in local education and infrastructure.\n\n# Your Choice Matters\n\nWhen you choose avocados from farms committed to sustainability, you're voting for a healthier planet. Every purchase supports farmers who care about the future and honors the land that feeds us."
+        }
+      },
+      {
+        "id": "b_cta_1773431081907",
+        "type": "CTA",
+        "props": {
+          "title": "Join the Sustainable Food Movement 🌱",
+          "description": "Make mindful choices about the avocados you buy. Support farms that protect our planet.",
+          "ctaText": "Start now",
+          "ctaHref": "/"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_avocado_culinary",
+    "slug": "/avocado-culinary",
+    "title": "Avocado Culinary",
+    "updatedAt": "2026-03-13T19:45:11.096Z",
+    "blocks": [
+      {
+        "id": "b_hero_1773431081908",
+        "type": "Hero",
+        "props": {
+          "heading": "Unlock Culinary Magic with Avocados 🥑",
+          "subheading": "From silky guacamole to unexpected pasta twists, explore creative recipes that turn avocados into unforgettable dishes. Your kitchen is about to get a lot more delicious.",
+          "ctaText": "Explore Recipes",
+          "ctaHref": "/#recipes",
+          "imageUrl": "https://images.unsplash.com/photo-1647545401842-4974e4bcbda5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
+          "imageAlt": "Fresh avocado being prepared in a mortar for guacamole and culinary creations"
+        }
+      },
+      {
+        "id": "b_richtext_1773431081908",
+        "type": "RichText",
+        "props": {
+          "title": "Discover Endless Culinary Possibilities",
+          "body": "# Beyond Toast: Breakfast Ideas\n\nStart your day with avocado-stuffed eggs, creamy smoothie bowls, or avocado pancakes topped with fresh berries. The richness of avocado pairs beautifully with sweet and savory flavors alike.\n\n# Main Courses and Salads\n\nToss sliced avocado into warm grain bowls, blend it into creamy pasta sauces, or layer it into nourishing Buddha bowls. Avocados add texture and nutrition to any meal while keeping dishes light and satisfying.\n\n# Guacamole and Dips\n\nThe classic never gets old. Fresh guacamole with lime, cilantro, and tomato is perfect for gatherings. Try variations with mango, black beans, or roasted garlic for new twists on a beloved favorite.\n\n# Sweet Surprises\n\nYes, avocado works in desserts too. Creamy avocado chocolate mousse, avocado ice cream, and avocado brownies offer a rich texture with less sugar than traditional recipes.\n\n# Start Cooking Today\n\nWhether you're a seasoned chef or a kitchen beginner, avocados make cooking easier and more enjoyable. Grab one and start experimenting—your next favorite dish is waiting."
+        }
+      },
+      {
+        "id": "b_cta_1773431081908",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to Cook with Avocados? 🍳",
+          "description": "Explore our full collection of tested recipes and culinary tips to make every meal memorable.",
+          "ctaText": "Browse Recipes",
           "ctaHref": "/"
         }
       }
