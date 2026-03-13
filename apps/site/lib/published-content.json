@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-13T21:38:47.239Z",
+    "updatedAt": "2026-03-13T22:14:38.038Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -21,11 +21,11 @@
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Sustainable Avocado Adventures",
+          "title": "Explore Avocado Stories",
           "cards": [
             {
               "title": "🥑 Avocado Wellness",
-              "description": "Discover the wellness benefits of avocados.",
+              "description": "Discover how avocados nourish your body with heart-healthy fats, essential vitamins, and powerful antioxidants that support wellness and vitality in everyday life.",
               "ctaText": "Explore",
               "ctaHref": "/avocado-wellness",
               "imageUrl": "http://localhost:4200/generated-images/var_1773436938167_mf1y56.png",
@@ -33,7 +33,7 @@
             },
             {
               "title": "🥑 Avocado Culinary Delights",
-              "description": "Discover new culinary uses for avocados.",
+              "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
               "imageUrl": "http://localhost:4200/generated-images/var_1773437069733_jgq8q0.png",
@@ -41,7 +41,7 @@
             },
             {
               "title": "🥑 Avocado Sustainability",
-              "description": "From seed to table — discover how sustainable farming grows better avocados.",
+              "description": "Learn about ethical farming practices and sustainable agriculture that protects our planet while bringing the freshest, most responsibly grown avocados to your table.",
               "ctaText": "Learn More",
               "ctaHref": "/avocado-sustainability",
               "imageUrl": "http://localhost:4200/generated-images/var_1773437186829_m3fsk2.png",
@@ -51,34 +51,55 @@
         }
       },
       {
+        "id": "b_stats_1773439854509",
+        "type": "Stats",
+        "props": {
+          "title": "Avocado Impact",
+          "stats": [
+            {
+              "value": "Avocado Lovers",
+              "label": "250K+"
+            },
+            {
+              "value": "1.5B+",
+              "label": "avocados consumed yearly"
+            },
+            {
+              "value": "100%",
+              "label": "sustainable farms featured"
+            }
+          ]
+        }
+      },
+      {
         "id": "b_richtext_1771982675835",
         "type": "RichText",
         "props": {
-          "title": "Discover the Magic of Avocados 🥑",
-          "body": "# 🥗 Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. 🥑 They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n# 💚 Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n# 🎉 Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
+          "title": "Discover the Magic of Avocados",
+          "body": "# Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n# Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n# Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
         }
       },
       {
         "id": "b_faqaccordion_1773150551758",
         "type": "FAQAccordion",
         "props": {
-          "title": "Häufig gestellte Fragen",
+          "title": "Frequently Asked Questions",
           "items": [
             {
-              "q": "Was macht Avocados so nahrhaft?",
-              "a": "Avocados sind vollgepackt mit den Vitaminen C, E und K, zusammen mit herzgesunden einfach ungesättigten Fetten, die das Wohlbefinden unterstützen. Sie enthalten auch Kalium, Folat und Antioxidantien wie Lutein und Beta-Carotin — was sie zu einem wahren Nährstoff­kraftpaket macht."
+              "q": "Are avocados really that healthy?",
+              "a": "Absolutely! Avocados are packed with heart-healthy monounsaturated fats, potassium, vitamins C, E, and K, plus fiber. They're a nutrient-dense food that supports heart health and keeps you feeling full. Like any food, balance is key—a quarter to half an avocado per serving is a great way to enjoy the benefits."
             },
             {
-              "q": "Wie wähle ich eine reife Avocado aus?",
-              "a": "Drücke die Avocado sanft in deine Handfläche. Eine reife Avocado sollte leicht auf Druck nachgeben, ohne sich matschig anzufühlen. Wenn sie fest ist, lege sie ein bis zwei Tage auf deine Küchentheke, um natürlich zu reifen."
+              "q": "How do I choose a ripe avocado?",
+              "a": "Gently press the avocado in your palm. A ripe avocado should yield slightly to pressure without feeling mushy. If it feels firm, let it sit on your kitchen counter for one to two days to ripen naturally."
             },
             {
-              "q": "Sind Avocados nachhaltig?",
-              "a": "Nachhaltiger Avocado-Anbau ist möglich und wichtig. Suche nach Anbauern, die Wasser­schonung und ethische Praktiken priorisieren. Indem du verantwortungs­voll angebaute Avocados wählst, unterstützt du sowohl deine Gesundheit als auch den Planeten."
+              "q": "Are avocados sustainable?",
+              "a": "Sustainable avocado farming is possible and important. Look for growers who prioritize water conservation and ethical practices. By choosing responsibly grown avocados, you support both your health and the planet."
             },
             {
-              "q": "Wie lagere ich Avocados am besten?",
-              "a": "Halte unreife Avocados bei Zimmer­temperatur, bis sie bereit zum Essen sind. Sobald sie reif sind, lagere sie im Kühlschrank, um die Frische zu verlängern. Bei geschnittenen Avocados den Kern drin lassen, fest in Kunststoff­folie einwickeln und bis zu drei Tage im Kühlschrank lagern."
+              "q": "How should I store avocados?",
+              "a": "Keep unripe avocados at room temperature until they're ready to eat. Once ripe, store them in the refrigerator to extend freshness. For cut avocados, keep the pit in, wrap tightly in plastic wrap, and refrigerate for up to three days."
             }
           ]
         }
@@ -87,16 +108,16 @@
         "id": "b_cta_1771983958937",
         "type": "CTA",
         "props": {
-          "title": "Tritt der Avocado-Revolution bei 🥑",
-          "description": "Erlebe die Reichhaltigkeit und Gesundheits­vorteile unserer Premium-Avocados. Perfekt für jede Mahlzeit, jederzeit.",
-          "ctaText": "Erste Schritte",
+          "title": "Join the Avocado Movement",
+          "description": "Experience the richness and health benefits of premium avocados. Perfect for every meal, every time.",
+          "ctaText": "Get Started",
           "ctaHref": "/signup"
         }
       }
     ],
     "meta": {
-      "title": "Avocado-Rezepte und Nach­haltigkeit | Avocado Stories",
-      "description": "Entdecke Avocado-Rezepte, Wellness-Tipps und nachhaltige Anbau­praktiken. Lerne, wie Avocados dein Leben bereichern können."
+      "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
+      "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
     }
   },
   {
@@ -214,74 +235,6 @@
         "props": {
           "title": "",
           "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_lemons",
-    "slug": "/lemons",
-    "title": "Lemons",
-    "updatedAt": "2026-03-13T21:34:48.543Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772150570555",
-        "type": "Hero",
-        "props": {
-          "heading": "🍋 Freshly Picked. Naturally Refreshing.",
-          "subheading": "Discover how lemons bring a burst of flavor and health benefits to your table. Embrace the zest of life with every squeeze.",
-          "ctaText": "Learn About Lemons",
-          "ctaHref": "/lemons-info",
-          "imageUrl": "http://localhost:4200/generated-images/var_1773437684994_iy96cr.png",
-          "imageAlt": "Fresh bright yellow lemons arranged on a rustic wooden table in natural sunlight, with green leaves, lemon blossoms, and a sustainable farm or garden setting in soft focus background. Vibrant, appetizing, and inviting composition that conveys freshness and quality.",
-          "secondaryCtaText": "Explore Lemon Recipes",
-          "secondaryCtaHref": "/lemon-recipes",
-          "imagePosition": "left"
-        }
-      },
-      {
-        "id": "b_richtext_1772228488636",
-        "type": "RichText",
-        "props": {
-          "title": "Discover the Magic of Fresh Lemons",
-          "body": "🍋 **When life gives you lemons, make lemonade!** 🍋\n\nLemons are not just a fruit; they are a way of life. Embrace the zest and enjoy the tangy goodness!\n\n## Health Benefits of Lemons\n\nLemons are rich in vitamin C and have numerous health benefits. They can boost your immune system, improve skin quality, and aid digestion. Including lemons in your diet can lead to a healthier lifestyle.\n\n## Culinary Uses of Lemons\n\nLemons add a refreshing flavor to dishes and drinks. From lemon chicken to lemonade, their versatility is unmatched. Discover how lemons can enhance your culinary creations.\n\nExplore the zesty world of lemons and discover their many uses and benefits!"
-        }
-      },
-      {
-        "id": "b_cardgrid_1772228568669",
-        "type": "CardGrid",
-        "props": {
-          "title": "Interesting Lemon Facts",
-          "cards": [
-            {
-              "title": "Health Benefits",
-              "description": "Lemons are rich in vitamin C and antioxidants.",
-              "ctaText": "Learn More",
-              "ctaHref": "/lemons-health-benefits"
-            },
-            {
-              "title": "Culinary Uses",
-              "description": "Lemons add flavor to dishes and drinks.",
-              "ctaText": "Explore Recipes",
-              "ctaHref": "/lemons-recipes"
-            },
-            {
-              "title": "Lemon Varieties",
-              "description": "Discover different types of lemons around the world.",
-              "ctaText": "See Varieties",
-              "ctaHref": "/lemons-varieties"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cta_1773354932967",
-        "type": "CTA",
-        "props": {
-          "title": "Discover Lemons in Every Bite",
-          "description": "Ready to bring fresh, zesty lemons into your kitchen? Explore our favorite recipes and learn how sustainable sourcing makes every squeeze count.",
-          "ctaText": "Explore Recipes",
-          "ctaHref": "/reclipes"
         }
       }
     ]
