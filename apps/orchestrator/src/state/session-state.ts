@@ -114,6 +114,8 @@ export const pendingClarificationBySession = new Map<string, { baseRequest: stri
 export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
 export const publishStatusBySession = new Map<string, PublishTracker>()
+export let lastPublishedScopedSession: string | undefined
+export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
 // ---------------------------------------------------------------------------
 // Persistence config constants

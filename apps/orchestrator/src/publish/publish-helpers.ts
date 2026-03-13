@@ -33,7 +33,20 @@ export function deploymentIdFromAny(input: string): string | undefined {
 
 export async function refreshPublishStatusFromVercel(current: PublishTracker) {
   const token = process.env.VERCEL_TOKEN?.trim()
-  if (!token || !current.deploymentId) return current
+  if (!token || !current.deploymentId) {
+    // Can't poll Vercel API — auto-resolve after a grace period so the UI
+    // doesn't spin forever.  Default 120 s (typical Vercel build time).
+    const graceSec = Number(process.env.PUBLISH_GRACE_SECONDS) || 120
+    const elapsed = current.startedAt
+      ? (Date.now() - new Date(current.startedAt).getTime()) / 1000
+      : Infinity
+    if (elapsed >= graceSec && current.status === "triggered") {
+      current.vercelState = "READY"
+      current.status = "triggered"
+      current.updatedAt = new Date().toISOString()
+    }
+    return current
+  }
 
   const teamId = process.env.VERCEL_TEAM_ID?.trim()
   const query = teamId ? `?teamId=${encodeURIComponent(teamId)}` : ""

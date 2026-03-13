@@ -8,7 +8,8 @@ import {
   getSessionDraft,
   ensureHeroImageProps,
   bumpVersion,
-  schedulePersistState
+  schedulePersistState,
+  setLastPublishedScopedSession
 } from "../state/session-state.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
 import {
@@ -67,6 +68,7 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
         deployStatus: result.status === "failed" ? 500 : 200
       }
       publishStatusBySession.set(scopedSession, tracker)
+      if (result.status !== "failed") setLastPublishedScopedSession(scopedSession)
 
       if (result.status === "failed") {
         return reply.code(400).send({
@@ -135,6 +137,7 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
         vercelState
       }
       publishStatusBySession.set(scopedSession, tracker)
+      if (hookResponse.ok) setLastPublishedScopedSession(scopedSession)
 
       return {
         status: hookResponse.ok ? "triggered" : "failed",
