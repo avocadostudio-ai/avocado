@@ -3,9 +3,9 @@ import assert from "node:assert/strict"
 import { defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, extractMentionedBlockTypes, isAdviceQuery } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
-import { inferBlockTypeFromText } from "./nlp/plan-normalizer.js"
+import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
 
 test("blockSupportsImageAtPath checks schema support", () => {
@@ -1841,6 +1841,12 @@ test("isBatchAddRequest treats populate/update-all as batch overrides", () => {
   assert.equal(isBatchAddRequest("update the hero heading"), false)
 })
 
+test("isBatchAddRequest matches counted add with adjectives between number and noun", () => {
+  assert.equal(isBatchAddRequest("Add 3 audience-targeted sections for beginner home cooks, nutrition-focused families, and premium food enthusiasts"), true)
+  assert.equal(isBatchAddRequest("add 3 new sections"), true, "regression: 'new' still works as adjective")
+  assert.equal(isBatchAddRequest("create 4 custom-styled blocks for different audiences"), true)
+})
+
 test("isBatchAddRequest detects 'each/every' + block type as batch override", () => {
   assert.equal(isBatchAddRequest("insert unsplash images to each card - they should not repeat"), true)
   assert.equal(isBatchAddRequest("add images to every card"), true)
@@ -1863,6 +1869,27 @@ test("isBatchRemoveRequest detects batch remove patterns", () => {
   // Negative: single block remove
   assert.equal(isBatchRemoveRequest("remove the hero"), false)
   assert.equal(isBatchRemoveRequest("delete this block"), false)
+})
+
+test("isPageWideRewriteRequest detects page-wide rewrite patterns", () => {
+  // Positive cases
+  assert.equal(isPageWideRewriteRequest("Refocus this page on premium avocado oils"), true)
+  assert.equal(isPageWideRewriteRequest("rebrand the page for a luxury audience"), true)
+  assert.equal(isPageWideRewriteRequest("rewrite all content for developers"), true)
+  assert.equal(isPageWideRewriteRequest("overhaul this page"), true)
+  assert.equal(isPageWideRewriteRequest("redo the whole page"), true)
+  assert.equal(isPageWideRewriteRequest("redo this page in Spanish"), true)
+  assert.equal(isPageWideRewriteRequest("redesign the page"), true)
+  assert.equal(isPageWideRewriteRequest("transform this page into a landing page"), true)
+  assert.equal(isPageWideRewriteRequest("retheme the page"), true)
+  assert.equal(isPageWideRewriteRequest("update the whole page for B2B"), true)
+  assert.equal(isPageWideRewriteRequest("change the entire page to focus on SaaS"), true)
+
+  // Negative cases — single-block or non-page-wide
+  assert.equal(isPageWideRewriteRequest("update the hero heading"), false)
+  assert.equal(isPageWideRewriteRequest("rewrite the CTA text"), false)
+  assert.equal(isPageWideRewriteRequest("change the heading to something better"), false)
+  assert.equal(isPageWideRewriteRequest("redesign my logo"), false)
 })
 
 test("extractMentionedBlockTypes returns all block types in order", () => {
@@ -2472,6 +2499,26 @@ test("normalizePlanCandidate converts update_props with appended array items to 
   }
 })
 
+test("normalizePlanCandidate assigns unique IDs to multiple same-type add_block ops", () => {
+  const page = demoPublishedPages()[0]
+  const plan = normalizePlanCandidate(
+    {
+      intent: "edit_plan",
+      ops: [
+        { op: "add_block", blockType: "RichText", pageSlug: "/", props: { content: "Section 1" } },
+        { op: "add_block", blockType: "RichText", pageSlug: "/", props: { content: "Section 2" } },
+        { op: "add_block", blockType: "RichText", pageSlug: "/", props: { content: "Section 3" } },
+      ],
+      summary_for_user: "Added 3 sections",
+      change_log: ["add 3 sections"],
+    },
+    { currentPage: page, defaultSlug: "/", userMessage: "Add 3 sections" }
+  ) as { ops: Array<Record<string, unknown>> }
+  const ids = plan.ops.map((op: any) => op.block?.id).filter(Boolean)
+  assert.equal(ids.length, 3, "should have 3 ops with block IDs")
+  assert.equal(new Set(ids).size, 3, "all 3 block IDs must be unique")
+})
+
 test("isHighConfidenceDeterministicCase returns false for 'add a proper CTA' (needs LLM for content)", () => {
   const currentPage = demoPublishedPages()[0]
   assert.equal(
@@ -2488,4 +2535,58 @@ test("isHighConfidenceDeterministicCase still returns true for plain 'add a CTA'
     true,
     "plain add block requests should use the deterministic path"
   )
+})
+
+test("isHighConfidenceDeterministicCase returns false for counted batch add with only 1 named type", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "Add 3 audience-targeted sections for beginner home cooks, nutrition-focused families, and premium food enthusiasts. Each section should include one practical takeaway and an educational CTA",
+      currentPage
+    }),
+    false,
+    "batch add with adjectives and only 1 named block type (CTA in description) should defer to LLM"
+  )
+})
+
+test("isHighConfidenceDeterministicCase returns false for page-wide rewrite (needs LLM)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "Refocus this page on premium avocado oils and usage education. Keep it refined and practical.",
+      currentPage
+    }),
+    false,
+    "page-wide rewrite/refocus requests should defer to LLM for content generation"
+  )
+})
+
+test("plannerDefaultProps for TwoColumn produces valid block props", () => {
+  const props = plannerDefaultProps("TwoColumn")
+  const result = validateBlockProps("TwoColumn", props)
+  assert.equal(result.success, true, "TwoColumn default props from plan-normalizer must pass Zod validation")
+  assert.ok(Array.isArray(props.left), "TwoColumn defaults must include left array")
+  assert.ok(Array.isArray(props.right), "TwoColumn defaults must include right array")
+})
+
+test("isPageListQuery detects page-listing requests", () => {
+  const positives = [
+    "list all pages on this site",
+    "show me the pages",
+    "what pages are on this site",
+    "what pages do I have",
+    "which pages are available",
+    "how many pages",
+    "show all pages",
+    "list pages"
+  ]
+  const negatives = [
+    "add a new page",
+    "delete the about page",
+    "rename page to /new-slug",
+    "move pages around",
+    "add hero block"
+  ]
+  for (const prompt of positives) assert.equal(isPageListQuery(prompt), true, prompt)
+  for (const prompt of negatives) assert.equal(isPageListQuery(prompt), false, prompt)
 })
