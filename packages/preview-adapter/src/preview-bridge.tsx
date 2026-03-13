@@ -31,13 +31,20 @@ type ResetToServerMessage = {
 type SiteMessage =
   | {
       protocol: "site-editor/v1"
-      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft"
+      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton"
       payload: Record<string, unknown>
     }
   | ({ protocol: "site-editor/v1" } & ApplyPatchMessage)
   | ({ protocol: "site-editor/v1" } & ResetToServerMessage)
 
 export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrigin: string }) {
+  // When running standalone (no editor origin), render nothing — there's no parent to talk to.
+  if (!editorOrigin) return null
+
+  return <PreviewBridgeInner slug={slug} editorOrigin={editorOrigin} />
+}
+
+function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const pendingFocusRef = useRef<string | null>(null)
@@ -88,6 +95,8 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       document.querySelectorAll(".editor-live-draft").forEach((node) => node.remove())
       document.querySelectorAll(".editor-live-draft-active").forEach((node) => node.classList.remove("editor-live-draft-active"))
       document.querySelectorAll(".editor-block-badge-status").forEach((node) => node.remove())
+      document.querySelectorAll(".editor-live-typing").forEach((node) => node.classList.remove("editor-live-typing"))
+      document.querySelectorAll(".editor-skeleton-block").forEach((node) => node.remove())
       liveDraftActiveBlockId = null
     }
 
@@ -112,26 +121,73 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         status.className = "editor-block-badge-status"
         status.textContent = "Updating"
         badge.append(status)
-      }, 1200)
+      }, 600)
     }
 
-    const renderLiveDraft = (blockId: string, text: string, active: boolean) => {
+    const liveDraftOriginals = new Map<HTMLElement, string>()
+
+    const restoreLiveDraftOriginals = () => {
+      for (const [node, html] of liveDraftOriginals) {
+        node.innerHTML = html
+        node.classList.remove("editor-live-typing")
+      }
+      liveDraftOriginals.clear()
+    }
+
+    const renderLiveDraft = (blockId: string, text: string, active: boolean, fields?: Record<string, string>) => {
       if (!active) {
+        restoreLiveDraftOriginals()
         clearLiveDraft()
         return
       }
       const trimmed = text.trim()
-      if (!blockId || !trimmed) {
+      if (!blockId || (!trimmed && !fields)) {
+        restoreLiveDraftOriginals()
         clearLiveDraft()
         return
       }
-      if (liveDraftActiveBlockId === blockId) return
-      clearLiveDraft()
+
       const block = findBlockNode(blockId)
       if (!block) return
+
+      // Inject streamed text into editable DOM nodes if fields provided
+      if (fields && typeof fields === "object") {
+        for (const [path, value] of Object.entries(fields)) {
+          const node = findEditableNode(block, path)
+          if (!node) continue
+          if (!liveDraftOriginals.has(node)) {
+            liveDraftOriginals.set(node, node.innerHTML)
+          }
+          node.textContent = value
+          node.classList.add("editor-live-typing")
+        }
+      }
+
+      if (liveDraftActiveBlockId === blockId) return
+      clearLiveDraft()
       block.classList.add("editor-live-draft-active")
       liveDraftActiveBlockId = blockId
       setLiveDraftBadge(block, true)
+    }
+
+    const showSkeleton = (afterBlockId: string | null, blockType: string) => {
+      const skeleton = document.createElement("div")
+      skeleton.className = "editor-skeleton-block"
+      skeleton.setAttribute("data-skeleton-for", blockType)
+      if (afterBlockId) {
+        const afterNode = findBlockNode(afterBlockId)
+        if (afterNode) {
+          afterNode.after(skeleton)
+          return
+        }
+      }
+      // Fallback: append to body main content
+      const main = document.querySelector("main") ?? document.body
+      main.append(skeleton)
+    }
+
+    const removeSkeletons = () => {
+      document.querySelectorAll(".editor-skeleton-block").forEach((node) => node.remove())
     }
 
     const findEditableNode = (parent: HTMLElement, editablePath: string) => {
@@ -779,15 +835,29 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         pendingScrollRestoreRef.current = null
       }
       cancelInlineEdit()
-      router.refresh()
-      window.setTimeout(() => {
-        if (pendingScrollRestoreRef.current) {
-          const { x, y } = pendingScrollRestoreRef.current
-          window.scrollTo({ left: x, top: y, behavior: "auto" })
-          pendingScrollRestoreRef.current = null
-        }
-        queueFocusAfterRefresh()
-      }, 80)
+
+      const afterRefresh = () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (pendingScrollRestoreRef.current) {
+              const { x, y } = pendingScrollRestoreRef.current
+              window.scrollTo({ left: x, top: y, behavior: "auto" })
+              pendingScrollRestoreRef.current = null
+            }
+            queueFocusAfterRefresh()
+          })
+        })
+      }
+
+      if (typeof document.startViewTransition === "function") {
+        const transition = document.startViewTransition(() => {
+          router.refresh()
+        })
+        transition.finished.then(afterRefresh)
+      } else {
+        router.refresh()
+        afterRefresh()
+      }
     }
 
     const onClick = (event: MouseEvent) => {
@@ -918,6 +988,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
 
       if (msg.type === "resetToServer") {
         serverVersionRef.current = msg.toVersion
+        expectingNewBlocks = true
         if (msg.focusBlockId) {
           pendingFocusRef.current = msg.focusBlockId
           pendingScrollIntoViewRef.current = false
@@ -930,6 +1001,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         const focusBlockId = String(msg.payload.focusBlockId ?? "")
         pendingFocusRef.current = focusBlockId || null
         pendingScrollIntoViewRef.current = false
+        expectingNewBlocks = true
         clearLiveDraft()
         clearChildFocus()
         selectedEditablePathRef.current = null
@@ -951,7 +1023,20 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
         const blockId = String(msg.payload.blockId ?? "")
         const text = String(msg.payload.text ?? "")
         const active = Boolean(msg.payload.active)
-        renderLiveDraft(blockId, text, active)
+        const fields = (msg.payload.fields && typeof msg.payload.fields === "object")
+          ? msg.payload.fields as Record<string, string>
+          : undefined
+        renderLiveDraft(blockId, text, active, fields)
+      }
+
+      if (msg.type === "showSkeleton") {
+        const afterBlockId = msg.payload.afterBlockId ? String(msg.payload.afterBlockId) : null
+        const blockType = String(msg.payload.blockType ?? "Block")
+        showSkeleton(afterBlockId, blockType)
+      }
+
+      if (msg.type === "removeSkeleton") {
+        removeSkeletons()
       }
     }
 
@@ -998,8 +1083,68 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
       )
     }
 
+    // Phase 3: Track known block IDs for progressive entrance animation
+    let knownBlockIds = new Set(
+      Array.from(document.querySelectorAll<HTMLElement>("[data-block-id]"))
+        .map((node) => node.getAttribute("data-block-id"))
+        .filter((id): id is string => Boolean(id))
+    )
+    let expectingNewBlocks = false
+
+    const detectNewBlocks = () => {
+      if (!expectingNewBlocks) return
+      const currentIds = new Set(
+        Array.from(document.querySelectorAll<HTMLElement>("[data-block-id]"))
+          .map((node) => node.getAttribute("data-block-id"))
+          .filter((id): id is string => Boolean(id))
+      )
+      let staggerIndex = 0
+      for (const id of currentIds) {
+        if (!knownBlockIds.has(id)) {
+          const node = findBlockNode(id)
+          if (node && !node.classList.contains("editor-block-entering")) {
+            const delay = staggerIndex * 120
+            node.style.animationDelay = `${delay}ms`
+            node.classList.add("editor-block-entering")
+            node.addEventListener("animationend", () => {
+              node.classList.remove("editor-block-entering")
+              node.style.animationDelay = ""
+            }, { once: true })
+            staggerIndex++
+          }
+        }
+      }
+      knownBlockIds = currentIds
+      if (staggerIndex > 0) expectingNewBlocks = false
+    }
+
     ensureBlockBadges()
-    const observer = new MutationObserver(() => ensureBlockBadges())
+    const ensureSelectedControlsMounted = () => {
+      const selectedId = selectedBlockRef.current
+      if (!selectedId) return
+      const selectedNode = findBlockNode(selectedId)
+      if (!selectedNode) return
+
+      const hasHighlight = selectedNode.classList.contains("editor-highlight")
+      const hasToolbar = Boolean(selectedNode.querySelector(".editor-block-toolbar"))
+      const hasTopAdd = Boolean(selectedNode.querySelector(".editor-selected-add-top"))
+      const hasBottomAdd = Boolean(selectedNode.querySelector(".editor-selected-add-bottom"))
+
+      if (hasHighlight && hasToolbar && hasTopAdd && hasBottomAdd) return
+      applyBlockFocus(selectedId, false, selectedEditablePathRef.current ?? undefined, { scrollIntoView: false })
+    }
+
+    let selectionMountQueued = false
+    const observer = new MutationObserver(() => {
+      ensureBlockBadges()
+      detectNewBlocks()
+      if (selectionMountQueued) return
+      selectionMountQueued = true
+      requestAnimationFrame(() => {
+        selectionMountQueued = false
+        ensureSelectedControlsMounted()
+      })
+    })
     if (document.body) observer.observe(document.body, { childList: true, subtree: true })
 
     document.addEventListener("click", onClick, true)
@@ -1011,6 +1156,7 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
     return () => {
       cancelInlineEdit()
       clearChildFocus()
+      restoreLiveDraftOriginals()
       clearLiveDraft()
       removeSelectedDeleteHandle()
       observer.disconnect()

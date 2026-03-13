@@ -103,6 +103,8 @@
 
 .editor-highlight {
   overflow: visible !important;
+  position: relative;
+  z-index: 2147483645;
 }
 
 .editor-live-draft-active {
@@ -284,7 +286,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  z-index: 23;
+  z-index: 2147483646;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
   opacity: 0;
   visibility: hidden;
@@ -382,6 +384,10 @@
   visibility: hidden;
   pointer-events: none;
   transition: opacity 120ms ease;
+}
+
+.editor-list-item-add {
+  z-index: 2147483646;
 }
 
 .editor-list-item-controls > .editor-list-item-delete {
@@ -754,9 +760,65 @@
   }
 }
 
+/* View Transition crossfade for smooth refresh */
+::view-transition-old(root) { animation: none; }
+::view-transition-new(root) { animation: editor-crossfade 180ms ease-out; }
+@keyframes editor-crossfade { from { opacity: 0.6; } to { opacity: 1; } }
+
+/* Progressive block entrance animation */
+.editor-block-entering {
+  animation: editor-block-slide-in 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+@keyframes editor-block-slide-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Live typing cursor effect */
+.editor-live-typing {
+  position: relative;
+}
+.editor-live-typing::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: rgb(var(--editor-selected-rgb));
+  animation: editor-cursor-blink 0.6s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 1px;
+}
+@keyframes editor-cursor-blink { 50% { opacity: 0; } }
+
+/* Skeleton shimmer for incoming blocks */
+.editor-skeleton-block {
+  min-height: 120px;
+  border-radius: 4px;
+  background: linear-gradient(110deg, #f1f5f9 30%, #e2e8f0 50%, #f1f5f9 70%);
+  background-size: 200% 100%;
+  animation: editor-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes editor-skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aifx-updated::before,
   .aifx-updated::after {
+    animation: none !important;
+  }
+  .editor-block-entering {
+    animation: none !important;
+  }
+  .editor-live-typing::after {
+    animation: none !important;
+  }
+  .editor-skeleton-block {
+    animation: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
     animation: none !important;
   }
 }
