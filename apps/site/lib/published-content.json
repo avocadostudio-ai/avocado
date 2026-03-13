@@ -3,18 +3,18 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-10T13:49:29.345Z",
+    "updatedAt": "2026-03-13T18:06:04.429Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Magic of Avocados 🥑",
-          "subheading": "Experience the vibrant taste and health benefits of our avocados — a delightful addition to any dish.",
-          "ctaText": "Get Started",
-          "ctaHref": "/",
-          "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=2400&q=80",
-          "imageAlt": "Close-up of avocados in natural light"
+          "heading": "Unlock Endless Flavor with Every Avocado 🥑",
+          "subheading": "From creamy morning toast to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
+          "ctaText": "Browse Recipes",
+          "ctaHref": "/recipes",
+          "imageUrl": "https://images.unsplash.com/photo-1693942276719-8eb2b97ecce1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxOXx8ZGlzY292ZXIlMjB0aGUlMjBtYWdpYyUyMG9mJTIwYXZvY2Fkb3MlMjBoZXJvJTIwZm9vZCUyMHBob3RvZ3JhcGh5JTIwbmF0dXJhbCUyMGxpZ2h0fGVufDF8MHx8fDE3NzMzMTkyNzJ8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Beautifully plated avocado toast with fresh toppings and natural sunlight"
         }
       },
       {
@@ -27,40 +27,25 @@
               "title": "🥑 Avocado Culinary Delights",
               "description": "Uncover new culinary uses for avocados.",
               "ctaText": "Try Now",
-              "ctaHref": "/avocado-culinary"
-            },
-            {
-              "title": "🥑 Avocado Wellness",
-              "description": "Explore the wellness benefits of avocados.",
-              "ctaText": "Discover",
-              "ctaHref": "/avocado-wellness"
+              "ctaHref": "/avocado-culinary",
+              "imageUrl": "https://images.unsplash.com/photo-1661182260393-a3918d4e8571?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwY3VsaW5hcnklMjBjb29raW5nJTIwcmVjaXBlcyUyMGZyZXNofGVufDF8MHx8fDE3NzM0MjUxNTV8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Fresh avocado culinary dish in a vibrant bowl"
             },
             {
               "title": "🥑 Avocado Sustainability",
               "description": "Learn about sustainable avocado farming practices.",
               "ctaText": "Learn More",
-              "ctaHref": "/avocado-sustainability"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_testimonials_1771979725070",
-        "type": "Testimonials",
-        "props": {
-          "title": "Testimonials from Avocado Enthusiasts",
-          "items": [
-            {
-              "quote": "Avocados are a superfood that never fails to impress! 🥑 Their creamy texture and rich flavor make every meal a delight.",
-              "author": "Emily Avocado"
+              "ctaHref": "/avocado-sustainability",
+              "imageUrl": "https://images.unsplash.com/photo-1762828397344-1a5629661e00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxzdXN0YWluYWJsZSUyMGZhcm1pbmclMjBhZ3JpY3VsdHVyZSUyMGdyZWVufGVufDF8MHx8fDE3NzMzNDY1NDR8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Lush green sustainable farming landscape from above"
             },
             {
-              "quote": "Avocados are my culinary secret weapon from morning to night. 🥑 They bring a luxurious touch to every meal.",
-              "author": "Michael Green"
-            },
-            {
-              "quote": "The best avocados I've ever tasted! 🥑 Perfectly ripe and full of flavor, they elevate any recipe.",
-              "author": "Sarah Chef"
+              "title": "🥑 Avocado Wellness",
+              "description": "Explore the wellness benefits of avocados.",
+              "ctaText": "Discover",
+              "ctaHref": "/avocado-wellness",
+              "imageUrl": "https://images.unsplash.com/photo-1770223722037-8dc5d3dff8d3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHx3ZWxsbmVzcyUyMGhlYWx0aCUyMG51dHJpdGlvbiUyMGhlYWx0aHklMjBmb29kfGVufDF8MHx8fDE3NzM0MjUxNTZ8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Colorful healthy wellness meal on a plate"
             }
           ]
         }
@@ -543,7 +528,7 @@
     "id": "p_about_lemons",
     "slug": "/about-lemons",
     "title": "About Lemons",
-    "updatedAt": "2026-03-12T22:35:46.959Z",
+    "updatedAt": "2026-03-13T17:21:21.138Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
@@ -564,7 +549,7 @@
         "id": "b_richtext_1772228488636",
         "type": "RichText",
         "props": {
-          "title": "The Zesty World of Lemons",
+          "title": "Discover the Magic of Fresh Lemons",
           "body": "🍋 **When life gives you lemons, make lemonade!** 🍋\n\nLemons are not just a fruit; they are a way of life. Embrace the zest and enjoy the tangy goodness!\n\n## Health Benefits of Lemons\n\nLemons are rich in vitamin C and have numerous health benefits. They can boost your immune system, improve skin quality, and aid digestion. Including lemons in your diet can lead to a healthier lifestyle.\n\n## Culinary Uses of Lemons\n\nLemons add a refreshing flavor to dishes and drinks. From lemon chicken to lemonade, their versatility is unmatched. Discover how lemons can enhance your culinary creations.\n\nExplore the zesty world of lemons and discover their many uses and benefits!"
         }
       },
