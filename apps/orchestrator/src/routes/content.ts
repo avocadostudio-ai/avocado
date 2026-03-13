@@ -10,7 +10,8 @@ import {
   getSessionDraft,
   getPage,
   getSessionPages,
-  ensureHeroImageProps
+  ensureHeroImageProps,
+  lastPublishedScopedSession
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
 
@@ -116,7 +117,11 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
   app.get("/publish/content", async (request, reply) => {
     const query = request.query as { session?: string; siteId?: string }
     const session = normalizeSession(query.session)
-    const scopedSession = scopedSessionKey(session, query.siteId)
+    // If no siteId provided, fall back to the last-published scoped session
+    // so the Vercel build script doesn't need SITE_PUBLISH_SITE_ID env var.
+    const scopedSession = query.siteId
+      ? scopedSessionKey(session, query.siteId)
+      : (lastPublishedScopedSession ?? scopedSessionKey(session, undefined))
     const pages = getSessionPages(scopedSession)
     return {
       session,
