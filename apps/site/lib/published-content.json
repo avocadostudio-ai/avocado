@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-13T19:25:13.445Z",
+    "updatedAt": "2026-03-13T19:25:45.879Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -35,7 +35,7 @@
               "title": "🥑 Avocado Sustainability",
               "description": "Learn about sustainable avocado farming practices.",
               "ctaText": "Learn More",
-              "ctaHref": "/sustainable-avocado-adventures",
+              "ctaHref": "/sustainable-adventures",
               "imageUrl": "http://localhost:4200/generated-images/var_1773425814424_5b2e0y.png",
               "imageAlt": "AI-generated CardGrid image featuring avocado sustainability learn about"
             },
@@ -601,10 +601,10 @@
     ]
   },
   {
-    "id": "p_sustainable_avocado_adventures",
-    "slug": "/sustainable-avocado-adventures",
-    "title": "Sustainable Avocado Adventures",
-    "updatedAt": "2026-03-13T19:20:35.398Z",
+    "id": "p_sustainable_adventures",
+    "slug": "/sustainable-adventures",
+    "title": "Sustainable Adventures",
+    "updatedAt": "2026-03-13T19:25:45.879Z",
     "blocks": [
       {
         "id": "b_hero_sustainable-avocado-adventures",
