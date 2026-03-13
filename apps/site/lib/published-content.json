@@ -3,15 +3,15 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-13T19:46:46.254Z",
+    "updatedAt": "2026-03-13T20:01:37.727Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Unlock Endless Flavor with Every Avocado 🥑",
-          "subheading": "From creamy morning toast to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
-          "ctaText": "Browse Recipes",
+          "heading": "Freisetze endloses Aroma mit jeder Avocado 🥑",
+          "subheading": "Von cremigem Morgen­toast bis zu lebendigen Salaten und darüber hinaus — entdecke, wie Avocados gewöhnliche Mahlzeiten in außer­gewöhnliche Momente verwandeln.",
+          "ctaText": "Rezepte durchsuchen",
           "ctaHref": "/recipes",
           "imageUrl": "https://images.unsplash.com/photo-1704960961383-67dd63756199?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzM3x8ZnJlc2glMjBhdm9jYWRvJTIwaGVybyUyMGZvb2QlMjBwaG90b2dyYXBoeSUyMHZpYnJhbnR8ZW58MXwwfHx8MTc3MzQyNjQzM3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
           "imageAlt": "Fresh halved avocado with vibrant green flesh on a neutral background"
@@ -21,31 +21,31 @@
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Sustainable Avocado Adventures",
+          "title": "Nachhaltige Avocado-Abenteuer",
           "cards": [
             {
-              "title": "🥑 Avocado Wellness",
-              "description": "Explore the wellness benefits of avocados.",
-              "ctaText": "Discover",
+              "title": "🥑 Avocado-Wellness",
+              "description": "Entdecke die Wellness-Vorteile von Avocados.",
+              "ctaText": "Entdecken",
               "ctaHref": "/avocado-wellness",
               "imageUrl": "http://localhost:4200/generated-images/var_1773425870003_pekbr0.png",
               "imageAlt": "AI-generated CardGrid image featuring avocado wellness explore benefits"
             },
             {
-              "title": "🥑 Avocado Sustainability",
-              "description": "Learn about sustainable avocado farming practices.",
-              "ctaText": "Learn More",
-              "ctaHref": "/avocado-sustainability",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773425814424_5b2e0y.png",
-              "imageAlt": "AI-generated CardGrid image featuring avocado sustainability learn about"
-            },
-            {
-              "title": "🥑 Avocado Culinary Delights",
-              "description": "Uncover new culinary uses for avocados.",
-              "ctaText": "Try Now",
+              "title": "🥑 Avocado-Kulinarische Köstlich­keiten",
+              "description": "Entdecke neue kulinarische Verwendungen für Avocados.",
+              "ctaText": "Jetzt ausprobieren",
               "ctaHref": "/avocado-culinary",
               "imageUrl": "http://localhost:4200/generated-images/var_1773425761679_u1teu6.png",
               "imageAlt": "AI-generated CardGrid image featuring avocado culinary delights uncover"
+            },
+            {
+              "title": "🥑 Avocado-Nach­haltigkeit",
+              "description": "Lerne über nachhaltige Avocado-Anbau­praktiken.",
+              "ctaText": "Mehr erfahren",
+              "ctaHref": "/avocado-sustainability",
+              "imageUrl": "http://localhost:4200/generated-images/var_1773425814424_5b2e0y.png",
+              "imageAlt": "AI-generated CardGrid image featuring avocado sustainability learn about"
             }
           ]
         }
@@ -54,31 +54,31 @@
         "id": "b_richtext_1771982675835",
         "type": "RichText",
         "props": {
-          "title": "Discover the Magic of Avocados 🥑",
-          "body": "# 🥗 Nutritional Benefits of Avocados\n\nAvocados are not only delicious but also packed with essential nutrients. 🥑 They are a rich source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n# 💚 Heart-Healthy Fats\n\nAdditionally, avocados contain lutein, beta-carotene, and omega-3 fatty acids. Moreover, avocados are renowned for their heart-healthy monounsaturated fats, which can help lower bad cholesterol levels and reduce the risk of heart disease.\n\n# 🎉 Enjoy Avocados Today\n\nEnjoy the magic of avocados in your meals today!"
+          "title": "Entdecke die Magie der Avocados 🥑",
+          "body": "# 🥗 Nährstoff­vorteile von Avocados\n\nAvocados sind nicht nur lecker, sondern auch voller essenzieller Nährstoffe. 🥑 Sie sind eine großartige Quelle für die Vitamine C, E, K und B-6, zusammen mit Riboflavin, Niacin, Folat, Pantothensäure, Magnesium und Kalium.\n\n# 💚 Herz­gesunde Fette\n\nZudem enthalten Avocados Lutein, Beta-Carotin und Omega-3-Fettsäuren. Darüber hinaus sind Avocados für ihre herzgesunden einfach ungesättigten Fette bekannt, die helfen können, schlechtes Cholesterin zu senken und das Risiko von Herz­erkrankungen zu reduzieren.\n\n# 🎉 Genießen Sie Avocados noch heute\n\nGenießen Sie die Magie der Avocados in Ihren Mahlzeiten noch heute!"
         }
       },
       {
         "id": "b_faqaccordion_1773150551758",
         "type": "FAQAccordion",
         "props": {
-          "title": "Frequently asked questions",
+          "title": "Häufig gestellte Fragen",
           "items": [
             {
-              "q": "What makes avocados so nutritious?",
-              "a": "Avocados are packed with vitamins C, E, and K, along with heart-healthy monounsaturated fats that support wellness. They also contain potassium, folate, and antioxidants like lutein and beta-carotene — making them a true nutritional powerhouse."
+              "q": "Was macht Avocados so nahrhaft?",
+              "a": "Avocados sind vollgepackt mit den Vitaminen C, E und K, zusammen mit herzgesunden einfach ungesättigten Fetten, die das Wohlbefinden unterstützen. Sie enthalten auch Kalium, Folat und Antioxidantien wie Lutein und Beta-Carotin — was sie zu einem wahren Nährstoff­kraftpaket macht."
             },
             {
-              "q": "How do I pick a ripe avocado?",
-              "a": "Gently squeeze the avocado in the palm of your hand. A ripe avocado should yield slightly to pressure without feeling mushy. If it's firm, place it on your kitchen counter for a day or two to ripen naturally."
+              "q": "Wie wähle ich eine reife Avocado aus?",
+              "a": "Drücke die Avocado sanft in deine Handfläche. Eine reife Avocado sollte leicht auf Druck nachgeben, ohne sich matschig anzufühlen. Wenn sie fest ist, lege sie ein bis zwei Tage auf deine Küchentheke, um natürlich zu reifen."
             },
             {
-              "q": "Are avocados sustainable?",
-              "a": "Sustainable avocado farming is possible and important. Look for growers who prioritize water conservation and ethical practices. By choosing responsibly grown avocados, you're supporting both your health and the planet."
+              "q": "Sind Avocados nachhaltig?",
+              "a": "Nachhaltiger Avocado-Anbau ist möglich und wichtig. Suche nach Anbauern, die Wasser­schonung und ethische Praktiken priorisieren. Indem du verantwortungs­voll angebaute Avocados wählst, unterstützt du sowohl deine Gesundheit als auch den Planeten."
             },
             {
-              "q": "What's the best way to store avocados?",
-              "a": "Keep unripe avocados at room temperature until they're ready to eat. Once ripe, store them in the refrigerator to extend freshness. For cut avocados, keep the pit in, wrap tightly in plastic wrap, and refrigerate for up to three days."
+              "q": "Wie lagere ich Avocados am besten?",
+              "a": "Halte unreife Avocados bei Zimmer­temperatur, bis sie bereit zum Essen sind. Sobald sie reif sind, lagere sie im Kühlschrank, um die Frische zu verlängern. Bei geschnittenen Avocados den Kern drin lassen, fest in Kunststoff­folie einwickeln und bis zu drei Tage im Kühlschrank lagern."
             }
           ]
         }
@@ -87,13 +87,17 @@
         "id": "b_cta_1771983958937",
         "type": "CTA",
         "props": {
-          "title": "Join the Avocado Revolution 🥑",
-          "description": "Experience the richness and health benefits of our premium avocados. Perfect for any meal, any time.",
-          "ctaText": "Get Started",
+          "title": "Tritt der Avocado-Revolution bei 🥑",
+          "description": "Erlebe die Reichhaltigkeit und Gesundheits­vorteile unserer Premium-Avocados. Perfekt für jede Mahlzeit, jederzeit.",
+          "ctaText": "Erste Schritte",
           "ctaHref": "/signup"
         }
       }
-    ]
+    ],
+    "meta": {
+      "title": "Avocado-Rezepte und Nach­haltigkeit | Avocado Stories",
+      "description": "Entdecke Avocado-Rezepte, Wellness-Tipps und nachhaltige Anbau­praktiken. Lerne, wie Avocados dein Leben bereichern können."
+    }
   },
   {
     "id": "p_avocado_recipes",
@@ -634,7 +638,7 @@
     "id": "p_avocado_sustainability",
     "slug": "/avocado-sustainability",
     "title": "Avocado Sustainability",
-    "updatedAt": "2026-03-13T19:44:41.907Z",
+    "updatedAt": "2026-03-13T19:50:04.062Z",
     "blocks": [
       {
         "id": "b_hero_1773431081907",
@@ -644,8 +648,8 @@
           "subheading": "Learn how responsible farming practices protect the environment while growing the avocados you love. Discover what makes truly sustainable avocados different.",
           "ctaText": "Learn Our Practices",
           "ctaHref": "/#practices",
-          "imageUrl": "https://images.unsplash.com/photo-1574943320219-553eb213f72d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
-          "imageAlt": "Lush avocado orchard with trees in natural landscape"
+          "imageUrl": "https://images.unsplash.com/photo-1762708551128-f94748385ae3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
+          "imageAlt": "Lush green rice field showcasing sustainable farming practices"
         }
       },
       {
