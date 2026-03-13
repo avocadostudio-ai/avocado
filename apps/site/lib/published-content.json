@@ -100,226 +100,43 @@
     }
   },
   {
-    "id": "p_avocado_recipes",
-    "slug": "/avocado-recipes",
-    "title": "Avocado Recipes",
-    "updatedAt": "2026-03-13T09:55:12.319Z",
-    "blocks": [
-      {
-        "id": "b_hero_avocado-recipes",
-        "type": "Hero",
-        "props": {
-          "heading": "Discover Delicious Avocado Recipes",
-          "subheading": "From creamy dips to fresh salads and vibrant pastas—explore easy, inspiring ways to bring avocados to your table.",
-          "ctaText": "Explore Recipes",
-          "ctaHref": "#featured-recipes",
-          "imageUrl": "https://images.unsplash.com/photo-1616485828923-2640a1ee48b4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxkaXNjb3ZlciUyMGRlbGljaW91cyUyMGF2b2NhZG8lMjByZWNpcGVzfGVufDF8MHx8fDE3NzMzNTUxMjF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Photo of discover delicious avocado recipes"
-        }
-      },
-      {
-        "id": "b_cardgrid_avocado-recipes",
-        "type": "CardGrid",
-        "props": {
-          "title": "Featured Recipes",
-          "cards": [
-            {
-              "title": "Creamy Guacamole",
-              "description": "Classic avocado dip blended with lime, cilantro, and fresh tomatoes. Perfect for snacks, appetizers, or game day.",
-              "ctaText": "View Recipe",
-              "ctaHref": "/avocado-recipes/guacamole",
-              "imageUrl": "https://images.unsplash.com/photo-1761243743989-726fb70af78d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxndWFjYW1vbGUlMjBmcmVzaCUyMGF2b2NhZG8lMjByZWNpcGV8ZW58MXwwfHx8MTc3MzM1NTAxMnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "Fried pastries arranged around a guacamole dip"
-            },
-            {
-              "title": "Avocado Toast",
-              "description": "Creamy avocado spread on toasted bread, topped with sea salt, red pepper flakes, and a drizzle of olive oil.",
-              "ctaText": "View Recipe",
-              "ctaHref": "/avocado-recipes/avocado-toast",
-              "imageUrl": "https://images.unsplash.com/photo-1608330557791-8dff6a434bbf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwdG9hc3QlMjBvbiUyMGJyZWFkfGVufDF8MHx8fDE3NzMzNTUwMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "Sandwich on red ceramic plate"
-            },
-            {
-              "title": "Avocado Pasta",
-              "description": "Silky avocado sauce tossed with fresh pasta, garlic, and lemon. Light, satisfying, and ready in 15 minutes.",
-              "ctaText": "View Recipe",
-              "ctaHref": "/avocado-recipes/avocado-pasta",
-              "imageUrl": "https://images.unsplash.com/photo-1698307190839-1e02b37d3441?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxOXx8YXZvY2FkbyUyMHBhc3RhJTIwZnJlc2glMjBncmVlbiUyMHNhdWNlJTIwbm9vZGxlc3xlbnwxfDB8fHwxNzczMzU1MTExfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "Bowls of creamy avocado pasta with fresh green sauce"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cta_1773355043811",
-        "type": "CTA",
-        "props": {
-          "title": "Master Avocado Toast",
-          "description": "Perfect your toast technique and discover the endless ways to top it. From simple spreads to gourmet combinations, Avocado Toast is your gateway to creative avocado cooking.",
-          "ctaText": "Explore More",
-          "ctaHref": "#featured-recipes"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_meal_prep",
-    "slug": "/meal-prep",
-    "title": "Meal Prep",
-    "updatedAt": "2026-03-13T18:19:19.838Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772016866777",
-        "type": "Hero",
-        "props": {
-          "heading": "Avocado Meal Prep 101: Prep Smart & Sustainably 🥑",
-          "subheading": "Learn how to make the most of every avocado while supporting responsible farming. Reduce waste, maximize nutrition, and eat with purpose.",
-          "ctaText": "Learn More",
-          "ctaHref": "/sustainable-avocado-guide",
-          "imageUrl": "https://images.unsplash.com/photo-1693042441459-9498f625ce6c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8YXZvY2FkbyUyMG1lYWwlMjBwcmVwJTIwMTAxJTIwbGVhcm4lMjBjcmVhdGUlMjBoZXJvJTIwZm9vZCUyMHBob3RvZ3JhcGh5JTIwbmF0dXJhbCUyMGxpZ2h0fGVufDF8MHx8fDE3NzMzOTU4NDR8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "fresh avocados sourced from sustainable farms with natural, organic preparation"
-        }
-      },
-      {
-        "id": "b_richtext_1772016966005",
-        "type": "RichText",
-        "props": {
-          "title": "Avocado Meal Prep Essentials",
-          "body": "**Choosing the Right Avocado**\n\nStart by selecting avocados that are ripe but still firm. A ripe avocado yields slightly to gentle pressure—not mushy. Look for dark green skin and avoid any bruised or dark spots. If you're prepping ahead, choose slightly firmer avocados that will ripen over a day or two.\n\n**Storage Tips**\n\nKeep ripe avocados in the fridge to slow ripening and extend freshness to 3–5 days. Store them in a sealed container or wrap the cut side tightly with plastic wrap. If your avocado is already cut, leave the pit in the half you're saving—it helps prevent browning.\n\n**Simple Prep Techniques**\n\nFor meal prep, slice, dice, or mash your avocados just before eating or combining with other ingredients (a squeeze of lemon juice slows browning). Prepare components separately and assemble bowls, salads, or sandwiches when you're ready to eat. This keeps everything fresh and prevents sogginess.\n\n**Building Your First Meals**\n\nStart simple: avocado toast, grain bowls with veggies, or creamy salads. Pair avocado with fresh citrus, leafy greens, whole grains, and lean proteins. The creaminess of avocado makes every meal feel indulgent while keeping prep straightforward."
-        }
-      },
-      {
-        "id": "b_cardgrid_1773425942378",
-        "type": "CardGrid",
-        "props": {
-          "title": "Quick & Easy: Beginner Avocado Dishes",
-          "cards": [
-            {
-              "title": "Perfect Avocado Toast",
-              "description": "Learn the foundation: ripe avocado, crusty bread, and simple seasonings. This 5-minute classic teaches you the basics of ripeness, slicing, and presentation.",
-              "ctaText": "Get the Recipe",
-              "ctaHref": "/avocado-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1672590312032-0d2f114367d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxiZWdpbm5lciUyMGhvbWUlMjBjb29rJTIwYXZvY2FkbyUyMGtpdGNoZW4lMjBzaW1wbGV8ZW58MXwwfHx8MTc3MzQyNTkxNXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "person cutting an avocado on a cutting board"
-            },
-            {
-              "title": "Smart Storage Secrets",
-              "description": "Keep avocados fresh longer with proven techniques: the pit trick, plastic wrap wrapping, and refrigerator timing. Master the skills that prevent browning and waste.",
-              "ctaText": "Learn Storage Tips",
-              "ctaHref": "/meal-prep",
-              "imageUrl": "https://images.unsplash.com/photo-1578830610522-c0d6763f92a0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw5fHxiZWdpbm5lciUyMGhvbWUlMjBjb29rJTIwYXZvY2FkbyUyMGtpdGNoZW4lMjBzaW1wbGV8ZW58MXwwfHx8MTc3MzQyNTkxNXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "sliced avocados on a tray"
-            },
-            {
-              "title": "Your First Meal Prep Bowl",
-              "description": "Build confidence with a simple template: grain base, fresh veggies, avocado, and protein. No fancy ingredients needed—just wholesome, nourishing components.",
-              "ctaText": "Explore Bowl Ideas",
-              "ctaHref": "/avocado-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1643310765760-ac258fad80a8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwZmFtaWx5JTIwbnV0cml0aW9uJTIwYXZvY2FkbyUyMG1lYWwlMjBwcmVwJTIwYm93bHxlbnwxfDB8fHwxNzczNDI1OTE2fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "a white bowl filled with nutritious food components"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cardgrid_1773425942379",
-        "type": "CardGrid",
-        "props": {
-          "title": "Nutrition-Smart: Avocado Meals for Families",
-          "cards": [
-            {
-              "title": "Balanced Bowl Building",
-              "description": "Create complete meals with avocado's healthy fats. Pair with lean proteins, whole grains, and colorful vegetables to keep your family satisfied and nourished all week.",
-              "ctaText": "Discover Balanced Recipes",
-              "ctaHref": "/avocado-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1612215047504-a6c07dbe4f7f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMHx8aGVhbHRoeSUyMGZhbWlseSUyMG51dHJpdGlvbiUyMGF2b2NhZG8lMjBtZWFsJTIwcHJlcCUyMGJvd2x8ZW58MXwwfHx8MTc3MzQyNTkxN3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "sliced avocado on a wooden chopping board"
-            },
-            {
-              "title": "Smart Nutrition Pairing",
-              "description": "Maximize nutrient absorption by combining avocado with vitamin C sources like citrus and tomatoes. Learn which ingredients work together to boost your family's health benefits.",
-              "ctaText": "Explore Nutrition Science",
-              "ctaHref": "/meal-prep",
-              "imageUrl": "https://images.unsplash.com/photo-1643310765760-ac258fad80a8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwZmFtaWx5JTIwbnV0cml0aW9uJTIwYXZvY2FkbyUyMG1lYWwlMjBwcmVwJTIwYm93bHxlbnwxfDB8fHwxNzczNDI1OTE2fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "a nutritious meal bowl with multiple food components"
-            },
-            {
-              "title": "Family-Friendly Prep Strategy",
-              "description": "Save time with batch prepping components on Sunday. Store avocados separately and assemble fresh meals in minutes. Perfect for busy families who want nutrition without the stress.",
-              "ctaText": "Get Weekly Meal Plans",
-              "ctaHref": "/avocado-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1612215047504-a6c07dbe4f7f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMHx8aGVhbHRoeSUyMGZhbWlseSUyMG51dHJpdGlvbiUyMGF2b2NhZG8lMjBtZWFsJTIwcHJlcCUyMGJvd2x8ZW58MXwwfHx8MTc3MzQyNTkxN3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "sliced avocado ready for meal prep"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cardgrid_1773425942379_1",
-        "type": "CardGrid",
-        "props": {
-          "title": "Gourmet & Refined: Premium Avocado Preparations",
-          "cards": [
-            {
-              "title": "Artisan Avocado Techniques",
-              "description": "Elevate your skills with advanced slicing, precise ripeness control, and presentation mastery. Learn how chefs work with avocado as a central ingredient in refined cuisine.",
-              "ctaText": "Master Advanced Techniques",
-              "ctaHref": "/avocado-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1642689690565-bf0afb7eb41e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxwcmVtaXVtJTIwZ291cm1ldCUyMGF2b2NhZG8lMjB0b2FzdCUyMGZpbmUlMjBkaW5pbmclMjBmb29kJTIwcGhvdG9ncmFwaHl8ZW58MXwwfHx8MTc3MzQyNTkxN3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "a white plate topped with artfully prepared avocado and eggs"
-            },
-            {
-              "title": "Flavor Pairing Mastery",
-              "description": "Discover sophisticated combinations: avocado with truffle oil, microgreens, citrus oils, and premium vinegars. Transform simple ingredients into restaurant-quality experiences.",
-              "ctaText": "Explore Gourmet Pairings",
-              "ctaHref": "/meal-prep",
-              "imageUrl": "https://images.unsplash.com/photo-1772717737730-85eff61606c8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMHx8cHJlbWl1bSUyMGdvdXJtZXQlMjBhdm9jYWRvJTIwdG9hc3QlMjBmaW5lJTIwZGluaW5nJTIwZm9vZCUyMHBob3RvZ3JhcGh5fGVufDF8MHx8fDE3NzM0MjU5MTd8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "gourmet avocado toast with microgreens and fried eggs"
-            },
-            {
-              "title": "Restaurant-Quality Plating",
-              "description": "Master presentation techniques that make avocado shine. Learn knife skills, color theory, and composition to plate dishes worthy of your finest table.",
-              "ctaText": "Learn Plating Techniques",
-              "ctaHref": "/avocado-recipes",
-              "imageUrl": "https://images.unsplash.com/photo-1642689690565-bf0afb7eb41e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxwcmVtaXVtJTIwZ291cm1ldCUyMGF2b2NhZG8lMjB0b2FzdCUyMGZpbmUlMjBkaW5pbmclMjBmb29kJTIwcGhvdG9ncmFwaHl8ZW58MXwwfHx8MTc3MzQyNTkxN3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "beautifully plated avocado dish with premium ingredients"
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cta_1773395353420",
-        "type": "CTA",
-        "props": {
-          "title": "Start Your Avocado Meal Prep Journey",
-          "description": "Whether you're just beginning or refining your technique, our recipes and guides are designed to help you prep with confidence and purpose. Explore fresh, nourishing avocado meals for every skill level and lifestyle.",
-          "ctaText": "Explore Recipes",
-          "ctaHref": "/avocado-recipes"
-        }
-      }
-    ],
-    "meta": {
-      "title": "Avocado Meal Prep for Beginners | Avocado Stories",
-      "description": "Learn avocado meal prep essentials. Master selection, storage, and simple techniques to prep nutrient-rich avocado dishes in minutes.",
-      "ogImage": "https://images.unsplash.com/photo-1572847610026-eddac7fe5b8c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwbWVhbCUyMHByZXAlMjBib3dsJTIwZWF0aW5nfGVufDB8fHx8fDE3NzIxNTAxMTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    }
-  },
-  {
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-02-26T22:40:07.960Z",
+    "updatedAt": "2026-03-13T21:00:35.499Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
         "type": "Hero",
         "props": {
-          "heading": "Citrus Bliss",
+          "heading": "Fresh & Vibrant Oranges",
           "subheading": "Discover the vibrant world of citrus fruits.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "https://images.unsplash.com/photo-1657746430182-d08f11b013fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2VzJTIwZGlmZmVyZW50JTIwYmFja2dyb3VuZHMlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwxfDB8fHwxNzcyMTQ1MjIwfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "Oranges on a blue background"
+          "imageUrl": "http://localhost:4200/generated-images/var_1773435514410_hox78s.png",
+          "imageAlt": "A juicy orange with water droplets glistening in bright sunlight",
+          "imagePosition": "left"
+        }
+      },
+      {
+        "id": "b_stats_1773435579852_761",
+        "type": "Stats",
+        "props": {
+          "title": "Orange Nutrition & Global Impact",
+          "stats": [
+            {
+              "value": "92%",
+              "label": "Vitamin C per orange"
+            },
+            {
+              "value": "50M+",
+              "label": "Tons produced annually"
+            },
+            {
+              "value": "600+",
+              "label": "Varieties worldwide"
+            }
+          ]
         }
       },
       {
@@ -402,69 +219,10 @@
     ]
   },
   {
-    "id": "p_cherries",
-    "slug": "/cherries",
-    "title": "Cherries",
-    "updatedAt": "2026-02-27T23:24:35.403Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772137257073",
-        "type": "Hero",
-        "props": {
-          "heading": "Discover the Delight of Cherries.",
-          "subheading": "Explore the sweet and tart flavors of our premium cherries. Perfect for desserts, snacks, and more.",
-          "ctaText": "Learn More",
-          "ctaHref": "/cherries",
-          "imageUrl": "http://localhost:4200/generated-images/var_1772234675399_j8psne.png",
-          "imageAlt": "Photorealistic pair of cherries on a bright yellow background",
-          "secondaryCtaText": "Shop Now",
-          "secondaryCtaHref": "/shop-cherries"
-        }
-      },
-      {
-        "id": "b_richtext_1772137766387",
-        "type": "RichText",
-        "props": {
-          "title": "Benefits of Cherries",
-          "body": "Cherries are not only delicious but also packed with nutrients. They are rich in antioxidants, which help fight free radicals in the body, reducing inflammation and potentially lowering the risk of chronic diseases. Additionally, cherries are a good source of vitamin C, potassium, and fiber, all of which contribute to overall health.\n\nConsuming cherries can also improve sleep quality due to their natural melatonin content. This hormone regulates sleep-wake cycles, making cherries a great snack for those struggling with insomnia. Furthermore, the anti-inflammatory properties of cherries can aid in muscle recovery, making them a popular choice among athletes."
-        }
-      },
-      {
-        "id": "b_faqaccordion_1772137776777",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Frequently Asked Questions about Cherries",
-          "items": [
-            {
-              "q": "What are the health benefits of cherries?",
-              "a": "Cherries are rich in antioxidants, vitamin C, potassium, and fiber, which help reduce inflammation and improve overall health."
-            },
-            {
-              "q": "Can cherries help improve sleep?",
-              "a": "Yes, cherries contain natural melatonin, which can help regulate sleep-wake cycles and improve sleep quality."
-            },
-            {
-              "q": "Are cherries good for muscle recovery?",
-              "a": "Cherries have anti-inflammatory properties that can aid in muscle recovery, making them popular among athletes."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_richtext_1772137893814",
-        "type": "RichText",
-        "props": {
-          "title": "Vitamins in Cherries",
-          "body": "**Cherries are a great source of essential vitamins, providing a delicious way to meet your daily nutritional needs.** They contain **vitamin C**, which is important for the growth and repair of tissues in the body, helping to maintain healthy skin and a strong immune system.\n\nAdditionally, cherries provide **vitamin A**, which supports vision and immune function, ensuring that your eyes remain healthy and your body can effectively fight off infections. Including cherries in your diet can help you meet your daily vitamin needs while enjoying a delicious fruit that is both sweet and nutritious."
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_about_lemons",
-    "slug": "/about-lemons",
-    "title": "About Lemons",
-    "updatedAt": "2026-03-13T17:21:21.138Z",
+    "id": "p_lemons",
+    "slug": "/lemons",
+    "title": "Lemons",
+    "updatedAt": "2026-03-13T20:54:32.986Z",
     "blocks": [
       {
         "id": "b_hero_1772150570555",
@@ -477,7 +235,7 @@
           "imageUrl": "https://images.unsplash.com/photo-1652284916670-2adf1ec4c8dc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8ZXhwbG9yZSUyMHRoZSUyMGJlbmVmaXRzJTIwb2YlMjBsZW1vbnMlMjBoZXJvJTIwZm9vZCUyMHBob3RvZ3JhcGh5JTIwbmF0dXJhbCUyMGxpZ2h0fGVufDF8MHx8fDE3NzMzNTAyMDJ8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
           "imageAlt": "Avocado growing on a tree in a lush, sustainable farm",
           "secondaryCtaText": "Explore Recipes",
-          "secondaryCtaHref": "/avocado-recipes",
+          "secondaryCtaHref": "/reclipes",
           "imagePosition": "left"
         }
       },
@@ -523,121 +281,70 @@
           "title": "Discover Lemons in Every Bite",
           "description": "Ready to bring fresh, zesty lemons into your kitchen? Explore our favorite recipes and learn how sustainable sourcing makes every squeeze count.",
           "ctaText": "Explore Recipes",
-          "ctaHref": "/avocado-recipes"
+          "ctaHref": "/reclipes"
         }
       }
     ]
   },
   {
-    "id": "p_avocado_wellness",
-    "slug": "/avocado-wellness",
-    "title": "Avocado Wellness",
-    "updatedAt": "2026-03-13T19:44:41.907Z",
+    "id": "p_reclipes",
+    "slug": "/reclipes",
+    "title": "Reclipes",
+    "updatedAt": "2026-03-13T20:54:32.986Z",
     "blocks": [
       {
-        "id": "b_hero_1773431081907",
+        "id": "b_hero_avocado-recipes",
         "type": "Hero",
         "props": {
-          "heading": "Nourish Your Body with Avocado Wellness 🥑",
-          "subheading": "Discover why avocados are one of nature's most nutrient-dense foods. From heart health to glowing skin, explore the wellness benefits that make avocados a staple of healthy living.",
-          "ctaText": "Explore Benefits",
-          "ctaHref": "/#wellness",
-          "imageUrl": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
-          "imageAlt": "Fresh avocado cut in half with pit, showcasing creamy green flesh"
-        }
-      },
-      {
-        "id": "b_richtext_1773431081907",
-        "type": "RichText",
-        "props": {
-          "title": "Why Avocados Are a Wellness Powerhouse",
-          "body": "# Packed with Essential Nutrients\n\nAvocados are loaded with vitamins C, E, K, B-6, and folate. They also contain magnesium, potassium, and pantothenic acid—nutrients your body needs to thrive. One avocado provides about 20% of your daily fiber intake, supporting digestion and overall gut health.\n\n# Heart-Healthy Fats\n\nThe monounsaturated fats in avocados help lower bad cholesterol and reduce the risk of heart disease. These healthy fats also support brain function and help your body absorb vitamins from other foods.\n\n# Skin, Eyes, and More\n\nAvocados contain lutein and beta-carotene, which protect your eyes and skin from damage. They're also rich in antioxidants that help fight inflammation and keep you looking and feeling your best.\n\n# Make Wellness a Daily Habit\n\nAdd avocados to your morning toast, blend them into smoothies, or enjoy them in salads. With so many ways to enjoy them, wellness has never tasted better."
-        }
-      },
-      {
-        "id": "b_cta_1773431081907",
-        "type": "CTA",
-        "props": {
-          "title": "Ready to Transform Your Wellness Routine? 🥑",
-          "description": "Start incorporating avocados into your daily diet and feel the difference. Your body will thank you.",
-          "ctaText": "Get Wellness Tips",
-          "ctaHref": "/"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_avocado_sustainability",
-    "slug": "/avocado-sustainability",
-    "title": "Avocado Sustainability",
-    "updatedAt": "2026-03-13T19:50:04.062Z",
-    "blocks": [
-      {
-        "id": "b_hero_1773431081907",
-        "type": "Hero",
-        "props": {
-          "heading": "Sustainable Avocado Farming for a Healthier Planet 🌍",
-          "subheading": "Learn how responsible farming practices protect the environment while growing the avocados you love. Discover what makes truly sustainable avocados different.",
-          "ctaText": "Learn Our Practices",
-          "ctaHref": "/#practices",
-          "imageUrl": "https://images.unsplash.com/photo-1762708551128-f94748385ae3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
-          "imageAlt": "Lush green rice field showcasing sustainable farming practices"
-        }
-      },
-      {
-        "id": "b_richtext_1773431081907",
-        "type": "RichText",
-        "props": {
-          "title": "Growing Avocados Responsibly",
-          "body": "# Water Stewardship\n\nSustainable avocado farming starts with smart water use. Forward-thinking growers use efficient irrigation systems, rainwater harvesting, and soil management to minimize waste. Protecting water resources ensures avocados can be grown for generations to come.\n\n# Soil Health and Biodiversity\n\nHealthy soil is the foundation of thriving farms. Sustainable practices include crop rotation, composting, and avoiding harmful pesticides. This approach builds fertile soil while protecting the plants and animals that share the land.\n\n# Fair Labor and Community Support\n\nTrue sustainability includes treating workers fairly and supporting the communities where avocados are grown. Responsible farms offer good wages, safe working conditions, and invest in local education and infrastructure.\n\n# Your Choice Matters\n\nWhen you choose avocados from farms committed to sustainability, you're voting for a healthier planet. Every purchase supports farmers who care about the future and honors the land that feeds us."
-        }
-      },
-      {
-        "id": "b_cta_1773431081907",
-        "type": "CTA",
-        "props": {
-          "title": "Join the Sustainable Food Movement 🌱",
-          "description": "Make mindful choices about the avocados you buy. Support farms that protect our planet.",
-          "ctaText": "Start now",
-          "ctaHref": "/"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_avocado_culinary",
-    "slug": "/avocado-culinary",
-    "title": "Avocado Culinary",
-    "updatedAt": "2026-03-13T19:45:11.096Z",
-    "blocks": [
-      {
-        "id": "b_hero_1773431081908",
-        "type": "Hero",
-        "props": {
-          "heading": "Unlock Culinary Magic with Avocados 🥑",
-          "subheading": "From silky guacamole to unexpected pasta twists, explore creative recipes that turn avocados into unforgettable dishes. Your kitchen is about to get a lot more delicious.",
+          "heading": "Discover Delicious Avocado Recipes",
+          "subheading": "From creamy dips to fresh salads and vibrant pastas—explore easy, inspiring ways to bring avocados to your table.",
           "ctaText": "Explore Recipes",
-          "ctaHref": "/#recipes",
-          "imageUrl": "https://images.unsplash.com/photo-1647545401842-4974e4bcbda5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1600",
-          "imageAlt": "Fresh avocado being prepared in a mortar for guacamole and culinary creations"
+          "ctaHref": "#featured-recipes",
+          "imageUrl": "https://images.unsplash.com/photo-1616485828923-2640a1ee48b4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxkaXNjb3ZlciUyMGRlbGljaW91cyUyMGF2b2NhZG8lMjByZWNpcGVzfGVufDF8MHx8fDE3NzMzNTUxMjF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Photo of discover delicious avocado recipes"
         }
       },
       {
-        "id": "b_richtext_1773431081908",
-        "type": "RichText",
+        "id": "b_cardgrid_avocado-recipes",
+        "type": "CardGrid",
         "props": {
-          "title": "Discover Endless Culinary Possibilities",
-          "body": "# Beyond Toast: Breakfast Ideas\n\nStart your day with avocado-stuffed eggs, creamy smoothie bowls, or avocado pancakes topped with fresh berries. The richness of avocado pairs beautifully with sweet and savory flavors alike.\n\n# Main Courses and Salads\n\nToss sliced avocado into warm grain bowls, blend it into creamy pasta sauces, or layer it into nourishing Buddha bowls. Avocados add texture and nutrition to any meal while keeping dishes light and satisfying.\n\n# Guacamole and Dips\n\nThe classic never gets old. Fresh guacamole with lime, cilantro, and tomato is perfect for gatherings. Try variations with mango, black beans, or roasted garlic for new twists on a beloved favorite.\n\n# Sweet Surprises\n\nYes, avocado works in desserts too. Creamy avocado chocolate mousse, avocado ice cream, and avocado brownies offer a rich texture with less sugar than traditional recipes.\n\n# Start Cooking Today\n\nWhether you're a seasoned chef or a kitchen beginner, avocados make cooking easier and more enjoyable. Grab one and start experimenting—your next favorite dish is waiting."
+          "title": "Featured Recipes",
+          "cards": [
+            {
+              "title": "Creamy Guacamole",
+              "description": "Classic avocado dip blended with lime, cilantro, and fresh tomatoes. Perfect for snacks, appetizers, or game day.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/reclipes/guacamole",
+              "imageUrl": "https://images.unsplash.com/photo-1761243743989-726fb70af78d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxndWFjYW1vbGUlMjBmcmVzaCUyMGF2b2NhZG8lMjByZWNpcGV8ZW58MXwwfHx8MTc3MzM1NTAxMnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Fried pastries arranged around a guacamole dip"
+            },
+            {
+              "title": "Avocado Toast",
+              "description": "Creamy avocado spread on toasted bread, topped with sea salt, red pepper flakes, and a drizzle of olive oil.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/reclipes/avocado-toast",
+              "imageUrl": "https://images.unsplash.com/photo-1608330557791-8dff6a434bbf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwdG9hc3QlMjBvbiUyMGJyZWFkfGVufDF8MHx8fDE3NzMzNTUwMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Sandwich on red ceramic plate"
+            },
+            {
+              "title": "Avocado Pasta",
+              "description": "Silky avocado sauce tossed with fresh pasta, garlic, and lemon. Light, satisfying, and ready in 15 minutes.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/reclipes/avocado-pasta",
+              "imageUrl": "https://images.unsplash.com/photo-1698307190839-1e02b37d3441?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxOXx8YXZvY2FkbyUyMHBhc3RhJTIwZnJlc2glMjBncmVlbiUyMHNhdWNlJTIwbm9vZGxlc3xlbnwxfDB8fHwxNzczMzU1MTExfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Bowls of creamy avocado pasta with fresh green sauce"
+            }
+          ]
         }
       },
       {
-        "id": "b_cta_1773431081908",
+        "id": "b_cta_1773355043811",
         "type": "CTA",
         "props": {
-          "title": "Ready to Cook with Avocados? 🍳",
-          "description": "Explore our full collection of tested recipes and culinary tips to make every meal memorable.",
-          "ctaText": "Browse Recipes",
-          "ctaHref": "/"
+          "title": "Master Avocado Toast",
+          "description": "Perfect your toast technique and discover the endless ways to top it. From simple spreads to gourmet combinations, Avocado Toast is your gateway to creative avocado cooking.",
+          "ctaText": "Explore More",
+          "ctaHref": "#featured-recipes"
         }
       }
     ]
