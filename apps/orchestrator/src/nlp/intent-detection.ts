@@ -176,7 +176,7 @@ const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
 ]
 
 const COUNTED_MULTI_BLOCK_ADD_PATTERN =
-  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:new\s+)?(?:blocks?|components?|sections?|elements?|widgets?)\b/
+  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:\w+[-\s])*)(?:blocks?|components?|sections?|elements?|widgets?)\b/
 
 const ADD_ACTION_PATTERN = /\b(?:add|insert|include|create|generate|build)\b/
 
@@ -257,6 +257,25 @@ export function isBatchAddRequest(message: string) {
  * multiple blocks should be affected. Broadly matches so the LLM can
  * handle the nuance (typos, "this one", etc.) without strict single-op limits.
  */
+// ---------------------------------------------------------------------------
+// Detects page-wide content rewrite/refocus/rebrand requests — e.g.
+// "refocus this page on premium avocado oils", "redesign the page",
+// "overhaul this page". When detected the planner should override strict
+// single-op mode so all blocks can be updated.
+// ---------------------------------------------------------------------------
+
+const PAGE_WIDE_REWRITE_PATTERNS: RegExp[] = [
+  /\b(?:refocus|rebrand|retheme|overhaul|redesign|transform)\s+(?:this|the)\s+page\b/,
+  /\brewrite\s+(?:all|the|this)\s+(?:page|content)\b/,
+  /\bredo\s+(?:this|the)\s+(?:whole\s+|entire\s+)?page\b/,
+  /\b(?:update|change)\s+(?:this|the)\s+(?:whole|entire)\s+page\b/,
+]
+
+export function isPageWideRewriteRequest(message: string) {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  return PAGE_WIDE_REWRITE_PATTERNS.some((re) => re.test(m))
+}
+
 export function isBatchRemoveRequest(message: string) {
   const m = normalizeForIntent(stripSiteContextEnvelope(message))
   const hasRemoveAction = /\b(?:remove|delete|clear)\b/.test(m)
@@ -278,6 +297,26 @@ export function isInfoQuery(message: string) {
     /\b(which|what)\s+fields?\b/.test(m) ||
     /\bwhat\s+prop(ertie)?s?\b/.test(m)
   )
+}
+
+// ---------------------------------------------------------------------------
+// Detects page-listing / page-directory queries like "list all pages",
+// "show me the pages on this site", "what pages do I have", etc.
+// ---------------------------------------------------------------------------
+
+const PAGE_LIST_PATTERNS: RegExp[] = [
+  /\blist\s+(all\s+)?(the\s+)?pages\b/,
+  /\bshow\s+(me\s+)?(all\s+)?(the\s+)?pages\b/,
+  /\bwhat\s+pages\s+(are|do|does|is)\b/,
+  /\bwhich\s+pages\s+(are|do|does|is)\b/,
+  /\bhow\s+many\s+pages\b/,
+  /\bwhat\s+pages\s+(do\s+)?(i|we)\s+(have|got)\b/,
+  /\b(all|my|the|our)\s+pages\b/
+]
+
+export function isPageListQuery(message: string) {
+  const m = normalizeForIntent(message)
+  return PAGE_LIST_PATTERNS.some((re) => re.test(m))
 }
 
 export function isAdviceQuery(message: string) {

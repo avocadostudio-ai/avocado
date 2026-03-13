@@ -10,7 +10,15 @@ import {
   setParseIntentWithAnthropicForTests,
   shouldResolveCreatePageHeroImage
 } from "./chat/chat-pipeline.js"
-import { PlannerOutputError } from "./chat/planner.js"
+import { PlannerOutputError, type PlannerSchemaContextMeta } from "./chat/planner.js"
+
+const STUB_SCHEMA_CONTEXT: PlannerSchemaContextMeta = {
+  contractMode: "targeted",
+  contractBytes: 0,
+  contractBlockCount: 0,
+  targetBlockTypes: [],
+  strictJsonEnabled: false
+}
 import { pendingApprovalPlanBySession } from "./state/session-state.js"
 import { ZERO_USAGE } from "./telemetry/usage.js"
 
@@ -61,7 +69,7 @@ test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocke
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
   }
 
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const planReady = await app.inject({
     method: "POST",
@@ -130,7 +138,8 @@ test("chat auto mode reuses pending plan when the same prompt is sent again", as
           change_log: ["Changed hero heading."],
           ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
         },
-        usage: { ...ZERO_USAGE }
+        usage: { ...ZERO_USAGE },
+        schemaContext: STUB_SCHEMA_CONTEXT
       }
     }
     return {
@@ -140,7 +149,8 @@ test("chat auto mode reuses pending plan when the same prompt is sent again", as
         change_log: [],
         ops: []
       },
-      usage: { ...ZERO_USAGE }
+      usage: { ...ZERO_USAGE },
+      schemaContext: STUB_SCHEMA_CONTEXT
     }
   })
 
@@ -367,7 +377,7 @@ test("chat apply_pending_plan preserves detected image query when image fields w
       }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
   // Mock intent parser to produce update with imageUrl: "pending" + imageAlt for query detection.
   // This test validates pipeline plumbing (image query preservation through plan_only → apply),
   // not LLM intent quality — the mocked intent ensures deterministic image alt text.
@@ -599,7 +609,7 @@ test("plan_only rewrites add_block CardGrid image request to update existing blo
       }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const response = await app.inject({
     method: "POST",
@@ -652,7 +662,7 @@ test("plan_only rewrites add_block CardGrid image request phrased as 'to each ca
       }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const response = await app.inject({
     method: "POST",
@@ -694,7 +704,7 @@ test("compact context experiment reduces planner context payload for simple rewr
 
   setGeneratePlanWithOpenAIForTests(async ({ contextPack }) => {
     capturedSizes.push(JSON.stringify(contextPack).length)
-    return { plan: mockedPlan, usage: { ...ZERO_USAGE } }
+    return { plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
   })
 
   t.after(() => {
@@ -755,7 +765,7 @@ test("minimal context experiment further reduces planner payload for selected-bl
 
   setGeneratePlanWithOpenAIForTests(async ({ contextPack }) => {
     capturedSizes.push(JSON.stringify(contextPack).length)
-    return { plan: mockedPlan, usage: { ...ZERO_USAGE } }
+    return { plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
   })
 
   t.after(() => {
@@ -819,7 +829,8 @@ test("result debug timeline records first_structured_progress when planner strea
         change_log: ["Updated hero heading."],
         ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: "Streamed heading" } }]
       },
-      usage: { ...ZERO_USAGE }
+      usage: { ...ZERO_USAGE },
+      schemaContext: STUB_SCHEMA_CONTEXT
     }
   })
 
@@ -879,7 +890,7 @@ test("plan_only does not rewrite when prompt asks for a new CardGrid", async (t)
       }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const response = await app.inject({
     method: "POST",
@@ -973,7 +984,7 @@ test("plan_only rewrites add_block Card image request to existing CardGrid", asy
       }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const response = await app.inject({
     method: "POST",
@@ -1060,7 +1071,7 @@ test("plan_only rewrites add_block image request even when planner emits wrong p
       }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const response = await app.inject({
     method: "POST",
@@ -1157,7 +1168,8 @@ test("rewrite without selected editable path falls back to model planner", async
         change_log: ["Rewrite heading."],
         ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
       },
-      usage: { ...ZERO_USAGE }
+      usage: { ...ZERO_USAGE },
+      schemaContext: STUB_SCHEMA_CONTEXT
     }
   })
 
@@ -1283,7 +1295,7 @@ test("chat stream emits op_applied events for mocked multi-op plan", async (t) =
       { op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { subheading: `Stream subheading ${Date.now()}` } }
     ]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const response = await app.inject({
     method: "GET",
@@ -1317,7 +1329,7 @@ test("chat telemetry includes received -> plan_generated -> result phases for mo
     change_log: ["Changed heading."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: `Telemetry ${Date.now()}` } }]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const chatResponse = await app.inject({
     method: "POST",
@@ -1379,7 +1391,7 @@ test("chat pending-plan lifecycle: mismatch ids for discard/apply return 409", a
     change_log: ["Prepared heading update."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: `Mismatch ${Date.now()}` } }]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
 
   const planReady = await app.inject({
     method: "POST",
@@ -1510,7 +1522,7 @@ test("chat returns repair_failed when deterministic repair generation throws", a
   let calls = 0
   setGeneratePlanWithOpenAIForTests(async () => {
     calls += 1
-    if (calls === 1) return { plan: invalidPlan, usage: { ...ZERO_USAGE } }
+    if (calls === 1) return { plan: invalidPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
     throw new Error("invalid repair response")
   })
   t.after(() => {
@@ -1586,7 +1598,7 @@ test("chat applies repaired OpenAI plan after initial schema violation", async (
   let calls = 0
   setGeneratePlanWithOpenAIForTests(async () => {
     calls += 1
-    return { plan: calls === 1 ? invalidPlan : repairedPlan, usage: { ...ZERO_USAGE } }
+    return { plan: calls === 1 ? invalidPlan : repairedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
   })
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
@@ -1635,7 +1647,7 @@ test("chat returns guardrail failure when repaired plan still fails to apply", a
     change_log: ["Attempted patch on missing block."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "missing_block", patch: { heading: "x" } }]
   }
-  setGeneratePlanWithOpenAIForTests(async ({ feedback }) => ({ plan: feedback ? stillBadRepairPlan : invalidPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async ({ feedback }) => ({ plan: feedback ? stillBadRepairPlan : invalidPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
@@ -1663,7 +1675,7 @@ test("chat returns guardrail failure when repaired plan still fails to apply", a
 test("chat returns planning_missing when planner returns null plan", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: null as unknown as EditPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: null as unknown as EditPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
@@ -1774,7 +1786,7 @@ test("chat returns direct guardrail failure when initial apply error is not repa
   let calls = 0
   setGeneratePlanWithOpenAIForTests(async () => {
     calls += 1
-    return { plan: invalidPlan, usage: { ...ZERO_USAGE } }
+    return { plan: invalidPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
   })
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
@@ -1823,7 +1835,7 @@ test("chat returns no_effective_change when plan updates a prop to its current v
     change_log: ["Tried to set heading to the same value."],
     ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: currentHeading } }]
   }
-  setGeneratePlanWithOpenAIForTests(async () => ({ plan: noOpPlan, usage: { ...ZERO_USAGE } }))
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: noOpPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
