@@ -17,6 +17,7 @@ import {
   siteCapabilitiesSchema,
   isBlockCatalogQuery,
   isInfoQuery,
+  isPageListQuery,
   plannerMessageWithPendingContext,
   buildSiteContextBlock,
   infoResponse
@@ -2087,6 +2088,29 @@ export async function runChatPipeline(
   if (body.message && isInfoQuery(body.message)) {
     const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: info.code, payload: withDebugPayload(info.payload, { outcome: "info" }) }
+  }
+  if (body.message && isPageListQuery(body.message)) {
+    const directory = buildPageDirectory(body.session)
+    const draft = getSessionDraft(body.session)
+    const pageCount = draft.size
+    return {
+      code: 200,
+      payload: withDebugPayload({
+        status: "info",
+        summary: `This site has ${pageCount} page${pageCount === 1 ? "" : "s"}:`,
+        changes: directory ? directory.split("\n").map((l) => l.trim()) : ["No pages found."],
+        suggestions: [
+          "Add a new page",
+          "Delete a page",
+          "Rename a page",
+          "Reorder pages"
+        ],
+        previewVersion: versions.get(body.session) ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      } satisfies ChatResult, { outcome: "info" })
+    }
   }
   if (body.message && isVariationRequestMessage(body.message)) {
     const suggestions = [

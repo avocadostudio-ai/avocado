@@ -1057,6 +1057,8 @@ export function isHighConfidenceDeterministicCase(args: {
   const action = inferActionFromMessage(raw)
   // "add X to each/every card" = bulk item update — needs LLM for content generation
   if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
+  // Counted multi-block add without enough named types → needs LLM for content generation
+  if (action === "add" && isBatchAddRequest(raw) && extractMentionedBlockTypes(raw).length < 2) return false
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
   if (action === "remove" && args.activeBlockId && /\b(this|selected|it)\b/i.test(raw)) return true
   // "add CTA directing to recipes" = needs LLM for content-aware props

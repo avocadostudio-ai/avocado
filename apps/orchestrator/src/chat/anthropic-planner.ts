@@ -12,7 +12,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest, isBatchRemoveRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   normalizeOpName,
@@ -25,7 +25,7 @@ import {
   isPageWideTranslationRequest,
   type PlannerSchemaContextMeta
 } from "./planner.js"
-import { editPlanJsonSchema } from "./plan-json-schema.js"
+import { editPlanJsonSchema, intentJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthropic-cache.js"
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
@@ -68,14 +68,17 @@ export async function parseIntentWithAnthropic(args: {
     model: args.model,
     max_tokens: 2048,
     system: anthropicSystemPromptWithCache(system),
+    output_config: {
+      format: { type: "json_schema", schema: intentJsonSchema }
+    },
     messages: [
       { role: "user", content: JSON.stringify(user) }
     ],
   })
 
-  const textBlock = response.content.find((b) => b.type === "text")
-  const raw = textBlock && "text" in textBlock ? textBlock.text : ""
   if (response.stop_reason === "max_tokens") {
+    const textBlock = response.content.find((b) => b.type === "text")
+    const raw = textBlock && "text" in textBlock ? textBlock.text : ""
     args.log?.warn({
       event: "anthropic_intent_truncated",
       model: args.model,
@@ -84,65 +87,24 @@ export async function parseIntentWithAnthropic(args: {
     }, "Anthropic intent parser: response truncated (max_tokens)")
     throw new Error("Intent parser response was truncated (max_tokens reached)")
   }
-  const jsonText = extractJsonObject(raw)
-  if (!jsonText) {
+  const textBlock = response.content.find((b) => b.type === "text")
+  const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+  if (!raw.trim()) {
     args.log?.warn({
       event: "anthropic_intent_no_json",
       model: args.model,
       stopReason: response.stop_reason ?? "unknown",
       rawPreview: raw.slice(0, 500),
       contentBlockTypes: response.content.map((b) => b.type)
-    }, "Anthropic intent parser: model did not return parseable JSON")
+    }, "Anthropic intent parser: model returned empty response")
     throw new Error("Intent parser did not return JSON")
   }
-  const parsedRoot = JSON.parse(jsonText) as Record<string, unknown>
-  const normalized = { ...parsedRoot } as Record<string, unknown>
+  // output_config guarantees valid JSON matching our schema — parse directly
+  const normalized = JSON.parse(raw) as Record<string, unknown>
 
-  if (typeof normalized.action !== "string") {
-    const intent = typeof normalized.intent === "string" ? normalized.intent : undefined
-    if (intent === "needs_clarification") normalized.action = "clarify"
-    if (intent === "info") normalized.action = "info"
-  }
-
-  if (
-    typeof normalized.action !== "string" &&
-    Array.isArray(normalized.ops) &&
-    normalized.ops.length > 0 &&
-    normalized.ops[0] &&
-    typeof normalized.ops[0] === "object"
-  ) {
-    const first = normalized.ops[0] as Record<string, unknown>
-    const op = normalizeOpName(first.op ?? first.operation ?? first.action ?? first.kind)
-    if (op === "add_block") {
-      normalized.action = "add"
-      const block = first.block && typeof first.block === "object" ? (first.block as Record<string, unknown>) : null
-      if (block && typeof block.type === "string") normalized.new_block_type = block.type
-      if (typeof first.afterBlockId === "string") {
-        normalized.position = "after"
-        normalized.anchor_block_ref = first.afterBlockId
-      } else {
-        normalized.position = "bottom"
-      }
-      if (block && typeof block.props === "object" && block.props !== null && !Array.isArray(block.props)) {
-        normalized.patch = block.props
-      }
-    } else if (op === "update_props") {
-      normalized.action = "update"
-      if (typeof first.blockId === "string") normalized.target_block_ref = first.blockId
-      if (first.patch && typeof first.patch === "object" && !Array.isArray(first.patch)) normalized.patch = first.patch
-    } else if (op === "remove_block") {
-      normalized.action = "remove"
-      if (typeof first.blockId === "string") normalized.target_block_ref = first.blockId
-    } else if (op === "move_block") {
-      normalized.action = "move"
-      if (typeof first.blockId === "string") normalized.target_block_ref = first.blockId
-      if (typeof first.afterBlockId === "string") {
-        normalized.position = "after"
-        normalized.anchor_block_ref = first.afterBlockId
-      } else {
-        normalized.position = "top"
-      }
-    }
+  // Nulls from the schema become undefined for Zod optional fields
+  for (const key of Object.keys(normalized)) {
+    if (normalized[key] === null) delete normalized[key]
   }
 
   const parsed = intentSchema.safeParse(normalized)
@@ -215,7 +177,8 @@ export async function generatePlanWithAnthropic(args: {
   forceFullSchemaContracts?: boolean
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
-  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message)
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isPageWideRewriteRequest(args.message)
+  const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
   const selectedBlockId = String(args.contextPack.selected.blockId ?? "")
@@ -254,7 +217,7 @@ export async function generatePlanWithAnthropic(args: {
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
-    "If rewrite/rephrase is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first.",
+    "If rewrite/rephrase of a specific field is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first. This does NOT apply to page-wide rewrite/refocus/rebrand requests — those should generate update_props ops across all blocks.",
     "When rewriting text, return plain text unless the user explicitly asks for markdown formatting. Do not wrap the entire rewrite in **bold** markers.",
     "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
     "For image search requests (e.g. Unsplash, stock photo, hero image replacement), call tool unsplash.search with a concise search query and choose an imageUrl from tool results.",
@@ -276,6 +239,13 @@ export async function generatePlanWithAnthropic(args: {
           "This is a full-page translation request. Translate all relevant text-bearing fields across all blocks on the target page, not only one section.",
           "Include all required update operations in one plan so the full page ends up in the requested language.",
           "For list-based child items across all blocks (e.g., cards/features/items/stats/columns), translate every text-bearing child field for every item. Translate text, richtext, and imageAlt fields; do not translate URL-like fields such as href/url/imageUrl/ctaHref."
+        ]
+      : []),
+    ...(pageWideRewrite
+      ? [
+          "This is a page-wide rewrite/refocus request. Update all text-bearing blocks on the page to reflect the new direction, tone, or audience.",
+          "Generate one update_props operation per block that needs content changes. Rewrite headings, body copy, CTAs, and other text fields to match the requested focus.",
+          "Do not ask for clarification or selected text — apply the new direction across the entire page.",
         ]
       : []),
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
@@ -560,12 +530,15 @@ export async function generatePlanWithAnthropic(args: {
       }
     }
   } else {
+    // No runtime tools — use output_config.format for constrained decoding
+    // instead of forcing a tool_use call. This guarantees schema-valid JSON.
     const response = await client.messages.create({
       model: args.model,
       max_tokens: 8192,
       system: anthropicSystemPromptWithCache(system),
-      tools: [submitPlanToolDef],
-      tool_choice: { type: "tool", name: "submit_edit_plan" },
+      output_config: {
+        format: { type: "json_schema", schema: editPlanJsonSchema }
+      },
       messages: [
         ...historyMessages,
         { role: "user", content: JSON.stringify(user) }
@@ -583,16 +556,10 @@ export async function generatePlanWithAnthropic(args: {
       throw new Error("Model response was truncated (max_tokens reached)")
     }
 
-    // Extract from tool_use content block
-    const toolBlock = response.content.find((b) => b.type === "tool_use")
-    if (toolBlock && "input" in toolBlock && toolBlock.input && typeof toolBlock.input === "object") {
-      parsed = toolBlock.input as Record<string, unknown>
-    } else {
-      // Fallback: extract from text block
-      const textBlock = response.content.find((b) => b.type === "text")
-      const raw = textBlock && "text" in textBlock ? textBlock.text : ""
-      const jsonText = extractJsonObject(raw)
-      if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+    const textBlock = response.content.find((b) => b.type === "text")
+    const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+    if (raw.trim()) {
+      parsed = JSON.parse(raw) as Record<string, unknown>
     }
   }
 

@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
-// JSON Schema for EditPlan — used as Anthropic tool_use input_schema
+// JSON Schema for EditPlan — used as Anthropic tool_use input_schema and
+// OpenAI json_schema response_format.
 // ---------------------------------------------------------------------------
 // Intentionally loose on the ops array: the downstream normalizePlanCandidate +
 // Zod editPlanSchema validation handles strict validation and repair. Keeping
@@ -47,4 +48,65 @@ export const editPlanJsonSchema = {
     }
   },
   required: ["intent", "summary_for_user", "change_log", "ops"] as string[]
+} as const
+
+// ---------------------------------------------------------------------------
+// JSON Schema for intent parsing — used with output_config.format for
+// constrained decoding (guaranteed valid JSON matching this schema).
+// ---------------------------------------------------------------------------
+
+export const intentJsonSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  properties: {
+    action: {
+      type: "string",
+      enum: ["add", "move", "update", "remove", "info", "clarify"],
+      description: "The editing action to perform."
+    },
+    target_block_ref: {
+      type: ["string", "null"] as const,
+      description: "Block ID or type reference to target (e.g. 'b_hero1' or 'hero')."
+    },
+    target_block_type: {
+      type: ["string", "null"] as const,
+      description: "Block type to target (e.g. 'Hero', 'CTA')."
+    },
+    new_block_type: {
+      type: ["string", "null"] as const,
+      description: "Block type to add (e.g. 'Hero', 'FAQAccordion')."
+    },
+    position: {
+      type: ["string", "null"] as const,
+      enum: ["top", "bottom", "before", "after", null],
+      description: "Placement position for add/move operations."
+    },
+    anchor_block_ref: {
+      type: ["string", "null"] as const,
+      description: "Block ID or type reference for relative positioning."
+    },
+    patch: {
+      type: ["object", "null"] as const,
+      description: "Partial props to update on the target block."
+    },
+    summary: {
+      type: ["string", "null"] as const,
+      description: "Brief summary of the intended action."
+    },
+    assumption: {
+      type: ["string", "null"] as const,
+      description: "Any assumption made about an ambiguous request."
+    }
+  },
+  required: [
+    "action",
+    "target_block_ref",
+    "target_block_type",
+    "new_block_type",
+    "position",
+    "anchor_block_ref",
+    "patch",
+    "summary",
+    "assumption"
+  ] as string[]
 } as const
