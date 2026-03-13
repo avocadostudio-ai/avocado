@@ -306,6 +306,19 @@ export function defaultPropsForType(type: BlockType) {
       ]
     }
   }
+  if (type === "TwoColumn") {
+    return {
+      variant: "default",
+      left: [
+        { type: "heading", text: "Built for teams" },
+        { type: "paragraph", text: "Ship changes quickly with a clear, reliable workflow." },
+        { type: "cta", label: "Learn more", href: "/" }
+      ],
+      right: [
+        { type: "image", src: "/hero-generated.svg", alt: "Team collaborating on a website update" }
+      ]
+    }
+  }
   return {
     title: "Ready to get started?",
     description: "Apply your next change in seconds.",
@@ -407,6 +420,10 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     if (idx <= 0) return undefined
     return args.currentPage.blocks[idx - 1]?.id
   }
+
+  const usedBlockIds = new Set<string>(
+    (args?.currentPage?.blocks ?? []).map((b: { id: string }) => b.id)
+  )
 
   let createdPageSlug: string | undefined
   let droppedPageLevelUpdate = false
@@ -777,12 +794,17 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     if (!raw.block) {
       raw.block = raw.newBlock ?? raw.new_block
       if (!raw.block && (raw.op === "add_block" || raw.op === "create_page") && normalizedType) {
-        const generatedId =
+        let generatedId =
           typeof raw.blockId === "string" && raw.blockId.length > 0
             ? raw.blockId
-            : args?.currentPage
-              ? nextBlockId(normalizedType, args.currentPage)
-              : `b_${String(normalizedType).toLowerCase()}_${Date.now()}`
+            : `b_${String(normalizedType).toLowerCase()}_${Date.now()}`
+        // Dedup against both existing page blocks and earlier ops in this batch
+        let suffix = 0
+        while (usedBlockIds.has(generatedId)) {
+          suffix++
+          generatedId = `b_${String(normalizedType).toLowerCase()}_${Date.now()}_${suffix}`
+        }
+        usedBlockIds.add(generatedId)
         const incomingPatch = patchObject(raw.props ?? raw.patch ?? raw.changes) ?? {}
         raw.block = {
           id: generatedId,
@@ -798,7 +820,14 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         block.props = patchObject(raw.patch ?? raw.props ?? raw.changes) ?? {}
       }
       if ((!block.id || typeof block.id !== "string") && typeof block.type === "string") {
-        block.id = `b_${String(block.type).toLowerCase()}_${Date.now()}`
+        let fallbackId = `b_${String(block.type).toLowerCase()}_${Date.now()}`
+        let sfx = 0
+        while (usedBlockIds.has(fallbackId)) {
+          sfx++
+          fallbackId = `b_${String(block.type).toLowerCase()}_${Date.now()}_${sfx}`
+        }
+        usedBlockIds.add(fallbackId)
+        block.id = fallbackId
       }
       raw.block = block
 
@@ -941,6 +970,8 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
       if (!pageSlug) return raw
       const out: Record<string, unknown>[] = []
       let previousId: string | undefined
+      // Track blocks as we add them so nextBlockId generates unique IDs
+      let pageSnapshot = args?.currentPage
       for (const candidate of raw.blocks) {
         if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue
         const block = { ...(candidate as Record<string, unknown>) }
@@ -949,7 +980,7 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
           allowedBlockTypes.find((t) => t.toLowerCase() === typeRaw.toLowerCase()) ?? inferBlockTypeFromText(typeRaw)
         if (!blockType) continue
         if (typeof block.id !== "string" || block.id.length === 0) {
-          block.id = args?.currentPage ? nextBlockId(blockType, args.currentPage) : `b_${blockType.toLowerCase()}_${Date.now()}`
+          block.id = pageSnapshot ? nextBlockId(blockType, pageSnapshot) : `b_${blockType.toLowerCase()}_${Date.now()}`
         }
         if (!block.props || typeof block.props !== "object" || Array.isArray(block.props)) {
           block.props = defaultPropsForType(blockType)
@@ -961,6 +992,10 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
         }
         if (previousId) addOp.afterBlockId = previousId
         previousId = block.id as string
+        // Update snapshot so the next nextBlockId sees this block's ID
+        if (pageSnapshot) {
+          pageSnapshot = { ...pageSnapshot, blocks: [...pageSnapshot.blocks, { id: block.id as string, type: blockType, props: block.props as Record<string, unknown> }] }
+        }
         out.push(addOp)
       }
       return out.length > 0 ? out : raw
@@ -981,6 +1016,7 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
       // Blocks may be inside pageInput.blocks (page wrapper) or raw.blocks (flat format).
       const blocksSource = Array.isArray(pageInput.blocks) ? pageInput.blocks : Array.isArray(raw.blocks) ? raw.blocks : null
       if (blocksSource) {
+        const usedIds = new Set<string>()
         for (const candidate of blocksSource) {
           if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue
           const block = candidate as Record<string, unknown>
@@ -988,7 +1024,10 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
           const blockType =
             allowedBlockTypes.find((t) => t.toLowerCase() === typeRaw.toLowerCase()) ?? inferBlockTypeFromText(typeRaw)
           if (!blockType) continue
-          const id = typeof block.id === "string" && block.id.length > 0 ? block.id : `b_${blockType.toLowerCase()}_${Date.now()}`
+          let id = typeof block.id === "string" && block.id.length > 0 ? block.id : `b_${blockType.toLowerCase()}_${Date.now()}`
+          let suffix = 1
+          while (usedIds.has(id)) { id = `b_${blockType.toLowerCase()}_${Date.now()}_${suffix++}` }
+          usedIds.add(id)
           const props =
             block.props && typeof block.props === "object" && !Array.isArray(block.props)
               ? { ...defaultPropsForType(blockType), ...(block.props as Record<string, unknown>) }
