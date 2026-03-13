@@ -1,10 +1,9 @@
-import Link from "next/link"
 import { unstable_noStore as noStore } from "next/cache"
 import { draftMode } from "next/headers"
 import type { Metadata } from "next"
 import "../site-nav.css"
 import { BlockRenderer } from "../../components/block-renderer"
-import { SiteThemeToggle } from "../../components/theme-toggle"
+import { SiteHeader } from "../../components/site-header"
 
 import { EditorPreviewBridgeLoader } from "../../components/editor-preview-bridge-loader"
 import { fetchDraftPage } from "../../lib/content-api"
@@ -55,7 +54,13 @@ function slugToLabel(route: string) {
     .join(" / ")
 }
 
+const SITE_DISPLAY_OVERRIDES: Record<string, { name?: string; logo?: string }> = {
+  "adventure-atlas": { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" }
+}
+
 function siteNameFromId(siteId: string) {
+  const override = SITE_DISPLAY_OVERRIDES[siteId.trim().toLowerCase()]
+  if (override?.name) return override.name
   return siteId
     .split("-")
     .filter(Boolean)
@@ -65,6 +70,8 @@ function siteNameFromId(siteId: string) {
 
 function siteLogoFromId(siteId: string) {
   const normalized = siteId.trim().toLowerCase()
+  const override = SITE_DISPLAY_OVERRIDES[normalized]
+  if (override?.logo) return override.logo
   const available = new Set([
     "avocado-stories",
     "avocado-magic",
@@ -149,6 +156,11 @@ export default async function SitePage({ params, searchParams }: PageProps) {
         return `?${params.toString()}`
       })()
     : ""
+  const navItems = navSlugs.map((route) => ({
+    href: `${route}${editorQuery}`,
+    label: slugToLabel(route),
+    isActive: route === slug
+  }))
 
   if (!page) {
     if (editorMode) {
@@ -170,36 +182,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   return (
     <>
       {tileMode ? <style>{`nextjs-portal { display: none !important; }`}</style> : null}
-      <header className="site-top-nav">
-        <Link className="site-brand" href={`/${editorQuery}`}>
-          <img className="site-logo" src={siteLogo} alt={`${siteName} logo`} width={38} height={38} />
-          <span className="site-brand-text">{siteName}</span>
-        </Link>
-        <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
-          {navSlugs.map((route) => (
-            <Link key={route} href={`${route}${editorQuery}`} className={route === slug ? "is-active" : undefined}>
-              {slugToLabel(route)}
-            </Link>
-          ))}
-        </nav>
-        <details className="site-mobile-menu">
-          <summary aria-label="Toggle navigation menu">
-            <span className="burger-icon" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-          </summary>
-          <nav className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
-            {navSlugs.map((route) => (
-              <Link key={route} href={`${route}${editorQuery}`} className={route === slug ? "is-active" : undefined}>
-                {slugToLabel(route)}
-              </Link>
-            ))}
-          </nav>
-        </details>
-        <SiteThemeToggle />
-      </header>
+      <SiteHeader siteName={siteName} siteLogo={siteLogo} homeHref={`/${editorQuery}`} navItems={navItems} />
       <main className={editorMode ? "editor-mode" : undefined}>
         {page.blocks.map((block) => (
           <BlockRenderer key={block.id} block={block} editorMode={editorMode} />
