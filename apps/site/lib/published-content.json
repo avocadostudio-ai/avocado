@@ -305,82 +305,6 @@
     }
   },
   {
-    "id": "p_strawberries",
-    "slug": "/strawberries",
-    "title": "Strawberries",
-    "updatedAt": "2026-02-26T20:02:58.431Z",
-    "blocks": [
-      {
-        "id": "b_hero_1772121141940",
-        "type": "Hero",
-        "props": {
-          "heading": "Discover the Sweetness of Strawberries 🍓",
-          "subheading": "Nature's candy packed with nutrients.",
-          "ctaText": "Learn More",
-          "ctaHref": "/strawberries",
-          "imageUrl": "https://images.unsplash.com/photo-1589533610925-1cffc309ebaa?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OTJ8fHN0cmF3YmVycnl8ZW58MHx8MHx8fDI%3D",
-          "imageAlt": "Fresh strawberries in a basket"
-        }
-      },
-      {
-        "id": "b_richtext_1772121141940",
-        "type": "RichText",
-        "props": {
-          "title": "Why Strawberries?",
-          "body": "Strawberries are not only delicious but also packed with vitamins, fiber, and high levels of antioxidants known as polyphenols. They are a sodium-free, fat-free, cholesterol-free, low-calorie food."
-        }
-      },
-      {
-        "id": "b_featuregrid_1772121141940",
-        "type": "FeatureGrid",
-        "props": {
-          "title": "Health Benefits",
-          "features": [
-            {
-              "title": "Rich in Nutrients",
-              "description": "Strawberries are an excellent source of vitamin C and manganese and also contain decent amounts of folate (vitamin B9) and potassium."
-            },
-            {
-              "title": "Antioxidant Powerhouse",
-              "description": "These berries are loaded with antioxidants and plant compounds, which may have benefits for heart health and blood sugar control."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_faqaccordion_1772121275190",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Frequently Asked Questions",
-          "items": [
-            {
-              "q": "What are the health benefits of strawberries?",
-              "a": "Strawberries are rich in vitamins, fiber, and antioxidants. They can help improve heart health, lower blood pressure, and reduce inflammation."
-            },
-            {
-              "q": "How should I store strawberries?",
-              "a": "Store strawberries in the refrigerator and wash them just before eating to keep them fresh longer."
-            },
-            {
-              "q": "Can strawberries be frozen?",
-              "a": "Yes, strawberries can be frozen. Wash and dry them thoroughly, then freeze in a single layer before transferring to a container."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cta_1772121141940",
-        "type": "CTA",
-        "props": {
-          "title": "Enjoy Strawberries Today",
-          "description": "Add strawberries to your diet and enjoy their sweet taste and health benefits.",
-          "ctaText": "Find Recipes",
-          "ctaHref": "/strawberries-recipes"
-        }
-      }
-    ]
-  },
-  {
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
@@ -412,7 +336,7 @@
     "id": "p_olives",
     "slug": "/olives",
     "title": "Olives",
-    "updatedAt": "2026-03-13T10:50:14.197Z",
+    "updatedAt": "2026-03-13T20:51:46.288Z",
     "blocks": [
       {
         "id": "b_hero_1772048325072",
@@ -422,8 +346,8 @@
           "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
           "ctaText": "Shop the Collection",
           "ctaHref": "/shop",
-          "imageUrl": "https://images.unsplash.com/photo-1632702931182-8095478495c1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvbGl2ZXMlMjBkaWZmZXJlbnQlMjBiYWNrZ3JvdW5kcyUyMHN0dWRpbyUyMGJhY2tncm91bmR8ZW58MXwwfHx8MTc3MjE1MDE3MHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "a white bowl filled with green olives on top of a table"
+          "imageUrl": "http://localhost:4200/generated-images/var_1773434968055_8g99nk.png",
+          "imageAlt": "Three fresh green olives on white marble surface with delicate drops of virgin olive oil, minimalist and elegant photography, soft natural lighting, clean and sophisticated composition"
         }
       },
       {
@@ -436,25 +360,33 @@
               "title": "Rich in Healthy Fats",
               "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
               "ctaText": "Learn More",
-              "ctaHref": "/health-benefits#healthy-fats"
+              "ctaHref": "/health-benefits#healthy-fats",
+              "imageUrl": "http://localhost:4200/generated-images/var_1773435042084_wvet78.png",
+              "imageAlt": "Fresh green olives on a neutral warm olive-toned background, minimalist product photography, soft natural lighting, clean composition"
             },
             {
               "title": "High in Antioxidants",
               "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
               "ctaText": "Discover More",
-              "ctaHref": "/health-benefits#antioxidants"
+              "ctaHref": "/health-benefits#antioxidants",
+              "imageUrl": "http://localhost:4200/generated-images/var_1773435061562_6hf8s6.png",
+              "imageAlt": "Golden-green olives arranged on a neutral warm olive-toned background, professional product photography, soft diffused lighting, elegant and simple"
             },
             {
               "title": "Anti-inflammatory Properties",
               "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
               "ctaText": "Read More",
-              "ctaHref": "/health-benefits#anti-inflammatory"
+              "ctaHref": "/health-benefits#anti-inflammatory",
+              "imageUrl": "http://localhost:4200/generated-images/var_1773435080764_6ocahu.png",
+              "imageAlt": "Glossy olives with olive oil drops on neutral warm olive-toned background, luxury product photography, sophisticated lighting, minimal aesthetic"
             },
             {
               "title": "Supports Heart Health",
               "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
               "ctaText": "Find Out More",
-              "ctaHref": "/health-benefits#heart-health"
+              "ctaHref": "/health-benefits#heart-health",
+              "imageUrl": "http://localhost:4200/generated-images/var_1773435101045_1y544z.png",
+              "imageAlt": "Beautiful ripe olives on neutral warm olive-toned background, artisanal product photography, natural soft lighting, clean and inviting composition"
             }
           ]
         }
