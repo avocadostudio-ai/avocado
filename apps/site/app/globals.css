@@ -152,10 +152,10 @@ body {
 }
 
 .site-theme-toggle {
-  position: fixed;
-  top: 14px;
-  right: 16px;
-  z-index: 40;
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  flex-shrink: 0;
   width: 38px;
   height: 36px;
   border: 1px solid #99d6d0;
@@ -818,6 +818,12 @@ a {
   .site-mobile-menu {
     display: block;
     margin-left: auto;
+    order: 2;
+  }
+
+  .site-theme-toggle {
+    margin-left: 0;
+    order: 3;
   }
 
   .site-mobile-menu summary {
@@ -831,6 +837,7 @@ a {
   .site-mobile-menu[open] {
     width: 100%;
     margin-top: 10px;
+    order: 4;
   }
 
   .site-mobile-menu[open] summary {
