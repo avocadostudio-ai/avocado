@@ -11,6 +11,7 @@ import { fetchDraftPage } from "../../lib/content-api"
 import { resolveSiteContentSource } from "../../lib/content-source"
 import { resolveRuntimePageAndNav } from "../../lib/content-resolver-runtime"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
+import { derivePageDescription } from "../../lib/seo"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -105,14 +106,14 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       : getPublishedPage(slug)
   if (!page) return {}
 
+  const description = derivePageDescription(page)
   const meta: Metadata = {
-    title: page.meta?.title ?? page.title
+    title: page.meta?.title ?? page.title,
+    description
   }
-  if (page.meta?.description) {
-    meta.description = page.meta.description
-  }
+  meta.openGraph = { description }
   if (page.meta?.ogImage) {
-    meta.openGraph = { images: [page.meta.ogImage] }
+    meta.openGraph.images = [page.meta.ogImage]
   }
   return meta
 }
