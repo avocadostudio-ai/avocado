@@ -13,7 +13,7 @@
           "subheading": "From creamy avocado toast breakfasts to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
           "ctaText": "Explore Avocado Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "http://localhost:4200/generated-images/var_1773437814781_dbvz8v.png",
+          "imageUrl": "/generated-images/var_1773437814781_dbvz8v.png",
           "imageAlt": "A vibrant food photography scene featuring fresh avocado toast on rustic sourdough bread topped with sliced avocado, chili flakes, lemon zest and microgreens, placed on a natural wooden table with soft morning sunlight coming from the side, surrounded by whole avocados, lime wedges and herbs, shallow depth of field, editorial food photography style, warm tones, bright and inviting atmosphere, ultra realistic, 4k"
         }
       },
@@ -28,7 +28,7 @@
               "description": "Discover how avocados nourish your body with heart-healthy fats, essential vitamins, and powerful antioxidants that support wellness and vitality in everyday life.",
               "ctaText": "Explore",
               "ctaHref": "/avocado-wellness",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773436938167_mf1y56.png",
+              "imageUrl": "/generated-images/var_1773436938167_mf1y56.png",
               "imageAlt": "Woman with glowing skin applying avocado skincare mask surrounded by fresh avocados in soft natural light"
             },
             {
@@ -36,7 +36,7 @@
               "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773437069733_jgq8q0.png",
+              "imageUrl": "/generated-images/var_1773437069733_jgq8q0.png",
               "imageAlt": "Top-down food photography of a perfectly ripe avocado cut in half with fresh cooking ingredients including sea salt, garlic, olive oil, cherry tomatoes, lime, and herbs on a light stone kitchen surface with natural soft lighting"
             },
             {
@@ -44,7 +44,7 @@
               "description": "Learn about ethical farming practices and sustainable agriculture that protects our planet while bringing the freshest, most responsibly grown avocados to your table.",
               "ctaText": "Learn More",
               "ctaHref": "/avocado-sustainability",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773437186829_m3fsk2.png",
+              "imageUrl": "/generated-images/var_1773437186829_m3fsk2.png",
               "imageAlt": "Natural eco-friendly scene showing a ripe avocado cut in half on a rustic wooden table beside a small avocado plant growing from a seed in a clay pot, soft natural sunlight, lush green garden background with bokeh, sustainable farming concept, farm-to-table food story, vibrant green tones, realistic food photography, minimal composition, high detail, cinematic lighting"
             }
           ]
@@ -134,7 +134,7 @@
           "subheading": "Discover the vibrant world of citrus fruits.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "http://localhost:4200/generated-images/var_1773435514410_hox78s.png",
+          "imageUrl": "/generated-images/var_1773435514410_hox78s.png",
           "imageAlt": "A juicy orange with water droplets glistening in bright sunlight",
           "imagePosition": "left"
         }
@@ -188,7 +188,7 @@
           "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
           "ctaText": "Shop the Collection",
           "ctaHref": "/shop",
-          "imageUrl": "http://localhost:4200/generated-images/var_1773434968055_8g99nk.png",
+          "imageUrl": "/generated-images/var_1773434968055_8g99nk.png",
           "imageAlt": "Three fresh green olives on white marble surface with delicate drops of virgin olive oil, minimalist and elegant photography, soft natural lighting, clean and sophisticated composition"
         }
       },
@@ -203,7 +203,7 @@
               "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
               "ctaText": "Learn More",
               "ctaHref": "/health-benefits#healthy-fats",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773435042084_wvet78.png",
+              "imageUrl": "/generated-images/var_1773435042084_wvet78.png",
               "imageAlt": "Fresh green olives on a neutral warm olive-toned background, minimalist product photography, soft natural lighting, clean composition"
             },
             {
@@ -211,7 +211,7 @@
               "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
               "ctaText": "Discover More",
               "ctaHref": "/health-benefits#antioxidants",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773435061562_6hf8s6.png",
+              "imageUrl": "/generated-images/var_1773435061562_6hf8s6.png",
               "imageAlt": "Golden-green olives arranged on a neutral warm olive-toned background, professional product photography, soft diffused lighting, elegant and simple"
             },
             {
@@ -219,7 +219,7 @@
               "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
               "ctaText": "Read More",
               "ctaHref": "/health-benefits#anti-inflammatory",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773435080764_6ocahu.png",
+              "imageUrl": "/generated-images/var_1773435080764_6ocahu.png",
               "imageAlt": "Glossy olives with olive oil drops on neutral warm olive-toned background, luxury product photography, sophisticated lighting, minimal aesthetic"
             },
             {
@@ -227,7 +227,7 @@
               "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
               "ctaText": "Find Out More",
               "ctaHref": "/health-benefits#heart-health",
-              "imageUrl": "http://localhost:4200/generated-images/var_1773435101045_1y544z.png",
+              "imageUrl": "/generated-images/var_1773435101045_1y544z.png",
               "imageAlt": "Beautiful ripe olives on neutral warm olive-toned background, artisanal product photography, natural soft lighting, clean and inviting composition"
             }
           ]
