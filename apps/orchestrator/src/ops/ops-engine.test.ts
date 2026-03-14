@@ -1,14 +1,7 @@
 import { describe, it, beforeEach } from "node:test"
 import assert from "node:assert/strict"
-import type { EditorComponentsManifest, PageDoc, Operation } from "@ai-site-editor/shared"
-import {
-  draftPages,
-  publishedPages,
-  historyUndo,
-  historyRedo,
-  versions,
-  recentEdits
-} from "../state/session-state.js"
+import type { PageDoc, Operation } from "@ai-site-editor/shared"
+import { draftPages } from "../state/session-state.js"
 import {
   applyOpsAtomically,
   pickFocusBlockId,
@@ -18,128 +11,32 @@ import {
   isDeterministicRepairEligible,
   toErrorDetail
 } from "./ops-engine.js"
+import {
+  makeHomePage as makePage,
+  makePricingPage,
+  makeFeaturePage,
+  seedSession as seedSessionRaw,
+  getDraft as getDraftRaw,
+  resetSessionState,
+  CTA_ONLY_MANIFEST
+} from "../test/fixtures.js"
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers — thin wrappers binding to a fixed session ID
 // ---------------------------------------------------------------------------
 
 const TEST_SESSION = "__test__"
 
-function makePage(overrides: Partial<PageDoc> = {}): PageDoc {
-  return {
-    id: "p_home",
-    slug: "/",
-    title: "Home",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    blocks: [
-      {
-        id: "b_hero",
-        type: "Hero",
-        props: {
-          heading: "Hello",
-          subheading: "World",
-          ctaText: "Click",
-          ctaHref: "/pricing",
-          imageUrl: "/hero.svg",
-          imageAlt: "Hero"
-        }
-      },
-      {
-        id: "b_cta",
-        type: "CTA",
-        props: {
-          title: "Ready?",
-          description: "Go for it.",
-          ctaText: "Go",
-          ctaHref: "/"
-        }
-      }
-    ],
-    ...overrides
-  }
-}
-
-function makePricingPage(): PageDoc {
-  return {
-    id: "p_pricing",
-    slug: "/pricing",
-    title: "Pricing",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    blocks: [
-      {
-        id: "b_hero_pricing",
-        type: "Hero",
-        props: {
-          heading: "Pricing",
-          subheading: "Plans",
-          ctaText: "Buy",
-          ctaHref: "/",
-          imageUrl: "/hero.svg",
-          imageAlt: "Pricing hero"
-        }
-      }
-    ]
-  }
-}
-
-function makeFeaturePage(): PageDoc {
-  return {
-    id: "p_features",
-    slug: "/features",
-    title: "Features",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    blocks: [
-      {
-        id: "b_grid",
-        type: "FeatureGrid",
-        props: {
-          title: "Our Features",
-          features: [
-            { title: "Fast", description: "Speedy." },
-            { title: "Safe", description: "Secure." },
-            { title: "Simple", description: "Easy." }
-          ]
-        }
-      }
-    ]
-  }
-}
-
 function seedSession(...pages: PageDoc[]) {
-  const sessionMap = new Map<string, PageDoc>()
-  for (const page of pages) sessionMap.set(page.slug, structuredClone(page))
-  draftPages.set(TEST_SESSION, sessionMap)
+  seedSessionRaw(TEST_SESSION, ...pages)
 }
 
 function getDraft(slug: string) {
-  return draftPages.get(TEST_SESSION)?.get(slug) ?? null
+  return getDraftRaw(TEST_SESSION, slug)
 }
 
 function resetState() {
-  draftPages.delete(TEST_SESSION)
-  historyUndo.delete(TEST_SESSION)
-  historyRedo.delete(TEST_SESSION)
-  versions.delete(TEST_SESSION)
-  recentEdits.delete(TEST_SESSION)
-}
-
-const CTA_ONLY_MANIFEST: EditorComponentsManifest = {
-  version: 1,
-  components: [
-    {
-      type: "CTA",
-      propsSchema: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          description: { type: "string" },
-          ctaText: { type: "string" },
-          ctaHref: { type: "string" }
-        },
-        required: ["title", "description", "ctaText", "ctaHref"]
-      }
-    }
-  ]
+  resetSessionState(TEST_SESSION)
 }
 
 // ---------------------------------------------------------------------------
@@ -483,6 +380,19 @@ describe("ops-engine: rename_page", () => {
         ]),
       /No effective page change/
     )
+  })
+
+  it("preserves page position in nav order after rename", () => {
+    seedSession(makePage(), makePricingPage(), makeFeaturePage())
+    const slugsBefore = Array.from(draftPages.get(TEST_SESSION)!.keys())
+    assert.deepEqual(slugsBefore, ["/", "/pricing", "/features"])
+
+    applyOpsAtomically(TEST_SESSION, [
+      { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/plans" }
+    ])
+
+    const slugsAfter = Array.from(draftPages.get(TEST_SESSION)!.keys())
+    assert.deepEqual(slugsAfter, ["/", "/plans", "/features"])
   })
 })
 
