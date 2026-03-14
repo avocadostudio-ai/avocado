@@ -1,0 +1,46 @@
+# Streaming/Optimistic Patch Transport Checklist
+
+## Editor Tasks
+File: `apps/editor/src/App.tsx`
+
+1. Add transport flag near env constants (`siteOrigin`, `orchestrator`) and derive `enablePatchTransport` from `VITE_ENABLE_PATCH_TRANSPORT`.
+2. Add tx state near existing `useState` declarations: `lastConfirmedVersionBySlug`, `pendingTxBySlug`, `transportDegradedBySlug`.
+3. Add helpers near `postToSite(...)`: `postPatchToSite(...)`, `enqueueTx(...)`, `ackTx(...)`, `rejectTxAndResync(...)`, `scheduleTxTimeout(...)`.
+4. Extend the existing `window.addEventListener("message", onMessage)` handler to process new iframe `patchAck` messages.
+5. In `submitChatStream(...)`, inside `payload.type === "op_applied"` handling, send `applyPatch` per op (instead of only `draftUpdated`), with fallback to current refresh behavior.
+6. In `inlineEditCommit(...)`, after successful `/ops`, send `applyPatch` with the same op payload and versions.
+7. In `reorderBlock(...)`, after successful `/ops`, send `applyPatch` for the move op.
+8. In `deleteBlock(...)`, after successful `/ops`, send `applyPatch` for the remove op.
+9. In `applyVariation(...)`, after successful `/ops`, send `applyPatch` for the `update_props` op.
+10. Keep `postToSite("draftUpdated", ...)` as fallback path when transport disabled, timed out, or rejected.
+
+## Preview Adapter Tasks
+File: `packages/preview-adapter/src/preview-bridge.tsx`
+
+1. Extend `SiteMessage` union to include `applyPatch` and `resetToServer`.
+2. Add local refs/state in `useEffect` scope: `serverVersionRef`, `optimisticQueueRef`, `currentSlugRef`.
+3. Add helper functions near existing helpers: `validatePatchVersion(...)`, `applyOpsOptimistically(...)`, `emitPatchAck(...)`, `clearOptimisticState(...)`.
+4. In `onMessage(...)`, add `msg.type === "applyPatch"` branch: validate version, apply/reject patch, send `patchAck`.
+5. In `onMessage(...)`, add `msg.type === "resetToServer"` branch: clear optimistic queue, run existing `smoothRefresh()`, restore focus.
+6. Keep current `draftUpdated` branch unchanged as compatibility fallback.
+
+## Shared Contract Tasks
+File: `packages/shared/src/index.ts`
+
+1. Add TS types for `site-editor/v2` messages: `ApplyPatchMessage`, `PatchAckMessage`, `ResetToServerMessage`.
+2. Add zod schemas for these payloads and a typed reject-reason enum.
+3. Export these types/schemas for editor and preview adapter consumption.
+
+## Orchestrator Compatibility Tasks
+File: `apps/orchestrator/src/index.ts`
+
+1. Keep `/chat/stream` `op_applied` payload stable and documented as source of patch transport ops.
+2. Ensure all op-producing paths continue returning `previewVersion` and `focusBlockId` consistently.
+3. Add a short comment near `op_applied` SSE write clarifying it is patch-transport input for editor iframe.
+
+## Validation Tasks
+
+1. Streamed chat with multiple ops updates preview incrementally without full refresh.
+2. Force version mismatch and confirm automatic `resetToServer` recovery.
+3. Confirm inline edit/reorder/delete/variation all still work with fallback off/on.
+4. Confirm undo/redo still yields same final server JSON as before.

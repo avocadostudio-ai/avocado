@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import { appendFile, mkdir, readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { resolve } from "node:path"
+import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
 
 export type ChatTelemetryPhase =
   | "received"
@@ -80,10 +81,8 @@ type CreateChatTelemetryStoreArgs = {
   logger: Logger
 }
 
-function toErrorDetail(error: unknown) {
-  if (error instanceof Error) return error.message
-  return String(error)
-}
+// Use the canonical toErrorDetail from errors.ts
+const toErrorDetail = _unifiedToErrorDetail
 
 export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
   const buffer: ChatTelemetryEntry[] = []

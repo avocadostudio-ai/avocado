@@ -2,20 +2,25 @@ import { z } from "zod"
 import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
 import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
+import { type GuardrailErrorCategory } from "../errors.js"
+import {
+  UNIT,
+  BLOCK_CATALOG_PATTERNS,
+  BATCH_ADD_PATTERNS,
+  BATCH_UPDATE_PATTERNS,
+  BATCH_PAGE_CREATE_PATTERNS,
+  COUNTED_MULTI_BLOCK_ADD_PATTERN,
+  ADD_ACTION_PATTERN,
+  BLOCK_TYPE_KEYWORDS,
+  KEYWORD_TO_BLOCK_TYPE,
+  EACH_BLOCK_TYPE_PATTERN,
+  PAGE_WIDE_REWRITE_PATTERNS,
+  BATCH_REORDER_PATTERNS,
+  PAGE_LIST_PATTERNS
+} from "./intent-patterns.js"
 
-// ---------------------------------------------------------------------------
-// Shared types used by the chat pipeline and intent handlers
-// ---------------------------------------------------------------------------
-
-export type GuardrailErrorCategory =
-  | "schema_violation"
-  | "ambiguity"
-  | "not_found"
-  | "no_effective_change"
-  | "planner_refusal"
-  | "incomplete_output"
-  | "malformed_output"
-  | "internal_error"
+// Re-export for backward compatibility
+export type { GuardrailErrorCategory }
 
 export const siteCapabilitiesSchema = z.object({
   allowStructuralEdits: z.boolean(),
@@ -118,104 +123,12 @@ export function normalizeForIntent(message: string) {
   return message.toLowerCase().replace(/\s+/g, " ").trim()
 }
 
-// ---------------------------------------------------------------------------
-// Single source of truth for block-catalog query patterns.
-// ---------------------------------------------------------------------------
-
-// Matches "block(s)", "component(s)", "section(s)", "element(s)", "widget(s)"
-const UNIT = String.raw`(?:blocks?|components?|sections?|elements?|widgets?)`
-const UNIT_TYPE = String.raw`(?:block|component|section|element|widget)\s+types?`
-
-export const BLOCK_CATALOG_PATTERNS: RegExp[] = [
-  new RegExp(String.raw`\bwhat\s+(?:other\s+)?${UNIT}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
-  new RegExp(String.raw`\bwhich\s+(?:other\s+)?${UNIT}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
-  new RegExp(String.raw`\bwhat\s+(?:other\s+)?${UNIT_TYPE}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
-  new RegExp(String.raw`\bwhich\s+(?:other\s+)?${UNIT_TYPE}\s+(?:can|do)\s+(?:you|i|we)\s+(?:have|add)\b`),
-  new RegExp(String.raw`\bwhat\s+${UNIT}\s+(?:are|is)\s+(?:available|supported)\b`),
-  new RegExp(String.raw`\bwhat\s+${UNIT}\s+are\b.{0,20}\badd\b`),
-  new RegExp(String.raw`\bavailabl\w*\s+${UNIT}\b`),
-  new RegExp(String.raw`\bavailabl\w*\s+${UNIT_TYPE}\b`),
-  /\bwhat\s+else\s+can\s+i\s+add\b/,
-  /\bwhat\s+other\s+content\b/,
-  /\blist\s+(all\s+)?(the\s+)?(?:blocks?|components?|sections?)\b/
-]
+// Backward-compatible re-exports — patterns now live in intent-patterns.ts
+export { BLOCK_CATALOG_PATTERNS } from "./intent-patterns.js"
 
 export function isBlockCatalogQuery(message: string) {
   const m = normalizeForIntent(message)
   return BLOCK_CATALOG_PATTERNS.some((re) => re.test(m))
-}
-
-// ---------------------------------------------------------------------------
-// Detects requests to add or update many/all block types at once (e.g.
-// "add all available block types", "scaffold the page", "fill out the page",
-// "populate all components with sample content").
-// When detected the planner should override strict single-op mode.
-// ---------------------------------------------------------------------------
-
-const BATCH_ADD_PATTERNS: RegExp[] = [
-  new RegExp(String.raw`\badd\s+(?:all|every|each|the\s+remaining|the\s+rest\s+of(?:\s+the)?)\s+${UNIT}\b`),
-  new RegExp(String.raw`\badd\s+(?:all|every|each|the\s+remaining|the\s+rest\s+of(?:\s+the)?)\s+${UNIT_TYPE}\b`),
-  /\bscaffold\b/,
-  /\bfill\s+(?:out\s+)?(?:the\s+)?page\b/,
-  /\badd\s+(?:all|every)\s+(?:available|missing|remaining)\b/,
-  new RegExp(String.raw`\b(?:all|every)\s+(?:available|missing|remaining)\s+${UNIT}\b`),
-  /\bbuild\s+(?:out|up)\s+(?:the\s+)?(?:whole\s+)?page\b/,
-  // "showcasing/featuring all (available) components/blocks" — page creation with all block types
-  new RegExp(String.raw`\b(?:showcas\w*|featuring|demonstrat\w*)\s+(?:all\s+)?(?:(?:the\s+)?available\s+)?${UNIT}\b`),
-  // "all available componenzs" and similar typos — fuzzy match for "all available" + unit-like word
-  /\ball\s+(?:available|existing)\s+\w*(?:componen|block|section|element|widget)\w*\b/
-]
-
-// Detects batch update requests that should also override strict single-op mode.
-// e.g. "populate all components", "update all blocks", "fill in all sections"
-const BATCH_UPDATE_PATTERNS: RegExp[] = [
-  new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT}\b`),
-  new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT_TYPE}\b`),
-  new RegExp(String.raw`\b(?:populate|fill\s+in|fill)\s+(?:all|every|each)\s+(?:the\s+)?${UNIT}\b`),
-  /\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every)\s+(?:existing\s+)?(?:content|blocks?|components?|sections?)\b/,
-  /\bpopulate\s+(?:\w+\s+){0,2}page\b/,
-  /\bpopulate\b.{0,60}\bwith\b.{0,30}\bcontent\b/,
-  /\b(?:sample|placeholder|demo)\s+content\s+(?:for|to|in|on)\s+(?:all|every|each)\b/,
-  new RegExp(String.raw`\b(?:all|every|each)\s+(?:the\s+)?${UNIT}\s+with\s+(?:sample|placeholder|demo|real)\s+content\b`)
-]
-
-const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
-  /\b(?:create|generate|build|make|draft|add)\b[^.\n]{0,140}\bpages\b/,
-  /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bonly\b[^.\n]{0,140}\bpages\b/,
-  /\bpages?\s+for\s+(?:these|those|the following|multiple|several)\b/,
-  /\bfor\s+.+\b(?:and|,|&)\b.+\bpages?\b/,
-  /\bfor\s+.+\b(?:and|,|&)\b.+\b(?:audiences|users?|customers?|buyers?|founders?|teams?|developers?|marketers?|parents?|students?)\b/
-]
-
-const COUNTED_MULTI_BLOCK_ADD_PATTERN =
-  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:\w+[-\s])*)(?:blocks?|components?|sections?|elements?|widgets?)\b/
-
-const ADD_ACTION_PATTERN = /\b(?:add|insert|include|create|generate|build)\b/
-
-const BLOCK_TYPE_KEYWORDS: Array<{ key: string; pattern: RegExp }> = [
-  { key: "hero", pattern: /\bhero\b/ },
-  { key: "featuregrid", pattern: /\bfeature\s*grid\b|\bfeatures?\b/ },
-  { key: "testimonials", pattern: /\btestimonials?\b|\breviews?\b|\bsocial proof\b/ },
-  { key: "faq", pattern: /\bfaq\b/ },
-  { key: "cta", pattern: /\bcta\b|\bcall to action\b/ },
-  { key: "cardgrid", pattern: /\bcard\s*grid\b|\bcardgrid\b|\bpricing\b/ },
-  { key: "card", pattern: /\bcard\b/ },
-  { key: "richtext", pattern: /\brich[\s-]?text\b|\btext block\b|\bparagraph\b|\bcopy\b/ },
-  { key: "twocolumn", pattern: /\btwo\s*column\b|\btwocolumn\b|\b2\s*column\b/ },
-  { key: "stats", pattern: /\bstats?\b|\bstatistics\b|\bmetrics\b|\bnumbers\b/ }
-]
-
-const KEYWORD_TO_BLOCK_TYPE: Record<string, BlockType> = {
-  hero: "Hero",
-  featuregrid: "FeatureGrid",
-  testimonials: "Testimonials",
-  faq: "FAQAccordion",
-  cta: "CTA",
-  cardgrid: "CardGrid",
-  card: "Card",
-  richtext: "RichText",
-  twocolumn: "TwoColumn",
-  stats: "Stats"
 }
 
 function countMentionedBlockTypes(message: string) {
@@ -243,14 +156,6 @@ export function extractMentionedBlockTypes(message: string): BlockType[] {
   return found.map((f) => KEYWORD_TO_BLOCK_TYPE[f.key]!)
 }
 
-// Matches "each card", "every feature", "all testimonials" — specific block type targets
-// that imply a batch operation across multiple items.
-const EACH_BLOCK_TYPE_PATTERN = new RegExp(
-  String.raw`\b(?:each|every|all)\s+(?:` +
-    BLOCK_TYPE_KEYWORDS.map((entry) => entry.pattern.source).join("|") +
-    String.raw`)\b`
-)
-
 export function isBatchAddRequest(message: string) {
   const m = normalizeForIntent(stripSiteContextEnvelope(message))
   if (BATCH_ADD_PATTERNS.some((re) => re.test(m)) || BATCH_PAGE_CREATE_PATTERNS.some((re) => re.test(m))) return true
@@ -269,23 +174,14 @@ export function isBatchAddRequest(message: string) {
  * multiple blocks should be affected. Broadly matches so the LLM can
  * handle the nuance (typos, "this one", etc.) without strict single-op limits.
  */
-// ---------------------------------------------------------------------------
-// Detects page-wide content rewrite/refocus/rebrand requests — e.g.
-// "refocus this page on premium avocado oils", "redesign the page",
-// "overhaul this page". When detected the planner should override strict
-// single-op mode so all blocks can be updated.
-// ---------------------------------------------------------------------------
-
-const PAGE_WIDE_REWRITE_PATTERNS: RegExp[] = [
-  /\b(?:refocus|rebrand|retheme|overhaul|redesign|transform)\s+(?:this|the)\s+page\b/,
-  /\brewrite\s+(?:all|the|this)\s+(?:page|content)\b/,
-  /\bredo\s+(?:this|the)\s+(?:whole\s+|entire\s+)?page\b/,
-  /\b(?:update|change)\s+(?:this|the)\s+(?:whole|entire)\s+page\b/,
-]
-
 export function isPageWideRewriteRequest(message: string) {
   const m = normalizeForIntent(stripSiteContextEnvelope(message))
   return PAGE_WIDE_REWRITE_PATTERNS.some((re) => re.test(m))
+}
+
+export function isBatchReorderRequest(message: string) {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  return BATCH_REORDER_PATTERNS.some((re) => re.test(m))
 }
 
 export function isBatchRemoveRequest(message: string) {
@@ -310,21 +206,6 @@ export function isInfoQuery(message: string) {
     /\bwhat\s+prop(ertie)?s?\b/.test(m)
   )
 }
-
-// ---------------------------------------------------------------------------
-// Detects page-listing / page-directory queries like "list all pages",
-// "show me the pages on this site", "what pages do I have", etc.
-// ---------------------------------------------------------------------------
-
-const PAGE_LIST_PATTERNS: RegExp[] = [
-  /\blist\s+(all\s+)?(the\s+)?pages\b/,
-  /\bshow\s+(me\s+)?(all\s+)?(the\s+)?pages\b/,
-  /\bwhat\s+pages\s+(are|do|does|is)\b/,
-  /\bwhich\s+pages\s+(are|do|does|is)\b/,
-  /\bhow\s+many\s+pages\b/,
-  /\bwhat\s+pages\s+(do\s+)?(i|we)\s+(have|got)\b/,
-  /\b(all|my|the|our)\s+pages\b/
-]
 
 export function isPageListQuery(message: string) {
   const m = normalizeForIntent(message)

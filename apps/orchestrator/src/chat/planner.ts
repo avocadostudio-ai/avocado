@@ -16,7 +16,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   inferBlockTypeFromText,
@@ -26,24 +26,20 @@ import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js
 import { editPlanJsonSchema, intentJsonSchema } from "./plan-json-schema.js"
 import type { ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
+import {
+  PlannerError,
+  isPlannerError,
+  type PlannerFailureReasonCategory
+} from "../errors.js"
 
-export type PlannerFailureReasonCategory = "schema_violation" | "planner_refusal" | "incomplete_output" | "malformed_output" | "internal_error"
+// Re-export for backward compatibility
+export { PlannerError, isPlannerError }
+export type { PlannerFailureReasonCategory }
 
-export class PlannerOutputError extends Error {
-  reasonCategory: PlannerFailureReasonCategory
-  retryable: boolean
-
-  constructor(message: string, options: { reasonCategory: PlannerFailureReasonCategory; retryable?: boolean }) {
-    super(message)
-    this.name = "PlannerOutputError"
-    this.reasonCategory = options.reasonCategory
-    this.retryable = options.retryable ?? false
-  }
-}
-
-export function isPlannerOutputError(error: unknown): error is PlannerOutputError {
-  return error instanceof PlannerOutputError
-}
+/** @deprecated Use `PlannerError` instead. */
+export const PlannerOutputError = PlannerError
+/** @deprecated Use `isPlannerError` instead. */
+export const isPlannerOutputError = isPlannerError
 
 const rawPlanCandidateSchema = z.object({
   intent: z.enum(["edit_plan", "needs_clarification"]).optional(),
@@ -58,7 +54,7 @@ function asObject(value: unknown) {
 }
 
 function toPlannerError(category: PlannerFailureReasonCategory, message: string, retryable = false) {
-  return new PlannerOutputError(message, { reasonCategory: category, retryable })
+  return new PlannerError(message, { reasonCategory: category, retryable })
 }
 
 function extractCompletionRefusal(completion: unknown): string | null {
@@ -613,10 +609,12 @@ export async function generatePlanWithOpenAI(args: {
   client?: PlannerOpenAIClient
   siteContextBlock?: string | null
   forceFullSchemaContracts?: boolean
+  manifestBlockTypes?: string[]
   signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
-  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isPageWideRewriteRequest(args.message)
+  const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
@@ -691,7 +689,7 @@ export async function generatePlanWithOpenAI(args: {
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
-    `Allowed block types: ${allowedBlockTypes.join(", ")}.`,
+    `Allowed block types: ${effectiveBlockTypes.join(", ")}.`,
     ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : [])
   ].join("\n")
 

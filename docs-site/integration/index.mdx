@@ -1,0 +1,55 @@
+# Integration Docs (Start Here)
+
+Use this page as the entry point for onboarding any Next.js site.
+
+Related docs:
+- [/site-provider-spi](/site-provider-spi) — advanced provider/SPI mode for enterprise-style integrations.
+- [/integration/tools-mvp](/integration/tools-mvp) — Anthropic-first native tool contract, runtime policy, and adopter onboarding.
+
+## Recommended reading order
+
+1. [/integration/nextjs-mvp-embedded](/integration/nextjs-mvp-embedded)
+2. [/integration/editor-quickstart](/integration/editor-quickstart)
+3. [/integration/nextjs-mvp-adoption-example](/integration/nextjs-mvp-adoption-example)
+4. [/integration/templates/nextjs-embedded](/integration/templates/nextjs-embedded)
+
+## MVP integration model
+
+- Source of truth: adopter-owned component registry in code.
+- Transport contract: `GET /api/editor/components` manifest JSON generated from that registry.
+- Preview bootstrap: Next.js Draft Mode (`/api/draft`, `/api/draft/disable`).
+- Fallback behavior: if manifest is missing/invalid, editor runs in degraded mode (no structural edits).
+
+## Required endpoints
+
+- `GET /api/editor/components` — component manifest for structural edits
+- `GET /api/editor/bootstrap-pages` — returns `{ pages: PageDoc[] }` of published content; the editor calls this to seed the orchestrator with initial draft content when a session has no pages yet
+- `GET /api/draft?secret=...&redirect=...` — enables Next.js draft mode and redirects
+- `GET /api/draft/disable?redirect=...` — disables draft mode and redirects
+
+## Required environment variables
+
+- Site:
+  - `DRAFT_MODE_SECRET`
+- Editor:
+  - `VITE_SITE_ORIGIN`
+  - `VITE_SITE_DRAFT_SECRET`
+
+## Adoption checklist
+
+1. Add local component registry in site code.
+2. Generate manifest from registry and expose `/api/editor/components`.
+3. Add draft mode routes and secret validation.
+4. Verify CORS for editor origin on `/api/editor/components` in local/dev.
+5. Confirm editor header shows `Manifest` (not `Degraded`).
+
+## Quick validation script
+
+Run:
+
+```bash
+./docs/integration/scripts/check-manifest.sh http://localhost:3000
+```
+
+Expected:
+- prints `PASS: version=..., components=...`

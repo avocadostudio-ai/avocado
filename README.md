@@ -1,33 +1,65 @@
-# AI Site Editor PoC
+# AI Site Editor
 
-Local monorepo PoC for chat-driven website editing with instant preview updates.
+Chat-driven website editing platform. Users describe content and layout changes in natural language, and the system applies them as validated structured operations with live preview.
 
-## Apps
+**For site owners and external developers**: see [Integration docs](docs/integration/README.md) to connect the editor to your site.
 
-- `apps/site` Next.js website renderer on `http://localhost:3000`
-- `apps/editor` Vite editor UI on `http://localhost:4100`
-- `apps/orchestrator` Fastify API on `http://localhost:4200`
-- `packages/shared` Shared types, schemas, registry, and edit-plan validation
+## What is this?
 
-## Run
+AI Site Editor is a split-pane editing experience:
+- **Left**: live site preview (your actual website in an iframe)
+- **Right**: chat interface where users request edits in plain English
 
-1. Install pnpm and dependencies:
-   - `pnpm install`
-2. Copy env template if needed:
-   - `cp .env.example .env`
+Changes are applied as validated, schema-checked operations (not raw code edits), with full undo/redo and plan approval support. The system supports OpenAI and Anthropic models, with a deterministic fallback when no API key is configured.
+
+## Architecture
+
+pnpm monorepo with three apps and shared packages:
+
+| App / Package | Stack | Port | Purpose |
+|---|---|---|---|
+| `apps/site` | Next.js | `:3000` | Renders pages from content JSON; editor preview target |
+| `apps/editor` | Vite + React | `:4100` | Chat UI, model selection, iframe preview host |
+| `apps/orchestrator` | Fastify | `:4200` | AI planning, operation engine, state, undo/redo, publish |
+| `packages/shared` | TypeScript | — | Zod schemas, block registry, shared types |
+| `packages/blocks` | React | — | Block renderer components |
+| `packages/preview-adapter` | TypeScript + React | — | postMessage bridge, CSS overlay, selection system |
+
+## Prerequisites
+
+- **Node.js** >= 20
+- **pnpm** >= 9
+- **OpenAI API key** or **Anthropic API key** (optional — without one, the system uses deterministic demo planning)
+
+## Quick start
+
+1. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+2. Copy and configure environment:
+   ```bash
+   cp .env.example .env
+   # Edit .env — at minimum set OPENAI_API_KEY or ANTHROPIC_API_KEY for AI planning
+   ```
 3. Start all apps:
-   - `pnpm dev`
+   ```bash
+   pnpm dev
+   ```
+4. Open the editor at `http://localhost:4100`
 
-Alternative (recommended for repeated restarts without opening new terminals):
-- `pnpm dev:start` — start managed singleton dev stack in background
-- `pnpm dev:ctl start --wait --timeout 90` — start and block until all services are healthy
-- `pnpm dev:status` — check status/pid/log path
-- `pnpm dev:restart` — restart same managed stack
-- `pnpm dev:logs` — tail combined logs
-- `pnpm dev:doctor` — print PID tree, listeners, health checks, and recent logs
-- `pnpm dev:stop` — stop managed stack
+### Managed dev stack (recommended for repeated restarts)
 
-## Key endpoints
+```bash
+pnpm dev:start          # start background dev stack
+pnpm dev:status         # check status/pid/log path
+pnpm dev:restart        # restart same managed stack
+pnpm dev:logs           # tail combined logs
+pnpm dev:doctor         # print PID tree, listeners, health checks, and recent logs
+pnpm dev:stop           # stop managed stack
+```
+
+## Key endpoints (orchestrator on :4200)
 
 - `GET /draft/pages?session=dev&slug=/`
 - `POST /chat`
@@ -37,38 +69,32 @@ Alternative (recommended for repeated restarts without opening new terminals):
 - `POST /history/undo`
 - `POST /history/redo`
 
-## Notes
+## Integrating your site
 
-- Integration docs start here:
-  - `docs/integration/README.md`
-- Next.js onboarding default is embedded Draft Mode (no required `/preview` route):
-  - `docs/integration/nextjs-mvp-embedded.md`
-- Editor URL/bootstrap quickstart:
-  - `docs/integration/editor-quickstart.md`
-- Copy-paste Next.js API route templates:
-  - `docs/integration/templates/nextjs-embedded/`
-  - includes MVP component manifest route (`/api/editor/components`)
-- If `OPENAI_API_KEY` is missing, `/chat` uses deterministic demo planning.
-- `CHAT_STRICT_PRIMARY_OP_MODE=1` makes `/chat` planner choose one primary operation in `ops` (strict mode).
-- Speech transcription model defaults to `gpt-4o-mini-transcribe`.
-- Configure transcription model order with:
-  - `OPENAI_TRANSCRIBE_MODEL` (primary)
-  - `OPENAI_TRANSCRIBE_FALLBACK_MODELS` (comma-separated, tried in order when primary fails)
-- Optional Unsplash search for hero image requests:
-  - `UNSPLASH_ACCESS_KEY` (if set, orchestrator uses Unsplash Search API; otherwise it falls back to a deterministic Picsum URL to avoid broken `source.unsplash.com` links)
-- Site preview refresh is triggered by editor `postMessage` with `draftUpdated`.
-- Chat troubleshooting playbook:
-  - `docs/observability/chat-behavior-troubleshooting.md`
-- Dev server runbook (start/restart/status/logs/health checks):
-  - `docs/operations/dev-server-runbook.md`
-- Avocado transformation demo runbook (stakeholder narrative + pass/fail script):
-  - `docs/testing/avocado-transformation-demo-runbook.md`
-  - `pnpm demo:avocado:check`
-- Product improvement backlog:
-  - `docs/planning/things-to-improve.md`
-- Editor debug mode:
-  - Enable in Settings -> `Debug mode` to show trace/debug data per assistant response.
-  - Optional default-on via `VITE_CHAT_DEBUG=1`.
+If you want to connect the AI editor to your own website, start here:
+
+| Doc | Purpose |
+|---|---|
+| [Integration overview](docs/integration/README.md) | Entry point, adoption checklist, reading order |
+| [Next.js embedded mode](docs/integration/nextjs-mvp-embedded.md) | Default onboarding path for Next.js sites |
+| [Editor quickstart](docs/integration/editor-quickstart.md) | Iframe bootstrap URLs and env var setup |
+| [Copy-paste templates](docs/integration/templates/nextjs-embedded/) | Ready-to-use API routes and helpers |
+| [Site Provider SPI](docs/site-provider-spi.md) | Advanced: framework-agnostic REST API contract |
+| [Native tools](docs/integration/tools-mvp.md) | Register custom tools (PIM, DAM, etc.) |
+
+## Configuration notes
+
+- If `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are both missing, `/chat` uses deterministic demo planning.
+- `CHAT_STRICT_PRIMARY_OP_MODE=1` makes the planner choose one primary operation per request.
+- `UNSPLASH_ACCESS_KEY` enables Unsplash image search; without it, hero images use Picsum placeholders.
+- Speech transcription defaults to `gpt-4o-mini-transcribe`. Configure with `OPENAI_TRANSCRIBE_MODEL` and `OPENAI_TRANSCRIBE_FALLBACK_MODELS`.
+- Editor debug mode: enable in Settings or set `VITE_CHAT_DEBUG=1`.
+
+## Further reading
+
+- [Chat troubleshooting playbook](docs/observability/chat-behavior-troubleshooting.md)
+- [Dev server runbook](docs/operations/dev-server-runbook.md)
+- [Product improvement backlog](docs/planning/things-to-improve.md)
 
 ## Planner Command Test Set
 

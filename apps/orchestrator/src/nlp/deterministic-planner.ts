@@ -44,12 +44,7 @@ import {
   getRecentEdits,
   orderSlugsHomeFirst
 } from "../state/session-state.js"
-
-// "except", "but not", "other than", "all but", etc. — exact spelling only; typos fall through to LLM
-const EXCEPT_PATTERN = /\b(except|but not|other than|besides|everything but)\b|\ball\s+but\b/i
-
-// "this one", "this block", "the selected one/block", bare "this" at word boundary
-const THIS_ONE_PATTERN = /\b(this\s+(?:one|block|section|component)|the\s+(?:selected|current|active)\s+(?:one|block|section|component))\b|\bthis\s*$/i
+import { EXCEPT_PATTERN, THIS_ONE_PATTERN } from "./intent-patterns.js"
 
 export function extractAudienceTarget(message: string) {
   return extractAudienceTargets(message)[0]
@@ -478,8 +473,42 @@ export function demoPlanFromMessage(message: string, slug: string, activeBlockId
   const quoted = /"([^"]+)"/.exec(message)?.[1]
 
   // SEO metadata patterns — checked early so "seo title" isn't mistaken for hero heading
-  const hasSeoKeyword = /\b(seo|meta\s*desc|meta\s*title|og\s*image|open\s*graph)\b/.test(lower)
+  const hasSeoKeyword = /\b(seo|meta\s*desc(?:ription)?|meta\s*title|metadata|og\s*image|open\s*graph)\b/.test(lower)
   if (hasSeoKeyword) {
+    // Multi-field metadata: "add metadata with the title '...' and description '...'"
+    const multiFieldMatch = lower.match(/\b(?:set|change|update|add)\b.*?\bmetadata\b/)
+    if (multiFieldMatch) {
+      const patch: Record<string, string> = {}
+      const changeLog: string[] = []
+      const titleMatch = message.match(/\btitle\s+['"]([^'"]+)['"]/i)
+        ?? message.match(/\btitle\s+to\s+['"]([^'"]+)['"]/i)
+      if (titleMatch) {
+        patch.title = titleMatch[1]
+        changeLog.push(`Title \u2192 "${titleMatch[1]}".`)
+      }
+      const descMatch = message.match(/\bdescription\s+['"]([^'"]+)['"]/i)
+        ?? message.match(/\bdescription\s+to\s+['"]([^'"]+)['"]/i)
+      if (descMatch) {
+        patch.description = descMatch[1]
+        changeLog.push(`Description \u2192 "${descMatch[1]}".`)
+      }
+      const ogMatch = message.match(/\b(?:og\s*image|open\s*graph\s*image)\s+['"]([^'"]+)['"]/i)
+        ?? message.match(/\b(?:og\s*image|open\s*graph\s*image)\s+to\s+['"]([^'"]+)['"]/i)
+      if (ogMatch) {
+        patch.ogImage = ogMatch[1]
+        changeLog.push(`OG image \u2192 "${ogMatch[1]}".`)
+      }
+      if (Object.keys(patch).length > 0) {
+        const fields = changeLog.length === 1 ? changeLog[0].split(" \u2192")[0] : "page metadata"
+        return {
+          intent: "edit_plan",
+          summary_for_user: `Updated ${fields}.`,
+          change_log: changeLog,
+          ops: [{ op: "update_page_meta", pageSlug: slug, patch }]
+        }
+      }
+    }
+
     const seoGenerate = /\b(write|generate|create|add)\b.*\b(seo|meta)\b/.test(lower) && !quoted
     const seoSetMatch = lower.match(/\b(?:set|change|update|add)\b.*?\b(meta\s*desc(?:ription)?|seo\s*desc(?:ription)?)\b/)
       ?? lower.match(/\b(?:set|change|update|add)\b.*?\b(seo\s*title|meta\s*title)\b/)
@@ -491,8 +520,9 @@ export function demoPlanFromMessage(message: string, slug: string, activeBlockId
       const isOgImage = /og|open\s*graph/.test(fieldRaw)
 
       const extractedQuoted = quoted
+      const singleQuoted = /'([^']+)'/.exec(message)?.[1]
       const afterTo = message.match(/\bto\s+(.+)$/i)?.[1]?.trim()
-      const value = extractedQuoted ?? afterTo ?? ""
+      const value = extractedQuoted ?? singleQuoted ?? afterTo ?? ""
 
       if (!value) {
         return {

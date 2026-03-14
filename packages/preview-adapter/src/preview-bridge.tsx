@@ -2,31 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
-
-// site-editor/v2 patch transport message types (mirrored from @ai-site-editor/shared)
-type PatchRejectReason = "version_mismatch" | "apply_error" | "unknown_op"
-
-type ApplyPatchMessage = {
-  type: "applyPatch"
-  txId: string
-  op: Record<string, unknown>
-  fromVersion: number
-  toVersion: number
-  focusBlockId?: string
-}
-
-type PatchAckMessage = {
-  type: "patchAck"
-  txId: string
-  accepted: boolean
-  reason?: PatchRejectReason
-}
-
-type ResetToServerMessage = {
-  type: "resetToServer"
-  toVersion: number
-  focusBlockId?: string
-}
+import type { ApplyPatchMessage, PatchAckMessage, PatchRejectReason, ResetToServerMessage } from "@ai-site-editor/shared"
 
 type SiteMessage =
   | {

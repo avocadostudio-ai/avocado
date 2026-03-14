@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
@@ -1885,6 +1885,10 @@ test("isBatchAddRequest detects showcase/demo all components patterns", () => {
   assert.equal(isBatchAddRequest("add a hero section"), false)
 })
 
+test("isBatchAddRequest matches 'add all Available components' (not intercepted as info query)", () => {
+  assert.equal(isBatchAddRequest("add all Available components to this page. For any components with images, use Unsplash to add relevant images. Do not generate with AI."), true)
+})
+
 test("isBatchRemoveRequest detects batch remove patterns", () => {
   assert.equal(isBatchRemoveRequest("remove all blocks except this one"), true)
   assert.equal(isBatchRemoveRequest("delete everything but the hero"), true)
@@ -1898,6 +1902,21 @@ test("isBatchRemoveRequest detects batch remove patterns", () => {
   // Negative: single block remove
   assert.equal(isBatchRemoveRequest("remove the hero"), false)
   assert.equal(isBatchRemoveRequest("delete this block"), false)
+})
+
+test("isBatchReorderRequest detects batch reorder/rearrange patterns", () => {
+  assert.equal(isBatchReorderRequest("reorder blocks in a suggested order"), true)
+  assert.equal(isBatchReorderRequest("rearrange the sections"), true)
+  assert.equal(isBatchReorderRequest("reorganize all blocks"), true)
+  assert.equal(isBatchReorderRequest("sort the blocks into a logical order"), true)
+  assert.equal(isBatchReorderRequest("reorder blocks"), true)
+  assert.equal(isBatchReorderRequest("re-order the sections"), true)
+  assert.equal(isBatchReorderRequest("shuffle blocks"), true)
+  // Common typo
+  assert.equal(isBatchReorderRequest("reoder blocks in a suggested order"), true)
+  // Negative: single block move
+  assert.equal(isBatchReorderRequest("move the hero to the top"), false)
+  assert.equal(isBatchReorderRequest("move this block down"), false)
 })
 
 test("isPageWideRewriteRequest detects page-wide rewrite patterns", () => {

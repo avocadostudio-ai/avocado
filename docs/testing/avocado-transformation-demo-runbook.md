@@ -1,0 +1,169 @@
+# Avocado Stories Transformation Demo Runbook
+
+Audience: product stakeholders  
+Style: transformation narrative  
+Site: `avocado-stories`  
+Purpose: brand awareness + education
+
+## Demo promise
+
+Transform a generic starter site into an audience-aware avocado education experience in one live session, with visible reversibility and publish proof.
+
+## Demo setup
+
+1. Start services:
+   - `pnpm dev:start`
+2. Verify services are healthy:
+   - Site: `http://localhost:3000`
+   - Editor: `http://localhost:4100`
+   - Orchestrator: `http://localhost:4200/health`
+3. Optional automated check:
+   - `pnpm demo:avocado:check`
+
+## Opening narrative (before state)
+
+1. Open `http://localhost:4100/sites`
+2. Open editor for `Avocado Stories`.
+3. Show the current weak baseline (`/` and `/pricing`, generic hero text).
+
+Speaker line:
+`We're starting from a plain baseline so the business impact is obvious as we go.`
+
+## High-impact live flow
+
+### 1. Route control + preview sync
+
+Action:
+1. Use route dropdown to switch between `/` and `/pricing`.
+
+Speaker line:
+`Route context is explicit, so every AI edit is scoped and predictable.`
+
+Pass criteria:
+1. Preview switches route immediately.
+
+### 2. Hero value proposition rewrite
+
+Prompt:
+`Rewrite hero headline/subheading for premium avocado products`
+
+Speaker line:
+`This improves message clarity before we touch structure.`
+
+Pass criteria:
+1. Hero heading/subheading visibly changes.
+2. Assistant response reports applied changes.
+
+Fallback prompt:
+`On /, rewrite only the hero headline and subheading for premium avocado products in an educational, modern tone.`
+
+### 3. Structural edit: testimonials below hero
+
+Prompt:
+`Add testimonials section below hero`
+
+Speaker line:
+`Now we move from copy edits to layout-level trust building.`
+
+Pass criteria:
+1. New testimonials block appears directly below hero.
+
+Fallback prompt:
+`On /, insert a testimonials section immediately after the hero with 3 concise customer quotes.`
+
+### 4. New route generation
+
+Prompt:
+`Create new page /recipes and add 3 featured recipes`
+
+Speaker line:
+`We're not just editing existing pages; we're creating net-new content paths.`
+
+Pass criteria:
+1. `/recipes` appears in route selector.
+2. `/recipes` renders with 3 featured recipe items.
+
+Fallback prompt:
+`Create /recipes with a hero plus a featured recipes section containing exactly 3 items.`
+
+### 5. Audience-proof generation on /recipes
+
+Prompt:
+`For /recipes, generate 3 audience-targeted educational sections for beginner home cooks, nutrition-focused families, and premium food enthusiasts. Each section should include a practical takeaway and educational CTA.`
+
+Speaker line:
+`This shows one brand voice adapting to multiple audiences without fragmenting the product story.`
+
+Pass criteria:
+1. Three distinct sections are present.
+2. Tone/wording differs by audience.
+3. CTAs remain educational (learn/explore/guide-oriented).
+
+Fallback prompt:
+`On /recipes, add one section per audience: beginner home cooks, nutrition-focused families, premium food enthusiasts. Keep each section educational and end with one practical CTA.`
+
+### 6. Inline edit in preview
+
+Action:
+1. Click an editable text region in preview.
+2. Change one sentence and commit.
+
+Speaker line:
+`Direct manipulation keeps momentum high for marketing teams.`
+
+Pass criteria:
+1. Text updates instantly.
+2. Edit persists after route switch away and back.
+
+### 7. Variations on selected block
+
+Action:
+1. Select a block in preview.
+2. Prompt: `Generate 3 variations for this block`
+3. Apply one variation.
+
+Speaker line:
+`Teams can explore alternatives quickly without losing control.`
+
+Pass criteria:
+1. Variation modal opens.
+2. Applied option visibly updates the selected block.
+
+### 8. Reversibility with Undo
+
+Action:
+1. Click Undo on last undoable assistant message.
+
+Speaker line:
+`Experimentation is safe because edits are reversible.`
+
+Pass criteria:
+1. Latest applied change is reverted.
+
+### 9. Publish confidence
+
+Action:
+1. Click Publish.
+2. Open `Open live site` link (and `View deploy` if available).
+
+Speaker line:
+`We've moved from idea to publish-ready output with a verifiable release step.`
+
+Pass criteria:
+1. Publish status is `triggered` or `ready`.
+2. Live site link opens successfully.
+
+## Workflow behavior callouts to show live
+
+1. If a response is `plan_ready`, click `Approve plan` to continue.
+2. Confirm created routes appear in selector after generation.
+3. Mention that variation generation requires selected block context.
+
+## Dry run scorecard (quick)
+
+1. Preflight: all 3 services healthy.
+2. Baseline: initial hero is generic and site looks plain.
+3. Edits: prompts 1-3 each produce visible applied changes.
+4. Audience proof: `/recipes` has 3 differentiated audience sections.
+5. Interactions: inline edit, variation apply, and undo all succeed.
+6. Publish: success state and live link open.

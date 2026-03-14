@@ -1,0 +1,190 @@
+# AI Website Editor — Product + Architecture Spec
+
+_Last updated: 2026-03-04_
+
+## 1) Product Overview
+
+AI Site Editor is a chat-driven website editing product for non-technical users.
+
+Core experience:
+- Live site preview acts as the editing canvas.
+- Chat acts as the control interface.
+- Users request content/layout/SEO changes in natural language.
+- Changes are applied as validated structured operations (not direct code edits).
+
+Primary outcomes:
+- Fast iteration on page content and structure.
+- Safe edits through schema validation and guardrails.
+- Clear recoverability through undo/redo and plan approval flow.
+
+## 2) Runtime Architecture
+
+Monorepo apps and packages:
+- `apps/site` (Next.js): renders draft/published content and editor harness behavior.
+- `apps/editor` (Vite + React): chat UI, controls, and iframe preview host.
+- `apps/orchestrator` (Fastify): planning, validation, apply engine, telemetry, publish.
+- `packages/shared`: shared schemas/types/contracts and block registry.
+- `packages/blocks`: block renderer components.
+- `packages/preview-adapter`: site-editor bridge, selection, and preview overlay behavior.
+
+Local ports:
+- Site: `http://localhost:3000`
+- Editor: `http://localhost:4100`
+- Orchestrator: `http://localhost:4200`
+
+## 3) Current Product Capabilities
+
+Implemented capabilities:
+- Split editor + live preview workflow.
+- Block/field selection from preview (`blockId`, `blockType`, optional `editablePath`).
+- Chat planning via deterministic + LLM hybrid pipeline.
+- Structured operation apply with atomic validation.
+- Undo/redo history.
+- Plan approval lifecycle:
+  - `plan_only`
+  - `apply_pending_plan`
+  - `discard_pending_plan`
+- Multi-page operations (create/rename/remove/move/duplicate page).
+- Block/list operations (add/update/remove/move/duplicate block/items).
+- SEO metadata updates through `update_page_meta`.
+- Publish flow through orchestrator.
+- Streaming chat progress (`/chat/stream`) plus final structured result.
+
+## 4) Domain Model
+
+Core content model:
+- `PageDoc`: page-level document (`slug`, `title`, `meta`, `blocks[]`).
+- `BlockInstance`: typed block (`id`, `type`, `props`).
+
+Operation model (validated contract):
+- Page ops: `create_page`, `rename_page`, `remove_page`, `move_page`, `duplicate_page`, `update_page_meta`
+- Block ops: `add_block`, `update_props`, `remove_block`, `move_block`, `duplicate_block`
+- List ops: `add_item`, `update_item`, `remove_item`, `move_item`
+
+All operation and block schemas are shared from `packages/shared` and enforced in orchestrator before persistence.
+
+## 5) Editing Pipeline
+
+End-to-end request flow:
+1. Editor sends chat request and context (`session`, `slug`, selection context).
+2. Orchestrator performs deterministic checks/routing first.
+3. If needed, orchestrator calls LLM intent router and/or full plan generator.
+4. Returned plan is normalized and schema-validated.
+5. Apply engine validates operation semantics and block prop contracts.
+6. Ops apply atomically to draft state.
+7. Telemetry and usage are recorded.
+8. Editor receives structured result and updates preview.
+
+Safety behavior:
+- Ambiguous requests return `needs_clarification`.
+- Invalid plans are rejected with guardrail-classified errors.
+- Deterministic repair paths are used for eligible failures.
+
+## 6) LLM Strategy
+
+Providers:
+- OpenAI and Anthropic are supported.
+- Deterministic fallback exists when provider keys are unavailable.
+
+Model selection:
+- Editor uses abstract `modelKey` (`fast`, `balanced`, `reasoning`, `codex`).
+- Orchestrator maps keys to provider-specific model IDs via environment configuration.
+
+LLM output contract:
+- One strict JSON `EditPlan`.
+- Human-readable summary + change log + operations.
+- No free-form direct mutation of source files.
+
+## 7) Editor and Site Bridge
+
+Protocol namespace:
+- `site-editor/v1` postMessage envelope.
+
+Site -> Editor examples:
+- `blockClicked`
+- `routeChanged`
+- inline edit/selection events
+
+Editor -> Site examples:
+- `highlightBlock`
+- `draftUpdated`
+- patch transport messages
+
+Preview updates:
+- Supports full refresh signaling and patch-based updates.
+- Focus/highlight can be preserved via returned `focusBlockId` where relevant.
+
+## 8) API Surface (Current)
+
+Primary endpoints:
+- `POST /chat`
+- `GET /chat/stream`
+- `GET /draft/pages`
+- `GET /published/pages`
+- `POST /ops`
+- `POST /history/undo`
+- `POST /history/redo`
+- `POST /publish`
+- `GET /telemetry/chat`
+- `GET /telemetry/chat/review`
+
+Chat response shape (high level):
+- `status`
+- `summary`
+- `changes`
+- optional `validationErrors`/`suggestions`
+- `previewVersion`
+- `plannerSource`, `modelUsed`, `modelKey`
+- debug and token usage fields when enabled
+
+## 9) State and Persistence
+
+Orchestrator maintains session-scoped draft/edit state with persistence support:
+- Draft pages
+- Undo/redo stacks
+- Preview versions
+- Pending clarifications
+- Pending approval plans
+- Recent edits and chat history
+
+Session keys support site scoping (`siteId::session`) with backward compatibility for legacy defaults.
+
+## 10) Observability and Quality Controls
+
+Implemented observability:
+- Structured chat telemetry phases and outcomes.
+- Token usage/cost fields including cache metrics when available.
+- Review endpoint for failure clustering and prompt-family analysis.
+
+Quality controls:
+- Contract-first validation with shared schemas.
+- Deterministic + guarded LLM hybrid planning.
+- Repair and clarification loops for unsafe/invalid plans.
+
+## 11) Testing Posture
+
+Strongest coverage is in orchestrator:
+- operation engine correctness
+- plan normalization and validation
+- deterministic planner behavior
+- chat pipeline integration
+- contract stability
+- telemetry behavior
+
+Current gap:
+- full browser-level E2E depth remains lower than backend/domain coverage.
+
+## 12) Non-Goals (Current)
+
+Still intentionally out of scope:
+- AI-generated new React component code authoring as primary workflow.
+- Drag-and-drop visual builder as the primary editing model.
+- Full multi-user collaborative conflict resolution as a completed feature.
+
+## 13) Success Criteria
+
+The product is successful when users can:
+- make correct page edits quickly via chat,
+- see reliable near-immediate preview updates,
+- recover safely via undo/redo or plan approval,
+- and publish with confidence using validated structured operations.

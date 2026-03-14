@@ -456,7 +456,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       }
     } catch (err) {
       if (isCancelError(err)) {
-        cleanupImagePlaceholders(scopedQuery.session)
+        cleanupImagePlaceholders(scopedQuery.session ?? "dev")
         emit("canceled", { type: "canceled", message: "Run was canceled." })
         if (streamEntry) streamEntry.state = "canceled"
       } else {

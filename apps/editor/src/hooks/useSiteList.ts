@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { RestoreSnapshot, SiteConfig } from "../lib/editor-types"
 import {
   DEFAULT_SITE_HOSTING,
@@ -9,26 +9,77 @@ import {
   siteNameFromId
 } from "../lib/editor-utils"
 
+/** Form fields for creating a new site. */
+export interface NewSiteFormState {
+  name: string
+  purpose: string
+  tone: string
+  constraints: string
+  hosting: string
+  vercelProjectId: string
+  vercelTeamId: string
+  vercelProductionUrl: string
+  vercelDeployHookUrl: string
+}
+
+const INITIAL_NEW_SITE_FORM: NewSiteFormState = {
+  name: "",
+  purpose: "",
+  tone: "",
+  constraints: "",
+  hosting: DEFAULT_SITE_HOSTING,
+  vercelProjectId: "",
+  vercelTeamId: "",
+  vercelProductionUrl: "",
+  vercelDeployHookUrl: ""
+}
+
+/** State for the restore-snapshot modal. */
+export interface RestoreState {
+  siteId: string | null
+  options: RestoreSnapshot[]
+  commit: string
+  isLoading: boolean
+  isRestoring: boolean
+  error: string | null
+}
+
+const INITIAL_RESTORE_STATE: RestoreState = {
+  siteId: null,
+  options: [],
+  commit: "",
+  isLoading: false,
+  isRestoring: false,
+  error: null
+}
+
 export function useSiteList(siteId: string, session: string) {
   const [siteList, setSiteList] = useState<SiteConfig[]>(() => loadSiteListFromStorage(siteId))
-  const [newSiteName, setNewSiteName] = useState("")
-  const [newSitePurpose, setNewSitePurpose] = useState("")
-  const [newSiteTone, setNewSiteTone] = useState("")
-  const [newSiteConstraints, setNewSiteConstraints] = useState("")
-  const [newSiteHosting, setNewSiteHosting] = useState(DEFAULT_SITE_HOSTING)
-  const [newSiteVercelProjectId, setNewSiteVercelProjectId] = useState("")
-  const [newSiteVercelTeamId, setNewSiteVercelTeamId] = useState("")
-  const [newSiteVercelProductionUrl, setNewSiteVercelProductionUrl] = useState("")
-  const [newSiteVercelDeployHookUrl, setNewSiteVercelDeployHookUrl] = useState("")
+  const [newSiteForm, setNewSiteForm] = useState<NewSiteFormState>(INITIAL_NEW_SITE_FORM)
   const [showSiteModal, setShowSiteModal] = useState(false)
   const [configSiteId, setConfigSiteId] = useState<string | null>(null)
-  const [restoreSiteId, setRestoreSiteId] = useState<string | null>(null)
-  const [restoreOptions, setRestoreOptions] = useState<RestoreSnapshot[]>([])
-  const [restoreCommit, setRestoreCommit] = useState("")
-  const [isLoadingRestoreOptions, setIsLoadingRestoreOptions] = useState(false)
-  const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false)
-  const [restoreError, setRestoreError] = useState<string | null>(null)
+  const [restoreState, setRestoreState] = useState<RestoreState>(INITIAL_RESTORE_STATE)
   const [siteTileRefreshToken, setSiteTileRefreshToken] = useState(0)
+
+  /** Update one or more fields of the new-site form. */
+  const updateNewSiteForm = useCallback(
+    (patch: Partial<NewSiteFormState>) =>
+      setNewSiteForm((prev) => ({ ...prev, ...patch })),
+    []
+  )
+
+  /** Reset the new-site form to defaults. */
+  const resetNewSiteForm = useCallback(
+    () => setNewSiteForm(INITIAL_NEW_SITE_FORM),
+    []
+  )
+
+  /** Update one or more fields of the restore state. */
+  const updateRestoreState = useCallback(
+    (patch: Partial<RestoreState>) =>
+      setRestoreState((prev) => ({ ...prev, ...patch })),
+    []
+  )
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -63,63 +114,61 @@ export function useSiteList(siteId: string, session: string) {
   }
 
   const openRestoreModal = async (targetSiteId: string) => {
-    setRestoreSiteId(targetSiteId)
-    setRestoreError(null)
-    setIsLoadingRestoreOptions(true)
-    setRestoreOptions([])
-    setRestoreCommit("")
+    setRestoreState({
+      siteId: targetSiteId,
+      error: null,
+      isLoading: true,
+      isRestoring: false,
+      options: [],
+      commit: ""
+    })
     try {
       const res = await fetch(`${orchestrator}/restore/snapshots?limit=30`)
       const data = (await res.json()) as { snapshots?: RestoreSnapshot[]; error?: string }
       if (!res.ok) {
-        setRestoreError(data.error ?? "Failed to load snapshots.")
+        setRestoreState((prev) => ({ ...prev, error: data.error ?? "Failed to load snapshots.", isLoading: false }))
         return
       }
       const options = Array.isArray(data.snapshots) ? data.snapshots : []
-      setRestoreOptions(options)
-      setRestoreCommit(options[0]?.commit ?? "")
-      if (options.length === 0) {
-        setRestoreError("No snapshots available yet.")
-      }
+      setRestoreState((prev) => ({
+        ...prev,
+        options,
+        commit: options[0]?.commit ?? "",
+        error: options.length === 0 ? "No snapshots available yet." : null,
+        isLoading: false
+      }))
     } catch {
-      setRestoreError("Failed to load snapshots.")
-    } finally {
-      setIsLoadingRestoreOptions(false)
+      setRestoreState((prev) => ({ ...prev, error: "Failed to load snapshots.", isLoading: false }))
     }
   }
 
   const restoreSnapshotForSite = async () => {
-    if (!restoreSiteId || !restoreCommit) return
-    setRestoreError(null)
-    setIsRestoringSnapshot(true)
+    if (!restoreState.siteId || !restoreState.commit) return
+    setRestoreState((prev) => ({ ...prev, error: null, isRestoring: true }))
     try {
       const res = await fetch(`${orchestrator}/restore/snapshot`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          commit: restoreCommit,
+          commit: restoreState.commit,
           session,
-          siteId: restoreSiteId
+          siteId: restoreState.siteId
         })
       })
       const data = (await res.json()) as { error?: string }
       if (!res.ok) {
-        setRestoreError(data.error ?? "Failed to restore snapshot.")
+        setRestoreState((prev) => ({ ...prev, error: data.error ?? "Failed to restore snapshot.", isRestoring: false }))
         return
       }
       setSiteTileRefreshToken((prev) => prev + 1)
-      setRestoreSiteId(null)
-      setRestoreCommit("")
-      setRestoreOptions([])
+      setRestoreState(INITIAL_RESTORE_STATE)
     } catch {
-      setRestoreError("Failed to restore snapshot.")
-    } finally {
-      setIsRestoringSnapshot(false)
+      setRestoreState((prev) => ({ ...prev, error: "Failed to restore snapshot.", isRestoring: false }))
     }
   }
 
   const addSiteFromName = () => {
-    const name = newSiteName.trim()
+    const name = newSiteForm.name.trim()
     if (!name) return
     const baseId = sanitizeSiteId(name) || "site"
     const takenIds = new Set(siteList.map((site) => site.id))
@@ -129,7 +178,7 @@ export function useSiteList(siteId: string, session: string) {
       nextId = `${baseId}-${suffix}`
       suffix += 1
     }
-    const parsedConstraints = newSiteConstraints
+    const parsedConstraints = newSiteForm.constraints
       .split(/\n|,/g)
       .map((item) => item.trim())
       .filter(Boolean)
@@ -138,25 +187,17 @@ export function useSiteList(siteId: string, session: string) {
       {
         id: nextId,
         name,
-        purpose: newSitePurpose.trim(),
-        hosting: newSiteHosting.trim() || DEFAULT_SITE_HOSTING,
-        vercelProjectId: newSiteVercelProjectId.trim(),
-        vercelTeamId: newSiteVercelTeamId.trim(),
-        vercelProductionUrl: newSiteVercelProductionUrl.trim(),
-        vercelDeployHookUrl: newSiteVercelDeployHookUrl.trim(),
-        tone: newSiteTone.trim(),
+        purpose: newSiteForm.purpose.trim(),
+        hosting: newSiteForm.hosting.trim() || DEFAULT_SITE_HOSTING,
+        vercelProjectId: newSiteForm.vercelProjectId.trim(),
+        vercelTeamId: newSiteForm.vercelTeamId.trim(),
+        vercelProductionUrl: newSiteForm.vercelProductionUrl.trim(),
+        vercelDeployHookUrl: newSiteForm.vercelDeployHookUrl.trim(),
+        tone: newSiteForm.tone.trim(),
         constraints: parsedConstraints
       }
     ])
-    setNewSiteName("")
-    setNewSitePurpose("")
-    setNewSiteTone("")
-    setNewSiteConstraints("")
-    setNewSiteHosting(DEFAULT_SITE_HOSTING)
-    setNewSiteVercelProjectId("")
-    setNewSiteVercelTeamId("")
-    setNewSiteVercelProductionUrl("")
-    setNewSiteVercelDeployHookUrl("")
+    resetNewSiteForm()
     setShowSiteModal(false)
   }
 
@@ -197,37 +238,16 @@ export function useSiteList(siteId: string, session: string) {
   return {
     siteList,
     activeSiteConfig,
-    newSiteName,
-    setNewSiteName,
-    newSitePurpose,
-    setNewSitePurpose,
-    newSiteTone,
-    setNewSiteTone,
-    newSiteConstraints,
-    setNewSiteConstraints,
-    newSiteHosting,
-    setNewSiteHosting,
-    newSiteVercelProjectId,
-    setNewSiteVercelProjectId,
-    newSiteVercelTeamId,
-    setNewSiteVercelTeamId,
-    newSiteVercelProductionUrl,
-    setNewSiteVercelProductionUrl,
-    newSiteVercelDeployHookUrl,
-    setNewSiteVercelDeployHookUrl,
+    newSiteForm,
+    updateNewSiteForm,
+    resetNewSiteForm,
     showSiteModal,
     setShowSiteModal,
     configSiteId,
     setConfigSiteId,
     configSite,
-    restoreSiteId,
-    setRestoreSiteId,
-    restoreOptions,
-    restoreCommit,
-    setRestoreCommit,
-    isLoadingRestoreOptions,
-    isRestoringSnapshot,
-    restoreError,
+    restoreState,
+    updateRestoreState,
     siteTileRefreshToken,
     addSiteFromName,
     openEditorForSite,
