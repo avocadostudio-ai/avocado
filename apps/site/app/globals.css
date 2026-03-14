@@ -934,6 +934,10 @@ a {
   }
 }
 
+.site-top-nav:has(.site-mobile-menu.is-open) {
+  border-bottom: none !important;
+}
+
 .dark .site-top-nav {
   border-bottom-color: #334155;
   background: rgb(15 23 42 / 0.92);
