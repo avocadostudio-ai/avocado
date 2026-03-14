@@ -15,6 +15,7 @@ import {
   type ChatRequestBody,
   type ChatResult,
   siteCapabilitiesSchema,
+  isBatchAddRequest,
   isBlockCatalogQuery,
   isInfoQuery,
   isPageListQuery,
@@ -2103,6 +2104,7 @@ export async function runChatPipeline(
   const onPlanningToken = (token: string) => {
     if (firstPlanningTokenMs === null) {
       firstPlanningTokenMs = Date.now() - pipelineStartedAtMs
+      emitStatus("Generating plan...")
       if (!stageTimeline.some((item) => item.stage === "first_token")) {
         stageTimeline.push({ stage: "first_token", atMs: firstPlanningTokenMs })
       }
@@ -2272,7 +2274,7 @@ export async function runChatPipeline(
   const current = getPage(body.session, effectiveSlug)
   if (!current) return { code: 404, payload: { error: "page not found" } }
 
-  if (body.message && isInfoQuery(body.message)) {
+  if (body.message && isInfoQuery(body.message) && !isBatchAddRequest(body.message)) {
     const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: info.code, payload: withDebugPayload(info.payload, { outcome: "info" }) }
   }
@@ -2858,7 +2860,7 @@ export async function runChatPipeline(
     let applyStartedAtMs: number | null = null
     let skippedOps: SkippedOperation[] = []
     try {
-      emitStatus("Applying planned changes...")
+      emitStatus("Applying changes...")
       applyStartedAtMs = Date.now()
       const hasPageStructuralOps = resolvedPlan.ops.some(
         (op) => op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
@@ -3696,7 +3698,7 @@ export async function runChatPipeline(
     throwIfCanceled(options?.signal)
     planningAttempts = attempt
     try {
-      emitStatus(attempt === 1 ? "Planning edits..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
+      emitStatus(attempt === 1 ? "Calling AI model..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
       const result = await raceCancel(generatePlanImpl({
         message: plannerMessage,
         slug: effectiveSlug,
@@ -3753,6 +3755,7 @@ export async function runChatPipeline(
               options?.onPlannedOp?.({ op, index })
             }
           : undefined,
+        manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
         signal: options?.signal
       }), options?.signal)
       initialPlan = result.plan
@@ -3764,6 +3767,7 @@ export async function runChatPipeline(
         plannerContextTelemetryFields.strictJsonEnabled = result.schemaContext.strictJsonEnabled
       }
       markPlanningFinish()
+      emitStatus("Validating plan...")
       break
     } catch (error) {
       if (isCancelError(error)) throw error

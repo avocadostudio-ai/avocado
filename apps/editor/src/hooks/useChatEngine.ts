@@ -161,6 +161,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const [continuationChainId, setContinuationChainId] = useState<string | null>(null)
   const [streamingText, setStreamingText] = useState<string | null>(null)
   const [streamingChanges, setStreamingChanges] = useState<string[]>([])
+  const [streamSteps, setStreamSteps] = useState<{ label: string; done: boolean }[]>([])
 
   // Track last sent message so server-forced plan_only can populate pendingPlanMessage
   const lastSentMessageRef = useRef<string | null>(null)
@@ -915,6 +916,34 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftFlushTimer: number | null = null
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
+      let currentStepLabel: string | null = null
+
+      /** Advance the progress stepper: mark previous step done, add new active step */
+      const normalizeStepLabel = (s: string) =>
+        s.replace(/[\u2026.]+$/, "").replace(/\s*\([\d/,\s]+\)$/, "").trim()
+      const advanceStep = (label: string) => {
+        const baseLabel = normalizeStepLabel(label)
+        const prevBase = currentStepLabel ? normalizeStepLabel(currentStepLabel) : null
+        if (baseLabel === prevBase) {
+          // Same phase — update the display label in-place (e.g. "Applying changes (3/8)")
+          currentStepLabel = label
+          const display = label.replace(/[\u2026.]+$/, "").trim()
+          setStreamSteps((prev) => {
+            if (prev.length === 0) return prev
+            const last = prev[prev.length - 1]
+            if (last.done || last.label === display) return prev
+            return [...prev.slice(0, -1), { ...last, label: display }]
+          })
+          return
+        }
+        currentStepLabel = label
+        const display = label.replace(/[\u2026.]+$/, "").trim()
+        setStreamSteps((prev) => {
+          const next = prev.map((s) => (s.done ? s : { ...s, done: true }))
+          next.push({ label: display, done: false })
+          return next
+        })
+      }
 
       const sendLiveDraft = (force = false) => {
         if (!liveDraftBlockId) return
@@ -982,6 +1011,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           message?: string
           text?: string
           stage?: string
+          label?: string
           percent?: number
           elapsedMs?: number
           intent?: string
@@ -1012,7 +1042,9 @@ export function useChatEngine(config: ChatEngineConfig) {
         }
 
         if (payload.type === "status") {
-          setStreamStatus(payload.message ?? "Working...")
+          const msg = payload.message ?? "Working..."
+          setStreamStatus(msg)
+          advanceStep(msg)
         }
 
         if (payload.type === "image_progress") {
@@ -1035,11 +1067,11 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           const estimatedOps = Number(payload.estimatedOps ?? 0)
-          if (estimatedOps > 0) {
-            setStreamStatus(`Plan ready (${estimatedOps} change${estimatedOps === 1 ? "" : "s"})...`)
-          } else {
-            setStreamStatus("Plan ready...")
-          }
+          const planLabel = estimatedOps > 0
+            ? `Plan ready (${estimatedOps} change${estimatedOps === 1 ? "" : "s"})`
+            : "Plan ready"
+          setStreamStatus(`${planLabel}...`)
+          advanceStep(planLabel)
         }
 
         if (payload.type === "op_candidate") {
@@ -1098,9 +1130,8 @@ export function useChatEngine(config: ChatEngineConfig) {
 
         if (payload.type === "heartbeat") {
           const elapsedSec = Math.max(0, Math.floor(Number(payload.elapsedMs ?? 0) / 1000))
-          const stage = String(payload.stage ?? "working")
-          if (stage === "planning") setStreamStatus(`Planning… ${elapsedSec}s`)
-          if (stage === "applying") setStreamStatus(`Applying… ${elapsedSec}s`)
+          const label = String(payload.label ?? (payload.stage === "applying" ? "Applying" : "Planning"))
+          setStreamStatus(`${label}… ${elapsedSec}s`)
         }
 
         if (payload.type === "summary_token") {
@@ -1118,6 +1149,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           appliedOpCount += 1
+          advanceStep(total > 0 ? `Applying changes (${appliedOpCount}/${total})` : "Applying changes")
           if (total > 0 && index > 0) {
             const suffix = skippedOpCount > 0 ? `, skipped ${skippedOpCount}` : ""
             setStreamStatus(`Applying changes (${index}/${total}, applied ${appliedOpCount}${suffix})...`)
@@ -1187,6 +1219,7 @@ export function useChatEngine(config: ChatEngineConfig) {
             setImageProgress(null)
             setStreamingText(null)
             setStreamingChanges([])
+            setStreamSteps([])
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -1221,6 +1254,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setImageProgress(null)
           setStreamingText(null)
           setStreamingChanges([])
+          setStreamSteps([])
           clearOpRefreshTimer()
           endLiveDraft()
           pendingFocusBlockId = null
@@ -1239,6 +1273,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setImageProgress(null)
           setStreamingText(null)
           setStreamingChanges([])
+          setStreamSteps([])
           clearOpRefreshTimer()
           endLiveDraft()
           pendingFocusBlockId = null
@@ -1273,6 +1308,7 @@ export function useChatEngine(config: ChatEngineConfig) {
             setStreamTokenCount(0)
             setStreamingText(null)
             setStreamingChanges([])
+            setStreamSteps([])
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -1290,6 +1326,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamTokenCount(0)
           setStreamingText(null)
           setStreamingChanges([])
+          setStreamSteps([])
           clearOpRefreshTimer()
           endLiveDraft()
           if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -1379,6 +1416,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       setStreamStatus(null)
       setStreamingText(null)
       setStreamingChanges([])
+      setStreamSteps([])
       setIsLoading(false)
     }
   }
@@ -1407,6 +1445,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       setStreamStatus(null)
       setStreamingText(null)
       setStreamingChanges([])
+      setStreamSteps([])
       setIsLoading(false)
     }
   }
@@ -1506,6 +1545,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     imageProgress,
     streamingText,
     streamingChanges,
+    streamSteps,
     latestStreamFocusBlockId,
     plannerBadgeState,
     setPlannerBadgeState,

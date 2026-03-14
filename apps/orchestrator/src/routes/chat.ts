@@ -373,10 +373,12 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
     emit("status", { type: "status", message: "Crafting your update..." })
     const streamStartedAt = Date.now()
     let heartbeatStage: "planning" | "applying" = "planning"
+    let heartbeatLabel = "Planning"
     const heartbeatTimer = setInterval(() => {
       emit("heartbeat", {
         type: "heartbeat",
         stage: heartbeatStage,
+        label: heartbeatLabel,
         elapsedMs: Date.now() - streamStartedAt
       })
     }, 1000)
@@ -404,6 +406,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
             reason: event.reason
           }),
         onPlanMeta: (event) => {
+          const n = event.estimatedOps ?? 0
+          heartbeatLabel = n > 0 ? `Plan ready (${n} change${n === 1 ? "" : "s"})` : "Plan ready"
           emit("plan_meta", {
             type: "plan_meta",
             intent: event.intent,
@@ -413,6 +417,9 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
         },
         onOpApplied: (event) => {
           heartbeatStage = "applying"
+          heartbeatLabel = event.total > 0
+            ? `Applying changes (${event.index}/${event.total})`
+            : "Applying changes"
           emit("op_applied", {
             type: "op_applied",
             index: event.index,
@@ -434,7 +441,10 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
             type: "rollback_done",
             restoredVersion: event.restoredVersion
           }),
-        onStatusUpdate: (message) => emit("status", { type: "status", message }),
+        onStatusUpdate: (message) => {
+          heartbeatLabel = message
+          emit("status", { type: "status", message })
+        },
         onImageProgress: (event) => emit("image_progress", { type: "image_progress", ...event })
       })
 
