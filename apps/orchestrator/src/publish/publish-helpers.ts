@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { readFile, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
 import { resolve } from "node:path"
 import type { FastifyBaseLogger } from "fastify"
@@ -209,6 +209,30 @@ export async function ensurePresetRestoreSessions(log: FastifyBaseLogger) {
   if (changed) await persistStateNow(log)
 }
 
+// ---------------------------------------------------------------------------
+// Image URL rewriting for publish
+// ---------------------------------------------------------------------------
+
+const LOCALHOST_IMAGE_RE =
+  /https?:\/\/localhost:\d+\/generated-images\/([a-zA-Z0-9_-]+\.(?:png|jpg|jpeg|webp|gif))/gi
+
+function findLocalhostImageUrls(pages: PageDoc[]): Map<string, string> {
+  const json = JSON.stringify(pages)
+  const urlMap = new Map<string, string>()
+  for (const match of json.matchAll(LOCALHOST_IMAGE_RE)) {
+    urlMap.set(match[0], match[1])
+  }
+  return urlMap
+}
+
+function rewriteImageUrlsInPages(pages: PageDoc[], urlMap: Map<string, string>): PageDoc[] {
+  let json = JSON.stringify(pages)
+  for (const [originalUrl, fileName] of urlMap) {
+    json = json.replaceAll(originalUrl, `/generated-images/${fileName}`)
+  }
+  return JSON.parse(json) as PageDoc[]
+}
+
 function sanitizeBranch(input: string) {
   const trimmed = input.trim()
   return trimmed.length > 0 ? trimmed : "main"
@@ -220,10 +244,32 @@ export async function publishViaGit(session: string) {
   const absoluteTargetPath = resolve(repoRoot, targetPath)
   const branch = sanitizeBranch(process.env.PUBLISH_GIT_BRANCH ?? "main")
   const strict = process.env.PUBLISH_GIT_STRICT === "1"
-  const pages = getSessionPages(session)
+  let pages = getSessionPages(session)
   const slugs = pages.map((page) => page.slug)
-  const payload = `${JSON.stringify(pages, null, 2)}\n`
 
+  // Rewrite localhost image URLs → relative paths and copy files into public/
+  const imageUrlMap = findLocalhostImageUrls(pages)
+  const imageDestDir = resolve(repoRoot, "apps/site/public/generated-images")
+  let copiedImages = false
+  if (imageUrlMap.size > 0) {
+    const generatedImageDir =
+      process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ??
+      resolve(process.cwd(), "../../.data/generated-images")
+    await mkdir(imageDestDir, { recursive: true })
+    for (const [, fileName] of imageUrlMap) {
+      const src = resolve(generatedImageDir, fileName)
+      const dest = resolve(imageDestDir, fileName)
+      try {
+        await copyFile(src, dest)
+        copiedImages = true
+      } catch {
+        // Source file missing — still rewrite URL (relative 404 > unreachable localhost)
+      }
+    }
+    pages = rewriteImageUrlsInPages(pages, imageUrlMap)
+  }
+
+  const payload = `${JSON.stringify(pages, null, 2)}\n`
   await writeFile(absoluteTargetPath, payload, "utf8")
 
   const statusRaw = await runGit(["status", "--porcelain"], repoRoot)
@@ -233,7 +279,11 @@ export async function publishViaGit(session: string) {
     .filter(Boolean)
 
   if (strict) {
-    const blocking = statusLines.filter((line) => !line.endsWith(` ${targetPath}`) && !line.endsWith(` ${targetPath.replace(/\//g, "\\/")}`))
+    const allowedPrefixes = [targetPath, "apps/site/public/generated-images/"]
+    const blocking = statusLines.filter((line) => {
+      const filePart = line.slice(3) // strip status prefix (e.g. " M " or "?? ")
+      return !allowedPrefixes.some((prefix) => filePart.startsWith(prefix))
+    })
     if (blocking.length > 0) {
       return {
         status: "failed" as const,
@@ -245,9 +295,11 @@ export async function publishViaGit(session: string) {
     }
   }
 
-  await runGit(["add", targetPath], repoRoot)
+  const addPaths = [targetPath]
+  if (copiedImages) addPaths.push("apps/site/public/generated-images")
+  await runGit(["add", ...addPaths], repoRoot)
   try {
-    await runGit(["diff", "--cached", "--quiet", "--", targetPath], repoRoot)
+    await runGit(["diff", "--cached", "--quiet"], repoRoot)
     return {
       status: "ready" as const,
       session,
