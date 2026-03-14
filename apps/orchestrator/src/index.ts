@@ -22,6 +22,7 @@ import { opsRoutes } from "./routes/ops.js"
 import { mediaRoutes } from "./routes/media.js"
 import { historyRoutes } from "./routes/history.js"
 import { toolsRoutes } from "./routes/tools.js"
+import { authRoutes } from "./routes/auth.js"
 import { createToolRuntime } from "./tools/runtime.js"
 
 const app = Fastify({ logger: true })
@@ -113,6 +114,7 @@ await app.register((instance) => opsRoutes(instance, ctx))
 await app.register((instance) => mediaRoutes(instance, ctx))
 await app.register((instance) => historyRoutes(instance, ctx))
 await app.register((instance) => toolsRoutes(instance, ctx))
+await app.register((instance) => authRoutes(instance))
 
 // ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)
