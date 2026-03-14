@@ -243,7 +243,7 @@
     "id": "p_about",
     "slug": "/about",
     "title": "About",
-    "updatedAt": "2026-03-14T07:58:22.918Z",
+    "updatedAt": "2026-03-14T08:08:38.965Z",
     "blocks": [
       {
         "id": "b_hero_1773474917941",
@@ -304,52 +304,6 @@
         }
       },
       {
-        "id": "b_faqaccordion_1773474917942",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Common Questions",
-          "items": [
-            {
-              "q": "What is Avocado Stories' mission?",
-              "a": "We celebrate avocados as a gateway to mindful eating, culinary creativity, and sustainable living. Our mission is to inspire people to explore the flavor, nutrition, and versatility of avocados while learning about responsible food production."
-            },
-            {
-              "q": "Do you offer recipes for every skill level?",
-              "a": "Absolutely. Our collection ranges from simple five-minute toast ideas to more involved dishes for adventurous cooks. Each recipe includes notes to help you adjust difficulty or swap ingredients based on your comfort level."
-            },
-            {
-              "q": "How do you support sustainable farming?",
-              "a": "We partner with growers using regenerative agriculture practices, highlight sustainable sourcing in our content, and provide education about the environmental impact of our food choices. Learn more in our Sustainability section."
-            },
-            {
-              "q": "Can I join your community?",
-              "a": "Yes! Sign up for our newsletter to receive weekly recipes, wellness tips, and sustainability insights. You'll also get early access to new content and special discounts from our partner farms."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_stats_1773474917942",
-        "type": "Stats",
-        "props": {
-          "title": "By The Numbers",
-          "stats": [
-            {
-              "value": "50K+",
-              "label": "Monthly Visitors"
-            },
-            {
-              "value": "200+",
-              "label": "Original Recipes"
-            },
-            {
-              "value": "98%",
-              "label": "Positive Feedback"
-            }
-          ]
-        }
-      },
-      {
         "id": "b_richtext_1773474917942",
         "type": "RichText",
         "props": {
@@ -386,6 +340,62 @@
         }
       },
       {
+        "id": "b_stats_1773474917942",
+        "type": "Stats",
+        "props": {
+          "title": "By The Numbers",
+          "stats": [
+            {
+              "value": "50K+",
+              "label": "Monthly Visitors"
+            },
+            {
+              "value": "200+",
+              "label": "Original Recipes"
+            },
+            {
+              "value": "98%",
+              "label": "Positive Feedback"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773474917942",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Common Questions",
+          "items": [
+            {
+              "q": "What is Avocado Stories' mission?",
+              "a": "We celebrate avocados as a gateway to mindful eating, culinary creativity, and sustainable living. Our mission is to inspire people to explore the flavor, nutrition, and versatility of avocados while learning about responsible food production."
+            },
+            {
+              "q": "Do you offer recipes for every skill level?",
+              "a": "Absolutely. Our collection ranges from simple five-minute toast ideas to more involved dishes for adventurous cooks. Each recipe includes notes to help you adjust difficulty or swap ingredients based on your comfort level."
+            },
+            {
+              "q": "How do you support sustainable farming?",
+              "a": "We partner with growers using regenerative agriculture practices, highlight sustainable sourcing in our content, and provide education about the environmental impact of our food choices. Learn more in our Sustainability section."
+            },
+            {
+              "q": "Can I join your community?",
+              "a": "Yes! Sign up for our newsletter to receive weekly recipes, wellness tips, and sustainability insights. You'll also get early access to new content and special discounts from our partner farms."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773474917945",
+        "type": "CTA",
+        "props": {
+          "title": "Get Weekly Recipe & Wellness Tips",
+          "description": "Join our community for fresh ideas, nutrition insights, and stories from sustainable farms. Delivered to your inbox every Thursday.",
+          "ctaText": "Sign Up Now",
+          "ctaHref": "/subscribe"
+        }
+      },
+      {
         "id": "b_cardgrid_1773474917945",
         "type": "CardGrid",
         "props": {
@@ -416,16 +426,6 @@
               "imageAlt": "Aerial view of a sustainable avocado farm"
             }
           ]
-        }
-      },
-      {
-        "id": "b_cta_1773474917945",
-        "type": "CTA",
-        "props": {
-          "title": "Get Weekly Recipe & Wellness Tips",
-          "description": "Join our community for fresh ideas, nutrition insights, and stories from sustainable farms. Delivered to your inbox every Thursday.",
-          "ctaText": "Sign Up Now",
-          "ctaHref": "/subscribe"
         }
       },
       {
