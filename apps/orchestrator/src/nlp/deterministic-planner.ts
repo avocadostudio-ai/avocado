@@ -721,6 +721,15 @@ export function blockContractsSummary() {
       }
     }
 
+    // Collect image spec hints for scalar fields
+    const imageHints: string[] = []
+    for (const [fieldKey, fieldMeta] of Object.entries(meta.fields)) {
+      if (fieldMeta.imageSpec) {
+        const s = fieldMeta.imageSpec
+        imageHints.push(`${fieldKey}: recommended ${s.aspectRatio} ${s.width}\u00d7${s.height}`)
+      }
+    }
+
     // Append list-field item shapes to notes for array props
     let autoNotes = ""
     if (meta.listFields) {
@@ -728,11 +737,22 @@ export function blockContractsSummary() {
       for (const [listKey, listMeta] of Object.entries(meta.listFields)) {
         const itemKeys = Object.keys(listMeta.itemFields).join(", ")
         parts.push(`${listKey} must be a non-empty array of {${itemKeys}}`)
+        // Collect image spec hints for list item fields
+        for (const [itemKey, itemMeta] of Object.entries(listMeta.itemFields)) {
+          if (itemMeta.imageSpec) {
+            const s = itemMeta.imageSpec
+            imageHints.push(`${listKey}[].${itemKey}: recommended ${s.aspectRatio} ${s.width}\u00d7${s.height}`)
+          }
+        }
       }
       if (parts.length > 0) autoNotes = parts.join(". ") + "."
     }
+    const imageHintStr = imageHints.length > 0 ? imageHints.join(". ") + "." : ""
 
-    const notes = _blockNotes[type] ?? (autoNotes || `${meta.description ?? type} Never invent prop names.`)
+    let notes = _blockNotes[type] ?? (autoNotes || `${meta.description ?? type} Never invent prop names.`)
+    if (imageHintStr) {
+      notes += (notes ? " " : "") + imageHintStr
+    }
 
     const entry: BlockContract = {
       allowedProps: allProps,
@@ -1055,6 +1075,8 @@ export function isHighConfidenceDeterministicCase(args: {
     return false
   }
   const action = inferActionFromMessage(raw)
+  // Case: create_page — "create a new /about page", "create a new test page"
+  if (action === "add" && parseCreatePageRequest(raw)) return true
   // "add X to each/every card" = bulk item update — needs LLM for content generation
   if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
   // Counted multi-block add without enough named types → needs LLM for content generation
@@ -1803,7 +1825,7 @@ export function compileDeterministicPlan(args: {
               subheading: `Everything on this page is tailored for ${aud}.`,
               ctaText: "Get Started",
               ctaHref: "/",
-              imageUrl: `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`,
+              imageUrl: "/hero-generated.svg",
               imageAlt: `Audience-focused hero image for ${label}`
             }
           },

@@ -53,6 +53,9 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
   const suppressClickUntilRef = useRef(0)
   const selectedBlockRef = useRef<string | null>(null)
   const selectedEditablePathRef = useRef<string | null>(null)
+  const pendingListItemMovePathRef = useRef<string | null>(null)
+  const childSelectionLockRef = useRef<{ blockId: string; listKey: string; index: number; position?: number } | null>(null)
+  const skipParentAnimationOnceRef = useRef(false)
   const deleteConfirmTimerRef = useRef<number | null>(null)
   const inlineEditingRef = useRef<{
     node: HTMLElement
@@ -205,23 +208,58 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       return { listKey: match[1], index: Number(match[2]) }
     }
 
+    const setChildSelectionLock = (next: { blockId: string; listKey: string; index: number; position?: number } | null) => {
+      childSelectionLockRef.current = next
+      document
+        .querySelectorAll(".editor-child-selection-locked")
+        .forEach((node) => node.classList.remove("editor-child-selection-locked"))
+      if (!next) return
+      const block = findBlockNode(next.blockId)
+      if (!block) return
+      block.classList.add("editor-child-selection-locked")
+    }
+
     const clearListItemSelection = (scope?: ParentNode) => {
       ;(scope ?? document).querySelectorAll(".editor-item-selected").forEach((node) => node.classList.remove("editor-item-selected"))
       ;(scope ?? document)
         .querySelectorAll(".editor-child-selected")
         .forEach((node) => node.classList.remove("editor-child-selected"))
+      ;(scope ?? document)
+        .querySelectorAll(".editor-child-selection-locked")
+        .forEach((node) => node.classList.remove("editor-child-selection-locked"))
     }
 
     const applyListItemSelection = (block: HTMLElement, editablePath?: string | null) => {
       clearListItemSelection(block)
       const parsed = parseListItemPath(editablePath)
       if (!parsed) return false
-      const itemRoot = block.querySelector<HTMLElement>(
+      let itemRoot = block.querySelector<HTMLElement>(
         `.editor-item-has-delete[data-editor-list-key="${parsed.listKey}"][data-editor-list-index="${parsed.index}"]`
       )
+      if (!itemRoot) {
+        const lock = childSelectionLockRef.current
+        if (
+          lock &&
+          lock.blockId === (block.getAttribute("data-block-id") ?? "") &&
+          lock.listKey === parsed.listKey &&
+          typeof lock.position === "number"
+        ) {
+          const candidates = Array.from(block.querySelectorAll<HTMLElement>(`.editor-item-has-delete[data-editor-list-key="${parsed.listKey}"]`))
+          itemRoot = candidates[lock.position] ?? null
+          if (itemRoot) {
+            const resolvedIndex = Number(itemRoot.getAttribute("data-editor-list-index") ?? lock.index)
+            selectedEditablePathRef.current = `${parsed.listKey}[${resolvedIndex}]`
+            pendingListItemMovePathRef.current = selectedEditablePathRef.current
+          }
+        }
+      }
       if (!itemRoot) return false
       itemRoot.classList.add("editor-item-selected")
       block.classList.add("editor-child-selected")
+      const lock = childSelectionLockRef.current
+      if (lock && lock.blockId === (block.getAttribute("data-block-id") ?? "") && lock.listKey === parsed.listKey && lock.index === parsed.index) {
+        block.classList.add("editor-child-selection-locked")
+      }
       return true
     }
 
@@ -583,6 +621,15 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           event.preventDefault()
           event.stopPropagation()
           if (!canMoveUp) return
+          const targetPosition = Math.max(0, pos - 1)
+          const targetIndex = Number(order[targetPosition] ?? group.index)
+          const nextPath = `${group.listKey}[${targetIndex}]`
+          pendingListItemMovePathRef.current = nextPath
+          setChildSelectionLock({ blockId, listKey: group.listKey, index: targetIndex, position: targetPosition })
+          skipParentAnimationOnceRef.current = true
+          selectedEditablePathRef.current = nextPath
+          selectedBlockRef.current = blockId
+          setHoveredListItem(null)
           window.parent.postMessage(
             {
               protocol: "site-editor/v1",
@@ -612,6 +659,15 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           event.preventDefault()
           event.stopPropagation()
           if (!canMoveDown || typeof downAfterIndex !== "number") return
+          const targetPosition = Math.min(order.length - 1, pos + 1)
+          const targetIndex = Number(order[targetPosition] ?? group.index)
+          const nextPath = `${group.listKey}[${targetIndex}]`
+          pendingListItemMovePathRef.current = nextPath
+          setChildSelectionLock({ blockId, listKey: group.listKey, index: targetIndex, position: targetPosition })
+          skipParentAnimationOnceRef.current = true
+          selectedEditablePathRef.current = nextPath
+          selectedBlockRef.current = blockId
+          setHoveredListItem(null)
           window.parent.postMessage(
             {
               protocol: "site-editor/v1",
@@ -691,9 +747,11 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const match = findBlockNode(blockId)
       if (!match) return false
 
-      if (enter) match.classList.add("editor-enter")
-      match.classList.add("editor-highlight", "editor-flash")
-      if (enter) {
+      const shouldAnimate = enter
+      if (shouldAnimate && !match.classList.contains("editor-block-entering")) match.classList.add("editor-enter")
+      match.classList.add("editor-highlight")
+      if (shouldAnimate) match.classList.add("editor-flash")
+      if (shouldAnimate) {
         match.classList.remove("aifx-updated")
         // Force reflow so repeated updates can replay the wave animation.
         void match.offsetWidth
@@ -706,10 +764,12 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         match.scrollIntoView({ behavior: "smooth", block: "center" })
       }
 
-      window.setTimeout(() => {
-        match.classList.remove("editor-flash")
-        match.classList.remove("editor-enter")
-      }, 280)
+      if (shouldAnimate) {
+        window.setTimeout(() => {
+          match.classList.remove("editor-flash")
+          match.classList.remove("editor-enter")
+        }, 280)
+      }
 
       // Create a toolbar container for action buttons
       const toolbar = document.createElement("div")
@@ -728,6 +788,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         event.stopPropagation()
         const move = computeMoveAfter(blockId, "up")
         if (!move.canMove) return
+        pendingScrollIntoViewRef.current = true
         window.parent.postMessage(
           { protocol: "site-editor/v1", type: "blockReordered", payload: { slug, blockId, afterBlockId: move.afterBlockId } },
           editorOrigin
@@ -747,6 +808,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         event.stopPropagation()
         const move = computeMoveAfter(blockId, "down")
         if (!move.canMove) return
+        pendingScrollIntoViewRef.current = true
         window.parent.postMessage(
           { protocol: "site-editor/v1", type: "blockReordered", payload: { slug, blockId, afterBlockId: move.afterBlockId } },
           editorOrigin
@@ -818,17 +880,19 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
 
       let attempts = 0
       const timer = window.setInterval(() => {
-        const done = applyBlockFocus(targetId, true, undefined, { scrollIntoView: pendingScrollIntoViewRef.current })
+        const shouldAnimate = !skipParentAnimationOnceRef.current
+        const done = applyBlockFocus(targetId, shouldAnimate, undefined, { scrollIntoView: pendingScrollIntoViewRef.current })
         attempts += 1
         if (done || attempts >= 20) {
           window.clearInterval(timer)
           pendingFocusRef.current = null
           pendingScrollIntoViewRef.current = false
+          skipParentAnimationOnceRef.current = false
         }
       }, 45)
     }
 
-    const smoothRefresh = () => {
+    const smoothRefresh = (useViewTransition = false) => {
       if (!pendingScrollIntoViewRef.current) {
         pendingScrollRestoreRef.current = { x: window.scrollX, y: window.scrollY }
       } else {
@@ -836,27 +900,41 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       }
       cancelInlineEdit()
 
-      const afterRefresh = () => {
+      const restoreAndFocus = () => {
+        if (pendingScrollRestoreRef.current) {
+          const { x, y } = pendingScrollRestoreRef.current
+          window.scrollTo({ left: x, top: y, behavior: "auto" })
+          pendingScrollRestoreRef.current = null
+        }
+        queueFocusAfterRefresh()
+      }
+
+      const doRefreshAndRestore = () => {
+        router.refresh()
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            if (pendingScrollRestoreRef.current) {
-              const { x, y } = pendingScrollRestoreRef.current
-              window.scrollTo({ left: x, top: y, behavior: "auto" })
-              pendingScrollRestoreRef.current = null
-            }
-            queueFocusAfterRefresh()
+            restoreAndFocus()
           })
         })
       }
 
-      if (typeof document.startViewTransition === "function") {
-        const transition = document.startViewTransition(() => {
+      // View Transition: only used for AI-driven updates (streaming ops) where a
+      // crossfade helps mask the RSC round-trip. Direct user actions (move, delete,
+      // inline edit) skip this to stay responsive.
+      if (useViewTransition && typeof document.startViewTransition === "function") {
+        document.startViewTransition(() => {
           router.refresh()
+          return new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                restoreAndFocus()
+                resolve()
+              })
+            })
+          })
         })
-        transition.finished.then(afterRefresh)
       } else {
-        router.refresh()
-        afterRefresh()
+        doRefreshAndRestore()
       }
     }
 
@@ -892,6 +970,8 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           document.querySelectorAll(".editor-highlight").forEach((n) => n.classList.remove("editor-highlight"))
           selectedBlockRef.current = null
           selectedEditablePathRef.current = null
+          pendingListItemMovePathRef.current = null
+          setChildSelectionLock(null)
           window.parent.postMessage(
             { protocol: "site-editor/v1", type: "blockClicked", payload: { slug, blockId: null, blockType: null, editablePath: null } },
             editorOrigin
@@ -919,7 +999,19 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           editablePath = String(firstEditable?.getAttribute("data-editable-target") ?? "") || undefined
         }
       }
-      if (!editablePath) selectedEditablePathRef.current = null
+      if (!editablePath) {
+        selectedEditablePathRef.current = null
+        pendingListItemMovePathRef.current = null
+        setChildSelectionLock(null)
+      } else {
+        const parsed = parseListItemPath(editablePath)
+        if (parsed) {
+          setChildSelectionLock({ blockId, listKey: parsed.listKey, index: parsed.index })
+        } else {
+          pendingListItemMovePathRef.current = null
+          setChildSelectionLock(null)
+        }
+      }
       applyBlockFocus(blockId, false, editablePath)
 
       window.parent.postMessage(
@@ -952,6 +1044,10 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
     }
 
     const onPointerMove = (event: PointerEvent) => {
+      if (childSelectionLockRef.current) {
+        setHoveredListItem(null)
+        return
+      }
       const target = event.target as HTMLElement | null
       const item = target?.closest<HTMLElement>(".editor-item-has-delete") ?? null
       if (!item) {
@@ -979,8 +1075,13 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         serverVersionRef.current = msg.toVersion
         if (msg.focusBlockId) {
           pendingFocusRef.current = msg.focusBlockId
-          pendingScrollIntoViewRef.current = false
+          // Preserve move-triggered follow scroll; default to no scroll for other patch ops.
+          pendingScrollIntoViewRef.current = pendingScrollIntoViewRef.current && msg.op?.op === "move_block"
         }
+        if (msg.op?.op === "move_item") {
+          skipParentAnimationOnceRef.current = true
+        }
+        expectingNewBlocks = msg.op?.op === "add_block"
         smoothRefresh()
         emitPatchAck(msg.txId, true)
         return
@@ -993,7 +1094,9 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           pendingFocusRef.current = msg.focusBlockId
           pendingScrollIntoViewRef.current = false
         }
-        smoothRefresh()
+        pendingListItemMovePathRef.current = null
+        setChildSelectionLock(null)
+        smoothRefresh(true)
         return
       }
 
@@ -1005,13 +1108,45 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         clearLiveDraft()
         clearChildFocus()
         selectedEditablePathRef.current = null
+        pendingListItemMovePathRef.current = null
+        setChildSelectionLock(null)
         smoothRefresh()
       }
 
       if (msg.type === "highlightBlock") {
         const blockId = String(msg.payload.blockId ?? "")
-        const editablePath = String(msg.payload.editablePath ?? "") || undefined
-        if (!editablePath) selectedEditablePathRef.current = null
+        let editablePath = String(msg.payload.editablePath ?? "") || undefined
+        if (!editablePath && pendingListItemMovePathRef.current && selectedBlockRef.current === blockId) {
+          editablePath = pendingListItemMovePathRef.current
+        }
+        if (!editablePath) {
+          selectedEditablePathRef.current = null
+          pendingListItemMovePathRef.current = null
+          setChildSelectionLock(null)
+        } else if (pendingListItemMovePathRef.current === editablePath) {
+          pendingListItemMovePathRef.current = null
+          const parsed = parseListItemPath(editablePath)
+          if (parsed) {
+            const existing = childSelectionLockRef.current
+            const position =
+              existing && existing.blockId === blockId && existing.listKey === parsed.listKey
+                ? existing.position
+                : undefined
+            setChildSelectionLock({ blockId, listKey: parsed.listKey, index: parsed.index, position })
+          }
+        } else {
+          const parsed = parseListItemPath(editablePath)
+          if (parsed) {
+            const existing = childSelectionLockRef.current
+            const position =
+              existing && existing.blockId === blockId && existing.listKey === parsed.listKey
+                ? existing.position
+                : undefined
+            setChildSelectionLock({ blockId, listKey: parsed.listKey, index: parsed.index, position })
+          } else {
+            setChildSelectionLock(null)
+          }
+        }
         applyBlockFocus(blockId, false, editablePath)
       }
 
@@ -1073,6 +1208,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
 
       event.preventDefault()
       event.stopPropagation()
+      pendingScrollIntoViewRef.current = true
       window.parent.postMessage(
         {
           protocol: "site-editor/v1",
@@ -1115,35 +1251,23 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         }
       }
       knownBlockIds = currentIds
-      if (staggerIndex > 0) expectingNewBlocks = false
+      // Run detection only once per refresh cycle to avoid persistent full-DOM scans.
+      expectingNewBlocks = false
+    }
+
+    let detectNewBlocksRaf: number | null = null
+    const scheduleDetectNewBlocks = () => {
+      if (detectNewBlocksRaf !== null) return
+      detectNewBlocksRaf = requestAnimationFrame(() => {
+        detectNewBlocksRaf = null
+        detectNewBlocks()
+      })
     }
 
     ensureBlockBadges()
-    const ensureSelectedControlsMounted = () => {
-      const selectedId = selectedBlockRef.current
-      if (!selectedId) return
-      const selectedNode = findBlockNode(selectedId)
-      if (!selectedNode) return
-
-      const hasHighlight = selectedNode.classList.contains("editor-highlight")
-      const hasToolbar = Boolean(selectedNode.querySelector(".editor-block-toolbar"))
-      const hasTopAdd = Boolean(selectedNode.querySelector(".editor-selected-add-top"))
-      const hasBottomAdd = Boolean(selectedNode.querySelector(".editor-selected-add-bottom"))
-
-      if (hasHighlight && hasToolbar && hasTopAdd && hasBottomAdd) return
-      applyBlockFocus(selectedId, false, selectedEditablePathRef.current ?? undefined, { scrollIntoView: false })
-    }
-
-    let selectionMountQueued = false
     const observer = new MutationObserver(() => {
       ensureBlockBadges()
-      detectNewBlocks()
-      if (selectionMountQueued) return
-      selectionMountQueued = true
-      requestAnimationFrame(() => {
-        selectionMountQueued = false
-        ensureSelectedControlsMounted()
-      })
+      scheduleDetectNewBlocks()
     })
     if (document.body) observer.observe(document.body, { childList: true, subtree: true })
 
@@ -1154,6 +1278,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
     window.addEventListener("message", onMessage)
 
     return () => {
+      if (detectNewBlocksRaf !== null) cancelAnimationFrame(detectNewBlocksRaf)
       cancelInlineEdit()
       clearChildFocus()
       restoreLiveDraftOriginals()
@@ -1178,6 +1303,62 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       editorOrigin
     )
   }, [editorOrigin, pathname])
+
+  // Track placeholder→real image swaps for blur→sharp reveal animation
+  const placeholderBlockIdsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const PLACEHOLDER_PREFIX = "data:image/svg+xml"
+
+    function scanForPlaceholders() {
+      document.querySelectorAll<HTMLElement>(".hero__media img").forEach((img) => {
+        const src = img.getAttribute("src") ?? ""
+        const blockEl = img.closest<HTMLElement>("[data-block-id]")
+        if (!blockEl) return
+        const blockId = blockEl.getAttribute("data-block-id") ?? ""
+        if (src.startsWith(PLACEHOLDER_PREFIX)) {
+          placeholderBlockIdsRef.current.add(blockId)
+        }
+      })
+    }
+
+    function applyReveal(img: HTMLImageElement) {
+      const doReveal = () => {
+        img.classList.add("ai-image-reveal")
+        img.addEventListener("animationend", () => img.classList.remove("ai-image-reveal"), { once: true })
+      }
+      if (img.complete && img.naturalWidth > 0) doReveal()
+      else img.addEventListener("load", doReveal, { once: true })
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type !== "childList") continue
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof HTMLElement)) continue
+          const imgs = node.matches?.(".hero__media img")
+            ? [node as HTMLImageElement]
+            : Array.from(node.querySelectorAll<HTMLImageElement>(".hero__media img"))
+          for (const img of imgs) {
+            const src = img.getAttribute("src") ?? ""
+            const blockEl = img.closest<HTMLElement>("[data-block-id]")
+            if (!blockEl) continue
+            const blockId = blockEl.getAttribute("data-block-id") ?? ""
+            if (src.startsWith(PLACEHOLDER_PREFIX)) {
+              placeholderBlockIdsRef.current.add(blockId)
+            } else if (src.startsWith("http") && placeholderBlockIdsRef.current.has(blockId)) {
+              placeholderBlockIdsRef.current.delete(blockId)
+              applyReveal(img)
+            }
+          }
+        }
+      }
+    })
+
+    observer.observe(document.body, { childList: true, subtree: true })
+    scanForPlaceholders()
+    return () => observer.disconnect()
+  }, [])
 
   return null
 }

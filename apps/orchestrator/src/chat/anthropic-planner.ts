@@ -21,6 +21,7 @@ import {
 import {
   buildPlannerSchemaContext,
   extractOpsFromPlanBuffer,
+  extractSummaryFromPlanBuffer,
   isChatStrictPrimaryOpMode,
   isPageWideTranslationRequest,
   type PlannerSchemaContextMeta
@@ -168,7 +169,11 @@ export async function generatePlanWithAnthropic(args: {
   feedback?: string
   onToken?: (token: string) => void
   onPlannedOp?: (op: Operation, index: number) => void
+  onSummaryChunk?: (text: string) => void
+  onChangeLogEntry?: (entry: string) => void
   onToolExecution?: (event: ToolExecutionEvent) => void
+  onStatusUpdate?: (message: string) => void
+  onImageProgress?: (event: { percent: number; stage: string }) => void
   toolRuntime?: ToolRuntime
   toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
   client?: PlannerAnthropicClient
@@ -212,6 +217,7 @@ export async function generatePlanWithAnthropic(args: {
     "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     "If user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page. Do not ask which page to create first.",
     "For create_page, derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page.",
+    "If the user asks to create a page showcasing, demonstrating, or featuring all available components/block types (even with typos like 'componenzs'), generate a create_page op containing one block of each allowed block type. Fill all block props with themed sample content matching the user's topic. This is a clear, actionable request — do not return needs_clarification.",
     "For add_block, use exact prop names from blockContracts. Common mistakes: use 'title' not 'heading' for section titles (except Hero which uses 'heading'), use 'q'/'a' not 'question'/'answer' for FAQ items, use 'quote' not 'testimonial' for Testimonials items.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
@@ -220,8 +226,10 @@ export async function generatePlanWithAnthropic(args: {
     "If rewrite/rephrase of a specific field is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first. This does NOT apply to page-wide rewrite/refocus/rebrand requests — those should generate update_props ops across all blocks.",
     "When rewriting text, return plain text unless the user explicitly asks for markdown formatting. Do not wrap the entire rewrite in **bold** markers.",
     "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
-    "For image search requests (e.g. Unsplash, stock photo, hero image replacement), call tool unsplash.search with a concise search query and choose an imageUrl from tool results.",
+    "For image search requests that explicitly mention Unsplash or stock photos, call tool unsplash.search with a concise search query and choose an imageUrl from tool results.",
+    "For image requests that say 'generate', 'create', or 'make' an image, call tool image.generate with a detailed prompt describing the desired image. When calling image.generate, check the target block's image spec in blockContracts for the recommended aspectRatio and pass it. If the user explicitly specifies an aspectRatio, use that instead. Default to quality 'draft'. Use 'final' only when the user explicitly asks for high quality, polished, or production-ready images.",
     "When using unsplash.search, write the selected image URL into the relevant imageUrl field and set imageAlt to a concise accessible description.",
+    "When using image.generate, write the returned imageUrl into the relevant imageUrl field and set imageAlt from the returned alt text.",
     ...(chatStrictPrimaryOpMode
       ? [
           "Return exactly one operation in ops[].",
@@ -309,6 +317,8 @@ export async function generatePlanWithAnthropic(args: {
   let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
   let streamedOpsCount = 0
+  let lastSummaryLen = 0
+  let emittedChangeLogCount = 0
   const maxToolTurns = 6
 
   if (runtimeTools.length > 0) {
@@ -367,12 +377,14 @@ export async function generatePlanWithAnthropic(args: {
         return {
           plan: {
             intent: "needs_clarification",
-            summary_for_user: "I need a more specific edit request to produce a valid plan.",
+            summary_for_user: "I'm not sure what to do with that. You can try:",
             change_log: [],
             ops: [],
             suggested_next_actions: [
-              "Specify the page section to change.",
-              "Describe exactly what to update."
+              "Create a new page",
+              "Add a section to the page",
+              "Rewrite the copy",
+              "Change the images"
             ]
           },
           usage,
@@ -401,7 +413,9 @@ export async function generatePlanWithAnthropic(args: {
             sessionId: args.toolCallContext?.sessionId ?? "dev",
             userId: args.toolCallContext?.userId,
             traceId: args.toolCallContext?.traceId ?? "tool-call",
-            plannerProvider: "anthropic"
+            plannerProvider: "anthropic",
+            onStatusUpdate: args.onStatusUpdate,
+            onImageProgress: args.onImageProgress
           },
           policy: args.toolRuntime?.defaultPolicy
         })
@@ -451,6 +465,17 @@ export async function generatePlanWithAnthropic(args: {
         if (event.type === "content_block_delta") {
           if (event.delta?.type === "input_json_delta") {
             toolJsonBuf += event.delta.partial_json ?? ""
+            if (args.onSummaryChunk || args.onChangeLogEntry) {
+              const extracted = extractSummaryFromPlanBuffer(toolJsonBuf)
+              if (extracted.summary && extracted.summary.length > lastSummaryLen) {
+                args.onSummaryChunk?.(extracted.summary.slice(lastSummaryLen))
+                lastSummaryLen = extracted.summary.length
+              }
+              for (let i = emittedChangeLogCount; i < extracted.changeLog.length; i++) {
+                args.onChangeLogEntry?.(extracted.changeLog[i]!)
+              }
+              emittedChangeLogCount = extracted.changeLog.length
+            }
             if (args.onPlannedOp) {
               const next = extractOpsFromPlanBuffer(toolJsonBuf, streamedOpsCount)
               streamedOpsCount = next.nextEmittedCount

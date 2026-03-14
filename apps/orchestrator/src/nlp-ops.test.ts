@@ -238,6 +238,22 @@ test("inferDeterministicIntent infers remove action against selected block", () 
   assert.equal(parsed?.target_block_ref, "b_hero_home")
 })
 
+test("isHighConfidenceDeterministicCase returns true for 'create a new test page'", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "create a new test page", currentPage }),
+    true
+  )
+})
+
+test("isHighConfidenceDeterministicCase returns true for 'create a new /about page'", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "create a new /about page", currentPage }),
+    true
+  )
+})
+
 test("isHighConfidenceDeterministicCase returns true for 'remove all blocks except hero'", () => {
   const currentPage = demoPublishedPages()[0]
   assert.equal(
@@ -1856,6 +1872,16 @@ test("isBatchAddRequest detects 'each/every' + block type as batch override", ()
   assert.equal(isBatchAddRequest("update the card title"), false)
 })
 
+test("isBatchAddRequest detects showcase/demo all components patterns", () => {
+  assert.equal(isBatchAddRequest("generate a new page called test show casing all available componenzs with sample content. make it about potatoes"), true)
+  assert.equal(isBatchAddRequest("create a page showcasing all components"), true)
+  assert.equal(isBatchAddRequest("build a page demonstrating all available blocks"), true)
+  assert.equal(isBatchAddRequest("page featuring all sections"), true)
+  assert.equal(isBatchAddRequest("all available components with sample content"), true)
+  // Negative: single component mention should not trigger
+  assert.equal(isBatchAddRequest("add a hero section"), false)
+})
+
 test("isBatchRemoveRequest detects batch remove patterns", () => {
   assert.equal(isBatchRemoveRequest("remove all blocks except this one"), true)
   assert.equal(isBatchRemoveRequest("delete everything but the hero"), true)
@@ -2589,4 +2615,22 @@ test("isPageListQuery detects page-listing requests", () => {
   ]
   for (const prompt of positives) assert.equal(isPageListQuery(prompt), true, prompt)
   for (const prompt of negatives) assert.equal(isPageListQuery(prompt), false, prompt)
+})
+
+test("isBatchAddRequest matches 'add N pages for each card' (add verb in BATCH_PAGE_CREATE_PATTERNS)", () => {
+  assert.equal(isBatchAddRequest("add 3 new pages for each card item and link CTAs to them"), true)
+  assert.equal(isBatchAddRequest("add pages for developers and marketers"), true)
+})
+
+test("isPageListQuery does not match page-creation requests that mention 'the pages'", () => {
+  assert.equal(isPageListQuery("add 3 pages and link each card to them. the content of the pages should match the cards"), false)
+  assert.equal(isPageListQuery("create new pages and update the pages to match"), false)
+  assert.equal(isPageListQuery("add pages for each card item"), false)
+})
+
+test("isLikelyClarificationFollowUp returns false for 'translate this page to german'", () => {
+  assert.equal(isLikelyClarificationFollowUp("translate this page to german"), false)
+  assert.equal(isLikelyClarificationFollowUp("redesign this page"), false)
+  assert.equal(isLikelyClarificationFollowUp("refocus this page on SaaS"), false)
+  assert.equal(isLikelyClarificationFollowUp("rebuild this page"), false)
 })

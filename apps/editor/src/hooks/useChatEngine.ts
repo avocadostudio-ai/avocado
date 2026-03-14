@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   defaultListItemForBlock,
   defaultPropsForType,
@@ -48,7 +48,7 @@ export type ChatEngineConfig = {
   setActiveBlockId: (id: string | undefined) => void
   setActiveBlockType: (type: string | undefined) => void
   setActiveEditablePath: (path: string | undefined) => void
-  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft", payload: Record<string, unknown>) => void
+  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
   setAvailableSlugs: (slugs: string[]) => void
   setIsLoadingSlugs: (loading: boolean) => void
@@ -95,6 +95,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   } = config
 
   const activeSiteOrigin = resolveSiteOrigin(activeSiteConfig)
+  const chatLogStorageKey = `editor-chat-log-v1:${session}:${siteId}`
   const lastStructuralNoticeRef = useRef<number>(0)
 
   const pushStructuralDisabledNotice = (action: string) => {
@@ -117,22 +118,39 @@ export function useChatEngine(config: ChatEngineConfig) {
     return null
   }
 
-  const [chatLog, setChatLog] = useState<ChatEntry[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text: "Let’s shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.",
-      suggestions: [
-        "Add testimonials below hero",
-        "Change the hero headline",
-        "Create a new /about page",
-        "Add a FAQ section"
-      ]
-    }
-  ])
+  const welcomeEntry: ChatEntry = {
+    id: "welcome",
+    role: "assistant",
+    text: "Let’s shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.",
+    suggestions: [
+      "Add testimonials below hero",
+      "Change the hero headline",
+      "Create a new /about page",
+      "Add a FAQ section"
+    ]
+  }
+
+  const [chatLog, setChatLog] = useState<ChatEntry[]>(() => {
+    try {
+      const stored = localStorage.getItem(chatLogStorageKey)
+      if (stored) {
+        const parsed = JSON.parse(stored) as ChatEntry[]
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch { /* ignore corrupt data */ }
+    return [welcomeEntry]
+  })
+
+  useEffect(() => {
+    try {
+      const toStore = chatLog.slice(-50).map(({ status, ...rest }) => rest)
+      localStorage.setItem(chatLogStorageKey, JSON.stringify(toStore))
+    } catch { /* ignore quota errors */ }
+  }, [chatLog, chatLogStorageKey])
   const [isLoading, setIsLoading] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamTokenCount, setStreamTokenCount] = useState(0)
+  const [imageProgress, setImageProgress] = useState<{ percent: number; stage: string } | null>(null)
   const [latestStreamFocusBlockId, setLatestStreamFocusBlockId] = useState<string | null>(null)
   const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
@@ -140,6 +158,9 @@ export function useChatEngine(config: ChatEngineConfig) {
   const [variationModal, setVariationModal] = useState<VariationModalState | null>(null)
   const [isApplyingVariation, setIsApplyingVariation] = useState(false)
   const [undoInFlightEntryId, setUndoInFlightEntryId] = useState<string | null>(null)
+  const [continuationChainId, setContinuationChainId] = useState<string | null>(null)
+  const [streamingText, setStreamingText] = useState<string | null>(null)
+  const [streamingChanges, setStreamingChanges] = useState<string[]>([])
 
   // Track last sent message so server-forced plan_only can populate pendingPlanMessage
   const lastSentMessageRef = useRef<string | null>(null)
@@ -168,7 +189,8 @@ export function useChatEngine(config: ChatEngineConfig) {
       debug: data.debug,
       aiJustification: parsedChanges.aiJustification,
       aiPerformanceNote: parsedChanges.aiPerformanceNote,
-      pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined
+      pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined,
+      continuation: data.continuation ?? undefined
     }
 
     setChatLog((prev) => {
@@ -190,6 +212,11 @@ export function useChatEngine(config: ChatEngineConfig) {
     } else if (data.status === "applied" || data.status === "canceled") {
       setPendingPlanId(null)
       setPendingPlanMessage(null)
+    }
+    if (data.continuation?.chainId) {
+      setContinuationChainId(data.continuation.chainId)
+    } else {
+      setContinuationChainId(null)
     }
     pushAssistantFromResult(data, { canUndo: data.status === "applied" })
     if (data.status === "applied") {
@@ -677,7 +704,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string }) {
+  async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string; continuationChainId?: string }) {
     const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
     const res = await fetch(`${orchestrator}/chat`, {
       method: "POST",
@@ -694,7 +721,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         activeBlockType: activeBlockTypeRef.current,
         activeEditablePath: activeEditablePathRef.current,
         executionMode: options?.executionMode ?? "auto",
-        pendingPlanId: options?.pendingPlanId
+        pendingPlanId: options?.pendingPlanId,
+        ...(options?.continuationChainId ? { continuationChainId: options.continuationChainId } : {})
       }, componentManifest, siteCapabilities))
     })
 
@@ -836,6 +864,9 @@ export function useChatEngine(config: ChatEngineConfig) {
       ...(extraParams ?? {})
     }, componentManifest, siteCapabilities)
 
+    // Show immediate feedback before any SSE events arrive
+    setStreamStatus("Thinking...")
+
     let streamId: string
     try {
       const res = await fetch(`${orchestrator}/chat/start`, {
@@ -865,6 +896,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftText = ""
       let liveDraftFlushTimer: number | null = null
       let liveDraftActive = false
+      let liveDraftFields: Record<string, string> | null = null
 
       const sendLiveDraft = (force = false) => {
         if (!liveDraftBlockId) return
@@ -872,7 +904,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         postToSite("liveDraft", {
           blockId: liveDraftBlockId,
           text: liveDraftText.slice(0, 2400),
-          active: liveDraftActive
+          active: liveDraftActive,
+          ...(liveDraftFields ? { fields: liveDraftFields } : {})
         })
       }
 
@@ -887,7 +920,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         liveDraftFlushTimer = window.setTimeout(() => {
           liveDraftFlushTimer = null
           sendLiveDraft(true)
-        }, 45)
+        }, 16)
       }
 
       const endLiveDraft = () => {
@@ -896,6 +929,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         liveDraftActive = false
         sendLiveDraft(true)
         liveDraftText = ""
+        liveDraftFields = null
       }
 
       const flushOpRefresh = () => {
@@ -920,15 +954,16 @@ export function useChatEngine(config: ChatEngineConfig) {
         opRefreshTimer = window.setTimeout(() => {
           opRefreshTimer = null
           flushOpRefresh()
-        }, 100)
+        }, 50)
       }
 
       source.onmessage = (event) => {
         let payload: {
-          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error"
+          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error" | "summary_token" | "changelog_entry" | "image_progress"
           message?: string
           text?: string
           stage?: string
+          percent?: number
           elapsedMs?: number
           intent?: string
           summary?: string
@@ -939,6 +974,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           reason?: string
           previewVersion?: number
           focusBlockId?: string | null
+          updatedSlug?: string
           appliedCount?: number
           restoredVersion?: number
           result?: AssistantResponse
@@ -954,6 +990,10 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamStatus(payload.message ?? "Working...")
         }
 
+        if (payload.type === "image_progress") {
+          setImageProgress({ percent: payload.percent ?? 0, stage: payload.stage ?? "" })
+        }
+
         if (payload.type === "token") {
           const text = payload.text ?? ""
           if (text) {
@@ -967,6 +1007,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         }
 
         if (payload.type === "plan_meta") {
+          setStreamingText(null)
+          setStreamingChanges([])
           const estimatedOps = Number(payload.estimatedOps ?? 0)
           if (estimatedOps > 0) {
             setStreamStatus(`Plan ready (${estimatedOps} change${estimatedOps === 1 ? "" : "s"})...`)
@@ -987,6 +1029,45 @@ export function useChatEngine(config: ChatEngineConfig) {
               }
             }
           }
+
+          // Extract editable field values from operation for live typing
+          // update_props → patch contains field values; add_block → block.props contains field values
+          const op = payload.op
+          if (op && typeof op === "object") {
+            const opRecord = op as Record<string, unknown>
+            const rawFields =
+              (opRecord.patch && typeof opRecord.patch === "object" ? opRecord.patch :
+               opRecord.block && typeof (opRecord.block as Record<string, unknown>).props === "object"
+                 ? (opRecord.block as Record<string, unknown>).props : null) as Record<string, unknown> | null
+
+            if (rawFields) {
+              const fields: Record<string, string> = {}
+              for (const [key, value] of Object.entries(rawFields)) {
+                if (typeof value === "string" && value.trim()) {
+                  fields[key] = value
+                }
+              }
+              if (Object.keys(fields).length > 0) {
+                liveDraftFields = fields
+                if (liveDraftBlockId) {
+                  liveDraftActive = true
+                  sendLiveDraft(true)
+                }
+              }
+            }
+
+            // Send skeleton for add_block operations
+            const opType = opRecord.op ?? opRecord.type
+            if (opType === "add_block") {
+              const blockObj = opRecord.block as Record<string, unknown> | undefined
+              const afterBlockId = opRecord.afterBlockId
+              postToSite("showSkeleton", {
+                afterBlockId: typeof afterBlockId === "string" ? afterBlockId : null,
+                blockType: typeof blockObj?.type === "string" ? blockObj.type : "Block"
+              })
+            }
+          }
+
           setStreamStatus(idx > 0 ? `Drafting operation ${idx}...` : "Drafting operations...")
         }
 
@@ -997,8 +1078,18 @@ export function useChatEngine(config: ChatEngineConfig) {
           if (stage === "applying") setStreamStatus(`Applying… ${elapsedSec}s`)
         }
 
+        if (payload.type === "summary_token") {
+          setStreamingText((prev) => (prev ?? "") + (payload.text ?? ""))
+        }
+        if (payload.type === "changelog_entry") {
+          setStreamingChanges((prev) => [...prev, (payload as { entry?: string }).entry ?? ""])
+        }
+
         if (payload.type === "op_applied") {
+          setStreamingText(null)
+          setStreamingChanges([])
           if (liveDraftActive) endLiveDraft()
+          postToSite("removeSkeleton", {})
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           appliedOpCount += 1
@@ -1022,6 +1113,22 @@ export function useChatEngine(config: ChatEngineConfig) {
             flushOpRefresh()
           } else {
             scheduleOpRefresh()
+          }
+
+          // Navigate to a newly created page when the server signals updatedSlug
+          if (typeof payload.updatedSlug === "string" && payload.updatedSlug.length > 0) {
+            const nextSlug = payload.updatedSlug as string
+            if (nextSlug !== slugRef.current) {
+              setSlug(nextSlug)
+              activeBlockIdRef.current = undefined
+              activeBlockTypeRef.current = undefined
+              activeEditablePathRef.current = undefined
+              setActiveBlockId(undefined)
+              setActiveBlockType(undefined)
+              setActiveEditablePath(undefined)
+            }
+            postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId })
+            void refreshRouteSlugs()
           }
         }
 
@@ -1051,6 +1158,9 @@ export function useChatEngine(config: ChatEngineConfig) {
             settled = true
             setStreamStatus(null)
             setStreamTokenCount(0)
+            setImageProgress(null)
+            setStreamingText(null)
+            setStreamingChanges([])
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -1062,7 +1172,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
           const elapsedSinceLastOp = lastOpAppliedAt > 0 ? Date.now() - lastOpAppliedAt : Number.POSITIVE_INFINITY
           const appliedTotal = lastOpTotal > 0 ? lastOpTotal : Number(payload.result?.debug?.opCount ?? 0)
-          const minVisibleMs = appliedTotal <= 1 ? 300 : 700
+          const minVisibleMs = appliedTotal <= 1 ? 100 : 250
           if (lastOpAppliedAt > 0 && elapsedSinceLastOp < minVisibleMs) {
             const skipped = Number(payload.result?.debug?.skippedOpCount ?? skippedOpCount ?? 0)
             const applied = Math.max(0, appliedTotal - skipped)
@@ -1081,6 +1191,9 @@ export function useChatEngine(config: ChatEngineConfig) {
           settled = true
           setStreamStatus(null)
           setStreamTokenCount(0)
+          setImageProgress(null)
+          setStreamingText(null)
+          setStreamingChanges([])
           clearOpRefreshTimer()
           endLiveDraft()
           pendingFocusBlockId = null
@@ -1098,6 +1211,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         if (settled || gotAnyEvent) {
           setStreamStatus(null)
           setStreamTokenCount(0)
+          setStreamingText(null)
+          setStreamingChanges([])
           clearOpRefreshTimer()
           endLiveDraft()
           if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -1108,6 +1223,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         }
         setStreamStatus("Streaming failed, retrying with standard request...")
         setStreamTokenCount(0)
+        setStreamingText(null)
+        setStreamingChanges([])
         clearOpRefreshTimer()
         endLiveDraft()
         pendingFocusBlockId = null
@@ -1160,6 +1277,8 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
     } finally {
       setStreamStatus(null)
+      setStreamingText(null)
+      setStreamingChanges([])
       setIsLoading(false)
     }
   }
@@ -1186,6 +1305,8 @@ export function useChatEngine(config: ChatEngineConfig) {
       })
     } finally {
       setStreamStatus(null)
+      setStreamingText(null)
+      setStreamingChanges([])
       setIsLoading(false)
     }
   }
@@ -1200,6 +1321,30 @@ export function useChatEngine(config: ChatEngineConfig) {
         pendingPlanId: planId
       })
     } finally {
+      setStreamingText(null)
+      setStreamingChanges([])
+      setIsLoading(false)
+    }
+  }
+
+  async function continueChain(chainId: string) {
+    if (!chainId || isLoading) return
+    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Continue to next step." }])
+    setIsLoading(true)
+    try {
+      await submitChatHttp("Continue to next step", {
+        executionMode: "continue_chain",
+        continuationChainId: chainId
+      })
+    } catch (error) {
+      pushAssistantFromResult({
+        status: "error",
+        summary: `Continuation failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        changes: []
+      })
+    } finally {
+      setStreamingText(null)
+      setStreamingChanges([])
       setIsLoading(false)
     }
   }
@@ -1258,6 +1403,9 @@ export function useChatEngine(config: ChatEngineConfig) {
     isLoading,
     streamStatus,
     streamTokenCount,
+    imageProgress,
+    streamingText,
+    streamingChanges,
     latestStreamFocusBlockId,
     plannerBadgeState,
     setPlannerBadgeState,
@@ -1271,6 +1419,8 @@ export function useChatEngine(config: ChatEngineConfig) {
     applyVariation,
     approvePendingPlan,
     stopPendingPlan,
+    continueChain,
+    continuationChainId,
     applyUndoHistory,
     refreshRouteSlugs,
     addBlockAfter,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Check, Copy, Sparkles } from "lucide-react"
+import { Check, Copy, ExternalLink, Sparkles } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
@@ -426,7 +426,7 @@ function EditorPage({
     const thread = chatThreadRef.current
     if (!thread) return
     thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" })
-  }, [chatEngine.chatLog, chatEngine.streamStatus])
+  }, [chatEngine.chatLog, chatEngine.streamStatus, chatEngine.streamingText])
 
   // Nested labels sync
   useEffect(() => {
@@ -549,8 +549,8 @@ function EditorPage({
   }, [addBlockPicker, isAddingBlock])
 
   const streamIsError = chatEngine.streamStatus ? /failed|error/i.test(chatEngine.streamStatus) : false
-  const streamLabel = chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready...")
-  const streamTextLabel = chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Updating..." : "Thinking")
+  const streamLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."))
+  const streamTextLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Updating..." : "Thinking"))
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const hasUserEntry = chatEngine.chatLog.some((entry) => entry.role === "user")
   const buildCopyPayload = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
@@ -650,8 +650,15 @@ function EditorPage({
                   </a>
                 ) : null}
                 {liveSiteUrl ? (
-                  <a className="publish-view-link" href={liveSiteUrl} target="_blank" rel="noreferrer">
-                    Open live site
+                  <a
+                    className="live-site-icon-btn"
+                    href={liveSiteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open live site"
+                    title="Open live site"
+                  >
+                    <ExternalLink size={16} aria-hidden="true" />
                   </a>
                 ) : null}
               </>
@@ -717,6 +724,18 @@ function EditorPage({
                       </>
                     )
                   })()}
+                </div>
+              ) : null}
+              {entry.continuation ? (
+                <div className="msg-plan-actions">
+                  <button
+                    type="button"
+                    className="primary-btn msg-plan-btn"
+                    onClick={() => void chatEngine.continueChain(entry.continuation!.chainId)}
+                    disabled={chatEngine.isLoading || chatEngine.continuationChainId !== entry.continuation.chainId}
+                  >
+                    Continue: {entry.continuation.nextStepLabel} ({entry.continuation.currentStep} of {entry.continuation.totalSteps})
+                  </button>
                 </div>
               ) : null}
               {(() => {
@@ -799,7 +818,21 @@ function EditorPage({
               ) : null}
             </article>
           ))}
-          {chatEngine.streamStatus ? (
+          {chatEngine.streamingText ? (
+            <article className="msg msg-assistant msg-streaming">
+              <div className="msg-main">
+                {renderSimpleMarkdown(chatEngine.streamingText)}
+                <span className="streaming-cursor" aria-hidden="true" />
+              </div>
+              {chatEngine.streamingChanges.length > 0 ? (
+                <ul className="msg-list">
+                  {chatEngine.streamingChanges.map((line, idx) => (
+                    <li key={idx}>{line}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </article>
+          ) : chatEngine.streamStatus ? (
             <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"} ${STREAMING_INDICATOR_STYLE === "text" ? "is-text" : "is-legacy"}`}>
               {STREAMING_INDICATOR_STYLE === "text" ? (
                 <span className="streaming-pill-status streaming-pill-status-text">{streamTextLabel}</span>
@@ -818,6 +851,11 @@ function EditorPage({
                   ) : null}
                 </>
               )}
+              {chatEngine.imageProgress ? (
+                <div className="image-gen-progress">
+                  <div className="image-gen-progress-fill" style={{ width: `${chatEngine.imageProgress.percent}%` }} />
+                </div>
+              ) : null}
               {chatEngine.latestStreamFocusBlockId ? (
                 <button
                   type="button"
