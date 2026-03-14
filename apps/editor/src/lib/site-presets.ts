@@ -40,18 +40,16 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
       .filter((site): site is Record<string, unknown> => Boolean(site && typeof site === "object"))
       .map((site) => {
         const id = sanitizeSiteId(typeof site.id === "string" ? site.id : "")
-        const name = typeof site.name === "string" ? site.name.trim() : ""
-        const purpose = typeof site.purpose === "string" ? site.purpose.trim() : ""
-        const hosting = typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING
-        const vercelProjectId = typeof site.vercelProjectId === "string" ? site.vercelProjectId.trim() : ""
-        const vercelTeamId = typeof site.vercelTeamId === "string" ? site.vercelTeamId.trim() : ""
-        const vercelProductionUrl = typeof site.vercelProductionUrl === "string" ? site.vercelProductionUrl.trim() : ""
-        const vercelDeployHookUrl = typeof site.vercelDeployHookUrl === "string" ? site.vercelDeployHookUrl.trim() : ""
-        const tone = typeof site.tone === "string" ? site.tone.trim() : ""
-        const constraints = Array.isArray(site.constraints)
-          ? site.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
-          : []
-        const previewUrl = typeof site.previewUrl === "string" ? site.previewUrl.trim() : ""
+        const name = parseString(site.name, "")
+        const purpose = parseString(site.purpose, "")
+        const hosting = parseString(site.hosting, DEFAULT_SITE_HOSTING)
+        const vercelProjectId = parseString(site.vercelProjectId, "")
+        const vercelTeamId = parseString(site.vercelTeamId, "")
+        const vercelProductionUrl = parseString(site.vercelProductionUrl, "")
+        const vercelDeployHookUrl = parseString(site.vercelDeployHookUrl, "")
+        const tone = parseString(site.tone, "")
+        const constraints = parseArrayOfStrings(site.constraints)
+        const previewUrl = parseString(site.previewUrl, "")
         return {
           id,
           name,
@@ -149,17 +147,15 @@ export function loadSiteListFromStorage(siteId: string) {
       .map((site) => ({
         id: sanitizeSiteId(site.id),
         name: site.name.trim(),
-        purpose: typeof site.purpose === "string" ? site.purpose.trim() : "",
-        hosting: typeof site.hosting === "string" && site.hosting.trim().length > 0 ? site.hosting.trim() : DEFAULT_SITE_HOSTING,
-        vercelProjectId: typeof site.vercelProjectId === "string" ? site.vercelProjectId.trim() : "",
-        vercelTeamId: typeof site.vercelTeamId === "string" ? site.vercelTeamId.trim() : "",
-        vercelProductionUrl: typeof site.vercelProductionUrl === "string" ? site.vercelProductionUrl.trim() : "",
-        vercelDeployHookUrl: typeof site.vercelDeployHookUrl === "string" ? site.vercelDeployHookUrl.trim() : "",
-        tone: typeof site.tone === "string" ? site.tone.trim() : "",
-        constraints: Array.isArray(site.constraints)
-          ? site.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
-          : [],
-        ...(typeof site.previewUrl === "string" && site.previewUrl.trim() ? { previewUrl: site.previewUrl.trim() } : {})
+        purpose: parseString(site.purpose, ""),
+        hosting: parseString(site.hosting, DEFAULT_SITE_HOSTING),
+        vercelProjectId: parseString(site.vercelProjectId, ""),
+        vercelTeamId: parseString(site.vercelTeamId, ""),
+        vercelProductionUrl: parseString(site.vercelProductionUrl, ""),
+        vercelDeployHookUrl: parseString(site.vercelDeployHookUrl, ""),
+        tone: parseString(site.tone, ""),
+        constraints: parseArrayOfStrings(site.constraints),
+        ...(parseString(site.previewUrl, "") ? { previewUrl: parseString(site.previewUrl, "") } : {})
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
       .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 import type { ApplyPatchMessage, Operation } from "@ai-site-editor/shared"
 import type { SiteMessage } from "../lib/editor-types"
 import { siteOrigin as defaultSiteOrigin } from "../lib/editor-utils"
+import { parseOptionalString, parseString } from "../lib/parse-utils"
 
 export type PreviewBridgeCallbacks = {
   onBlockClicked: (slug: string, blockId: string | undefined, blockType: string | undefined, editablePath: string | undefined) => void
@@ -76,9 +77,9 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const rawBlockId = msg.payload.blockId
         const rawBlockType = msg.payload.blockType
         const rawPath = msg.payload.editablePath
-        const nextBlockId = typeof rawBlockId === "string" && rawBlockId.length > 0 ? rawBlockId : undefined
-        const nextBlockType = typeof rawBlockType === "string" && rawBlockType.length > 0 ? rawBlockType : undefined
-        const nextPath = typeof rawPath === "string" && rawPath.length > 0 ? rawPath : undefined
+        const nextBlockId = parseOptionalString(rawBlockId)
+        const nextBlockType = parseOptionalString(rawBlockType)
+        const nextPath = parseOptionalString(rawPath)
         callbacks.onBlockClicked(String(msg.payload.slug ?? "/"), nextBlockId, nextBlockType, nextPath)
       }
 
@@ -88,50 +89,47 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
 
       if (msg.type === "blockReordered") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
-        const afterRaw = msg.payload.afterBlockId
-        const afterBlockId = typeof afterRaw === "string" && afterRaw.length > 0 ? afterRaw : undefined
+        const blockId = parseString(msg.payload.blockId, "")
+        const afterBlockId = parseOptionalString(msg.payload.afterBlockId)
         callbacks.onBlockReordered(nextSlug, blockId, afterBlockId)
       }
 
       if (msg.type === "blockDeleteRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
+        const blockId = parseString(msg.payload.blockId, "")
         callbacks.onBlockDeleteRequested(nextSlug, blockId)
       }
 
       if (msg.type === "blockAddRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const afterBlockId =
-          typeof msg.payload.afterBlockId === "string" && msg.payload.afterBlockId.length > 0 ? msg.payload.afterBlockId : undefined
-        const beforeBlockId =
-          typeof msg.payload.beforeBlockId === "string" && msg.payload.beforeBlockId.length > 0 ? msg.payload.beforeBlockId : undefined
+        const afterBlockId = parseOptionalString(msg.payload.afterBlockId)
+        const beforeBlockId = parseOptionalString(msg.payload.beforeBlockId)
         callbacks.onBlockAddRequested(nextSlug, { afterBlockId, beforeBlockId })
       }
 
       if (msg.type === "listItemAddRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
-        const blockType = typeof msg.payload.blockType === "string" ? msg.payload.blockType : ""
-        const listKey = typeof msg.payload.listKey === "string" ? msg.payload.listKey : ""
+        const blockId = parseString(msg.payload.blockId, "")
+        const blockType = parseString(msg.payload.blockType, "")
+        const listKey = parseString(msg.payload.listKey, "")
         const afterIndex = typeof msg.payload.afterIndex === "number" && Number.isInteger(msg.payload.afterIndex) ? msg.payload.afterIndex : undefined
         callbacks.onListItemAddRequested(nextSlug, blockId, blockType, listKey, afterIndex)
       }
 
       if (msg.type === "listItemRemoveRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
-        const blockType = typeof msg.payload.blockType === "string" ? msg.payload.blockType : ""
-        const listKey = typeof msg.payload.listKey === "string" ? msg.payload.listKey : ""
+        const blockId = parseString(msg.payload.blockId, "")
+        const blockType = parseString(msg.payload.blockType, "")
+        const listKey = parseString(msg.payload.listKey, "")
         const index = typeof msg.payload.index === "number" && Number.isInteger(msg.payload.index) ? msg.payload.index : -1
         callbacks.onListItemRemoveRequested(nextSlug, blockId, blockType, listKey, index)
       }
 
       if (msg.type === "listItemMoveRequested") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
-        const blockType = typeof msg.payload.blockType === "string" ? msg.payload.blockType : ""
-        const listKey = typeof msg.payload.listKey === "string" ? msg.payload.listKey : ""
+        const blockId = parseString(msg.payload.blockId, "")
+        const blockType = parseString(msg.payload.blockType, "")
+        const listKey = parseString(msg.payload.listKey, "")
         const index = typeof msg.payload.index === "number" && Number.isInteger(msg.payload.index) ? msg.payload.index : -1
         const afterIndex = typeof msg.payload.afterIndex === "number" && Number.isInteger(msg.payload.afterIndex) ? msg.payload.afterIndex : undefined
         callbacks.onListItemMoveRequested(nextSlug, blockId, blockType, listKey, index, afterIndex)
@@ -139,9 +137,9 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
 
       if (msg.type === "inlineTextCommitted") {
         const nextSlug = String(msg.payload.slug ?? slug)
-        const blockId = typeof msg.payload.blockId === "string" ? msg.payload.blockId : ""
-        const editablePath = typeof msg.payload.editablePath === "string" ? msg.payload.editablePath : ""
-        const value = typeof msg.payload.value === "string" ? msg.payload.value : ""
+        const blockId = parseString(msg.payload.blockId, "")
+        const editablePath = parseString(msg.payload.editablePath, "")
+        const value = parseString(msg.payload.value, "")
         callbacks.onInlineTextCommitted(nextSlug, blockId, editablePath, value)
       }
     }

@@ -41,13 +41,13 @@ export const PlannerOutputError = PlannerError
 /** @deprecated Use `isPlannerError` instead. */
 export const isPlannerOutputError = isPlannerError
 
-const rawPlanCandidateSchema = z.object({
+const rawPlanCandidateSchema = z.looseObject({
   intent: z.enum(["edit_plan", "needs_clarification"]).optional(),
   summary_for_user: z.string().optional(),
   change_log: z.array(z.string()).optional(),
-  ops: z.array(z.record(z.unknown())).optional(),
+  ops: z.array(z.record(z.string(), z.unknown())).optional(),
   suggested_next_actions: z.array(z.string()).optional()
-}).passthrough()
+})
 
 function asObject(value: unknown) {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null

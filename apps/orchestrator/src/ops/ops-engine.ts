@@ -295,7 +295,7 @@ export function validateOperations(ops: unknown[]): Operation[] {
   const result = opsArraySchema.safeParse(ops)
   if (!result.success) {
     const first = result.error.issues[0]
-    const path = first?.path?.length ? ` at ops${first.path.map((p) => typeof p === "number" ? `[${p}]` : `.${p}`).join("")}` : ""
+    const path = first?.path?.length ? ` at ops${first.path.map((p) => typeof p === "number" ? `[${p}]` : `.${String(p)}`).join("")}` : ""
     const detail = first?.message ?? "Invalid operation"
     throw new OperationError(`Operation contract violation${path}: ${detail}`, { category: "schema_violation" })
   }

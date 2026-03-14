@@ -1,5 +1,6 @@
 import type { EditorComponentsManifest } from "@ai-site-editor/shared"
 import type { SiteCapabilities, SiteConfig } from "./editor-types"
+import { parseArrayOfStrings, parseString } from "./parse-utils"
 
 type SiteContextPayload = {
   sitePurpose?: string
@@ -18,7 +19,7 @@ type SiteContextPayload = {
 }
 
 export function manifestUnavailableChanges(reason?: string) {
-  const trimmedReason = typeof reason === "string" ? reason.trim() : ""
+  const trimmedReason = parseString(reason, "")
   return [
     trimmedReason.length > 0 ? `Manifest issue: ${trimmedReason}` : "Component manifest is unavailable or invalid.",
     "Expose GET /api/editor/components and return a valid manifest to enable structural edits."
@@ -26,10 +27,8 @@ export function manifestUnavailableChanges(reason?: string) {
 }
 
 export function buildSiteContextPayload(siteId: string, activeSiteConfig: SiteConfig): SiteContextPayload {
-  const tone = typeof activeSiteConfig.tone === "string" ? activeSiteConfig.tone.trim() : ""
-  const constraints = Array.isArray(activeSiteConfig.constraints)
-    ? activeSiteConfig.constraints.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
-    : []
+  const tone = parseString(activeSiteConfig.tone, "")
+  const constraints = parseArrayOfStrings(activeSiteConfig.constraints)
   const purpose = activeSiteConfig.purpose?.trim() || undefined
 
   return {

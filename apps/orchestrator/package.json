@@ -18,14 +18,14 @@
   },
   "dependencies": {
     "@ai-site-editor/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.78.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^9.4.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.2.1",
-    "@anthropic-ai/sdk": "^0.78.0",
     "openai": "^4.87.1",
     "tsx": "^4.19.3",
-    "zod": "^3.24.2"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
