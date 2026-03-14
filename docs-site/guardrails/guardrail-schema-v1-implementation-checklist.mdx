@@ -1,0 +1,226 @@
+# Guardrail Schema v1 Implementation Checklist
+
+## Goal
+
+Implement Guardrail Schema v1 in the current orchestrator flow with minimal architectural change, using existing plan and block schema validation primitives.
+
+Primary implementation file:
+
+- `apps/orchestrator/src/index.ts`
+
+Supporting schema file:
+
+- `packages/shared/src/index.ts`
+
+## Function Anchors (Current Code)
+
+- `runChatPipeline(...)`
+- `applyOpsAtomically(...)`
+- `toErrorDetail(...)`
+- `isNoEffectiveChangeError(...)`
+- `clarificationSuggestions(...)`
+- `app.post("/ops", ...)`
+- `app.post("/chat", ...)`
+- `app.get("/chat/stream", ...)`
+- Shared schemas:
+  - `blockSchemas`
+  - `operationSchema`
+  - `editPlanSchema`
+  - `validateBlockProps(...)`
+
+## Phase 1: Error Taxonomy Wiring
+
+### 1. Add typed error categories
+
+Location:
+
+- `apps/orchestrator/src/index.ts` near existing error helpers (`toErrorDetail`, `isNoEffectiveChangeError`).
+
+Tasks:
+
+1. Introduce internal error category type:
+   - `schema_violation`
+   - `ambiguity`
+   - `not_found`
+   - `no_effective_change`
+   - `internal_error`
+2. Add `classifyGuardrailError(reason: string)` helper.
+3. Add `formatValidationError(category, message, fieldPath?)` helper for consistent UI-facing errors.
+
+Done when:
+
+- Every known validation/apply failure can be classified deterministically.
+
+### 2. Standardize chat failure payload mapping
+
+Location:
+
+- `runChatPipeline(...)` catch paths and final failure return.
+
+Tasks:
+
+1. Replace raw `validationErrors: [outcome.reason]` with classified messages.
+2. Keep current wire format:
+   - `status: "validation_error"`
+   - `validationErrors: string[]`
+3. Preserve `needs_clarification` path for ambiguity.
+
+Done when:
+
+- `/chat` and `/chat/stream` final error payloads contain categorized, consistent messages.
+
+## Phase 2: One-Retry Deterministic Auto-Repair
+
+### 3. Constrain retry budget from generic attempts to bounded repair
+
+Location:
+
+- `runChatPipeline(...)` planning/apply loop.
+
+Tasks:
+
+1. Keep planning attempts as needed, but allow only one guardrail repair pass after apply failure.
+2. Add `isDeterministicRepairEligible(reason: string)` helper.
+3. Add `buildRepairFeedback(reason)` to request strictly structural fixes only.
+4. Ensure no semantic rewrite hints are injected into repair prompt.
+
+Done when:
+
+- At most one structural repair attempt occurs per request after initial failure.
+
+### 4. Enforce stopping rules
+
+Location:
+
+- `runChatPipeline(...)` retry loop and post-loop fallback.
+
+Tasks:
+
+1. Stop immediately for non-repairable/ambiguous failures.
+2. On failed repair, return:
+   - `needs_clarification` for ambiguity
+   - `validation_error` for schema violations
+3. Keep existing preview version invariants (no bump on rejected edits).
+
+Done when:
+
+- The pipeline never enters unbounded or semantic-rewrite retries.
+
+## Phase 3: Operation/Props Guardrail Hardening
+
+### 5. Improve field-level diagnostics in apply layer
+
+Location:
+
+- `applyOpsAtomically(...)` and helper branches (`update_props`, `add_item`, `update_item`, etc.).
+
+Tasks:
+
+1. Preserve current hard-blocking behavior.
+2. Upgrade thrown errors to include field context where possible:
+   - block id/type
+   - prop key/list key/index
+3. Keep unknown prop protection in `update_props` branch.
+
+Done when:
+
+- Validation failures identify specific fields (not only generic "Invalid props for X").
+
+### 6. Keep block schema authority in shared package
+
+Location:
+
+- `packages/shared/src/index.ts`
+
+Tasks:
+
+1. Confirm v1 constraints match current `blockSchemas`.
+2. Add comments for intentionally permissive fields (e.g. `RichText.title`).
+3. Do not expand into policy/a11y/SEO constraints in v1.
+
+Done when:
+
+- Shared schema remains the single source of truth for field constraints.
+
+## Phase 4: Endpoint Contract Consistency
+
+### 7. `/chat` and `/chat/stream` parity
+
+Location:
+
+- `app.post("/chat", ...)`
+- `app.get("/chat/stream", ...)`
+
+Tasks:
+
+1. Ensure stream `final` payload mirrors `/chat` payload for:
+   - `applied`
+   - `needs_clarification`
+   - `validation_error`
+2. Keep `op_applied` behavior unchanged.
+3. Ensure `error` stream event includes categorized validation messages when available.
+
+Done when:
+
+- Non-stream and stream clients get equivalent guardrail outcomes.
+
+### 8. `/ops` endpoint alignment
+
+Location:
+
+- `app.post("/ops", ...)`
+
+Tasks:
+
+1. Keep strict payload validation via `operationSchema`.
+2. Optionally add `errorCode` in response while preserving existing `error` string for compatibility.
+3. Ensure `/ops` rejects never mutate state or bump version.
+
+Done when:
+
+- Direct ops path has guardrail behavior consistent with chat pipeline.
+
+## Phase 5: Acceptance Test Matrix
+
+### 9. Add tests for required v1 scenarios
+
+Location:
+
+- Existing orchestrator tests (add new suite if needed in `apps/orchestrator/src`).
+
+Required cases:
+
+1. Valid apply:
+   - update Hero heading
+   - add FeatureGrid item
+2. Hard-block failures:
+   - missing required prop on add/update
+   - unknown `op`
+   - invalid index on item ops
+3. Clarification:
+   - ambiguous prompt -> `needs_clarification`
+4. Auto-repair:
+   - one deterministic repair succeeds
+   - non-repairable case stops and returns expected failure
+5. Invariants:
+   - rejected change does not bump `previewVersion`
+   - rejected change does not persist mutations
+
+Done when:
+
+- All scenarios pass and map to v1 spec outcomes.
+
+## Implementation Order (Recommended)
+
+1. Error taxonomy helpers
+2. Retry/repair constraints in `runChatPipeline`
+3. Field-level diagnostic improvements in `applyOpsAtomically`
+4. Endpoint parity checks (`/chat` + stream + `/ops`)
+5. Acceptance tests
+
+## Out of Scope for v1
+
+1. Section-aware composition constraints
+2. Per-customer policy profiles
+3. Tone/claim/SEO/accessibility policy enforcement
+4. Multi-user conflict policy

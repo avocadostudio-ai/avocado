@@ -1,6 +1,8 @@
 # Native Tools MVP (Anthropic-first)
 
-This document defines the MVP tool contract and onboarding flow for adopter tools.
+This document defines the MVP tool contract and onboarding flow for adopter tools. If you want the AI planner to call your own APIs (product catalog, asset management, etc.) during chat-driven editing, this is the contract to implement.
+
+**Prerequisites**: a running orchestrator instance and familiarity with the [integration overview](README.md).
 
 ## Scope
 

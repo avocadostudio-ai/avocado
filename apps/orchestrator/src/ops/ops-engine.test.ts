@@ -4,6 +4,7 @@ import type { PageDoc, Operation } from "@ai-site-editor/shared"
 import { draftPages } from "../state/session-state.js"
 import {
   applyOpsAtomically,
+  validateOperations,
   pickFocusBlockId,
   pickUpdatedSlug,
   classifyGuardrailError,
@@ -711,6 +712,21 @@ describe("pickUpdatedSlug", () => {
     assert.equal(pickUpdatedSlug(TEST_SESSION, "/", ops), "/new")
   })
 
+  it("returns undefined when multiple pages are created", () => {
+    seedSession(makePage())
+    const ops: Operation[] = [
+      {
+        op: "create_page",
+        page: { id: "p1", slug: "/about", title: "About", updatedAt: "", blocks: [] }
+      },
+      {
+        op: "create_page",
+        page: { id: "p2", slug: "/pricing", title: "Pricing", updatedAt: "", blocks: [] }
+      }
+    ]
+    assert.equal(pickUpdatedSlug(TEST_SESSION, "/", ops), undefined)
+  })
+
   it("returns undefined when current page still exists", () => {
     seedSession(makePage())
     const ops: Operation[] = [
@@ -859,5 +875,48 @@ describe("ops-engine: update_page_meta", () => {
     const updated = getDraft("/")!
     assert.equal(updated.meta!.title, undefined)
     assert.equal(updated.meta!.description, "Keep this")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// validateOperations — typed contract layer
+// ---------------------------------------------------------------------------
+
+describe("validateOperations", () => {
+  it("accepts valid operations and returns typed array", () => {
+    const ops: Operation[] = [
+      { op: "update_props", pageSlug: "/", blockId: "b_hero", patch: { heading: "Hello" } },
+      { op: "remove_block", pageSlug: "/", blockId: "b_cta" }
+    ]
+    const result = validateOperations(ops)
+    assert.equal(result.length, 2)
+    assert.equal(result[0].op, "update_props")
+    assert.equal(result[1].op, "remove_block")
+  })
+
+  it("rejects operation with unknown op name", () => {
+    assert.throws(
+      () => validateOperations([{ op: "invalid_op", pageSlug: "/" }]),
+      /contract violation/
+    )
+  })
+
+  it("rejects operation missing required fields", () => {
+    assert.throws(
+      () => validateOperations([{ op: "update_props" }]),
+      /contract violation/
+    )
+  })
+
+  it("rejects non-array elements in ops", () => {
+    assert.throws(
+      () => validateOperations(["not_an_op"]),
+      /contract violation/
+    )
+  })
+
+  it("returns empty array for empty input", () => {
+    const result = validateOperations([])
+    assert.equal(result.length, 0)
   })
 })

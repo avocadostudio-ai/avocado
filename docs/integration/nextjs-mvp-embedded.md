@@ -1,11 +1,16 @@
 # Next.js MVP Onboarding (Embedded Mode)
 
-This is the default onboarding path for any Next.js site.
+This is the default onboarding path for any Next.js site. Estimated time: **~30 minutes**.
 
-Central entry:
-- `docs/integration/README.md`
+**Start here first**: [Integration overview](README.md)
 
-Goal:
+## Prerequisites
+
+- Next.js 14+ with App Router (Pages Router works but templates assume App Router)
+- AI Site Editor monorepo running locally (`pnpm dev`)
+- A shared secret string for draft mode (any random value — set as `DRAFT_MODE_SECRET`)
+
+## Goal
 - Keep existing site routes.
 - Do not require a `/preview` route.
 - Enable editor preview through Next.js Draft Mode cookies.

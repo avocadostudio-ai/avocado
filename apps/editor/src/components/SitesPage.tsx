@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { editorComponentsManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
-import { buildSiteDraftEnableUrl, DEFAULT_SITE_HOSTING, LEGACY_AVOCADO_SITE_ID, resolveSiteOrigin } from "../lib/editor-utils"
+import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, resolveSiteOrigin } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 function compactPurposeText(value: string) {
@@ -127,15 +127,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             type="button"
             className="primary-btn"
             onClick={() => {
-              sites.setNewSiteName("")
-              sites.setNewSitePurpose("")
-              sites.setNewSiteTone("")
-              sites.setNewSiteConstraints("")
-              sites.setNewSiteHosting(DEFAULT_SITE_HOSTING)
-              sites.setNewSiteVercelProjectId("")
-              sites.setNewSiteVercelTeamId("")
-              sites.setNewSiteVercelProductionUrl("")
-              sites.setNewSiteVercelDeployHookUrl("")
+              sites.resetNewSiteForm()
               setAddAiTab("overview")
               sites.setShowSiteModal(true)
             }}
@@ -213,9 +205,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   <span>Site name</span>
                   <input
                     type="text"
-                    value={sites.newSiteName}
+                    value={sites.newSiteForm.name}
                     placeholder="Adventure Arena"
-                    onChange={(event) => sites.setNewSiteName(event.target.value)}
+                    onChange={(event) => sites.updateNewSiteForm({ name: event.target.value })}
                   />
                 </label>
                 <p className="sites-form-section-title">Editorial brief</p>
@@ -235,9 +227,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     <label className="sites-form-field">
                       <span>Overview</span>
                       <textarea
-                        value={sites.newSitePurpose}
+                        value={sites.newSiteForm.purpose}
                         placeholder="What this site is for."
-                        onChange={(event) => sites.setNewSitePurpose(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ purpose: event.target.value })}
                         rows={8}
                       />
                     </label>
@@ -246,9 +238,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     <label className="sites-form-field">
                       <span>Preferred tone</span>
                       <textarea
-                        value={sites.newSiteTone}
+                        value={sites.newSiteForm.tone}
                         placeholder="How the writing should sound."
-                        onChange={(event) => sites.setNewSiteTone(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ tone: event.target.value })}
                         rows={8}
                       />
                     </label>
@@ -257,9 +249,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     <label className="sites-form-field">
                       <span>Writing constraints</span>
                       <textarea
-                        value={sites.newSiteConstraints}
+                        value={sites.newSiteForm.constraints}
                         placeholder={"Rules for content output.\nOne per line."}
-                        onChange={(event) => sites.setNewSiteConstraints(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ constraints: event.target.value })}
                         rows={8}
                       />
                     </label>
@@ -272,45 +264,45 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                       <span>Hosting</span>
                       <input
                         type="text"
-                        value={sites.newSiteHosting}
+                        value={sites.newSiteForm.hosting}
                         placeholder="Vercel production site (single shared project)"
-                        onChange={(event) => sites.setNewSiteHosting(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ hosting: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
                       <span>Vercel project ID</span>
                       <input
                         type="text"
-                        value={sites.newSiteVercelProjectId}
+                        value={sites.newSiteForm.vercelProjectId}
                         placeholder="prj_..."
-                        onChange={(event) => sites.setNewSiteVercelProjectId(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ vercelProjectId: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
                       <span>Vercel team ID</span>
                       <input
                         type="text"
-                        value={sites.newSiteVercelTeamId}
+                        value={sites.newSiteForm.vercelTeamId}
                         placeholder="team_..."
-                        onChange={(event) => sites.setNewSiteVercelTeamId(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ vercelTeamId: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
                       <span>Vercel production URL</span>
                       <input
                         type="url"
-                        value={sites.newSiteVercelProductionUrl}
+                        value={sites.newSiteForm.vercelProductionUrl}
                         placeholder="https://example.vercel.app"
-                        onChange={(event) => sites.setNewSiteVercelProductionUrl(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ vercelProductionUrl: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field sites-form-field-wide">
                       <span>Vercel deploy hook URL</span>
                       <input
                         type="url"
-                        value={sites.newSiteVercelDeployHookUrl}
+                        value={sites.newSiteForm.vercelDeployHookUrl}
                         placeholder="https://api.vercel.com/v1/integrations/deploy/..."
-                        onChange={(event) => sites.setNewSiteVercelDeployHookUrl(event.target.value)}
+                        onChange={(event) => sites.updateNewSiteForm({ vercelDeployHookUrl: event.target.value })}
                       />
                     </label>
                   </div>
@@ -463,25 +455,25 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           </section>
         </div>
       ) : null}
-      {sites.restoreSiteId ? (
-        <div className="sites-modal-backdrop" onClick={() => sites.setRestoreSiteId(null)}>
+      {sites.restoreState.siteId ? (
+        <div className="sites-modal-backdrop" onClick={() => sites.updateRestoreState({ siteId: null })}>
           <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Restore snapshot" onClick={(event) => event.stopPropagation()}>
             <header className="sites-modal-header">
               <h2>Restore Snapshot</h2>
-              <button type="button" className="settings-close-btn" onClick={() => sites.setRestoreSiteId(null)} aria-label="Close">
+              <button type="button" className="settings-close-btn" onClick={() => sites.updateRestoreState({ siteId: null })} aria-label="Close">
                 ×
               </button>
             </header>
             <div className="sites-modal-body">
-              <p className="site-purpose">Restore a previous published snapshot into <strong>{sites.restoreSiteId}</strong>.</p>
+              <p className="site-purpose">Restore a previous published snapshot into <strong>{sites.restoreState.siteId}</strong>.</p>
               <label className="sites-form-field">
                 <span>Snapshot version</span>
                 <select
-                  value={sites.restoreCommit}
-                  onChange={(event) => sites.setRestoreCommit(event.target.value)}
-                  disabled={sites.isLoadingRestoreOptions || sites.isRestoringSnapshot || sites.restoreOptions.length === 0}
+                  value={sites.restoreState.commit}
+                  onChange={(event) => sites.updateRestoreState({ commit: event.target.value })}
+                  disabled={sites.restoreState.isLoading || sites.restoreState.isRestoring || sites.restoreState.options.length === 0}
                 >
-                  {sites.restoreOptions.map((option) => {
+                  {sites.restoreState.options.map((option) => {
                     const dateLabel = new Date(option.committedAt).toLocaleString()
                     const label = `${option.commit} · ${option.pageCount} pages · ${option.homeHeading} · ${dateLabel}`
                     return (
@@ -492,19 +484,19 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   })}
                 </select>
               </label>
-              {sites.restoreError ? <p className="site-purpose">{sites.restoreError}</p> : null}
+              {sites.restoreState.error ? <p className="site-purpose">{sites.restoreState.error}</p> : null}
             </div>
             <footer className="sites-modal-footer">
-              <button type="button" className="secondary-btn" onClick={() => sites.setRestoreSiteId(null)} disabled={sites.isRestoringSnapshot}>
+              <button type="button" className="secondary-btn" onClick={() => sites.updateRestoreState({ siteId: null })} disabled={sites.restoreState.isRestoring}>
                 Cancel
               </button>
               <button
                 type="button"
                 className="primary-btn"
                 onClick={() => void sites.restoreSnapshotForSite()}
-                disabled={sites.isLoadingRestoreOptions || sites.isRestoringSnapshot || !sites.restoreCommit}
+                disabled={sites.restoreState.isLoading || sites.restoreState.isRestoring || !sites.restoreState.commit}
               >
-                {sites.isRestoringSnapshot ? "Restoring..." : "Restore"}
+                {sites.restoreState.isRestoring ? "Restoring..." : "Restore"}
               </button>
             </footer>
           </section>

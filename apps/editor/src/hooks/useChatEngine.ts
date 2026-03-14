@@ -1,25 +1,16 @@
 import { useEffect, useRef, useState } from "react"
 import {
-  defaultListItemForBlock,
-  defaultPropsForType,
   type EditorComponentsManifest,
   type Operation
 } from "@ai-site-editor/shared"
 import type {
   AIProvider,
-  ApplyOpsResponse,
   AssistantResponse,
   ChatEntry,
   ChatExecutionMode,
-  HistoryResponse,
   ModelKey,
-  PlannerBadgeState,
-  PlannerSource,
   SiteCapabilities,
-  SiteConfig,
-  VariationModalState,
-  VariationOption,
-  VariationResponse
+  SiteConfig
 } from "../lib/editor-types"
 import {
   createId,
@@ -32,6 +23,10 @@ import {
   splitAiInsightChanges
 } from "../lib/editor-utils"
 import { buildSiteContextPayload, manifestUnavailableChanges, withIntegrationContext } from "../lib/integration-context"
+import { usePlanApproval } from "./chat-engine/usePlanApproval"
+import { useStructuralOps } from "./chat-engine/useStructuralOps"
+import { useUndoHistory } from "./chat-engine/useUndoHistory"
+import { useVariations } from "./chat-engine/useVariations"
 
 export type ChatEngineConfig = {
   session: string
@@ -96,19 +91,6 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   const activeSiteOrigin = resolveSiteOrigin(activeSiteConfig)
   const chatLogStorageKey = `editor-chat-log-v1:${session}:${siteId}`
-  const lastStructuralNoticeRef = useRef<number>(0)
-
-  const pushStructuralDisabledNotice = (action: string) => {
-    const now = Date.now()
-    if (now - lastStructuralNoticeRef.current < 1200) return
-    lastStructuralNoticeRef.current = now
-    const reason = siteCapabilities?.reason?.trim()
-    pushAssistantFromResult({
-      status: "needs_clarification",
-      summary: `Cannot ${action} because structural editing is currently disabled.`,
-      changes: manifestUnavailableChanges(reason)
-    })
-  }
 
   const blockIdFromOperation = (op?: Operation) => {
     if (!op || typeof op !== "object") return null
@@ -121,7 +103,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const welcomeEntry: ChatEntry = {
     id: "welcome",
     role: "assistant",
-    text: "Let’s shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.",
+    text: "Let's shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.",
     suggestions: [
       "Add testimonials below hero",
       "Change the hero headline",
@@ -152,12 +134,6 @@ export function useChatEngine(config: ChatEngineConfig) {
   const [streamTokenCount, setStreamTokenCount] = useState(0)
   const [imageProgress, setImageProgress] = useState<{ percent: number; stage: string } | null>(null)
   const [latestStreamFocusBlockId, setLatestStreamFocusBlockId] = useState<string | null>(null)
-  const [plannerBadgeState, setPlannerBadgeState] = useState<PlannerBadgeState>("checking")
-  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
-  const [pendingPlanMessage, setPendingPlanMessage] = useState<string | null>(null)
-  const [variationModal, setVariationModal] = useState<VariationModalState | null>(null)
-  const [isApplyingVariation, setIsApplyingVariation] = useState(false)
-  const [undoInFlightEntryId, setUndoInFlightEntryId] = useState<string | null>(null)
   const [continuationChainId, setContinuationChainId] = useState<string | null>(null)
   const [streamingText, setStreamingText] = useState<string | null>(null)
   const [streamingChanges, setStreamingChanges] = useState<string[]>([])
@@ -204,16 +180,16 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   function applyChatResult(data: AssistantResponse) {
     if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "demo") {
-      setPlannerBadgeState(data.plannerSource)
+      planApproval.setPlannerBadgeState(data.plannerSource)
     }
     if (data.status === "plan_ready" && typeof data.pendingPlanId === "string" && data.pendingPlanId.length > 0) {
-      setPendingPlanId(data.pendingPlanId)
+      planApproval.setPendingPlanId(data.pendingPlanId)
       // Server may force plan_only (e.g. for image generation) on a non-complex message.
       // Ensure pendingPlanMessage is populated so approval sends the original text.
-      setPendingPlanMessage((prev) => prev ?? lastSentMessageRef.current)
+      planApproval.setPendingPlanMessage((prev) => prev ?? lastSentMessageRef.current)
     } else if (data.status === "applied" || data.status === "canceled") {
-      setPendingPlanId(null)
-      setPendingPlanMessage(null)
+      planApproval.setPendingPlanId(null)
+      planApproval.setPendingPlanMessage(null)
     }
     if (data.continuation?.chainId) {
       setContinuationChainId(data.continuation.chainId)
@@ -300,412 +276,6 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  async function addBlockAfter(
-    slugForOp: string,
-    afterBlockId: string | undefined,
-    blockType: string,
-    beforeBlockId?: string,
-    defaultPropsOverride?: Record<string, unknown>
-  ) {
-    if (!allowStructuralEdits) {
-      pushStructuralDisabledNotice("add a block")
-      return false
-    }
-    if (!blockType) return false
-
-    const normalizedType = blockType.trim()
-    const safeType = normalizedType.toLowerCase().replace(/[^a-z0-9]+/g, "_")
-    const block = {
-      id: `b_${safeType}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      type: normalizedType,
-      props: defaultPropsOverride ?? getBlockDefaultProps?.(normalizedType) ?? defaultPropsForType(normalizedType)
-    }
-    const isInsertAtTop = Boolean(beforeBlockId && !afterBlockId)
-    const addOp: Record<string, unknown> = { op: "add_block", pageSlug: slugForOp, block }
-    if (afterBlockId) addOp.afterBlockId = afterBlockId
-    const ops: Record<string, unknown>[] = isInsertAtTop
-      ? [addOp, { op: "move_block", pageSlug: slugForOp, blockId: block.id }]
-      : [addOp]
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not add block.",
-          changes: data.changes ?? []
-        })
-        return false
-      }
-
-      const focusBlockId = data.focusBlockId ?? block.id
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = normalizedType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(normalizedType)
-      setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number" && !isInsertAtTop) {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = { op: "add_block" as const, pageSlug: slugForOp, ...(afterBlockId ? { afterBlockId } : {}), block }
-        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-      return true
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not add block.",
-        changes: []
-      })
-      return false
-    }
-  }
-
-  async function reorderBlock(slugForOp: string, blockId: string, afterBlockId?: string) {
-    if (!allowStructuralEdits) {
-      pushStructuralDisabledNotice("reorder blocks")
-      return
-    }
-    if (!blockId) return
-    const op: Record<string, unknown> = { op: "move_block", pageSlug: slugForOp, blockId }
-    if (afterBlockId) op.afterBlockId = afterBlockId
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not reorder blocks.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = { op: "move_block" as const, pageSlug: slugForOp, blockId, ...(afterBlockId ? { afterBlockId } : {}) }
-        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not reorder blocks.",
-        changes: []
-      })
-    }
-  }
-
-  async function addListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, afterIndex?: number) {
-    if (!allowStructuralEdits) {
-      pushStructuralDisabledNotice("add list items")
-      return
-    }
-    if (!blockId || !blockType || !listKey) return
-    const fallbackItem = { title: "New item", description: "Describe this item." }
-    const item = defaultListItemForBlock(blockType, listKey) ?? fallbackItem
-    const op: Record<string, unknown> = { op: "add_item", pageSlug: slugForOp, blockId, listKey, item }
-    if (typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0) op.afterIndex = afterIndex
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not add item.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = blockType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(blockType)
-      setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = {
-          op: "add_item" as const,
-          pageSlug: slugForOp,
-          blockId,
-          listKey,
-          item,
-          ...(typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0 ? { afterIndex } : {})
-        }
-        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not add item.",
-        changes: []
-      })
-    }
-  }
-
-  async function removeListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, index: number) {
-    if (!allowStructuralEdits) {
-      pushStructuralDisabledNotice("remove list items")
-      return
-    }
-    if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
-    const op = { op: "remove_item", pageSlug: slugForOp, blockId, listKey, index }
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not remove item.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = blockType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(blockType)
-      setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = { op: "remove_item" as const, pageSlug: slugForOp, blockId, listKey, index }
-        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not remove item.",
-        changes: []
-      })
-    }
-  }
-
-  async function moveListItem(slugForOp: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex?: number) {
-    if (!allowStructuralEdits) {
-      pushStructuralDisabledNotice("reorder list items")
-      return
-    }
-    if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
-    const op: Record<string, unknown> = { op: "move_item", pageSlug: slugForOp, blockId, listKey, index }
-    if (typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0) op.afterIndex = afterIndex
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not reorder items.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = blockType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(blockType)
-      setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = {
-          op: "move_item" as const,
-          pageSlug: slugForOp,
-          blockId,
-          listKey,
-          index,
-          ...(typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0 ? { afterIndex } : {})
-        }
-        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not reorder items.",
-        changes: []
-      })
-    }
-  }
-
-  async function deleteBlock(slugForOp: string, blockId: string) {
-    if (!allowStructuralEdits) {
-      pushStructuralDisabledNotice("delete blocks")
-      return
-    }
-    if (!blockId) return
-    const op = { op: "remove_block", pageSlug: slugForOp, blockId }
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not delete block.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      activeBlockIdRef.current = undefined
-      activeBlockTypeRef.current = undefined
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(undefined)
-      setActiveBlockType(undefined)
-      setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = { op: "remove_block" as const, pageSlug: slugForOp, blockId }
-        postPatchToSite(typedOp, fromVersion, toVersion)
-      } else {
-        postToSite("draftUpdated", { focusBlockId: null })
-      }
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not delete block.",
-        changes: []
-      })
-    }
-  }
-
-  async function inlineEditCommit(slugForOp: string, blockId: string, editablePath: string, value: string) {
-    if (!blockId || !editablePath) return
-
-    const indexedPath = /^([A-Za-z_][A-Za-z0-9_]*)\[([0-9]+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(editablePath)
-    let op: Record<string, unknown> | null = null
-
-    if (indexedPath) {
-      const listKey = indexedPath[1]
-      const index = Number(indexedPath[2])
-      const fieldKey = indexedPath[3]
-      op = {
-        op: "update_item",
-        pageSlug: slugForOp,
-        blockId,
-        listKey,
-        index,
-        patch: { [fieldKey]: value }
-      }
-    } else if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(editablePath)) {
-      op = {
-        op: "update_props",
-        pageSlug: slugForOp,
-        blockId,
-        patch: { [editablePath]: value }
-      }
-    }
-
-    if (!op) {
-      pushAssistantFromResult({
-        status: "error",
-        summary: `Inline edit is not supported for "${editablePath}".`,
-        changes: []
-      })
-      return
-    }
-
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({ session, siteId, ops: [op] }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not apply inline edit.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeEditablePathRef.current = editablePath
-      setActiveBlockId(focusBlockId)
-      setActiveEditablePath(editablePath)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        if (indexedPath) {
-          const listKey = indexedPath[1]
-          const index = Number(indexedPath[2])
-          const fieldKey = indexedPath[3]
-          const typedOp = { op: "update_item" as const, pageSlug: slugForOp, blockId, listKey: listKey!, index, patch: { [fieldKey!]: value } }
-          postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-        } else {
-          const typedOp = { op: "update_props" as const, pageSlug: slugForOp, blockId, patch: { [editablePath]: value } }
-          postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-        }
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not apply inline edit.",
-        changes: []
-      })
-    }
-  }
-
   async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string; continuationChainId?: string }) {
     const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
     const res = await fetch(`${orchestrator}/chat`, {
@@ -730,124 +300,6 @@ export function useChatEngine(config: ChatEngineConfig) {
 
     const data = (await res.json()) as AssistantResponse
     applyChatResult(data)
-  }
-
-  async function submitVariations(finalMessage: string) {
-    const selectedBlockId = activeBlockIdRef.current
-    const selectedBlockType = activeBlockTypeRef.current
-    if (!selectedBlockId || !selectedBlockType) {
-      pushAssistantFromResult({
-        status: "needs_clarification",
-        summary: "Select a block first, then ask to generate variations.",
-        changes: []
-      })
-      return
-    }
-
-    const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
-    const res = await fetch(`${orchestrator}/chat/variations`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(withIntegrationContext({
-        session,
-        siteId,
-        ...contextPayload,
-        slug: slugRef.current,
-        message: finalMessage,
-        modelKey,
-        provider,
-        activeBlockId: selectedBlockId,
-        activeBlockType: selectedBlockType,
-        activeEditablePath: activeEditablePathRef.current
-      }, componentManifest, siteCapabilities))
-    })
-
-    const data = (await res.json()) as VariationResponse
-    if (!res.ok || data.status !== "ok" || !Array.isArray(data.variations) || data.variations.length === 0) {
-      pushAssistantFromResult({
-        status: "error",
-        summary: data.error ?? data.summary ?? "Could not generate variations.",
-        changes: []
-      })
-      return
-    }
-
-    setVariationModal({
-      requestText: finalMessage,
-      blockId: data.blockId ?? selectedBlockId,
-      blockType: data.blockType ?? selectedBlockType,
-      pageSlug: data.pageSlug ?? slugRef.current,
-      baseProps: (data.baseProps && typeof data.baseProps === "object" ? data.baseProps : {}) as Record<string, unknown>,
-      options: data.variations
-    })
-    pushAssistantFromResult({
-      status: "info",
-      summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
-      changes: [`Block: ${data.blockType ?? selectedBlockType}`, `Options: ${data.variations.length}`]
-    })
-  }
-
-  async function applyVariation(option: VariationOption) {
-    if (!variationModal || isApplyingVariation) return
-    setIsApplyingVariation(true)
-    try {
-      const res = await fetch(`${orchestrator}/ops`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(withIntegrationContext({
-          session,
-          siteId,
-          ops: [
-            {
-              op: "update_props",
-              pageSlug: variationModal.pageSlug,
-              blockId: variationModal.blockId,
-              patch: option.patch
-            }
-          ]
-        }, componentManifest, siteCapabilities))
-      })
-      const data = (await res.json()) as ApplyOpsResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? data.summary ?? "Could not apply variation.",
-          changes: data.changes ?? []
-        })
-        return
-      }
-
-      const focusBlockId = data.focusBlockId ?? variationModal.blockId
-      activeBlockIdRef.current = focusBlockId
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveEditablePath(undefined)
-      if (enablePatchTransport && typeof data.previewVersion === "number") {
-        const toVersion = data.previewVersion
-        const fromVersion = toVersion - 1
-        const typedOp = { op: "update_props" as const, pageSlug: variationModal.pageSlug, blockId: variationModal.blockId, patch: option.patch }
-        postPatchToSite(typedOp, fromVersion, toVersion, focusBlockId)
-      } else {
-        postToSite("draftUpdated", { focusBlockId })
-      }
-      setVariationModal(null)
-      pushAssistantFromResult(
-        {
-          status: "applied",
-          summary: `Applied variation: ${option.title}`,
-          changes: [option.summary]
-        },
-        { canUndo: true }
-      )
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not apply variation.",
-        changes: []
-      })
-    } finally {
-      setIsApplyingVariation(false)
-    }
   }
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
@@ -1372,14 +824,110 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
+  // --- Compose sub-hooks ---
+
+  const structuralOps = useStructuralOps({
+    session,
+    siteId,
+    activeSiteConfig,
+    slug,
+    setSlug,
+    activeBlockIdRef,
+    activeBlockTypeRef,
+    activeEditablePathRef,
+    setActiveBlockId,
+    setActiveBlockType,
+    setActiveEditablePath,
+    postToSite,
+    postPatchToSite,
+    componentManifest,
+    siteCapabilities,
+    allowStructuralEdits,
+    getBlockDefaultProps,
+    pushAssistantFromResult
+  })
+
+  const variations = useVariations({
+    session,
+    siteId,
+    activeSiteConfig,
+    slug,
+    setSlug,
+    activeBlockIdRef,
+    activeBlockTypeRef,
+    activeEditablePathRef,
+    setActiveBlockId,
+    setActiveBlockType,
+    setActiveEditablePath,
+    postToSite,
+    postPatchToSite,
+    componentManifest,
+    siteCapabilities,
+    allowStructuralEdits,
+    getBlockDefaultProps,
+    pushAssistantFromResult,
+    slugRef,
+    modelKey,
+    provider
+  })
+
+  const planApproval = usePlanApproval({
+    isLoading,
+    setIsLoading,
+    useStreaming,
+    setChatLog,
+    setLatestStreamFocusBlockId,
+    setStreamStatus,
+    setStreamingText,
+    setStreamingChanges,
+    setStreamSteps,
+    pushAssistantFromResult,
+    submitChatStream,
+    submitChatHttp
+  })
+
+  const undoHistory = useUndoHistory({
+    session,
+    siteId,
+    slugRef,
+    isLoading,
+    activeEditablePathRef,
+    setActiveEditablePath,
+    postToSite,
+    setChatLog,
+    pushAssistantFromResult
+  })
+
+  async function continueChain(chainId: string) {
+    if (!chainId || isLoading) return
+    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Continue to next step." }])
+    setIsLoading(true)
+    try {
+      await submitChatHttp("Continue to next step", {
+        executionMode: "continue_chain",
+        continuationChainId: chainId
+      })
+    } catch (error) {
+      pushAssistantFromResult({
+        status: "error",
+        summary: `Continuation failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        changes: []
+      })
+    } finally {
+      setStreamingText(null)
+      setStreamingChanges([])
+      setIsLoading(false)
+    }
+  }
+
   async function submitChat(explicitMessage?: string, currentMessage?: string) {
     const finalMessage = (explicitMessage ?? currentMessage ?? "").trim()
     if (!finalMessage || isLoading) return
 
     // If there's a pending plan and the user types an approval-like message,
     // route through the plan approval flow instead of treating as a new request.
-    if (pendingPlanId && /\b(approve|execute|go\s+ahead|yes|do\s+it|apply|confirm)\b/i.test(finalMessage)) {
-      await approvePendingPlan(pendingPlanId)
+    if (planApproval.pendingPlanId && /\b(approve|execute|go\s+ahead|yes|do\s+it|apply|confirm)\b/i.test(finalMessage)) {
+      await planApproval.approvePendingPlan(planApproval.pendingPlanId)
       return
     }
 
@@ -1391,12 +939,12 @@ export function useChatEngine(config: ChatEngineConfig) {
     setLatestStreamFocusBlockId(null)
     try {
       if (isVariationRequest(finalMessage)) {
-        await submitVariations(finalMessage)
+        await variations.submitVariations(finalMessage)
         return
       }
       const requiresPlanApproval = isComplexTaskRequest(finalMessage)
       if (requiresPlanApproval) {
-        setPendingPlanMessage(finalMessage)
+        planApproval.setPendingPlanMessage(finalMessage)
         const planOnlyParams = { executionMode: "plan_only" as const }
         if (useStreaming) {
           const ok = await submitChatStream(finalMessage, planOnlyParams)
@@ -1421,122 +969,6 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  async function approvePendingPlan(planId: string) {
-    if (!planId || isLoading) return
-    const originalMessage = pendingPlanMessage?.trim() || "Approve and execute the pending plan."
-    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Approve plan and execute." }])
-    setIsLoading(true)
-    setLatestStreamFocusBlockId(null)
-    try {
-      const approvalParams = { executionMode: "apply_pending_plan" as const, pendingPlanId: planId }
-      if (useStreaming) {
-        const ok = await submitChatStream(originalMessage, approvalParams)
-        if (!ok) await submitChatHttp(originalMessage, approvalParams)
-      } else {
-        await submitChatHttp(originalMessage, approvalParams)
-      }
-    } catch (error) {
-      pushAssistantFromResult({
-        status: "error",
-        summary: `Plan execution failed: ${error instanceof Error ? error.message : "unknown error"}`,
-        changes: []
-      })
-    } finally {
-      setStreamStatus(null)
-      setStreamingText(null)
-      setStreamingChanges([])
-      setStreamSteps([])
-      setIsLoading(false)
-    }
-  }
-
-  async function stopPendingPlan(planId: string) {
-    if (!planId || isLoading) return
-    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Stop and discard this plan." }])
-    setIsLoading(true)
-    try {
-      await submitChatHttp("Stop pending plan.", {
-        executionMode: "discard_pending_plan",
-        pendingPlanId: planId
-      })
-    } finally {
-      setStreamingText(null)
-      setStreamingChanges([])
-      setIsLoading(false)
-    }
-  }
-
-  async function continueChain(chainId: string) {
-    if (!chainId || isLoading) return
-    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Continue to next step." }])
-    setIsLoading(true)
-    try {
-      await submitChatHttp("Continue to next step", {
-        executionMode: "continue_chain",
-        continuationChainId: chainId
-      })
-    } catch (error) {
-      pushAssistantFromResult({
-        status: "error",
-        summary: `Continuation failed: ${error instanceof Error ? error.message : "unknown error"}`,
-        changes: []
-      })
-    } finally {
-      setStreamingText(null)
-      setStreamingChanges([])
-      setIsLoading(false)
-    }
-  }
-
-  async function applyUndoHistory(entryId: string) {
-    if (isLoading || undoInFlightEntryId) return
-    setUndoInFlightEntryId(entryId)
-    try {
-      const res = await fetch(`${orchestrator}/history/undo`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, siteId, slug: slugRef.current })
-      })
-      const data = (await res.json()) as HistoryResponse
-      if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
-          status: "error",
-          summary: data.error ?? "Could not undo.",
-          changes: []
-        })
-        return
-      }
-
-      activeEditablePathRef.current = undefined
-      setActiveEditablePath(undefined)
-      postToSite("draftUpdated", { focusBlockId: null })
-      setChatLog((prev) => {
-        const targetIndex = prev.findIndex((entry) => entry.id === entryId)
-        if (targetIndex < 0) return prev
-
-        const next = prev.map((entry, index) => (index === targetIndex ? { ...entry, canUndo: false, wasUndone: true } : entry))
-        let promoteIndex = -1
-        for (let index = targetIndex - 1; index >= 0; index -= 1) {
-          const entry = next[index]
-          if (entry.role === "assistant" && entry.status === "applied") {
-            promoteIndex = index
-            break
-          }
-        }
-        if (promoteIndex >= 0) next[promoteIndex] = { ...next[promoteIndex], canUndo: true, wasUndone: false }
-        return next
-      })
-    } catch {
-      pushAssistantFromResult({
-        status: "error",
-        summary: "Could not undo.",
-        changes: []
-      })
-    } finally {
-      setUndoInFlightEntryId(null)
-    }
-  }
-
   return {
     chatLog,
     isLoading,
@@ -1547,30 +979,30 @@ export function useChatEngine(config: ChatEngineConfig) {
     streamingChanges,
     streamSteps,
     latestStreamFocusBlockId,
-    plannerBadgeState,
-    setPlannerBadgeState,
-    pendingPlanId,
-    variationModal,
-    setVariationModal,
-    isApplyingVariation,
-    undoInFlightEntryId,
+    plannerBadgeState: planApproval.plannerBadgeState,
+    setPlannerBadgeState: planApproval.setPlannerBadgeState,
+    pendingPlanId: planApproval.pendingPlanId,
+    variationModal: variations.variationModal,
+    setVariationModal: variations.setVariationModal,
+    isApplyingVariation: variations.isApplyingVariation,
+    undoInFlightEntryId: undoHistory.undoInFlightEntryId,
     pushAssistantFromResult,
     submitChat,
     cancelChat,
-    applyVariation,
-    approvePendingPlan,
-    stopPendingPlan,
+    applyVariation: variations.applyVariation,
+    approvePendingPlan: planApproval.approvePendingPlan,
+    stopPendingPlan: planApproval.stopPendingPlan,
     continueChain,
     continuationChainId,
-    applyUndoHistory,
+    applyUndoHistory: undoHistory.applyUndoHistory,
     refreshRouteSlugs,
-    addBlockAfter,
-    addListItem,
-    removeListItem,
-    moveListItem,
-    reorderBlock,
-    deleteBlock,
-    inlineEditCommit,
+    addBlockAfter: structuralOps.addBlockAfter,
+    addListItem: structuralOps.addListItem,
+    removeListItem: structuralOps.removeListItem,
+    moveListItem: structuralOps.moveListItem,
+    reorderBlock: structuralOps.reorderBlock,
+    deleteBlock: structuralOps.deleteBlock,
+    inlineEditCommit: structuralOps.inlineEditCommit,
     clearChat: () => setChatLog([welcomeEntry])
   }
 }

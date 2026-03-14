@@ -4,9 +4,8 @@ Date: 2026-02-26
 Repo: /Users/yury/Projects/ai-site-editor
 
 ## Live deployment status
-- Public site is deployed on Vercel at [avocado-site.vercel.app](https://avocado-site.vercel.app/).
-- Production renders from committed published content (static build output), not from live local draft APIs.
-- Current homepage hero heading is restored to: `Experience Avocado Excellence`.
+- Public site is deployed on Vercel (static build output from committed published content).
+- Production renders from committed published content, not from live local draft APIs.
 
 ## Phase 1 publish model (implemented)
 - Publish mode: `git` (recommended for current local-only orchestrator).

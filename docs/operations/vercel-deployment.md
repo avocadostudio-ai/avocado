@@ -4,11 +4,7 @@ This document summarizes the changes needed to publish this project on Vercel.
 
 ## Current state (Mar 2026)
 
-Full demo deployment is live: site + editor on Vercel, orchestrator on Render.
-
-- Site: `https://avocado-site.vercel.app`
-- Editor: `https://avocado-editor.vercel.app`
-- Orchestrator: Render (long-running Node process via `tsx`)
+Full demo deployment is supported: site + editor on Vercel, orchestrator on a long-running host (e.g. Render, Fly, Railway).
 
 Phase 1 (public site only) and Phase 2 (full stack) are both supported.
 

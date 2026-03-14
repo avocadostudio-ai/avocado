@@ -12,7 +12,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   normalizeOpName,
@@ -180,10 +180,12 @@ export async function generatePlanWithAnthropic(args: {
   siteContextBlock?: string | null
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
+  manifestBlockTypes?: string[]
   signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
-  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isPageWideRewriteRequest(args.message)
+  const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
@@ -262,7 +264,7 @@ export async function generatePlanWithAnthropic(args: {
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
-    `Allowed block types: ${allowedBlockTypes.join(", ")}.`,
+    `Allowed block types: ${effectiveBlockTypes.join(", ")}.`,
     ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : [])
   ].join("\n")
 

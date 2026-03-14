@@ -8,6 +8,7 @@ import {
   type Operation,
   type PageDoc
 } from "@ai-site-editor/shared"
+import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
 
 // ---------------------------------------------------------------------------
 // ModelKey inline type (avoids circular dependency with index.ts)
@@ -151,27 +152,9 @@ export let persistTimer: NodeJS.Timeout | null = null
 export let lastStateBackupAt = 0
 
 // ---------------------------------------------------------------------------
-// Utility: error detail extractor (needed by persistence functions)
+// Utility: error detail extractor — canonical impl in ../errors.ts
 // ---------------------------------------------------------------------------
-export function toErrorDetail(error: unknown) {
-  if (error instanceof Error) {
-    const issueMatch = /"message"\s*:\s*"([^"]+)"/.exec(error.message)
-    if (issueMatch?.[1]) return issueMatch[1]
-    return error.message
-  }
-  if (
-    error &&
-    typeof error === "object" &&
-    "issues" in error &&
-    Array.isArray((error as { issues?: unknown[] }).issues)
-  ) {
-    const first = (error as { issues: Array<{ message?: unknown; path?: unknown[] }> }).issues[0]
-    if (!first) return "Unknown validation error"
-    const path = Array.isArray(first.path) && first.path.length > 0 ? ` (${first.path.join(".")})` : ""
-    return `${String(first.message ?? "Validation error")}${path}`
-  }
-  return String(error ?? "Unknown error")
-}
+export const toErrorDetail = _unifiedToErrorDetail
 
 // ---------------------------------------------------------------------------
 // Hero image prop guard (needed by getSessionDraft, setPage, applyPersistedState)

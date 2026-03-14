@@ -2,10 +2,15 @@
 
 Use this when integrating the editor with any existing Next.js site.
 
-Start here first:
-- `docs/integration/README.md`
+**Start here first**: [Integration overview](README.md)
 
-MVP requirement:
+## Prerequisites
+
+- Next.js site running locally (App Router recommended)
+- AI Site Editor monorepo running (`pnpm dev`)
+- `DRAFT_MODE_SECRET` set in both site and editor `.env`
+
+## MVP requirement
 - Expose `GET /api/editor/components` so the editor/orchestrator knows which components are safely editable.
 - Without this manifest, run in degraded mode (read-only preview or text-only edits).
 

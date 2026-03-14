@@ -1,0 +1,37 @@
+---
+title: "AI Site Editor Docs"
+description: "Integration, operations, and technical references for the AI Site Editor platform."
+---
+
+## What is AI Site Editor?
+
+AI Site Editor is a chat-driven website editing platform. Site owners and content teams describe changes in natural language — the system applies them as validated, schema-checked operations with live preview, undo/redo, and plan approval.
+
+**How it works**: a split-pane experience where your live website renders on the left and a chat interface on the right. Users type requests like _"add a testimonials section below the hero"_ or _"change the hero heading to Welcome"_, and the system plans and applies structured edits.
+
+**For site owners**: connect the editor to your existing site by implementing a small API contract (component manifest + draft mode endpoints). No changes to your existing pages required.
+
+## Start Here
+
+<CardGroup cols={2}>
+  <Card title="Integration quickstart" icon="rocket" href="/integration/editor-quickstart">
+    Connect the editor to a Next.js site in ~30 minutes using embedded draft mode.
+  </Card>
+  <Card title="Operations runbook" icon="server" href="/operations/dev-server-runbook">
+    Start, restart, and diagnose the local multi-service dev environment.
+  </Card>
+  <Card title="Product + architecture spec" icon="diagram-project" href="/specs/ai-website-editor-poc-spec">
+    Review product goals, architecture, domain model, and APIs.
+  </Card>
+  <Card title="Advanced references" icon="book-open-cover" href="/observability/chat-behavior-troubleshooting">
+    Deep dives for observability, guardrails, and advanced integration contracts.
+  </Card>
+</CardGroup>
+
+## Suggested Reading Path
+
+1. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
+2. [Next.js embedded onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
+3. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally
+4. [Product + architecture spec](/specs/ai-website-editor-poc-spec) — full domain model and API surface
+5. [Site Provider SPI](/site-provider-spi) — advanced framework-agnostic REST contract

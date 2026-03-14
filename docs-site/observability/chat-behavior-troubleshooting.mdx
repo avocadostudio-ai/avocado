@@ -1,0 +1,143 @@
+# Chat Behavior Troubleshooting Playbook
+
+This playbook is for investigating prompt failures, wrong operations, and regressions in the site editor assistant.
+
+## What telemetry is captured
+
+The orchestrator now emits structured chat telemetry events for each request:
+
+- `received`
+- `forced_plan`
+- `plan_attempt_failed`
+- `plan_generated`
+- `plan_apply_failed`
+- `repair_attempt`
+- `repair_generated`
+- `result`
+
+Each event includes:
+
+- request id
+- session
+- requested/effective slug
+- model key/model used
+- planner source (`openai` or `demo`)
+- prompt hash (stable fingerprint)
+- prompt excerpt (short preview)
+- prompt length
+- intent/op types/op count (when available)
+- outcome + error category (when available)
+
+## Persistence
+
+Telemetry is persisted to NDJSON so it survives restarts.
+
+- Default file: `.data/chat-telemetry.ndjson`
+- Env override: `CHAT_TELEMETRY_FILE`
+- Disable persistence: `CHAT_TELEMETRY_PERSIST=0`
+- In-memory buffer size: `CHAT_TELEMETRY_LIMIT` (default `500`)
+
+On startup, orchestrator loads recent telemetry entries from disk.
+
+## APIs for debugging
+
+### 1) Raw telemetry stream (filtered)
+
+`GET /telemetry/chat`
+
+Query params:
+
+- `limit` (default `100`, max `1000`)
+- `session`
+- `phase`
+- `outcome`
+
+Example:
+
+```bash
+curl -s "http://127.0.0.1:4200/telemetry/chat?session=dev&limit=200" | jq
+```
+
+### 2) Review summary for manual test runs
+
+`GET /telemetry/chat/review`
+
+Query params:
+
+- `limit` (default `300`, max `2000`)
+- `session`
+
+Returns:
+
+- analyzed count
+- applied/failed counts
+- failure rate
+- failure breakdown by outcome
+- failure breakdown by reason category
+- top failed prompts (grouped by prompt hash)
+- automatic recommendations
+
+Example:
+
+```bash
+curl -s "http://127.0.0.1:4200/telemetry/chat/review?session=dev&limit=500" | jq
+```
+
+## UI debug mode (for screenshots)
+
+Enable debug metadata directly in assistant response cards:
+
+1. Open editor settings (gear icon).
+2. Enable `Debug mode`.
+3. Run the prompt and capture screenshot.
+
+Each assistant card includes a `Debug` panel with:
+
+- `traceId`
+- `promptHash`
+- `outcome`
+- `reason` category
+- `intent`
+- `opCount` and `ops`
+- prompt excerpt
+
+Use this panel when sharing failures so engineering can reproduce and convert them into regression tests quickly.
+
+## Standard workflow after manual UI testing
+
+1. Use a dedicated session for a test batch (for example: `manual-2026-03-01-a`).
+2. Run your manual prompts in UI.
+3. Pull review summary:
+
+```bash
+curl -s "http://127.0.0.1:4200/telemetry/chat/review?session=manual-2026-03-01-a&limit=1000" | jq
+```
+
+4. Inspect top failures:
+   - high `schema_violation`: normalization/repair gaps
+   - high `not_found`: slug/block resolution gaps
+   - high `ambiguity`: clarification prompts too weak
+5. Drill into raw events for one problematic prompt hash:
+
+```bash
+curl -s "http://127.0.0.1:4200/telemetry/chat?session=manual-2026-03-01-a&limit=1000" \
+| jq '.rows | map(select(.promptHash=="<hash>"))'
+```
+
+6. Convert top failed prompts into regression tests in:
+   - `apps/orchestrator/src/nlp-ops.test.ts`
+
+## Recommended operating rules
+
+- Always run manual tests with an explicit session id.
+- Keep a fixed prompt suite for weekly regression checks.
+- Add a test for every new recurring failed prompt family.
+- Track failure rate trend (`/telemetry/chat/review`) before/after changes.
+
+## Quick checklist when behavior is wrong
+
+- Did the model fail to produce valid schema?
+- Did normalization repair aliases correctly?
+- Was deterministic fallback expected but not triggered?
+- Was the apply step blocked by not-found or no-effective-change?
+- Did clarification context leak across unrelated intents?

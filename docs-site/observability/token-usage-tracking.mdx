@@ -1,0 +1,129 @@
+# Token Usage & Cost Tracking
+
+The orchestrator tracks LLM token usage and estimated cost for every AI-powered chat and variation request. This data is available through three channels: the editor debug panel, browser DevTools, server logs, and telemetry API endpoints.
+
+## Editor Debug Panel
+
+The editor has a built-in debug overlay that shows per-message metadata.
+
+1. Open the editor at `http://localhost:4100`
+2. Toggle **debug mode** (the setting persists in localStorage)
+3. Send a chat message
+4. Each assistant response shows a **Debug** section with `traceId`, `outcome`, `intent`, `opCount`, and `ops`
+
+> **Note:** Token and cache counts (`inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, `estimatedUsd`) are included in the debug payload but not yet rendered in the panel. To see them, use the Network tab or telemetry API (below).
+
+## Browser DevTools (Network Tab)
+
+Every `/chat` POST response includes a `debug` object:
+
+```jsonc
+{
+  "status": "applied",
+  "summary": "Updated hero heading.",
+  "debug": {
+    "traceId": "abc-123",
+    "promptHash": "d408ff2e63278b72",
+    "promptExcerpt": "change hero heading",
+    "outcome": "applied",
+    "intent": "edit_plan",
+    "opCount": 1,
+    "opTypes": ["update_props"],
+    // Token usage fields:
+    "inputTokens": 1842,
+    "outputTokens": 312,
+    "totalTokens": 2154,
+    "cacheReadInputTokens": 640,
+    "cacheCreationInputTokens": 1200,
+    "estimatedUsd": 0.00773
+  }
+}
+```
+
+For the **variation endpoint** (`POST /chat/variations`), usage is a top-level field:
+
+```jsonc
+{
+  "status": "ok",
+  "summary": "Generated 3 variations for Hero.",
+  "variations": [ ... ],
+  "usage": {
+    "inputTokens": 920,
+    "outputTokens": 1450,
+    "totalTokens": 2370,
+    "cacheReadInputTokens": 320,
+    "cacheCreationInputTokens": 610,
+    "estimatedUsd": 0.0168
+  }
+}
+```
+
+## Server Logs
+
+The orchestrator logs every telemetry event with token data. Look for `"event":"chat_telemetry"` lines in the terminal running `pnpm dev:orchestrator`:
+
+```jsonc
+{
+  "event": "chat_telemetry",
+  "phase": "result",
+  "outcome": "applied",
+  "modelUsed": "gpt-4o",
+  "inputTokens": 1842,
+  "outputTokens": 312,
+  "totalTokens": 2154,
+  "cacheReadInputTokens": 640,
+  "cacheCreationInputTokens": 1200,
+  "estimatedUsd": 0.00773
+}
+```
+
+Key phases that include token data:
+- `plan_generated` — after the AI returns a plan
+- `result` — final outcome (`applied`, `needs_clarification`, `plan_ready_for_approval`, etc.)
+
+## Telemetry API
+
+Two HTTP endpoints expose stored telemetry:
+
+### List events
+
+```
+GET http://localhost:4200/telemetry/chat?session=<id>&limit=50
+```
+
+Returns recent telemetry rows with summary stats. Each row includes `inputTokens`, `outputTokens`, `totalTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, and `estimatedUsd` when available.
+
+### Failure review
+
+```
+GET http://localhost:4200/telemetry/chat/review?session=<id>&limit=300
+```
+
+Returns failure analysis: rates, top failed prompts, and recommendations.
+
+## Pricing Table
+
+Cost estimates use a built-in pricing table with prefix matching (e.g. `claude-sonnet-4-6` matches `claude-sonnet`):
+
+| Model prefix    | Input ($/1M tokens) | Output ($/1M tokens) |
+|-----------------|--------------------:|---------------------:|
+| `gpt-4o-mini`   |               0.15 |                 0.60 |
+| `gpt-4o`        |               2.50 |                10.00 |
+| `gpt-5`         |               1.75 |                14.00 |
+| `claude-haiku`  |               0.80 |                 4.00 |
+| `claude-sonnet` |               3.00 |                15.00 |
+| `claude-opus`   |              15.00 |                75.00 |
+
+If the model doesn't match any prefix, `estimatedUsd` is `null`.
+
+To update pricing, edit `USD_PER_MTOK` in `apps/orchestrator/src/telemetry/usage.ts`.
+
+## Limitations
+
+- **Streaming requests** return zero token counts (OpenAI streaming doesn't include per-chunk usage data)
+- **Anthropic streaming** captures usage via `stream.finalMessage()` after the stream completes
+- `cacheReadInputTokens` maps to OpenAI `cached_tokens` and Anthropic `cache_read_input_tokens`
+- `cacheCreationInputTokens` is currently provided by Anthropic (`cache_creation_input_tokens`)
+- **Demo mode** (no API key) always returns zero usage
+- **Image generation and audio** are not tracked
+- Cost is an estimate based on list pricing; actual billing may differ
