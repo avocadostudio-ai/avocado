@@ -28,6 +28,7 @@ type Props = {
   onTranscribeAudio: (blob: Blob, mimeType: string) => Promise<string>
   onInterpretImage: (blob: Blob, mimeType: string) => Promise<string>
   onUploadImage: (blob: Blob, mimeType: string) => Promise<string>
+  onCancel?: () => void
   onAutoHeightChange: (height: number) => void
 }
 
@@ -40,7 +41,7 @@ function selectionValue(provider: AIProvider, model: ModelKey) {
 }
 
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, modelKey, provider, availableProviders, onMessageChange, onModelChange, onProviderChange, onSubmit, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange } = props
+  const { message, isLoading, modelKey, provider, availableProviders, onMessageChange, onModelChange, onProviderChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -60,8 +61,8 @@ export default function ClaudeStyleChatInput(props: Props) {
     const shell = shellRef.current
     if (!textarea || !shell) return
 
-    // Temporarily remove height constraints so we can measure natural content height
-    textarea.style.height = "auto"
+    // Temporarily collapse so scrollHeight reflects only content, not available space
+    textarea.style.height = "0px"
     textarea.style.overflowY = "hidden"
     const naturalHeight = textarea.scrollHeight
 
@@ -395,9 +396,17 @@ export default function ClaudeStyleChatInput(props: Props) {
                   <path d="M12 18v3" />
                 </svg>
               </button>
-              <button type="button" className="composer-send-btn" onClick={() => onSubmit()} disabled={!canSubmit} aria-label="Send message">
-                <ArrowUpIcon size={16} color="currentColor" strokeWidth={2.8} />
-              </button>
+              {isLoading && onCancel ? (
+                <button type="button" className="composer-stop-btn" onClick={onCancel} aria-label="Stop generation">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              ) : (
+                <button type="button" className="composer-send-btn" onClick={() => onSubmit()} disabled={!canSubmit} aria-label="Send message">
+                  <ArrowUpIcon size={16} color="currentColor" strokeWidth={2.8} />
+                </button>
+              )}
             </>
           )}
         </div>

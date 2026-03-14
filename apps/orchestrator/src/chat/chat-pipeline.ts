@@ -158,6 +158,19 @@ export function isGeneratingPlaceholder(url: string): boolean {
   return url.startsWith("data:image/svg+xml,") && url.includes("Generating%20image")
 }
 
+/** Remove any "Generating image..." SVG placeholders left in session state (e.g. after cancel). */
+export function cleanupImagePlaceholders(session: string) {
+  const draft = getSessionDraft(session)
+  for (const [, page] of draft) {
+    for (const block of page.blocks) {
+      const props = block.props as Record<string, unknown>
+      if (typeof props.imageUrl === "string" && isGeneratingPlaceholder(props.imageUrl)) {
+        props.imageUrl = ""
+      }
+    }
+  }
+}
+
 /** Metadata for a deferred create_page Hero image that still needs resolution. */
 export type DeferredCreatePageImage = {
   pageSlug: string
@@ -1235,43 +1248,9 @@ export async function withUnsplashHeroImage(args: {
     op.patch = patchCandidate
   }
 
-  // For create_page ops, set a shimmer placeholder instead of blocking on image generation.
-  // The real image is resolved after the page is applied (deferred phase).
-  const deferredCreatePageImages: DeferredCreatePageImage[] = []
-  for (const op of plan.ops) {
-    if (op.op !== "create_page") continue
-    const page = (op as unknown as { page: PageDoc }).page
-    if (!page?.blocks) continue
-    for (const block of page.blocks) {
-      if (block.type !== "Hero") continue
-      const props = block.props as Record<string, unknown>
-      const placeholderUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
-      // Skip if the user provided an explicit URL in the message
-      if (firstUrlFromText(args.message)) continue
-      if (shouldResolveCreatePageHeroImage(placeholderUrl)) {
-        const heading = typeof props.heading === "string" ? props.heading : ""
-        const subheading = typeof props.subheading === "string" ? props.subheading : ""
-        const pageTitle = typeof page.title === "string" ? page.title : ""
-        const candidates = [heading, subheading, pageTitle].filter(Boolean)
-        const query = candidates.length > 0
-          ? imageKeywordsFromQuery(candidates.join(" "), 4).join(" ") || pageTitle || "hero image"
-          : "hero image"
-        const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
-
-        // Set placeholder so the page renders instantly with a shimmer
-        props.imageUrl = GENERATING_IMAGE_PLACEHOLDER
-        props.imageAlt = "Generating image\u2026"
-        deferredCreatePageImages.push({ pageSlug: page.slug, blockId: block.id, query, pageTitle, sectionContext })
-        args.log.info(
-          { event: "hero_image_create_page_deferred", chatRequestId: args.chatRequestId, pageSlug: page.slug, blockId: block.id, query },
-          "Deferred hero image resolution for create_page"
-        )
-      }
-    }
-  }
-  if (deferredCreatePageImages.length > 0) {
-    ;(plan as EditPlan & { _deferredCreatePageImages?: DeferredCreatePageImage[] })._deferredCreatePageImages = deferredCreatePageImages
-  }
+  // For create_page ops, keep the default placeholder image and let the user
+  // decide whether to generate an AI hero image via a suggestion pill.
+  // (Previously this auto-generated an AI image which was slow and often unwanted.)
 
   const planAlreadyHasResolvedImage = plan.ops.some((op) => {
     if (op.op !== "update_props") return false
@@ -1832,6 +1811,37 @@ function shouldReturnDeterministicClarification(message: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Cancel error
+// ---------------------------------------------------------------------------
+
+export class CancelError extends Error {
+  constructor(reason?: string) {
+    super(reason ?? "user_canceled")
+    this.name = "CancelError"
+  }
+}
+
+export function isCancelError(error: unknown): error is CancelError {
+  return error instanceof CancelError
+}
+
+export function throwIfCanceled(signal?: AbortSignal) {
+  if (signal?.aborted) throw new CancelError(signal.reason as string ?? "user_canceled")
+}
+
+/** Race a promise against an abort signal. Rejects with CancelError if signal fires first. */
+export function raceCancel<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise
+  if (signal.aborted) return Promise.reject(new CancelError(signal.reason as string ?? "user_canceled"))
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      signal.addEventListener("abort", () => reject(new CancelError(signal.reason as string ?? "user_canceled")), { once: true })
+    })
+  ])
+}
+
+// ---------------------------------------------------------------------------
 // SSE write helper
 // ---------------------------------------------------------------------------
 
@@ -1873,6 +1883,7 @@ export async function runChatPipeline(
     onPlanMeta?: (event: { intent: EditPlan["intent"]; summary: string; estimatedOps: number }) => void
     onRollbackStarted?: (event: { appliedCount: number; reason: string }) => void
     onRollbackDone?: (event: { restoredVersion: number }) => void
+    signal?: AbortSignal
   }
 ): Promise<{ code: number; payload: ChatResult | { error: string } }> {
   let executionMode = body.executionMode ?? "auto"
@@ -1967,6 +1978,7 @@ export async function runChatPipeline(
       return { code: 409, payload: { error: "continuation chain already completed" } }
     }
     // Execute the next step as a normal chat message
+    throwIfCanceled(options?.signal)
     const stepMessage = chain.steps[chain.currentStep]
     chain.currentStep++
     const isLastStep = chain.currentStep >= chain.totalSteps
@@ -2899,6 +2911,7 @@ export async function runChatPipeline(
         const total = resolvedPlan.ops.length
         try {
           for (let index = 0; index < total; index += 1) {
+            throwIfCanceled(options?.signal)
             const stepStartedAtMs = Date.now()
             const op = resolvedPlan.ops[index]
             const stepResult = applyOpsAtomically(body.session!, [op], { componentsManifest })
@@ -2948,6 +2961,7 @@ export async function runChatPipeline(
             }
           }
         } catch (progressiveError) {
+          if (isCancelError(progressiveError)) throw progressiveError
           options?.onRollbackStarted?.({ appliedCount: total, reason: toErrorDetail(progressiveError) })
           // Roll back to pre-plan state so we don't leave a partially-applied plan.
           for (const [slug, snapshot] of rollbackBySlug) {
@@ -2999,9 +3013,10 @@ export async function runChatPipeline(
 
           // Resolve each deferred image and patch the Hero block
           for (const deferred of deferredImages) {
+            throwIfCanceled(options?.signal)
             try {
               const deferredImageStart = Date.now()
-              const imageResult = await resolveHeroImageForCreatePage({
+              const imageResult = await raceCancel(resolveHeroImageForCreatePage({
                 query: deferred.query,
                 pageTitle: deferred.pageTitle,
                 pageSlug: deferred.pageSlug,
@@ -3010,7 +3025,7 @@ export async function runChatPipeline(
                 log: ctx.log,
                 onStatusUpdate: options.onStatusUpdate,
                 onImageProgress: options?.onImageProgress
-              })
+              }), options?.signal)
               const deferredImageDurationMs = Date.now() - deferredImageStart
               if (imageResult) {
                 const patchOp: Operation = {
@@ -3035,6 +3050,7 @@ export async function runChatPipeline(
                 )
               }
             } catch (err) {
+              if (isCancelError(err)) throw err
               ctx.log.warn(
                 { event: "deferred_hero_image_failed", chatRequestId, pageSlug: deferred.pageSlug, blockId: deferred.blockId, error: toErrorDetail(err) },
                 "Deferred hero image resolution failed — page remains with placeholder"
@@ -3111,6 +3127,7 @@ export async function runChatPipeline(
         }
       }
     } catch (error) {
+      if (isCancelError(error)) throw error
       if (applyDurationMs === undefined && applyStartedAtMs !== null) {
         applyDurationMs = Date.now() - applyStartedAtMs
       }
@@ -3663,6 +3680,7 @@ export async function runChatPipeline(
       }
       // If 1 step, fall through to normal flow
     } catch (decompositionError) {
+      if (isCancelError(decompositionError)) throw decompositionError
       ctx.log.warn({ err: toErrorDetail(decompositionError), event: "decomposition_failed" }, "Request decomposition failed, falling back to normal planner")
       // Fall through to normal flow
     }
@@ -3675,10 +3693,11 @@ export async function runChatPipeline(
   markPlanningStart()
 
   for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
+    throwIfCanceled(options?.signal)
     planningAttempts = attempt
     try {
       emitStatus(attempt === 1 ? "Planning edits..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
-      const result = await generatePlanImpl({
+      const result = await raceCancel(generatePlanImpl({
         message: plannerMessage,
         slug: effectiveSlug,
         currentPage: current,
@@ -3733,8 +3752,9 @@ export async function runChatPipeline(
               markFirstStructuredProgress()
               options?.onPlannedOp?.({ op, index })
             }
-          : undefined
-      })
+          : undefined,
+        signal: options?.signal
+      }), options?.signal)
       initialPlan = result.plan
       planUsage = result.usage
       if (result.schemaContext) {
@@ -3746,6 +3766,7 @@ export async function runChatPipeline(
       markPlanningFinish()
       break
     } catch (error) {
+      if (isCancelError(error)) throw error
       const reason = toErrorDetail(error)
       const reasonCategory = isPlannerOutputError(error) ? error.reasonCategory : classifyGuardrailError(reason)
       ctx.log.warn({ event: "plan_attempt_failed", attempt, model: modelUsed, reason: reason.slice(0, 300) },
@@ -3913,6 +3934,7 @@ export async function runChatPipeline(
 
   let repairedPlan: EditPlan
   try {
+    throwIfCanceled(options?.signal)
     emitStatus("Repairing plan and retrying...")
     ctx.chatTelemetry.push({
       id: chatRequestId,
@@ -3937,7 +3959,7 @@ export async function runChatPipeline(
     const repairFeedback = /full-page translation coverage/i.test(initialOutcome.reason)
       ? `${initialOutcome.reason}. Repair for translation completeness: include missing translated text fields for list children across all affected blocks. Preserve links/hrefs unchanged.`
       : buildDeterministicRepairFeedback(initialOutcome.reason)
-    const repairResult = await generatePlanImpl({
+    const repairResult = await raceCancel(generatePlanImpl({
       message: plannerMessage,
       slug: effectiveSlug,
       currentPage: current,
@@ -3955,8 +3977,9 @@ export async function runChatPipeline(
             markFirstStructuredProgress()
             options?.onPlannedOp?.({ op, index })
           }
-        : undefined
-    })
+        : undefined,
+      signal: options?.signal
+    }), options?.signal)
     repairedPlan = repairResult.plan
     planUsage = repairResult.usage
     if (repairResult.schemaContext) {
@@ -3986,6 +4009,7 @@ export async function runChatPipeline(
       ...timingFields()
     })
   } catch (error) {
+    if (isCancelError(error)) throw error
     markPlanningFinish()
     const reason = toErrorDetail(error)
     ctx.chatTelemetry.push({

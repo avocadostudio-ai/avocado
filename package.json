@@ -12,6 +12,7 @@
     "dev:status": "./scripts/devctl.sh status",
     "dev:logs": "./scripts/devctl.sh logs",
     "dev:doctor": "./scripts/devctl.sh doctor",
+    "demo:avocado:check": "./scripts/demo-avocado-check.sh",
     "dev:site": "pnpm --filter @ai-site-editor/site dev",
     "dev:editor": "pnpm --filter @ai-site-editor/editor dev",
     "dev:orchestrator": "pnpm --filter @ai-site-editor/orchestrator dev",

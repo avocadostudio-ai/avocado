@@ -37,7 +37,7 @@ type CreateChatTransportsArgs = {
   applyChatResult: (data: AssistantResponse) => void
   pushAssistantFromResult: (data: AssistantResponse) => void
   setVariationModal: (state: VariationModalState | null) => void
-  postToSite: (type: "draftUpdated" | "liveDraft", payload: Record<string, unknown>) => void
+  postToSite: (type: "draftUpdated" | "liveDraft" | "showSkeleton" | "removeSkeleton", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
   setActiveBlockId: (id: string | undefined) => void
   setActiveEditablePath: (value: string | undefined) => void
@@ -144,6 +144,9 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       ...(extraParams ?? {})
     }, args.componentManifest, args.siteCapabilities)
 
+    // Show immediate feedback before any SSE events arrive
+    args.setStreamStatus("Thinking...")
+
     let streamId: string
     try {
       const res = await fetch(`${args.orchestrator}/chat/start`, {
@@ -173,6 +176,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       let liveDraftText = ""
       let liveDraftFlushTimer: number | null = null
       let liveDraftActive = false
+      let liveDraftFields: Record<string, string> | null = null
 
       const sendLiveDraft = (force = false) => {
         if (!liveDraftBlockId) return
@@ -180,7 +184,8 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         args.postToSite("liveDraft", {
           blockId: liveDraftBlockId,
           text: liveDraftText.slice(0, 2400),
-          active: liveDraftActive
+          active: liveDraftActive,
+          ...(liveDraftFields ? { fields: liveDraftFields } : {})
         })
       }
 
@@ -195,7 +200,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         liveDraftFlushTimer = window.setTimeout(() => {
           liveDraftFlushTimer = null
           sendLiveDraft(true)
-        }, 45)
+        }, 16)
       }
 
       const endLiveDraft = () => {
@@ -204,6 +209,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         liveDraftActive = false
         sendLiveDraft(true)
         liveDraftText = ""
+        liveDraftFields = null
       }
 
       const flushOpRefresh = () => {
@@ -228,7 +234,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         opRefreshTimer = window.setTimeout(() => {
           opRefreshTimer = null
           flushOpRefresh()
-        }, 100)
+        }, 50)
       }
 
       source.onmessage = (event) => {
@@ -295,6 +301,45 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
               }
             }
           }
+
+          // Extract editable field values from operation for live typing
+          // update_props → patch contains field values; add_block → block.props contains field values
+          const op = payload.op
+          if (op && typeof op === "object") {
+            const opRecord = op as Record<string, unknown>
+            const rawFields =
+              (opRecord.patch && typeof opRecord.patch === "object" ? opRecord.patch :
+               opRecord.block && typeof (opRecord.block as Record<string, unknown>).props === "object"
+                 ? (opRecord.block as Record<string, unknown>).props : null) as Record<string, unknown> | null
+
+            if (rawFields) {
+              const fields: Record<string, string> = {}
+              for (const [key, value] of Object.entries(rawFields)) {
+                if (typeof value === "string" && value.trim()) {
+                  fields[key] = value
+                }
+              }
+              if (Object.keys(fields).length > 0) {
+                liveDraftFields = fields
+                if (liveDraftBlockId) {
+                  liveDraftActive = true
+                  sendLiveDraft(true)
+                }
+              }
+            }
+
+            // Send skeleton for add_block operations
+            const opType = opRecord.op ?? opRecord.type
+            if (opType === "add_block") {
+              const blockObj = opRecord.block as Record<string, unknown> | undefined
+              const afterBlockId = opRecord.afterBlockId
+              args.postToSite("showSkeleton", {
+                afterBlockId: typeof afterBlockId === "string" ? afterBlockId : null,
+                blockType: typeof blockObj?.type === "string" ? blockObj.type : "Block"
+              })
+            }
+          }
+
           args.setStreamStatus(idx > 0 ? `Drafting operation ${idx}...` : "Drafting operations...")
         }
 
@@ -307,6 +352,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
 
         if (payload.type === "op_applied") {
           if (liveDraftActive) endLiveDraft()
+          args.postToSite("removeSkeleton", {})
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           appliedOpCount += 1
@@ -370,7 +416,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
 
           const elapsedSinceLastOp = lastOpAppliedAt > 0 ? Date.now() - lastOpAppliedAt : Number.POSITIVE_INFINITY
           const appliedTotal = lastOpTotal > 0 ? lastOpTotal : Number(payload.result?.debug?.opCount ?? 0)
-          const minVisibleMs = appliedTotal <= 1 ? 300 : 700
+          const minVisibleMs = appliedTotal <= 1 ? 100 : 250
           if (lastOpAppliedAt > 0 && elapsedSinceLastOp < minVisibleMs) {
             const skipped = Number(payload.result?.debug?.skippedOpCount ?? skippedOpCount ?? 0)
             const applied = Math.max(0, appliedTotal - skipped)

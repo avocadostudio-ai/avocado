@@ -1049,6 +1049,27 @@ textarea {
   box-shadow: 0 4px 10px rgba(15, 118, 110, 0.25);
 }
 
+.composer-stop-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: 0;
+  background: #dc2626;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+}
+
+.composer-stop-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  stroke: none;
+}
+
 .composer-send-btn svg {
   width: 12px;
   height: 12px;
@@ -1621,6 +1642,19 @@ textarea {
   padding: 14px;
   display: grid;
   gap: 10px;
+}
+
+.settings-link-btn {
+  background: none;
+  border: none;
+  color: #8bb4e0;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-align: left;
+}
+.settings-link-btn:hover {
+  text-decoration: underline;
 }
 
 .variation-modal-backdrop {
@@ -2535,6 +2569,11 @@ textarea {
 
 .editor-dark .composer-send-btn {
   background: #0f766e;
+  box-shadow: 0 4px 12px rgb(2 6 23 / 0.4);
+}
+
+.editor-dark .composer-stop-btn {
+  background: #dc2626;
   box-shadow: 0 4px 12px rgb(2 6 23 / 0.4);
 }
 

@@ -18,6 +18,7 @@ type ExecuteArgs = {
   input: unknown
   context: ToolCallContext
   policy?: Partial<ToolExecutionPolicy>
+  signal?: AbortSignal
 }
 
 function sleep(ms: number) {
@@ -106,9 +107,20 @@ export class ToolExecutor {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       attempts = attempt
       try {
+        const combinedSignal = args.signal
+          ? AbortSignal.any([args.signal, AbortSignal.timeout(tool.manifest.timeoutMs)])
+          : AbortSignal.timeout(tool.manifest.timeoutMs)
         const output = await Promise.race([
           tool.handler({ input: args.input, context: args.context, manifest: tool.manifest }),
-          timeoutPromise(tool.manifest.timeoutMs)
+          new Promise<never>((_resolve, reject) => {
+            if (combinedSignal.aborted) {
+              reject(new Error(combinedSignal.reason ?? `Tool timed out after ${tool.manifest.timeoutMs}ms`))
+              return
+            }
+            combinedSignal.addEventListener("abort", () => {
+              reject(new Error(combinedSignal.reason ?? `Tool timed out after ${tool.manifest.timeoutMs}ms`))
+            }, { once: true })
+          })
         ])
 
         const outputValidation = validateAgainstSchema(output, tool.manifest.outputSchema)

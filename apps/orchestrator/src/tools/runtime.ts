@@ -4,6 +4,7 @@ import type { ToolExecutionEvent, ToolExecutionPolicy, ToolCallContext, ToolMani
 import { ToolRegistry } from "./registry.js"
 import { ToolExecutor } from "./executor.js"
 import { unsplashSearchHandler, unsplashSearchManifest } from "./builtins/unsplash-search.js"
+import { imageGenerateHandler, imageGenerateManifest } from "./builtins/image-generate.js"
 
 type Logger = {
   info: (payload: Record<string, unknown>, message?: string) => void
@@ -25,6 +26,9 @@ type CreateToolRuntimeArgs = {
 export async function createToolRuntime(args: CreateToolRuntimeArgs): Promise<ToolRuntime> {
   const registry = new ToolRegistry()
   registry.registerBuiltin(unsplashSearchManifest, unsplashSearchHandler)
+  if (process.env.OPENAI_API_KEY) {
+    registry.registerBuiltin(imageGenerateManifest, imageGenerateHandler)
+  }
 
   const defaultPolicy: ToolExecutionPolicy = {
     autoRunRead: true,

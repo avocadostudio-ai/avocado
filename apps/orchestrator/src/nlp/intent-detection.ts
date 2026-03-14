@@ -55,8 +55,9 @@ export type ChatRequestBody = {
   activeBlockId?: string
   activeBlockType?: string
   activeEditablePath?: string
-  executionMode?: "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
+  executionMode?: "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan" | "continue_chain"
   pendingPlanId?: string
+  continuationChainId?: string
 }
 
 export type ChatResult = {
@@ -73,6 +74,12 @@ export type ChatResult = {
   modelUsed: string
   modelKey: ModelKey
   pendingPlanId?: string
+  continuation?: {
+    chainId: string
+    currentStep: number
+    totalSteps: number
+    nextStepLabel: string
+  }
   debug?: {
     traceId: string
     promptHash: string
@@ -152,7 +159,11 @@ const BATCH_ADD_PATTERNS: RegExp[] = [
   /\bfill\s+(?:out\s+)?(?:the\s+)?page\b/,
   /\badd\s+(?:all|every)\s+(?:available|missing|remaining)\b/,
   new RegExp(String.raw`\b(?:all|every)\s+(?:available|missing|remaining)\s+${UNIT}\b`),
-  /\bbuild\s+(?:out|up)\s+(?:the\s+)?(?:whole\s+)?page\b/
+  /\bbuild\s+(?:out|up)\s+(?:the\s+)?(?:whole\s+)?page\b/,
+  // "showcasing/featuring all (available) components/blocks" — page creation with all block types
+  new RegExp(String.raw`\b(?:showcas\w*|featuring|demonstrat\w*)\s+(?:all\s+)?(?:(?:the\s+)?available\s+)?${UNIT}\b`),
+  // "all available componenzs" and similar typos — fuzzy match for "all available" + unit-like word
+  /\ball\s+(?:available|existing)\s+\w*(?:componen|block|section|element|widget)\w*\b/
 ]
 
 // Detects batch update requests that should also override strict single-op mode.
@@ -162,13 +173,14 @@ const BATCH_UPDATE_PATTERNS: RegExp[] = [
   new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT_TYPE}\b`),
   new RegExp(String.raw`\b(?:populate|fill\s+in|fill)\s+(?:all|every|each)\s+(?:the\s+)?${UNIT}\b`),
   /\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every)\s+(?:existing\s+)?(?:content|blocks?|components?|sections?)\b/,
-  /\bpopulate\s+(?:the\s+)?(?:whole\s+)?page\b/,
+  /\bpopulate\s+(?:\w+\s+){0,2}page\b/,
+  /\bpopulate\b.{0,60}\bwith\b.{0,30}\bcontent\b/,
   /\b(?:sample|placeholder|demo)\s+content\s+(?:for|to|in|on)\s+(?:all|every|each)\b/,
   new RegExp(String.raw`\b(?:all|every|each)\s+(?:the\s+)?${UNIT}\s+with\s+(?:sample|placeholder|demo|real)\s+content\b`)
 ]
 
 const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
-  /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bpages\b/,
+  /\b(?:create|generate|build|make|draft|add)\b[^.\n]{0,140}\bpages\b/,
   /\b(?:create|generate|build|make|draft)\b[^.\n]{0,140}\bonly\b[^.\n]{0,140}\bpages\b/,
   /\bpages?\s+for\s+(?:these|those|the following|multiple|several)\b/,
   /\bfor\s+.+\b(?:and|,|&)\b.+\bpages?\b/,
@@ -316,6 +328,9 @@ const PAGE_LIST_PATTERNS: RegExp[] = [
 
 export function isPageListQuery(message: string) {
   const m = normalizeForIntent(message)
+  // Exclude messages that contain page creation/modification verbs — those are action
+  // requests that happen to mention "the pages", not listing queries.
+  if (/\b(?:add|create|generate|build|make|draft|update|link|remove|delete)\b.*\bpages?\b/.test(m)) return false
   return PAGE_LIST_PATTERNS.some((re) => re.test(m))
 }
 

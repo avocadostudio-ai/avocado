@@ -332,16 +332,26 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
       const page = staged.get(op.pageSlug)
       if (!page) throw new Error(`Page not found for slug ${op.pageSlug}`)
       if (staged.has(nextSlug)) throw new Error(`Target page slug already exists: ${nextSlug}`)
-      staged.delete(op.pageSlug)
       deletedSlugs.add(op.pageSlug)
-      staged.set(nextSlug, {
+      const renamedPage = {
         ...page,
         id: pageIdFromSlug(nextSlug),
         slug: nextSlug,
         title: typeof op.newTitle === "string" && op.newTitle.trim().length > 0 ? op.newTitle.trim() : pageTitleFromSlug(nextSlug),
         updatedAt: new Date().toISOString()
-      })
+      }
       touchedSlugs.add(nextSlug)
+
+      // Rebuild the map to preserve the renamed page's position in nav order.
+      const entries = Array.from(staged.entries())
+      staged.clear()
+      for (const [slug, p] of entries) {
+        if (slug === op.pageSlug) {
+          staged.set(nextSlug, renamedPage)
+        } else {
+          staged.set(slug, p)
+        }
+      }
 
       // Keep route references consistent after a slug change.
       for (const [slug, candidate] of staged) {

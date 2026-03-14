@@ -905,6 +905,7 @@ function EditorPage({
             onTranscribeAudio={media.transcribeAudio}
             onInterpretImage={media.interpretPastedImage}
             onUploadImage={media.uploadPastedImage}
+            onCancel={chatEngine.cancelChat}
             onAutoHeightChange={handleComposerAutoHeight}
           />
         </footer>
@@ -1087,6 +1088,9 @@ function EditorPage({
                 <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
                 <span>Debug mode</span>
               </label>
+              <button type="button" className="settings-link-btn" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
+                Clear chat
+              </button>
             </div>
           </div>
         </div>

@@ -74,6 +74,19 @@ export type PendingApprovalPlan = {
   originalMessage?: string
 }
 
+export type ContinuationChain = {
+  id: string
+  steps: string[]
+  stepLabels: string[]
+  currentStep: number
+  totalSteps: number
+  originalMessage: string
+  effectiveSlug: string
+  siteContextBlock: string | null
+}
+
+export const continuationChainBySession = new Map<string, ContinuationChain>()
+
 export type PublishTracker = {
   session: string
   status: "triggered" | "failed"

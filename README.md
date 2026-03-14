@@ -61,6 +61,9 @@ Alternative (recommended for repeated restarts without opening new terminals):
   - `docs/observability/chat-behavior-troubleshooting.md`
 - Dev server runbook (start/restart/status/logs/health checks):
   - `docs/operations/dev-server-runbook.md`
+- Avocado transformation demo runbook (stakeholder narrative + pass/fail script):
+  - `docs/testing/avocado-transformation-demo-runbook.md`
+  - `pnpm demo:avocado:check`
 - Product improvement backlog:
   - `docs/planning/things-to-improve.md`
 - Editor debug mode:

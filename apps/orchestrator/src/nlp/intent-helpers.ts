@@ -52,13 +52,13 @@ export function isLikelyClarificationFollowUp(message: string) {
     /\b(selected|this|that|it|them|those|these|one|ones|same)\b/.test(normalized) ||
     /\bfirst|second|third|last\b/.test(normalized) ||
     /\b(?:all|the|both)\s+\d+\b/.test(normalized)
-  const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace)\b/.test(normalized)
+  const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace|translate|redesign|refocus|overhaul|rebuild)\b/.test(normalized)
   return (words.length <= 8 && hasReferenceCue) || (!hasActionVerb && words.length <= 5)
 }
 
 export function isStandalonePageOperation(message: string) {
   const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
-  return /\b(create|generate|add|make|build|remove|delete|rename|move)\b.*\bpage\b/.test(normalized)
+  return /\b(create|generate|add|make|build|remove|delete|rename|move|translate|redesign|refocus|overhaul|rebuild)\b.*\bpage\b/.test(normalized)
 }
 
 export function parseCreatePageRequest(message: string) {

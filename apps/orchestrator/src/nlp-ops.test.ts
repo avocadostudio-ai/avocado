@@ -1853,6 +1853,9 @@ test("isBatchAddRequest treats populate/update-all as batch overrides", () => {
   assert.equal(isBatchAddRequest("update all blocks with real content"), true)
   assert.equal(isBatchAddRequest("rewrite every section"), true)
   assert.equal(isBatchAddRequest("populate the whole page"), true)
+  assert.equal(isBatchAddRequest("populate this page with sample content"), true)
+  assert.equal(isBatchAddRequest("populate thsis page withall availablebocks and sample content"), true)
+  assert.equal(isBatchAddRequest("populate thsis page withall availablebocks and sample content. DO NOT gen AI images,, used Unspalsh only"), true)
   // Negative: single block update should not trigger
   assert.equal(isBatchAddRequest("update the hero heading"), false)
 })
