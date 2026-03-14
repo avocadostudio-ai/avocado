@@ -62,6 +62,7 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
           </Link>
         ))}
       </nav>
+      <SiteThemeToggle />
       <div ref={mobileMenuRef} className={`site-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}>
         <button
           type="button"
@@ -92,7 +93,6 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
           </nav>
         ) : null}
       </div>
-      <SiteThemeToggle />
     </header>
   )
 }
