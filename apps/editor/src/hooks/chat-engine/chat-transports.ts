@@ -42,6 +42,7 @@ type CreateChatTransportsArgs = {
   setActiveBlockId: (id: string | undefined) => void
   setActiveEditablePath: (value: string | undefined) => void
   setStreamStatus: (value: string | null) => void
+  setStreamSteps: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
   setStreamTokenCount: (value: number | ((prev: number) => number)) => void
   setLatestStreamFocusBlockId: (value: string | null) => void
   enablePatchTransport: boolean
@@ -177,6 +178,32 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       let liveDraftFlushTimer: number | null = null
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
+      let currentStepLabel: string | null = null
+
+      const normalizeStepLabel = (s: string) =>
+        s.replace(/[\u2026.]+$/, "").replace(/\s*\([\d/,\s]+\)$/, "").trim()
+      const advanceStep = (label: string) => {
+        const baseLabel = normalizeStepLabel(label)
+        const prevBase = currentStepLabel ? normalizeStepLabel(currentStepLabel) : null
+        if (baseLabel === prevBase) {
+          currentStepLabel = label
+          const display = label.replace(/[\u2026.]+$/, "").trim()
+          args.setStreamSteps((prev) => {
+            if (prev.length === 0) return prev
+            const last = prev[prev.length - 1]
+            if (last.done || last.label === display) return prev
+            return [...prev.slice(0, -1), { ...last, label: display }]
+          })
+          return
+        }
+        currentStepLabel = label
+        const display = label.replace(/[\u2026.]+$/, "").trim()
+        args.setStreamSteps((prev) => {
+          const next = prev.map((s) => (s.done ? s : { ...s, done: true }))
+          next.push({ label: display, done: false })
+          return next
+        })
+      }
 
       const sendLiveDraft = (force = false) => {
         if (!liveDraftBlockId) return
@@ -243,6 +270,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           message?: string
           text?: string
           stage?: string
+          label?: string
           elapsedMs?: number
           intent?: string
           summary?: string
@@ -265,7 +293,9 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         gotAnyEvent = true
 
         if (payload.type === "status") {
-          args.setStreamStatus(payload.message ?? "Working...")
+          const msg = payload.message ?? "Working..."
+          args.setStreamStatus(msg)
+          advanceStep(msg)
         }
 
         if (payload.type === "token") {
@@ -282,11 +312,11 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
 
         if (payload.type === "plan_meta") {
           const estimatedOps = Number(payload.estimatedOps ?? 0)
-          if (estimatedOps > 0) {
-            args.setStreamStatus(`Plan ready (${estimatedOps} change${estimatedOps === 1 ? "" : "s"})...`)
-          } else {
-            args.setStreamStatus("Plan ready...")
-          }
+          const planLabel = estimatedOps > 0
+            ? `Plan ready (${estimatedOps} change${estimatedOps === 1 ? "" : "s"})`
+            : "Plan ready"
+          args.setStreamStatus(`${planLabel}...`)
+          advanceStep(planLabel)
         }
 
         if (payload.type === "op_candidate") {
@@ -345,9 +375,8 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
 
         if (payload.type === "heartbeat") {
           const elapsedSec = Math.max(0, Math.floor(Number(payload.elapsedMs ?? 0) / 1000))
-          const stage = String(payload.stage ?? "working")
-          if (stage === "planning") args.setStreamStatus(`Planning… ${elapsedSec}s`)
-          if (stage === "applying") args.setStreamStatus(`Applying… ${elapsedSec}s`)
+          const label = payload.label ?? (payload.stage === "applying" ? "Applying" : "Planning")
+          args.setStreamStatus(`${label}… ${elapsedSec}s`)
         }
 
         if (payload.type === "op_applied") {
@@ -356,6 +385,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           appliedOpCount += 1
+          advanceStep(total > 0 ? `Applying changes (${appliedOpCount}/${total})` : "Applying changes")
           if (total > 0 && index > 0) {
             const suffix = skippedOpCount > 0 ? `, skipped ${skippedOpCount}` : ""
             args.setStreamStatus(`Applying changes (${index}/${total}, applied ${appliedOpCount}${suffix})...`)
@@ -404,6 +434,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           const completeFinal = () => {
             settled = true
             args.setStreamStatus(null)
+            args.setStreamSteps([])
             args.setStreamTokenCount(0)
             clearOpRefreshTimer()
             endLiveDraft()
@@ -434,6 +465,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         if (payload.type === "error") {
           settled = true
           args.setStreamStatus(null)
+          args.setStreamSteps([])
           args.setStreamTokenCount(0)
           clearOpRefreshTimer()
           endLiveDraft()
@@ -451,6 +483,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       source.onerror = () => {
         if (settled || gotAnyEvent) {
           args.setStreamStatus(null)
+          args.setStreamSteps([])
           args.setStreamTokenCount(0)
           clearOpRefreshTimer()
           endLiveDraft()

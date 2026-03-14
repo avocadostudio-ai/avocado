@@ -820,6 +820,13 @@ function EditorPage({
           ))}
           {chatEngine.streamingText ? (
             <article className="msg msg-assistant msg-streaming">
+              {chatEngine.streamSteps.filter((s) => s.done).length > 0 ? (
+                <ul className="stream-steps stream-steps-in-bubble">
+                  {chatEngine.streamSteps.filter((s) => s.done).map((step, idx) => (
+                    <li key={idx} className="stream-step is-done">{step.label}</li>
+                  ))}
+                </ul>
+              ) : null}
               <div className="msg-main">
                 {renderSimpleMarkdown(chatEngine.streamingText)}
                 <span className="streaming-cursor" aria-hidden="true" />
@@ -831,11 +838,23 @@ function EditorPage({
                   ))}
                 </ul>
               ) : null}
+              {chatEngine.streamStatus ? (
+                <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{streamTextLabel}</span>
+              ) : null}
             </article>
           ) : chatEngine.streamStatus ? (
             <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"} ${STREAMING_INDICATOR_STYLE === "text" ? "is-text" : "is-legacy"}`}>
               {STREAMING_INDICATOR_STYLE === "text" ? (
-                <span className="streaming-pill-status streaming-pill-status-text">{streamTextLabel}</span>
+                <>
+                  {chatEngine.streamSteps.filter((s) => s.done).length > 0 ? (
+                    <ul className="stream-steps">
+                      {chatEngine.streamSteps.filter((s) => s.done).map((step, idx) => (
+                        <li key={idx} className="stream-step is-done">{step.label}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <span className="streaming-pill-status streaming-pill-status-text">{streamTextLabel}</span>
+                </>
               ) : (
                 <>
                   <span className="streaming-pill-title">
