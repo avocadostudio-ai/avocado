@@ -49,6 +49,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
   const pathname = usePathname()
   const pendingFocusRef = useRef<string | null>(null)
   const pendingScrollIntoViewRef = useRef(false)
+  const pendingScrollAnchorYRef = useRef<number | null>(null)
   const pendingScrollRestoreRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickUntilRef = useRef(0)
   const selectedBlockRef = useRef<string | null>(null)
@@ -761,7 +762,14 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         }, 980)
       }
       if (options?.scrollIntoView !== false) {
-        match.scrollIntoView({ behavior: "smooth", block: "center" })
+        const anchorY = pendingScrollAnchorYRef.current
+        if (anchorY !== null) {
+          const currentTop = match.getBoundingClientRect().top
+          window.scrollBy({ top: currentTop - anchorY, behavior: "instant" })
+          pendingScrollAnchorYRef.current = null
+        } else {
+          match.scrollIntoView({ behavior: "smooth", block: "center" })
+        }
       }
 
       if (shouldAnimate) {
@@ -788,6 +796,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         event.stopPropagation()
         const move = computeMoveAfter(blockId, "up")
         if (!move.canMove) return
+        pendingScrollAnchorYRef.current = match.getBoundingClientRect().top
         pendingScrollIntoViewRef.current = true
         window.parent.postMessage(
           { protocol: "site-editor/v1", type: "blockReordered", payload: { slug, blockId, afterBlockId: move.afterBlockId } },
@@ -808,6 +817,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         event.stopPropagation()
         const move = computeMoveAfter(blockId, "down")
         if (!move.canMove) return
+        pendingScrollAnchorYRef.current = match.getBoundingClientRect().top
         pendingScrollIntoViewRef.current = true
         window.parent.postMessage(
           { protocol: "site-editor/v1", type: "blockReordered", payload: { slug, blockId, afterBlockId: move.afterBlockId } },
@@ -887,6 +897,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           window.clearInterval(timer)
           pendingFocusRef.current = null
           pendingScrollIntoViewRef.current = false
+          pendingScrollAnchorYRef.current = null
           skipParentAnimationOnceRef.current = false
         }
       }, 45)
@@ -1103,7 +1114,8 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       if (msg.type === "draftUpdated") {
         const focusBlockId = String(msg.payload.focusBlockId ?? "")
         pendingFocusRef.current = focusBlockId || null
-        pendingScrollIntoViewRef.current = false
+        // Don't reset pendingScrollIntoViewRef here — move handlers set it to true
+        // and we need to preserve that so applyBlockFocus uses anchor-based scrolling.
         expectingNewBlocks = true
         clearLiveDraft()
         clearChildFocus()
