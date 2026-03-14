@@ -179,6 +179,8 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
       let currentStepLabel: string | null = null
+      let currentStepStartedAt = 0
+      const MIN_STEP_DURATION_MS = 800
 
       const normalizeStepLabel = (s: string) =>
         s.replace(/[\u2026.]+$/, "").replace(/\s*\([\d/,\s]+\)$/, "").trim()
@@ -196,13 +198,29 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           })
           return
         }
+
+        const now = Date.now()
+        const prevWasLongEnough = currentStepStartedAt > 0 && (now - currentStepStartedAt) >= MIN_STEP_DURATION_MS
+
         currentStepLabel = label
+        currentStepStartedAt = now
         const display = label.replace(/[\u2026.]+$/, "").trim()
-        args.setStreamSteps((prev) => {
-          const next = prev.map((s) => (s.done ? s : { ...s, done: true }))
-          next.push({ label: display, done: false })
-          return next
-        })
+
+        if (prevWasLongEnough) {
+          // Previous step was visible long enough — promote it to done, then add the new one
+          args.setStreamSteps((prev) => {
+            const next = prev.map((s) => (s.done ? s : { ...s, done: true }))
+            next.push({ label: display, done: false })
+            return next
+          })
+        } else {
+          // Previous step was too brief — silently replace it instead of marking done
+          args.setStreamSteps((prev) => {
+            if (prev.length === 0) return [{ label: display, done: false }]
+            const doneSteps = prev.filter((s) => s.done)
+            return [...doneSteps, { label: display, done: false }]
+          })
+        }
       }
 
       const sendLiveDraft = (force = false) => {
