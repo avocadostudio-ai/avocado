@@ -243,7 +243,7 @@
     "id": "p_about",
     "slug": "/about",
     "title": "About",
-    "updatedAt": "2026-03-14T08:08:38.965Z",
+    "updatedAt": "2026-03-14T08:12:34.630Z",
     "blocks": [
       {
         "id": "b_hero_1773474917941",
@@ -386,16 +386,6 @@
         }
       },
       {
-        "id": "b_cta_1773474917945",
-        "type": "CTA",
-        "props": {
-          "title": "Get Weekly Recipe & Wellness Tips",
-          "description": "Join our community for fresh ideas, nutrition insights, and stories from sustainable farms. Delivered to your inbox every Thursday.",
-          "ctaText": "Sign Up Now",
-          "ctaHref": "/subscribe"
-        }
-      },
-      {
         "id": "b_cardgrid_1773474917945",
         "type": "CardGrid",
         "props": {
@@ -426,6 +416,16 @@
               "imageAlt": "Aerial view of a sustainable avocado farm"
             }
           ]
+        }
+      },
+      {
+        "id": "b_cta_1773474917945",
+        "type": "CTA",
+        "props": {
+          "title": "Get Weekly Recipe & Wellness Tips",
+          "description": "Join our community for fresh ideas, nutrition insights, and stories from sustainable farms. Delivered to your inbox every Thursday.",
+          "ctaText": "Sign Up Now",
+          "ctaHref": "/subscribe"
         }
       },
       {
