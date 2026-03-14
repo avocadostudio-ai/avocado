@@ -370,7 +370,6 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       }
     }
 
-    emit("status", { type: "status", message: "Crafting your update..." })
     const streamStartedAt = Date.now()
     let heartbeatStage: "planning" | "applying" = "planning"
     let heartbeatLabel = "Planning"
