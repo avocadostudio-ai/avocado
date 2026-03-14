@@ -671,6 +671,8 @@ textarea {
 
 .streaming-pill.is-text {
   padding: 2px 4px 6px;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .streaming-pill-status-text {
@@ -692,6 +694,42 @@ textarea {
   -webkit-text-fill-color: transparent;
   animation: stream-text-ripple 3s ease-in-out infinite;
   opacity: 1;
+}
+
+.stream-steps {
+  list-style: none;
+  margin: 0 0 2px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stream-step {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #94a3b8;
+  padding-left: 16px;
+  position: relative;
+}
+
+.stream-step::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.stream-steps-in-bubble {
+  margin-bottom: 6px;
+}
+
+.stream-status-inline {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
 }
 
 .streaming-jump-btn {
@@ -1047,30 +1085,49 @@ textarea {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(15, 118, 110, 0.25);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.25s ease;
 }
 
-.composer-stop-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  border: 0;
-  background: #dc2626;
-  color: #fff;
+.composer-send-btn .icon-send,
+.composer-send-btn .icon-stop {
+  position: absolute;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.composer-stop-btn svg {
+.composer-send-btn .icon-send {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.composer-send-btn .icon-stop {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.composer-send-btn.is-stop .icon-send {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.composer-send-btn.is-stop .icon-stop {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.composer-send-btn .icon-stop {
   width: 12px;
   height: 12px;
   fill: currentColor;
   stroke: none;
 }
 
-.composer-send-btn svg {
+.composer-send-btn .icon-send svg,
+.composer-send-btn > svg {
   width: 12px;
   height: 12px;
   fill: none;
@@ -2394,6 +2451,10 @@ textarea {
     font-size: 12px;
     line-height: 1.35;
   }
+
+  .stream-step {
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 430px) {
@@ -2569,11 +2630,6 @@ textarea {
 
 .editor-dark .composer-send-btn {
   background: #0f766e;
-  box-shadow: 0 4px 12px rgb(2 6 23 / 0.4);
-}
-
-.editor-dark .composer-stop-btn {
-  background: #dc2626;
   box-shadow: 0 4px 12px rgb(2 6 23 / 0.4);
 }
 
