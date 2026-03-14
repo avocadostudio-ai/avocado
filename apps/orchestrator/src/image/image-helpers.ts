@@ -15,6 +15,24 @@ export type ImageLogger = {
 }
 
 // ---------------------------------------------------------------------------
+// Image generation timing — rolling average for progress estimation
+// ---------------------------------------------------------------------------
+
+const recentGenDurations: number[] = []
+const MAX_DURATION_HISTORY = 10
+const DEFAULT_ESTIMATED_MS = 35_000
+
+export function recordImageGenDuration(ms: number) {
+  recentGenDurations.push(ms)
+  if (recentGenDurations.length > MAX_DURATION_HISTORY) recentGenDurations.shift()
+}
+
+export function estimatedImageGenMs(): number {
+  if (recentGenDurations.length === 0) return DEFAULT_ESTIMATED_MS
+  return Math.round(recentGenDurations.reduce((a, b) => a + b, 0) / recentGenDurations.length)
+}
+
+// ---------------------------------------------------------------------------
 // Query normalisation & keyword extraction
 // ---------------------------------------------------------------------------
 
@@ -263,6 +281,8 @@ export function buildVariationImagePrompt(args: {
 export async function generateVariationImageWithOpenAI(args: {
   prompt: string
   altText: string
+  size?: string
+  model?: string
   log?: ImageLogger
 }): Promise<UnsplashImage | null> {
   if (!process.env.OPENAI_API_KEY) {
@@ -270,19 +290,22 @@ export async function generateVariationImageWithOpenAI(args: {
     return null
   }
 
-  const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1"
+  const model = args.model ?? process.env.OPENAI_IMAGE_MODEL?.trim() ?? "gpt-image-1-mini"
+  const size = args.size ?? "1536x1024"
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
   const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
 
-  args.log?.info({ event: "openai_image_start", model, promptLength: args.prompt.length }, "Starting OpenAI image generation")
+  args.log?.info({ event: "openai_image_start", model, size, promptLength: args.prompt.length }, "Starting OpenAI image generation")
 
+  const genStartMs = Date.now()
   try {
     const result = await client.images.generate({
       model,
       prompt: args.prompt,
-      size: "1536x1024"
+      size: size as "1536x1024"
     })
+    const durationMs = Date.now() - genStartMs
 
     const image = result.data?.[0]
     let bytes: Buffer | null = null
@@ -303,14 +326,20 @@ export async function generateVariationImageWithOpenAI(args: {
     const fileName = `var_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
     await writeFile(resolve(generatedImageDir, fileName), bytes)
 
+    args.log?.info(
+      { event: "openai_image_done", model, size, durationMs, fileSizeBytes: bytes.byteLength },
+      `OpenAI image generated in ${durationMs}ms (model=${model})`
+    )
+
     return {
       url: `${orchestratorPublicOrigin}/generated-images/${fileName}`,
       alt: args.altText,
       query: args.prompt
     }
   } catch (err) {
+    const failDurationMs = Date.now() - genStartMs
     args.log?.warn(
-      { event: "openai_image_error", error: err instanceof Error ? err.message : String(err) },
+      { event: "openai_image_error", model, durationMs: failDurationMs, error: err instanceof Error ? err.message : String(err) },
       "OpenAI image generation failed"
     )
     return null
@@ -429,33 +458,5 @@ export async function resolveUnsplashImage(
     }
   }
 
-  const usedImageUrls = options?.usedImageUrls
-  let picsumPage = page
-  let seed = toSeedSlug(`${safeQuery}-${picsumPage}`) || "hero-image"
-  let sourceUrl = `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`
-
-  if (usedImageUrls) {
-    for (let attempt = 0; attempt < 3 && usedImageUrls.has(sourceUrl); attempt++) {
-      picsumPage++
-      seed = toSeedSlug(`${safeQuery}-${picsumPage}`) || "hero-image"
-      sourceUrl = `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`
-    }
-  }
-
-  log?.warn(
-    {
-      event: "hero_image_resolve_fallback",
-      chatRequestId: logContext?.chatRequestId,
-      provider: "picsum_seed",
-      query: safeQuery,
-      seed,
-      url: sourceUrl
-    },
-    "Falling back to picsum seeded hero image"
-  )
-  return {
-    url: sourceUrl,
-    alt: `Photo for ${safeQuery}`,
-    query: safeQuery
-  }
+  return null
 }

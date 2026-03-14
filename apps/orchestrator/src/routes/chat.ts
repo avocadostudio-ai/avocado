@@ -162,6 +162,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
     try {
       const result = await runChatPipeline(pipelineCtx, scopedQuery, {
         onPlanningToken: (token) => sseWrite(reply, { type: "token", text: token }),
+        onSummaryChunk: (text) => sseWrite(reply, { type: "summary_token", text }),
+        onChangeLogEntry: (entry) => sseWrite(reply, { type: "changelog_entry", entry }),
         onPlannedOp: (event) =>
           sseWrite(reply, {
             type: "op_candidate",
@@ -192,7 +194,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
             total: event.total,
             op: event.op,
             previewVersion: event.previewVersion,
-            focusBlockId: event.focusBlockId ?? null
+            focusBlockId: event.focusBlockId ?? null,
+            ...(event.updatedSlug ? { updatedSlug: event.updatedSlug } : {})
           })
         },
         onRollbackStarted: (event) =>
@@ -206,7 +209,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
             type: "rollback_done",
             restoredVersion: event.restoredVersion
           }),
-        onStatusUpdate: (message) => sseWrite(reply, { type: "status", message })
+        onStatusUpdate: (message) => sseWrite(reply, { type: "status", message }),
+        onImageProgress: (event) => sseWrite(reply, { type: "image_progress", ...event })
       })
       if (result.code >= 400) {
         sseWrite(reply, { type: "error", result: result.payload, code: result.code })

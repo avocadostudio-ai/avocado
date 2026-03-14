@@ -407,17 +407,17 @@
   pointer-events: auto;
 }
 
-.editor-item-has-delete:hover > .editor-list-item-controls,
-.editor-item-has-delete:focus-within > .editor-list-item-controls,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover > .editor-list-item-controls,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within > .editor-list-item-controls,
 .editor-item-has-delete.editor-item-selected > .editor-list-item-controls,
-.editor-item-has-delete:hover > .editor-list-item-add,
-.editor-item-has-delete:focus-within > .editor-list-item-add,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover > .editor-list-item-add,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within > .editor-list-item-add,
 .editor-item-has-delete.editor-item-selected > .editor-list-item-add,
-.editor-item-has-delete:hover .editor-list-item-delete,
-.editor-item-has-delete:focus-within .editor-list-item-delete,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover .editor-list-item-delete,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within .editor-list-item-delete,
 .editor-item-has-delete.editor-item-selected .editor-list-item-delete,
-.editor-item-has-delete:hover .editor-list-item-move,
-.editor-item-has-delete:focus-within .editor-list-item-move,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover .editor-list-item-move,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within .editor-list-item-move,
 .editor-item-has-delete.editor-item-selected .editor-list-item-move {
   opacity: 1;
   visibility: visible;
@@ -803,6 +803,15 @@
   to { background-position: -200% 0; }
 }
 
+/* AI image reveal: blur→sharp transition when generated image replaces placeholder */
+.ai-image-reveal {
+  animation: ai-image-reveal 1.2s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+@keyframes ai-image-reveal {
+  from { filter: blur(20px) saturate(1.1); transform: scale(1.04); opacity: 0.6; }
+  to   { filter: blur(0) saturate(1); transform: scale(1); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aifx-updated::before,
   .aifx-updated::after {
@@ -815,6 +824,9 @@
     animation: none !important;
   }
   .editor-skeleton-block {
+    animation: none !important;
+  }
+  .ai-image-reveal {
     animation: none !important;
   }
   ::view-transition-old(root),

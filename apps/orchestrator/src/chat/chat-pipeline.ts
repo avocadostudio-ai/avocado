@@ -26,11 +26,13 @@ import type { createChatTelemetryStore } from "../telemetry/chat-telemetry.js"
 import {
   type AIProvider,
   type ModelKey,
+  type ContinuationChain,
   type PendingImageGeneration,
   versions,
   pendingClarificationBySession,
   chatHistoryBySession,
   pendingApprovalPlanBySession,
+  continuationChainBySession,
   orderSlugsHomeFirst,
   getSessionDraft,
   getPage,
@@ -67,6 +69,7 @@ import {
   rewriteFromExisting
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI } from "./planner.js"
+import { isMultiStepCandidate, decomposeRequest } from "./decomposer.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic } from "./anthropic-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import type { ToolRuntime } from "../tools/runtime.js"
@@ -76,7 +79,9 @@ import {
   generateVariationImageWithOpenAI,
   resolveUnsplashImage,
   isExplicitImageGenRequest,
-  extractImagePromptFromMessage
+  extractImagePromptFromMessage,
+  estimatedImageGenMs,
+  recordImageGenDuration
 } from "../image/image-helpers.js"
 
 let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
@@ -114,6 +119,52 @@ export type ChatPipelineContext = {
   modelLookup: Record<AIProvider, Record<ModelKey, string>>
   availableProviders: AIProvider[]
   toolRuntime: ToolRuntime
+}
+
+// ---------------------------------------------------------------------------
+// Deferred image placeholder
+// ---------------------------------------------------------------------------
+
+/**
+ * Data URI SVG with SMIL shimmer animation and "Generating image..." text.
+ * Used as a Hero's `imageUrl` while the real image is being generated.
+ */
+export const GENERATING_IMAGE_PLACEHOLDER = [
+  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E`,
+  `%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E`,
+  `%3Cstop offset='0%25' stop-color='%23e2e8f0'/%3E`,
+  `%3Cstop offset='50%25' stop-color='%23f1f5f9'%3E%3Canimate attributeName='offset' values='0;1;0' dur='2s' repeatCount='indefinite'/%3E%3C/stop%3E`,
+  `%3Cstop offset='100%25' stop-color='%23e2e8f0'/%3E`,
+  `%3C/linearGradient%3E%3C/defs%3E`,
+  `%3Crect width='1200' height='600' fill='url(%23g)'/%3E`,
+  // AI sparkle — classic 4-point diamond star, positioned just left of the text
+  `%3Cg transform='translate(448,296)' fill='%2394a3b8'%3E`,
+  // Main sparkle: thin 4-point star (tall + narrow = classic AI look)
+  `%3Cpath d='M0-12C1 -4 4-1 12 0 4 1 1 4 0 12-1 4-4 1-12 0-4-1-1-4 0-12Z'%3E`,
+  `%3Canimate attributeName='opacity' values='0.5;1;0.5' dur='2s' repeatCount='indefinite'/%3E`,
+  `%3C/path%3E`,
+  // Small companion sparkle — offset top-right
+  `%3Cpath d='M11-9C11.4-7 12.6-5.8 15-5.5 12.6-5.2 11.4-4 11-2 10.6-4 9.4-5.2 7-5.5 9.4-5.8 10.6-7 11-9Z' opacity='0.6'%3E`,
+  `%3Canimate attributeName='opacity' values='0.3;0.8;0.3' dur='1.6s' repeatCount='indefinite'/%3E`,
+  `%3C/path%3E`,
+  `%3C/g%3E`,
+  // "Generating image..." — large centered text (nudged right to balance sparkle)
+  `%3Ctext x='616' y='310' text-anchor='middle' fill='%2394a3b8' font-family='system-ui' font-size='36' font-weight='500'%3EGenerating image%E2%80%A6%3C/text%3E`,
+  `%3C/svg%3E`
+].join("")
+
+/** Returns true if the URL is the shimmer placeholder used during deferred image generation. */
+export function isGeneratingPlaceholder(url: string): boolean {
+  return url.startsWith("data:image/svg+xml,") && url.includes("Generating%20image")
+}
+
+/** Metadata for a deferred create_page Hero image that still needs resolution. */
+export type DeferredCreatePageImage = {
+  pageSlug: string
+  blockId: string
+  query: string
+  pageTitle: string
+  sectionContext: string
 }
 
 // ---------------------------------------------------------------------------
@@ -959,6 +1010,42 @@ export function findFullPageTranslationCoverageGap(args: {
 }
 
 // ---------------------------------------------------------------------------
+// Progress-tracked image generation wrapper
+// ---------------------------------------------------------------------------
+
+const IMAGE_PROGRESS_STAGES = [
+  { at: 0.00, pct:  0, label: "Understanding prompt\u2026" },
+  { at: 0.10, pct: 15, label: "Composing scene\u2026" },
+  { at: 0.30, pct: 40, label: "Rendering image\u2026" },
+  { at: 0.65, pct: 75, label: "Finalizing details\u2026" },
+  { at: 0.90, pct: 95, label: "Almost there\u2026" },
+]
+
+function startImageProgressTimer(onImageProgress?: (event: { percent: number; stage: string }) => void): () => void {
+  if (!onImageProgress) return () => {}
+  const estimated = estimatedImageGenMs()
+  const startedAt = Date.now()
+  let currentStageIdx = 0
+  onImageProgress({ percent: 0, stage: IMAGE_PROGRESS_STAGES[0].label })
+  const timer = setInterval(() => {
+    const elapsed = Date.now() - startedAt
+    const progress = Math.min(elapsed / estimated, 1)
+    while (currentStageIdx < IMAGE_PROGRESS_STAGES.length - 1 && progress >= IMAGE_PROGRESS_STAGES[currentStageIdx + 1].at) {
+      currentStageIdx++
+    }
+    const cur = IMAGE_PROGRESS_STAGES[currentStageIdx]
+    const next = IMAGE_PROGRESS_STAGES[currentStageIdx + 1] ?? { at: 1, pct: 95 }
+    const stageProgress = (progress - cur.at) / (next.at - cur.at)
+    const pct = Math.min(Math.round(cur.pct + stageProgress * (next.pct - cur.pct)), 95)
+    onImageProgress({ percent: pct, stage: cur.label })
+  }, 500)
+  return () => {
+    clearInterval(timer)
+    onImageProgress({ percent: 100, stage: "Done" })
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Unsplash hero image rewrite
 // ---------------------------------------------------------------------------
 
@@ -973,6 +1060,7 @@ export async function withUnsplashHeroImage(args: {
   chatRequestId?: string
   log: FastifyBaseLogger
   onStatusUpdate?: (message: string) => void
+  onImageProgress?: (event: { percent: number; stage: string }) => void
 }): Promise<EditPlan> {
   const lowerMessage = args.message.toLowerCase()
   if (args.plan.intent !== "edit_plan") return args.plan
@@ -1061,7 +1149,7 @@ export async function withUnsplashHeroImage(args: {
 
       let resolved: UnsplashImage | null = null
       if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY) {
-        args.onStatusUpdate?.("Generating image...")
+        args.onStatusUpdate?.("Generating image\u2026")
         let generatedPrompt: string
         let generatedAlt: string
         if (userImagePrompt) {
@@ -1086,7 +1174,11 @@ export async function withUnsplashHeroImage(args: {
             "Constraints: no text, no logos, no watermark"
           ].join("\n")
         }
+        const stopProgress = startImageProgressTimer(args.onImageProgress)
+        const genStart = Date.now()
         resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
+        recordImageGenDuration(Date.now() - genStart)
+        stopProgress()
         if (resolved) imageSource = "ai-generated"
       }
       if (!resolved) {
@@ -1143,7 +1235,9 @@ export async function withUnsplashHeroImage(args: {
     op.patch = patchCandidate
   }
 
-  // Also resolve Hero images inside create_page ops (new pages with embedded Hero blocks).
+  // For create_page ops, set a shimmer placeholder instead of blocking on image generation.
+  // The real image is resolved after the page is applied (deferred phase).
+  const deferredCreatePageImages: DeferredCreatePageImage[] = []
   for (const op of plan.ops) {
     if (op.op !== "create_page") continue
     const page = (op as unknown as { page: PageDoc }).page
@@ -1154,8 +1248,6 @@ export async function withUnsplashHeroImage(args: {
       const placeholderUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
       // Skip if the user provided an explicit URL in the message
       if (firstUrlFromText(args.message)) continue
-      // Resolve when the Hero has no image or a local placeholder path (e.g. /hero-generated.svg).
-      // Preserve explicit remote URLs that the planner/user already chose.
       if (shouldResolveCreatePageHeroImage(placeholderUrl)) {
         const heading = typeof props.heading === "string" ? props.heading : ""
         const subheading = typeof props.subheading === "string" ? props.subheading : ""
@@ -1164,39 +1256,21 @@ export async function withUnsplashHeroImage(args: {
         const query = candidates.length > 0
           ? imageKeywordsFromQuery(candidates.join(" "), 4).join(" ") || pageTitle || "hero image"
           : "hero image"
+        const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
 
-        let resolved: UnsplashImage | null = null
-        if (process.env.OPENAI_API_KEY) {
-          args.onStatusUpdate?.("Generating image for new page...")
-          const sectionContext = [heading, subheading].filter(Boolean).join(" — ")
-          const generatedAlt = `AI-generated hero image featuring ${query}`
-          const generatedPrompt = [
-            "Use case: website hero image for a new page",
-            `Page: ${pageTitle} (${page.slug})`,
-            `Section: Hero — ${sectionContext}`,
-            `Primary subject: ${query}`,
-            "Style: photorealistic editorial product photography",
-            "Composition: clean landscape frame with clear focal subject",
-            "Lighting: natural and vibrant",
-            "Constraints: no text, no logos, no watermark"
-          ].join("\n")
-          resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
-        }
-        if (!resolved) {
-          args.onStatusUpdate?.("Finding image for new page...")
-          resolved = await resolveUnsplashImage(query, { subjectKeywords: imageKeywordsFromQuery(query, 4) }, { chatRequestId: args.chatRequestId, logger: args.log })
-        }
-        if (resolved) {
-          props.imageUrl = resolved.url
-          props.imageAlt = preferredImageAltText({ query, resolvedAlt: resolved.alt, existingAlt: typeof props.imageAlt === "string" ? props.imageAlt : undefined })
-          changed = true
-          args.log.info(
-            { event: "hero_image_create_page_resolved", chatRequestId: args.chatRequestId, pageSlug: page.slug, query, imageUrl: resolved.url },
-            "Resolved hero image for create_page"
-          )
-        }
+        // Set placeholder so the page renders instantly with a shimmer
+        props.imageUrl = GENERATING_IMAGE_PLACEHOLDER
+        props.imageAlt = "Generating image\u2026"
+        deferredCreatePageImages.push({ pageSlug: page.slug, blockId: block.id, query, pageTitle, sectionContext })
+        args.log.info(
+          { event: "hero_image_create_page_deferred", chatRequestId: args.chatRequestId, pageSlug: page.slug, blockId: block.id, query },
+          "Deferred hero image resolution for create_page"
+        )
       }
     }
+  }
+  if (deferredCreatePageImages.length > 0) {
+    ;(plan as EditPlan & { _deferredCreatePageImages?: DeferredCreatePageImage[] })._deferredCreatePageImages = deferredCreatePageImages
   }
 
   const planAlreadyHasResolvedImage = plan.ops.some((op) => {
@@ -1228,7 +1302,7 @@ export async function withUnsplashHeroImage(args: {
 
       let resolved: UnsplashImage | null = null
       if (!explicitUnsplashRequest && process.env.OPENAI_API_KEY && (explicitImageGen || userImagePrompt)) {
-        args.onStatusUpdate?.("Generating image...")
+        args.onStatusUpdate?.("Generating image\u2026")
         const targetProps = fallbackHero.props as Record<string, unknown>
         const heading = typeof targetProps.heading === "string" ? targetProps.heading : ""
         const subheading = typeof targetProps.subheading === "string" ? targetProps.subheading : ""
@@ -1258,7 +1332,11 @@ export async function withUnsplashHeroImage(args: {
             "Constraints: no text, no logos, no watermark"
           ].join("\n")
         }
+        const stopProgress = startImageProgressTimer(args.onImageProgress)
+        const genStart = Date.now()
         resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
+        recordImageGenDuration(Date.now() - genStart)
+        stopProgress()
         if (resolved) imageSource = "ai-generated"
       }
       if (!resolved) {
@@ -1346,6 +1424,57 @@ export function shouldResolveCreatePageHeroImage(imageUrl: string) {
   const normalized = imageUrl.trim()
   if (!normalized) return true
   return !/^https?:\/\//i.test(normalized)
+}
+
+/**
+ * Resolve a Hero image for a deferred create_page op.
+ * Tries DALL-E first, then falls back to Unsplash.
+ */
+export async function resolveHeroImageForCreatePage(args: {
+  query: string
+  pageTitle: string
+  pageSlug: string
+  sectionContext: string
+  chatRequestId?: string
+  log: FastifyBaseLogger
+  onStatusUpdate?: (message: string) => void
+  onImageProgress?: (event: { percent: number; stage: string }) => void
+}): Promise<{ url: string; alt: string; source: "ai-generated" | "unsplash" } | null> {
+  if (process.env.OPENAI_API_KEY) {
+    args.onStatusUpdate?.("Generating image\u2026")
+
+    const generatedAlt = `AI-generated hero image featuring ${args.query}`
+    const generatedPrompt = [
+      "Use case: website hero image for a new page",
+      `Page: ${args.pageTitle} (${args.pageSlug})`,
+      `Section: Hero — ${args.sectionContext}`,
+      `Primary subject: ${args.query}`,
+      "Style: photorealistic editorial product photography",
+      "Composition: clean landscape frame with clear focal subject",
+      "Lighting: natural and vibrant",
+      "Constraints: no text, no logos, no watermark"
+    ].join("\n")
+
+    const stopProgress = startImageProgressTimer(args.onImageProgress)
+    const genStart = Date.now()
+    const resolved = await generateVariationImageWithOpenAI({ prompt: generatedPrompt, altText: generatedAlt, log: args.log })
+    recordImageGenDuration(Date.now() - genStart)
+    stopProgress()
+
+    if (resolved) {
+      return { url: resolved.url, alt: resolved.alt, source: "ai-generated" }
+    }
+  }
+  args.onStatusUpdate?.("Finding image for new page...")
+  const resolved = await resolveUnsplashImage(
+    args.query,
+    { subjectKeywords: imageKeywordsFromQuery(args.query, 4) },
+    { chatRequestId: args.chatRequestId, logger: args.log }
+  )
+  if (resolved && resolved.url.includes("unsplash")) {
+    return { url: resolved.url, alt: resolved.alt, source: "unsplash" }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -1735,9 +1864,12 @@ export async function runChatPipeline(
   options?: {
     onPlanningToken?: (token: string) => void
     onPlannedOp?: (event: { index: number; op: Operation }) => void
-    onOpApplied?: (event: { index: number; total: number; op: Operation; previewVersion: number; focusBlockId?: string }) => void
+    onSummaryChunk?: (text: string) => void
+    onChangeLogEntry?: (entry: string) => void
+    onOpApplied?: (event: { index: number; total: number; op: Operation; previewVersion: number; focusBlockId?: string; updatedSlug?: string }) => void
     onOpSkipped?: (event: { index: number; total: number; op: Operation; reason: SkippedOperation["reason"] }) => void
     onStatusUpdate?: (message: string) => void
+    onImageProgress?: (event: { percent: number; stage: string }) => void
     onPlanMeta?: (event: { intent: EditPlan["intent"]; summary: string; estimatedOps: number }) => void
     onRollbackStarted?: (event: { appliedCount: number; reason: string }) => void
     onRollbackDone?: (event: { restoredVersion: number }) => void
@@ -1821,6 +1953,49 @@ export async function runChatPipeline(
       }
     }
   }
+
+  if (executionMode === "continue_chain") {
+    const chain = continuationChainBySession.get(body.session)
+    if (!chain) {
+      return { code: 409, payload: { error: "no continuation chain found for this session" } }
+    }
+    if (body.continuationChainId && body.continuationChainId !== chain.id) {
+      return { code: 409, payload: { error: "continuation chain id mismatch" } }
+    }
+    if (chain.currentStep >= chain.totalSteps) {
+      continuationChainBySession.delete(body.session)
+      return { code: 409, payload: { error: "continuation chain already completed" } }
+    }
+    // Execute the next step as a normal chat message
+    const stepMessage = chain.steps[chain.currentStep]
+    chain.currentStep++
+    const isLastStep = chain.currentStep >= chain.totalSteps
+
+    const result = await runChatPipeline(ctx, {
+      ...body,
+      message: stepMessage,
+      slug: chain.effectiveSlug,
+      executionMode: "auto"
+    }, options)
+
+    // Attach continuation info if more steps remain
+    if (!isLastStep && result.code === 200 && "status" in result.payload && result.payload.status !== "error") {
+      const payload = result.payload as ChatResult
+      payload.continuation = {
+        chainId: chain.id,
+        currentStep: chain.currentStep + 1,
+        totalSteps: chain.totalSteps,
+        nextStepLabel: chain.stepLabels[chain.currentStep]
+      }
+    }
+
+    if (isLastStep) {
+      continuationChainBySession.delete(body.session)
+    }
+
+    return result
+  }
+
   const sanitizedMessage = sanitizeMessageForPlanning(body.message ?? "")
   const pageDirectory = buildPageDirectory(body.session)
   const siteContextBlock = buildSiteContextBlock({
@@ -2233,6 +2408,7 @@ export async function runChatPipeline(
 
   let planUsage: TokenUsage | undefined
   let usedNativeUnsplashTool = false
+  let usedNativeImageTool = false
 
   const respondFromPlan = async (
     plan: EditPlan,
@@ -2369,8 +2545,37 @@ export async function runChatPipeline(
           resolvedPlan.change_log = [...resolvedPlan.change_log, pendingImageMessage]
         }
       } else {
+        // Emit plan metadata and progress markers before blocking image resolution
+        // so the UI gets instant feedback (e.g. "Created page /about.") while images load.
+        options?.onPlanMeta?.({
+          intent: resolvedPlan.intent,
+          summary: resolvedPlan.summary_for_user,
+          estimatedOps: resolvedPlan.ops.length
+        })
+        markFirstStructuredProgress()
+        if (!stageTimeline.some((item) => item.stage === "plan_ready")) {
+          const planReadyAtMs = Date.now() - pipelineStartedAtMs
+          stageTimeline.push({ stage: "plan_ready", atMs: planReadyAtMs })
+          ctx.chatTelemetry.push({
+            id: chatRequestId,
+            at: new Date().toISOString(),
+            phase: "milestone",
+            timelineStage: "plan_ready",
+            session: body.session!,
+            requestedSlug,
+            effectiveSlug,
+            plannerSource: source,
+            modelKey,
+            modelUsed,
+            promptHash,
+            promptExcerpt,
+            promptLength: plannerMessage.length,
+            totalDurationMs: planReadyAtMs
+          })
+        }
+
         // Keep legacy rewrite path as fallback only when native tool path did not already resolve image candidates.
-        if (!usedNativeUnsplashTool) {
+        if (!usedNativeUnsplashTool && !usedNativeImageTool) {
           const imageResolutionStartMs = Date.now()
           emitStatus("Resolving image assets...")
           resolvedPlan = await withUnsplashHeroImage({
@@ -2382,7 +2587,8 @@ export async function runChatPipeline(
             activeEditablePath: planningActiveEditablePath,
             chatRequestId,
             log: ctx.log,
-            onStatusUpdate: options?.onStatusUpdate
+            onStatusUpdate: options?.onStatusUpdate,
+            onImageProgress: options?.onImageProgress
           })
           imageResolutionDurationMs += Date.now() - imageResolutionStartMs
         }
@@ -2419,11 +2625,14 @@ export async function runChatPipeline(
       if (translationCoverageGap) return { done: false as const, reason: translationCoverageGap }
     }
 
-    options?.onPlanMeta?.({
-      intent: resolvedPlan.intent,
-      summary: resolvedPlan.summary_for_user,
-      estimatedOps: resolvedPlan.ops.length
-    })
+    // Emit plan metadata if not already emitted (deferred image path and other branches skip the early emit above)
+    if (!stageTimeline.some((item) => item.stage === "first_structured_progress")) {
+      options?.onPlanMeta?.({
+        intent: resolvedPlan.intent,
+        summary: resolvedPlan.summary_for_user,
+        estimatedOps: resolvedPlan.ops.length
+      })
+    }
     markFirstStructuredProgress()
     if (!stageTimeline.some((item) => item.stage === "plan_ready")) {
       const planReadyAtMs = Date.now() - pipelineStartedAtMs
@@ -2770,6 +2979,69 @@ export async function runChatPipeline(
             totalDurationMs: firstApplyMs
           })
         }
+
+        // Deferred image resolution for create_page: emit op_applied immediately
+        // so the editor navigates to the new page with a shimmer placeholder,
+        // then resolve the real image and patch it in.
+        const deferredImages = (resolvedPlan as EditPlan & { _deferredCreatePageImages?: DeferredCreatePageImage[] })._deferredCreatePageImages
+        if (deferredImages && deferredImages.length > 0 && options?.onOpApplied) {
+          const deferredUpdatedSlug = pickUpdatedSlug(body.session!, effectiveSlug, resolvedPlan.ops)
+          const immediatePreviewVersion = bumpVersion(body.session!)
+          const createOp = resolvedPlan.ops.find((op) => op.op === "create_page")
+          options.onOpApplied({
+            index: 1,
+            total: 1,
+            op: createOp ?? resolvedPlan.ops[0],
+            previewVersion: immediatePreviewVersion,
+            focusBlockId: pickFocusBlockId(resolvedPlan.ops),
+            updatedSlug: deferredUpdatedSlug
+          })
+
+          // Resolve each deferred image and patch the Hero block
+          for (const deferred of deferredImages) {
+            try {
+              const deferredImageStart = Date.now()
+              const imageResult = await resolveHeroImageForCreatePage({
+                query: deferred.query,
+                pageTitle: deferred.pageTitle,
+                pageSlug: deferred.pageSlug,
+                sectionContext: deferred.sectionContext,
+                chatRequestId,
+                log: ctx.log,
+                onStatusUpdate: options.onStatusUpdate,
+                onImageProgress: options?.onImageProgress
+              })
+              const deferredImageDurationMs = Date.now() - deferredImageStart
+              if (imageResult) {
+                const patchOp: Operation = {
+                  op: "update_props",
+                  pageSlug: deferred.pageSlug,
+                  blockId: deferred.blockId,
+                  patch: { props: { imageUrl: imageResult.url, imageAlt: imageResult.alt } }
+                }
+                applyOpsAtomically(body.session!, [patchOp], { componentsManifest })
+                const patchVersion = bumpVersion(body.session!)
+                options.onOpApplied({
+                  index: 1,
+                  total: 1,
+                  op: patchOp,
+                  previewVersion: patchVersion,
+                  focusBlockId: deferred.blockId
+                })
+                resolvedPlan.change_log = [...resolvedPlan.change_log, "Generated a new image with AI."]
+                ctx.log.info(
+                  { event: "deferred_hero_image_resolved", chatRequestId, pageSlug: deferred.pageSlug, blockId: deferred.blockId, source: imageResult.source, durationMs: deferredImageDurationMs },
+                  `Deferred hero image resolved and applied in ${deferredImageDurationMs}ms`
+                )
+              }
+            } catch (err) {
+              ctx.log.warn(
+                { event: "deferred_hero_image_failed", chatRequestId, pageSlug: deferred.pageSlug, blockId: deferred.blockId, error: toErrorDetail(err) },
+                "Deferred hero image resolution failed — page remains with placeholder"
+              )
+            }
+          }
+        }
       }
       pushUndo(body.session!, effectiveSlug, previous)
       pendingClarificationBySession.delete(body.session!)
@@ -2980,7 +3252,8 @@ export async function runChatPipeline(
           activeEditablePath: body.activeEditablePath,
           chatRequestId,
           log: ctx.log,
-          onStatusUpdate: options?.onStatusUpdate
+          onStatusUpdate: options?.onStatusUpdate,
+          onImageProgress: options?.onImageProgress
         })
         imageResolutionDurationMs += Date.now() - imageResolutionStartMs
       }
@@ -3329,6 +3602,72 @@ export async function runChatPipeline(
     }
   }
 
+  // --- Continuation chain decomposition ---
+  // If the message looks like a multi-step request and we haven't already entered a chain,
+  // decompose it into steps and execute only the first one through the normal planner.
+  if (
+    executionMode === "auto" &&
+    !continuationChainBySession.has(body.session) &&
+    isMultiStepCandidate(plannerMessage) &&
+    (plannerSource === "openai" || plannerSource === "anthropic")
+  ) {
+    try {
+      emitStatus("Breaking down your request...")
+      // Always use OpenAI for decomposition — it's a lightweight JSON task that
+      // doesn't need the full Anthropic planner, and avoids model/provider mismatch.
+      const decomposerModel =
+        ctx.modelLookup.openai?.fast ??
+        ctx.modelLookup.openai?.balanced ??
+        ctx.modelLookup[provider]?.fast ??
+        modelUsed
+      const decomposition = await decomposeRequest({
+        message: plannerMessage,
+        currentPage: current,
+        slug: effectiveSlug,
+        model: decomposerModel,
+        siteContextBlock
+      })
+      if (decomposition.steps.length > 1) {
+        const chain: ContinuationChain = {
+          id: randomUUID(),
+          steps: decomposition.steps,
+          stepLabels: decomposition.labels,
+          currentStep: 0,
+          totalSteps: decomposition.steps.length,
+          originalMessage: plannerMessage,
+          effectiveSlug,
+          siteContextBlock
+        }
+        continuationChainBySession.set(body.session, chain)
+
+        // Execute step 0 through normal planner
+        chain.currentStep = 1
+        const stepResult = await runChatPipeline(ctx, {
+          ...body,
+          message: decomposition.steps[0],
+          executionMode: "auto"
+        }, options)
+
+        // Attach continuation info for remaining steps
+        if (stepResult.code === 200 && "status" in stepResult.payload && stepResult.payload.status !== "error") {
+          const payload = stepResult.payload as ChatResult
+          payload.continuation = {
+            chainId: chain.id,
+            currentStep: 2, // 1-indexed for display
+            totalSteps: chain.totalSteps,
+            nextStepLabel: chain.stepLabels[1]
+          }
+        }
+
+        return stepResult
+      }
+      // If 1 step, fall through to normal flow
+    } catch (decompositionError) {
+      ctx.log.warn({ err: toErrorDetail(decompositionError), event: "decomposition_failed" }, "Request decomposition failed, falling back to normal planner")
+      // Fall through to normal flow
+    }
+  }
+
   const generatePlanImpl = plannerSource === "anthropic" ? generatePlanWithAnthropicImpl : generatePlanWithOpenAIImpl
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
@@ -3355,9 +3694,12 @@ export async function runChatPipeline(
               traceId: chatRequestId
             }
           : undefined,
+        onStatusUpdate: options?.onStatusUpdate,
+        onImageProgress: options?.onImageProgress,
         onToolExecution: plannerSource === "anthropic"
           ? (event) => {
               if (event.ok && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
+              if (event.ok && event.toolName === "image.generate") usedNativeImageTool = true
               ctx.chatTelemetry.push({
                 id: chatRequestId,
                 at: new Date().toISOString(),
@@ -3384,6 +3726,8 @@ export async function runChatPipeline(
           : undefined,
         log: ctx.log,
         onToken: onPlanningToken,
+        onSummaryChunk: options?.onSummaryChunk,
+        onChangeLogEntry: options?.onChangeLogEntry,
         onPlannedOp: incrementalPlanStreamEnabled
           ? (op, index) => {
               markFirstStructuredProgress()
@@ -3604,6 +3948,8 @@ export async function runChatPipeline(
       forceFullSchemaContracts: true,
       siteContextBlock,
       onToken: onPlanningToken,
+      onSummaryChunk: options?.onSummaryChunk,
+      onChangeLogEntry: options?.onChangeLogEntry,
       onPlannedOp: incrementalPlanStreamEnabled
         ? (op, index) => {
             markFirstStructuredProgress()
