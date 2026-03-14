@@ -39,8 +39,8 @@ function resolveContentSourceWithDevFallback({
   search: Record<string, string | string[] | undefined>
 }) {
   if (draftModeEnabled) return resolveSiteContentSource({ draftModeEnabled: true })
-  const devEditorFallback = process.env.NODE_ENV !== "production" && getSingleValue(search.__editor) === "1"
-  return resolveSiteContentSource({ draftModeEnabled: devEditorFallback })
+  const editorFallback = EDITOR_ENABLED && getSingleValue(search.__editor) === "1"
+  return resolveSiteContentSource({ draftModeEnabled: editorFallback })
 }
 
 function slugToLabel(route: string) {
