@@ -238,5 +238,221 @@
         }
       }
     ]
+  },
+  {
+    "id": "p_about",
+    "slug": "/about",
+    "title": "About",
+    "updatedAt": "2026-03-14T07:58:22.918Z",
+    "blocks": [
+      {
+        "id": "b_hero_1773474917941",
+        "type": "Hero",
+        "props": {
+          "heading": "About Avocado Stories",
+          "subheading": "Celebrating the world's favorite green fruit through recipes, wellness, and sustainable farming. We believe avocados are more than just food—they're a symbol of mindful living and culinary creativity.",
+          "ctaText": "Explore Our Recipes",
+          "ctaHref": "/recipes",
+          "imageUrl": "https://images.unsplash.com/photo-1643892343740-77e5efda67de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwZmFybSUyMHN1c3RhaW5hYmxlJTIwYWdyaWN1bHR1cmV8ZW58MXwwfHx8MTc3MzQ3Mjk1M3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Aerial view of a sustainable avocado farm with organized crop rows"
+        }
+      },
+      {
+        "id": "b_featuregrid_1773474917942",
+        "type": "FeatureGrid",
+        "props": {
+          "title": "Our Core Values",
+          "features": [
+            {
+              "title": "Quality First",
+              "description": "We partner with growers who share our commitment to excellence, selecting only the finest avocados for your table."
+            },
+            {
+              "title": "Curious & Creative",
+              "description": "From breakfast to dessert, we celebrate the endless possibilities of avocados through innovative recipes and ideas."
+            },
+            {
+              "title": "Planet Positive",
+              "description": "Sustainability matters to us. We promote farming practices that care for soil, water, and the future of our food."
+            },
+            {
+              "title": "Community Focused",
+              "description": "Your kitchen is our kitchen. We build a welcoming space where food lovers discover, share, and learn together."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_testimonials_1773474917942",
+        "type": "Testimonials",
+        "props": {
+          "title": "Loved by Food Lovers",
+          "items": [
+            {
+              "quote": "Avocado Stories transformed how I think about cooking. The recipes are creative, and the wellness tips actually stick with me. It feels like having a knowledgeable friend in the kitchen.",
+              "author": "Maya, Recipe Enthusiast"
+            },
+            {
+              "quote": "I appreciate how the site balances flavor with nutrition. The sustainability content inspired me to support local farms. This is food writing with a conscience.",
+              "author": "James, Health-Conscious Home Cook"
+            },
+            {
+              "quote": "Whether I'm looking for a quick weeknight meal or planning a dinner party, there's always something new to discover here. Avocado Stories keeps me inspired.",
+              "author": "Sofia, Food Blogger"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773474917942",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Common Questions",
+          "items": [
+            {
+              "q": "What is Avocado Stories' mission?",
+              "a": "We celebrate avocados as a gateway to mindful eating, culinary creativity, and sustainable living. Our mission is to inspire people to explore the flavor, nutrition, and versatility of avocados while learning about responsible food production."
+            },
+            {
+              "q": "Do you offer recipes for every skill level?",
+              "a": "Absolutely. Our collection ranges from simple five-minute toast ideas to more involved dishes for adventurous cooks. Each recipe includes notes to help you adjust difficulty or swap ingredients based on your comfort level."
+            },
+            {
+              "q": "How do you support sustainable farming?",
+              "a": "We partner with growers using regenerative agriculture practices, highlight sustainable sourcing in our content, and provide education about the environmental impact of our food choices. Learn more in our Sustainability section."
+            },
+            {
+              "q": "Can I join your community?",
+              "a": "Yes! Sign up for our newsletter to receive weekly recipes, wellness tips, and sustainability insights. You'll also get early access to new content and special discounts from our partner farms."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_stats_1773474917942",
+        "type": "Stats",
+        "props": {
+          "title": "By The Numbers",
+          "stats": [
+            {
+              "value": "50K+",
+              "label": "Monthly Visitors"
+            },
+            {
+              "value": "200+",
+              "label": "Original Recipes"
+            },
+            {
+              "value": "98%",
+              "label": "Positive Feedback"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1773474917942",
+        "type": "RichText",
+        "props": {
+          "title": "Our Story",
+          "body": "Avocado Stories was born from a simple observation: people were hungry for more than just recipes. They wanted connection—to food, to nature, and to a way of eating that felt meaningful.\n\nWhat started as a passion project has grown into a vibrant community of food lovers, home cooks, and wellness enthusiasts who share a curiosity about avocados and sustainable living. We believe that every meal is an opportunity to make a choice that nourishes both body and planet.\n\nToday, we're committed to sharing stories, recipes, and insights that celebrate the joy of eating well and living consciously. From our kitchen to yours, we hope Avocado Stories inspires your next great meal."
+        }
+      },
+      {
+        "id": "b_twocolumn_1773474917942",
+        "type": "TwoColumn",
+        "props": {
+          "variant": "default",
+          "left": [
+            {
+              "src": "https://images.unsplash.com/photo-1723110568116-a235ee001cab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw5fHxmcmVzaCUyMGF2b2NhZG8lMjBsaWZlc3R5bGUlMjBoZWFsdGh5JTIwZm9vZHxlbnwxfDB8fHwxNzczNDc0ODg4fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "poster": "https://images.unsplash.com/photo-1758696233586-6d2350a70f0c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMGF2b2NhZG8lMjBsaWZlc3R5bGUlMjBoZWFsdGh5JTIwZm9vZHxlbnwxfDB8fHwxNzczNDc0ODg4fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+            }
+          ],
+          "right": [
+            {
+              "body": "# Why Avocados Matter\n\nAvocados are more than a trendy ingredient—they're a nutritional powerhouse packed with healthy fats, fiber, and vitamins. But beyond the numbers, they represent something deeper: a way to slow down, savor your food, and connect with where it comes from.\n\nEvery avocado tells a story. It starts as a seed in someone's orchard, grows through seasons of care, and arrives at your table ready to nourish. When you choose avocados thoughtfully, you're supporting farmers, protecting ecosystems, and investing in your own wellbeing.\n\nThat's the philosophy behind Avocado Stories. We're here to help you discover not just how to cook with avocados, but why they deserve a place in a life lived well.",
+              "ctaText": "Learn More",
+              "ctaHref": "/sustainability"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1773474917942_1",
+        "type": "RichText",
+        "props": {
+          "title": "Our Commitment to Sustainability",
+          "body": "Avocado farming can be water-intensive and environmentally demanding, but it doesn't have to be. We work exclusively with growers who prioritize regenerative practices—methods that actually improve soil health, conserve water, and support local biodiversity.\n\n**What we look for in our partners:**\n\n- *Soil stewardship:* Building healthy soil that sequesters carbon and requires less water over time\n- *Water conservation:* Using drip irrigation and mulching to minimize waste\n- *Biodiversity:* Maintaining native plants and habitats alongside crops\n- *Fair labor:* Ensuring workers are treated fairly and have safe conditions\n\nWe believe transparency matters. When you explore a recipe on Avocado Stories, you're not just learning how to cook—you're learning about the farms and farmers behind your food. Together, we're proving that delicious eating and environmental responsibility aren't opposing goals—they're partners in building a better food system."
+        }
+      },
+      {
+        "id": "b_cardgrid_1773474917945",
+        "type": "CardGrid",
+        "props": {
+          "title": "Explore Our Resources",
+          "cards": [
+            {
+              "title": "Nutrition Guides",
+              "description": "Discover the health benefits of avocados, understand their nutrient profile, and learn how to get the most from every bite.",
+              "ctaText": "Read Guides",
+              "ctaHref": "/nutrition",
+              "imageUrl": "https://images.unsplash.com/photo-1758696233586-6d2350a70f0c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMGF2b2NhZG8lMjBsaWZlc3R5bGUlMjBoZWFsdGh5JTIwZm9vZHxlbnwxfDB8fHwxNzczNDc0ODg4fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Fresh fruits and vegetables at a farmers market"
+            },
+            {
+              "title": "Farming Practices",
+              "description": "Learn about regenerative agriculture, water conservation, and the farmers working hard to grow avocados responsibly.",
+              "ctaText": "Discover Practices",
+              "ctaHref": "/farming",
+              "imageUrl": "https://images.unsplash.com/photo-1570142056130-9f6b59c6287a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmdhbmljJTIwZmFybWluZyUyMHZlZ2V0YWJsZXMlMjBuYXR1cmV8ZW58MXwwfHx8MTc3MzQ3NDg4OXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Orange pumpkin plants growing in a field"
+            },
+            {
+              "title": "Recipe Collections",
+              "description": "Browse hundreds of original recipes organized by meal type, dietary preference, and cooking time. Something for every appetite.",
+              "ctaText": "Browse Recipes",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1643892343740-77e5efda67de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwZmFybSUyMHN1c3RhaW5hYmxlJTIwYWdyaWN1bHR1cmV8ZW58MXwwfHx8MTc3MzQ3Mjk1M3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Aerial view of a sustainable avocado farm"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773474917945",
+        "type": "CTA",
+        "props": {
+          "title": "Get Weekly Recipe & Wellness Tips",
+          "description": "Join our community for fresh ideas, nutrition insights, and stories from sustainable farms. Delivered to your inbox every Thursday.",
+          "ctaText": "Sign Up Now",
+          "ctaHref": "/subscribe"
+        }
+      },
+      {
+        "id": "b_footer_1773474917946",
+        "type": "Footer",
+        "props": {
+          "title": "Ready to get started?",
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Start now",
+          "ctaHref": "/",
+          "copyright": "© 2024 Avocado Stories. All rights reserved.",
+          "columns": [
+            {
+              "title": "Explore",
+              "links": "Home|/\nRecipes|/recipes\nNutrition|/nutrition\nSustainability|/sustainability"
+            },
+            {
+              "title": "Connect",
+              "links": "About|/about\nCommunity|/community\nNewsletter|/subscribe\nContact|/contact"
+            },
+            {
+              "title": "Resources",
+              "links": "Blog|/blog\nFarming Guides|/farming\nFAQ|/faq\nTerms|/terms"
+            }
+          ]
+        }
+      }
+    ]
   }
 ]
