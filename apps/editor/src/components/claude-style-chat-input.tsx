@@ -396,17 +396,20 @@ export default function ClaudeStyleChatInput(props: Props) {
                   <path d="M12 18v3" />
                 </svg>
               </button>
-              {isLoading && onCancel ? (
-                <button type="button" className="composer-stop-btn" onClick={onCancel} aria-label="Stop generation">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="6" y="6" width="12" height="12" rx="2" />
-                  </svg>
-                </button>
-              ) : (
-                <button type="button" className="composer-send-btn" onClick={() => onSubmit()} disabled={!canSubmit} aria-label="Send message">
+              <button
+                type="button"
+                className={`composer-send-btn${isLoading && onCancel ? " is-stop" : ""}`}
+                onClick={isLoading && onCancel ? onCancel : () => onSubmit()}
+                disabled={!(isLoading && onCancel) && !canSubmit}
+                aria-label={isLoading && onCancel ? "Stop generation" : "Send message"}
+              >
+                <span className="icon-send">
                   <ArrowUpIcon size={16} color="currentColor" strokeWidth={2.8} />
-                </button>
-              )}
+                </span>
+                <svg className="icon-stop" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
             </>
           )}
         </div>
