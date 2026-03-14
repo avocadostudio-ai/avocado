@@ -23,6 +23,7 @@ import {
   splitAiInsightChanges
 } from "../lib/editor-utils"
 import { buildSiteContextPayload, manifestUnavailableChanges, withIntegrationContext } from "../lib/integration-context"
+import { parseString } from "../lib/parse-utils"
 import { usePlanApproval } from "./chat-engine/usePlanApproval"
 import { useStructuralOps } from "./chat-engine/useStructuralOps"
 import { useUndoHistory } from "./chat-engine/useUndoHistory"
@@ -199,7 +200,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     pushAssistantFromResult(data, { canUndo: data.status === "applied" })
     if (data.status === "applied") {
       const currentSlug = slugRef.current
-      const nextSlug = typeof data.updatedSlug === "string" && data.updatedSlug.length > 0 ? data.updatedSlug : currentSlug
+      const nextSlug = parseString(data.updatedSlug, currentSlug)
       if (nextSlug !== currentSlug) {
         setSlug(nextSlug)
         activeBlockIdRef.current = undefined

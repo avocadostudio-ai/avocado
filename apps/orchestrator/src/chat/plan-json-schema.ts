@@ -1,3 +1,6 @@
+import { z } from "zod"
+import { allowedBlockTypes, type BlockType } from "@ai-site-editor/shared"
+
 // ---------------------------------------------------------------------------
 // JSON Schema for EditPlan — used as Anthropic tool_use input_schema and
 // OpenAI json_schema response_format.
@@ -53,60 +56,29 @@ export const editPlanJsonSchema = {
 // ---------------------------------------------------------------------------
 // JSON Schema for intent parsing — used with output_config.format for
 // constrained decoding (guaranteed valid JSON matching this schema).
+// Generated from intentSchemaForAI (Zod) via z.toJSONSchema().
 // ---------------------------------------------------------------------------
 
-export const intentJsonSchema = {
-  type: "object" as const,
-  additionalProperties: false,
-  properties: {
-    action: {
-      type: "string",
-      enum: ["add", "move", "update", "remove", "info", "clarify"],
-      description: "The editing action to perform."
-    },
-    target_block_ref: {
-      type: ["string", "null"] as const,
-      description: "Block ID or type reference to target (e.g. 'b_hero1' or 'hero')."
-    },
-    target_block_type: {
-      type: ["string", "null"] as const,
-      description: "Block type to target (e.g. 'Hero', 'CTA')."
-    },
-    new_block_type: {
-      type: ["string", "null"] as const,
-      description: "Block type to add (e.g. 'Hero', 'FAQAccordion')."
-    },
-    position: {
-      type: ["string", "null"] as const,
-      enum: ["top", "bottom", "before", "after", null],
-      description: "Placement position for add/move operations."
-    },
-    anchor_block_ref: {
-      type: ["string", "null"] as const,
-      description: "Block ID or type reference for relative positioning."
-    },
-    patch: {
-      type: ["object", "null"] as const,
-      description: "Partial props to update on the target block."
-    },
-    summary: {
-      type: ["string", "null"] as const,
-      description: "Brief summary of the intended action."
-    },
-    assumption: {
-      type: ["string", "null"] as const,
-      description: "Any assumption made about an ambiguous request."
-    }
-  },
-  required: [
-    "action",
-    "target_block_ref",
-    "target_block_type",
-    "new_block_type",
-    "position",
-    "anchor_block_ref",
-    "patch",
-    "summary",
-    "assumption"
-  ] as string[]
-} as const
+const blockTypeEnum = z.enum(allowedBlockTypes as [BlockType, ...BlockType[]])
+
+/** Zod schema for AI structured output — uses .nullable() so all fields are required (OpenAI strict mode). */
+const intentSchemaForAI = z.object({
+  action: z.enum(["add", "move", "update", "remove", "info", "clarify"]),
+  target_block_ref: z.string().nullable(),
+  target_block_type: blockTypeEnum.nullable(),
+  new_block_type: blockTypeEnum.nullable(),
+  position: z.enum(["top", "bottom", "before", "after"]).nullable(),
+  anchor_block_ref: z.string().nullable(),
+  patch: z.record(z.string(), z.unknown()).nullable(),
+  summary: z.string().nullable(),
+  assumption: z.string().nullable()
+})
+
+function stripSchemaKey(obj: Record<string, unknown>): Record<string, unknown> {
+  const { $schema, ...rest } = obj
+  return rest
+}
+
+export const intentJsonSchema = stripSchemaKey(
+  z.toJSONSchema(intentSchemaForAI) as Record<string, unknown>
+)

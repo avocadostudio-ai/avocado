@@ -50,49 +50,54 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
   }, [mobileMenuOpen])
 
   return (
-    <header className="site-top-nav">
-      <Link className="site-brand" href={homeHref}>
-        <img className="site-logo" src={siteLogo} alt={`${siteName} logo`} width={38} height={38} />
-        <span className="site-brand-text">{siteName}</span>
-      </Link>
-      <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} className={item.isActive ? "is-active" : undefined}>
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <SiteThemeToggle />
-      <div ref={mobileMenuRef} className={`site-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}>
-        <button
-          type="button"
-          className="site-mobile-menu-button"
-          aria-expanded={mobileMenuOpen}
-          aria-controls={mobileMenuId}
-          aria-label="Toggle navigation menu"
-          onClick={() => setMobileMenuOpen((open) => !open)}
-        >
-          <span className="burger-icon" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-        </button>
-        {mobileMenuOpen ? (
-          <nav id={mobileMenuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
-            {navItems.map((item) => (
-              <Link
-                key={`mobile-${item.href}`}
-                href={item.href}
-                className={item.isActive ? "is-active" : undefined}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
-      </div>
-    </header>
+    <>
+      <header className="site-top-nav">
+        <Link className="site-brand" href={homeHref}>
+          <img className="site-logo" src={siteLogo} alt={`${siteName} logo`} width={38} height={38} />
+          <span className="site-brand-text">{siteName}</span>
+        </Link>
+        <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
+          {navItems.map((item) => (
+            <Link key={item.href} href={item.href} className={item.isActive ? "is-active" : undefined}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <SiteThemeToggle />
+        <div ref={mobileMenuRef} className={`site-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}>
+          <button
+            type="button"
+            className="site-mobile-menu-button"
+            aria-expanded={mobileMenuOpen}
+            aria-controls={mobileMenuId}
+            aria-label="Toggle navigation menu"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span className="burger-icon" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+          </button>
+          {mobileMenuOpen ? (
+            <nav id={mobileMenuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
+              {navItems.map((item) => (
+                <Link
+                  key={`mobile-${item.href}`}
+                  href={item.href}
+                  className={item.isActive ? "is-active" : undefined}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+      </header>
+      {mobileMenuOpen ? (
+        <div className="site-mobile-backdrop" onClick={() => setMobileMenuOpen(false)} />
+      ) : null}
+    </>
   )
 }

@@ -24,7 +24,7 @@ export type PageDoc = {
 export const blockInstanceSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
-  props: z.record(z.unknown())
+  props: z.record(z.string(), z.unknown())
 })
 
 export const pageMetaSchema = z.object({
