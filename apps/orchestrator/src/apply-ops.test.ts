@@ -1,41 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { app } from "./index.js"
+import { createSessionFactory, postOps, getPage, getSlugs } from "./test/fixtures.js"
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-let sessionCounter = 0
-function newSession() {
-  return `apply-ops-test-${++sessionCounter}`
-}
-
-type OpsPayload = { session: string; ops: unknown[] }
-
-async function postOps(payload: OpsPayload) {
-  return app.inject({
-    method: "POST",
-    url: "/ops",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  })
-}
-
-async function getPage(session: string, slug: string) {
-  return app.inject({
-    method: "GET",
-    url: `/draft/pages?session=${encodeURIComponent(session)}&slug=${encodeURIComponent(slug)}`
-  })
-}
-
-async function getSlugs(session: string) {
-  const res = await app.inject({
-    method: "GET",
-    url: `/draft/slugs?session=${encodeURIComponent(session)}`
-  })
-  return JSON.parse(res.body) as { slugs: string[] }
-}
+const newSession = createSessionFactory("apply-ops-test")
 
 // ---------------------------------------------------------------------------
 // Happy-path: page-level ops

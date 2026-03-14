@@ -1,36 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { app } from "./index.js"
+import { createSessionFactory, parseSseData } from "./test/fixtures.js"
 
-let sessionCounter = 0
-function newSession() {
-  return `chat-contract-test-${++sessionCounter}`
-}
-
-function parseSseData(body: string) {
-  const events: Array<Record<string, unknown>> = []
-  const chunks = body
-    .split("\n\n")
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-
-  for (const chunk of chunks) {
-    const line = chunk
-      .split("\n")
-      .map((entry) => entry.trim())
-      .find((entry) => entry.startsWith("data:"))
-    if (!line) continue
-    const raw = line.slice("data:".length).trim()
-    if (!raw) continue
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      events.push(parsed)
-    } catch {
-      // ignore malformed non-JSON lines
-    }
-  }
-  return events
-}
+const newSession = createSessionFactory("chat-contract-test")
 
 test("POST /ops contract: applied response includes stable fields", async () => {
   const session = newSession()
@@ -237,4 +210,84 @@ test("POST /chat/start enforces max pending per session", async () => {
     payload: { session, siteId, slug: "/", message: "overflow" }
   })
   assert.equal(res.statusCode, 429)
+})
+
+// --- afterSeq replay ---
+
+test("GET /chat/stream with afterSeq replays only missed events", async () => {
+  const session = newSession()
+  const startRes = await app.inject({
+    method: "POST",
+    url: "/chat/start",
+    headers: { "content-type": "application/json" },
+    payload: { session, slug: "/", message: "what can i edit on this page?" }
+  })
+  assert.equal(startRes.statusCode, 200)
+  const { streamId } = startRes.json() as { streamId: string }
+
+  // First: complete the stream to populate the event buffer
+  const streamRes = await app.inject({
+    method: "GET",
+    url: `/chat/stream?streamId=${streamId}`
+  })
+  assert.equal(streamRes.statusCode, 200)
+  const allEvents = parseSseData(streamRes.body)
+  assert.ok(allEvents.length > 0, "should emit SSE events")
+
+  // Find the max _seq from the events
+  const seqValues = allEvents.map((e) => (e as { _seq?: number })._seq ?? 0).filter((s) => s > 0)
+  assert.ok(seqValues.length > 0, "events should contain _seq values")
+  const maxSeq = Math.max(...seqValues)
+
+  // Reconnect with afterSeq=maxSeq-1 to get only the last event(s)
+  const replayRes = await app.inject({
+    method: "GET",
+    url: `/chat/stream?streamId=${streamId}&afterSeq=${maxSeq - 1}`
+  })
+  assert.equal(replayRes.statusCode, 200)
+  const replayEvents = parseSseData(replayRes.body)
+  // Should only get events with seq > (maxSeq - 1)
+  const replaySeqs = replayEvents.map((e) => (e as { _seq?: number })._seq ?? 0).filter((s) => s > 0)
+  for (const seq of replaySeqs) {
+    assert.ok(seq > maxSeq - 1, `replayed seq ${seq} should be > ${maxSeq - 1}`)
+  }
+})
+
+// --- POST /chat/cancel ---
+
+test("POST /chat/cancel returns not_found for unknown streamId", async () => {
+  const res = await app.inject({
+    method: "POST",
+    url: "/chat/cancel",
+    headers: { "content-type": "application/json" },
+    payload: { streamId: "nonexistent-stream-id" }
+  })
+  assert.equal(res.statusCode, 404)
+  const payload = res.json() as { status?: string }
+  assert.equal(payload.status, "not_found")
+})
+
+test("POST /chat/cancel returns already_terminal for completed stream", async () => {
+  const session = newSession()
+  const startRes = await app.inject({
+    method: "POST",
+    url: "/chat/start",
+    headers: { "content-type": "application/json" },
+    payload: { session, slug: "/", message: "hello" }
+  })
+  const { streamId } = startRes.json() as { streamId: string }
+
+  // Complete the stream
+  await app.inject({ method: "GET", url: `/chat/stream?streamId=${streamId}` })
+
+  // Now cancel — should be already_terminal
+  const cancelRes = await app.inject({
+    method: "POST",
+    url: "/chat/cancel",
+    headers: { "content-type": "application/json" },
+    payload: { streamId }
+  })
+  assert.equal(cancelRes.statusCode, 200)
+  const cancelPayload = cancelRes.json() as { status?: string }
+  assert.equal(cancelPayload.status, "already_terminal")
 })

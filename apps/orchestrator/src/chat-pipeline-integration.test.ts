@@ -21,35 +21,9 @@ const STUB_SCHEMA_CONTEXT: PlannerSchemaContextMeta = {
 }
 import { pendingApprovalPlanBySession } from "./state/session-state.js"
 import { ZERO_USAGE } from "./telemetry/usage.js"
+import { createSessionFactory, parseSseData } from "./test/fixtures.js"
 
-let sessionCounter = 0
-function newSession() {
-  return `chat-pipeline-int-${++sessionCounter}`
-}
-
-function parseSseData(body: string) {
-  const events: Array<Record<string, unknown>> = []
-  const chunks = body
-    .split("\n\n")
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-
-  for (const chunk of chunks) {
-    const line = chunk
-      .split("\n")
-      .map((entry) => entry.trim())
-      .find((entry) => entry.startsWith("data:"))
-    if (!line) continue
-    const raw = line.slice("data:".length).trim()
-    if (!raw) continue
-    try {
-      events.push(JSON.parse(raw) as Record<string, unknown>)
-    } catch {
-      // Ignore malformed lines.
-    }
-  }
-  return events
-}
+const newSession = createSessionFactory("chat-pipeline-int")
 
 test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocked plan", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
