@@ -180,6 +180,7 @@ export async function generatePlanWithAnthropic(args: {
   siteContextBlock?: string | null
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
+  signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isPageWideRewriteRequest(args.message)

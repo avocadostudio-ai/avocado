@@ -457,6 +457,8 @@ export function postEditSuggestions(args: { plan: EditPlan; current: PageDoc; bo
           }
         }
       }
+    } else if (op.op === "create_page") {
+      suggestions.push("Generate an AI hero image")
     } else if (op.op === "add_block") {
       suggestions.push(`Update the new ${op.block.type} content`)
     } else if (op.op === "remove_block") {

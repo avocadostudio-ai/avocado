@@ -38,6 +38,14 @@ export type BlockInstance = {
 /** Semantic kind for a block prop field. */
 export type FieldKind = "text" | "richtext" | "url" | "image" | "imageAlt" | "enum" | "color" | "number"
 
+/** Recommended image dimensions for an image field. */
+export type ImageSpec = {
+  aspectRatio: "landscape" | "square" | "portrait"
+  width: number
+  height: number
+  format?: "png" | "webp" | "jpeg"
+}
+
 /** Metadata for a single prop field on a block. */
 export type FieldMeta = {
   kind: FieldKind
@@ -47,6 +55,8 @@ export type FieldMeta = {
   inlineEditable?: boolean
   /** For enum kind: the allowed values. */
   options?: string[]
+  /** For image kind: recommended dimensions and aspect ratio. */
+  imageSpec?: ImageSpec
 }
 
 /** Metadata for list-type props (features, items, cards). */
@@ -122,6 +132,29 @@ export function isFieldInlineEditable(type: string, fieldPath: string): boolean 
   return fm.kind === "text" || fm.kind === "richtext"
 }
 
+/** Resolve the ImageSpec for a block field, handling both scalar and list item paths. */
+export function getImageSpec(blockType: string, fieldPath: string): ImageSpec | undefined {
+  const meta = _blockMeta[blockType]
+  if (!meta) return undefined
+
+  // Handle list item paths like "cards[0].imageUrl" → listField "cards", itemField "imageUrl"
+  const listMatch = fieldPath.match(/^([a-zA-Z_]+)\[\d+\]\.(.+)$/)
+  if (listMatch) {
+    const [, listKey, itemField] = listMatch
+    return meta.listFields?.[listKey]?.itemFields[itemField]?.imageSpec
+  }
+
+  // Also support bare "listKey.itemField" (no index) as a convenience lookup
+  const dotMatch = fieldPath.match(/^([a-zA-Z_]+)\.(.+)$/)
+  if (dotMatch) {
+    const [, listKey, itemField] = dotMatch
+    const fromList = meta.listFields?.[listKey]?.itemFields[itemField]?.imageSpec
+    if (fromList) return fromList
+  }
+
+  return meta.fields[fieldPath]?.imageSpec
+}
+
 // ---------------------------------------------------------------------------
 // Built-in block registrations
 // ---------------------------------------------------------------------------
@@ -130,7 +163,7 @@ const f = {
   text: (label?: string): FieldMeta => ({ kind: "text", label }),
   richtext: (label?: string): FieldMeta => ({ kind: "richtext", label }),
   url: (label?: string): FieldMeta => ({ kind: "url", label, inlineEditable: false }),
-  image: (label?: string): FieldMeta => ({ kind: "image", label, inlineEditable: false }),
+  image: (label?: string, imageSpec?: ImageSpec): FieldMeta => ({ kind: "image", label, inlineEditable: false, ...(imageSpec ? { imageSpec } : {}) }),
   imageAlt: (label?: string): FieldMeta => ({ kind: "imageAlt", label }),
 } as const
 
@@ -155,7 +188,7 @@ registerBlock("Hero", {
       subheading: f.text("Subheading"),
       ctaText: f.text("CTA button text"),
       ctaHref: f.url("CTA link"),
-      imageUrl: f.image("Hero image"),
+      imageUrl: f.image("Hero image", { aspectRatio: "landscape", width: 1536, height: 1024 }),
       imageAlt: f.imageAlt("Hero image alt text"),
       imagePosition: { kind: "enum", label: "Image position", options: ["left", "right"], inlineEditable: false },
       secondaryCtaText: f.text("Secondary CTA text"),
@@ -259,7 +292,7 @@ registerBlock("Card", {
       description: f.text("Card description"),
       ctaText: f.text("Button text"),
       ctaHref: f.url("Button link"),
-      imageUrl: f.image("Card image"),
+      imageUrl: f.image("Card image", { aspectRatio: "landscape", width: 768, height: 512 }),
       imageAlt: f.imageAlt("Card image alt text"),
     }
   }
@@ -294,7 +327,7 @@ registerBlock("CardGrid", {
           description: f.text("Card description"),
           ctaText: f.text("Button text"),
           ctaHref: f.url("Button link"),
-          imageUrl: f.image("Card image"),
+          imageUrl: f.image("Card image", { aspectRatio: "landscape", width: 768, height: 512 }),
           imageAlt: f.imageAlt("Card image alt text"),
         }
       }
@@ -404,9 +437,9 @@ registerBlock("TwoColumn", {
           text: f.text("Text content"),
           label: f.text("Button label"),
           href: f.url("Link URL"),
-          src: f.image("Media source"),
+          src: f.image("Media source", { aspectRatio: "portrait", width: 768, height: 1024 }),
           alt: f.imageAlt("Alt text"),
-          poster: f.image("Video poster image"),
+          poster: f.image("Video poster image", { aspectRatio: "landscape", width: 768, height: 512 }),
         }
       },
       right: {
@@ -416,9 +449,9 @@ registerBlock("TwoColumn", {
           text: f.text("Text content"),
           label: f.text("Button label"),
           href: f.url("Link URL"),
-          src: f.image("Media source"),
+          src: f.image("Media source", { aspectRatio: "portrait", width: 768, height: 1024 }),
           alt: f.imageAlt("Alt text"),
-          poster: f.image("Video poster image"),
+          poster: f.image("Video poster image", { aspectRatio: "landscape", width: 768, height: 512 }),
         }
       }
     }

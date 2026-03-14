@@ -4,7 +4,7 @@ export type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
 export type AIProvider = "openai" | "anthropic"
 export type PlannerSource = "openai" | "anthropic" | "demo"
 export type PlannerBadgeState = PlannerSource | "checking" | "error"
-export type ChatExecutionMode = "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan"
+export type ChatExecutionMode = "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan" | "continue_chain"
 
 export type SiteCapabilities = {
   allowStructuralEdits: boolean
@@ -26,6 +26,12 @@ export type AssistantResponse = {
   modelKey?: string
   plannerSource?: PlannerSource
   pendingPlanId?: string
+  continuation?: {
+    chainId: string
+    currentStep: number
+    totalSteps: number
+    nextStepLabel: string
+  }
   focusBlockId?: string
   updatedSlug?: string
   suggestions?: string[]
@@ -123,6 +129,12 @@ export type ChatEntry = {
   aiJustification?: string
   aiPerformanceNote?: string
   pendingPlanId?: string
+  continuation?: {
+    chainId: string
+    currentStep: number
+    totalSteps: number
+    nextStepLabel: string
+  }
 }
 
 export type ApplyOpsResponse = {

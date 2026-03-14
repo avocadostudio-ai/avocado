@@ -4,6 +4,7 @@ export function getPreviewWrapperProps(editorMode: boolean, blockId: string, blo
   return {
     "data-block-id": blockId,
     "data-block-type": blockType,
-    className: "editor-selectable"
+    className: "editor-selectable",
+    style: { viewTransitionName: `block-${blockId}` }
   } as const
 }

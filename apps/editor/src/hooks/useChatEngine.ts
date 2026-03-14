@@ -164,6 +164,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   // Track last sent message so server-forced plan_only can populate pendingPlanMessage
   const lastSentMessageRef = useRef<string | null>(null)
+  const activeStreamIdRef = useRef<string | null>(null)
 
   // Use refs for values accessed in closures to avoid stale captures
   const slugRef = useRef(slug)
@@ -878,11 +879,28 @@ export function useChatEngine(config: ChatEngineConfig) {
       const data = await res.json() as { streamId?: string }
       if (!data.streamId) return false
       streamId = data.streamId
+      activeStreamIdRef.current = streamId
     } catch {
       return false
     }
 
     return await new Promise<boolean>((resolve) => {
+      let lastSeq = 0
+      const storageKey = `chat-stream:${session}:${siteId}`
+
+      const persistStreamContext = () => {
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({ streamId, lastSeq }))
+        } catch { /* quota exceeded or unavailable */ }
+      }
+
+      const clearStreamContext = () => {
+        activeStreamIdRef.current = null
+        try { sessionStorage.removeItem(storageKey) } catch { /* ignore */ }
+      }
+
+      persistStreamContext()
+
       const source = new EventSource(`${orchestrator}/chat/stream?streamId=${streamId}`)
       let settled = false
       let gotAnyEvent = false
@@ -959,7 +977,8 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       source.onmessage = (event) => {
         let payload: {
-          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error" | "summary_token" | "changelog_entry" | "image_progress"
+          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error" | "canceled" | "summary_token" | "changelog_entry" | "image_progress"
+          _seq?: number
           message?: string
           text?: string
           stage?: string
@@ -985,6 +1004,12 @@ export function useChatEngine(config: ChatEngineConfig) {
           return
         }
         gotAnyEvent = true
+
+        // Track sequence number for reconnect
+        if (typeof payload._seq === "number" && payload._seq > lastSeq) {
+          lastSeq = payload._seq
+          persistStreamContext()
+        }
 
         if (payload.type === "status") {
           setStreamStatus(payload.message ?? "Working...")
@@ -1156,6 +1181,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         if (payload.type === "final") {
           const completeFinal = () => {
             settled = true
+            clearStreamContext()
             setStreamStatus(null)
             setStreamTokenCount(0)
             setImageProgress(null)
@@ -1187,8 +1213,27 @@ export function useChatEngine(config: ChatEngineConfig) {
           }
         }
 
+        if (payload.type === "canceled") {
+          settled = true
+          clearStreamContext()
+          setStreamStatus(null)
+          setStreamTokenCount(0)
+          setImageProgress(null)
+          setStreamingText(null)
+          setStreamingChanges([])
+          clearOpRefreshTimer()
+          endLiveDraft()
+          pendingFocusBlockId = null
+          // Refresh preview to clear any image placeholders
+          postToSite("draftUpdated", { focusBlockId: null })
+          pushAssistantFromResult({ status: "info", summary: payload.message ?? "Request was canceled.", changes: [] })
+          source.close()
+          resolve(true)
+        }
+
         if (payload.type === "error") {
           settled = true
+          clearStreamContext()
           setStreamStatus(null)
           setStreamTokenCount(0)
           setImageProgress(null)
@@ -1208,7 +1253,39 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
 
       source.onerror = () => {
-        if (settled || gotAnyEvent) {
+        if (settled) {
+          source.close()
+          return
+        }
+
+        // If we got events, attempt reconnect with afterSeq
+        if (gotAnyEvent && lastSeq > 0) {
+          source.close()
+          setStreamStatus("Reconnecting...")
+          const reconnectSource = new EventSource(
+            `${orchestrator}/chat/stream?streamId=${streamId}&afterSeq=${lastSeq}`
+          )
+          reconnectSource.onmessage = source.onmessage
+          reconnectSource.onerror = () => {
+            // Reconnect failed — resolve as success since we got partial events
+            clearStreamContext()
+            setStreamStatus(null)
+            setStreamTokenCount(0)
+            setStreamingText(null)
+            setStreamingChanges([])
+            clearOpRefreshTimer()
+            endLiveDraft()
+            if (pendingFocusBlockId !== null) flushOpRefresh()
+            pendingFocusBlockId = null
+            settled = true
+            reconnectSource.close()
+            resolve(true)
+          }
+          return
+        }
+
+        if (gotAnyEvent) {
+          clearStreamContext()
           setStreamStatus(null)
           setStreamTokenCount(0)
           setStreamingText(null)
@@ -1221,6 +1298,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           resolve(true)
           return
         }
+        clearStreamContext()
         setStreamStatus("Streaming failed, retrying with standard request...")
         setStreamTokenCount(0)
         setStreamingText(null)
@@ -1233,6 +1311,28 @@ export function useChatEngine(config: ChatEngineConfig) {
         resolve(false)
       }
     })
+  }
+
+  async function cancelChat() {
+    const currentStreamId = activeStreamIdRef.current
+    if (!currentStreamId) return
+    setStreamStatus("Canceling...")
+    try {
+      const res = await fetch(`${orchestrator}/chat/cancel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ streamId: currentStreamId })
+      })
+      if (res.ok) {
+        const data = await res.json() as { status?: string }
+        if (data.status === "not_found" || data.status === "already_terminal") {
+          // Nothing to cancel — let the stream finish naturally
+          return
+        }
+      }
+    } catch {
+      // Best-effort cancel
+    }
   }
 
   async function submitChat(explicitMessage?: string, currentMessage?: string) {
@@ -1416,6 +1516,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     undoInFlightEntryId,
     pushAssistantFromResult,
     submitChat,
+    cancelChat,
     applyVariation,
     approvePendingPlan,
     stopPendingPlan,
@@ -1429,6 +1530,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     moveListItem,
     reorderBlock,
     deleteBlock,
-    inlineEditCommit
+    inlineEditCommit,
+    clearChat: () => setChatLog([welcomeEntry])
   }
 }

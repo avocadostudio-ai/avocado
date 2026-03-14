@@ -141,7 +141,7 @@ export function sanitizeSiteId(value: string) {
 }
 
 export function resolveEditorSiteId() {
-  const fallback = sanitizeSiteId((import.meta.env.VITE_SITE_ID as string | undefined) ?? "") || "dev-site"
+  const fallback = sanitizeSiteId((import.meta.env.VITE_SITE_ID as string | undefined) ?? "") || "avocado-stories"
   if (LOCK_SITE_ID) return fallback
   if (typeof window === "undefined") return fallback
   const fromQuery = sanitizeSiteId(new URLSearchParams(window.location.search).get("siteId") ?? "")

@@ -374,6 +374,94 @@ export function extractResponsesOutputText(response: unknown) {
   return chunks.join("")
 }
 
+export function extractSummaryFromPlanBuffer(raw: string): { summary: string | null; changeLog: string[] } {
+  // Extract summary_for_user value (may be partial if string is still open)
+  let summary: string | null = null
+  const summaryKey = '"summary_for_user"'
+  const summaryKeyIdx = raw.indexOf(summaryKey)
+  if (summaryKeyIdx >= 0) {
+    const afterKey = raw.indexOf(":", summaryKeyIdx + summaryKey.length)
+    if (afterKey >= 0) {
+      const quoteStart = raw.indexOf('"', afterKey + 1)
+      if (quoteStart >= 0) {
+        // Scan for closing quote respecting escapes
+        let escape = false
+        let closeIdx = -1
+        for (let i = quoteStart + 1; i < raw.length; i++) {
+          const ch = raw[i]!
+          if (escape) { escape = false; continue }
+          if (ch === "\\") { escape = true; continue }
+          if (ch === '"') { closeIdx = i; break }
+        }
+        if (closeIdx >= 0) {
+          // Closed string — use JSON.parse for correct decoding (handles \uXXXX etc.)
+          try {
+            summary = JSON.parse(raw.slice(quoteStart, closeIdx + 1)) as string
+          } catch {
+            // Fallback: return raw content without quotes
+            summary = raw.slice(quoteStart + 1, closeIdx)
+          }
+        } else {
+          // Still open (partial/streaming) — manual decode is acceptable
+          let value = ""
+          let esc = false
+          for (let i = quoteStart + 1; i < raw.length; i++) {
+            const ch = raw[i]!
+            if (esc) {
+              if (ch === "n") value += "\n"
+              else if (ch === "t") value += "\t"
+              else if (ch === "r") value += "\r"
+              else value += ch
+              esc = false
+              continue
+            }
+            if (ch === "\\") { esc = true; continue }
+            value += ch
+          }
+          if (value.length > 0) summary = value
+        }
+      }
+    }
+  }
+
+  // Extract change_log string entries
+  const changeLog: string[] = []
+  const clKey = '"change_log"'
+  const clKeyIdx = raw.indexOf(clKey)
+  if (clKeyIdx >= 0) {
+    const arrStart = raw.indexOf("[", clKeyIdx + clKey.length)
+    if (arrStart >= 0) {
+      let inString = false
+      let escape = false
+      let strStart = -1
+      let depth = 0
+      for (let i = arrStart; i < raw.length; i++) {
+        const ch = raw[i]!
+        if (inString) {
+          if (escape) { escape = false; continue }
+          if (ch === "\\") { escape = true; continue }
+          if (ch === '"') {
+            inString = false
+            if (depth === 1 && strStart >= 0) {
+              try {
+                const parsed = JSON.parse(raw.slice(strStart, i + 1)) as string
+                changeLog.push(parsed)
+              } catch { /* partial */ }
+              strStart = -1
+            }
+          }
+          continue
+        }
+        if (ch === '"') { inString = true; strStart = i; continue }
+        if (ch === "[") { depth++; continue }
+        if (ch === "]") { if (--depth <= 0) break; continue }
+      }
+    }
+  }
+
+  return { summary, changeLog }
+}
+
 export function extractOpsFromPlanBuffer(raw: string, emittedCount: number) {
   const opsKeyIdx = raw.indexOf('"ops"')
   if (opsKeyIdx < 0) return { nextEmittedCount: emittedCount, newOps: [] as Operation[] }
@@ -517,12 +605,15 @@ export async function generatePlanWithOpenAI(args: {
   feedback?: string
   onToken?: (token: string) => void
   onPlannedOp?: (op: Operation, index: number) => void
+  onSummaryChunk?: (text: string) => void
+  onChangeLogEntry?: (entry: string) => void
   onToolExecution?: (event: ToolExecutionEvent) => void
   toolRuntime?: ToolRuntime
   toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
   client?: PlannerOpenAIClient
   siteContextBlock?: string | null
   forceFullSchemaContracts?: boolean
+  signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isPageWideRewriteRequest(args.message)
@@ -560,6 +651,7 @@ export async function generatePlanWithOpenAI(args: {
     "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     "If user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page. Do not ask which page to create first.",
     "For create_page, derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page.",
+    "If the user asks to create a page showcasing, demonstrating, or featuring all available components/block types (even with typos like 'componenzs'), generate a create_page op containing one block of each allowed block type. Fill all block props with themed sample content matching the user's topic. This is a clear, actionable request — do not return needs_clarification.",
     "For add_block, use exact prop names from blockContracts. Common mistakes: use 'title' not 'heading' for section titles (except Hero which uses 'heading'), use 'q'/'a' not 'question'/'answer' for FAQ items, use 'quote' not 'testimonial' for Testimonials items.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "Do not return no-op updates: patch must change at least one effective value.",
@@ -630,6 +722,8 @@ export async function generatePlanWithOpenAI(args: {
   let raw = ""
   let usage: TokenUsage = { ...ZERO_USAGE }
   let streamedOpsCount = 0
+  let lastSummaryLen = 0
+  let emittedChangeLogCount = 0
   if (isResponsesOnlyModel(args.model)) {
     const response = await client.responses.create({
       model: args.model,
@@ -659,7 +753,7 @@ export async function generatePlanWithOpenAI(args: {
         { role: "system", content: system },
         ...(args.history ?? []),
         { role: "user", content: JSON.stringify(user) }
-      ]
+      ],
     })
     let sawRefusal = false
     for await (const chunk of stream) {
@@ -673,6 +767,17 @@ export async function generatePlanWithOpenAI(args: {
       if (typeof delta !== "string" || delta.length === 0) continue
       raw += delta
       args.onToken(delta)
+      if (args.onSummaryChunk || args.onChangeLogEntry) {
+        const extracted = extractSummaryFromPlanBuffer(raw)
+        if (extracted.summary && extracted.summary.length > lastSummaryLen) {
+          args.onSummaryChunk?.(extracted.summary.slice(lastSummaryLen))
+          lastSummaryLen = extracted.summary.length
+        }
+        for (let i = emittedChangeLogCount; i < extracted.changeLog.length; i++) {
+          args.onChangeLogEntry?.(extracted.changeLog[i]!)
+        }
+        emittedChangeLogCount = extracted.changeLog.length
+      }
       if (args.onPlannedOp) {
         const next = extractOpsFromPlanBuffer(raw, streamedOpsCount)
         streamedOpsCount = next.nextEmittedCount
@@ -700,7 +805,7 @@ export async function generatePlanWithOpenAI(args: {
         { role: "system", content: system },
         ...(args.history ?? []),
         { role: "user", content: JSON.stringify(user) }
-      ]
+      ],
     })
     const refusal = extractCompletionRefusal(completion)
     if (refusal) {

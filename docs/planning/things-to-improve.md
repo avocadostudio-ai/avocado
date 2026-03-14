@@ -12,6 +12,8 @@ This document tracks high-impact product and architecture improvements for the A
 6. Add a trace-level debug bundle endpoint for rapid issue reproduction.
 7. ~~Extract editor chat state into focused UI/domain modules~~ — **Done.** `apps/editor/src/App.tsx` split into `chat-state.ts`, `editor-actions.ts`, `editor-layout.tsx`, `chat-panel.tsx`.
 8. Expand automated e2e coverage for critical user flows.
+9. Add deterministic field-source binding (`ai.bind`-style) for sensitive outputs (hero image URL, CTA links, product pricing, legal copy snippets) so those fields can only be populated from approved tools or explicit constants.
+10. Add first-class request middleware (`prepareRequest`-style) in orchestrator AI clients to inject auth, tenant headers, policy tags, redaction, and audit metadata before every provider call.
 
 ## Why these matter
 
@@ -41,4 +43,3 @@ Extracted modules:
 - `src/routes/media.ts` — audio transcribe + image interpret routes
 - `src/routes/history.ts` — undo/redo routes
 - `src/routes/route-context.ts` — shared route context type
-
