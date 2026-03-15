@@ -1,29 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import ArrowUpIcon from "./arrow-up-icon"
-
-type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
-type AIProvider = "openai" | "anthropic"
-
-const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
-  openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
-  anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
-}
-
-const PROVIDER_LABELS: Record<AIProvider, string> = {
-  openai: "OpenAI",
-  anthropic: "Claude",
-}
+import { ArrowUp, Check, Mic, Plus, Square, X } from "lucide-react"
 
 type Props = {
   message: string
   isLoading: boolean
-  modelKey: ModelKey
-  provider: AIProvider
-  availableProviders: AIProvider[]
   hasUserEntry: boolean
   onMessageChange: (value: string) => void
-  onModelChange: (value: ModelKey) => void
-  onProviderChange: (value: AIProvider) => void
   onSubmit: (explicitMessage?: string) => void
   onTranscribeAudio: (blob: Blob, mimeType: string) => Promise<string>
   onInterpretImage: (blob: Blob, mimeType: string) => Promise<string>
@@ -32,16 +14,8 @@ type Props = {
   onAutoHeightChange: (height: number) => void
 }
 
-function modelLabel(provider: AIProvider, model: ModelKey) {
-  return MODEL_LABELS[provider][model]
-}
-
-function selectionValue(provider: AIProvider, model: ModelKey) {
-  return `${provider}:${model}`
-}
-
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, modelKey, provider, availableProviders, onMessageChange, onModelChange, onProviderChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange } = props
+  const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -66,8 +40,6 @@ export default function ClaudeStyleChatInput(props: Props) {
     textarea.style.overflowY = "hidden"
     const naturalHeight = textarea.scrollHeight
 
-    // Compute available space inside the shell for the textarea:
-    // shell height minus padding, gap, and actions row
     const shellStyle = getComputedStyle(shell)
     const shellPaddingTop = parseFloat(shellStyle.paddingTop) || 0
     const shellPaddingBottom = parseFloat(shellStyle.paddingBottom) || 0
@@ -75,7 +47,7 @@ export default function ClaudeStyleChatInput(props: Props) {
 
     // Measure the actions row height
     const actionsEl = shell.querySelector(".composer-actions") as HTMLElement | null
-    const actionsHeight = actionsEl ? actionsEl.offsetHeight : 38
+    const actionsHeight = actionsEl ? actionsEl.offsetHeight : 32
 
     // Measure any status notes below the textarea inside composer-input-area
     const inputArea = shell.querySelector(".composer-input-area") as HTMLElement | null
@@ -91,18 +63,15 @@ export default function ClaudeStyleChatInput(props: Props) {
 
     // Hard cap on textarea growth (absolute max before scrolling)
     const maxTextareaHeight = 220
-    const target = Math.min(maxTextareaHeight, Math.max(24, naturalHeight))
+    const target = Math.min(maxTextareaHeight, Math.max(20, naturalHeight))
     textarea.style.height = `${target}px`
-    // Enable scrolling when content exceeds the capped height.
-    // Also handles the case where flex-shrink compresses the textarea below target.
     textarea.style.overflowY = naturalHeight > target ? "auto" : "hidden"
 
     // Report the ideal total height to the parent so the grid row can grow.
-    // Include the shell's border and the .composer wrapper's own vertical padding.
     const shellBorderV = (parseFloat(shellStyle.borderTopWidth) || 0) + (parseFloat(shellStyle.borderBottomWidth) || 0)
 
-    const composerWrapper = shell.parentElement
-    let wrapperPaddingV = 28 // fallback: 14px top + 14px bottom
+    const composerWrapper = shell.closest(".composer")
+    let wrapperPaddingV = 18
     if (composerWrapper) {
       const ws = getComputedStyle(composerWrapper)
       wrapperPaddingV = (parseFloat(ws.paddingTop) || 0) + (parseFloat(ws.paddingBottom) || 0)
@@ -272,8 +241,6 @@ export default function ClaudeStyleChatInput(props: Props) {
 
   const micBusy = isRecording || isTranscribing
   const canSubmit = !isLoading && !micBusy && !isUploadingImage && !isAnalyzingImage && message.trim().length > 0
-  const providersForModels = availableProviders.length > 0 ? availableProviders : [provider]
-  const selectedOption = selectionValue(provider, modelKey)
 
   return (
     <div className={`composer-shell${isLoading ? " is-loading" : ""}`} ref={shellRef}>
@@ -296,6 +263,7 @@ export default function ClaudeStyleChatInput(props: Props) {
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}
+          placeholder="Ask anything"
           value={message}
           onChange={(e) => {
             onMessageChange(e.target.value)
@@ -330,55 +298,26 @@ export default function ClaudeStyleChatInput(props: Props) {
         {imagePasteError ? <div className="composer-input-note composer-input-note-error">{imagePasteError}</div> : null}
       </div>
       <div className="composer-actions">
-        <div className="composer-actions-left">
-          {!isRecording && (
-            <button
-              type="button"
-              className="composer-ghost-btn"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading || isUploadingImage || isAnalyzingImage}
-              aria-label="Add image"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
-            </button>
-          )}
-          <label className="composer-model-picker">
-            <span>{`${PROVIDER_LABELS[provider]} ${modelLabel(provider, modelKey)}`}</span>
-            <select
-              value={selectedOption}
-              onChange={(e) => {
-                const [nextProvider, nextModel] = e.target.value.split(":") as [AIProvider, ModelKey]
-                onProviderChange(nextProvider)
-                onModelChange(nextModel)
-              }}
-              aria-label="Select AI model"
-            >
-              {providersForModels.flatMap((p) =>
-                (Object.keys(MODEL_LABELS[p]) as ModelKey[]).map((m) => (
-                  <option key={selectionValue(p, m)} value={selectionValue(p, m)}>
-                    {PROVIDER_LABELS[p]} {MODEL_LABELS[p][m]}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-        </div>
+        {!isRecording && (
+          <button
+            type="button"
+            className="composer-ghost-btn composer-plus-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || isUploadingImage || isAnalyzingImage}
+            aria-label="Add image"
+          >
+            <Plus size={16} />
+          </button>
+        )}
+        <div className="composer-actions-spacer" />
         <div className="composer-actions-right" role="group" aria-label="Voice and send actions">
           {isRecording ? (
             <>
               <button type="button" className="composer-ghost-btn" onClick={cancelRecording} disabled={isLoading || isTranscribing} aria-label="Cancel voice input">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m6 6 12 12" />
-                  <path d="m18 6-12 12" />
-                </svg>
+                <X size={16} />
               </button>
               <button type="button" className="composer-send-btn" onClick={confirmRecording} disabled={isLoading || isTranscribing} aria-label="Send recorded message">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m5 12 4 4 10-10" />
-                </svg>
+                <Check size={16} />
               </button>
             </>
           ) : (
@@ -390,11 +329,7 @@ export default function ClaudeStyleChatInput(props: Props) {
                 disabled={isLoading || isTranscribing}
                 aria-label="Start voice input"
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Z" />
-                  <path d="M19 11a7 7 0 0 1-14 0" />
-                  <path d="M12 18v3" />
-                </svg>
+                <Mic size={16} />
               </button>
               <button
                 type="button"
@@ -404,11 +339,11 @@ export default function ClaudeStyleChatInput(props: Props) {
                 aria-label={isLoading && onCancel ? "Stop generation" : "Send message"}
               >
                 <span className="icon-send">
-                  <ArrowUpIcon size={16} color="currentColor" strokeWidth={2.8} />
+                  <ArrowUp size={16} strokeWidth={2.8} />
                 </span>
-                <svg className="icon-stop" viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
+                <span className="icon-stop">
+                  <Square size={12} fill="currentColor" />
+                </span>
               </button>
             </>
           )}
