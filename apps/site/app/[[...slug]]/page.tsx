@@ -19,7 +19,7 @@ const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.
 // --- Site-specific presentation helpers ---
 
 const SITE_DISPLAY_OVERRIDES: Record<string, { name?: string; logo?: string }> = {
-  "adventure-atlas": { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" }
+  "avocado-stories": { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" }
 }
 
 function siteNameFromId(siteId: string) {
@@ -32,7 +32,7 @@ function siteLogoFromId(siteId: string) {
   const normalized = siteId.trim().toLowerCase()
   const override = SITE_DISPLAY_OVERRIDES[normalized]
   if (override?.logo) return override.logo
-  const available = new Set(["avocado-stories", "avocado-magic", "avocado-odyssey", "adventures-eg", "adventure-echo", "adventure-atlas", "trailbound-expeditions"])
+  const available = new Set(["avocado-stories", "avocado-magic", "avocado-odyssey", "adventures-eg", "adventure-echo", "trailbound-expeditions"])
   if (available.has(normalized)) return `/logos/${normalized}.svg`
   return "/logos/default.svg"
 }
