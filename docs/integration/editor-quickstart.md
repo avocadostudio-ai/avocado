@@ -35,13 +35,13 @@ export const { GET, OPTIONS } = createBootstrapPagesHandler(() => fetchYourPubli
 
 The SDK handles secret validation, CORS headers, cookie management, and safe redirects automatically.
 
-## Required env vars
+## Required environment variables
 
-- Site:
-  - `DRAFT_MODE_SECRET`
-- Editor:
-  - `VITE_SITE_ORIGIN`
-  - `VITE_SITE_DRAFT_SECRET` (same value as site `DRAFT_MODE_SECRET`)
+| Variable | App | Required | Description |
+|---|---|---|---|
+| `DRAFT_MODE_SECRET` | Site | Yes | Shared secret for draft mode activation |
+| `VITE_SITE_ORIGIN` | Editor | Yes | Site origin for iframe target (e.g. `http://localhost:3000`) |
+| `VITE_SITE_DRAFT_SECRET` | Editor | Yes | Must match the site's `DRAFT_MODE_SECRET` |
 
 ## Iframe bootstrap URL (enter draft mode)
 
