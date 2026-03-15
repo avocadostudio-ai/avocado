@@ -342,7 +342,7 @@ function FieldEditor({
     )
   }
 
-  const useTextarea = field.kind === "richtext" || fieldKey === "body" || fieldKey === "description"
+  const useTextarea = field.kind === "richtext" || field.multiline === true
   const inputType = field.kind === "number" ? "number" : field.kind === "url" ? "url" : "text"
   const sharedProps = {
     value: displayValue,
