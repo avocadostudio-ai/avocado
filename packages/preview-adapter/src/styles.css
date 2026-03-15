@@ -33,7 +33,7 @@
 [data-editor-active] .editor-selectable:hover::before {
   opacity: 1;
   inset: 0;
-  border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
+  border: var(--editor-selected-border-width) solid rgb(var(--editor-accent-rgb));
   background: none;
   mix-blend-mode: normal;
 }
@@ -93,12 +93,12 @@
 }
 
 [data-editor-active] .editor-selectable:hover > .editor-block-badge .editor-block-badge-label {
-  background: rgba(var(--editor-selected-rgb), 0.97);
+  background: rgba(var(--editor-accent-rgb), 0.97);
 }
 
 [data-editor-active] .editor-selectable:hover::after {
   opacity: 1;
-  background: rgba(var(--editor-selected-rgb), 0.97);
+  background: rgba(var(--editor-accent-rgb), 0.97);
 }
 
 [data-editor-active] .editor-highlight {
