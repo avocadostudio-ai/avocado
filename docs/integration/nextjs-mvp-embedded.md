@@ -6,7 +6,8 @@ This is the default onboarding path for any Next.js site. Estimated time: **~30 
 
 ## Prerequisites
 
-- Next.js 14+ with App Router (Pages Router works but templates assume App Router)
+- Next.js 15+ with App Router
+- `@ai-site-editor/site-sdk` installed as a dependency
 - AI Site Editor monorepo running locally (`pnpm dev`)
 - A shared secret string for draft mode (any random value — set as `DRAFT_MODE_SECRET`)
 
@@ -17,41 +18,132 @@ This is the default onboarding path for any Next.js site. Estimated time: **~30 
 
 Related:
 - `docs/integration/editor-quickstart.md` for editor iframe/bootstrap URL templates.
-- `docs/integration/templates/nextjs-embedded/` for copy-paste API route files.
 - `docs/integration/nextjs-mvp-adoption-example.md` for a full page wiring example.
 
-## Required contract
+## Step 1: Create API route handlers
 
-1. Add component manifest endpoint:
-- `GET /api/editor/components`
-- returns available component types and prop schemas for safe ops
-- generated from adopter-owned component registry (recommended)
+The SDK provides handler factories — each API route is a one-liner:
 
-Template files for this:
-- `lib/site-component-registry.ts`
-- `lib/editor-components-manifest.ts`
-- `lib/editor-components-contract.ts`
+**`app/api/draft/route.ts`**
+```ts
+import { createDraftEnableHandler } from "@ai-site-editor/site-sdk"
 
-2. Add Draft Mode entry and exit endpoints:
-- `GET /api/draft?secret=...&redirect=/target-path`
-- `GET /api/draft/disable?redirect=/target-path`
+export const GET = createDraftEnableHandler()
+```
 
-3. Add secret validation and safe redirect behavior:
-- reject missing/invalid secrets
-- only allow internal redirects (paths starting with `/`)
+**`app/api/draft/disable/route.ts`**
+```ts
+import { createDraftDisableHandler } from "@ai-site-editor/site-sdk"
 
-4. In page data loading:
-- when Draft Mode is disabled, read published data only
-- when Draft Mode is enabled, read draft source (CMS/orchestrator/etc.)
-  - starter snippets: `docs/integration/templates/nextjs-embedded/lib/`
+export const GET = createDraftDisableHandler()
+```
 
-5. Editor iframe/bootstrap URL pattern:
-- `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>?<context>`
-  - starter helper: `docs/integration/templates/nextjs-embedded/editor/build-draft-url.ts`
+**`app/api/editor/components/route.ts`**
+```ts
+import { createComponentsHandler } from "@ai-site-editor/site-sdk"
+
+export const { GET, OPTIONS } = createComponentsHandler()
+```
+
+**`app/api/editor/bootstrap-pages/route.ts`**
+```ts
+import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk"
+import { getPublishedPage, getPublishedSlugs } from "@/lib/published-content-api"
+
+export const { GET, OPTIONS } = createBootstrapPagesHandler(() => {
+  return getPublishedSlugs()
+    .map((slug) => getPublishedPage(slug))
+    .filter((page): page is NonNullable<typeof page> => page !== null)
+})
+```
+
+The `createBootstrapPagesHandler` takes a callback that returns your published pages. Implement `getPublishedPage` and `getPublishedSlugs` to read from your CMS, file system, or database.
+
+## Step 2: Wire draft content loading
+
+Use `fetchDraftPage` and `fetchDraftSlugs` from the SDK to load draft content from the orchestrator:
+
+```ts
+// lib/content.ts
+import { fetchDraftPage, fetchDraftSlugs } from "@ai-site-editor/site-sdk"
+import { getPublishedPage, getPublishedSlugs } from "./published-content-api"
+
+export async function getPage(slug: string, isDraft: boolean, session: string, siteId: string) {
+  if (isDraft) return fetchDraftPage(slug, session, siteId)
+  return getPublishedPage(slug)
+}
+
+export async function getNavSlugs(isDraft: boolean, session: string, siteId: string) {
+  if (isDraft) {
+    const slugs = await fetchDraftSlugs(session, siteId)
+    if (slugs.length > 0) return slugs
+  }
+  return getPublishedSlugs()
+}
+```
+
+## Step 3: Add editor integration to your page
+
+Use `resolveDraftContext` to detect editor sessions, and SDK UI components for the preview overlay:
+
+```tsx
+// app/[[...slug]]/page.tsx
+import { draftMode } from "next/headers"
+import {
+  resolveDraftContext, isTileMode, buildSlug,
+  TileModeStyles, EditorOverlay, getPreviewWrapperProps, BlockErrorBoundary
+} from "@ai-site-editor/site-sdk"
+
+export default async function SitePage({ params, searchParams }) {
+  const draft = await draftMode()
+  const resolvedParams = await params
+  const resolvedSearch = await searchParams
+  const slug = buildSlug(resolvedParams.slug)
+
+  // Resolve editor context from search params and cookies
+  const editorCtx = await resolveDraftContext(resolvedSearch, {
+    defaultSession: "dev",
+    defaultSiteId: "my-site"
+  })
+
+  const editorMode = draft.isEnabled || !!editorCtx
+  const tileMode = editorMode && isTileMode(resolvedSearch)
+
+  const page = await getPage(slug, editorMode, editorCtx?.session ?? "dev", editorCtx?.siteId ?? "my-site")
+  if (!page) return <main><h1>Not found</h1></main>
+
+  return (
+    <>
+      {tileMode && <TileModeStyles />}
+      <main>
+        {page.blocks.map((block) => (
+          <div key={block.id} {...getPreviewWrapperProps(editorMode, block.id, block.type)}>
+            <BlockErrorBoundary blockId={block.id} blockType={block.type}>
+              {/* your block renderer */}
+            </BlockErrorBoundary>
+          </div>
+        ))}
+      </main>
+      {editorMode && !tileMode && (
+        <EditorOverlay slug={slug} editorOrigin={editorCtx?.editorOrigin ?? ""} />
+      )}
+    </>
+  )
+}
+```
+
+Key SDK utilities used:
+- `resolveDraftContext()` — resolves session/siteId/editorOrigin from search params and cookies
+- `isTileMode()` — detects tile mode for hiding header/footer in editor preview
+- `buildSlug()` — converts route params array to slug string (e.g., `["pricing"]` → `"/pricing"`)
+- `getPreviewWrapperProps()` — adds data attributes for the editor's block selection overlay
+- `EditorOverlay` — renders the PostMessage bridge for editor ↔ site communication
+- `BlockErrorBoundary` — catches render errors per-block so one broken block doesn't crash the page
+- `TileModeStyles` — injects CSS to hide header/footer when previewing in tile mode
 
 ## Component manifest shape (MVP)
 
-Example response:
+The SDK's `createComponentsHandler()` generates this automatically from the block registry:
 
 ```json
 {
@@ -82,35 +174,6 @@ Contract:
 2. Content block: `block.type`
 3. Site renderer registry key: same `type`
 
-Example:
-
-```json
-{
-  "components": [
-    { "type": "Hero", "propsSchema": { "type": "object" } },
-    { "type": "FeatureGrid", "propsSchema": { "type": "object" } }
-  ]
-}
-```
-
-```json
-{
-  "id": "p_home",
-  "slug": "/",
-  "blocks": [
-    { "id": "b1", "type": "Hero", "props": { "heading": "Hello" } },
-    { "id": "b2", "type": "FeatureGrid", "props": { "title": "Why us" } }
-  ]
-}
-```
-
-```ts
-const rendererRegistry = {
-  Hero: HeroSection,
-  FeatureGrid: FeatureGridSection
-}
-```
-
 If a block type exists in content but not in manifest:
 - block can still render on site
 - editor must not run structural ops for that type (degraded mode for that block/type)
@@ -119,19 +182,22 @@ If a block type exists in content but not in manifest:
 
 - Site:
   - `DRAFT_MODE_SECRET`
-  - `ORCHESTRATOR_URL` (or your draft backend origin)
+  - `ORCHESTRATOR_URL` (or your draft backend origin, defaults to `http://localhost:4200`)
 - Editor:
   - `VITE_SITE_ORIGIN`
   - `VITE_SITE_DRAFT_SECRET` (must match `DRAFT_MODE_SECRET`)
 
 ## 30-minute checklist
 
-1. Implement `/api/draft` and `/api/draft/disable`.
-2. Implement `/api/editor/components`.
-3. Verify `/api/draft?secret=wrong` returns `401`.
-4. Verify `/api/draft?secret=valid&redirect=/` returns redirect + draft cookie.
-5. Verify public route (no draft cookie) does not call draft backend.
-6. Point editor iframe to draft entry URL.
+1. Install `@ai-site-editor/site-sdk`.
+2. Create 4 API route files using SDK handler factories.
+3. Wire `resolveDraftContext()` and `fetchDraftPage()` into page data loading.
+4. Add `EditorOverlay`, `BlockErrorBoundary`, and `getPreviewWrapperProps()` to page renderer.
+5. Set `DRAFT_MODE_SECRET` env var.
+6. Verify `/api/draft?secret=wrong` returns `401`.
+7. Verify `/api/draft?secret=valid&redirect=/` redirects and sets draft cookie.
+8. Verify `/api/editor/components` returns manifest JSON.
+9. Confirm editor header shows `Manifest` (not `Degraded`).
 
 ## Optional later upgrade
 

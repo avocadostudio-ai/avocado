@@ -6,20 +6,34 @@ Use this when integrating the editor with any existing Next.js site.
 
 ## Prerequisites
 
-- Next.js site running locally (App Router recommended)
+- Next.js 15+ site running locally (App Router)
+- `@ai-site-editor/site-sdk` installed as a dependency
 - AI Site Editor monorepo running (`pnpm dev`)
 - `DRAFT_MODE_SECRET` set in both site and editor `.env`
 
-## MVP requirement
-- Expose `GET /api/editor/components` so the editor/orchestrator knows which components are safely editable.
-- Without this manifest, run in degraded mode (read-only preview or text-only edits).
+## Quick setup with `@ai-site-editor/site-sdk`
 
-Recommended:
-- keep a local component registry in site code and generate manifest from it.
+The SDK provides handler factories for all required endpoints. Each API route is a one-liner import:
 
-If you need starter route files, copy from:
-- `docs/integration/templates/nextjs-embedded/`
-- `docs/integration/templates/nextjs-embedded/editor/build-draft-url.ts` provides URL helper functions.
+```ts
+// app/api/draft/route.ts
+import { createDraftEnableHandler } from "@ai-site-editor/site-sdk"
+export const GET = createDraftEnableHandler()
+
+// app/api/draft/disable/route.ts
+import { createDraftDisableHandler } from "@ai-site-editor/site-sdk"
+export const GET = createDraftDisableHandler()
+
+// app/api/editor/components/route.ts
+import { createComponentsHandler } from "@ai-site-editor/site-sdk"
+export const { GET, OPTIONS } = createComponentsHandler()
+
+// app/api/editor/bootstrap-pages/route.ts
+import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk"
+export const { GET, OPTIONS } = createBootstrapPagesHandler(() => fetchYourPublishedPages())
+```
+
+The SDK handles secret validation, CORS headers, cookie management, and safe redirects automatically.
 
 ## Required env vars
 
