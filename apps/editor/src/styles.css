@@ -266,6 +266,90 @@ body {
   padding: 4px 0;
 }
 
+.property-field-image-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.property-field-image-preview {
+  position: relative;
+  display: inline-block;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.property-field-image-thumb {
+  display: block;
+  width: 88px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.property-field-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.property-field-image-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.property-field-image-change {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  padding: 5px 14px;
+  border-radius: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.property-field-image-change:hover {
+  border-color: var(--accent);
+  background: rgba(0, 122, 122, 0.08);
+}
+
+.property-field-image-alt-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.property-field-image-alt-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.property-field-image-alt {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: inherit;
+}
+
+.property-field-image-alt:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 /* ── List field sections ── */
 
 .property-list-section {
@@ -3125,6 +3209,30 @@ textarea {
 
 .editor-dark .property-field-image-url {
   color: #9fb3cf;
+}
+
+.editor-dark .property-field-image-widget {
+  border-color: #334155;
+}
+
+.editor-dark .property-field-image-thumb {
+  background: #0f172a;
+}
+
+.editor-dark .property-field-image-change {
+  border-color: #475569;
+  color: #2dd4bf;
+}
+
+.editor-dark .property-field-image-change:hover {
+  border-color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.editor-dark .property-field-image-alt {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
 }
 
 .editor-dark .property-list-section {
