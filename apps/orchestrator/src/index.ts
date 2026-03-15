@@ -128,7 +128,7 @@ app.get("/status/planner", async () => ({
   availableProviders,
   enabledTools: ctx.toolRuntime.registry.listManifests().map((tool) => tool.name),
   features: {
-    googleDrive: Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()),
+    googleDrive: Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON?.trim() || process.env.GOOGLE_API_KEY?.trim()),
     unsplash: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
     imageGenerate: Boolean(process.env.OPENAI_API_KEY?.trim())
   }

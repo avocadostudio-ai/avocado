@@ -1132,7 +1132,7 @@ function EditorPage({
       ) : null}
       <ImagePickerModal
         open={imagePickerOpen}
-        features={backendFeatures}
+        features={{ ...backendFeatures, googleDrive: backendFeatures.googleDrive || Boolean(activeSiteConfig.gdriveFolderId?.trim()) }}
         currentUrl={imagePickerTarget?.currentUrl}
         gdriveFolderId={activeSiteConfig.gdriveFolderId}
         onClose={() => setImagePickerTarget(null)}
