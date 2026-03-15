@@ -2,12 +2,12 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import {
   editorComponentsManifestSchema,
-  validateManifestDefaultProps
-} from "../lib/editor-components-contract.ts"
-import { buildEditorComponentsManifest } from "../lib/editor-components-manifest.ts"
+  validateManifestDefaultProps,
+  buildComponentsManifest
+} from "@ai-site-editor/site-sdk/editor-manifest"
 
-test("buildEditorComponentsManifest returns schema-valid manifest with valid defaults", () => {
-  const manifest = buildEditorComponentsManifest()
+test("buildComponentsManifest returns schema-valid manifest with valid defaults", () => {
+  const manifest = buildComponentsManifest()
   const parsed = editorComponentsManifestSchema.safeParse(manifest)
   assert.equal(parsed.success, true)
   if (!parsed.success) return

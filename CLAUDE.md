@@ -51,9 +51,10 @@ pnpm monorepo — chat-driven website editor with live preview. Three apps + two
 
 See `.claude/skills/` for deep architecture, block system, preview-editor, and chat pipeline docs.
 
+
 ## Environment
 
 Copy `.env.example` to `.env` before running. Key variables:
-- `OPENAI_API_KEY` — required for real AI planning; omit for demo mode
-- `OPENAI_MODEL_*` — override model names per tier (fast/balanced/reasoning/codex)
+- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — at least one required for AI planning; omit both for demo mode
+- `OPENAI_MODEL_*` / `ANTHROPIC_MODEL_*` — override model names per tier (fast/balanced/reasoning/codex)
 - `ORCHESTRATOR_URL` — defaults to `http://localhost:4200`

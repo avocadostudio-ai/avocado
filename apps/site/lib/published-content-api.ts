@@ -1,5 +1,5 @@
-import { pageDocSchema, type PageDoc } from "./site-contract"
-import publishedContent from "./published-content.json"
+import { pageDocSchema, type PageDoc } from "./site-contract.ts"
+import publishedContent from "./published-content.json" with { type: "json" }
 
 function loadPublishedPages() {
   if (!Array.isArray(publishedContent)) return []

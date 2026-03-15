@@ -1,25 +1,25 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { getSafeRedirectPath, isValidDraftSecret } from "../app/api/draft/helpers.ts"
+import { validateDraftSecret, getSafeInternalRedirectPath } from "@ai-site-editor/shared"
 
-test("isValidDraftSecret returns missing_config when no secret is configured", () => {
-  const result = isValidDraftSecret("anything", {})
+test("validateDraftSecret returns missing_config when no secret is configured", () => {
+  const result = validateDraftSecret("anything", {})
   assert.deepEqual(result, { ok: false, reason: "missing_config" })
 })
 
-test("isValidDraftSecret validates exact configured secret", () => {
+test("validateDraftSecret validates exact configured secret", () => {
   const env = { DRAFT_MODE_SECRET: "top-secret" }
 
-  const invalid = isValidDraftSecret("wrong", env)
+  const invalid = validateDraftSecret("wrong", env)
   assert.deepEqual(invalid, { ok: false, reason: "invalid_secret" })
 
-  const valid = isValidDraftSecret("top-secret", env)
-  assert.deepEqual(valid, { ok: true })
+  const valid = validateDraftSecret("top-secret", env)
+  assert.deepEqual(valid, { ok: true, reason: null })
 })
 
-test("getSafeRedirectPath allows internal paths and blocks external redirects", () => {
-  assert.equal(getSafeRedirectPath("/pricing?x=1"), "/pricing?x=1")
-  assert.equal(getSafeRedirectPath("https://evil.example"), "/")
-  assert.equal(getSafeRedirectPath("//evil.example"), "/")
-  assert.equal(getSafeRedirectPath("%2Fabout"), "/about")
+test("getSafeInternalRedirectPath allows internal paths and blocks external redirects", () => {
+  assert.equal(getSafeInternalRedirectPath("/pricing?x=1"), "/pricing?x=1")
+  assert.equal(getSafeInternalRedirectPath("https://evil.example"), "/")
+  assert.equal(getSafeInternalRedirectPath("//evil.example"), "/")
+  assert.equal(getSafeInternalRedirectPath("%2Fabout"), "/about")
 })

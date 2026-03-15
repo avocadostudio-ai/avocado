@@ -13,11 +13,20 @@
     "dev:logs": "./scripts/devctl.sh logs",
     "dev:doctor": "./scripts/devctl.sh doctor",
     "demo:avocado:check": "./scripts/demo-avocado-check.sh",
+    "docs:c4:render": "./scripts/render-c4.sh",
     "dev:site": "pnpm --filter @ai-site-editor/site dev",
     "dev:editor": "pnpm --filter @ai-site-editor/editor dev",
     "dev:orchestrator": "pnpm --filter @ai-site-editor/orchestrator dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "render:whoami": "render whoami",
+    "render:workspace": "render workspace current",
+    "render:services": "render services --output text",
+    "render:deploys:orchestrator": "render deploys list srv-d6glb0paae7s73bf0itg --output text",
+    "render:deploy:orchestrator": "render deploys create srv-d6glb0paae7s73bf0itg --wait --confirm",
+    "vercel:env:check": "./scripts/vercel-env-check.sh all",
+    "vercel:env:site": "./scripts/vercel-env-check.sh site",
+    "vercel:env:editor": "./scripts/vercel-env-check.sh editor"
   }
 }
