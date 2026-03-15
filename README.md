@@ -99,7 +99,8 @@ Pages Router support is not available — the SDK uses App Router APIs (`draftMo
 
 | Doc | Purpose |
 |---|---|
-| [AI Coding Agents guide](docs/integration/ai-coding-agents.md) | Instructions for Claude Code, Codex, Cursor, and other coding agents |
+| [Adoption guide for AI agents](docs/integration/ai-coding-agents-adoption.md) | Paste into your agent's context to integrate AI Site Editor into your site |
+| [Contributing guide for AI agents](docs/integration/ai-coding-agents.md) | For agents working on the AI Site Editor codebase itself |
 
 ### Reference
 
