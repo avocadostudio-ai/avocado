@@ -48,6 +48,9 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
   const [uploadResult, setUploadResult] = useState<{ url: string } | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [unsplashPage, setUnsplashPage] = useState(1)
+  const [hasMoreUnsplash, setHasMoreUnsplash] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -71,16 +74,17 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     finally { setLoading(false) }
   }, [gdriveFolderId])
 
-  const fetchUnsplashImages = useCallback(async (q?: string) => {
-    if (!q) { setItems([]); return }
-    setLoading(true)
+  const fetchUnsplashImages = useCallback(async (q?: string, page = 1) => {
+    if (!q) { setItems([]); setHasMoreUnsplash(false); return }
+    if (page === 1) setLoading(true); else setLoadingMore(true)
     try {
-      const res = await fetch(`${orchestrator}/unsplash/search?q=${encodeURIComponent(q)}&limit=20`)
-      if (!res.ok) { setItems([]); return }
-      const data = (await res.json()) as { items: ImageItem[] }
-      setItems(data.items)
-    } catch { setItems([]) }
-    finally { setLoading(false) }
+      const res = await fetch(`${orchestrator}/unsplash/search?q=${encodeURIComponent(q)}&limit=20&page=${page}`)
+      if (!res.ok) { if (page === 1) setItems([]); setHasMoreUnsplash(false); return }
+      const data = (await res.json()) as { items: ImageItem[]; totalPages: number }
+      setItems((prev) => page === 1 ? data.items : [...prev, ...data.items])
+      setHasMoreUnsplash(page < data.totalPages)
+    } catch { if (page === 1) setItems([]); setHasMoreUnsplash(false) }
+    finally { if (page === 1) setLoading(false); else setLoadingMore(false) }
   }, [])
 
   // Reset state on open / tab switch
@@ -95,15 +99,19 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     setGeneratedResult(null)
     setUploadResult(null)
     setUploadPreview(null)
+    setUnsplashPage(1)
+    setHasMoreUnsplash(false)
+    setLoadingMore(false)
     if (activeTab === "drive" && features.googleDrive) void fetchDriveImages()
   }, [open, activeTab, features.googleDrive, fetchDriveImages])
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
+    setUnsplashPage(1)
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     searchTimerRef.current = setTimeout(() => {
       if (activeTab === "drive") void fetchDriveImages(value || undefined)
-      if (activeTab === "unsplash") void fetchUnsplashImages(value || undefined)
+      if (activeTab === "unsplash") void fetchUnsplashImages(value || undefined, 1)
     }, 400)
   }
 
@@ -252,6 +260,25 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
                   </button>
                 ))}
               </div>
+              {activeTab === "unsplash" && hasMoreUnsplash && items.length > 0 && !loading && !loadingMore && (
+                <div style={S.loadMoreRow}>
+                  <button
+                    style={S.loadMoreBtn}
+                    onClick={() => {
+                      const next = unsplashPage + 1
+                      setUnsplashPage(next)
+                      void fetchUnsplashImages(searchQuery || undefined, next)
+                    }}
+                  >
+                    Load more
+                  </button>
+                </div>
+              )}
+              {loadingMore && (
+                <div style={S.loadMoreRow}>
+                  <span style={{ fontSize: 13, color: "#94a3b8" }}>Loading...</span>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -401,6 +428,11 @@ const S: Record<string, React.CSSProperties> = {
   },
 
   status: { padding: "48px 0", textAlign: "center", color: "#475569", fontSize: 14 },
+  loadMoreRow: { display: "flex", justifyContent: "center", padding: "12px 0 4px" },
+  loadMoreBtn: {
+    background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 8,
+    padding: "8px 24px", fontSize: 13, fontWeight: 500, cursor: "pointer"
+  },
 
   // Form area (upload / generate)
   formArea: { padding: "4px 20px 8px" },
