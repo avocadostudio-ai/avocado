@@ -34,6 +34,7 @@ export type ToolCallContext = {
   traceId: string
   plannerProvider: "anthropic" | "openai" | "demo"
   authHeader?: string
+  gdriveFolderId?: string
   onStatusUpdate?: (message: string) => void
   onImageProgress?: (event: { percent: number; stage: string }) => void
 }

@@ -15,6 +15,7 @@ type SiteContextPayload = {
     purpose?: string
     tone?: string
     constraints?: string[]
+    gdriveFolderId?: string
   }
 }
 
@@ -43,7 +44,8 @@ export function buildSiteContextPayload(siteId: string, activeSiteConfig: SiteCo
       siteName: activeSiteConfig.name?.trim() || undefined,
       purpose,
       tone: tone || undefined,
-      constraints: constraints.length > 0 ? constraints : undefined
+      constraints: constraints.length > 0 ? constraints : undefined,
+      gdriveFolderId: activeSiteConfig.gdriveFolderId?.trim() || undefined
     }
   }
 }

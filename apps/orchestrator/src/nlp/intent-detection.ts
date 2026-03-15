@@ -52,6 +52,7 @@ export type ChatRequestBody = {
     hosting?: string
     tone?: string
     constraints?: string[]
+    gdriveFolderId?: string
   } | string
   slug?: string
   message?: string

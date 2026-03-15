@@ -605,7 +605,7 @@ export async function generatePlanWithOpenAI(args: {
   onChangeLogEntry?: (entry: string) => void
   onToolExecution?: (event: ToolExecutionEvent) => void
   toolRuntime?: ToolRuntime
-  toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
+  toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string; gdriveFolderId?: string }
   client?: PlannerOpenAIClient
   siteContextBlock?: string | null
   forceFullSchemaContracts?: boolean

@@ -57,7 +57,7 @@ export type PendingImageGeneration = {
   path?: string
   altPath?: string
   query: string
-  provider: "openai" | "unsplash" | "auto"
+  provider: "openai" | "unsplash" | "gdrive" | "auto"
 }
 
 export type PendingApprovalPlan = {

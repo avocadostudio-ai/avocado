@@ -175,7 +175,7 @@ export async function generatePlanWithAnthropic(args: {
   onStatusUpdate?: (message: string) => void
   onImageProgress?: (event: { percent: number; stage: string }) => void
   toolRuntime?: ToolRuntime
-  toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string }
+  toolCallContext?: { siteId: string; sessionId: string; userId?: string; traceId: string; gdriveFolderId?: string }
   client?: PlannerAnthropicClient
   siteContextBlock?: string | null
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
@@ -231,6 +231,8 @@ export async function generatePlanWithAnthropic(args: {
     "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
     "For image search requests that explicitly mention Unsplash or stock photos, call tool unsplash.search with a concise search query and choose an imageUrl from tool results.",
     "For image requests that say 'generate', 'create', or 'make' an image, call tool image.generate with a detailed prompt describing the desired image. When calling image.generate, check the target block's image spec in blockContracts for the recommended aspectRatio and pass it. If the user explicitly specifies an aspectRatio, use that instead. Default to quality 'draft'. Use 'final' only when the user explicitly asks for high quality, polished, or production-ready images.",
+    "For image requests that mention 'brand', 'our photos', 'company images', 'from Drive', 'from our folder', or 'brand assets', call tool gdrive.browse with an optional search query. Choose an imageUrl from tool results and write it into the relevant imageUrl field.",
+    "When using gdrive.browse, write the selected image URL into the relevant imageUrl field and set imageAlt to a concise accessible description.",
     "When using unsplash.search, write the selected image URL into the relevant imageUrl field and set imageAlt to a concise accessible description.",
     "When using image.generate, write the returned imageUrl into the relevant imageUrl field and set imageAlt from the returned alt text.",
     ...(chatStrictPrimaryOpMode
@@ -417,6 +419,7 @@ export async function generatePlanWithAnthropic(args: {
             userId: args.toolCallContext?.userId,
             traceId: args.toolCallContext?.traceId ?? "tool-call",
             plannerProvider: "anthropic",
+            gdriveFolderId: args.toolCallContext?.gdriveFolderId,
             onStatusUpdate: args.onStatusUpdate,
             onImageProgress: args.onImageProgress
           },

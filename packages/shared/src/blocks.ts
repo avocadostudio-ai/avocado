@@ -282,6 +282,7 @@ registerBlock("Card", {
 registerBlock("CardGrid", {
   schema: z.object({
     title: z.string().min(1),
+    subtitle: z.string().optional(),
     cards: z
       .array(
         z.object({
@@ -299,7 +300,7 @@ registerBlock("CardGrid", {
     displayName: "Card Grid",
     description: "Grid of cards, each with title, description, and CTA.",
     category: "content",
-    fields: { title: f.text("Section title") },
+    fields: { title: f.text("Section title"), subtitle: f.text("Subtitle") },
     listFields: {
       cards: {
         label: "Cards",
@@ -388,13 +389,16 @@ registerBlock("ContactForm", {
 })
 
 const twoColumnChild = z.object({
-  type: z.enum(["heading", "paragraph", "cta", "image", "video"]),
+  type: z.enum(["heading", "subheading", "paragraph", "list", "cta", "ctas", "image", "video"]),
   text: z.string().optional(),
   label: z.string().optional(),
   href: z.string().optional(),
   src: z.string().optional(),
   alt: z.string().optional(),
-  poster: z.string().optional()
+  poster: z.string().optional(),
+  items: z.array(z.string()).optional(),
+  buttons: z.array(z.object({ label: z.string(), href: z.string(), variant: z.string().optional() })).optional(),
+  variant: z.string().optional()
 })
 
 registerBlock("TwoColumn", {
@@ -414,7 +418,7 @@ registerBlock("TwoColumn", {
       left: {
         label: "Left column items",
         itemFields: {
-          type: { kind: "enum", label: "Component type", options: ["heading", "paragraph", "cta", "image", "video"] },
+          type: { kind: "enum", label: "Component type", options: ["heading", "subheading", "paragraph", "list", "cta", "ctas", "image", "video"] },
           text: f.text("Text content"),
           label: f.text("Button label"),
           href: f.url("Link URL"),
@@ -426,7 +430,7 @@ registerBlock("TwoColumn", {
       right: {
         label: "Right column items",
         itemFields: {
-          type: { kind: "enum", label: "Component type", options: ["heading", "paragraph", "cta", "image", "video"] },
+          type: { kind: "enum", label: "Component type", options: ["heading", "subheading", "paragraph", "list", "cta", "ctas", "image", "video"] },
           text: f.text("Text content"),
           label: f.text("Button label"),
           href: f.url("Link URL"),

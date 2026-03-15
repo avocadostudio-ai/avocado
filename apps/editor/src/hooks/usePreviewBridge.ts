@@ -5,7 +5,7 @@ import { siteOrigin as defaultSiteOrigin } from "../lib/editor-utils"
 import { parseOptionalString, parseString } from "../lib/parse-utils"
 
 export type PreviewBridgeCallbacks = {
-  onBlockClicked: (slug: string, blockId: string | undefined, blockType: string | undefined, editablePath: string | undefined) => void
+  onBlockClicked: (slug: string, blockId: string | undefined, blockType: string | undefined, editablePath: string | undefined, editableValue: string | undefined) => void
   onRouteChanged: (slug: string) => void
   onBlockReordered: (slug: string, blockId: string, afterBlockId: string | undefined) => void
   onBlockDeleteRequested: (slug: string, blockId: string) => void
@@ -80,7 +80,8 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const nextBlockId = parseOptionalString(rawBlockId)
         const nextBlockType = parseOptionalString(rawBlockType)
         const nextPath = parseOptionalString(rawPath)
-        callbacks.onBlockClicked(String(msg.payload.slug ?? "/"), nextBlockId, nextBlockType, nextPath)
+        const nextValue = parseOptionalString(msg.payload.editableValue)
+        callbacks.onBlockClicked(String(msg.payload.slug ?? "/"), nextBlockId, nextBlockType, nextPath, nextValue)
       }
 
       if (msg.type === "routeChanged") {

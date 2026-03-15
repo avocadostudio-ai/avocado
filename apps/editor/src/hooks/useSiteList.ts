@@ -210,7 +210,7 @@ export function useSiteList(siteId: string, session: string) {
     patch: Partial<
       Pick<
         SiteConfig,
-        "name" | "purpose" | "hosting" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints"
+        "name" | "purpose" | "hosting" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "gdriveFolderId"
       >
     >
   ) => {
@@ -228,12 +228,24 @@ export function useSiteList(siteId: string, session: string) {
               ...(patch.vercelProductionUrl !== undefined ? { vercelProductionUrl: patch.vercelProductionUrl } : {}),
               ...(patch.vercelDeployHookUrl !== undefined ? { vercelDeployHookUrl: patch.vercelDeployHookUrl } : {}),
               ...(patch.tone !== undefined ? { tone: patch.tone } : {}),
-              ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {})
+              ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {}),
+              ...(patch.gdriveFolderId !== undefined ? { gdriveFolderId: patch.gdriveFolderId } : {})
             }
           : site
       )
     )
   }
+
+  const updateActiveSiteConfig = useCallback(
+    (patch: Partial<Pick<SiteConfig, "name" | "purpose" | "hosting" | "tone" | "constraints" | "gdriveFolderId" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl">>) => {
+      setSiteList((prev) =>
+        prev.map((site) =>
+          site.id === siteId ? { ...site, ...patch } : site
+        )
+      )
+    },
+    [siteId]
+  )
 
   return {
     siteList,
@@ -253,7 +265,8 @@ export function useSiteList(siteId: string, session: string) {
     openEditorForSite,
     openRestoreModal,
     restoreSnapshotForSite,
-    updateConfigSite
+    updateConfigSite,
+    updateActiveSiteConfig
   }
 }
 

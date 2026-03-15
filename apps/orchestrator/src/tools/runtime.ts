@@ -5,6 +5,7 @@ import { ToolRegistry } from "./registry.js"
 import { ToolExecutor } from "./executor.js"
 import { unsplashSearchHandler, unsplashSearchManifest } from "./builtins/unsplash-search.js"
 import { imageGenerateHandler, imageGenerateManifest } from "./builtins/image-generate.js"
+import { gdriveBrowseHandler, gdriveBrowseManifest } from "./builtins/gdrive-browse.js"
 
 type Logger = {
   info: (payload: Record<string, unknown>, message?: string) => void
@@ -28,6 +29,9 @@ export async function createToolRuntime(args: CreateToolRuntimeArgs): Promise<To
   registry.registerBuiltin(unsplashSearchManifest, unsplashSearchHandler)
   if (process.env.OPENAI_API_KEY) {
     registry.registerBuiltin(imageGenerateManifest, imageGenerateHandler)
+  }
+  if (process.env.GOOGLE_DRIVE_FOLDER_ID) {
+    registry.registerBuiltin(gdriveBrowseManifest, gdriveBrowseHandler)
   }
 
   const defaultPolicy: ToolExecutionPolicy = {

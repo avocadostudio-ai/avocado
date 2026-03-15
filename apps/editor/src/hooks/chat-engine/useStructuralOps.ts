@@ -105,6 +105,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
+      pushAssistantFromResult({ status: "applied", summary: `Added ${normalizedType} block.` }, { canUndo: true })
       return true
     } catch {
       pushAssistantFromResult({
@@ -153,6 +154,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
+      pushAssistantFromResult({ status: "applied", summary: "Moved block." }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -211,6 +213,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
+      pushAssistantFromResult({ status: "applied", summary: "Added list item." }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -259,6 +262,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
+      pushAssistantFromResult({ status: "applied", summary: "Removed list item." }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -315,6 +319,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
+      pushAssistantFromResult({ status: "applied", summary: "Moved list item." }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -362,6 +367,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId: null })
       }
+      pushAssistantFromResult({ status: "applied", summary: "Deleted block." }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -444,6 +450,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
+      const fieldLabel = editablePath.replace(/.*\./, "").replace(/([A-Z])/g, " $1").toLowerCase().trim()
+      pushAssistantFromResult({ status: "applied", summary: `Edited ${fieldLabel}.` }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",

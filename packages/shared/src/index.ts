@@ -1,4 +1,5 @@
 export { getConfiguredDraftSecret, getSafeInternalRedirectPath, validateDraftSecret, type DraftSecretValidationResult } from "./draft-mode.ts"
+export { isImagePath, toAltPath } from "./editable-path.ts"
 export {
   editorComponentSchema,
   editorComponentsManifestSchema,
