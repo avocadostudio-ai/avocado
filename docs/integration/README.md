@@ -15,19 +15,24 @@ Use this page as the entry point for connecting the AI Site Editor to your websi
 - The AI Site Editor monorepo cloned and running locally (see [root README](../../README.md))
 - An OpenAI or Anthropic API key (optional — deterministic demo mode works without one)
 
-## Integration tiers
+## What's supported now (MVP)
 
 | Tier | Audience | Effort | Doc |
 |---|---|---|---|
-| **Next.js Embedded** (default) | Startups, product teams on Next.js | ~30 min | [nextjs-mvp-embedded.md](nextjs-mvp-embedded.md) |
-| **Framework-Agnostic SPI** | Teams on Remix, Nuxt, SvelteKit, custom stacks | ~1–2 days | [site-provider-spi.md](site-provider-spi.md) |
+| **Next.js Embedded** | Startups, product teams on Next.js 15+ (App Router) | ~30 min | [nextjs-mvp-embedded.md](nextjs-mvp-embedded.md) |
 | **Custom tools** | Teams needing PIM, DAM, or other tool integrations | Variable | [tools-mvp.md](tools-mvp.md) |
 
-## Related planning
+**MVP requirements:** Next.js 15+ with App Router. The `@ai-site-editor/site-sdk` package handles all integration plumbing. Pages Router is not supported.
 
-- [`docs/planning/reduce-nextjs-coupling-plan.md`](../planning/reduce-nextjs-coupling-plan.md) — how we reduce framework coupling while keeping Next.js onboarding as default.
-- [`docs/integration/site-provider-spi.md`](site-provider-spi.md) — advanced provider/SPI mode for enterprise-style integrations.
-- [`docs/integration/tools-mvp.md`](tools-mvp.md) — Anthropic-first native tool contract, runtime policy, and adopter onboarding.
+**Available block types (12):** Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, Stats, ContactForm, TwoColumn, Footer.
+
+## Planned (not yet implemented)
+
+| Tier | Audience | Doc |
+|---|---|---|
+| **Framework-Agnostic SPI** | Teams on Remix, Nuxt, SvelteKit, custom stacks | [site-provider-spi.md](site-provider-spi.md) |
+
+The SPI defines a REST contract (`GET /pages`, `PUT /pages/{id}/content`, etc.) for non-Next.js integrations. The contract is documented but not yet wired into the orchestrator. See [reduce-nextjs-coupling-plan.md](../planning/reduce-nextjs-coupling-plan.md) for rationale.
 
 ## Recommended reading order
 

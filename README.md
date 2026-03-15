@@ -73,14 +73,30 @@ pnpm dev:stop           # stop managed stack
 
 If you want to connect the AI editor to your own website, start here:
 
+### Supported now (MVP)
+
 | Doc | Purpose |
 |---|---|
 | [Integration overview](docs/integration/README.md) | Entry point, adoption checklist, SDK overview |
 | [Next.js embedded mode](docs/integration/nextjs-mvp-embedded.md) | 30-minute setup with `@ai-site-editor/site-sdk` |
 | [Adoption example](docs/integration/nextjs-mvp-adoption-example.md) | Full code example for page wiring |
 | [Editor quickstart](docs/integration/editor-quickstart.md) | Draft mode URLs and behavior checks |
-| [Site Provider SPI](docs/integration/site-provider-spi.md) | Advanced: framework-agnostic REST API contract |
 | [Native tools](docs/integration/tools-mvp.md) | Register custom tools (PIM, DAM, etc.) |
+
+**MVP scope:** Next.js 15+ with App Router. The `@ai-site-editor/site-sdk` package provides handler factories for all required API routes, draft context resolution, content fetching, and editor overlay components. 12 block types are available out of the box (Hero, FeatureGrid, Testimonials, FAQ, CTA, Card, CardGrid, RichText, Stats, ContactForm, TwoColumn, Footer).
+
+### Planned (not yet implemented)
+
+| Doc | Purpose |
+|---|---|
+| [Site Provider SPI](docs/integration/site-provider-spi.md) | Framework-agnostic REST API contract for Remix, Nuxt, SvelteKit, custom stacks |
+
+The SPI defines a standard REST contract (`GET /pages`, `PUT /pages/{id}/content`, etc.) that will allow non-Next.js sites to integrate. This is documented as a target design but not yet wired into the orchestrator.
+
+Pages Router support is not available — the SDK uses App Router APIs (`draftMode()` from `next/headers`).
+
+### Reference
+
 | [All docs](docs/README.md) | Full documentation index |
 
 ## Configuration notes
