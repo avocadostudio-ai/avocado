@@ -5,7 +5,7 @@ import { z } from "zod"
 // ---------------------------------------------------------------------------
 
 /** Semantic kind for a block prop field. */
-export type FieldKind = "text" | "richtext" | "url" | "image" | "imageAlt" | "enum" | "color" | "number"
+export type FieldKind = "text" | "richtext" | "url" | "image" | "imageAlt" | "enum" | "color" | "number" | "headingLevel"
 
 /** Recommended image dimensions for an image field. */
 export type ImageSpec = {
@@ -28,6 +28,8 @@ export type FieldMeta = {
   imageSpec?: ImageSpec
   /** Render as a textarea in the PropertyPanel instead of a single-line input. */
   multiline?: boolean
+  /** Whether the field is required. Auto-derived from Zod schema at registration. */
+  required?: boolean
 }
 
 /** Metadata for list-type props (features, items, cards). */
@@ -79,6 +81,35 @@ export type BlockRegistration = {
  */
 export function registerBlock(type: string, config: BlockRegistration) {
   _blockSchemas[type] = config.schema
+
+  // Auto-derive `required` on each FieldMeta from the Zod schema shape
+  const shape = config.schema.shape as Record<string, z.ZodTypeAny> | undefined
+  if (shape) {
+    for (const [key, field] of Object.entries(config.meta.fields)) {
+      if (field.required !== undefined) continue // explicit override
+      const zodField = shape[key]
+      if (zodField) {
+        field.required = !zodField.isOptional()
+      }
+    }
+    // List item fields
+    if (config.meta.listFields) {
+      for (const [listKey, listMeta] of Object.entries(config.meta.listFields)) {
+        const listZod = shape[listKey]
+        // Unwrap ZodArray → element (ZodObject)
+        const elementShape = (listZod as any)?.element?.shape as Record<string, z.ZodTypeAny> | undefined
+        if (!elementShape) continue
+        for (const [itemKey, itemField] of Object.entries(listMeta.itemFields)) {
+          if (itemField.required !== undefined) continue
+          const zodItem = elementShape[itemKey]
+          if (zodItem) {
+            itemField.required = !zodItem.isOptional()
+          }
+        }
+      }
+    }
+  }
+
   _blockMeta[type] = config.meta
 }
 
@@ -149,6 +180,7 @@ const f = {
   url: (label?: string): FieldMeta => ({ kind: "url", label, inlineEditable: false }),
   image: (label?: string, imageSpec?: ImageSpec): FieldMeta => ({ kind: "image", label, inlineEditable: false, ...(imageSpec ? { imageSpec } : {}) }),
   imageAlt: (label?: string): FieldMeta => ({ kind: "imageAlt", label }),
+  headingLevel: (): FieldMeta => ({ kind: "headingLevel", label: "Heading level", inlineEditable: false }),
 } as const
 
 registerBlock("Hero", {
@@ -177,6 +209,7 @@ registerBlock("Hero", {
       imagePosition: { kind: "enum", label: "Image position", options: ["left", "right"], inlineEditable: false },
       secondaryCtaText: f.text("Secondary CTA text"),
       secondaryCtaHref: f.url("Secondary CTA link"),
+      headingLevel: f.headingLevel(),
     }
   }
 })
@@ -190,7 +223,7 @@ registerBlock("FeatureGrid", {
     displayName: "Feature Grid",
     description: "Grid of feature cards with title and description.",
     category: "content",
-    fields: { title: f.text("Section title") },
+    fields: { title: f.text("Section title"), headingLevel: f.headingLevel() },
     listFields: {
       features: {
         label: "Features",
@@ -209,7 +242,7 @@ registerBlock("Testimonials", {
     displayName: "Testimonials",
     description: "Grid of testimonial cards with quotes and authors.",
     category: "content",
-    fields: { title: f.text("Section title") },
+    fields: { title: f.text("Section title"), headingLevel: f.headingLevel() },
     listFields: {
       items: {
         label: "Testimonials",
@@ -228,7 +261,7 @@ registerBlock("FAQAccordion", {
     displayName: "FAQ Accordion",
     description: "Expandable question-and-answer section.",
     category: "content",
-    fields: { title: f.text("Section title") },
+    fields: { title: f.text("Section title"), headingLevel: f.headingLevel() },
     listFields: {
       items: {
         label: "FAQ items",
@@ -254,6 +287,7 @@ registerBlock("CTA", {
       description: f.longtext("Description"),
       ctaText: f.text("Button text"),
       ctaHref: f.url("Button link"),
+      headingLevel: f.headingLevel(),
     }
   }
 })
@@ -278,6 +312,7 @@ registerBlock("Card", {
       ctaHref: f.url("Button link"),
       imageUrl: f.image("Card image", { aspectRatio: "landscape", width: 768, height: 512 }),
       imageAlt: f.imageAlt("Card image alt text"),
+      headingLevel: f.headingLevel(),
     }
   }
 })
@@ -303,7 +338,7 @@ registerBlock("CardGrid", {
     displayName: "Card Grid",
     description: "Grid of cards, each with title, description, and CTA.",
     category: "content",
-    fields: { title: f.text("Section title"), subtitle: f.text("Subtitle") },
+    fields: { title: f.text("Section title"), subtitle: f.text("Subtitle"), headingLevel: f.headingLevel() },
     listFields: {
       cards: {
         label: "Cards",
@@ -332,6 +367,7 @@ registerBlock("RichText", {
     fields: {
       title: f.text("Section title"),
       body: f.richtext("Body"),
+      headingLevel: f.headingLevel(),
     }
   }
 })
@@ -345,7 +381,7 @@ registerBlock("Stats", {
     displayName: "Stats",
     description: "Row of big numbers with labels (e.g. 10K+ Users).",
     category: "content",
-    fields: { title: f.text("Section title") },
+    fields: { title: f.text("Section title"), headingLevel: f.headingLevel() },
     listFields: {
       stats: {
         label: "Stats",
@@ -416,6 +452,7 @@ registerBlock("TwoColumn", {
     category: "layout",
     fields: {
       variant: { kind: "enum", label: "Style variant", options: ["default", "accent"], inlineEditable: false },
+      headingLevel: f.headingLevel(),
     },
     listFields: {
       left: {
@@ -455,7 +492,7 @@ registerBlock("Footer", {
     displayName: "Footer",
     description: "Multi-column footer with link groups and copyright.",
     category: "navigation",
-    fields: { copyright: f.text("Copyright text") },
+    fields: { copyright: f.text("Copyright text"), headingLevel: f.headingLevel() },
     listFields: {
       columns: {
         label: "Footer columns",
@@ -464,6 +501,22 @@ registerBlock("Footer", {
     }
   }
 })
+
+// ---------------------------------------------------------------------------
+// Heading level defaults & resolution
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_HEADING_LEVELS: Record<string, string> = {
+  Hero: "h1", FeatureGrid: "h2", Testimonials: "h2", FAQAccordion: "h2",
+  CTA: "h2", Card: "h3", CardGrid: "h2", RichText: "h2",
+  Stats: "h2", TwoColumn: "h2", Footer: "h4",
+}
+
+export function resolveHeadingTag(blockType: string, props: Record<string, unknown>): string {
+  const v = props.headingLevel
+  if (typeof v === "string" && /^h[1-6]$/.test(v)) return v
+  return DEFAULT_HEADING_LEVELS[blockType] ?? "h2"
+}
 
 // ---------------------------------------------------------------------------
 // Backwards-compatible exports

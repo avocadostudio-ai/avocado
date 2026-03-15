@@ -222,6 +222,45 @@ body {
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.property-field-label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.property-field-required {
+  color: var(--danger, #e53e3e);
+  margin-left: 2px;
+  font-weight: 600;
+}
+
+.property-field-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.property-field-ai-btn:hover {
+  opacity: 1;
+  color: var(--accent);
+  background: rgba(0, 122, 122, 0.08);
 }
 
 .property-field-input,
@@ -328,6 +367,9 @@ body {
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .property-field-image-alt {
@@ -729,6 +771,25 @@ textarea {
 
 .msg-clarification {
   background: #f3f8ff;
+}
+
+.msg-field-context {
+  background: linear-gradient(135deg, rgba(0, 122, 122, 0.04), rgba(0, 122, 122, 0.08));
+  border-left: 2px solid var(--accent);
+}
+
+.msg-field-context .msg-main {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msg-field-context .msg-main::before {
+  content: "✦";
+  font-size: 11px;
 }
 
 .msg-main {
@@ -3225,6 +3286,24 @@ textarea {
   background: #0f172a;
   border-color: #334155;
   color: #e2e8f0;
+}
+
+.editor-dark .property-field-ai-btn {
+  color: #94a3b8;
+}
+
+.editor-dark .property-field-ai-btn:hover {
+  color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.editor-dark .msg-field-context {
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.06), rgba(45, 212, 191, 0.12));
+  border-left-color: #2dd4bf;
+}
+
+.editor-dark .msg-field-context .msg-main {
+  color: #2dd4bf;
 }
 
 .editor-dark .property-list-section {
