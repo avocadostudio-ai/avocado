@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-15T19:15:31.496Z",
+    "updatedAt": "2026-03-15T22:07:20.335Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -14,7 +14,7 @@
           "ctaText": "Explore Avocado Recipes",
           "ctaHref": "/recipes",
           "imageUrl": "http://localhost:4200/gdrive/images/1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s",
-          "imageAlt": "avocado4",
+          "imageAlt": "Fresh sliced avocado on a wooden cutting board with vibrant ingredients ready for meal preparation",
           "imagePosition": "right",
           "secondaryCtaText": ""
         }
@@ -24,16 +24,8 @@
         "type": "CardGrid",
         "props": {
           "title": "Explore Avocado Stories",
-          "subtitle": "",
+          "subtitle": "Discover recipes, health insights, and sustainable practices that celebrate avocados in every part of your life.",
           "cards": [
-            {
-              "title": "🥑 Avocado Wellness",
-              "description": "Discover how avocados nourish your body with heart-healthy fats, essential vitamins, and powerful antioxidants that support wellness and vitality in everyday life.",
-              "ctaText": "Explore",
-              "ctaHref": "/avocado-wellness",
-              "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
-              "imageAlt": "woman with white face mask holding green fruit"
-            },
             {
               "title": "🥑 Avocado Culinary Delights",
               "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
@@ -41,6 +33,14 @@
               "ctaHref": "/avocado-culinary",
               "imageUrl": "http://localhost:4200/gdrive/images/1NwnCLmDBnwWplCTlmQaHbJ0aQZ5HdXEp",
               "imageAlt": "avocado6"
+            },
+            {
+              "title": "🥑 Avocado Wellness",
+              "description": "Discover how avocados nourish your body with heart-healthy fats, essential vitamins, and powerful antioxidants that support wellness and vitality in everyday life.",
+              "ctaText": "Explore",
+              "ctaHref": "/avocado-wellness",
+              "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "woman with white face mask holding green fruit"
             },
             {
               "title": "🥑 Avocado Sustainability",
@@ -127,7 +127,7 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-03-15T19:01:36.642Z",
+    "updatedAt": "2026-03-15T19:18:59.078Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
@@ -140,6 +140,14 @@
           "imageUrl": "https://images.unsplash.com/photo-1598048150218-53ab5609ef31?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8T3JhbmdlfGVufDF8MHx8fDE3NzM2MDEyODB8MA&ixlib=rb-4.1.0&q=80&w=1080",
           "imageAlt": "sliced lemon on orange surface",
           "imagePosition": "right"
+        }
+      },
+      {
+        "id": "b_richtext_1772135749521",
+        "type": "RichText",
+        "props": {
+          "title": "The Wonders of Oranges",
+          "body": "**Oranges** are among the most beloved fruits globally, cherished not only for their **delicious taste** but also for their nutritional benefits. Here are some intriguing insights about oranges:\n\n- **Rich in Vitamin C**, oranges play a crucial role in boosting the immune system and maintaining skin health.\n- The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.\n- With over **600 varieties**, oranges offer a diverse range of flavors and uses.\n- Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.\n- Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.\n\nDiscover more about the diverse benefits and culinary uses of oranges on our page."
         }
       },
       {
@@ -164,14 +172,6 @@
         }
       },
       {
-        "id": "b_richtext_1772135749521",
-        "type": "RichText",
-        "props": {
-          "title": "The Wonders of Oranges",
-          "body": "**Oranges** are among the most beloved fruits globally, cherished not only for their **delicious taste** but also for their nutritional benefits. Here are some intriguing insights about oranges:\n\n- **Rich in Vitamin C**, oranges play a crucial role in boosting the immune system and maintaining skin health.\n- The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.\n- With over **600 varieties**, oranges offer a diverse range of flavors and uses.\n- Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.\n- Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.\n\nDiscover more about the diverse benefits and culinary uses of oranges on our page."
-        }
-      },
-      {
         "id": "b_cardgrid_1773601007304_177",
         "type": "CardGrid",
         "props": {
@@ -190,8 +190,8 @@
               "description": "Discover how oranges support your wellbeing. Packed with vitamin C and fiber, they boost immunity, skin health, and digestion. A simple, delicious way to nourish your body.",
               "ctaText": "Explore benefits",
               "ctaHref": "/oranges",
-              "imageUrl": "https://images.unsplash.com/photo-1672088405753-37d5a8de4d93?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw5fHxvcmFuZ2UlMjBzbGljZXMlMjBudXRyaXRpb24lMjBoZWFsdGh5fGVufDF8MHx8fDE3NzM2MDEyMDF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "A pile of sliced oranges sitting on top of a wooden table"
+              "imageUrl": "https://images.unsplash.com/photo-1617218607489-4d28d612bd07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxvcmFuZ2VzJTIwYW5kJTIwaGVhbHRofGVufDF8MHx8fDE3NzM2MDIzMzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "orange fruit on clear glass bowl"
             },
             {
               "title": "Culinary Inspiration",
@@ -214,7 +214,7 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-15T19:09:56.240Z",
+    "updatedAt": "2026-03-15T19:53:30.050Z",
     "blocks": [
       {
         "id": "b_hero_about",
@@ -249,21 +249,6 @@
             }
           ]
         }
-      },
-      {
-        "id": "b_cardgrid_1773558876092",
-        "type": "CardGrid",
-        "props": {
-          "title": "Grapefruit Varieties & Origins",
-          "cards": [
-            {
-              "title": "Nutritional Powerhouse",
-              "description": "Rich in vitamin C, antioxidants, and fiber. Grapefruits support immunity, skin health, and digestion—making them a refreshing choice for wellness-focused eating.",
-              "ctaText": "Explore Benefits",
-              "ctaHref": "/grapefruits"
-            }
-          ]
-        }
       }
     ],
     "meta": {
@@ -276,7 +261,7 @@
     "id": "p_olives",
     "slug": "/olives",
     "title": "Olives",
-    "updatedAt": "2026-03-13T20:51:46.288Z",
+    "updatedAt": "2026-03-15T19:53:36.150Z",
     "blocks": [
       {
         "id": "b_hero_1772048325072",
@@ -329,14 +314,6 @@
               "imageAlt": "Beautiful ripe olives on neutral warm olive-toned background, artisanal product photography, natural soft lighting, clean and inviting composition"
             }
           ]
-        }
-      },
-      {
-        "id": "b_richtext_1772048420274",
-        "type": "RichText",
-        "props": {
-          "title": "",
-          "body": "Olive oil is a staple in many kitchens worldwide. 🌿 It is not only used for cooking but also for its health benefits. Here are some key points about olive oil:\n\n- **Rich in healthy monounsaturated fats**: Olive oil is high in oleic acid, which is believed to reduce inflammation. 💧\n- **Contains large amounts of antioxidants**: These substances are biologically active and may help reduce the risk of chronic diseases. 🛡️\n- **Has strong anti-inflammatory properties**: The antioxidants in olive oil can reduce inflammation, which is a major cause of many diseases.\n\nIncluding olive oil in your diet can be a delicious way to enhance your health. 🍽️ 🫒"
         }
       }
     ]
