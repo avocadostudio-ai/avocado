@@ -12,7 +12,8 @@ Start here if you want to add AI-powered editing to your website.
 | [Editor Quickstart](integration/editor-quickstart.md) | Draft mode URLs, behavior checks, self-check commands |
 | [Framework-Agnostic SPI](integration/site-provider-spi.md) | REST API contract for non-Next.js integrations |
 | [Custom Tools](integration/tools-mvp.md) | Register PIM, DAM, or other tools with the AI planner |
-| [AI Coding Agents](integration/ai-coding-agents.md) | Instructions for Claude Code, Codex, Cursor, and other coding agents |
+| [Adoption guide for AI agents](integration/ai-coding-agents-adoption.md) | Paste into your agent to integrate AI Site Editor into your site |
+| [Contributing guide for AI agents](integration/ai-coding-agents.md) | For agents working on the AI Site Editor codebase itself |
 
 ## Architecture
 

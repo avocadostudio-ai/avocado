@@ -36,7 +36,12 @@ The SPI defines a REST contract (`GET /pages`, `PUT /pages/{id}/content`, etc.) 
 
 ## For dev teams using AI coding tools
 
-If your team uses Claude Code, Codex, Cursor, or similar LLM-based coding agents, see [ai-coding-agents.md](ai-coding-agents.md) — a ready-to-paste guide with repo structure, code conventions, common tasks, and do's/don'ts for agents working in this codebase.
+If your team uses Claude Code, Codex, Cursor, or similar LLM-based coding agents:
+
+| Guide | Purpose |
+|---|---|
+| [Adoption guide for AI agents](ai-coding-agents-adoption.md) | Paste into your agent's context to have it integrate AI Site Editor into your Next.js site |
+| [Contributing guide for AI agents](ai-coding-agents.md) | For agents working on the AI Site Editor codebase itself |
 
 ## Recommended reading order
 
