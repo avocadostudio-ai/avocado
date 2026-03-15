@@ -95,6 +95,12 @@ The SPI defines a standard REST contract (`GET /pages`, `PUT /pages/{id}/content
 
 Pages Router support is not available — the SDK uses App Router APIs (`draftMode()` from `next/headers`).
 
+### For dev teams using AI coding tools
+
+| Doc | Purpose |
+|---|---|
+| [AI Coding Agents guide](docs/integration/ai-coding-agents.md) | Instructions for Claude Code, Codex, Cursor, and other coding agents |
+
 ### Reference
 
 | [All docs](docs/README.md) | Full documentation index |

@@ -34,6 +34,10 @@ Use this page as the entry point for connecting the AI Site Editor to your websi
 
 The SPI defines a REST contract (`GET /pages`, `PUT /pages/{id}/content`, etc.) for non-Next.js integrations. The contract is documented but not yet wired into the orchestrator. See [reduce-nextjs-coupling-plan.md](../planning/reduce-nextjs-coupling-plan.md) for rationale.
 
+## For dev teams using AI coding tools
+
+If your team uses Claude Code, Codex, Cursor, or similar LLM-based coding agents, see [ai-coding-agents.md](ai-coding-agents.md) — a ready-to-paste guide with repo structure, code conventions, common tasks, and do's/don'ts for agents working in this codebase.
+
 ## Recommended reading order
 
 1. `docs/integration/nextjs-mvp-embedded.md`
