@@ -298,11 +298,11 @@ export async function generatePlanWithAnthropic(args: {
     content: h.content
   }))
 
-  const submitPlanToolDef: Anthropic.Messages.Tool = anthropicToolWithCache({
+  const submitPlanToolDef: Anthropic.Messages.Tool = {
     name: "submit_edit_plan",
     description: "Submit the structured EditPlan JSON.",
     input_schema: editPlanJsonSchema
-  })
+  }
   const runtimeToolNameByAlias = new Map<string, string>()
   const usedAliases = new Set<string>(["submit_edit_plan"])
   const runtimeTools: Anthropic.Messages.Tool[] =
@@ -310,14 +310,18 @@ export async function generatePlanWithAnthropic(args: {
       ? args.toolRuntime.registry.listEnabled().map((entry) => {
           const alias = toAnthropicToolAlias(entry.manifest.name, usedAliases)
           runtimeToolNameByAlias.set(alias, entry.manifest.name)
-          return anthropicToolWithCache({
+          return {
             name: alias,
             description: entry.manifest.description,
             input_schema: entry.manifest.inputSchema as unknown as { type: "object" }
-          })
+          }
         })
       : []
-  const toolDefs: Anthropic.Messages.Tool[] = [submitPlanToolDef, ...runtimeTools].map((tool) => anthropicToolWithCache(tool))
+  // Anthropic allows max 4 cache_control breakpoints total. Apply only to the last tool
+  // (system prompt already uses one breakpoint via anthropicSystemPromptWithCache).
+  const toolDefs: Anthropic.Messages.Tool[] = [submitPlanToolDef, ...runtimeTools].map((tool, i, arr) =>
+    i === arr.length - 1 ? anthropicToolWithCache(tool) : tool
+  )
 
   let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
@@ -457,7 +461,7 @@ export async function generatePlanWithAnthropic(args: {
         model: args.model,
         max_tokens: 8192,
         system: anthropicSystemPromptWithCache(system),
-        tools: [submitPlanToolDef],
+        tools: [anthropicToolWithCache(submitPlanToolDef)],
         tool_choice: { type: "tool", name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
@@ -533,7 +537,7 @@ export async function generatePlanWithAnthropic(args: {
         model: args.model,
         max_tokens: 8192,
         system: anthropicSystemPromptWithCache(system),
-        tools: [submitPlanToolDef],
+        tools: [anthropicToolWithCache(submitPlanToolDef)],
         tool_choice: { type: "tool", name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
