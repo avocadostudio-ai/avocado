@@ -54,13 +54,13 @@ ${VITE_SITE_ORIGIN}/api/draft?secret=${VITE_SITE_DRAFT_SECRET}&redirect=${encode
 Where `pathWithQuery` is your target site path plus context query params, for example:
 
 ```text
-/pricing?session=dev&siteId=adventure-atlas
+/pricing?session=dev&siteId=avocado-stories
 ```
 
 Full example:
 
 ```text
-http://localhost:3000/api/draft?secret=top-secret&redirect=%2Fpricing%3Fsession%3Ddev%26siteId%3Dadventure-atlas
+http://localhost:3000/api/draft?secret=top-secret&redirect=%2Fpricing%3Fsession%3Ddev%26siteId%3Davocado-stories
 ```
 
 ## Exit draft mode (view live page)

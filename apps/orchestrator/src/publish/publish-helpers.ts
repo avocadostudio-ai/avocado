@@ -213,14 +213,20 @@ export async function ensurePresetRestoreSessions(log: FastifyBaseLogger) {
 // Image URL rewriting for publish
 // ---------------------------------------------------------------------------
 
-const LOCALHOST_IMAGE_RE =
+const LOCALHOST_GENERATED_RE =
   /https?:\/\/localhost:\d+\/generated-images\/([a-zA-Z0-9_-]+\.(?:png|jpg|jpeg|webp|gif))/gi
+
+const LOCALHOST_GDRIVE_RE =
+  /https?:\/\/localhost:\d+\/gdrive\/images\/([a-zA-Z0-9_-]+)/gi
 
 function findLocalhostImageUrls(pages: PageDoc[]): Map<string, string> {
   const json = JSON.stringify(pages)
   const urlMap = new Map<string, string>()
-  for (const match of json.matchAll(LOCALHOST_IMAGE_RE)) {
+  for (const match of json.matchAll(LOCALHOST_GENERATED_RE)) {
     urlMap.set(match[0], match[1])
+  }
+  for (const match of json.matchAll(LOCALHOST_GDRIVE_RE)) {
+    urlMap.set(match[0], `gdrive_${match[1]}.webp`)
   }
   return urlMap
 }
