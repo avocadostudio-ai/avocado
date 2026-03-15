@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type CSSProperties } from "react"
+import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
 import { getAllBlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 
 type Props = {
@@ -8,9 +8,10 @@ type Props = {
   props: Record<string, unknown> | null
   status: "idle" | "loading" | "ready" | "error"
   onFieldChange: (fieldPath: string, value: string) => void
+  onImageClick?: (fieldPath: string, currentUrl: string) => void
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange }: Props) {
+export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick }: Props) {
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
@@ -42,15 +43,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
         <div className="property-panel-empty">Failed to load block properties</div>
       ) : props ? (
         <div className="property-panel-fields">
-          {Object.entries(meta.fields).map(([key, field]) => (
-            <FieldEditor
-              key={key}
-              fieldKey={key}
-              field={field}
-              value={props[key]}
-              onCommit={(value) => onFieldChange(key, value)}
-            />
-          ))}
+          {renderFieldEntries(Object.entries(meta.fields), props, "", onFieldChange, onImageClick)}
           {meta.listFields
             ? Object.entries(meta.listFields).map(([key, listField]) => {
                 const items = Array.isArray(props[key]) ? (props[key] as Record<string, unknown>[]) : []
@@ -61,6 +54,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
                     listField={listField}
                     items={items}
                     onFieldChange={onFieldChange}
+                    onImageClick={onImageClick}
                   />
                 )
               })
@@ -71,16 +65,165 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
   )
 }
 
+/** Detect if `altKey` is the companion imageAlt for `imageKey` (e.g. imageUrl → imageAlt). */
+function isAltFor(imageKey: string, altKey: string): boolean {
+  if (imageKey === "imageUrl" && altKey === "imageAlt") return true
+  if (imageKey.endsWith(".src") && altKey === imageKey.replace(/\.src$/, ".alt")) return true
+  return false
+}
+
+/** Extract a display filename from a URL. */
+function filenameFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url, "http://localhost").pathname
+    const last = pathname.split("/").pop() || ""
+    return last.length > 30 ? last.slice(0, 27) + "..." : last || "(image)"
+  } catch {
+    return url.length > 30 ? url.slice(0, 27) + "..." : url || "(empty)"
+  }
+}
+
+/**
+ * Renders a list of field entries, pairing imageUrl + imageAlt into a single widget.
+ */
+function renderFieldEntries(
+  entries: [string, FieldMeta][],
+  data: Record<string, unknown>,
+  pathPrefix: string,
+  onFieldChange: (fieldPath: string, value: string) => void,
+  onImageClick?: (fieldPath: string, currentUrl: string) => void
+): ReactNode[] {
+  const pairedAltKeys = new Set<string>()
+
+  // Pre-scan: find imageAlt fields that are paired with an image field
+  for (let i = 0; i < entries.length; i++) {
+    const [key, field] = entries[i]
+    if (field.kind === "image") {
+      // Look for the companion alt field
+      for (const [altKey, altField] of entries) {
+        if (altField.kind === "imageAlt" && isAltFor(key, altKey)) {
+          pairedAltKeys.add(altKey)
+        }
+      }
+    }
+  }
+
+  const nodes: ReactNode[] = []
+
+  for (const [key, field] of entries) {
+    // Skip alt fields that are paired — they render inside the image widget
+    if (pairedAltKeys.has(key)) continue
+
+    if (field.kind === "image") {
+      // Find paired alt field
+      const altEntry = entries.find(([ak, af]) => af.kind === "imageAlt" && isAltFor(key, ak))
+      const altKey = altEntry?.[0]
+      const altValue = altKey ? (data[altKey] == null ? "" : String(data[altKey])) : undefined
+
+      nodes.push(
+        <ImageFieldWidget
+          key={key}
+          label={field.label ?? key}
+          imageUrl={data[key] == null ? "" : String(data[key])}
+          altText={altValue}
+          onChangeClick={() => onImageClick?.(pathPrefix + key, data[key] == null ? "" : String(data[key]))}
+          onAltCommit={altKey ? (v) => onFieldChange(pathPrefix + altKey, v) : undefined}
+        />
+      )
+    } else {
+      nodes.push(
+        <FieldEditor
+          key={key}
+          fieldKey={key}
+          field={field}
+          value={data[key]}
+          onCommit={(value) => onFieldChange(pathPrefix + key, value)}
+        />
+      )
+    }
+  }
+
+  return nodes
+}
+
+function ImageFieldWidget({
+  label,
+  imageUrl,
+  altText,
+  onChangeClick,
+  onAltCommit
+}: {
+  label: string
+  imageUrl: string
+  altText?: string
+  onChangeClick: () => void
+  onAltCommit?: (value: string) => void
+}) {
+  const [altLocal, setAltLocal] = useState(altText ?? "")
+  const [altFocused, setAltFocused] = useState(false)
+  const displayAlt = altFocused ? altLocal : (altText ?? "")
+
+  return (
+    <div className="property-field">
+      <label className="property-field-label">{label}</label>
+      <div className="property-field-image-widget">
+        <div className="property-field-image-row">
+          <div className="property-field-image-preview">
+            {imageUrl ? (
+              <img
+                className="property-field-image-thumb"
+                src={imageUrl}
+                alt=""
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+              />
+            ) : (
+              <div className="property-field-image-thumb property-field-image-placeholder">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="m21 15-5-5L5 21" />
+                </svg>
+              </div>
+            )}
+          </div>
+          <button type="button" className="property-field-image-change" onClick={onChangeClick}>
+            {imageUrl ? "Change" : "Choose image"}
+          </button>
+        </div>
+        {onAltCommit !== undefined && (
+          <div className="property-field-image-alt-group">
+            <label className="property-field-image-alt-label">Image description</label>
+            <input
+              type="text"
+              className="property-field-image-alt"
+              placeholder="Describe what's in this image"
+              value={displayAlt}
+              onFocus={() => { setAltLocal(altText ?? ""); setAltFocused(true) }}
+              onChange={(e) => setAltLocal(e.target.value)}
+              onBlur={() => {
+                setAltFocused(false)
+                if (altLocal !== (altText ?? "")) onAltCommit(altLocal)
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ListFieldSection({
   listKey,
   listField,
   items,
-  onFieldChange
+  onFieldChange,
+  onImageClick
 }: {
   listKey: string
   listField: ListFieldMeta
   items: Record<string, unknown>[]
   onFieldChange: (fieldPath: string, value: string) => void
+  onImageClick?: (fieldPath: string, currentUrl: string) => void
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const label = listField.label ?? listKey
@@ -109,15 +252,13 @@ function ListFieldSection({
             </button>
             {isExpanded ? (
               <div className="property-list-item-fields">
-                {Object.entries(listField.itemFields).map(([fieldKey, field]) => (
-                  <FieldEditor
-                    key={fieldKey}
-                    fieldKey={fieldKey}
-                    field={field}
-                    value={item[fieldKey]}
-                    onCommit={(value) => onFieldChange(`${listKey}[${index}].${fieldKey}`, value)}
-                  />
-                ))}
+                {renderFieldEntries(
+                  Object.entries(listField.itemFields),
+                  item,
+                  `${listKey}[${index}].`,
+                  onFieldChange,
+                  onImageClick
+                )}
               </div>
             ) : null}
           </div>

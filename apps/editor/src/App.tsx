@@ -937,6 +937,10 @@ function EditorPage({
             await chatEngine.inlineEditCommit(slug, activeBlockId!, path, value, { silent: true })
             void blockProps.refetch()
           }}
+          onImageClick={(fieldPath, currentUrl) => {
+            if (!activeBlockId) return
+            setImagePickerTarget({ slug, blockId: activeBlockId, editablePath: fieldPath, currentUrl })
+          }}
         />
 
         <div
