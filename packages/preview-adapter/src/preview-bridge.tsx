@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import type { ApplyPatchMessage, PatchAckMessage, PatchRejectReason, ResetToServerMessage } from "@ai-site-editor/shared"
+import { isImagePath, type ApplyPatchMessage, type PatchAckMessage, type PatchRejectReason, type ResetToServerMessage } from "@ai-site-editor/shared"
 
 type SiteMessage =
   | {
@@ -56,6 +56,9 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
     }
     // Keep nested labels hidden by default until the editor explicitly enables them.
     setNestedLabelsVisibility(false)
+
+    // Signal that the editor overlay is active so CSS styles are gated behind this attribute.
+    document.documentElement.setAttribute("data-editor-active", "")
 
     const clearChildFocus = () => {
       document.querySelectorAll(".editor-child-highlight").forEach((node) => node.classList.remove("editor-child-highlight"))
@@ -272,6 +275,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       if (!editablePath) return false
       if (!/^[A-Za-z_][A-Za-z0-9_]*(?:\[[0-9]+\]\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(editablePath)) return false
       if (/(^|\.)(?:ctaHref|secondaryCtaHref|imageUrl|imageAlt|href|url)$/i.test(editablePath)) return false
+      if (/\]\.(src|alt|poster)$/i.test(editablePath)) return false
       return true
     }
 
@@ -1001,11 +1005,18 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       }
       applyBlockFocus(blockId, false, editablePath)
 
+      // For image targets, extract the current src so the editor can show it
+      let editableValue: string | null = null
+      if (editablePath && isImagePath(editablePath) && childNode) {
+        const img = childNode.querySelector("img")
+        if (img?.src) editableValue = img.src
+      }
+
       window.parent.postMessage(
         {
           protocol: "site-editor/v1",
           type: "blockClicked",
-          payload: { slug, blockId, blockType, editablePath: editablePath ?? null }
+          payload: { slug, blockId, blockType, editablePath: editablePath ?? null, editableValue }
         },
         editorOrigin
       )
@@ -1278,6 +1289,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       document.removeEventListener("pointermove", onPointerMove, true)
       document.removeEventListener("keydown", onKeyDown, true)
       window.removeEventListener("message", onMessage)
+      document.documentElement.removeAttribute("data-editor-active")
     }
   }, [editorOrigin, router, slug])
 

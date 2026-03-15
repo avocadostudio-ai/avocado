@@ -438,6 +438,12 @@ export async function runChatPipeline(
     : inferredTranslationScope
   const planningActiveBlockId = translationScope === "page" ? undefined : body.activeBlockId
   const planningActiveEditablePath = translationScope === "page" ? undefined : body.activeEditablePath
+  const parsedSiteContext: Record<string, unknown> = (() => {
+    if (!body.siteContext) return {}
+    if (typeof body.siteContext === "object") return body.siteContext as Record<string, unknown>
+    try { return JSON.parse(body.siteContext) as Record<string, unknown> } catch { return {} }
+  })()
+  const gdriveFolderId: string | undefined = typeof parsedSiteContext.gdriveFolderId === "string" ? parsedSiteContext.gdriveFolderId.trim() || undefined : undefined
   const sessionChatHistory = chatHistoryBySession.get(body.session) ?? []
   const chatRequestId = randomUUID()
   const requestedSlug = body.slug
@@ -1008,6 +1014,7 @@ export async function runChatPipeline(
             activeBlockId: planningActiveBlockId,
             activeEditablePath: planningActiveEditablePath,
             chatRequestId,
+            gdriveFolderId,
             log: ctx.log,
             onStatusUpdate: options?.onStatusUpdate,
             onImageProgress: options?.onImageProgress
@@ -1437,6 +1444,7 @@ export async function runChatPipeline(
                 pageSlug: deferred.pageSlug,
                 sectionContext: deferred.sectionContext,
                 chatRequestId,
+                gdriveFolderId,
                 log: ctx.log,
                 onStatusUpdate: options.onStatusUpdate,
                 onImageProgress: options?.onImageProgress
@@ -1683,6 +1691,7 @@ export async function runChatPipeline(
           activeBlockId: body.activeBlockId,
           activeEditablePath: body.activeEditablePath,
           chatRequestId,
+          gdriveFolderId,
           log: ctx.log,
           onStatusUpdate: options?.onStatusUpdate,
           onImageProgress: options?.onImageProgress
@@ -2125,7 +2134,8 @@ export async function runChatPipeline(
           ? {
               siteId: body.siteId ?? "default",
               sessionId: body.session ?? "dev",
-              traceId: chatRequestId
+              traceId: chatRequestId,
+              gdriveFolderId
             }
           : undefined,
         onStatusUpdate: options?.onStatusUpdate,

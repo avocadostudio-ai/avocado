@@ -207,6 +207,7 @@ export type SiteConfig = {
   tone?: string
   constraints?: string[]
   previewUrl?: string
+  gdriveFolderId?: string
 }
 
 export type RestoreSnapshot = {

@@ -1,15 +1,18 @@
 import { applyEditorCors, createEditorCorsOptionsHandler } from "./editor-cors.ts"
-import { buildComponentsManifest } from "./editor-manifest.ts"
+import { buildComponentsManifest, type EditorComponentsManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
 
-export function createComponentsHandler(): {
+export function createComponentsHandler(options?: {
+  getManifest?: () => EditorComponentsManifest
+}): {
   GET: (request: Request) => Response
   OPTIONS: (request: Request) => Response
 } {
+  const getManifest = options?.getManifest ?? buildComponentsManifest
   return {
     OPTIONS: createEditorCorsOptionsHandler(),
     GET(request: Request) {
-      const manifest = buildComponentsManifest()
+      const manifest = getManifest()
       const response = new Response(JSON.stringify(manifest), {
         status: 200,
         headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }

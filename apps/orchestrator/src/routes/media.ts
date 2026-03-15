@@ -186,6 +186,82 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
     }
   })
 
+  // Unsplash search proxy for the editor image picker
+  app.get("/unsplash/search", async (request, reply) => {
+    const accessKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
+    if (!accessKey) {
+      return reply.code(404).send({ error: "Unsplash not configured" })
+    }
+    const query = request.query as { q?: string; limit?: string }
+    const q = typeof query.q === "string" ? query.q.trim() : ""
+    if (!q) return { items: [] }
+    const limit = Math.min(20, Math.max(1, Number(query.limit) || 8))
+
+    try {
+      const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&orientation=landscape&per_page=${limit}&content_filter=high`
+      const res = await fetch(endpoint, {
+        headers: { Authorization: `Client-ID ${accessKey}`, "Accept-Version": "v1" }
+      })
+      if (!res.ok) return { items: [] }
+      const payload = (await res.json()) as { results?: Array<{ id?: string; urls?: { regular?: string; small?: string }; alt_description?: string; description?: string; user?: { name?: string } }> }
+      const items = (payload.results ?? []).map((r) => {
+        const imageUrl = typeof r.urls?.regular === "string" ? r.urls.regular : ""
+        const thumbUrl = typeof r.urls?.small === "string" ? r.urls.small : imageUrl
+        return {
+          id: r.id ?? "",
+          imageUrl,
+          thumbUrl,
+          alt: typeof r.alt_description === "string" ? r.alt_description : typeof r.description === "string" ? r.description : "",
+          author: r.user?.name ?? "Unsplash"
+        }
+      }).filter((item) => item.id && item.imageUrl)
+      return { items }
+    } catch {
+      return { items: [] }
+    }
+  })
+
+  // Image generation proxy for the editor image picker
+  app.post("/image/generate", async (request, reply) => {
+    if (!process.env.OPENAI_API_KEY) {
+      return reply.code(503).send({ error: "OPENAI_API_KEY is not configured" })
+    }
+    const body = (request.body ?? {}) as { prompt?: string; aspectRatio?: string }
+    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
+    if (!prompt) return reply.code(400).send({ error: "prompt is required" })
+
+    const aspectSizes: Record<string, string> = { landscape: "1536x1024", square: "1024x1024", portrait: "1024x1536" }
+    const size = aspectSizes[body.aspectRatio ?? "landscape"] ?? "1536x1024"
+    const model = process.env.OPENAI_IMAGE_MODEL_DRAFT?.trim() || "gpt-image-1-mini"
+
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    try {
+      const result = await client.images.generate({ model, prompt, size: size as "1536x1024" })
+      const image = result.data?.[0]
+      let bytes: Buffer | null = null
+      if (typeof image?.b64_json === "string" && image.b64_json.length > 0) {
+        bytes = Buffer.from(image.b64_json, "base64")
+      } else if (typeof image?.url === "string" && image.url.length > 0) {
+        const fetched = await fetch(image.url)
+        if (fetched.ok) bytes = Buffer.from(await fetched.arrayBuffer())
+      }
+      if (!bytes || bytes.byteLength === 0) {
+        return reply.code(502).send({ error: "Image generation returned no data" })
+      }
+
+      const fileName = `gen_${Date.now()}_${randomUUID().slice(0, 8)}.png`
+      await mkdir(ctx.generatedImageDir, { recursive: true })
+      await writeFile(resolve(ctx.generatedImageDir, fileName), bytes)
+
+      return {
+        url: `${ctx.orchestratorPublicOrigin}/generated-images/${fileName}`,
+        alt: prompt.slice(0, 200)
+      }
+    } catch (error) {
+      return reply.code(502).send({ error: "Image generation failed", detail: toErrorDetail(error) })
+    }
+  })
+
   app.post("/image/upload", async (request, reply) => {
     const parsed = await readMultipartImageFile(request, reply)
     if (!parsed.ok) return parsed.response

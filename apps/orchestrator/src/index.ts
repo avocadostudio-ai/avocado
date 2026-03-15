@@ -23,6 +23,7 @@ import { mediaRoutes } from "./routes/media.js"
 import { historyRoutes } from "./routes/history.js"
 import { toolsRoutes } from "./routes/tools.js"
 import { authRoutes } from "./routes/auth.js"
+import { gdriveRoutes } from "./routes/gdrive.js"
 import { createToolRuntime } from "./tools/runtime.js"
 
 const app = Fastify({ logger: true })
@@ -115,6 +116,7 @@ await app.register((instance) => mediaRoutes(instance, ctx))
 await app.register((instance) => historyRoutes(instance, ctx))
 await app.register((instance) => toolsRoutes(instance, ctx))
 await app.register((instance) => authRoutes(instance))
+await app.register((instance) => gdriveRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)
@@ -124,8 +126,12 @@ app.get("/health", async () => ({ ok: true }))
 app.get("/status/planner", async () => ({
   plannerSource: availableProviders.length > 0 ? availableProviders[0] : "demo",
   availableProviders,
-  unsplashConfigured: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
-  enabledTools: ctx.toolRuntime.registry.listManifests().map((tool) => tool.name)
+  enabledTools: ctx.toolRuntime.registry.listManifests().map((tool) => tool.name),
+  features: {
+    googleDrive: Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()),
+    unsplash: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
+    imageGenerate: Boolean(process.env.OPENAI_API_KEY?.trim())
+  }
 }))
 app.get("/telemetry/chat", async (request) => {
   const raw = request.query as { limit?: string; outcome?: string; phase?: string; session?: string }

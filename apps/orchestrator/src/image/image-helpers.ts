@@ -4,6 +4,7 @@ import OpenAI from "openai"
 import type { PageDoc } from "@ai-site-editor/shared"
 import { type UnsplashImage, type UnsplashResolveOptions } from "../variation-images.js"
 import { toSeedSlug } from "../nlp/intent-helpers.js"
+import { listImages, isGdriveConfigured, fileNameToAlt, resolveGdriveFolderId } from "./gdrive-client.js"
 
 // ---------------------------------------------------------------------------
 // Minimal logger interface compatible with Fastify's app.log
@@ -459,4 +460,39 @@ export async function resolveUnsplashImage(
   }
 
   return null
+}
+
+// ---------------------------------------------------------------------------
+// Google Drive image resolution (parallel to resolveUnsplashImage)
+// ---------------------------------------------------------------------------
+
+export async function resolveGdriveImage(
+  query: string,
+  options?: { chatRequestId?: string; logger?: ImageLogger; folderId?: string }
+): Promise<UnsplashImage | null> {
+  const resolvedFolderId = resolveGdriveFolderId(options?.folderId)
+  if (!resolvedFolderId) return null
+  const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
+  const log = options?.logger
+
+  const safeQuery = normalizeUnsplashQuery(query)
+  const files = await listImages(resolvedFolderId, safeQuery || undefined, log, 1)
+  if (files.length === 0) return null
+
+  const first = files[0]
+  const url = `${orchestratorPublicOrigin}/gdrive/images/${first.id}`
+  const alt = fileNameToAlt(first.name)
+
+  log?.info(
+    {
+      event: "gdrive_image_resolved",
+      chatRequestId: options?.chatRequestId,
+      query: safeQuery,
+      fileId: first.id,
+      fileName: first.name
+    },
+    "Resolved image from Google Drive"
+  )
+
+  return { url, alt, query: safeQuery }
 }

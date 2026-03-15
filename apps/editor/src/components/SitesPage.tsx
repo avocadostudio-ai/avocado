@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { editorComponentsManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
-import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, resolveSiteOrigin } from "../lib/editor-utils"
+import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, orchestrator, resolveSiteOrigin } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 function compactPurposeText(value: string) {
@@ -18,6 +18,8 @@ function compactPurposeText(value: string) {
 export function SitesPage({ sites, session }: { sites: UseSiteListReturn; session: string }) {
   const [addAiTab, setAddAiTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configAiTab, setConfigAiTab] = useState<"overview" | "tone" | "constraints">("overview")
+  const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
+  useEffect(() => { if (!sites.configSiteId) setDriveValidation(null) }, [sites.configSiteId])
 
   const dedupedSites = useMemo(() => sites.siteList
     .filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
@@ -442,6 +444,51 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                         placeholder="https://api.vercel.com/v1/integrations/deploy/..."
                         onChange={(event) => sites.updateConfigSite({ vercelDeployHookUrl: event.target.value })}
                       />
+                    </label>
+                    <label className="sites-form-field sites-form-field-wide">
+                      <span>Google Drive folder ID</span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="text"
+                          value={sites.configSite.gdriveFolderId ?? ""}
+                          placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+                          onChange={(event) => {
+                            sites.updateConfigSite({ gdriveFolderId: event.target.value })
+                            setDriveValidation(null)
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          style={{ whiteSpace: "nowrap", padding: "6px 12px", fontSize: 13 }}
+                          disabled={!sites.configSite.gdriveFolderId?.trim() || driveValidation?.status === "loading"}
+                          onClick={async () => {
+                            const folderId = sites.configSite!.gdriveFolderId?.trim()
+                            if (!folderId) return
+                            setDriveValidation({ status: "loading" })
+                            try {
+                              const res = await fetch(`${orchestrator}/gdrive/images?folderId=${encodeURIComponent(folderId)}&limit=1`)
+                              if (res.ok) {
+                                const data = (await res.json()) as { items: unknown[] }
+                                setDriveValidation({ status: "ok", message: `Connected (${data.items.length > 0 ? "images found" : "folder empty"})` })
+                              } else {
+                                const data = (await res.json().catch(() => ({}))) as { error?: string }
+                                setDriveValidation({ status: "error", message: data.error ?? `HTTP ${res.status}` })
+                              }
+                            } catch {
+                              setDriveValidation({ status: "error", message: "Could not reach orchestrator" })
+                            }
+                          }}
+                        >
+                          {driveValidation?.status === "loading" ? "Testing..." : "Test"}
+                        </button>
+                      </div>
+                      {driveValidation && driveValidation.status !== "loading" && (
+                        <span style={{ fontSize: 12, marginTop: 4, color: driveValidation.status === "ok" ? "#4ade80" : "#f87171" }}>
+                          {driveValidation.message}
+                        </span>
+                      )}
                     </label>
                   </div>
                 </div>

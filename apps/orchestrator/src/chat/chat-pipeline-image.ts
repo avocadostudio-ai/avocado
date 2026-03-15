@@ -12,11 +12,13 @@ import {
   imageKeywordsFromQuery,
   generateVariationImageWithOpenAI,
   resolveUnsplashImage,
+  resolveGdriveImage,
   isExplicitImageGenRequest,
   extractImagePromptFromMessage,
   estimatedImageGenMs,
   recordImageGenDuration
 } from "../image/image-helpers.js"
+import { isGdriveConfigured } from "../image/gdrive-client.js"
 import { firstUrlFromText, preferredImageAltText } from "./chat-pipeline-ui.js"
 
 export function blockHasImageUrlProp(
@@ -451,6 +453,7 @@ export async function withUnsplashHeroImage(args: {
   activeBlockId?: string
   activeEditablePath?: string
   chatRequestId?: string
+  gdriveFolderId?: string
   log: FastifyBaseLogger
   onStatusUpdate?: (message: string) => void
   onImageProgress?: (event: { percent: number; stage: string }) => void
@@ -486,7 +489,7 @@ export async function withUnsplashHeroImage(args: {
   let skippedImageCount = 0
   const globalUsedImageUrls = new Set<string>()
   let sourceQuery: string | undefined
-  let imageSource: "ai-generated" | "unsplash" | "placeholder" = "placeholder"
+  let imageSource: "ai-generated" | "gdrive" | "unsplash" | "placeholder" = "placeholder"
   const preferredQueries = new Map<string, string>()
   for (const item of args.preferredImageOps ?? []) {
     const query = typeof item.query === "string" ? item.query.trim() : ""
@@ -573,6 +576,11 @@ export async function withUnsplashHeroImage(args: {
         recordImageGenDuration(Date.now() - genStart)
         stopProgress()
         if (resolved) imageSource = "ai-generated"
+      }
+      if (!resolved && (isGdriveConfigured() || args.gdriveFolderId)) {
+        args.onStatusUpdate?.("Searching brand images…")
+        resolved = await resolveGdriveImage(imageQuery, { chatRequestId: args.chatRequestId, logger: args.log, folderId: args.gdriveFolderId })
+        if (resolved) imageSource = "gdrive"
       }
       if (!resolved) {
         args.onStatusUpdate?.("Finding a suitable image...")
@@ -698,6 +706,11 @@ export async function withUnsplashHeroImage(args: {
         stopProgress()
         if (resolved) imageSource = "ai-generated"
       }
+      if (!resolved && (isGdriveConfigured() || args.gdriveFolderId)) {
+        args.onStatusUpdate?.("Searching brand images…")
+        resolved = await resolveGdriveImage(query, { chatRequestId: args.chatRequestId, logger: args.log, folderId: args.gdriveFolderId })
+        if (resolved) imageSource = "gdrive"
+      }
       if (!resolved) {
         args.onStatusUpdate?.("Finding a suitable image...")
         const fbProps = fallbackHero.props as Record<string, unknown>
@@ -751,9 +764,11 @@ export async function withUnsplashHeroImage(args: {
     const sourceLabel =
       imageSource === "ai-generated"
         ? (resolvedImageCount > 1 ? `Generated ${resolvedImageCount} images with AI` : "Generated a new image with AI")
-        : imageSource === "unsplash"
-          ? `Found ${countLabel} from Unsplash`
-          : "Set Hero image from placeholder"
+        : imageSource === "gdrive"
+          ? `Found ${countLabel} from Google Drive`
+          : imageSource === "unsplash"
+            ? `Found ${countLabel} from Unsplash`
+            : "Set Hero image from placeholder"
     plan.change_log = [...plan.change_log, `${sourceLabel}.`]
     if (skippedImageCount > 0) {
       plan.change_log = [...plan.change_log, `${skippedImageCount} image${skippedImageCount > 1 ? "s" : ""} could not be resolved.`]
@@ -795,10 +810,11 @@ export async function resolveHeroImageForCreatePage(args: {
   pageSlug: string
   sectionContext: string
   chatRequestId?: string
+  gdriveFolderId?: string
   log: FastifyBaseLogger
   onStatusUpdate?: (message: string) => void
   onImageProgress?: (event: { percent: number; stage: string }) => void
-}): Promise<{ url: string; alt: string; source: "ai-generated" | "unsplash" } | null> {
+}): Promise<{ url: string; alt: string; source: "ai-generated" | "gdrive" | "unsplash" } | null> {
   if (process.env.OPENAI_API_KEY) {
     args.onStatusUpdate?.("Generating image\u2026")
 
@@ -822,6 +838,13 @@ export async function resolveHeroImageForCreatePage(args: {
 
     if (resolved) {
       return { url: resolved.url, alt: resolved.alt, source: "ai-generated" }
+    }
+  }
+  if (isGdriveConfigured() || args.gdriveFolderId) {
+    args.onStatusUpdate?.("Searching brand images…")
+    const gdriveResult = await resolveGdriveImage(args.query, { chatRequestId: args.chatRequestId, logger: args.log, folderId: args.gdriveFolderId })
+    if (gdriveResult) {
+      return { url: gdriveResult.url, alt: gdriveResult.alt, source: "gdrive" as const }
     }
   }
   args.onStatusUpdate?.("Finding image for new page...")
@@ -852,6 +875,7 @@ export function detectImageOps(args: {
   if (args.plan.intent !== "edit_plan") return []
 
   const explicitUnsplashRequest = lowerMessage.includes("unsplash")
+  const explicitGdriveRequest = /\b(drive|brand\s+(?:assets?|images?|photos?)|our\s+(?:photos?|images?|folder)|company\s+(?:images?|photos?))\b/.test(lowerMessage)
   const explicitImageGen = isExplicitImageGenRequest(args.message)
   const results: PendingImageGeneration[] = []
 
@@ -882,11 +906,12 @@ export function detectImageOps(args: {
       !userProvidedExplicitUrl &&
       touchesImage &&
       targets.length > 0 &&
-      (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen)
+      (explicitUnsplashRequest || hasImageUrlInPatch || explicitImageGen || explicitGdriveRequest)
     if (!touchesImage || !shouldReplace || targets.length === 0) continue
 
     const provider: PendingImageGeneration["provider"] =
-      explicitUnsplashRequest ? "unsplash"
+      explicitGdriveRequest && isGdriveConfigured() ? "gdrive"
+      : explicitUnsplashRequest ? "unsplash"
       : process.env.OPENAI_API_KEY ? "auto"
       : "unsplash"
 
@@ -932,7 +957,8 @@ export function detectImageOps(args: {
         targetBlock: fallbackHero
       })
       const provider: PendingImageGeneration["provider"] =
-        explicitUnsplashRequest ? "unsplash"
+        explicitGdriveRequest && isGdriveConfigured() ? "gdrive"
+        : explicitUnsplashRequest ? "unsplash"
         : process.env.OPENAI_API_KEY ? "auto"
         : "unsplash"
       results.push({ blockId: fallbackHero.id, pageSlug: args.slug, query, provider })

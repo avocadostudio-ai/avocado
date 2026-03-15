@@ -4,6 +4,7 @@ import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
 import { SitesPage } from "./components/SitesPage"
+import { ImagePickerModal } from "./components/ImagePickerModal"
 import { useSiteList } from "./hooks/useSiteList"
 import { usePreviewBridge, type PreviewBridgeCallbacks } from "./hooks/usePreviewBridge"
 import { useChatEngine } from "./hooks/useChatEngine"
@@ -11,7 +12,7 @@ import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
 import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
-import { allowedBlockTypes, getAllBlockMeta, type BlockInstance } from "@ai-site-editor/shared"
+import { allowedBlockTypes, getAllBlockMeta, isImagePath, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ModelKey, PlannerSource } from "./lib/editor-types"
 import { manifestUnavailableChanges } from "./lib/integration-context"
 import {
@@ -146,6 +147,9 @@ function EditorPage({
   const [isAddingBlock, setIsAddingBlock] = useState(false)
   const [copiedDebugEntryId, setCopiedDebugEntryId] = useState<string | null>(null)
   const [selectedVariationId, setSelectedVariationId] = useState<string | null>(null)
+  const [imagePickerTarget, setImagePickerTarget] = useState<{ slug: string; blockId: string; editablePath: string; currentUrl?: string } | null>(null)
+  const imagePickerOpen = imagePickerTarget !== null
+  const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
@@ -225,7 +229,7 @@ function EditorPage({
   }
 
   const previewCallbacks = useMemo<PreviewBridgeCallbacks>(() => ({
-    onBlockClicked: (newSlug, blockId, blockType, editablePath) => {
+    onBlockClicked: (newSlug, blockId, blockType, editablePath, editableValue) => {
       setSlug(newSlug)
       activeBlockIdRef.current = blockId
       activeBlockTypeRef.current = blockType
@@ -234,6 +238,10 @@ function EditorPage({
       setActiveBlockType(blockType)
       setActiveEditablePath(editablePath)
       if (blockId) preview.postToSite("highlightBlock", { blockId, editablePath: editablePath ?? null })
+      // Open image picker when an image field is clicked
+      if (blockId && editablePath && isImagePath(editablePath)) {
+        setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl: editableValue })
+      }
     },
     onRouteChanged: (newSlug) => {
       setSlug(newSlug)
@@ -400,8 +408,16 @@ function EditorPage({
         for (const url of urls) {
           const res = await fetch(url)
           if (!res.ok) continue
-          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[] }
+          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[]; features?: { googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean } }
           if (!active) return
+          if (data.features) {
+            setBackendFeatures((prev) => {
+              if (prev.googleDrive === data.features!.googleDrive &&
+                  prev.unsplash === data.features!.unsplash &&
+                  prev.imageGenerate === data.features!.imageGenerate) return prev
+              return data.features!
+            })
+          }
           if (Array.isArray(data.availableProviders) && data.availableProviders.length > 0) {
             setAvailableProviders(data.availableProviders)
             if (!data.availableProviders.includes(provider)) setProvider(data.availableProviders[0])
@@ -1107,6 +1123,16 @@ function EditorPage({
                 <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
                 <span>Debug mode</span>
               </label>
+              <label className="settings-text-field">
+                <span>Google Drive folder ID</span>
+                <input
+                  type="text"
+                  placeholder="e.g. 1aBcD..."
+                  value={activeSiteConfig.gdriveFolderId ?? ""}
+                  onChange={(e) => sites.updateActiveSiteConfig({ gdriveFolderId: e.target.value })}
+                  style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-input, #1e293b)", color: "inherit", fontSize: 13 }}
+                />
+              </label>
               <button type="button" className="settings-link-btn" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
                 Clear chat
               </button>
@@ -1114,6 +1140,24 @@ function EditorPage({
           </div>
         </div>
       ) : null}
+      <ImagePickerModal
+        open={imagePickerOpen}
+        features={backendFeatures}
+        currentUrl={imagePickerTarget?.currentUrl}
+        gdriveFolderId={activeSiteConfig.gdriveFolderId}
+        onClose={() => setImagePickerTarget(null)}
+        onSelect={(imageUrl, alt) => {
+          if (!imagePickerTarget) return
+          const { slug: targetSlug, blockId, editablePath } = imagePickerTarget
+          // Use inlineEditCommit for simple paths, ops endpoint for nested
+          void chatEngine.inlineEditCommit(targetSlug, blockId, editablePath, imageUrl)
+          // Also update imageAlt if applicable
+          const altPath = toAltPath(editablePath)
+          if (altPath !== editablePath) {
+            void chatEngine.inlineEditCommit(targetSlug, blockId, altPath, alt)
+          }
+        }}
+      />
     </div>
   )
 }
