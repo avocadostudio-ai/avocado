@@ -167,25 +167,23 @@ function ImageFieldWidget({
     <div className="property-field">
       <label className="property-field-label">{label}</label>
       <div className="property-field-image-widget">
-        <div className="property-field-image-row">
-          <div className="property-field-image-preview">
-            {imageUrl ? (
-              <img
-                className="property-field-image-thumb"
-                src={imageUrl}
-                alt=""
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
-              />
-            ) : (
-              <div className="property-field-image-thumb property-field-image-placeholder">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="m21 15-5-5L5 21" />
-                </svg>
-              </div>
-            )}
-          </div>
+        <div className="property-field-image-preview">
+          {imageUrl ? (
+            <img
+              className="property-field-image-thumb"
+              src={imageUrl}
+              alt=""
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+            />
+          ) : (
+            <div className="property-field-image-thumb property-field-image-placeholder">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="m21 15-5-5L5 21" />
+              </svg>
+            </div>
+          )}
           <button type="button" className="property-field-image-change" onClick={onChangeClick}>
             {imageUrl ? "Change" : "Choose image"}
           </button>
