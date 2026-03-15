@@ -277,7 +277,7 @@ body {
 
 .property-field-image-preview {
   position: relative;
-  display: inline-block;
+  width: 50%;
   border-radius: 8px;
   overflow: hidden;
   background: var(--line);
@@ -285,10 +285,9 @@ body {
 
 .property-field-image-thumb {
   display: block;
-  width: 88px;
-  height: 72px;
+  width: 100%;
+  height: 80px;
   object-fit: cover;
-  border-radius: 8px;
 }
 
 .property-field-image-placeholder {
@@ -298,27 +297,25 @@ body {
   color: var(--muted);
 }
 
-.property-field-image-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .property-field-image-change {
-  font-size: 12px;
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
   font-weight: 600;
-  color: var(--accent);
-  background: none;
-  border: 1px solid var(--line);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  border: none;
   cursor: pointer;
-  padding: 5px 14px;
-  border-radius: 6px;
-  transition: background 0.15s, border-color 0.15s;
+  padding: 3px 12px;
+  border-radius: 5px;
+  transition: background 0.15s;
 }
 
 .property-field-image-change:hover {
-  border-color: var(--accent);
-  background: rgba(0, 122, 122, 0.08);
+  background: rgba(0, 0, 0, 0.75);
 }
 
 .property-field-image-alt-group {
@@ -3219,14 +3216,9 @@ textarea {
   background: #0f172a;
 }
 
-.editor-dark .property-field-image-change {
-  border-color: #475569;
-  color: #2dd4bf;
-}
 
-.editor-dark .property-field-image-change:hover {
-  border-color: #2dd4bf;
-  background: rgba(45, 212, 191, 0.08);
+.editor-dark .property-field-image-alt-label {
+  color: #94a3b8;
 }
 
 .editor-dark .property-field-image-alt {
