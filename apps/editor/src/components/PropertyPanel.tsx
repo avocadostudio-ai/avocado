@@ -1,8 +1,10 @@
 import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
 import { getAllBlockMeta, DEFAULT_HEADING_LEVELS, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
+import { WandSparkles } from "lucide-react"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
+const noop = () => {}
 
 type Props = {
   style?: CSSProperties
@@ -50,7 +52,6 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
   return (
     <div className="property-panel" style={style}>
       <div className="property-panel-header">
-        <div className="property-panel-title">Properties</div>
         <div className="property-panel-block-name">{meta.displayName}</div>
       </div>
       {status === "loading" && !props ? (
@@ -174,10 +175,7 @@ function renderFieldEntries(
 function SparkleButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" className="property-field-ai-btn" onClick={onClick} title="AI suggestions">
-      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
-        <path d="M8 1l1.5 3.5L13 6l-3.5 1.5L8 11 6.5 7.5 3 6l3.5-1.5L8 1z" fill="currentColor" />
-        <path d="M12 10l.75 1.75L14.5 12.5l-1.75.75L12 15l-.75-1.75L9.5 12.5l1.75-.75L12 10z" fill="currentColor" opacity=".6" />
-      </svg>
+      <WandSparkles size={14} aria-hidden="true" />
     </button>
   )
 }
@@ -200,7 +198,6 @@ function ImageFieldWidget({
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
   const displayAlt = altFocused ? altLocal : (altText ?? "")
-  const noop = () => {}
   const { debouncedCommit: debouncedAltCommit, flushCommit: flushAltCommit } = useDebouncedCommit(onAltCommit ?? noop, 400)
 
   return (
