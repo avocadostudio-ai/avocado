@@ -155,7 +155,8 @@ export function loadSiteListFromStorage(siteId: string) {
         vercelDeployHookUrl: parseString(site.vercelDeployHookUrl, ""),
         tone: parseString(site.tone, ""),
         constraints: parseArrayOfStrings(site.constraints),
-        ...(parseString(site.previewUrl, "") ? { previewUrl: parseString(site.previewUrl, "") } : {})
+        ...(parseString(site.previewUrl, "") ? { previewUrl: parseString(site.previewUrl, "") } : {}),
+        ...(parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") ? { gdriveFolderId: parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") } : {})
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
       .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))
