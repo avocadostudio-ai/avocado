@@ -1123,16 +1123,6 @@ function EditorPage({
                 <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
                 <span>Debug mode</span>
               </label>
-              <label className="settings-text-field">
-                <span>Google Drive folder ID</span>
-                <input
-                  type="text"
-                  placeholder="e.g. 1aBcD..."
-                  value={activeSiteConfig.gdriveFolderId ?? ""}
-                  onChange={(e) => sites.updateActiveSiteConfig({ gdriveFolderId: e.target.value })}
-                  style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-input, #1e293b)", color: "inherit", fontSize: 13 }}
-                />
-              </label>
               <button type="button" className="settings-link-btn" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
                 Clear chat
               </button>
@@ -1149,13 +1139,24 @@ function EditorPage({
         onSelect={(imageUrl, alt) => {
           if (!imagePickerTarget) return
           const { slug: targetSlug, blockId, editablePath } = imagePickerTarget
-          // Use inlineEditCommit for simple paths, ops endpoint for nested
-          void chatEngine.inlineEditCommit(targetSlug, blockId, editablePath, imageUrl)
-          // Also update imageAlt if applicable
           const altPath = toAltPath(editablePath)
-          if (altPath !== editablePath) {
-            void chatEngine.inlineEditCommit(targetSlug, blockId, altPath, alt)
-          }
+          // Send a single ops call so undo reverts both imageUrl + imageAlt atomically
+          const patch: Record<string, string> = { [editablePath]: imageUrl }
+          if (altPath !== editablePath) patch[altPath] = alt
+          void (async () => {
+            try {
+              const res = await fetch(`${orchestrator}/ops`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ session, siteId, ops: [{ op: "update_props", pageSlug: targetSlug, blockId, patch }] })
+              })
+              const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string }
+              if (res.ok && data.status === "applied") {
+                preview.postToSite("draftUpdated", { focusBlockId: blockId })
+                chatEngine.pushAssistantFromResult({ status: "applied", summary: "Changed image." }, { canUndo: true })
+              }
+            } catch { /* ignore */ }
+          })()
         }}
       />
     </div>

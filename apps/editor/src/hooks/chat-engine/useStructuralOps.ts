@@ -377,7 +377,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
     }
   }
 
-  async function inlineEditCommit(slugForOp: string, blockId: string, editablePath: string, value: string) {
+  async function inlineEditCommit(slugForOp: string, blockId: string, editablePath: string, value: string, options?: { silent?: boolean }) {
     if (!blockId || !editablePath) return
 
     const indexedPath = /^([A-Za-z_][A-Za-z0-9_]*)\[([0-9]+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(editablePath)
@@ -450,8 +450,10 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      const fieldLabel = editablePath.replace(/.*\./, "").replace(/([A-Z])/g, " $1").toLowerCase().trim()
-      pushAssistantFromResult({ status: "applied", summary: `Edited ${fieldLabel}.` }, { canUndo: true })
+      if (!options?.silent) {
+        const fieldLabel = editablePath.replace(/.*\./, "").replace(/([A-Z])/g, " $1").toLowerCase().trim()
+        pushAssistantFromResult({ status: "applied", summary: `Edited ${fieldLabel}.` }, { canUndo: true })
+      }
     } catch {
       pushAssistantFromResult({
         status: "error",
