@@ -180,7 +180,7 @@ const f = {
   url: (label?: string): FieldMeta => ({ kind: "url", label, inlineEditable: false }),
   image: (label?: string, imageSpec?: ImageSpec): FieldMeta => ({ kind: "image", label, inlineEditable: false, ...(imageSpec ? { imageSpec } : {}) }),
   imageAlt: (label?: string): FieldMeta => ({ kind: "imageAlt", label }),
-  headingLevel: (): FieldMeta => ({ kind: "headingLevel", label: "Heading level", inlineEditable: false }),
+  headingLevel: (): FieldMeta => ({ kind: "headingLevel", label: "Heading type", inlineEditable: false }),
 } as const
 
 registerBlock("Hero", {

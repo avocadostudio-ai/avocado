@@ -202,7 +202,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
         {/* Header row: title + current image + close */}
         <div style={S.header}>
           <div style={S.headerLeft}>
-            <span style={S.title}>Select Image</span>
+            <span style={S.title}>Asset Picker</span>
             {currentUrl && <img src={currentUrl} alt="" style={S.currentImg} />}
           </div>
           <button onClick={onClose} style={S.closeBtn} aria-label="Close"><X size={18} /></button>

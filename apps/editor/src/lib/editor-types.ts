@@ -113,6 +113,14 @@ export type SiteMessage =
     }
   | ({ source: "site-editor/v1" } & PatchAckMessage)
 
+export type FieldAiContext = {
+  blockId: string
+  blockType: string
+  fieldPath: string
+  fieldLabel: string
+  blockDisplayName: string
+}
+
 export type ChatEntry = {
   id: string
   role: "user" | "assistant"
@@ -129,6 +137,7 @@ export type ChatEntry = {
   aiJustification?: string
   aiPerformanceNote?: string
   pendingPlanId?: string
+  fieldAiContext?: FieldAiContext
   continuation?: {
     chainId: string
     currentStep: number

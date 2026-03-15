@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
 import { getAllBlockMeta, DEFAULT_HEADING_LEVELS, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
+import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
 
@@ -18,7 +19,19 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
-        <div className="property-panel-empty">Select a block to edit its properties</div>
+        <div className="property-panel-empty">
+          <svg className="property-panel-empty-icon" viewBox="0 0 48 48" width="48" height="48" fill="none" aria-hidden="true">
+            <rect x="8" y="10" width="32" height="28" rx="4" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" opacity=".45" />
+            <rect x="13" y="17" width="14" height="2.5" rx="1.25" fill="currentColor" opacity=".25" />
+            <rect x="13" y="22" width="22" height="2" rx="1" fill="currentColor" opacity=".15" />
+            <rect x="13" y="26.5" width="18" height="2" rx="1" fill="currentColor" opacity=".15" />
+            <rect x="13" y="31" width="10" height="2" rx="1" fill="currentColor" opacity=".15" />
+            <circle cx="38" cy="12" r="7" fill="var(--accent, #6366f1)" opacity=".12" />
+            <path d="M38 9v6M35 12h6" stroke="var(--accent, #6366f1)" strokeWidth="1.5" strokeLinecap="round" opacity=".55" />
+          </svg>
+          <span className="property-panel-empty-title">No block selected</span>
+          <span className="property-panel-empty-hint">Click any block on the canvas to edit its properties here</span>
+        </div>
       </div>
     )
   }
@@ -135,7 +148,7 @@ function renderFieldEntries(
           altText={altValue}
           onChangeClick={() => onImageClick?.(pathPrefix + key, data[key] == null ? "" : String(data[key]))}
           onAltCommit={altKey ? (v) => onFieldChange(pathPrefix + altKey, v) : undefined}
-          onAltAiAssist={altKey && onAiAssist ? () => onAiAssist(pathPrefix + altKey, "Image description", "imageAlt", altValue ?? "") : undefined}
+          onAltAiAssist={altKey && onAiAssist ? () => onAiAssist(pathPrefix + altKey, "Alt text", "imageAlt", altValue ?? "") : undefined}
         />
       )
     } else {
@@ -187,6 +200,8 @@ function ImageFieldWidget({
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
   const displayAlt = altFocused ? altLocal : (altText ?? "")
+  const noop = () => {}
+  const { debouncedCommit: debouncedAltCommit, flushCommit: flushAltCommit } = useDebouncedCommit(onAltCommit ?? noop, 400)
 
   return (
     <div className="property-field">
@@ -216,7 +231,7 @@ function ImageFieldWidget({
         {onAltCommit !== undefined && (
           <div className="property-field-image-alt-group">
             <div className="property-field-image-alt-label">
-              <span>Image description</span>
+              <span>Alt text</span>
               {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} /> : null}
             </div>
             <input
@@ -225,10 +240,10 @@ function ImageFieldWidget({
               placeholder="Describe what's in this image"
               value={displayAlt}
               onFocus={() => { setAltLocal(altText ?? ""); setAltFocused(true) }}
-              onChange={(e) => setAltLocal(e.target.value)}
+              onChange={(e) => { setAltLocal(e.target.value); debouncedAltCommit(e.target.value) }}
               onBlur={() => {
                 setAltFocused(false)
-                if (altLocal !== (altText ?? "")) onAltCommit(altLocal)
+                flushAltCommit()
               }}
             />
           </div>
@@ -327,6 +342,7 @@ function FieldEditor({
   const stringValue = value == null ? "" : String(value)
   const [localValue, setLocalValue] = useState(stringValue)
   const [focused, setFocused] = useState(false)
+  const { debouncedCommit, flushCommit } = useDebouncedCommit(onCommit, 400)
 
   // Sync from props when not focused
   const displayValue = focused ? localValue : stringValue
@@ -340,9 +356,7 @@ function FieldEditor({
 
   const handleBlur = () => {
     setFocused(false)
-    if (localValue !== stringValue) {
-      onCommit(localValue)
-    }
+    flushCommit()
   }
 
   if (field.kind === "headingLevel") {
@@ -414,7 +428,7 @@ function FieldEditor({
   const sharedProps = {
     value: displayValue,
     onFocus: handleFocus,
-    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setLocalValue(e.target.value),
+    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { setLocalValue(e.target.value); debouncedCommit(e.target.value) },
     onBlur: handleBlur
   } as const
 
