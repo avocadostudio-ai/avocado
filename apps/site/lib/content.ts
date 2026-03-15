@@ -1,5 +1,4 @@
 import type { PageDoc } from "./site-contract"
-import { fetchDraftPage as fetchFromOrchestrator, fetchDraftSlugs as fetchSlugsFromOrchestrator } from "@ai-site-editor/site-sdk"
 import { getPublishedPage, getPublishedSlugs } from "./published-content-api"
 
 export type ContentSource = "published" | "draft"
@@ -15,6 +14,18 @@ function hasOrchestratorUrl(): boolean {
   return process.env.NODE_ENV !== "production"
 }
 
+// Lazy-load orchestrator fetch so published builds don't bundle it
+let draftFetchersPromise: ReturnType<typeof loadDraftFetchers> | null = null
+function loadDraftFetchers() {
+  return import("@ai-site-editor/site-sdk").then(
+    ({ fetchDraftPage, fetchDraftSlugs }) => ({ fetchDraftPage, fetchDraftSlugs })
+  )
+}
+function getDraftFetchers() {
+  if (!draftFetchersPromise) draftFetchersPromise = loadDraftFetchers()
+  return draftFetchersPromise
+}
+
 export async function getPage(
   slug: string,
   source: ContentSource,
@@ -22,7 +33,8 @@ export async function getPage(
   siteId: string
 ): Promise<PageDoc | null> {
   if (source === "draft") {
-    return fetchFromOrchestrator(slug, session, siteId)
+    const { fetchDraftPage } = await getDraftFetchers()
+    return fetchDraftPage(slug, session, siteId)
   }
   return getPublishedPage(slug)
 }
@@ -33,7 +45,8 @@ export async function getNavSlugs(
   siteId: string
 ): Promise<string[]> {
   if (source === "draft") {
-    const slugs = await fetchSlugsFromOrchestrator(session, siteId)
+    const { fetchDraftSlugs } = await getDraftFetchers()
+    const slugs = await fetchDraftSlugs(session, siteId)
     if (slugs.length > 0) return slugs
   }
   return getPublishedSlugs()
