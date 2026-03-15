@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-13T22:14:38.038Z",
+    "updatedAt": "2026-03-15T14:49:56.526Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -13,8 +13,8 @@
           "subheading": "From creamy avocado toast breakfasts to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
           "ctaText": "Explore Avocado Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "/generated-images/var_1773437814781_dbvz8v.png",
-          "imageAlt": "A vibrant food photography scene featuring fresh avocado toast on rustic sourdough bread topped with sliced avocado, chili flakes, lemon zest and microgreens, placed on a natural wooden table with soft morning sunlight coming from the side, surrounded by whole avocados, lime wedges and herbs, shallow depth of field, editorial food photography style, warm tones, bright and inviting atmosphere, ultra realistic, 4k"
+          "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxhdm9jYWRvfGVufDF8MHx8fDE3NzM1ODI2NzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "sliced green and yellow fruit"
         }
       },
       {
@@ -28,16 +28,16 @@
               "description": "Discover how avocados nourish your body with heart-healthy fats, essential vitamins, and powerful antioxidants that support wellness and vitality in everyday life.",
               "ctaText": "Explore",
               "ctaHref": "/avocado-wellness",
-              "imageUrl": "/generated-images/var_1773436938167_mf1y56.png",
-              "imageAlt": "Woman with glowing skin applying avocado skincare mask surrounded by fresh avocados in soft natural light"
+              "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "woman with white face mask holding green fruit"
             },
             {
               "title": "🥑 Avocado Culinary Delights",
               "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
-              "imageUrl": "/generated-images/var_1773437069733_jgq8q0.png",
-              "imageAlt": "Top-down food photography of a perfectly ripe avocado cut in half with fresh cooking ingredients including sea salt, garlic, olive oil, cherry tomatoes, lime, and herbs on a light stone kitchen surface with natural soft lighting"
+              "imageUrl": "https://images.unsplash.com/photo-1502642074847-9afe11995f6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMXx8YXZvY2Fkb3xlbnwxfDB8fHwxNzczNTgyMzQxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "sliced avocado against white background"
             },
             {
               "title": "🥑 Avocado Sustainability",
@@ -61,12 +61,12 @@
               "label": "250K+"
             },
             {
-              "value": "1.5B+",
-              "label": "avocados consumed yearly"
-            },
-            {
               "value": "100%",
               "label": "sustainable farms featured"
+            },
+            {
+              "value": "1.5B+",
+              "label": "avocados consumed yearly"
             }
           ]
         }
@@ -242,5 +242,66 @@
         }
       }
     ]
+  },
+  {
+    "id": "p_about",
+    "slug": "/about",
+    "title": "About",
+    "updatedAt": "2026-03-15T07:15:40.908Z",
+    "blocks": [
+      {
+        "id": "b_hero_about",
+        "type": "Hero",
+        "props": {
+          "heading": "About Grapefruits",
+          "subheading": "Discover the bright, refreshing world of grapefruits—a vibrant citrus fruit packed with wellness benefits, tangy flavor, and endless culinary possibilities.",
+          "ctaText": "Explore Grapefruits",
+          "ctaHref": "/grapefruits",
+          "imageUrl": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "A grapefruit cut in half on a vibrant yellow and orange background"
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773558915222",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Frequently asked questions",
+          "items": [
+            {
+              "q": "How fast can we publish?",
+              "a": "Most teams ship updates in minutes."
+            },
+            {
+              "q": "Can we revise later?",
+              "a": "Yes, every block can be updated anytime."
+            },
+            {
+              "q": "How do I pick a ripe grapefruit?",
+              "a": "Choose grapefruits that feel heavy for their size and have a smooth, unblemished skin. They should yield slightly to gentle pressure, indicating they're juicy and ready to enjoy."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cardgrid_1773558876092",
+        "type": "CardGrid",
+        "props": {
+          "title": "Grapefruit Varieties & Origins",
+          "cards": [
+            {
+              "title": "Nutritional Powerhouse",
+              "description": "Rich in vitamin C, antioxidants, and fiber. Grapefruits support immunity, skin health, and digestion—making them a refreshing choice for wellness-focused eating.",
+              "ctaText": "Explore Benefits",
+              "ctaHref": "/grapefruits"
+            }
+          ]
+        }
+      }
+    ],
+    "meta": {
+      "title": "About Grapefruits | Health, Varieties & Benefits",
+      "description": "Discover grapefruit varieties, nutrition facts, and wellness benefits. Learn how to select, store, and enjoy this vibrant citrus fruit in your daily meals.",
+      "ogImage": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+    }
   }
 ]
