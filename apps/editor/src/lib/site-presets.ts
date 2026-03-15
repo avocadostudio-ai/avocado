@@ -87,8 +87,7 @@ export function resolveEditorSiteId() {
   if (LOCK_SITE_ID) return fallback
   if (typeof window === "undefined") return fallback
   const fromQuery = sanitizeSiteId(new URLSearchParams(window.location.search).get("siteId") ?? "")
-  const resolved = fromQuery || fallback
-  return resolved === "adventure-atlas" ? "avocado-stories" : resolved
+  return fromQuery || fallback
 }
 
 export function defaultSiteList(siteId: string): SiteConfig[] {
@@ -146,8 +145,8 @@ export function loadSiteListFromStorage(siteId: string) {
         )
       })
       .map((site) => ({
-        id: sanitizeSiteId(site.id === "adventure-atlas" ? "avocado-stories" : site.id),
-        name: site.id === "adventure-atlas" ? "Avocado Stories" : site.name.trim(),
+        id: sanitizeSiteId(site.id),
+        name: site.name.trim(),
         purpose: parseString(site.purpose, ""),
         hosting: parseString(site.hosting, DEFAULT_SITE_HOSTING),
         vercelProjectId: parseString(site.vercelProjectId, ""),
