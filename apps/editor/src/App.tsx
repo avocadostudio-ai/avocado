@@ -154,6 +154,9 @@ function EditorPage({
   const imagePickerOpen = imagePickerTarget !== null
   const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
   const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
+  const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints">("overview")
+  const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
+  useEffect(() => { if (!sites.configSiteId) { setDriveValidation(null); setSiteConfigTab("overview") } }, [sites.configSiteId])
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
@@ -649,21 +652,42 @@ function EditorPage({
         <header className="chat-header">
           <div className="chat-header-top">
             <div className="chat-header-site-name">
-              {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">Switch</a>
+              {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">All sites</a>
             </div>
-            <div className="chat-header-badges">
+            <div className="chat-header-right">
               {componentManifest.status === "degraded" ? (
                 <span className="planner-badge" title={componentManifest.reason ?? "Components unavailable"}>
                   Limited
                 </span>
-              ) : componentManifest.status === "ready" ? (
-                <span className="planner-badge planner-badge-outline">Edit on</span>
               ) : null}
               {chatEngine.plannerBadgeState === "demo" ? (
                 <span className="planner-badge planner-badge-demo">Demo mode</span>
-              ) : chatEngine.plannerBadgeState === "openai" || chatEngine.plannerBadgeState === "anthropic" ? (
-                <Sparkles size={16} className="chat-header-sparkle" />
               ) : null}
+              <button
+                type="button"
+                className="chat-header-icon-btn"
+                aria-label="Site settings"
+                title="Site settings"
+                onClick={() => sites.setConfigSiteId(siteId)}
+              >
+                <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+                  <path d="M8.8 2h2.4l.5 2.1a6.7 6.7 0 0 1 1.5.6l1.9-1.1 1.7 1.7-1.1 1.9c.2.5.4 1 .5 1.5l2.1.5v2.4l-2.1.5a6.7 6.7 0 0 1-.6 1.5l1.1 1.9-1.7 1.7-1.9-1.1a6.7 6.7 0 0 1-1.5.6L11.2 18H8.8l-.5-2.1a6.7 6.7 0 0 1-1.5-.6l-1.9 1.1-1.7-1.7 1.1-1.9a6.7 6.7 0 0 1-.6-1.5L2 11.2V8.8l2.1-.5c.1-.5.3-1 .6-1.5L3.6 4.9l1.7-1.7 1.9 1.1c.5-.2 1-.4 1.5-.5L8.8 2z" />
+                  <circle cx="10" cy="10" r="2.4" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="chat-header-icon-btn"
+                aria-label="More options"
+                onClick={() => setShowSettingsModal(true)}
+                ref={settingsButtonRef}
+              >
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+                  <circle cx="3" cy="8" r="1.5" />
+                  <circle cx="8" cy="8" r="1.5" />
+                  <circle cx="13" cy="8" r="1.5" />
+                </svg>
+              </button>
             </div>
           </div>
           <div className="chat-header-controls">
@@ -677,15 +701,6 @@ function EditorPage({
               </select>
             </label>
             <div className="chat-header-primary-actions">
-              <button
-                type="button"
-                className="settings-icon-btn"
-                aria-label="Open settings"
-                onClick={() => setShowSettingsModal(true)}
-                ref={settingsButtonRef}
-              >
-                <Settings2Icon size={16} color="currentColor" />
-              </button>
               <button type="button" className="publish-preview-btn" onClick={() => void publish.publishSite()} disabled={chatEngine.isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
                 {publish.publishInProgress ? "Publishing" : "Publish"}
@@ -1152,13 +1167,13 @@ function EditorPage({
             className="settings-modal settings-modal-popover"
             role="dialog"
             aria-modal="true"
-            aria-label="Settings"
+            aria-label="Developer mode"
             onClick={(e) => e.stopPropagation()}
             style={settingsPopoverPos ? { top: settingsPopoverPos.top, left: settingsPopoverPos.left } : undefined}
           >
             <div className="settings-modal-header">
-              <h2>Settings</h2>
-              <button type="button" className="settings-close-btn" aria-label="Close settings" onClick={() => setShowSettingsModal(false)}>
+              <h2>Developer mode</h2>
+              <button type="button" className="settings-close-btn" aria-label="Close" onClick={() => setShowSettingsModal(false)}>
                 ×
               </button>
             </div>
@@ -1187,6 +1202,135 @@ function EditorPage({
           </div>
         </div>
       ) : null}
+
+      {sites.configSite ? (
+        <div className="sites-modal-backdrop" onClick={() => sites.setConfigSiteId(null)}>
+          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Site config" onClick={(e) => e.stopPropagation()}>
+            <header className="sites-modal-header">
+              <h2>Site Config</h2>
+              <button type="button" className="settings-close-btn" onClick={() => sites.setConfigSiteId(null)} aria-label="Close">
+                ×
+              </button>
+            </header>
+            <div className="sites-modal-body">
+              <div className="sites-form-grid">
+                <p className="sites-form-section-title">Core settings</p>
+                <label className="sites-form-field">
+                  <span>Site name</span>
+                  <input
+                    type="text"
+                    value={sites.configSite.name}
+                    placeholder="Site name"
+                    onChange={(e) => sites.updateConfigSite({ name: e.target.value })}
+                  />
+                </label>
+                <p className="sites-form-section-title">Editorial brief</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                    <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
+                    <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
+                    <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
+                  </div>
+                  {siteConfigTab === "overview" ? (
+                    <label className="sites-form-field">
+                      <span>Overview</span>
+                      <textarea value={sites.configSite.purpose} placeholder="What this site is for." onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
+                    </label>
+                  ) : null}
+                  {siteConfigTab === "tone" ? (
+                    <label className="sites-form-field">
+                      <span>Preferred tone</span>
+                      <textarea value={sites.configSite.tone ?? ""} placeholder="How the writing should sound." onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
+                    </label>
+                  ) : null}
+                  {siteConfigTab === "constraints" ? (
+                    <label className="sites-form-field">
+                      <span>Writing constraints</span>
+                      <textarea
+                        value={(sites.configSite.constraints ?? []).join("\n")}
+                        placeholder={"Rules for content output.\nOne per line."}
+                        onChange={(e) => sites.updateConfigSite({ constraints: e.target.value.split(/\n|,/g).map((s) => s.trim()).filter(Boolean) })}
+                        rows={8}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                <p className="sites-form-section-title">Settings</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-settings-grid">
+                    <label className="sites-form-field">
+                      <span>Hosting</span>
+                      <input type="text" value={sites.configSite.hosting} placeholder="Vercel production site" onChange={(e) => sites.updateConfigSite({ hosting: e.target.value })} />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel project ID</span>
+                      <input type="text" value={sites.configSite.vercelProjectId ?? ""} placeholder="prj_..." onChange={(e) => sites.updateConfigSite({ vercelProjectId: e.target.value })} />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel team ID</span>
+                      <input type="text" value={sites.configSite.vercelTeamId ?? ""} placeholder="team_..." onChange={(e) => sites.updateConfigSite({ vercelTeamId: e.target.value })} />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Vercel production URL</span>
+                      <input type="url" value={sites.configSite.vercelProductionUrl ?? ""} placeholder="https://example.vercel.app" onChange={(e) => sites.updateConfigSite({ vercelProductionUrl: e.target.value })} />
+                    </label>
+                    <label className="sites-form-field sites-form-field-wide">
+                      <span>Vercel deploy hook URL</span>
+                      <input type="url" value={sites.configSite.vercelDeployHookUrl ?? ""} placeholder="https://api.vercel.com/v1/integrations/deploy/..." onChange={(e) => sites.updateConfigSite({ vercelDeployHookUrl: e.target.value })} />
+                    </label>
+                    <label className="sites-form-field sites-form-field-wide">
+                      <span>Google Drive folder ID</span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="text"
+                          value={sites.configSite.gdriveFolderId ?? ""}
+                          placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+                          onChange={(e) => { sites.updateConfigSite({ gdriveFolderId: e.target.value }); setDriveValidation(null) }}
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          style={{ whiteSpace: "nowrap", padding: "6px 12px", fontSize: 13 }}
+                          disabled={!sites.configSite.gdriveFolderId?.trim() || driveValidation?.status === "loading"}
+                          onClick={async () => {
+                            const folderId = sites.configSite!.gdriveFolderId?.trim()
+                            if (!folderId) return
+                            setDriveValidation({ status: "loading" })
+                            try {
+                              const res = await fetch(`${orchestrator}/gdrive/images?folderId=${encodeURIComponent(folderId)}&limit=1`)
+                              if (res.ok) {
+                                const data = (await res.json()) as { items: unknown[] }
+                                setDriveValidation({ status: "ok", message: `Connected (${data.items.length > 0 ? "images found" : "folder empty"})` })
+                              } else {
+                                const data = (await res.json().catch(() => ({}))) as { error?: string }
+                                setDriveValidation({ status: "error", message: data.error ?? `HTTP ${res.status}` })
+                              }
+                            } catch {
+                              setDriveValidation({ status: "error", message: "Could not reach orchestrator" })
+                            }
+                          }}
+                        >
+                          {driveValidation?.status === "loading" ? "Testing..." : "Test"}
+                        </button>
+                      </div>
+                      {driveValidation && driveValidation.status !== "loading" && (
+                        <span style={{ fontSize: 12, marginTop: 4, color: driveValidation.status === "ok" ? "#4ade80" : "#f87171" }}>
+                          {driveValidation.message}
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <footer className="sites-modal-footer">
+              <button type="button" className="primary-btn" onClick={() => sites.setConfigSiteId(null)}>Done</button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
       <ImagePickerModal
         open={imagePickerOpen}
         features={{ ...backendFeatures, googleDrive: backendFeatures.googleDrive || Boolean(activeSiteConfig.gdriveFolderId?.trim()) }}

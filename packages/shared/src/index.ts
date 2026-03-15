@@ -34,6 +34,8 @@ export {
   getPropDisplayName,
   defaultPropsForType,
   defaultListItemForBlock,
+  resolveHeadingTag,
+  DEFAULT_HEADING_LEVELS,
   // Schemas & validation
   blockInstanceSchema,
   validateBlockProps,

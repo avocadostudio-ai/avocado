@@ -192,18 +192,19 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
     if (!accessKey) {
       return reply.code(404).send({ error: "Unsplash not configured" })
     }
-    const query = request.query as { q?: string; limit?: string }
+    const query = request.query as { q?: string; limit?: string; page?: string }
     const q = typeof query.q === "string" ? query.q.trim() : ""
-    if (!q) return { items: [] }
+    if (!q) return { items: [], totalPages: 0 }
     const limit = Math.min(20, Math.max(1, Number(query.limit) || 8))
+    const page = Math.max(1, Math.trunc(Number(query.page) || 1))
 
     try {
-      const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&orientation=landscape&per_page=${limit}&content_filter=high`
+      const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&orientation=landscape&per_page=${limit}&page=${page}&content_filter=high`
       const res = await fetch(endpoint, {
         headers: { Authorization: `Client-ID ${accessKey}`, "Accept-Version": "v1" }
       })
-      if (!res.ok) return { items: [] }
-      const payload = (await res.json()) as { results?: Array<{ id?: string; urls?: { regular?: string; small?: string }; alt_description?: string; description?: string; user?: { name?: string } }> }
+      if (!res.ok) return { items: [], totalPages: 0 }
+      const payload = (await res.json()) as { total_pages?: number; results?: Array<{ id?: string; urls?: { regular?: string; small?: string }; alt_description?: string; description?: string; user?: { name?: string } }> }
       const items = (payload.results ?? []).map((r) => {
         const imageUrl = typeof r.urls?.regular === "string" ? r.urls.regular : ""
         const thumbUrl = typeof r.urls?.small === "string" ? r.urls.small : imageUrl
@@ -215,9 +216,9 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
           author: r.user?.name ?? "Unsplash"
         }
       }).filter((item) => item.id && item.imageUrl)
-      return { items }
+      return { items, totalPages: payload.total_pages ?? 0 }
     } catch {
-      return { items: [] }
+      return { items: [], totalPages: 0 }
     }
   })
 
