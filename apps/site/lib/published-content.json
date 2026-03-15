@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-15T14:49:56.526Z",
+    "updatedAt": "2026-03-15T19:15:31.496Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -13,8 +13,10 @@
           "subheading": "From creamy avocado toast breakfasts to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
           "ctaText": "Explore Avocado Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxhdm9jYWRvfGVufDF8MHx8fDE3NzM1ODI2NzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
-          "imageAlt": "sliced green and yellow fruit"
+          "imageUrl": "http://localhost:4200/gdrive/images/1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s",
+          "imageAlt": "avocado4",
+          "imagePosition": "right",
+          "secondaryCtaText": ""
         }
       },
       {
@@ -22,6 +24,7 @@
         "type": "CardGrid",
         "props": {
           "title": "Explore Avocado Stories",
+          "subtitle": "",
           "cards": [
             {
               "title": "🥑 Avocado Wellness",
@@ -36,8 +39,8 @@
               "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
-              "imageUrl": "https://images.unsplash.com/photo-1502642074847-9afe11995f6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMXx8YXZvY2Fkb3xlbnwxfDB8fHwxNzczNTgyMzQxfDA&ixlib=rb-4.1.0&q=80&w=1080",
-              "imageAlt": "sliced avocado against white background"
+              "imageUrl": "http://localhost:4200/gdrive/images/1NwnCLmDBnwWplCTlmQaHbJ0aQZ5HdXEp",
+              "imageAlt": "avocado6"
             },
             {
               "title": "🥑 Avocado Sustainability",
@@ -124,7 +127,7 @@
     "id": "p_oranges",
     "slug": "/oranges",
     "title": "Oranges",
-    "updatedAt": "2026-03-14T19:04:17.275Z",
+    "updatedAt": "2026-03-15T19:01:36.642Z",
     "blocks": [
       {
         "id": "b_hero_1772135749521",
@@ -134,9 +137,9 @@
           "subheading": "Discover the vibrant world of citrus fruits.",
           "ctaText": "Learn More",
           "ctaHref": "/oranges",
-          "imageUrl": "/generated-images/var_1773435514410_hox78s.png",
-          "imageAlt": "A juicy orange with water droplets glistening in bright sunlight",
-          "imagePosition": "left"
+          "imageUrl": "https://images.unsplash.com/photo-1598048150218-53ab5609ef31?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8T3JhbmdlfGVufDF8MHx8fDE3NzM2MDEyODB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "sliced lemon on orange surface",
+          "imagePosition": "right"
         }
       },
       {
@@ -146,16 +149,16 @@
           "title": "Orange Nutrition & Global Impact",
           "stats": [
             {
-              "value": "92%",
-              "label": "Vitamin C per orange"
+              "value": "53mg",
+              "label": "Vitamin C per medium orange"
             },
             {
-              "value": "50M+",
-              "label": "Tons produced annually"
+              "value": "120M+",
+              "label": "Tons produced annually worldwide"
             },
             {
               "value": "600+",
-              "label": "Varieties worldwide"
+              "label": "Varieties grown globally"
             }
           ]
         }
@@ -167,11 +170,106 @@
           "title": "The Wonders of Oranges",
           "body": "**Oranges** are among the most beloved fruits globally, cherished not only for their **delicious taste** but also for their nutritional benefits. Here are some intriguing insights about oranges:\n\n- **Rich in Vitamin C**, oranges play a crucial role in boosting the immune system and maintaining skin health.\n- The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.\n- With over **600 varieties**, oranges offer a diverse range of flavors and uses.\n- Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.\n- Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.\n\nDiscover more about the diverse benefits and culinary uses of oranges on our page."
         }
+      },
+      {
+        "id": "b_cardgrid_1773601007304_177",
+        "type": "CardGrid",
+        "props": {
+          "title": "Discover Oranges",
+          "cards": [
+            {
+              "title": "Orange Varieties",
+              "description": "From bright Valencia to zesty Blood oranges, explore the diverse world of orange cultivars. Each variety brings its own flavor profile and best uses, whether fresh, juiced, or cooked.",
+              "ctaText": "Learn varieties",
+              "ctaHref": "/oranges",
+              "imageUrl": "https://images.unsplash.com/photo-1764457004444-8639f0912b92?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2UlMjBzbGljZXMlMjBudXRyaXRpb24lMjBoZWFsdGh5fGVufDF8MHx8fDE3NzM2MDEyMDB8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "Several orange slices on a dark background"
+            },
+            {
+              "title": "Health & Wellness",
+              "description": "Discover how oranges support your wellbeing. Packed with vitamin C and fiber, they boost immunity, skin health, and digestion. A simple, delicious way to nourish your body.",
+              "ctaText": "Explore benefits",
+              "ctaHref": "/oranges",
+              "imageUrl": "https://images.unsplash.com/photo-1672088405753-37d5a8de4d93?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw5fHxvcmFuZ2UlMjBzbGljZXMlMjBudXRyaXRpb24lMjBoZWFsdGh5fGVufDF8MHx8fDE3NzM2MDEyMDF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "A pile of sliced oranges sitting on top of a wooden table"
+            },
+            {
+              "title": "Culinary Inspiration",
+              "description": "Transform your kitchen with orange-infused recipes. From fresh juices and zesty marmalades to savory dishes and baked goods, oranges bring brightness and depth to every meal.",
+              "ctaText": "Get recipes",
+              "ctaHref": "/oranges",
+              "imageUrl": "https://images.unsplash.com/photo-1763221126410-de574de88b16?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8ZnJlc2glMjBvcmFuZ2VzJTIwY2l0cnVzJTIwZnJ1aXR8ZW58MXwwfHx8MTc3MzYwMTE5OXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+              "imageAlt": "A pile of fresh, ripe oranges"
+            }
+          ]
+        }
       }
     ],
     "meta": {
       "title": "Fresh Oranges: Health Benefits, Recipes & Wellness | Avocado Stories",
       "description": "Explore the vibrant world of oranges. Discover recipes, nutrition insights, and wellness benefits of this citrus essential. Learn how oranges complement a healthy lifestyle."
+    }
+  },
+  {
+    "id": "p_grapefruits",
+    "slug": "/grapefruits",
+    "title": "Grapefruits",
+    "updatedAt": "2026-03-15T19:09:56.240Z",
+    "blocks": [
+      {
+        "id": "b_hero_about",
+        "type": "Hero",
+        "props": {
+          "heading": "Grapefruits",
+          "subheading": "Discover the bright, refreshing world of grapefruits—a vibrant citrus fruit packed with wellness benefits, tangy flavor, and endless culinary possibilities.",
+          "ctaText": "Explore Grapefruits",
+          "ctaHref": "/grapefruits",
+          "imageUrl": "https://images.unsplash.com/photo-1622912789333-ba8bf8242e27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2MDE3MzB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "sliced orange fruit on blue background",
+          "imagePosition": "right"
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773558915222",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Frequently asked questions",
+          "items": [
+            {
+              "q": "How fast can we publish?",
+              "a": "Most teams ship updates in minutes."
+            },
+            {
+              "q": "Can we revise later?",
+              "a": "Yes, every block can be updated anytime."
+            },
+            {
+              "q": "How do I pick a ripe grapefruit?",
+              "a": "Choose grapefruits that feel heavy for their size and have a smooth, unblemished skin. They should yield slightly to gentle pressure, indicating they're juicy and ready to enjoy."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cardgrid_1773558876092",
+        "type": "CardGrid",
+        "props": {
+          "title": "Grapefruit Varieties & Origins",
+          "cards": [
+            {
+              "title": "Nutritional Powerhouse",
+              "description": "Rich in vitamin C, antioxidants, and fiber. Grapefruits support immunity, skin health, and digestion—making them a refreshing choice for wellness-focused eating.",
+              "ctaText": "Explore Benefits",
+              "ctaHref": "/grapefruits"
+            }
+          ]
+        }
+      }
+    ],
+    "meta": {
+      "title": "About Grapefruits | Health, Varieties & Benefits",
+      "description": "Discover grapefruit varieties, nutrition facts, and wellness benefits. Learn how to select, store, and enjoy this vibrant citrus fruit in your daily meals.",
+      "ogImage": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
     }
   },
   {
@@ -242,66 +340,5 @@
         }
       }
     ]
-  },
-  {
-    "id": "p_about",
-    "slug": "/about",
-    "title": "About",
-    "updatedAt": "2026-03-15T07:15:40.908Z",
-    "blocks": [
-      {
-        "id": "b_hero_about",
-        "type": "Hero",
-        "props": {
-          "heading": "About Grapefruits",
-          "subheading": "Discover the bright, refreshing world of grapefruits—a vibrant citrus fruit packed with wellness benefits, tangy flavor, and endless culinary possibilities.",
-          "ctaText": "Explore Grapefruits",
-          "ctaHref": "/grapefruits",
-          "imageUrl": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "A grapefruit cut in half on a vibrant yellow and orange background"
-        }
-      },
-      {
-        "id": "b_faqaccordion_1773558915222",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Frequently asked questions",
-          "items": [
-            {
-              "q": "How fast can we publish?",
-              "a": "Most teams ship updates in minutes."
-            },
-            {
-              "q": "Can we revise later?",
-              "a": "Yes, every block can be updated anytime."
-            },
-            {
-              "q": "How do I pick a ripe grapefruit?",
-              "a": "Choose grapefruits that feel heavy for their size and have a smooth, unblemished skin. They should yield slightly to gentle pressure, indicating they're juicy and ready to enjoy."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_cardgrid_1773558876092",
-        "type": "CardGrid",
-        "props": {
-          "title": "Grapefruit Varieties & Origins",
-          "cards": [
-            {
-              "title": "Nutritional Powerhouse",
-              "description": "Rich in vitamin C, antioxidants, and fiber. Grapefruits support immunity, skin health, and digestion—making them a refreshing choice for wellness-focused eating.",
-              "ctaText": "Explore Benefits",
-              "ctaHref": "/grapefruits"
-            }
-          ]
-        }
-      }
-    ],
-    "meta": {
-      "title": "About Grapefruits | Health, Varieties & Benefits",
-      "description": "Discover grapefruit varieties, nutrition facts, and wellness benefits. Learn how to select, store, and enjoy this vibrant citrus fruit in your daily meals.",
-      "ogImage": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
-    }
   }
 ]
