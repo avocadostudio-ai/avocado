@@ -1,10 +1,10 @@
 import { unstable_noStore as noStore } from "next/cache"
 import { draftMode } from "next/headers"
 import type { Metadata } from "next"
-import { resolveDraftContext, isTileMode, single, buildSlug, TileModeStyles, EditorOverlay, getPreviewWrapperProps, BlockErrorBoundary } from "@ai-site-editor/site-sdk"
-import { SharedBlockRenderer } from "@ai-site-editor/blocks"
+import { resolveDraftContext, isTileMode, single, buildSlug } from "@ai-site-editor/site-sdk"
 import "../site-nav.css"
-import { SiteHeader } from "../../components/site-header"
+import { SitePageContent } from "../../components/site-page-content"
+import { EditorPageWrapper } from "../../components/editor-wrapper"
 import { resolveContentSource, getPage, getNavSlugs } from "../../lib/content"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
@@ -89,7 +89,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const resolvedSearch = await searchParams
   const slug = buildSlug(resolvedParams.slug)
 
-  // Editor integration: resolve draft context from SDK
+  // Resolve editor context (null when editor disabled or not in draft mode)
   const editorCtx = EDITOR_ENABLED
     ? await resolveDraftContext(resolvedSearch, {
         defaultSession: "dev",
@@ -102,10 +102,8 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   if (contentSource === "draft") noStore()
 
   const editorMode = EDITOR_ENABLED && contentSource === "draft"
-  const tileMode = editorMode && isTileMode(resolvedSearch)
   const session = editorCtx?.session ?? "dev"
   const siteId = editorCtx?.siteId ?? "avocado-stories"
-  const editorOrigin = editorCtx?.editorOrigin ?? ""
 
   // Fetch content
   const [page, navSlugs] = await Promise.all([
@@ -118,6 +116,9 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const siteLogo = siteLogoFromId(siteId)
   const allSlugs = Array.from(new Set([...(navSlugs.length > 0 ? navSlugs : ["/", "/pricing"]), slug]))
   const orderedSlugs = allSlugs.includes("/") ? ["/", ...allSlugs.filter((r) => r !== "/")] : allSlugs
+
+  // Editor mode: propagate query params through nav links
+  const editorOrigin = editorCtx?.editorOrigin ?? ""
   const editorQuery = editorMode
     ? (() => {
         const p = new URLSearchParams({ session, siteId })
@@ -125,11 +126,13 @@ export default async function SitePage({ params, searchParams }: PageProps) {
         return `?${p.toString()}`
       })()
     : ""
+
   const navItems = orderedSlugs.map((route) => ({
     href: `${route}${editorQuery}`,
     label: slugToLabel(route),
     isActive: route === slug
   }))
+  const homeHref = `/${editorQuery}`
 
   if (!page) {
     return (
@@ -140,20 +143,23 @@ export default async function SitePage({ params, searchParams }: PageProps) {
     )
   }
 
+  // Published mode: pure renderer, no editor imports evaluated
+  if (!editorMode) {
+    return <SitePageContent page={page} navItems={navItems} siteName={siteName} siteLogo={siteLogo} homeHref={homeHref} />
+  }
+
+  // Editor mode: wrapper with overlays, block selection, tile mode
+  const tileMode = isTileMode(resolvedSearch)
   return (
-    <>
-      {tileMode && <TileModeStyles />}
-      <SiteHeader siteName={siteName} siteLogo={siteLogo} homeHref={`/${editorQuery}`} navItems={navItems} />
-      <main className={editorMode ? "editor-mode" : undefined}>
-        {page.blocks.map((block) => (
-          <div key={block.id} {...getPreviewWrapperProps(editorMode, block.id, block.type)}>
-            <BlockErrorBoundary blockId={block.id} blockType={block.type}>
-              <SharedBlockRenderer block={block} />
-            </BlockErrorBoundary>
-          </div>
-        ))}
-      </main>
-      {editorMode && !tileMode && <EditorOverlay slug={slug} editorOrigin={editorOrigin} />}
-    </>
+    <EditorPageWrapper
+      page={page}
+      navItems={navItems}
+      siteName={siteName}
+      siteLogo={siteLogo}
+      homeHref={homeHref}
+      slug={slug}
+      editorOrigin={editorOrigin}
+      tileMode={tileMode}
+    />
   )
 }

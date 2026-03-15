@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { useEffect, useId, useRef, useState } from "react"
 import { SiteThemeToggle } from "./theme-toggle"
 
-type NavItem = {
+export type NavItem = {
   href: string
   label: string
   isActive: boolean
