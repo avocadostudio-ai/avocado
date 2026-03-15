@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes, JSX, ReactNode } from "react"
-import type { BlockInstance } from "@ai-site-editor/shared"
+import { resolveHeadingTag, type BlockInstance } from "@ai-site-editor/shared"
 
 function decodeSoftHyphenEntities(input: string) {
   return input
@@ -139,13 +139,14 @@ function renderRichTextContent(input: string) {
 function Hero(props: Record<string, unknown>) {
   const imagePosition = String(props.imagePosition ?? "right") === "left" ? "left" : "right"
   const heroClass = imagePosition === "left" ? "hero hero--image-left" : "hero hero--image-right"
+  const HeadingTag = resolveHeadingTag("Hero", props) as keyof JSX.IntrinsicElements
   return (
     <section className={heroClass}>
       <div className="section__inner hero__inner">
         <div className="hero__content">
-          <h1 data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
+          <HeadingTag data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
             {String(props.heading ?? "")}
-          </h1>
+          </HeadingTag>
           <p data-editable-target="subheading" data-editable-target-label="subheading" data-editable-label="subheading">
             {String(props.subheading ?? "")}
           </p>
@@ -184,12 +185,13 @@ function Hero(props: Record<string, unknown>) {
 
 function FeatureGrid(props: Record<string, unknown>) {
   const items = Array.isArray(props.features) ? props.features : []
+  const HeadingTag = resolveHeadingTag("FeatureGrid", props) as keyof JSX.IntrinsicElements
   return (
     <section>
       <div className="section__inner">
-        <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+        <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
           {String(props.title ?? "")}
-        </h2>
+        </HeadingTag>
         <ul className="feature-grid">
           {items.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
@@ -220,12 +222,13 @@ function FeatureGrid(props: Record<string, unknown>) {
 
 function Testimonials(props: Record<string, unknown>) {
   const items = Array.isArray(props.items) ? props.items : []
+  const HeadingTag = resolveHeadingTag("Testimonials", props) as keyof JSX.IntrinsicElements
   return (
     <section>
       <div className="section__inner">
-        <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+        <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
           {String(props.title ?? "")}
-        </h2>
+        </HeadingTag>
         <div className="testimonials-grid">
           {items.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
@@ -261,12 +264,13 @@ function Testimonials(props: Record<string, unknown>) {
 
 function FAQAccordion(props: Record<string, unknown>) {
   const items = Array.isArray(props.items) ? props.items : []
+  const HeadingTag = resolveHeadingTag("FAQAccordion", props) as keyof JSX.IntrinsicElements
   return (
     <section>
       <div className="section__inner">
-        <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+        <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
           {String(props.title ?? "")}
-        </h2>
+        </HeadingTag>
         {items.map((item, idx) => {
           const row = (item ?? {}) as Record<string, unknown>
           return (
@@ -294,12 +298,13 @@ function FAQAccordion(props: Record<string, unknown>) {
 }
 
 function CTA(props: Record<string, unknown>) {
+  const HeadingTag = resolveHeadingTag("CTA", props) as keyof JSX.IntrinsicElements
   return (
     <section className="cta-section">
       <div className="section__inner">
-        <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+        <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
           {String(props.title ?? "")}
-        </h2>
+        </HeadingTag>
         <p data-editable-target="description" data-editable-target-label="description" data-editable-label="description">
           {String(props.description ?? "")}
         </p>
@@ -314,6 +319,7 @@ function CTA(props: Record<string, unknown>) {
 function Card(props: Record<string, unknown>) {
   const imageUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
   const imageAlt = typeof props.imageAlt === "string" ? props.imageAlt.trim() : ""
+  const HeadingTag = resolveHeadingTag("Card", props) as keyof JSX.IntrinsicElements
   return (
     <section>
       <div className="section__inner">
@@ -323,9 +329,9 @@ function Card(props: Record<string, unknown>) {
               <img src={imageUrl} alt={imageAlt.length > 0 ? imageAlt : "Card image"} className="card__image" loading="lazy" />
             </div>
           )}
-          <h3 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+          <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
             {String(props.title ?? "")}
-          </h3>
+          </HeadingTag>
           <p data-editable-target="description" data-editable-target-label="description" data-editable-label="description">
             {String(props.description ?? "")}
           </p>
@@ -340,12 +346,16 @@ function Card(props: Record<string, unknown>) {
 
 function CardGrid(props: Record<string, unknown>) {
   const cards = Array.isArray(props.cards) ? props.cards : []
+  const headingTag = resolveHeadingTag("CardGrid", props)
+  const HeadingTag = headingTag as keyof JSX.IntrinsicElements
+  const sectionLevel = parseInt(headingTag[1])
+  const ItemHeadingTag = (`h${Math.min(6, sectionLevel + 1)}`) as keyof JSX.IntrinsicElements
   return (
     <section className="card-grid-section">
       <div className="section__inner">
-        <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+        <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
           {String(props.title ?? "")}
-        </h2>
+        </HeadingTag>
         <div className="card-grid">
           {cards.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
@@ -368,13 +378,13 @@ function CardGrid(props: Record<string, unknown>) {
                     />
                   </div>
                 )}
-                <h3
+                <ItemHeadingTag
                   data-editable-target={`cards[${idx}].title`}
                   data-editable-target-label={`cards[${idx}].title`}
                   data-editable-label={`cards[${idx}].title`}
                 >
                   {String(row.title ?? "")}
-                </h3>
+                </ItemHeadingTag>
                 <p
                   data-editable-target={`cards[${idx}].description`}
                   data-editable-target-label={`cards[${idx}].description`}
@@ -402,13 +412,14 @@ function CardGrid(props: Record<string, unknown>) {
 function RichText(props: Record<string, unknown>) {
   const title = String(props.title ?? "")
   const renderedBody = renderRichTextContent(String(props.body ?? ""))
+  const HeadingTag = resolveHeadingTag("RichText", props) as keyof JSX.IntrinsicElements
   return (
     <section className="rich-text">
       <div className="section__inner">
         {title.length > 0 && (
-          <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+          <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
             {title}
-          </h2>
+          </HeadingTag>
         )}
         <div className="rich-text__body" data-editable-target="body" data-editable-target-label="body" data-editable-label="body">
           {renderedBody}
@@ -421,13 +432,14 @@ function RichText(props: Record<string, unknown>) {
 function Stats(props: Record<string, unknown>) {
   const title = String(props.title ?? "")
   const items = Array.isArray(props.stats) ? props.stats : []
+  const HeadingTag = resolveHeadingTag("Stats", props) as keyof JSX.IntrinsicElements
   return (
     <section className="stats-section">
       <div className="section__inner">
         {title.length > 0 && (
-          <h2 data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+          <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
             {title}
-          </h2>
+          </HeadingTag>
         )}
         <div className="stats-grid">
           {items.map((item, idx) => {
@@ -459,14 +471,15 @@ function Stats(props: Record<string, unknown>) {
   )
 }
 
-function TwoColumnChild({ item }: { item: Record<string, unknown> }) {
+function TwoColumnChild({ item, headingTag }: { item: Record<string, unknown>; headingTag: keyof JSX.IntrinsicElements }) {
   const childType = String(item.type ?? "")
+  const HeadingTag = headingTag
 
   if (childType === "heading") {
     return (
-      <h2 data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
+      <HeadingTag data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
         {String(item.text ?? "")}
-      </h2>
+      </HeadingTag>
     )
   }
 
@@ -528,6 +541,7 @@ function TwoColumn(props: Record<string, unknown>) {
   const leftItems = Array.isArray(props.left) ? props.left as Record<string, unknown>[] : []
   const rightItems = Array.isArray(props.right) ? props.right as Record<string, unknown>[] : []
   const variant = String(props.variant ?? "default")
+  const HeadingTag = resolveHeadingTag("TwoColumn", props) as keyof JSX.IntrinsicElements
 
   const allItems = [...leftItems, ...rightItems]
   const hasVideo = allItems.some((item) => String(item.type ?? "") === "video")
@@ -538,12 +552,12 @@ function TwoColumn(props: Record<string, unknown>) {
       <div className="section__inner two-column__inner">
         <div className="two-column__text">
           {leftItems.map((item, i) => (
-            <TwoColumnChild key={`l-${i}`} item={item} />
+            <TwoColumnChild key={`l-${i}`} item={item} headingTag={HeadingTag} />
           ))}
         </div>
         <div className="two-column__text">
           {rightItems.map((item, i) => (
-            <TwoColumnChild key={`r-${i}`} item={item} />
+            <TwoColumnChild key={`r-${i}`} item={item} headingTag={HeadingTag} />
           ))}
         </div>
       </div>
@@ -553,6 +567,7 @@ function TwoColumn(props: Record<string, unknown>) {
 
 function Footer(props: Record<string, unknown>) {
   const columns = Array.isArray(props.columns) ? props.columns : []
+  const HeadingTag = resolveHeadingTag("Footer", props) as keyof JSX.IntrinsicElements
   return (
     <footer className="site-footer">
       <div className="section__inner">
@@ -570,13 +585,13 @@ function Footer(props: Record<string, unknown>) {
               })
             return (
               <div key={idx} className="site-footer__col">
-                <h4
+                <HeadingTag
                   data-editable-target={`columns[${idx}].title`}
                   data-editable-target-label={`columns[${idx}].title`}
                   data-editable-label={`columns[${idx}].title`}
                 >
                   {String(row.title ?? "")}
-                </h4>
+                </HeadingTag>
                 <ul
                   data-editable-target={`columns[${idx}].links`}
                   data-editable-target-label={`columns[${idx}].links`}

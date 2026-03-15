@@ -15,7 +15,8 @@ import { PropertyPanel } from "./components/PropertyPanel"
 import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, isImagePath, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
-import type { AIProvider, ModelKey, PlannerSource } from "./lib/editor-types"
+import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
+import { fieldAiSuggestions } from "./lib/field-ai-suggestions"
 import { manifestUnavailableChanges } from "./lib/integration-context"
 import {
   DEBUG_MODE_STORAGE_KEY,
@@ -460,10 +461,32 @@ function EditorPage({
     preview.postToSite("highlightBlock", { blockId: activeBlockId, editablePath: activeEditablePath ?? null })
   }, [activeBlockId, activeEditablePath])
 
-  // Auto-switch to Properties tab when a block is selected (unless user is typing)
+  // Auto-switch to Properties tab when a block is selected (unless user is typing),
+  // and clear any field-AI context entries from a previous block
   useEffect(() => {
     if (activeBlockId && !message.trim()) setActiveTab("properties")
+    chatEngine.clearFieldAiContext()
   }, [activeBlockId])
+
+  const handleFieldAiAssist = useCallback((fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => {
+    if (!activeBlockId || !activeBlockType) return
+    const allMeta = getAllBlockMeta()
+    const blockDisplayName = allMeta[activeBlockType]?.displayName ?? activeBlockType
+
+    setActiveEditablePath(fieldPath)
+    setActiveTab("chat")
+
+    const suggestions = fieldAiSuggestions(fieldKind, fieldLabel, activeBlockType, currentValue)
+    const entry: ChatEntry = {
+      id: `field-ai-${Date.now()}`,
+      role: "assistant",
+      text: `Editing: ${blockDisplayName} → ${fieldLabel}`,
+      fieldAiContext: { blockId: activeBlockId, blockType: activeBlockType, fieldPath, fieldLabel, blockDisplayName },
+      suggestions
+    }
+
+    chatEngine.setFieldAiContext(entry)
+  }, [activeBlockId, activeBlockType])
 
   // Refresh slugs on session/site change
   useEffect(() => { void chatEngine.refreshRouteSlugs() }, [session, siteId])
@@ -703,7 +726,7 @@ function EditorPage({
           {chatEngine.chatLog.map((entry) => (
             <article
               key={entry.id}
-              className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""}`}
+              className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""} ${entry.fieldAiContext ? "msg-field-context" : ""}`}
             >
               <div className="msg-main">{entry.role === "assistant" ? renderSimpleMarkdown(entry.text) : entry.text}</div>
               {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
@@ -941,6 +964,7 @@ function EditorPage({
             if (!activeBlockId) return
             setImagePickerTarget({ slug, blockId: activeBlockId, editablePath: fieldPath, currentUrl })
           }}
+          onAiAssist={handleFieldAiAssist}
         />
 
         <div
