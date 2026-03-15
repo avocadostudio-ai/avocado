@@ -175,8 +175,8 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     </svg>
                     <span>Settings</span>
                   </button>
-                  <button type="button" className="secondary-btn site-config-btn" onClick={() => void sites.openRestoreModal(site.id)} aria-label={`Restore snapshot for ${site.name}`}>
-                    <span>Restore snapshot</span>
+                  <button type="button" className="secondary-btn site-config-btn" onClick={() => void sites.openRestoreModal(site.id)} aria-label={`Version history for ${site.name}`}>
+                    <span>Version history</span>
                   </button>
                   <button type="button" className="primary-btn" onClick={() => sites.openEditorForSite(site.id)}>
                     <span>Open editor</span>
@@ -504,9 +504,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       ) : null}
       {sites.restoreState.siteId ? (
         <div className="sites-modal-backdrop" onClick={() => sites.updateRestoreState({ siteId: null })}>
-          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Restore snapshot" onClick={(event) => event.stopPropagation()}>
+          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Version history" onClick={(event) => event.stopPropagation()}>
             <header className="sites-modal-header">
-              <h2>Restore Snapshot</h2>
+              <h2>Version History</h2>
               <button type="button" className="settings-close-btn" onClick={() => sites.updateRestoreState({ siteId: null })} aria-label="Close">
                 ×
               </button>
