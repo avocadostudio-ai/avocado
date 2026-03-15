@@ -1004,6 +1004,8 @@ export function useChatEngine(config: ChatEngineConfig) {
     reorderBlock: structuralOps.reorderBlock,
     deleteBlock: structuralOps.deleteBlock,
     inlineEditCommit: structuralOps.inlineEditCommit,
+    clearFieldAiContext: () => setChatLog((prev) => prev.filter((e) => !e.fieldAiContext)),
+    setFieldAiContext: (entry: ChatEntry) => setChatLog((prev) => [...prev.filter((e) => !e.fieldAiContext), entry]),
     clearChat: () => setChatLog([welcomeEntry])
   }
 }
