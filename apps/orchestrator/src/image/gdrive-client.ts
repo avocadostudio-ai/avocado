@@ -97,12 +97,21 @@ export function isGdriveConfigured(): boolean {
   )
 }
 
+/** Extract a bare folder ID from a value that may be a full Google Drive URL or a raw ID. */
+function extractFolderId(value: string): string {
+  // https://drive.google.com/drive/u/0/folders/FOLDER_ID or /drive/folders/FOLDER_ID
+  const urlMatch = value.match(/\/folders\/([a-zA-Z0-9_-]+)/)
+  if (urlMatch?.[1]) return urlMatch[1]
+  return value
+}
+
 /** Resolve folder ID from an override or fall back to env var. Returns undefined if neither is set. */
 export function resolveGdriveFolderId(override?: string): string | undefined {
   const trimmed = override?.trim()
-  if (trimmed) return trimmed
+  if (trimmed) return extractFolderId(trimmed)
   const envId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()
-  return envId || undefined
+  if (envId) return extractFolderId(envId)
+  return undefined
 }
 
 // ---------------------------------------------------------------------------
