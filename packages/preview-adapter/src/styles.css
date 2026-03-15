@@ -101,7 +101,7 @@
   background: rgba(var(--editor-selected-rgb), 0.97);
 }
 
-.editor-highlight {
+[data-editor-active] .editor-highlight {
   overflow: visible !important;
   position: relative;
   z-index: 2147483645;
@@ -165,7 +165,7 @@
   to { transform: scale(1); opacity: 1; }
 }
 
-.editor-highlight::before {
+[data-editor-active] .editor-highlight::before {
   opacity: 1;
   inset: 0;
   border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
@@ -173,23 +173,23 @@
   mix-blend-mode: normal;
 }
 
-.editor-highlight.editor-child-hovering::before,
-.editor-highlight.editor-child-selected::before {
+[data-editor-active] .editor-highlight.editor-child-hovering::before,
+[data-editor-active] .editor-highlight.editor-child-selected::before {
   opacity: 1;
   inset: 0;
   border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
 }
 
-.editor-highlight > .editor-block-badge {
+[data-editor-active] .editor-highlight > .editor-block-badge {
   opacity: 1;
 }
 
-.editor-highlight::after {
+[data-editor-active] .editor-highlight::after {
   opacity: 1;
   background: rgba(var(--editor-selected-rgb), 0.97);
 }
 
-.editor-highlight > .editor-block-badge .editor-block-badge-label {
+[data-editor-active] .editor-highlight > .editor-block-badge .editor-block-badge-label {
   background: rgba(var(--editor-selected-rgb), 0.97);
   border-radius: 8px 8px 0 0;
   padding: 5px 10px;
