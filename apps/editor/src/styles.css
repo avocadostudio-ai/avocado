@@ -58,11 +58,11 @@ body {
 }
 
 .chat-header {
-  padding: 14px 16px 12px;
+  padding: 18px 20px 14px;
   border-bottom: 0;
   background: #f3f6f9;
   display: grid;
-  gap: 10px;
+  gap: 14px;
   overflow: visible;
 }
 
@@ -229,9 +229,10 @@ body {
 }
 
 .property-panel-header {
-  padding: 12px 16px 8px;
+  padding: 14px 20px 10px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 2px;
+  margin-bottom: 0;
+  background: #f3f6f9;
 }
 
 .property-panel-title {
@@ -253,15 +254,15 @@ body {
 .property-panel-fields {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 16px 16px;
+  gap: 4px;
+  padding: 8px 20px 20px;
 }
 
 .property-field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 6px 0;
+  gap: 5px;
+  padding: 8px 0;
 }
 
 .property-field-label {
@@ -314,21 +315,23 @@ body {
 .property-field-textarea {
   font: inherit;
   font-size: 13px;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #e2e8f0;
   color: var(--ink);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .property-field-input:focus,
 .property-field-textarea:focus {
   border-color: var(--accent);
+  background: #fff;
 }
 
 .property-field-textarea {
+  border-radius: 10px;
   resize: vertical;
   min-height: 56px;
 }
@@ -355,10 +358,11 @@ body {
 .property-field-image-widget {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  gap: 10px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #e2e8f0;
 }
 
 .property-field-image-preview {
@@ -423,13 +427,14 @@ body {
 .property-field-image-alt {
   width: 100%;
   box-sizing: border-box;
-  font-size: 12px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
+  font-size: 13px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #fff;
   color: var(--ink);
   font-family: inherit;
+  transition: border-color 0.15s;
 }
 
 .property-field-image-alt:focus {
@@ -3309,6 +3314,7 @@ textarea {
 
 .editor-dark .property-panel-header {
   border-color: #334155;
+  background: #0f172a;
 }
 
 .editor-dark .property-panel-title {
@@ -3337,12 +3343,13 @@ textarea {
 .editor-dark .property-field-textarea {
   background: #1e293b;
   color: #e2e8f0;
-  border-color: #334155;
+  border-color: transparent;
 }
 
 .editor-dark .property-field-input:focus,
 .editor-dark .property-field-textarea:focus {
   border-color: #2dd4bf;
+  background: #0f172a;
 }
 
 .editor-dark .property-field-color {
@@ -3355,7 +3362,7 @@ textarea {
 }
 
 .editor-dark .property-field-image-widget {
-  border-color: #334155;
+  background: #1e293b;
 }
 
 .editor-dark .property-field-image-thumb {
@@ -3369,7 +3376,7 @@ textarea {
 
 .editor-dark .property-field-image-alt {
   background: #0f172a;
-  border-color: #334155;
+  border-color: transparent;
   color: #e2e8f0;
 }
 

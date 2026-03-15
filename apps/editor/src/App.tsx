@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Check, Copy, ExternalLink, Sparkles } from "lucide-react"
+import { Bot, Check, Copy, Ellipsis, ExternalLink, Settings, SlidersHorizontal, Sparkles } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
@@ -670,10 +670,7 @@ function EditorPage({
                 title="Site settings"
                 onClick={() => sites.setConfigSiteId(siteId)}
               >
-                <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-                  <path d="M8.8 2h2.4l.5 2.1a6.7 6.7 0 0 1 1.5.6l1.9-1.1 1.7 1.7-1.1 1.9c.2.5.4 1 .5 1.5l2.1.5v2.4l-2.1.5a6.7 6.7 0 0 1-.6 1.5l1.1 1.9-1.7 1.7-1.9-1.1a6.7 6.7 0 0 1-1.5.6L11.2 18H8.8l-.5-2.1a6.7 6.7 0 0 1-1.5-.6l-1.9 1.1-1.7-1.7 1.1-1.9a6.7 6.7 0 0 1-.6-1.5L2 11.2V8.8l2.1-.5c.1-.5.3-1 .6-1.5L3.6 4.9l1.7-1.7 1.9 1.1c.5-.2 1-.4 1.5-.5L8.8 2z" />
-                  <circle cx="10" cy="10" r="2.4" />
-                </svg>
+                <Settings size={14} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -682,11 +679,7 @@ function EditorPage({
                 onClick={() => setShowSettingsModal(true)}
                 ref={settingsButtonRef}
               >
-                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
-                  <circle cx="3" cy="8" r="1.5" />
-                  <circle cx="8" cy="8" r="1.5" />
-                  <circle cx="13" cy="8" r="1.5" />
-                </svg>
+                <Ellipsis size={14} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -731,9 +724,9 @@ function EditorPage({
         </header>
 
         <nav className="panel-tabs">
-          <button type="button" className={`panel-tab ${activeTab === "chat" ? "is-active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
+          <button type="button" className={`panel-tab ${activeTab === "chat" ? "is-active" : ""}`} onClick={() => setActiveTab("chat")}><Bot size={14} /> Chat</button>
           <button type="button" className={`panel-tab ${activeTab === "properties" ? "is-active" : ""}`} onClick={() => setActiveTab("properties")}>
-            Properties{activeBlockId ? <span className="panel-tab-dot" /> : null}
+            <SlidersHorizontal size={14} /> Properties{activeBlockId ? <span className="panel-tab-dot" /> : null}
           </button>
         </nav>
 

@@ -384,7 +384,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       del.setAttribute("aria-label", `Delete ${blockType}`)
       del.title = `Delete ${blockType}`
       del.innerHTML =
-        '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 3h7"/><path d="M4.5 3V2h3v1"/><path d="M3.5 3h5l-.4 6.2a.8.8 0 0 1-.8.8H4.7a.8.8 0 0 1-.8-.8z"/></svg>'
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
       del.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -560,7 +560,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         del.setAttribute("aria-label", `Delete ${group.listKey} item`)
         del.title = "Delete item"
         del.innerHTML =
-          '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 3h7"/><path d="M4.5 3V2h3v1"/><path d="M3.5 3h5l-.4 6.2a.8.8 0 0 1-.8.8H4.7a.8.8 0 0 1-.8-.8z"/></svg>'
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
         del.disabled = (perListCounts.get(group.listKey) ?? 0) <= 1
         del.addEventListener("click", (event) => {
           event.preventDefault()
@@ -585,11 +585,11 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const showHorizontalUp = useHorizontalArrows
         const showHorizontalDown = useHorizontalArrows
         const upIcon = showHorizontalUp
-          ? '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M10 6H2"/><path d="M5.5 2.5L2 6l3.5 3.5"/></svg>'
-          : '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 10V2"/><path d="M2.5 5.5L6 2l3.5 3.5"/></svg>'
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>'
         const downIcon = showHorizontalDown
-          ? '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2 6h8"/><path d="M6.5 2.5L10 6l-3.5 3.5"/></svg>'
-          : '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2.5 6.5L6 10l3.5-3.5"/></svg>'
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 5 7 7-7 7"/><path d="M5 12h14"/></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m19 12-7 7-7-7"/><path d="M12 5v14"/></svg>'
 
         const moveUp = document.createElement("button")
         moveUp.type = "button"
@@ -677,7 +677,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         add.className = "editor-list-item-add"
         add.setAttribute("aria-label", `Add ${entry.listKey} item`)
         add.title = "Add item"
-        add.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2 6h8"/></svg>'
+        add.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'
         add.addEventListener("click", (event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -768,7 +768,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       moveUpBtn.className = "editor-selected-move editor-selected-move-up"
       moveUpBtn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} up`)
       moveUpBtn.title = "Move up"
-      moveUpBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 10V2"/><path d="M2.5 5.5L6 2l3.5 3.5"/></svg>'
+      moveUpBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>'
       const upResult = computeMoveAfter(blockId, "up")
       moveUpBtn.disabled = !upResult.canMove
       moveUpBtn.addEventListener("click", (event) => {
@@ -789,7 +789,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       moveDownBtn.className = "editor-selected-move editor-selected-move-down"
       moveDownBtn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} down`)
       moveDownBtn.title = "Move down"
-      moveDownBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2.5 6.5L6 10l3.5-3.5"/></svg>'
+      moveDownBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m19 12-7 7-7-7"/><path d="M12 5v14"/></svg>'
       const downResult = computeMoveAfter(blockId, "down")
       moveDownBtn.disabled = !downResult.canMove
       moveDownBtn.addEventListener("click", (event) => {
@@ -810,7 +810,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       addBtn.className = "editor-selected-add editor-selected-add-bottom"
       addBtn.setAttribute("aria-label", `Add block after ${match.getAttribute("data-block-type") ?? "block"}`)
       addBtn.title = "Add block below"
-      addBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2 6h8"/></svg>'
+      addBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'
       addBtn.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -829,7 +829,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       addTopBtn.className = "editor-selected-add editor-selected-add-top"
       addTopBtn.setAttribute("aria-label", `Add block before ${match.getAttribute("data-block-type") ?? "block"}`)
       addTopBtn.title = "Add block above"
-      addTopBtn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M6 2v8"/><path d="M2 6h8"/></svg>'
+      addTopBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'
       addTopBtn.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
