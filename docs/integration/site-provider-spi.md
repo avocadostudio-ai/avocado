@@ -102,11 +102,11 @@ User sends chat message: "add a testimonials section to /pricing"
 
 ## Configuration
 
-The orchestrator connects to a provider via two env vars:
+The orchestrator connects to a provider via environment variables:
 
-```env
-SITE_PROVIDER_URL=https://your-cms.example.com/api/site-editor
-SITE_PROVIDER_TOKEN=your-api-key
-```
+| Variable | Required | Description |
+|---|---|---|
+| `SITE_PROVIDER_URL` | Yes | Provider API base URL (e.g. `https://your-cms.example.com/api/site-editor`) |
+| `SITE_PROVIDER_TOKEN` | Yes | API key for `Authorization: Bearer` header on all provider requests |
 
 When `SITE_PROVIDER_URL` is not set, the orchestrator falls back to its built-in local storage (in-memory drafts + disk persistence).
