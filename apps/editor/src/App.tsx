@@ -40,6 +40,20 @@ import {
 
 const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
 
+const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
+  openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
+  anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
+}
+
+const PROVIDER_LABELS: Record<AIProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Claude",
+}
+
+function selectionValue(provider: AIProvider, model: ModelKey) {
+  return `${provider}:${model}`
+}
+
 function renderSimpleMarkdown(text: string) {
   const lines = text.split("\n")
   const elements: (React.ReactNode)[] = []
@@ -143,7 +157,7 @@ function EditorPage({
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showDebugDetails, setShowDebugDetails] = useState(() => resolveDefaultDebugMode())
-  const [composerHeight, setComposerHeight] = useState(124)
+  const [composerHeight, setComposerHeight] = useState(56)
   const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
   const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId?: string; beforeBlockId?: string } | null>(null)
   const [addBlockSearch, setAddBlockSearch] = useState("")
@@ -496,7 +510,7 @@ function EditorPage({
 
   // Composer resize
   const clampComposerHeight = (value: number) => {
-    const minComposer = 124
+    const minComposer = 56
     const panel = chatPanelRef.current
     const thread = chatThreadRef.current
     if (!panel || !thread) return Math.max(minComposer, value)
@@ -991,13 +1005,8 @@ function EditorPage({
           <ClaudeStyleChatInput
             message={message}
             isLoading={chatEngine.isLoading}
-            modelKey={modelKey}
-            provider={provider}
-            availableProviders={availableProviders}
             hasUserEntry={hasUserEntry}
             onMessageChange={setMessage}
-            onModelChange={setModelKey}
-            onProviderChange={setProvider}
             onSubmit={(explicitMessage) => {
               setMessage("")
               void chatEngine.submitChat(explicitMessage, message)
@@ -1187,6 +1196,26 @@ function EditorPage({
               <label className="inline-toggle">
                 <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
                 <span>Debug mode</span>
+              </label>
+              <label className="settings-model-picker">
+                <span>Model</span>
+                <select
+                  value={selectionValue(provider, modelKey)}
+                  onChange={(e) => {
+                    const [nextProvider, nextModel] = e.target.value.split(":") as [AIProvider, ModelKey]
+                    setProvider(nextProvider)
+                    setModelKey(nextModel)
+                  }}
+                  aria-label="Select AI model"
+                >
+                  {(availableProviders.length > 0 ? availableProviders : [provider]).flatMap((p) =>
+                    (Object.keys(MODEL_LABELS[p]) as ModelKey[]).map((m) => (
+                      <option key={selectionValue(p, m)} value={selectionValue(p, m)}>
+                        {PROVIDER_LABELS[p]} {MODEL_LABELS[p][m]}
+                      </option>
+                    ))
+                  )}
+                </select>
               </label>
               <button type="button" className="settings-link-btn" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
                 Clear chat
