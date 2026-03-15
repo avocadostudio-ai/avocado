@@ -7,7 +7,7 @@ import type { RouteContext } from "./route-context.js"
 export async function gdriveRoutes(app: FastifyInstance, ctx: RouteContext) {
   // GET /gdrive/images — list images for the editor picker
   app.get("/gdrive/images", async (request, reply) => {
-    const query = request.query as { q?: string; limit?: string; folderId?: string }
+    const query = request.query as { q?: string; limit?: string; folderId?: string; refresh?: string }
     const folderId = resolveGdriveFolderId(query.folderId)
     if (!folderId) {
       return reply.code(404).send({ error: "Google Drive not configured" })
@@ -15,8 +15,9 @@ export async function gdriveRoutes(app: FastifyInstance, ctx: RouteContext) {
     const limitRaw = query.limit ? Number(query.limit) : 20
     const limit = Math.min(50, Math.max(1, Math.trunc(limitRaw)))
     const searchQuery = typeof query.q === "string" ? query.q.trim() : undefined
+    const skipCache = query.refresh === "1"
 
-    const files = await listImages(folderId, searchQuery || undefined, app.log, limit)
+    const files = await listImages(folderId, searchQuery || undefined, app.log, limit, skipCache)
     const items = files.map((file) => ({
       id: file.id,
       name: file.name,

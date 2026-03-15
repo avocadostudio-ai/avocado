@@ -460,6 +460,11 @@ function EditorPage({
     preview.postToSite("highlightBlock", { blockId: activeBlockId, editablePath: activeEditablePath ?? null })
   }, [activeBlockId, activeEditablePath])
 
+  // Auto-switch to Properties tab when a block is selected (unless user is typing)
+  useEffect(() => {
+    if (activeBlockId && !message.trim()) setActiveTab("properties")
+  }, [activeBlockId])
+
   // Refresh slugs on session/site change
   useEffect(() => { void chatEngine.refreshRouteSlugs() }, [session, siteId])
 
@@ -1164,20 +1169,32 @@ function EditorPage({
           if (!imagePickerTarget) return
           const { slug: targetSlug, blockId, editablePath } = imagePickerTarget
           const altPath = toAltPath(editablePath)
-          // Send a single ops call so undo reverts both imageUrl + imageAlt atomically
-          const patch: Record<string, string> = { [editablePath]: imageUrl }
-          if (altPath !== editablePath) patch[altPath] = alt
+          // Detect indexed list paths like "cards[0].imageUrl" → use update_item
+          const listMatch = editablePath.match(/^([a-zA-Z_]+)\[(\d+)\]\.(.+)$/)
+          const altListMatch = altPath !== editablePath ? altPath.match(/^([a-zA-Z_]+)\[(\d+)\]\.(.+)$/) : null
+          let ops: Record<string, unknown>[]
+          if (listMatch) {
+            const [, listKey, indexStr, fieldKey] = listMatch
+            const itemPatch: Record<string, string> = { [fieldKey]: imageUrl }
+            if (altListMatch) itemPatch[altListMatch[3]] = alt
+            ops = [{ op: "update_item", pageSlug: targetSlug, blockId, listKey, index: Number(indexStr), patch: itemPatch }]
+          } else {
+            const patch: Record<string, string> = { [editablePath]: imageUrl }
+            if (altPath !== editablePath) patch[altPath] = alt
+            ops = [{ op: "update_props", pageSlug: targetSlug, blockId, patch }]
+          }
           void (async () => {
             try {
               const res = await fetch(`${orchestrator}/ops`, {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ session, siteId, ops: [{ op: "update_props", pageSlug: targetSlug, blockId, patch }] })
+                body: JSON.stringify({ session, siteId, ops })
               })
               const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string }
               if (res.ok && data.status === "applied") {
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
                 chatEngine.pushAssistantFromResult({ status: "applied", summary: "Changed image." }, { canUndo: true })
+                void blockProps.refetch()
               }
             } catch { /* ignore */ }
           })()

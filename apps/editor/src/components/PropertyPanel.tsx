@@ -32,7 +32,10 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
 
   return (
     <div className="property-panel" style={style}>
-      <div className="property-panel-header">{meta.displayName}</div>
+      <div className="property-panel-header">
+        <div className="property-panel-title">Properties</div>
+        <div className="property-panel-block-name">{meta.displayName}</div>
+      </div>
       {status === "loading" && !props ? (
         <div className="property-panel-empty">Loading...</div>
       ) : status === "error" ? (

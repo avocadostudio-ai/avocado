@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon } from "lucide-react"
+import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw } from "lucide-react"
 import { orchestrator } from "../lib/editor-utils"
 
 type ImageItem = {
@@ -51,13 +51,14 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchDriveImages = useCallback(async (q?: string) => {
+  const fetchDriveImages = useCallback(async (q?: string, refresh?: boolean) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (q) params.set("q", q)
       params.set("limit", "20")
       if (gdriveFolderId?.trim()) params.set("folderId", gdriveFolderId.trim())
+      if (refresh) params.set("refresh", "1")
       const res = await fetch(`${orchestrator}/gdrive/images?${params}`)
       if (!res.ok) { setItems([]); return }
       const data = (await res.json()) as { items: ImageItem[] }
@@ -223,6 +224,17 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
                 style={S.searchInput}
                 autoFocus
               />
+              {activeTab === "drive" && (
+                <button
+                  onClick={() => void fetchDriveImages(searchQuery || undefined, true)}
+                  disabled={loading}
+                  style={S.refreshBtn}
+                  aria-label="Refresh"
+                  title="Refresh from Drive"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
             </div>
             <div style={S.gridScroll}>
               {loading && <div style={S.status}>Searching...</div>}
@@ -362,6 +374,11 @@ const S: Record<string, React.CSSProperties> = {
   searchInput: {
     flex: 1, background: "transparent", border: "none", outline: "none",
     color: "#f1f5f9", fontSize: 14
+  },
+  refreshBtn: {
+    background: "none", border: "none", color: "#64748b", cursor: "pointer",
+    padding: 4, borderRadius: 6, display: "flex", flexShrink: 0,
+    transition: "color .15s"
   },
 
   // Grid

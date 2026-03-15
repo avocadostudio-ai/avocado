@@ -20,8 +20,8 @@ export function useBlockProps(
   const abortRef = useRef<AbortController | null>(null)
   const propsJsonRef = useRef<string>("")
 
-  const fetchProps = useCallback(async () => {
-    if (!activeBlockId || !enabled) {
+  const doFetch = useCallback(async () => {
+    if (!activeBlockId) {
       setStatus("idle")
       setProps(null)
       propsJsonRef.current = ""
@@ -35,7 +35,7 @@ export function useBlockProps(
     setStatus("loading")
     try {
       const url = `${orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slug)}`
-      const res = await fetch(url, { signal: controller.signal })
+      const res = await fetch(url, { signal: controller.signal, cache: "no-store" })
       if (!res.ok) {
         setStatus("error")
         return
@@ -59,12 +59,14 @@ export function useBlockProps(
       if ((err as Error).name === "AbortError") return
       setStatus("error")
     }
-  }, [session, siteId, slug, activeBlockId, enabled])
+  }, [session, siteId, slug, activeBlockId])
 
+  // Auto-fetch when deps change, gated on `enabled`
   useEffect(() => {
-    void fetchProps()
+    if (enabled) void doFetch()
     return () => { abortRef.current?.abort() }
-  }, [fetchProps])
+  }, [doFetch, enabled])
 
-  return { status, props, refetch: fetchProps }
+  // refetch is always callable — not gated on `enabled`
+  return { status, props, refetch: doFetch }
 }

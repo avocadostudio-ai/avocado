@@ -187,7 +187,8 @@ export async function listImages(
   folderId: string,
   query?: string,
   log?: ImageLogger,
-  maxResults?: number
+  maxResults?: number,
+  skipCache?: boolean
 ): Promise<GDriveImageItem[]> {
   const drive = getDriveClient()
   if (!drive) {
@@ -196,9 +197,11 @@ export async function listImages(
   }
 
   const cacheKey = `${folderId}::${query ?? ""}`
-  const cached = listCache.get(cacheKey)
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
-    return maxResults ? cached.items.slice(0, maxResults) : cached.items
+  if (!skipCache) {
+    const cached = listCache.get(cacheKey)
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      return maxResults ? cached.items.slice(0, maxResults) : cached.items
+    }
   }
 
   try {
