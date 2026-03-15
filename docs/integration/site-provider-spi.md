@@ -1,10 +1,10 @@
 # Site Provider SPI — Framework-Agnostic Integration Contract
 
-This is the **advanced** integration path for teams not on Next.js, or for enterprise CMS/platform integrations. If you are on Next.js, start with the [default embedded onboarding](docs/integration/nextjs-mvp-embedded.md) instead — it is faster and requires less backend work.
+This is the **advanced** integration path for teams not on Next.js, or for enterprise CMS/platform integrations. If you are on Next.js, start with the [default embedded onboarding](nextjs-mvp-embedded.md) instead — it is faster and requires less backend work.
 
 Related docs:
-- [`docs/integration/README.md`](docs/integration/README.md) — default fast onboarding path (Next.js embedded mode).
-- [`docs/planning/reduce-nextjs-coupling-plan.md`](docs/planning/reduce-nextjs-coupling-plan.md) — rationale for default vs advanced integration tiers.
+- [Integration overview](README.md) — default fast onboarding path (Next.js embedded mode).
+- [Reduce Next.js coupling plan](../planning/reduce-nextjs-coupling-plan.md) — rationale for default vs advanced integration tiers.
 
 ## Context
 

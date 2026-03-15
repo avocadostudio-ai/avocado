@@ -75,12 +75,13 @@ If you want to connect the AI editor to your own website, start here:
 
 | Doc | Purpose |
 |---|---|
-| [Integration overview](docs/integration/README.md) | Entry point, adoption checklist, reading order |
-| [Next.js embedded mode](docs/integration/nextjs-mvp-embedded.md) | Default onboarding path for Next.js sites |
-| [Editor quickstart](docs/integration/editor-quickstart.md) | Iframe bootstrap URLs and env var setup |
-| [Copy-paste templates](docs/integration/templates/nextjs-embedded/) | Ready-to-use API routes and helpers |
-| [Site Provider SPI](docs/site-provider-spi.md) | Advanced: framework-agnostic REST API contract |
+| [Integration overview](docs/integration/README.md) | Entry point, adoption checklist, SDK overview |
+| [Next.js embedded mode](docs/integration/nextjs-mvp-embedded.md) | 30-minute setup with `@ai-site-editor/site-sdk` |
+| [Adoption example](docs/integration/nextjs-mvp-adoption-example.md) | Full code example for page wiring |
+| [Editor quickstart](docs/integration/editor-quickstart.md) | Draft mode URLs and behavior checks |
+| [Site Provider SPI](docs/integration/site-provider-spi.md) | Advanced: framework-agnostic REST API contract |
 | [Native tools](docs/integration/tools-mvp.md) | Register custom tools (PIM, DAM, etc.) |
+| [All docs](docs/README.md) | Full documentation index |
 
 ## Configuration notes
 
