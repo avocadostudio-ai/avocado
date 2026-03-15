@@ -13,7 +13,7 @@
           "subheading": "From creamy avocado toast breakfasts to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
           "ctaText": "Explore Avocado Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "http://localhost:4200/gdrive/images/1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s",
+          "imageUrl": "/generated-images/gdrive_1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s.webp",
           "imageAlt": "Fresh sliced avocado on a wooden cutting board with vibrant ingredients ready for meal preparation",
           "imagePosition": "right",
           "secondaryCtaText": ""
@@ -31,7 +31,7 @@
               "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
-              "imageUrl": "http://localhost:4200/gdrive/images/1NwnCLmDBnwWplCTlmQaHbJ0aQZ5HdXEp",
+              "imageUrl": "/generated-images/gdrive_1NwnCLmDBnwWplCTlmQaHbJ0aQZ5HdXEp.webp",
               "imageAlt": "avocado6"
             },
             {
