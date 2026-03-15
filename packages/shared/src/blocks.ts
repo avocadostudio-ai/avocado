@@ -26,6 +26,8 @@ export type FieldMeta = {
   options?: string[]
   /** For image kind: recommended dimensions and aspect ratio. */
   imageSpec?: ImageSpec
+  /** Render as a textarea in the PropertyPanel instead of a single-line input. */
+  multiline?: boolean
 }
 
 /** Metadata for list-type props (features, items, cards). */
@@ -142,6 +144,7 @@ export function getImageSpec(blockType: string, fieldPath: string): ImageSpec | 
 
 const f = {
   text: (label?: string): FieldMeta => ({ kind: "text", label }),
+  longtext: (label?: string): FieldMeta => ({ kind: "text", label, multiline: true }),
   richtext: (label?: string): FieldMeta => ({ kind: "richtext", label }),
   url: (label?: string): FieldMeta => ({ kind: "url", label, inlineEditable: false }),
   image: (label?: string, imageSpec?: ImageSpec): FieldMeta => ({ kind: "image", label, inlineEditable: false, ...(imageSpec ? { imageSpec } : {}) }),
@@ -191,7 +194,7 @@ registerBlock("FeatureGrid", {
     listFields: {
       features: {
         label: "Features",
-        itemFields: { title: f.text("Feature title"), description: f.text("Feature description") }
+        itemFields: { title: f.text("Feature title"), description: f.longtext("Feature description") }
       }
     }
   }
@@ -210,7 +213,7 @@ registerBlock("Testimonials", {
     listFields: {
       items: {
         label: "Testimonials",
-        itemFields: { quote: f.text("Quote"), author: f.text("Author") }
+        itemFields: { quote: f.longtext("Quote"), author: f.text("Author") }
       }
     }
   }
@@ -229,7 +232,7 @@ registerBlock("FAQAccordion", {
     listFields: {
       items: {
         label: "FAQ items",
-        itemFields: { q: f.text("Question"), a: f.text("Answer") }
+        itemFields: { q: f.text("Question"), a: f.longtext("Answer") }
       }
     }
   }
@@ -248,7 +251,7 @@ registerBlock("CTA", {
     category: "conversion",
     fields: {
       title: f.text("Headline"),
-      description: f.text("Description"),
+      description: f.longtext("Description"),
       ctaText: f.text("Button text"),
       ctaHref: f.url("Button link"),
     }
@@ -270,7 +273,7 @@ registerBlock("Card", {
     category: "content",
     fields: {
       title: f.text("Card title"),
-      description: f.text("Card description"),
+      description: f.longtext("Card description"),
       ctaText: f.text("Button text"),
       ctaHref: f.url("Button link"),
       imageUrl: f.image("Card image", { aspectRatio: "landscape", width: 768, height: 512 }),
@@ -306,7 +309,7 @@ registerBlock("CardGrid", {
         label: "Cards",
         itemFields: {
           title: f.text("Card title"),
-          description: f.text("Card description"),
+          description: f.longtext("Card description"),
           ctaText: f.text("Button text"),
           ctaHref: f.url("Button link"),
           imageUrl: f.image("Card image", { aspectRatio: "landscape", width: 768, height: 512 }),
@@ -419,7 +422,7 @@ registerBlock("TwoColumn", {
         label: "Left column items",
         itemFields: {
           type: { kind: "enum", label: "Component type", options: ["heading", "subheading", "paragraph", "list", "cta", "ctas", "image", "video"] },
-          text: f.text("Text content"),
+          text: f.longtext("Text content"),
           label: f.text("Button label"),
           href: f.url("Link URL"),
           src: f.image("Media source", { aspectRatio: "portrait", width: 768, height: 1024 }),
@@ -431,7 +434,7 @@ registerBlock("TwoColumn", {
         label: "Right column items",
         itemFields: {
           type: { kind: "enum", label: "Component type", options: ["heading", "subheading", "paragraph", "list", "cta", "ctas", "image", "video"] },
-          text: f.text("Text content"),
+          text: f.longtext("Text content"),
           label: f.text("Button label"),
           href: f.url("Link URL"),
           src: f.image("Media source", { aspectRatio: "portrait", width: 768, height: 1024 }),
