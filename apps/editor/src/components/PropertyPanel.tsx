@@ -1,5 +1,7 @@
 import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
-import { getAllBlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta, DEFAULT_HEADING_LEVELS, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
+
+const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
 
 type Props = {
   style?: CSSProperties
@@ -9,9 +11,10 @@ type Props = {
   status: "idle" | "loading" | "ready" | "error"
   onFieldChange: (fieldPath: string, value: string) => void
   onImageClick?: (fieldPath: string, currentUrl: string) => void
+  onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick }: Props) {
+export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist }: Props) {
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
@@ -43,7 +46,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
         <div className="property-panel-empty">Failed to load block properties</div>
       ) : props ? (
         <div className="property-panel-fields">
-          {renderFieldEntries(Object.entries(meta.fields), props, "", onFieldChange, onImageClick)}
+          {renderFieldEntries(Object.entries(meta.fields), props, "", blockType, onFieldChange, onImageClick, onAiAssist)}
           {meta.listFields
             ? Object.entries(meta.listFields).map(([key, listField]) => {
                 const items = Array.isArray(props[key]) ? (props[key] as Record<string, unknown>[]) : []
@@ -53,8 +56,10 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
                     listKey={key}
                     listField={listField}
                     items={items}
+                    blockType={blockType}
                     onFieldChange={onFieldChange}
                     onImageClick={onImageClick}
+                    onAiAssist={onAiAssist}
                   />
                 )
               })
@@ -90,8 +95,10 @@ function renderFieldEntries(
   entries: [string, FieldMeta][],
   data: Record<string, unknown>,
   pathPrefix: string,
+  blockType: string | undefined,
   onFieldChange: (fieldPath: string, value: string) => void,
-  onImageClick?: (fieldPath: string, currentUrl: string) => void
+  onImageClick?: (fieldPath: string, currentUrl: string) => void,
+  onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
 ): ReactNode[] {
   const pairedAltKeys = new Set<string>()
 
@@ -128,6 +135,7 @@ function renderFieldEntries(
           altText={altValue}
           onChangeClick={() => onImageClick?.(pathPrefix + key, data[key] == null ? "" : String(data[key]))}
           onAltCommit={altKey ? (v) => onFieldChange(pathPrefix + altKey, v) : undefined}
+          onAltAiAssist={altKey && onAiAssist ? () => onAiAssist(pathPrefix + altKey, "Image description", "imageAlt", altValue ?? "") : undefined}
         />
       )
     } else {
@@ -137,7 +145,11 @@ function renderFieldEntries(
           fieldKey={key}
           field={field}
           value={data[key]}
+          blockType={blockType}
           onCommit={(value) => onFieldChange(pathPrefix + key, value)}
+          onAiAssist={AI_ELIGIBLE_KINDS.has(field.kind) && onAiAssist
+            ? () => onAiAssist(pathPrefix + key, field.label ?? key, field.kind, data[key] == null ? "" : String(data[key]))
+            : undefined}
         />
       )
     }
@@ -146,18 +158,31 @@ function renderFieldEntries(
   return nodes
 }
 
+function SparkleButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="property-field-ai-btn" onClick={onClick} title="AI suggestions">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+        <path d="M8 1l1.5 3.5L13 6l-3.5 1.5L8 11 6.5 7.5 3 6l3.5-1.5L8 1z" fill="currentColor" />
+        <path d="M12 10l.75 1.75L14.5 12.5l-1.75.75L12 15l-.75-1.75L9.5 12.5l1.75-.75L12 10z" fill="currentColor" opacity=".6" />
+      </svg>
+    </button>
+  )
+}
+
 function ImageFieldWidget({
   label,
   imageUrl,
   altText,
   onChangeClick,
-  onAltCommit
+  onAltCommit,
+  onAltAiAssist
 }: {
   label: string
   imageUrl: string
   altText?: string
   onChangeClick: () => void
   onAltCommit?: (value: string) => void
+  onAltAiAssist?: () => void
 }) {
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
@@ -190,7 +215,10 @@ function ImageFieldWidget({
         </div>
         {onAltCommit !== undefined && (
           <div className="property-field-image-alt-group">
-            <label className="property-field-image-alt-label">Image description</label>
+            <label className="property-field-image-alt-label">
+              Image description
+              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} /> : null}
+            </label>
             <input
               type="text"
               className="property-field-image-alt"
@@ -214,14 +242,18 @@ function ListFieldSection({
   listKey,
   listField,
   items,
+  blockType,
   onFieldChange,
-  onImageClick
+  onImageClick,
+  onAiAssist
 }: {
   listKey: string
   listField: ListFieldMeta
   items: Record<string, unknown>[]
+  blockType: string | undefined
   onFieldChange: (fieldPath: string, value: string) => void
   onImageClick?: (fieldPath: string, currentUrl: string) => void
+  onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const label = listField.label ?? listKey
@@ -254,8 +286,10 @@ function ListFieldSection({
                   Object.entries(listField.itemFields),
                   item,
                   `${listKey}[${index}].`,
+                  blockType,
                   onFieldChange,
-                  onImageClick
+                  onImageClick,
+                  onAiAssist
                 )}
               </div>
             ) : null}
@@ -266,16 +300,29 @@ function ListFieldSection({
   )
 }
 
+const HEADING_LEVEL_LABELS: Record<string, string> = {
+  h1: "H1 — Page title",
+  h2: "H2 — Section",
+  h3: "H3 — Subsection",
+  h4: "H4",
+  h5: "H5",
+  h6: "H6",
+}
+
 function FieldEditor({
   fieldKey,
   field,
   value,
-  onCommit
+  blockType,
+  onCommit,
+  onAiAssist
 }: {
   fieldKey: string
   field: FieldMeta
   value: unknown
+  blockType?: string | undefined
   onCommit: (value: string) => void
+  onAiAssist?: () => void
 }) {
   const stringValue = value == null ? "" : String(value)
   const [localValue, setLocalValue] = useState(stringValue)
@@ -296,6 +343,26 @@ function FieldEditor({
     if (localValue !== stringValue) {
       onCommit(localValue)
     }
+  }
+
+  if (field.kind === "headingLevel") {
+    const defaultTag = (blockType && DEFAULT_HEADING_LEVELS[blockType]) ?? "h2"
+    const current = stringValue && /^h[1-6]$/.test(stringValue) ? stringValue : ""
+    return (
+      <div className="property-field">
+        <label className="property-field-label">{label}</label>
+        <select
+          className="property-field-input"
+          value={current}
+          onChange={(e) => onCommit(e.target.value)}
+        >
+          <option value="">Auto ({defaultTag.toUpperCase()})</option>
+          {(["h1", "h2", "h3", "h4", "h5", "h6"] as const).map((h) => (
+            <option key={h} value={h}>{HEADING_LEVEL_LABELS[h]}</option>
+          ))}
+        </select>
+      </div>
+    )
   }
 
   if (field.kind === "image") {
@@ -353,7 +420,13 @@ function FieldEditor({
 
   return (
     <div className="property-field">
-      <label className="property-field-label">{label}</label>
+      <div className="property-field-label">
+        <span>
+          {label}
+          {field.required && <span className="property-field-required">*</span>}
+        </span>
+        {onAiAssist ? <SparkleButton onClick={onAiAssist} /> : null}
+      </div>
       {useTextarea ? (
         <textarea className="property-field-textarea" rows={3} {...sharedProps} />
       ) : (
