@@ -190,7 +190,7 @@ function ImageFieldWidget({
 
   return (
     <div className="property-field">
-      <label className="property-field-label">{label}</label>
+      <div className="property-field-label"><span>{label}</span></div>
       <div className="property-field-image-widget">
         <div className="property-field-image-preview">
           {imageUrl ? (
@@ -215,10 +215,10 @@ function ImageFieldWidget({
         </div>
         {onAltCommit !== undefined && (
           <div className="property-field-image-alt-group">
-            <label className="property-field-image-alt-label">
-              Image description
+            <div className="property-field-image-alt-label">
+              <span>Image description</span>
               {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} /> : null}
-            </label>
+            </div>
             <input
               type="text"
               className="property-field-image-alt"
@@ -350,7 +350,7 @@ function FieldEditor({
     const current = stringValue && /^h[1-6]$/.test(stringValue) ? stringValue : ""
     return (
       <div className="property-field">
-        <label className="property-field-label">{label}</label>
+        <div className="property-field-label"><span>{label}</span></div>
         <select
           className="property-field-input"
           value={current}
@@ -368,7 +368,7 @@ function FieldEditor({
   if (field.kind === "image") {
     return (
       <div className="property-field">
-        <label className="property-field-label">{label}</label>
+        <div className="property-field-label"><span>{label}</span></div>
         <div className="property-field-image-url" title={stringValue}>
           {stringValue || "(empty)"}
         </div>
@@ -379,7 +379,7 @@ function FieldEditor({
   if (field.kind === "enum" && field.options) {
     return (
       <div className="property-field">
-        <label className="property-field-label">{label}</label>
+        <div className="property-field-label"><span>{label}</span></div>
         <select
           className="property-field-input"
           value={stringValue}
@@ -398,7 +398,7 @@ function FieldEditor({
   if (field.kind === "color") {
     return (
       <div className="property-field">
-        <label className="property-field-label">{label}</label>
+        <div className="property-field-label"><span>{label}</span></div>
         <input
           type="color"
           className="property-field-color"
