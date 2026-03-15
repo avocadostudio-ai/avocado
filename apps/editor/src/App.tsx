@@ -10,6 +10,8 @@ import { usePreviewBridge, type PreviewBridgeCallbacks } from "./hooks/usePrevie
 import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
+import { useBlockProps } from "./hooks/useBlockProps"
+import { PropertyPanel } from "./components/PropertyPanel"
 import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, isImagePath, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
@@ -150,6 +152,7 @@ function EditorPage({
   const [imagePickerTarget, setImagePickerTarget] = useState<{ slug: string; blockId: string; editablePath: string; currentUrl?: string } | null>(null)
   const imagePickerOpen = imagePickerTarget !== null
   const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
+  const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
@@ -348,6 +351,8 @@ function EditorPage({
   const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult)
 
   const media = useMediaInput()
+
+  const blockProps = useBlockProps(session, siteId, slug, activeBlockId, activeTab === "properties")
 
   // Sync refs
   useEffect(() => { activeBlockIdRef.current = activeBlockId }, [activeBlockId])
@@ -682,7 +687,14 @@ function EditorPage({
           </div>
         </header>
 
-        <section className="chat-thread" ref={chatThreadRef}>
+        <nav className="panel-tabs">
+          <button type="button" className={`panel-tab ${activeTab === "chat" ? "is-active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
+          <button type="button" className={`panel-tab ${activeTab === "properties" ? "is-active" : ""}`} onClick={() => setActiveTab("properties")}>
+            Properties{activeBlockId ? <span className="panel-tab-dot" /> : null}
+          </button>
+        </nav>
+
+        <section className="chat-thread" ref={chatThreadRef} style={{ display: activeTab === "chat" ? "" : "none" }}>
           {chatEngine.chatLog.map((entry) => (
             <article
               key={entry.id}
@@ -909,6 +921,18 @@ function EditorPage({
           ) : null}
           <div />
         </section>
+
+        <PropertyPanel
+          style={{ display: activeTab === "properties" ? "" : "none" }}
+          blockId={activeBlockId}
+          blockType={activeBlockType}
+          props={blockProps.props}
+          status={blockProps.status}
+          onFieldChange={async (path, value) => {
+            await chatEngine.inlineEditCommit(slug, activeBlockId!, path, value, { silent: true })
+            void blockProps.refetch()
+          }}
+        />
 
         <div
           ref={splitHandleRef}
