@@ -4,10 +4,23 @@ This document defines the MVP tool contract and onboarding flow for adopter tool
 
 **Prerequisites**: a running orchestrator instance and familiarity with the [integration overview](README.md).
 
+## What "Anthropic-first" means
+
+The AI planner supports multiple LLM providers (Anthropic and OpenAI). **"Anthropic-first"** means the tool calling system in the MVP is built on Anthropic's native tool use protocol — tools are exposed to Claude as `tools[]` with `input_schema`, and the model responds with `tool_use` content blocks.
+
+| What works now (MVP) | Planned |
+|---|---|
+| Tools called via Anthropic's `tool_use` / `tool_result` protocol | OpenAI Responses API tool adapter |
+| Claude models (Haiku, Sonnet, Opus) trigger tool calls during planning | GPT models using equivalent function calling |
+
+The internal tool runtime is provider-neutral — tool manifests, execution, and results use a shared contract. Only the adapter layer that maps tools into LLM API calls is Anthropic-specific today. Adding OpenAI support is an adapter change, not a contract change, so any tools you register now will work with both providers once the OpenAI adapter ships.
+
+**In practice**: if you're using an Anthropic API key for planning, tools work today. If you're using only an OpenAI key, registered tools will not be called by the planner until the OpenAI adapter is added.
+
 ## Scope
 
-- MVP provider path: Anthropic tool use only.
-- Runtime is provider-neutral internally so OpenAI Responses tools can be added later.
+- MVP: tools work with Anthropic models via native tool use protocol.
+- OpenAI Responses API tool adapter planned (tool contracts are forward-compatible).
 - Built-in tool shipped in MVP: `unsplash.search`.
 
 ## Internal Tool Contract
