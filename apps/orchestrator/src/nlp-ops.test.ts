@@ -2665,3 +2665,10 @@ test("isLikelyClarificationFollowUp returns false for 'translate this page to ge
   assert.equal(isLikelyClarificationFollowUp("refocus this page on SaaS"), false)
   assert.equal(isLikelyClarificationFollowUp("rebuild this page"), false)
 })
+
+test("editPlanJsonSchema ops items must NOT have additionalProperties:false", async () => {
+  const { editPlanJsonSchema } = await import("./chat/plan-json-schema.js")
+  const opsItems = editPlanJsonSchema.properties.ops.items as Record<string, unknown>
+  assert.notEqual(opsItems.additionalProperties, false,
+    "ops items schema must not set additionalProperties:false — smaller models (Haiku) follow it literally and strip block/pageSlug/props fields")
+})

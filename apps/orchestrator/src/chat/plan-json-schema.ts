@@ -33,7 +33,6 @@ export const editPlanJsonSchema = {
       type: "array",
       items: {
         type: "object",
-        additionalProperties: false,
         properties: {
           op: {
             type: "string",
@@ -42,7 +41,7 @@ export const editPlanJsonSchema = {
         },
         required: ["op"]
       },
-      description: "Array of operations to apply. Each must have an 'op' field."
+      description: "Array of operations to apply. Each must have an 'op' field plus operation-specific fields (pageSlug, block, patch, blockId, etc.)."
     },
     suggested_next_actions: {
       type: "array",
