@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { blockInstanceSchema, type BlockInstance } from "./blocks.ts"
+import { blockInstanceSchema, type BlockInstance } from "./blocks/_registry.ts"
 
 // ---------------------------------------------------------------------------
 // Site config
@@ -147,6 +147,14 @@ const updatePageMetaSchema = z.object({
     ogImage: z.string().optional()
   })
 })
+const updateSiteConfigSchema = z.object({
+  op: z.literal("update_site_config"),
+  patch: z.object({
+    name: z.string().optional(),
+    logo: z.string().optional(),
+    navLabels: z.record(z.string(), z.string()).optional()
+  })
+})
 
 export const operationSchema = z.discriminatedUnion("op", [
   createPageSchema,
@@ -163,7 +171,8 @@ export const operationSchema = z.discriminatedUnion("op", [
   removePageSchema,
   movePageSchema,
   duplicatePageSchema,
-  updatePageMetaSchema
+  updatePageMetaSchema,
+  updateSiteConfigSchema
 ])
 
 export type Operation = z.infer<typeof operationSchema>

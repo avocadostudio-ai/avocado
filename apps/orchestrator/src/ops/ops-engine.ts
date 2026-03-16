@@ -21,7 +21,9 @@ import {
   getSessionDraft,
   orderSlugsHomeFirst,
   setPage,
-  getPage
+  getPage,
+  getSiteConfig,
+  setSiteConfig
 } from "../state/session-state.js"
 
 // ---------------------------------------------------------------------------
@@ -321,9 +323,23 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
   const deletedSlugs = new Set<string>()
   const skippedOps: SkippedOperation[] = []
   let orderChanged = false
+  let configChanged = false
 
   for (let opIndex = 0; opIndex < ops.length; opIndex += 1) {
     const op = ops[opIndex]
+    if (op.op === "update_site_config") {
+      const current = getSiteConfig(session)
+      const merged = { ...current }
+      if (op.patch.name !== undefined) merged.name = op.patch.name
+      if (op.patch.logo !== undefined) merged.logo = op.patch.logo
+      if (op.patch.navLabels !== undefined) {
+        merged.navLabels = { ...(current.navLabels ?? {}), ...op.patch.navLabels }
+      }
+      setSiteConfig(session, merged)
+      configChanged = true
+      continue
+    }
+
     if (op.op === "create_page") {
       staged.set(op.page.slug, structuredClone(op.page))
       touchedSlugs.add(op.page.slug)
@@ -725,7 +741,7 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
     }
   }
 
-  if (touchedSlugs.size === 0 && deletedSlugs.size === 0 && !orderChanged) {
+  if (touchedSlugs.size === 0 && deletedSlugs.size === 0 && !orderChanged && !configChanged) {
     if (skippedOps.length > 0 && skippedOps.length === ops.length) {
       throw new OperationError("No effective prop change across plan. All update patches matched existing values.", { category: "no_effective_change" })
     }

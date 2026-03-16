@@ -148,7 +148,11 @@ export function normalizeOpName(op: unknown) {
     remove_page: "remove_page",
     removepage: "remove_page",
     delete_page: "remove_page",
-    deletepage: "remove_page"
+    deletepage: "remove_page",
+    update_site_config: "update_site_config",
+    updatesiteconfig: "update_site_config",
+    update_page_meta: "update_page_meta",
+    updatepagemeta: "update_page_meta"
   }
   return aliases[key] ?? op
 }
