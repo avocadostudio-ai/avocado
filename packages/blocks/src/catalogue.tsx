@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { SharedBlockRenderer } from "./renderer"
-import { getAllBlockMeta, allowedBlockTypes, defaultPropsForType, getChromeTypes, type BlockMeta, type FieldMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta, allowedBlockTypes, defaultPropsForType, getChromeTypes, type BlockMeta, type FieldMeta, type ImageSpec } from "@ai-site-editor/shared"
 
 const CATEGORY_ORDER: NonNullable<BlockMeta["category"]>[] = ["content", "conversion", "layout", "navigation", "media"]
 const CATEGORY_LABELS: Record<string, string> = {
@@ -12,6 +12,55 @@ const CATEGORY_LABELS: Record<string, string> = {
   navigation: "Navigation",
   conversion: "Conversion",
   layout: "Layout",
+}
+
+// ---------------------------------------------------------------------------
+// Dummy image URL builder — replaces image props with placeholder images
+// that respect the field's declared aspect ratio / dimensions.
+// ---------------------------------------------------------------------------
+
+function dummyImageUrl(spec?: ImageSpec): string {
+  const w = spec?.width ?? 600
+  const h = spec?.height ?? 400
+  return `https://dummyimage.com/${w}x${h}/ab96ab/000000.jpg`
+}
+
+function withDummyImages(
+  props: Record<string, unknown>,
+  meta: BlockMeta | undefined
+): Record<string, unknown> {
+  if (!meta) return props
+  const result = { ...props }
+
+  // Scalar image fields — replace existing or populate missing optional images
+  for (const [key, fm] of Object.entries(meta.fields)) {
+    if (fm.kind === "image" && (typeof result[key] === "string" || result[key] === undefined)) {
+      result[key] = dummyImageUrl(fm.imageSpec)
+    }
+  }
+
+  // List item image fields
+  if (meta.listFields) {
+    for (const [listKey, lm] of Object.entries(meta.listFields)) {
+      const imageItemKeys = Object.entries(lm.itemFields)
+        .filter(([, fm]) => fm.kind === "image")
+      if (imageItemKeys.length === 0) continue
+      const list = result[listKey]
+      if (!Array.isArray(list)) continue
+      result[listKey] = list.map((item) => {
+        if (!item || typeof item !== "object") return item
+        const patched = { ...(item as Record<string, unknown>) }
+        for (const [itemKey, fm] of imageItemKeys) {
+          if (typeof patched[itemKey] === "string" || patched[itemKey] === undefined) {
+            patched[itemKey] = dummyImageUrl(fm.imageSpec)
+          }
+        }
+        return patched
+      })
+    }
+  }
+
+  return result
 }
 
 export function BlockCatalogue() {
@@ -85,7 +134,22 @@ export function BlockCatalogue() {
   const activeBlock = blocks.find((b) => b.type === activeType)
   const activeMeta = activeBlock?.meta
   const activeDefaultProps = activeBlock?.defaultProps ?? {}
-  const activeProps = { ...activeDefaultProps, ...(liveProps[activeType] ?? {}) }
+  const activeRawProps = { ...activeDefaultProps, ...(liveProps[activeType] ?? {}) }
+  const activeProps = withDummyImages(activeRawProps, activeMeta)
+
+  // Build enum variants — for each enum field with options, render one preview per value
+  const enumVariants = useMemo(() => {
+    if (!activeMeta) return []
+    const enumFields = Object.entries(activeMeta.fields)
+      .filter(([, fm]) => fm.kind === "enum" && Array.isArray(fm.options) && fm.options.length > 1)
+    if (enumFields.length === 0) return []
+    // Use the first enum field that has visual variants (e.g. imagePosition)
+    const [fieldKey, fm] = enumFields[0]
+    return fm.options!.map((option) => ({
+      label: `${fm.label ?? fieldKey}: ${option}`,
+      props: { ...activeProps, [fieldKey]: option },
+    }))
+  }, [activeMeta, activeProps])
 
   // Scale preview to fit container
   useEffect(() => {
@@ -225,16 +289,34 @@ export function BlockCatalogue() {
               {activeMeta?.description && (
                 <p className="cat-desc">{activeMeta.description}</p>
               )}
-              <CataloguePreview
-                viewportWidth={viewportWidth}
-                darkMode={darkMode}
-                previewWrapRef={previewWrapRef}
-                previewScale={previewScale}
-              >
-                <SharedBlockRenderer
-                  block={{ id: `cat-${activeType}`, type: activeType, props: activeProps }}
-                />
-              </CataloguePreview>
+              {enumVariants.length > 0 ? (
+                enumVariants.map(({ label, props: variantProps }) => (
+                  <div key={label} className="cat-variant">
+                    <p className="cat-variant-label">{label}</p>
+                    <CataloguePreview
+                      viewportWidth={viewportWidth}
+                      darkMode={darkMode}
+                      previewWrapRef={previewWrapRef}
+                      previewScale={previewScale}
+                    >
+                      <SharedBlockRenderer
+                        block={{ id: `cat-${activeType}-${label}`, type: activeType, props: variantProps }}
+                      />
+                    </CataloguePreview>
+                  </div>
+                ))
+              ) : (
+                <CataloguePreview
+                  viewportWidth={viewportWidth}
+                  darkMode={darkMode}
+                  previewWrapRef={previewWrapRef}
+                  previewScale={previewScale}
+                >
+                  <SharedBlockRenderer
+                    block={{ id: `cat-${activeType}`, type: activeType, props: activeProps }}
+                  />
+                </CataloguePreview>
+              )}
             </>
           )}
         </main>
@@ -633,6 +715,22 @@ const catalogueCSS = /* css */ `
     background: var(--brand-subtle, var(--bg-200));
     color: var(--brand);
     font-weight: 600;
+  }
+
+  /* ---- Enum variant labels ---- */
+  .cat-variant {
+    margin-bottom: 20px;
+  }
+  .cat-variant:last-child {
+    margin-bottom: 0;
+  }
+  .cat-variant-label {
+    margin: 0 0 6px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--caption);
   }
 
   /* ---- Viewport toggle ---- */
