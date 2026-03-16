@@ -283,7 +283,7 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T17:10:33.878Z",
+    "updatedAt": "2026-03-16T17:11:27.714Z",
     "blocks": [
       {
         "id": "b_banner_1773680900785_798",
@@ -316,6 +316,78 @@
           "author": "Peter Drucker",
           "role": "Management Consultant",
           "imageUrl": "https://i.pravatar.cc/300"
+        }
+      },
+      {
+        "id": "b_table_1773681049002_351",
+        "type": "Table",
+        "props": {
+          "title": "",
+          "headers": [
+            "Variety",
+            "Flavor Profile",
+            "Vitamin C",
+            "Best Season"
+          ],
+          "rows": [
+            [
+              "Pink/Red",
+              "Sweet & tangy",
+              "High",
+              "Winter–Spring"
+            ],
+            [
+              "White",
+              "Tart & bitter",
+              "High",
+              "Year-round"
+            ],
+            [
+              "Star Ruby",
+              "Sweet & juicy",
+              "Very high",
+              "Winter–Spring"
+            ],
+            [
+              "Pomelo",
+              "Mild & sweet",
+              "Moderate",
+              "Fall–Winter"
+            ]
+          ],
+          "striped": "false"
+        }
+      },
+      {
+        "id": "b_carousel_1773681087702_227",
+        "type": "Carousel",
+        "props": {
+          "items": [
+            {
+              "imageUrl": "/hero-generated.svg",
+              "imageAlt": "First slide",
+              "heading": "Welcome",
+              "description": "Get started with our platform.",
+              "ctaText": "Get started",
+              "ctaHref": "/"
+            },
+            {
+              "imageUrl": "/hero-generated.svg",
+              "imageAlt": "Second slide",
+              "heading": "Features",
+              "description": "Discover what makes us different."
+            },
+            {
+              "imageUrl": "/hero-generated.svg",
+              "imageAlt": "Third slide",
+              "heading": "Get Started",
+              "description": "Sign up today and start building.",
+              "ctaText": "Sign up",
+              "ctaHref": "/pricing"
+            }
+          ],
+          "autoplay": "false",
+          "interval": 5000
         }
       },
       {
