@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T16:59:36.734Z",
+    "updatedAt": "2026-03-16T18:07:20.297Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -118,37 +118,6 @@
         "props": {
           "title": "Discover the Magic of Avocados",
           "body": "## Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n## Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n## Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
-        }
-      },
-      {
-        "id": "b_twocolumn_1773680337950_482",
-        "type": "TwoColumn",
-        "props": {
-          "variant": "default",
-          "left": [
-            {
-              "type": "heading",
-              "text": "Built for teams"
-            },
-            {
-              "type": "paragraph",
-              "text": "Ship changes quickly with a clear, reliable workflow."
-            },
-            {
-              "type": "cta",
-              "label": "Learn more",
-              "href": "/"
-            }
-          ],
-          "right": [
-            {
-              "type": "video",
-              "src": "/hero-generated.svg",
-              "alt": "Team collaborating on a website update",
-              "text": "ewewewew",
-              "label": "ewewe"
-            }
-          ]
         }
       },
       {
@@ -283,7 +252,7 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T17:18:32.953Z",
+    "updatedAt": "2026-03-16T18:18:07.963Z",
     "blocks": [
       {
         "id": "b_hero_about",
@@ -305,7 +274,8 @@
           "quote": "The best way to predict the future is to create it.",
           "author": "Peter Drucker",
           "role": "Management Consultant",
-          "imageUrl": "https://i.pravatar.cc/300"
+          "imageUrl": "https://images.unsplash.com/flagged/photo-1570612861542-284f4c12e75f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxwZXJzb258ZW58MXwwfHx8MTc3MzY4NDg4NXww&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "grayscale photo of man"
         }
       },
       {
