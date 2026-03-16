@@ -16,6 +16,8 @@ import { Banner } from "./banner/renderer"
 import { Carousel } from "./carousel/renderer"
 import { Gallery } from "./gallery/renderer"
 import { Tabs } from "./tabs/renderer"
+import { Table } from "./table/renderer"
+import { Quote } from "./quote/renderer"
 
 export const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element | null> = {
   Hero,
@@ -34,5 +36,7 @@ export const renderers: Record<string, (props: Record<string, unknown>) => JSX.E
   Banner,
   Carousel,
   Gallery,
-  Tabs
+  Tabs,
+  Table,
+  Quote
 }

@@ -1,0 +1,95 @@
+.quote-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.quote-block .section__inner {
+  max-width: 720px;
+}
+
+.quote-block__quote {
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.quote-block__mark {
+  display: block;
+  font-size: 4rem;
+  line-height: 0.8;
+  color: var(--brand);
+  font-family: Georgia, "Times New Roman", serif;
+  user-select: none;
+}
+
+.quote-block__text {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  color: var(--heading);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.quote-block__text p {
+  margin: 0 0 8px;
+}
+
+.quote-block__text p:last-child {
+  margin-bottom: 0;
+}
+
+/* Attribution row */
+.quote-block__attribution {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.quote-block__avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  max-width: 48px;
+  max-height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.quote-block__author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quote-block__author {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--heading);
+}
+
+.quote-block__role {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-200);
+}
+
+@media (max-width: 600px) {
+  .quote-block {
+    padding: 24px 12px;
+  }
+
+  .quote-block__mark {
+    font-size: 3rem;
+  }
+
+  .quote-block__text {
+    font-size: 1.1rem;
+  }
+}
