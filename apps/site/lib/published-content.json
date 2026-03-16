@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T18:22:24.712Z",
+    "updatedAt": "2026-03-16T18:23:04.356Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -45,16 +45,6 @@
               "content": "Choosing the perfect avocado and storing it correctly ensures you always have creamy, delicious fruit ready when you need it. Learn the secrets that experienced produce enthusiasts use to select peak ripeness and extend freshness throughout the week.\n\n• **Selection Tips** – Gently squeeze to check firmness, look for dark green or blackish skin (variety-dependent), and choose avocados that yield slightly to palm pressure without feeling mushy\n• **Ripeness Check** – Place in a paper bag with an apple or banana to speed ripening naturally, or test readiness by inserting a small knife near the pit—it should slide in smoothly\n• **Storage Methods** – Keep unripe avocados at room temperature; once ripe, store in the refrigerator (lasts 3–5 days); cut halves can be preserved with lemon juice and plastic wrap\n• **Troubleshooting** – If avocados ripen too quickly, refrigerate immediately; if purchased too firm, use a paper bag method; for browning flesh, store with pit intact and use within 1–2 days\n\nMaster these simple techniques and you'll always have perfect avocados on hand for any meal inspiration."
             }
           ]
-        }
-      },
-      {
-        "id": "b_embed_1773679987848_995",
-        "type": "Embed",
-        "props": {
-          "embedType": "youtube",
-          "url": "https://www.youtube.com/watch?xv=cYPKqRIFVdU",
-          "title": "",
-          "aspectRatio": "16:9"
         }
       },
       {
@@ -148,10 +138,6 @@
             {
               "q": "Are avocados sustainable?",
               "a": "Sustainable avocado farming is possible and important. Look for growers who prioritize water conservation and ethical practices. By choosing responsibly grown avocados, you support both your health and the planet."
-            },
-            {
-              "q": "How should I store avocados?",
-              "a": "Keep unripe avocados at room temperature until they're ready to eat. Once ripe, store them in the refrigerator to extend freshness. For cut avocados, keep the pit in, wrap tightly in plastic wrap, and refrigerate for up to three days."
             }
           ]
         }
