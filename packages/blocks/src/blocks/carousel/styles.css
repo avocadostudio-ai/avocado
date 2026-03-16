@@ -40,9 +40,10 @@
   display: block;
 }
 
-/* Caption overlay */
+/* Caption area */
 .carousel__caption {
   padding: 20px 24px;
+  border-top: 1px solid var(--border);
 }
 
 .carousel__caption h3 {
