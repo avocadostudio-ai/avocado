@@ -10,6 +10,7 @@ import { RichText } from "./rich-text/renderer"
 import { Stats } from "./stats/renderer"
 import { TwoColumn } from "./two-column/renderer"
 import { Footer } from "./footer/renderer"
+import { SiteHeader } from "./site-header/renderer"
 
 export const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element | null> = {
   Hero,
@@ -22,5 +23,6 @@ export const renderers: Record<string, (props: Record<string, unknown>) => JSX.E
   RichText,
   Stats,
   TwoColumn,
-  Footer
+  Footer,
+  SiteHeader
 }

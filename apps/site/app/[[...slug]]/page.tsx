@@ -8,7 +8,7 @@ import { EditorPageWrapper } from "../../components/editor-wrapper"
 import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../../lib/content"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
-import { buildNavItems } from "../../lib/navigation"
+import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -98,7 +98,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
       })()
     : ""
 
-  const { navItems, siteName, siteLogo, homeHref } = buildNavItems({
+  const { navItems, siteName, siteLogo } = buildNavItems({
     navSlugs,
     currentSlug: slug,
     siteConfig,
@@ -116,9 +116,11 @@ export default async function SitePage({ params, searchParams }: PageProps) {
     )
   }
 
+  const chromeHeader = buildSiteHeaderBlock({ navItems, siteName, siteLogo, activePath: slug })
+
   // Published mode: pure renderer, no editor imports evaluated
   if (!editorMode) {
-    return <SitePageContent page={page} navItems={navItems} siteName={siteName} siteLogo={siteLogo} homeHref={homeHref} />
+    return <SitePageContent page={page} chromeHeader={chromeHeader} />
   }
 
   // Editor mode: wrapper with overlays, block selection, tile mode
@@ -126,10 +128,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   return (
     <EditorPageWrapper
       page={page}
-      navItems={navItems}
-      siteName={siteName}
-      siteLogo={siteLogo}
-      homeHref={homeHref}
+      chromeHeader={chromeHeader}
       slug={slug}
       editorOrigin={editorOrigin}
       tileMode={tileMode}

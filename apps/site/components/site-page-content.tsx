@@ -1,21 +1,17 @@
 import { BlockErrorBoundary } from "@ai-site-editor/site-sdk"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
-import { SiteHeader } from "./site-header"
-import type { NavItem } from "../lib/navigation"
+import type { SiteHeaderBlock } from "../lib/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
 export type SitePageContentProps = {
   page: PageDoc
-  navItems: NavItem[]
-  siteName: string
-  siteLogo: string
-  homeHref: string
+  chromeHeader: SiteHeaderBlock
 }
 
-export function SitePageContent({ page, navItems, siteName, siteLogo, homeHref }: SitePageContentProps) {
+export function SitePageContent({ page, chromeHeader }: SitePageContentProps) {
   return (
     <>
-      <SiteHeader siteName={siteName} siteLogo={siteLogo} homeHref={homeHref} navItems={navItems} />
+      <SharedBlockRenderer block={chromeHeader} />
       <main>
         {page.blocks.map((block) => (
           <div key={block.id}>

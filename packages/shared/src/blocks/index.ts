@@ -10,6 +10,7 @@ import { richTextDefaultProps } from "./rich-text.ts"
 import { statsDefaultProps } from "./stats.ts"
 import { twoColumnDefaultProps } from "./two-column.ts"
 import { footerDefaultProps } from "./footer.ts"
+import { siteHeaderDefaultProps } from "./site-header.ts"
 
 import type { BlockType } from "./_registry.ts"
 
@@ -25,6 +26,7 @@ const defaults: Record<string, () => Record<string, unknown>> = {
   Stats: statsDefaultProps,
   TwoColumn: twoColumnDefaultProps,
   Footer: footerDefaultProps,
+  SiteHeader: siteHeaderDefaultProps,
 }
 
 const fallback: Record<string, unknown> = {

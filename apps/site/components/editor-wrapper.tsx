@@ -1,27 +1,23 @@
 import { BlockErrorBoundary, getPreviewWrapperProps, EditorOverlay, TileModeStyles } from "@ai-site-editor/site-sdk"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
-import { SiteHeader } from "./site-header"
-import type { NavItem } from "../lib/navigation"
+import type { SiteHeaderBlock } from "../lib/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
 export type EditorPageProps = {
   page: PageDoc
-  navItems: NavItem[]
-  siteName: string
-  siteLogo: string
-  homeHref: string
+  chromeHeader: SiteHeaderBlock
   slug: string
   editorOrigin: string
   tileMode: boolean
 }
 
 export function EditorPageWrapper({
-  page, navItems, siteName, siteLogo, homeHref, slug, editorOrigin, tileMode
+  page, chromeHeader, slug, editorOrigin, tileMode
 }: EditorPageProps) {
   return (
     <>
       {tileMode && <TileModeStyles />}
-      <SiteHeader siteName={siteName} siteLogo={siteLogo} homeHref={homeHref} navItems={navItems} />
+      <SharedBlockRenderer block={chromeHeader} />
       <main className="editor-mode">
         {page.blocks.map((block) => (
           <div key={block.id} {...getPreviewWrapperProps(true, block.id, block.type)}>

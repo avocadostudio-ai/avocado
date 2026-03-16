@@ -45,6 +45,8 @@ export type BlockMeta = {
   displayName: string
   description?: string
   category?: "content" | "media" | "navigation" | "conversion" | "layout"
+  /** Chrome blocks (header/footer) are structurally pinned — not addable, movable, or removable. Editable via props only. */
+  chrome?: boolean
   /** Metadata for scalar (non-list) props. */
   fields: Record<string, FieldMeta>
   /** Metadata for array/list props. */
@@ -112,7 +114,7 @@ export function registerBlock(type: string, config: BlockRegistration) {
 
   _blockMeta[type] = config.meta
 
-  if (!allowedBlockTypes.includes(type)) {
+  if (!config.meta.chrome && !allowedBlockTypes.includes(type)) {
     allowedBlockTypes.push(type)
   }
 }
@@ -125,6 +127,16 @@ export function getBlockMeta(type: string): BlockMeta | undefined {
 /** Get all registered block metadata. */
 export function getAllBlockMeta(): Readonly<Record<string, BlockMeta>> {
   return _blockMeta
+}
+
+/** Check if a block type is a chrome block (structurally pinned). */
+export function isChrome(type: string): boolean {
+  return _blockMeta[type]?.chrome === true
+}
+
+/** Get all registered chrome block type names. */
+export function getChromeTypes(): string[] {
+  return Object.entries(_blockMeta).filter(([, meta]) => meta.chrome).map(([type]) => type)
 }
 
 /** Check if a field is inline-editable based on its metadata kind. */
