@@ -177,6 +177,7 @@ function EditorPage({
   const chatThreadRef = useRef<HTMLElement>(null)
   const splitHandleRef = useRef<HTMLDivElement>(null)
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
+  const settingsPopoverRef = useRef<HTMLDivElement>(null)
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
@@ -560,16 +561,24 @@ function EditorPage({
     if (!showSettingsModal) return
     const updatePopoverPosition = () => {
       const button = settingsButtonRef.current
+      const popover = settingsPopoverRef.current
       if (!button) return
       const rect = button.getBoundingClientRect()
-      const popoverWidth = 320
-      const popoverHeight = 220
       const gap = 8
       const minEdge = 8
+      const popoverWidth = popover?.offsetWidth ?? Math.min(360, window.innerWidth - minEdge * 2)
+      const popoverHeight = popover?.offsetHeight ?? 320
       const maxLeft = Math.max(minEdge, window.innerWidth - popoverWidth - minEdge)
-      const maxTop = Math.max(minEdge, window.innerHeight - popoverHeight - minEdge)
       const left = Math.min(maxLeft, Math.max(minEdge, rect.right - popoverWidth))
-      const top = Math.min(maxTop, Math.max(minEdge, rect.bottom + gap))
+
+      const spaceBelow = window.innerHeight - rect.bottom - minEdge
+      const spaceAbove = rect.top - minEdge
+      const preferredTop = rect.bottom + gap
+      const preferredTopAbove = rect.top - popoverHeight - gap
+      const topCandidate = spaceBelow < popoverHeight + gap && spaceAbove > spaceBelow ? preferredTopAbove : preferredTop
+
+      const maxTop = Math.max(minEdge, window.innerHeight - popoverHeight - minEdge)
+      const top = Math.min(maxTop, Math.max(minEdge, topCandidate))
       setSettingsPopoverPos({ top, left })
     }
     updatePopoverPosition()
@@ -1173,6 +1182,7 @@ function EditorPage({
       {showSettingsModal ? (
         <div className="settings-popover-backdrop" onClick={() => setShowSettingsModal(false)}>
           <div
+            ref={settingsPopoverRef}
             className="settings-modal settings-modal-popover"
             role="dialog"
             aria-modal="true"
@@ -1187,25 +1197,26 @@ function EditorPage({
               </button>
             </div>
             <div className="settings-modal-body">
-              <label className="inline-toggle">
-                <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
-                <span>Streaming</span>
-              </label>
-
-              <label className="inline-toggle">
-                <input type="checkbox" checked={showNestedLabels} onChange={(e) => setShowNestedLabels(e.target.checked)} />
-                <span>Nested labels</span>
-              </label>
-              <label className="inline-toggle">
-                <input type="checkbox" checked={chatDarkMode} onChange={(e) => onSetChatDarkMode(e.target.checked)} />
-                <span>Dark mode</span>
-              </label>
-              <label className="inline-toggle">
-                <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
-                <span>Debug mode</span>
-              </label>
+              <div className="settings-toggle-list" role="group" aria-label="Developer toggles">
+                <label className="inline-toggle">
+                  <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
+                  <span>Streaming</span>
+                </label>
+                <label className="inline-toggle">
+                  <input type="checkbox" checked={showNestedLabels} onChange={(e) => setShowNestedLabels(e.target.checked)} />
+                  <span>Nested labels</span>
+                </label>
+                <label className="inline-toggle">
+                  <input type="checkbox" checked={chatDarkMode} onChange={(e) => onSetChatDarkMode(e.target.checked)} />
+                  <span>Dark mode</span>
+                </label>
+                <label className="inline-toggle">
+                  <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
+                  <span>Debug mode</span>
+                </label>
+              </div>
               <label className="settings-model-picker">
-                <span>Model</span>
+                <span className="settings-field-label">Model</span>
                 <select
                   value={selectionValue(provider, modelKey)}
                   onChange={(e) => {
@@ -1224,7 +1235,7 @@ function EditorPage({
                   )}
                 </select>
               </label>
-              <button type="button" className="settings-link-btn" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
+              <button type="button" className="settings-link-btn settings-link-btn-danger" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
                 Clear chat
               </button>
             </div>

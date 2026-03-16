@@ -702,12 +702,36 @@ label {
 .inline-toggle {
   flex-direction: row;
   align-items: center;
-  gap: 6px;
-  align-self: center;
+  gap: 10px;
+  align-self: stretch;
   grid-column: 1 / -1;
-  padding: 0 2px;
+  margin: 0;
+  padding: 10px 12px;
   font-size: 13px;
+  font-weight: 600;
   color: var(--ink);
+  border: 0;
+  border-radius: 10px;
+  background: #edf3fa;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.inline-toggle:hover {
+  background: #e3edf8;
+}
+
+.inline-toggle input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #4f8ed9;
+  flex: 0 0 auto;
+}
+
+.inline-toggle span {
+  flex: 1 1 auto;
+  color: inherit;
 }
 
 input,
@@ -2038,31 +2062,33 @@ textarea {
 }
 
 .settings-modal {
-  width: min(460px, calc(100vw - 24px));
+  width: min(420px, calc(100vw - 24px));
   background: #f8fbff;
   border: 1px solid #b5c0ca;
-  border-radius: 14px;
-  box-shadow: 0 18px 42px rgb(15 23 42 / 0.24);
+  border-radius: 16px;
+  box-shadow: 0 20px 44px rgb(15 23 42 / 0.26);
   overflow: hidden;
 }
 
 .settings-modal-popover {
   position: fixed;
-  width: min(320px, calc(100vw - 16px));
+  width: min(360px, calc(100vw - 16px));
 }
 
 .settings-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid #d2dbe5;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6fc 100%);
 }
 
 .settings-modal-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .settings-close-btn {
@@ -2077,47 +2103,111 @@ textarea {
   line-height: 1;
 }
 
+.settings-modal-header .settings-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #e8eff7;
+  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-modal-header .settings-close-btn:hover:not(:disabled) {
+  background: #dce6f2;
+  border-color: #879db5;
+  color: #0f172a;
+}
+
 .settings-modal-body {
-  padding: 14px;
+  padding: 14px 16px 16px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.settings-toggle-list {
+  display: grid;
+  gap: 7px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #51627a;
 }
 
 .settings-model-picker {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: 8px;
   font-size: 13px;
   color: var(--ink);
-  padding: 0 2px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-model-picker span {
+  color: inherit;
 }
 
 .settings-model-picker select {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
-  max-width: 180px;
-  height: 30px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  max-width: none;
+  height: 36px;
+  border: 1px solid #aec0d4;
+  border-radius: 10px;
   background: #fff;
   color: var(--ink);
   font-size: 13px;
-  padding: 0 8px;
+  font-weight: 600;
+  padding: 0 10px;
   cursor: pointer;
 }
 
+.settings-model-picker select:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
 .settings-link-btn {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid transparent;
   background: none;
-  border: none;
   color: #8bb4e0;
   cursor: pointer;
-  padding: 0;
-  font-size: inherit;
-  text-align: left;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
+
 .settings-link-btn:hover {
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+.settings-link-btn-danger {
+  border-color: transparent;
+  background: #fff2f4;
+  color: #9f2436;
+}
+
+.settings-link-btn-danger:hover {
+  background: #fee2e7;
+  border-color: transparent;
+  color: #7f1d2d;
 }
 
 .variation-modal-backdrop {
@@ -3004,10 +3094,69 @@ textarea {
   color: #6b7280;
 }
 
+.editor-dark .settings-modal-header {
+  border-bottom-color: #334155;
+  background: linear-gradient(180deg, rgb(30 41 59 / 0.72), rgb(17 24 39 / 0.94));
+}
+
+.editor-dark .settings-modal-header .settings-close-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.editor-dark .settings-modal-header .settings-close-btn:hover:not(:disabled) {
+  background: #334155;
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+.editor-dark .settings-toggle-list {
+  background: transparent;
+  border-color: transparent;
+}
+
+.editor-dark .settings-toggle-list .inline-toggle {
+  background: #162235;
+  border-color: transparent;
+  color: #f8fafc;
+}
+
+.editor-dark .settings-toggle-list .inline-toggle:hover {
+  background: #1f2f46;
+  border-color: transparent;
+}
+
+.editor-dark .settings-toggle-list .inline-toggle input[type="checkbox"] {
+  accent-color: #7dd3fc;
+}
+
+.editor-dark .settings-model-picker {
+  background: transparent;
+  border-color: transparent;
+  color: #e2e8f0;
+}
+
+.editor-dark .settings-field-label {
+  color: #94a3b8;
+}
+
 .editor-dark .settings-model-picker select {
   background: #1e293b;
-  border-color: #475569;
+  border-color: #3b4e66;
   color: #e5e7eb;
+}
+
+.editor-dark .settings-link-btn-danger {
+  background: #2b1019;
+  border-color: transparent;
+  color: #fda4af;
+}
+
+.editor-dark .settings-link-btn-danger:hover {
+  background: #3e1623;
+  border-color: transparent;
+  color: #fecdd3;
 }
 
 .editor-dark .chat-header-icon-btn {
