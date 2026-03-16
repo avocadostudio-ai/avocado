@@ -16,6 +16,8 @@ import { bannerDefaultProps } from "./banner.ts"
 import { carouselDefaultProps } from "./carousel.ts"
 import { galleryDefaultProps } from "./gallery.ts"
 import { tabsDefaultProps } from "./tabs.ts"
+import { tableDefaultProps } from "./table.ts"
+import { quoteDefaultProps } from "./quote.ts"
 
 import type { BlockType } from "./_registry.ts"
 
@@ -37,6 +39,8 @@ const defaults: Record<string, () => Record<string, unknown>> = {
   Carousel: carouselDefaultProps,
   Gallery: galleryDefaultProps,
   Tabs: tabsDefaultProps,
+  Table: tableDefaultProps,
+  Quote: quoteDefaultProps,
 }
 
 const fallback: Record<string, unknown> = {
