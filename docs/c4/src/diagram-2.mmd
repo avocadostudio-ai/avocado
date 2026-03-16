@@ -1,0 +1,24 @@
+C4Container
+    title Container Diagram — Production Deployment
+
+    Person(visitor, "Site Visitor")
+    Person(editor_user, "Editor User")
+
+    System_Boundary(vercel, "Vercel") {
+        Container(site, "Site", "Next.js SSG", "Static pages from published-content.json + draft API routes for preview")
+        Container(editor_spa, "Editor UI", "Vite + React SPA", "Chat UI, model picker, iframe preview")
+    }
+
+    System_Boundary(render, "Render") {
+        Container(orchestrator, "Orchestrator", "Fastify", "Session state, AI planning, operations engine, publish API")
+    }
+
+    System_Ext(openai, "OpenAI API")
+
+    Rel(visitor, site, "GET /", "HTTPS — static HTML")
+    Rel(editor_user, editor_spa, "Opens editor", "HTTPS")
+    Rel(editor_spa, orchestrator, "POST /chat, GET /sessions/*", "HTTPS")
+    Rel(editor_spa, site, "Loads in iframe, activates draft mode", "postMessage + /api/draft")
+    Rel(site, orchestrator, "GET /sessions/*/pages/* (draft)", "HTTPS")
+    Rel(orchestrator, openai, "Chat completions", "HTTPS")
+    Rel(orchestrator, site, "Syncs content at build time via /publish/content", "HTTPS (build only)")

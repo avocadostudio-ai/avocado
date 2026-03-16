@@ -1,0 +1,28 @@
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.card-grid-section h2 {
+  margin-bottom: 16px;
+}
+
+.card-grid .card {
+  background-color: var(--surface);
+  background-image:
+    radial-gradient(circle at 100% 0, rgba(15, 118, 110, 0.1) 0, rgba(15, 118, 110, 0) 42%),
+    linear-gradient(145deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0) 38%);
+  border: 1px solid var(--surface-border);
+}
+
+/* Dark */
+.dark .card-grid .card {
+  background-image: none;
+}
+
+@media (max-width: 900px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}

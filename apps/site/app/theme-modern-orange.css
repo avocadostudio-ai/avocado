@@ -1,0 +1,127 @@
+/* Theme: Modern Orange */
+html.theme-modern-orange {
+  --bg-0: #fafaf9;
+  --bg-000: #fafaf9;
+  --bg-100: #ffffff;
+  --bg-200: #f5f5f4;
+  --bg-300: #d6d3d1;
+  --text-100: #1c1917;
+  --text-200: #292524;
+  --text-300: #78716c;
+  --text-400: #a8a29e;
+  --text-500: #d6d3d1;
+  --accent: #f97316;
+  --accent-hover: #ea580c;
+
+  /* Brand */
+  --brand: #ea580c;
+  --brand-hover: #c2410c;
+  --brand-subtle: #fff7ed;
+  --brand-fg: #fff;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-border: #e7e5e4;
+
+  /* Typography — semantic */
+  --heading: #1c1917;
+  --body: #292524;
+  --body-secondary: #44403c;
+  --caption: #78716c;
+  --link: #ea580c;
+
+  /* Nav */
+  --nav-border: #fdba74;
+  --nav-bg: rgb(255 247 237 / 0.95);
+
+  /* Footer */
+  --footer-bg: #1c1917;
+  --footer-text: #d6d3d1;
+  --footer-heading: #fafaf9;
+  --footer-link: #a8a29e;
+  --footer-link-hover: #e7e5e4;
+  --footer-border: #292524;
+
+  /* Misc */
+  --placeholder-img: #e7e5e4;
+
+  /* Typography */
+  --font-body: "Avenir Next", "Avenir", system-ui, sans-serif;
+  --font-heading: Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Shapes */
+  --radius-btn: 9999px;
+  --radius-card: 12px;
+  --radius-feature: 12px;
+  --radius-logo: 12px;
+  --radius-input: 9999px;
+  --radius-dropdown: 16px;
+
+  /* Compound surfaces */
+  --card-bg: #ffffff;
+  --card-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+  --hero-bg: linear-gradient(135deg, #fff7ed 0%, #fef3c7 50%, #ffedd5 100%);
+  --cta-bg:
+    radial-gradient(circle at 15% 20%, rgb(249 115 22 / 0.15), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgb(234 88 12 / 0.1), transparent 45%),
+    linear-gradient(135deg, #fff7ed 0%, #fffbeb 50%, #fef2f2 100%);
+  --section-bg: #ffffff;
+}
+
+html.theme-modern-orange.dark {
+  --bg-0: #1c1917;
+  --bg-000: #1c1917;
+  --bg-100: #231f1d;
+  --bg-200: #2c2724;
+  --bg-300: #44403c;
+  --text-100: #fafaf9;
+  --text-200: #e7e5e4;
+  --text-300: #a8a29e;
+  --text-400: #78716c;
+  --text-500: #57534e;
+  --accent: #fb923c;
+  --accent-hover: #fdba74;
+
+  /* Brand */
+  --brand: #fb923c;
+  --brand-hover: #f97316;
+  --brand-subtle: rgb(249 115 22 / 0.1);
+  --brand-fg: #1c1917;
+
+  /* Surfaces */
+  --surface: #231f1d;
+  --surface-border: #44403c;
+
+  /* Typography — semantic */
+  --heading: #fafaf9;
+  --body: #d6d3d1;
+  --body-secondary: #d6d3d1;
+  --caption: #fdba74;
+  --link: #fdba74;
+
+  /* Nav */
+  --nav-border: #44403c;
+  --nav-bg: rgb(28 25 23 / 0.92);
+
+  /* Footer */
+  --footer-bg: #0c0a09;
+  --footer-text: #d6d3d1;
+  --footer-heading: #fafaf9;
+  --footer-link: #a8a29e;
+  --footer-link-hover: #e7e5e4;
+  --footer-border: #1c1917;
+
+  /* Misc */
+  --placeholder-img: #44403c;
+
+  /* Compound surfaces */
+  --card-bg: linear-gradient(160deg, #292018 0%, #1c1917 100%);
+  --card-shadow: 0 8px 22px rgb(12 10 9 / 0.4);
+  --hero-bg: linear-gradient(135deg, #292018 0%, #1f1a14 50%, #271c14 100%);
+  --cta-bg:
+    radial-gradient(circle at 15% 20%, rgb(249 115 22 / 0.18), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgb(234 88 12 / 0.12), transparent 45%),
+    linear-gradient(135deg, #1c1917 0%, #1c1612 50%, #1c1917 100%);
+  --section-bg: #1c1917;
+}

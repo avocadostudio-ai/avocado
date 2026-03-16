@@ -1,0 +1,17 @@
+C4Context
+    title System Context — AI Site Editor
+
+    Person(visitor, "Site Visitor", "Views the published website")
+    Person(editor_user, "Editor User", "Edits site content via chat")
+
+    System(site, "Site", "Next.js on Vercel — serves static pages to visitors, draft pages to editor")
+    System(editor, "Editor UI", "React SPA on Vercel — chat interface for editing")
+    System(orchestrator, "Orchestrator", "Fastify API on Render — AI planning, session state, publishing")
+    System_Ext(openai, "OpenAI API", "LLM for content planning and generation")
+
+    Rel(visitor, site, "Visits pages", "HTTPS")
+    Rel(editor_user, editor, "Chats, selects blocks", "HTTPS")
+    Rel(editor, site, "Embeds as iframe", "postMessage")
+    Rel(editor, orchestrator, "Sends chat messages, receives operations", "HTTPS")
+    Rel(site, orchestrator, "Fetches draft content (preview) + syncs at build", "HTTPS")
+    Rel(orchestrator, openai, "Generates edit plans", "HTTPS")

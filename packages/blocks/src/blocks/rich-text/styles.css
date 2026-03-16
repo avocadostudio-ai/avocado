@@ -1,0 +1,64 @@
+.rich-text {}
+
+.rich-text__body p {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--body-secondary);
+  margin-bottom: 1em;
+}
+
+.rich-text__body p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text__body ul,
+.rich-text__body ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+  color: var(--body-secondary);
+  line-height: 1.75;
+}
+
+.rich-text__body ul {
+  list-style: disc;
+}
+
+.rich-text__body ol {
+  list-style: decimal;
+}
+
+.rich-text__body li {
+  display: list-item;
+}
+
+.rich-text__body li + li {
+  margin-top: 0.3em;
+}
+
+.rich-text__body h3 {
+  margin-top: 1.25em;
+  margin-bottom: 0.45em;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+/* Dark */
+.dark .rich-text__body,
+.dark .rich-text__body li,
+.dark .rich-text__body strong,
+.dark .rich-text__body em {
+  color: #dbe7f7;
+}
+
+.dark main.editor-mode .rich-text__body p,
+.dark main.editor-mode .rich-text__body li {
+  color: #dbe7f7;
+}
+
+.dark .editor-live-draft-active .rich-text__body[data-editable-target]::after {
+  background: rgba(56, 189, 248, 0.025);
+  animation: none;
+}

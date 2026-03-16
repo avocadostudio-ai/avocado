@@ -1,0 +1,82 @@
+section {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  background: var(--section-bg);
+  border: 0;
+  border-radius: 0;
+  padding: 24px 20px;
+  margin-bottom: 0;
+}
+
+.section__inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.section__inner > h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.75rem, 2.3vw, 2.15rem);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+  color: var(--heading);
+}
+
+.btn-primary,
+.btn-secondary {
+  display: inline-block;
+  padding: 10px 22px;
+  border-radius: var(--radius-btn);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-fg);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+.btn-primary:hover {
+  opacity: 0.88;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--brand);
+  border: 1.5px solid var(--brand);
+}
+
+.btn-secondary:hover {
+  background: var(--brand-subtle);
+}
+
+/* Dark overrides for buttons */
+.dark .btn-primary {
+  background: #0f766e;
+  box-shadow: 0 2px 8px rgb(2 6 23 / 0.35);
+}
+
+.dark .btn-primary:hover {
+  opacity: 1;
+  background: var(--brand-hover);
+}
+
+.dark .btn-secondary {
+  color: #5eead4;
+  border-color: #14b8a6;
+}
+
+.dark .btn-secondary:hover {
+  background: rgb(20 184 166 / 0.16);
+}
+
+@media (max-width: 900px) {
+  section {
+    padding: 20px 16px;
+  }
+}
