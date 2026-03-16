@@ -283,7 +283,7 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T17:16:03.239Z",
+    "updatedAt": "2026-03-16T17:18:32.953Z",
     "blocks": [
       {
         "id": "b_hero_about",
@@ -312,7 +312,7 @@
         "id": "b_table_1773681049002_351",
         "type": "Table",
         "props": {
-          "title": "",
+          "title": "Grapefruit Varieties & Nutrition Guide",
           "headers": [
             "Variety",
             "Flavor Profile",
@@ -345,7 +345,7 @@
               "Fall–Winter"
             ]
           ],
-          "striped": "false"
+          "striped": "true"
         }
       },
       {
