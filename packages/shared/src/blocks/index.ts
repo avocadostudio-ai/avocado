@@ -18,6 +18,7 @@ import { galleryDefaultProps } from "./gallery.ts"
 import { tabsDefaultProps } from "./tabs.ts"
 import { tableDefaultProps } from "./table.ts"
 import { quoteDefaultProps } from "./quote.ts"
+import { videoDefaultProps } from "./video.ts"
 
 import type { BlockType } from "./_registry.ts"
 
@@ -41,6 +42,7 @@ const defaults: Record<string, () => Record<string, unknown>> = {
   Tabs: tabsDefaultProps,
   Table: tableDefaultProps,
   Quote: quoteDefaultProps,
+  Video: videoDefaultProps,
 }
 
 const fallback: Record<string, unknown> = {
