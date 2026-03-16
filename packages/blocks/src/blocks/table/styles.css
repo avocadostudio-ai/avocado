@@ -44,7 +44,7 @@
 
 /* Striped variant */
 .table-block__table--striped tbody tr:nth-child(even) {
-  background: var(--bg-1);
+  background: var(--stripe-bg, #f1f5f9);
 }
 
 /* First column — sticky + emphasis */
@@ -63,7 +63,7 @@
 }
 
 .table-block__table--striped tbody tr:nth-child(even) td:first-child {
-  background: var(--bg-1);
+  background: var(--stripe-bg, #f1f5f9);
 }
 
 @media (max-width: 600px) {
