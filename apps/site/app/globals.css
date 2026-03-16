@@ -145,10 +145,10 @@
   --accent-hover: #e5aa7f;
 
   /* Brand */
-  --brand: #2dd4bf;
-  --brand-hover: #5eead4;
+  --brand: #0f766e;
+  --brand-hover: #10958a;
   --brand-subtle: rgb(20 184 166 / 0.08);
-  --brand-fg: #0f172a;
+  --brand-fg: #fff;
 
   /* Surfaces */
   --surface: #111827;
