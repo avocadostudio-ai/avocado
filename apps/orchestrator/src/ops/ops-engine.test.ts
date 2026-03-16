@@ -175,6 +175,31 @@ describe("ops-engine: add_block", () => {
     }
     assert.throws(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /does not match component manifest schema/)
   })
+
+  it("coerces numeric values to strings for Table rows", () => {
+    seedSession(makePage())
+    const op: Operation = {
+      op: "add_block",
+      pageSlug: "/",
+      block: {
+        id: "b_table",
+        type: "Table",
+        props: {
+          title: "Nutrition Facts",
+          headers: ["Nutrient", "Amount"],
+          rows: [["Calories", 884], ["Total Fat", 100]],
+          striped: "true"
+        } as Record<string, unknown>
+      }
+    }
+    const result = applyOpsAtomically(TEST_SESSION, [op])
+    assert.equal(result.appliedCount, 1)
+    const page = getDraft("/")!
+    const table = page.blocks.find((b) => b.id === "b_table")!
+    const rows = table.props.rows as string[][]
+    assert.equal(rows[0][1], "884")
+    assert.equal(rows[1][1], "100")
+  })
 })
 
 describe("ops-engine: remove_block", () => {

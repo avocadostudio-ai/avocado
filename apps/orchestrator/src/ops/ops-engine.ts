@@ -236,16 +236,19 @@ function _validateWithManifestIfPresent(
   blockType: string,
   nextProps: Record<string, unknown>
 ) {
+  // Always run Zod validation first — it coerces values (e.g. numbers → strings)
+  const propCheck = validateBlockProps(blockType as BlockType, nextProps)
+  const coerced = propCheck.success ? (propCheck.data as Record<string, unknown>) : nextProps
+
   const manifestComponent = manifestByType.get(blockType)
   if (manifestComponent) {
-    if (!validateByJsonSchemaLike(manifestComponent.propsSchema, nextProps)) {
+    if (!validateByJsonSchemaLike(manifestComponent.propsSchema, coerced)) {
       throw new OperationError(`Invalid props for ${blockType}: does not match component manifest schema`, { category: "schema_violation" })
     }
-    return nextProps
+    return coerced
   }
-  const propCheck = validateBlockProps(blockType as BlockType, nextProps)
   if (!propCheck.success) throw new OperationError(`Invalid props for ${blockType}: ${_describeValidationIssue(propCheck.error)}`, { category: "schema_violation" })
-  return propCheck.data
+  return coerced
 }
 
 function _requireManifestComponent(
