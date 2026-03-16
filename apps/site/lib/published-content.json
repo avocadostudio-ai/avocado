@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-15T22:07:20.335Z",
+    "updatedAt": "2026-03-16T08:55:58.061Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -79,7 +79,7 @@
         "type": "RichText",
         "props": {
           "title": "Discover the Magic of Avocados",
-          "body": "# Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n# Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n# Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
+          "body": "## Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n## Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n## Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
         }
       },
       {
