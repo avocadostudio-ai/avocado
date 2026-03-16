@@ -23,6 +23,7 @@ import {
   MODEL_KEY_STORAGE_KEY,
   PROVIDER_STORAGE_KEY,
   CHAT_THEME_STORAGE_KEY,
+  buildSitePathWithQuery,
   isRedundantChangeLine,
   mergedVariationProps,
   orchestrator,
@@ -30,6 +31,7 @@ import {
   buildSiteDraftDisableUrl,
   buildSiteDraftEnableUrl,
   resolveSiteOrigin,
+  siteDraftSecret,
   resolveDefaultChatDarkMode,
   resolveDefaultDebugMode,
   resolveDefaultModelKey,
@@ -181,6 +183,9 @@ function EditorPage({
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
+  const draftPrimedRef = useRef(false)
+  const draftPrimedOriginRef = useRef<string | null>(null)
+  const slugSyncedFromPreviewRef = useRef(false)
   const lastStructuralNoticeAtRef = useRef(0)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
 
@@ -251,9 +256,17 @@ function EditorPage({
     })
   }
 
+  const setSlugFromPreview = useCallback((nextSlug: string) => {
+    setSlug((prev) => {
+      if (prev === nextSlug) return prev
+      slugSyncedFromPreviewRef.current = true
+      return nextSlug
+    })
+  }, [])
+
   const previewCallbacks = useMemo<PreviewBridgeCallbacks>(() => ({
     onBlockClicked: (newSlug, blockId, blockType, editablePath, editableValue) => {
-      setSlug(newSlug)
+      setSlugFromPreview(newSlug)
       activeBlockIdRef.current = blockId
       activeBlockTypeRef.current = blockType
       activeEditablePathRef.current = editablePath
@@ -267,7 +280,7 @@ function EditorPage({
       }
     },
     onRouteChanged: (newSlug) => {
-      setSlug(newSlug)
+      setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
     },
@@ -276,7 +289,7 @@ function EditorPage({
         notifyStructuralUnavailable()
         return
       }
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.reorderBlock(newSlug, blockId, afterBlockId)
@@ -286,7 +299,7 @@ function EditorPage({
         notifyStructuralUnavailable()
         return
       }
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.deleteBlock(newSlug, blockId)
@@ -296,7 +309,7 @@ function EditorPage({
         notifyStructuralUnavailable()
         return
       }
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       if (!args.afterBlockId && !args.beforeBlockId) return
       setAddBlockPicker({ slug: newSlug, afterBlockId: args.afterBlockId, beforeBlockId: args.beforeBlockId })
     },
@@ -305,7 +318,7 @@ function EditorPage({
         notifyStructuralUnavailable()
         return
       }
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.addListItem(newSlug, blockId, blockType, listKey, afterIndex)
@@ -315,7 +328,7 @@ function EditorPage({
         notifyStructuralUnavailable()
         return
       }
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.removeListItem(newSlug, blockId, blockType, listKey, index)
@@ -325,20 +338,20 @@ function EditorPage({
         notifyStructuralUnavailable()
         return
       }
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void chatEngine.moveListItem(newSlug, blockId, blockType, listKey, index, afterIndex)
     },
     onInlineTextCommitted: (newSlug, blockId, editablePath, value) => {
-      if (newSlug !== slug) setSlug(newSlug)
+      if (newSlug !== slug) setSlugFromPreview(newSlug)
       if (editablePath) {
         activeEditablePathRef.current = editablePath
         setActiveEditablePath(editablePath)
       }
       void chatEngine.inlineEditCommit(newSlug, blockId, editablePath, value)
     }
-  }), [componentManifest.allowStructuralEdits, slug])
+  }), [componentManifest.allowStructuralEdits, setSlugFromPreview, slug])
 
   const preview = usePreviewBridge(slug, previewCallbacks, activeSiteOrigin)
 
@@ -395,13 +408,30 @@ function EditorPage({
     window.localStorage.setItem(PROVIDER_STORAGE_KEY, provider)
   }, [provider])
 
-  // Preview src — uses per-site previewUrl when available, falls back to VITE_SITE_ORIGIN
-  const previewSrc = useMemo(() => {
-    return buildSiteDraftEnableUrl(slug, {
-      session,
-      siteId,
-      editorOrigin
-    }, activeSiteOrigin)
+  // Preview src: bootstrap draft mode via /api/draft once per origin,
+  // then switch routes directly to avoid extra redirect navigations.
+  const [previewSrc, setPreviewSrc] = useState(() =>
+    buildSiteDraftEnableUrl("/", { session, siteId, editorOrigin }, activeSiteOrigin)
+  )
+
+  useEffect(() => {
+    if (draftPrimedOriginRef.current !== activeSiteOrigin) {
+      draftPrimedOriginRef.current = activeSiteOrigin
+      draftPrimedRef.current = false
+    }
+
+    const params = { session, siteId, editorOrigin }
+    if (siteDraftSecret && draftPrimedRef.current) {
+      if (slugSyncedFromPreviewRef.current) {
+        slugSyncedFromPreviewRef.current = false
+        return
+      }
+      preview.postToSite("navigate", { href: buildSitePathWithQuery(slug, params) })
+      return
+    }
+
+    const nextSrc = buildSiteDraftEnableUrl(slug, params, activeSiteOrigin)
+    setPreviewSrc((prev) => (prev === nextSrc ? prev : nextSrc))
   }, [activeSiteOrigin, editorOrigin, session, siteId, slug])
 
   const liveSiteUrl = useMemo(() => {
@@ -1041,7 +1071,13 @@ function EditorPage({
           ref={preview.iframeRef}
           title="Live preview"
           src={previewSrc}
-          onLoad={() => preview.postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })}
+          onLoad={() => {
+            if (siteDraftSecret && !draftPrimedRef.current) {
+              draftPrimedRef.current = true
+              draftPrimedOriginRef.current = activeSiteOrigin
+            }
+            preview.postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })
+          }}
         />
       </section>
 
