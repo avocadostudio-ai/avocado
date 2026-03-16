@@ -283,7 +283,7 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T17:13:12.507Z",
+    "updatedAt": "2026-03-16T17:16:03.239Z",
     "blocks": [
       {
         "id": "b_hero_about",
@@ -358,8 +358,8 @@
               "imageAlt": "Grapefruit cut in half on colorful background",
               "heading": "Pink Grapefruit",
               "description": "Sweet and tangy perfection in every bite",
-              "ctaText": "Learn More",
-              "ctaHref": "/grapefruits"
+              "ctaText": "",
+              "ctaHref": ""
             },
             {
               "imageUrl": "https://images.unsplash.com/photo-1580072222821-f26e9efd417c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8Z3JhcGVmcnVpdCUyMGNpdHJ1cyUyMGZydWl0JTIwZnJlc2h8ZW58MXwwfHx8MTc3MzY4MTEyNHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
