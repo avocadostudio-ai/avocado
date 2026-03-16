@@ -11,6 +11,7 @@ registerBlock("Footer", {
     displayName: "Footer",
     description: "Multi-column footer with link groups and copyright.",
     category: "navigation",
+    chrome: true,
     fields: { copyright: f.text("Copyright text"), headingLevel: f.headingLevel() },
     listFields: {
       columns: {

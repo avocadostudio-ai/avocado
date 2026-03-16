@@ -26,6 +26,8 @@ export {
   getAllBlockMeta,
   isFieldInlineEditable,
   getImageSpec,
+  isChrome,
+  getChromeTypes,
   // Backwards-compatible exports
   blockSchemas,
   allowedBlockTypes,

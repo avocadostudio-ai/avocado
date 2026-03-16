@@ -5,7 +5,7 @@ export function Footer(props: Record<string, unknown>) {
   const columns = Array.isArray(props.columns) ? props.columns : []
   const HeadingTag = resolveHeadingTag("Footer", props) as keyof JSX.IntrinsicElements
   return (
-    <footer className="site-footer">
+    <footer className="site-footer" data-block-chrome="true">
       <div className="section__inner">
         <div className="site-footer__columns">
           {columns.map((col, idx) => {

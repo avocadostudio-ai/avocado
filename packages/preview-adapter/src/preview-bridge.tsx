@@ -851,12 +851,15 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const previousSelectedBlockId = selectedBlockRef.current
       const previousEditablePath = selectedEditablePathRef.current
       const effectivePath = editablePath ?? (previousSelectedBlockId === blockId ? previousEditablePath ?? undefined : undefined)
-      toolbar.append(moveUpBtn, moveDownBtn)
-      match.prepend(toolbar)
-      match.prepend(addTopBtn)
-      match.append(addBtn)
-      mountListItemDeleteHandles(match, blockId)
-      mountSelectedDeleteHandle()
+      const isChromeBlock = match.querySelector("[data-block-chrome]") !== null || match.matches("[data-block-chrome]")
+      if (!isChromeBlock) {
+        toolbar.append(moveUpBtn, moveDownBtn)
+        match.prepend(toolbar)
+        match.prepend(addTopBtn)
+        match.append(addBtn)
+        mountListItemDeleteHandles(match, blockId)
+        mountSelectedDeleteHandle()
+      }
       applyListItemSelection(match, effectivePath)
       selectedBlockRef.current = blockId
       if (!effectivePath) selectedEditablePathRef.current = null

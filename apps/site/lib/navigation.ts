@@ -23,6 +23,35 @@ export type NavItem = {
   isActive: boolean
 }
 
+export type SiteHeaderBlock = {
+  id: string
+  type: "SiteHeader"
+  props: {
+    siteName: string
+    logoUrl: string
+    links: { label: string; href: string }[]
+    activePath?: string
+  }
+}
+
+export function buildSiteHeaderBlock(opts: {
+  navItems: NavItem[]
+  siteName: string
+  siteLogo: string
+  activePath: string
+}): SiteHeaderBlock {
+  return {
+    id: "chrome_site-header",
+    type: "SiteHeader",
+    props: {
+      siteName: opts.siteName,
+      logoUrl: opts.siteLogo,
+      links: opts.navItems.map((item) => ({ label: item.label, href: item.href })),
+      activePath: opts.activePath,
+    },
+  }
+}
+
 export function buildNavItems(opts: {
   navSlugs: string[]
   currentSlug: string

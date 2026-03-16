@@ -8,7 +8,8 @@ import {
   type Operation,
   type PageDoc,
   validateBlockProps,
-  validateByJsonSchemaLike
+  validateByJsonSchemaLike,
+  isChrome
 } from "@ai-site-editor/shared"
 import { normalizeRouteCandidate } from "../nlp/intent-helpers.js"
 import { pageIdFromSlug, pageTitleFromSlug } from "../nlp/plan-normalizer.js"
@@ -494,6 +495,7 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
     if (!page) throw new OperationError(`Page not found for slug ${op.pageSlug}`, { category: "not_found" })
 
     if (op.op === "add_block") {
+      if (isChrome(op.block.type)) throw new OperationError(`Cannot add chrome block type "${op.block.type}"`, { category: "schema_violation" })
       _requireManifestComponent(manifestByType, op.block.type, "add block")
       const validatedProps = _validateWithManifestIfPresent(manifestByType, op.block.type, op.block.props)
 
@@ -531,6 +533,7 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const source = page.blocks[idx]
+      if (isChrome(source.type)) throw new OperationError(`Cannot duplicate chrome block "${op.blockId}"`, { category: "schema_violation" })
       _requireManifestComponent(manifestByType, source.type, "duplicate block")
       const targetPageSlug = typeof op.toPageSlug === "string" && op.toPageSlug.length > 0 ? op.toPageSlug : op.pageSlug
       const targetPage = staged.get(targetPageSlug)
@@ -715,6 +718,7 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
     if (op.op === "remove_block") {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
+      if (isChrome(page.blocks[idx].type)) throw new OperationError(`Cannot remove chrome block "${op.blockId}"`, { category: "schema_violation" })
       _requireManifestComponent(manifestByType, page.blocks[idx].type, "remove block")
       page.blocks.splice(idx, 1)
       page.updatedAt = new Date().toISOString()
@@ -725,6 +729,7 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
     if (op.op === "move_block") {
       const idx = page.blocks.findIndex((b) => b.id === op.blockId)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
+      if (isChrome(page.blocks[idx].type)) throw new OperationError(`Cannot move chrome block "${op.blockId}"`, { category: "schema_violation" })
       _requireManifestComponent(manifestByType, page.blocks[idx].type, "move block")
       const [block] = page.blocks.splice(idx, 1)
 
