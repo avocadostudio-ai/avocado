@@ -12,7 +12,7 @@ registerBlock("Table", {
   }),
   meta: {
     displayName: "Table",
-    description: "Data table with column headers, rows, and optional stripe styling.",
+    description: "Data table with column headers, rows, and optional stripe styling. Headers is a string array. Rows is a 2D string array where each inner array is one row matching the headers order.",
     category: "content",
     fields: {
       title: f.text("Section title"),
@@ -32,6 +32,6 @@ export function tableDefaultProps(): Record<string, unknown> {
       ["Support", "Community", "Email", "Dedicated"],
       ["API access", "—", "Yes", "Yes"],
     ],
-    striped: "false",
+    striped: "true",
   }
 }
