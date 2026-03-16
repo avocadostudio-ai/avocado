@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T08:55:58.061Z",
+    "updatedAt": "2026-03-16T16:46:26.830Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -17,6 +17,34 @@
           "imageAlt": "Fresh sliced avocado on a wooden cutting board with vibrant ingredients ready for meal preparation",
           "imagePosition": "right",
           "secondaryCtaText": ""
+        }
+      },
+      {
+        "id": "b_tabs_1773679560096_781",
+        "type": "Tabs",
+        "props": {
+          "tabs": [
+            {
+              "label": "Overview",
+              "content": "Avocados come in many varieties, each with unique flavors and textures. From the creamy Hass to the buttery Fuerte, there's an avocado for every palate. Discover where these nutrient-dense fruits are grown and how they've become a global culinary staple."
+            },
+            {
+              "label": "Nutritional Benefits",
+              "content": "Avocados are nutritional powerhouses packed with vitamins C, E, K, and B-6. They contain heart-healthy monounsaturated fats that support cardiovascular health, plus potassium, magnesium, and folate. A single avocado provides lutein, beta-carotene, and omega-3 fatty acids — making them one of nature's most nutrient-dense foods."
+            },
+            {
+              "label": "Recipes & Ideas",
+              "content": "From creamy avocado toast and guacamole to salads, smoothie bowls, and sushi rolls, avocados are incredibly versatile. Try slicing them into your morning eggs, blending them into pasta sauce, or using them as a healthy fat source in desserts. The possibilities are endless!"
+            },
+            {
+              "label": "Sustainability",
+              "content": "Sustainable avocado farming practices protect water resources and soil health. Many growers are adopting regenerative agriculture, reducing pesticide use, and supporting biodiversity. By choosing sustainably sourced avocados, you're supporting farmers who care for the land and their communities."
+            },
+            {
+              "label": "Fun Facts",
+              "content": "Did you know? Avocados are technically a fruit, not a vegetable. They're the only fruit with significant amounts of monounsaturated fat. Plus, avocado trees can live for over 100 years, and it takes 3-4 years for a tree to produce its first fruit!"
+            }
+          ]
         }
       },
       {
