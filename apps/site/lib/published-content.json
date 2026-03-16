@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T16:55:27.507Z",
+    "updatedAt": "2026-03-16T16:59:36.734Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -25,12 +25,12 @@
         "props": {
           "tabs": [
             {
-              "label": "Recipes & Ideas",
-              "content": "Avocados are incredibly versatile and work beautifully across every meal, from sunrise to sunset. Whether you're a seasoned chef or a cooking novice, these delicious fruits inspire endless culinary creativity and bring nutrition to every plate.\n\n• **Breakfast Favorites** – Spread on whole-grain toast, blend into smoothie bowls, add to scrambled eggs, or create avocado-based omelets\n• **Lunch & Salads** – Top grain bowls, toss into green salads, layer in sandwiches, or serve alongside fresh seafood\n• **Dinner Innovation** – Blend into creamy pasta sauces, use as a healthy fat in tacos, or stuff with quinoa and roasted vegetables\n• **Snacks & Desserts** – Make silky guacamole, create chocolate avocado mousse, blend into vegan ice cream, or top with granola\n\nThe possibilities are truly endless—let your imagination guide your next avocado creation."
-            },
-            {
               "label": "Overview",
               "content": "Avocados come in many varieties, each with unique flavors and textures. From the creamy Hass to the buttery Fuerte, these nutrient-dense fruits have become a global culinary staple. Discover the fascinating world of avocado cultivation, the origins of different varieties, and why chefs and home cooks alike celebrate this remarkable fruit.\n\n• **Hass Avocados** – The most popular variety worldwide, known for their creamy texture and rich, buttery flavor\n• **Fuerte Avocados** – Pear-shaped with a smooth, mild taste, perfect for slicing and serving\n• **Bacon Avocados** – Thinner skin and milder flavor, ideal for fresh applications and salads\n• **Reed Avocados** – Large, round, and creamy, with a subtle, delicate taste\n\nEach variety thrives in specific climates, and sustainable farming practices ensure these trees produce fruit year after year."
+            },
+            {
+              "label": "Recipes & Ideas",
+              "content": "Avocados are incredibly versatile and work beautifully across every meal, from sunrise to sunset. Whether you're a seasoned chef or a cooking novice, these delicious fruits inspire endless culinary creativity and bring nutrition to every plate.\n\n• **Breakfast Favorites** – Spread on whole-grain toast, blend into smoothie bowls, add to scrambled eggs, or create avocado-based omelets\n• **Lunch & Salads** – Top grain bowls, toss into green salads, layer in sandwiches, or serve alongside fresh seafood\n• **Dinner Innovation** – Blend into creamy pasta sauces, use as a healthy fat in tacos, or stuff with quinoa and roasted vegetables\n• **Snacks & Desserts** – Make silky guacamole, create chocolate avocado mousse, blend into vegan ice cream, or top with granola\n\nThe possibilities are truly endless—let your imagination guide your next avocado creation."
             },
             {
               "label": "Sustainability",
@@ -118,6 +118,37 @@
         "props": {
           "title": "Discover the Magic of Avocados",
           "body": "## Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n## Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n## Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
+        }
+      },
+      {
+        "id": "b_twocolumn_1773680337950_482",
+        "type": "TwoColumn",
+        "props": {
+          "variant": "default",
+          "left": [
+            {
+              "type": "heading",
+              "text": "Built for teams"
+            },
+            {
+              "type": "paragraph",
+              "text": "Ship changes quickly with a clear, reliable workflow."
+            },
+            {
+              "type": "cta",
+              "label": "Learn more",
+              "href": "/"
+            }
+          ],
+          "right": [
+            {
+              "type": "video",
+              "src": "/hero-generated.svg",
+              "alt": "Team collaborating on a website update",
+              "text": "ewewewew",
+              "label": "ewewe"
+            }
+          ]
         }
       },
       {
@@ -252,8 +283,18 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-15T19:53:30.050Z",
+    "updatedAt": "2026-03-16T17:09:09.377Z",
     "blocks": [
+      {
+        "id": "b_banner_1773680900785_798",
+        "type": "Banner",
+        "props": {
+          "text": "Grapefruits: bright, refreshing, and packed with wellness benefits.",
+          "variant": "info",
+          "ctaText": "Discover Benefits",
+          "ctaHref": "/"
+        }
+      },
       {
         "id": "b_hero_about",
         "type": "Hero",
