@@ -112,6 +112,11 @@
   --radius-input: 10px;
   --radius-dropdown: 12px;
 
+  /* Block surfaces */
+  --bg-1: #ffffff;
+  --border: #e2e8f0;
+  --stripe-bg: #f1f5f9;
+
   /* Compound surfaces */
   --card-bg: #f8fafc;
   --card-shadow: none;
@@ -169,6 +174,11 @@
 
   /* Misc */
   --placeholder-img: #e2e8f0;
+
+  /* Block surfaces */
+  --bg-1: #1e293b;
+  --border: #334155;
+  --stripe-bg: #1a2332;
 
   /* Compound surfaces */
   --card-bg: linear-gradient(160deg, #172033 0%, #111827 100%);
