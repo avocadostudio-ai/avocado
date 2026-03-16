@@ -252,7 +252,7 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T18:19:03.558Z",
+    "updatedAt": "2026-03-16T18:20:30.143Z",
     "blocks": [
       {
         "id": "b_hero_about",
@@ -324,24 +324,24 @@
         "props": {
           "items": [
             {
-              "imageUrl": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwY2l0cnVzJTIwZnJ1aXQlMjBmcmVzaHxlbnwxfDB8fHwxNzczNjgxMTIzfDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "Grapefruit cut in half on colorful background",
+              "imageUrl": "https://images.unsplash.com/photo-1568651239222-7af48d48d3eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8cGluayUyMGdyYXBlZnJ1aXR8ZW58MXwwfHx8MTc3MzY4NTE1N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "shallow focus photo of sliced orange fruit",
               "heading": "Pink Grapefruit",
               "description": "Sweet and tangy perfection in every bite",
               "ctaText": "",
               "ctaHref": ""
             },
             {
-              "imageUrl": "https://images.unsplash.com/photo-1580072222821-f26e9efd417c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8Z3JhcGVmcnVpdCUyMGNpdHJ1cyUyMGZydWl0JTIwZnJlc2h8ZW58MXwwfHx8MTc3MzY4MTEyNHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "Fresh grapefruit varieties displayed",
+              "imageUrl": "https://images.unsplash.com/photo-1670259382864-c532bcf1fa5e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjdXQlMjBncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxOTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "a fruit cut in half",
               "heading": "Packed with Nutrients",
               "description": "Rich in vitamin C, potassium, and antioxidants for daily wellness",
               "ctaText": "",
               "ctaHref": ""
             },
             {
-              "imageUrl": "https://images.unsplash.com/photo-1577627762018-e62a123c89bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyNnx8Z3JhcGVmcnVpdCUyMGNpdHJ1cyUyMGZydWl0JTIwZnJlc2h8ZW58MXwwfHx8MTc3MzY4MTEyNXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-              "imageAlt": "Abundance of fresh grapefruits",
+              "imageUrl": "https://images.unsplash.com/photo-1718833051058-4caaf174ed27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNnx8bWFueSUyMGdyYXBlZnJ1aXRzfGVufDF8MHx8fDE3NzM2ODUyMTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+              "imageAlt": "A pile of oranges sitting next to each other",
               "heading": "Endless Culinary Uses",
               "description": "From breakfast juice to salads and desserts—versatile and delicious",
               "ctaText": "",
