@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant V as Site Visitor
+    participant CDN as Vercel CDN
+    participant Build as Vercel Build
+
+    Note over Build: Build time (on deploy)
+    Build->>+Orchestrator: GET /publish/content?session=dev
+    Orchestrator-->>-Build: { pages: [...] }
+    Build->>Build: Write published-content.json
+    Build->>Build: next build → generateStaticParams() → SSG
+
+    Note over V,CDN: Runtime (visitor request)
+    V->>+CDN: GET /pricing
+    CDN-->>-V: Static HTML + JS (pre-rendered)
+    Note over V: No editor overlay<br/>No draft mode<br/>No orchestrator calls

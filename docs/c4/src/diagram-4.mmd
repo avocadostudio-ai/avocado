@@ -1,0 +1,35 @@
+sequenceDiagram
+    participant U as Editor User
+    participant E as Editor UI<br/>(Vite SPA)
+    participant O as Orchestrator<br/>(Render)
+    participant AI as OpenAI API
+    participant S as Site<br/>(Next.js)
+
+    U->>E: Opens editor, starts session
+
+    Note over E,S: 1. Activate draft preview
+    E->>S: GET /api/draft?secret=***&redirect=/
+    S->>S: Enable Next.js draft mode cookie
+    S-->>E: 302 redirect (iframe reloads in draft mode)
+
+    Note over U,AI: 2. User edits via chat
+    U->>E: "Change the hero headline to 'Adventure Awaits'"
+    E->>O: POST /chat { message, session, siteId }
+    O->>AI: Generate edit plan
+    AI-->>O: EditPlan { operations: [...] }
+    O->>O: Apply operations to in-memory session state
+    O-->>E: SSE stream: operations + updated page
+
+    Note over E,S: 3. Preview updates
+    E->>S: postMessage("site-editor/v1", { type: "refresh" })
+    S->>O: GET /sessions/dev/pages/?slug=/&siteId=...
+    O-->>S: Updated PageDoc (draft)
+    S-->>E: Re-rendered page in iframe
+    U->>U: Sees updated headline instantly
+
+    Note over U,O: 4. Publish
+    U->>E: Clicks "Publish"
+    E->>O: POST /publish { session, siteId }
+    O->>O: Commit published-content.json to git
+    O-->>E: { ok: true }
+    Note over S: Vercel auto-deploys from git push<br/>→ new static build with updated content

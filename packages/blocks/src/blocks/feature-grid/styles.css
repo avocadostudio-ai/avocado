@@ -1,0 +1,38 @@
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+  list-style: none;
+  padding: 0;
+}
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-feature);
+  padding: 20px;
+}
+
+.feature-card strong {
+  display: block;
+  font-size: 1.125rem;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--heading);
+}
+
+.feature-card p {
+  margin: 0;
+  color: var(--body-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}

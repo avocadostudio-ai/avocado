@@ -1,0 +1,93 @@
+.cta-section {
+  text-align: center;
+  padding: 40px 20px;
+  position: relative;
+  overflow: hidden;
+  background: var(--cta-bg);
+}
+
+.cta-section .section__inner {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  max-width: 1080px;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  row-gap: 18px;
+}
+
+.cta-section .section__inner > h2 {
+  margin: 0;
+  max-width: 22ch;
+  font-size: clamp(2rem, 3.7vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.cta-section .section__inner > p {
+  margin: 0;
+  max-width: 62ch;
+  font-size: clamp(1.1rem, 1.9vw, 1.15rem);
+  line-height: 1.5;
+  color: var(--body);
+  text-wrap: pretty;
+}
+
+.cta-section .section__inner > .btn-primary {
+  margin-top: 4px;
+  min-width: 255px;
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.cta-section::before {
+  content: "";
+  position: absolute;
+  inset: auto -8% -55% auto;
+  width: 340px;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle at center, rgb(20 184 166 / 0.2), transparent 68%);
+  pointer-events: none;
+}
+
+/* Dark */
+.dark .cta-section [data-editable-target="description"] {
+  color: #d6e2f5;
+}
+
+.dark main.editor-mode .cta-section [data-editable-target="description"] {
+  color: #dbe7f7;
+}
+
+.dark .editor-live-draft-active .cta-section [data-editable-target="description"]::after {
+  background: rgba(56, 189, 248, 0.025);
+  animation: none;
+}
+
+@media (max-width: 900px) {
+  .cta-section .section__inner {
+    padding: 24px 16px;
+    row-gap: 14px;
+  }
+
+  .cta-section .section__inner > h2 {
+    max-width: 16ch;
+  }
+
+  .cta-section .section__inner > p {
+    max-width: 40ch;
+    font-size: 1rem;
+  }
+
+  .cta-section .section__inner > .btn-primary {
+    min-width: 220px;
+    font-size: 1rem;
+    padding: 12px 26px;
+  }
+}
