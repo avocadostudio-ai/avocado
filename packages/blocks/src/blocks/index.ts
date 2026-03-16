@@ -18,6 +18,7 @@ import { Gallery } from "./gallery/renderer"
 import { Tabs } from "./tabs/renderer"
 import { Table } from "./table/renderer"
 import { Quote } from "./quote/renderer"
+import { Video } from "./video/renderer"
 
 export const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element | null> = {
   Hero,
@@ -38,5 +39,6 @@ export const renderers: Record<string, (props: Record<string, unknown>) => JSX.E
   Gallery,
   Tabs,
   Table,
-  Quote
+  Quote,
+  Video
 }

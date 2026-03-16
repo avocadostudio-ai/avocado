@@ -47,10 +47,23 @@
   background: var(--bg-1);
 }
 
-/* First column emphasis */
+/* First column — sticky + emphasis */
+.table-block__table th:first-child,
+.table-block__table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-1);
+}
+
 .table-block__table td:first-child {
   font-weight: 500;
   color: var(--heading);
+  background: var(--section-bg);
+}
+
+.table-block__table--striped tbody tr:nth-child(even) td:first-child {
+  background: var(--bg-1);
 }
 
 @media (max-width: 600px) {

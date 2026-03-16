@@ -5,6 +5,7 @@
 
 .quote-block .section__inner {
   max-width: 720px;
+  text-align: center;
 }
 
 .quote-block__quote {
@@ -40,13 +41,14 @@
 
 /* Attribution row */
 .quote-block__attribution {
-  display: flex;
+  display: inline-flex;
   flex-direction: row;
   align-items: center;
   gap: 12px;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+  text-align: left;
 }
 
 .quote-block__avatar {
