@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T18:07:20.297Z",
+    "updatedAt": "2026-03-16T18:22:24.712Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -52,9 +52,20 @@
         "type": "Embed",
         "props": {
           "embedType": "youtube",
-          "url": "https://www.youtube.com/watch?v=cYPKqRIFVdU",
+          "url": "https://www.youtube.com/watch?xv=cYPKqRIFVdU",
           "title": "",
           "aspectRatio": "16:9"
+        }
+      },
+      {
+        "id": "b_video_1773685338972_965",
+        "type": "Video",
+        "props": {
+          "src": "https://www.youtube.com/watch?xv=cYPKqRIFVdU",
+          "title": "",
+          "posterUrl": "",
+          "autoplay": "false",
+          "loop": "false"
         }
       },
       {
