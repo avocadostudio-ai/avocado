@@ -2,17 +2,11 @@
   "name": "@ai-site-editor/site-sdk",
   "version": "0.0.2",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./editor-manifest": {
-      "import": "./dist/editor-manifest.js",
-      "types": "./dist/editor-manifest.d.ts"
-    }
+    ".": "./src/index.ts",
+    "./editor-manifest": "./src/editor-manifest.ts"
   },
   "repository": {
     "type": "git",
@@ -23,7 +17,7 @@
     "registry": "https://npm.pkg.github.com",
     "access": "restricted"
   },
-  "files": ["dist"],
+  "files": ["src"],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
