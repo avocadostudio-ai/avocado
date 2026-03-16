@@ -283,8 +283,18 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T17:09:50.558Z",
+    "updatedAt": "2026-03-16T17:10:17.434Z",
     "blocks": [
+      {
+        "id": "b_banner_1773680900785_798",
+        "type": "Banner",
+        "props": {
+          "text": "Grapefruits: bright, refreshing, and packed with wellness benefits.",
+          "variant": "info",
+          "ctaText": "Discover Benefits",
+          "ctaHref": "/"
+        }
+      },
       {
         "id": "b_hero_about",
         "type": "Hero",
@@ -306,16 +316,6 @@
           "author": "Peter Drucker",
           "role": "Management Consultant",
           "imageUrl": "https://i.pravatar.cc/300"
-        }
-      },
-      {
-        "id": "b_banner_1773680900785_798",
-        "type": "Banner",
-        "props": {
-          "text": "Grapefruits: bright, refreshing, and packed with wellness benefits.",
-          "variant": "info",
-          "ctaText": "Discover Benefits",
-          "ctaHref": "/"
         }
       },
       {
