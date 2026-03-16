@@ -13,7 +13,7 @@ export const f = {
 export const DEFAULT_HEADING_LEVELS: Record<string, string> = {
   Hero: "h1", FeatureGrid: "h2", Testimonials: "h2", FAQAccordion: "h2",
   CTA: "h2", Card: "h3", CardGrid: "h2", RichText: "h2",
-  Stats: "h2", TwoColumn: "h2", Footer: "h4",
+  Stats: "h2", TwoColumn: "h2", Footer: "h4", Gallery: "h2",
 }
 
 export function resolveHeadingTag(blockType: string, props: Record<string, unknown>): string {

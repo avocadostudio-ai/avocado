@@ -1,0 +1,72 @@
+.banner {
+  padding: 16px 20px;
+}
+
+.banner__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.banner__text {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.banner__cta.btn-primary {
+  padding: 8px 20px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* Variants — light mode */
+.banner--info {
+  background: var(--brand-subtle, #e0f2fe);
+  color: var(--heading);
+}
+
+.banner--success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.banner--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Dark mode */
+.dark .banner--info {
+  background: color-mix(in srgb, var(--brand) 15%, var(--bg-1));
+  color: var(--text-100);
+}
+
+.dark .banner--success {
+  background: color-mix(in srgb, #10b981 15%, var(--bg-1));
+  color: #6ee7b7;
+}
+
+.dark .banner--warning {
+  background: color-mix(in srgb, #f59e0b 15%, var(--bg-1));
+  color: #fcd34d;
+}
+
+@media (max-width: 900px) {
+  .banner {
+    padding: 12px 12px;
+  }
+
+  .banner__inner {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .banner__text {
+    font-size: 0.95rem;
+  }
+}

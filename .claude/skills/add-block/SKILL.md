@@ -298,12 +298,62 @@ Good notes describe:
 
 Skip this step for simple blocks — the auto-generated contract is usually sufficient.
 
-## Step 8 — Verify
+## Step 8 — Create Focused Test
+
+Create `packages/blocks/src/blocks/<name>/renderer.test.ts` to validate the block in isolation:
+
+```typescript
+import test from "node:test"
+import assert from "node:assert/strict"
+import { validateBlockProps, getBlockMeta, defaultPropsForType } from "@ai-site-editor/shared"
+import { renderers } from "../index"
+
+const BLOCK_TYPE = "MyBlock"
+
+test(`${BLOCK_TYPE}: registered in block registry`, () => {
+  const meta = getBlockMeta(BLOCK_TYPE)
+  assert.ok(meta, `${BLOCK_TYPE} not found in registry`)
+  assert.ok(meta.displayName, "missing displayName")
+  assert.ok(meta.category, "missing category")
+})
+
+test(`${BLOCK_TYPE}: default props pass schema validation`, () => {
+  const props = defaultPropsForType(BLOCK_TYPE)
+  const result = validateBlockProps(BLOCK_TYPE, props)
+  assert.equal(result.success, true, `Schema validation failed: ${JSON.stringify(result.success ? null : result.error.issues)}`)
+})
+
+test(`${BLOCK_TYPE}: renderer is registered`, () => {
+  assert.ok(renderers[BLOCK_TYPE], `No renderer found for ${BLOCK_TYPE}`)
+  assert.equal(typeof renderers[BLOCK_TYPE], "function")
+})
+```
+
+Adapt the `BLOCK_TYPE` constant and add block-specific schema validation tests:
+- Test that required props are enforced (empty string rejected, missing fields rejected)
+- Test that enum fields reject invalid values
+- Test that optional fields work with and without values
+- Test array fields with empty arrays if applicable
+
+**Note:** Avoid `renderToStaticMarkup` in tests — the JSX automatic runtime (`react-jsx`) doesn't inject React globals needed for server rendering in the test runner. Focus tests on schema validation, metadata, and renderer registration.
+
+**Note:** Test files are excluded from `packages/blocks/tsconfig.json` via `"exclude": ["src/**/*.test.ts"]` since the blocks package doesn't have `@types/node`. Tests run via `tsx` directly which handles this. This is already configured — no changes needed.
+
+## Step 9 — Verify (iterate until green)
+
+Run verification commands and **fix any errors before moving on**. If typecheck or tests fail, read the error output, fix the issue, and re-run until both pass. Do not skip this step.
 
 ```bash
 pnpm typecheck   # Must pass — all workspaces
 pnpm test        # All tests should pass
 ```
+
+The existing `buildComponentsManifest` test in `apps/site/test/editor-components-manifest.test.ts` automatically validates that every registered block has a valid schema and valid default props. This means your new block is already covered — if the schema or defaults are wrong, this test will catch it.
+
+**If typecheck fails:** fix type errors in the schema or renderer, then re-run.
+**If tests fail:** check that `defaultProps` satisfies all required schema fields and that the `registerBlock()` call has correct metadata. Fix and re-run.
+
+Keep iterating until both commands pass with zero errors.
 
 Then manually verify in the running app:
 - Block appears in editor's "add block" list (auto via manifest)
@@ -312,14 +362,13 @@ Then manually verify in the running app:
 - AI can create and edit the block (auto via schema contracts)
 - Dark mode and mobile responsive styles look correct
 
-No test file changes needed — block rendering is schema-driven and the registry auto-wires everything.
-
 ## Checklist
 
 **Create:**
 - [ ] `packages/shared/src/blocks/<name>.ts` — `registerBlock()` + default props function
 - [ ] `packages/blocks/src/blocks/<name>/renderer.tsx` — React component with `data-editable-*` attributes
 - [ ] `packages/blocks/src/blocks/<name>/styles.css` — Desktop + mobile + dark CSS
+- [ ] `packages/blocks/src/blocks/<name>/renderer.test.ts` — Focused test (registry, schema, render)
 
 **Wire (3 barrel files):**
 - [ ] `packages/shared/src/blocks/index.ts` — import + `defaults` map entry
@@ -329,9 +378,10 @@ No test file changes needed — block rendering is schema-driven and the registr
 **Optional:**
 - [ ] `apps/orchestrator/src/nlp/deterministic-planner-suggestions.ts` — `_blockNotes` entry
 
-**Verify:**
+**Verify (iterate until green):**
 - [ ] `pnpm typecheck` passes
-- [ ] `pnpm test` passes
+- [ ] `pnpm test` passes (including new block-specific test)
+- [ ] If either fails, fix and re-run until both pass
 - [ ] Block renders on site
 - [ ] Editor property panel works
 - [ ] Inline editing works in preview

@@ -1,0 +1,143 @@
+.tabs-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+/* Tab bar wrapper — provides fade gradient overflow hints */
+.tabs-block__bar-wrap {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.tabs-block__bar-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 2px; /* above the border-bottom */
+  width: 48px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--section-bg, var(--bg-0)));
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* Show fade when bar is scrollable — JS adds this class */
+.tabs-block__bar-wrap--overflow::after {
+  opacity: 1;
+}
+
+/* Hide fade when scrolled to the end */
+.tabs-block__bar-wrap--at-end::after {
+  opacity: 0;
+}
+
+/* Tab bar */
+.tabs-block__bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-block__bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-block__tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-200);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, box-shadow 0.15s;
+}
+
+.tabs-block__tab:hover {
+  color: var(--heading);
+}
+
+.tabs-block__tab--active {
+  color: var(--brand);
+  box-shadow: inset 0 -2px 0 var(--brand);
+}
+
+/* Panel content */
+.tabs-block__content {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-100);
+}
+
+.tabs-block__content p {
+  margin: 0 0 12px;
+}
+
+.tabs-block__content p:last-child {
+  margin-bottom: 0;
+}
+
+.tabs-block__content h3 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.tabs-block__content ul {
+  margin: 0 0 12px;
+  padding-left: 24px;
+  list-style: none;
+}
+
+.tabs-block__content ol {
+  margin: 0 0 12px;
+  padding-left: 24px;
+  list-style: none;
+  counter-reset: ol-counter;
+}
+
+.tabs-block__content ul li::before {
+  content: "•";
+  color: var(--brand);
+  font-weight: 700;
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+}
+
+.tabs-block__content ol li {
+  counter-increment: ol-counter;
+}
+
+.tabs-block__content ol li::before {
+  content: counter(ol-counter) ".";
+  color: var(--brand);
+  font-weight: 600;
+  display: inline-block;
+  width: 1.5em;
+  margin-left: -1.5em;
+}
+
+.tabs-block__content li {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 600px) {
+  .tabs-block {
+    padding: 24px 12px;
+  }
+
+  .tabs-block__tab {
+    padding: 8px 14px;
+    font-size: 0.95rem;
+  }
+
+  .tabs-block__bar {
+    margin-bottom: 16px;
+  }
+}

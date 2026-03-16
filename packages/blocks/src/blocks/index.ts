@@ -11,6 +11,11 @@ import { Stats } from "./stats/renderer"
 import { TwoColumn } from "./two-column/renderer"
 import { Footer } from "./footer/renderer"
 import { SiteHeader } from "./site-header/renderer"
+import { Embed } from "./embed/renderer"
+import { Banner } from "./banner/renderer"
+import { Carousel } from "./carousel/renderer"
+import { Gallery } from "./gallery/renderer"
+import { Tabs } from "./tabs/renderer"
 
 export const renderers: Record<string, (props: Record<string, unknown>) => JSX.Element | null> = {
   Hero,
@@ -24,5 +29,10 @@ export const renderers: Record<string, (props: Record<string, unknown>) => JSX.E
   Stats,
   TwoColumn,
   Footer,
-  SiteHeader
+  SiteHeader,
+  Embed,
+  Banner,
+  Carousel,
+  Gallery,
+  Tabs
 }

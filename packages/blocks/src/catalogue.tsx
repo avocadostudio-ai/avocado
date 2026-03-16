@@ -3,6 +3,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { SharedBlockRenderer } from "./renderer"
+import { initCarousels } from "./blocks/carousel/init"
+import { initTabs } from "./blocks/tabs/init"
 import { getAllBlockMeta, allowedBlockTypes, defaultPropsForType, getChromeTypes, type BlockMeta, type FieldMeta, type ImageSpec } from "@ai-site-editor/shared"
 
 const CATEGORY_ORDER: NonNullable<BlockMeta["category"]>[] = ["content", "conversion", "layout", "navigation", "media"]
@@ -592,6 +594,14 @@ function CataloguePreview({ viewportWidth, darkMode, previewWrapRef, previewScal
     observer.observe(document.head, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [mountNode])
+
+  // Initialize interactive blocks (carousel, etc.) after portal renders
+  useEffect(() => {
+    if (!mountNode) return
+    // Defer to let React finish flushing the portal content
+    const id = requestAnimationFrame(() => { initCarousels(mountNode); initTabs(mountNode) })
+    return () => cancelAnimationFrame(id)
+  })
 
   const scaledHeight = contentHeight * previewScale
 
