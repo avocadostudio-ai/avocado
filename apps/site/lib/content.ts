@@ -1,5 +1,6 @@
 import type { PageDoc } from "./site-contract"
-import { getPublishedPage, getPublishedSlugs } from "./published-content-api"
+import type { SiteConfig } from "@ai-site-editor/shared"
+import { getPublishedPage, getPublishedSlugs, getPublishedSiteConfig } from "./published-content-api"
 
 export type ContentSource = "published" | "draft"
 
@@ -18,7 +19,7 @@ function hasOrchestratorUrl(): boolean {
 let draftFetchersPromise: ReturnType<typeof loadDraftFetchers> | null = null
 function loadDraftFetchers() {
   return import("@ai-site-editor/site-sdk").then(
-    ({ fetchDraftPage, fetchDraftSlugs }) => ({ fetchDraftPage, fetchDraftSlugs })
+    ({ fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig }) => ({ fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig })
   )
 }
 function getDraftFetchers() {
@@ -50,4 +51,16 @@ export async function getNavSlugs(
     if (slugs.length > 0) return slugs
   }
   return getPublishedSlugs()
+}
+
+export async function getSiteConfig(
+  source: ContentSource,
+  session: string,
+  siteId: string
+): Promise<SiteConfig> {
+  if (source === "draft") {
+    const { fetchDraftSiteConfig } = await getDraftFetchers()
+    return fetchDraftSiteConfig(session, siteId)
+  }
+  return getPublishedSiteConfig()
 }

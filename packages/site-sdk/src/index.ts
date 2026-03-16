@@ -1,9 +1,10 @@
 // Types
 export type { PageDoc, PageMeta, BlockInstance, DraftContext, SearchParamsRecord } from "./types.ts"
+export type { SiteConfig } from "@ai-site-editor/shared"
 export { pageDocSchema } from "./types.ts"
 
 // Draft fetching
-export { getOrchestratorUrl, fetchDraftPage, fetchDraftSlugs } from "./draft-fetch.ts"
+export { getOrchestratorUrl, fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig } from "./draft-fetch.ts"
 
 // Draft context resolution
 export { resolveDraftContext, isTileMode, single } from "./draft-context.ts"

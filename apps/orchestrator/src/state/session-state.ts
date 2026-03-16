@@ -6,7 +6,8 @@ import {
   demoPublishedPages,
   type EditPlan,
   type Operation,
-  type PageDoc
+  type PageDoc,
+  type SiteConfig
 } from "@ai-site-editor/shared"
 import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
 
@@ -111,6 +112,7 @@ export type PersistedState = {
   versions: Record<string, number>
   recentEdits: Record<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>
   chatHistory: Record<string, Array<{ role: "user" | "assistant"; content: string }>>
+  siteConfigs?: Record<string, SiteConfig>
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +130,9 @@ export const pendingClarificationBySession = new Map<string, { baseRequest: stri
 export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
 export const publishStatusBySession = new Map<string, PublishTracker>()
+export const siteConfigs = new Map<string, SiteConfig>()
+// Seed default config for avocado-stories
+siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
@@ -303,6 +308,18 @@ export function getRecentEdits(session: string, slug: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Site config accessors
+// ---------------------------------------------------------------------------
+export function getSiteConfig(session: string): SiteConfig {
+  return siteConfigs.get(session) ?? {}
+}
+
+export function setSiteConfig(session: string, config: SiteConfig) {
+  const existing = siteConfigs.get(session) ?? {}
+  siteConfigs.set(session, { ...existing, ...config })
+}
+
+// ---------------------------------------------------------------------------
 // Persistence helpers
 // ---------------------------------------------------------------------------
 export function nestedPageMapToObject(source: Map<string, Map<string, PageDoc>>) {
@@ -409,6 +426,17 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
       chatHistoryBySession.set(session, list.slice(-CHAT_HISTORY_MAX_TURNS))
     }
   }
+
+  siteConfigs.clear()
+  // Re-seed default
+  siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
+  if (parsed.siteConfigs && typeof parsed.siteConfigs === "object") {
+    for (const [session, config] of Object.entries(parsed.siteConfigs)) {
+      if (config && typeof config === "object") {
+        siteConfigs.set(session, config as SiteConfig)
+      }
+    }
+  }
 }
 
 async function rotateStateBackups(logger: FastifyBaseLogger) {
@@ -482,7 +510,8 @@ export async function persistStateNow(logger: FastifyBaseLogger) {
     historyRedo: nestedHistoryMapToObject(historyRedo),
     versions: Object.fromEntries(versions.entries()),
     recentEdits: Object.fromEntries(recentEdits.entries()),
-    chatHistory: Object.fromEntries(chatHistoryBySession.entries())
+    chatHistory: Object.fromEntries(chatHistoryBySession.entries()),
+    siteConfigs: Object.fromEntries(siteConfigs.entries())
   }
   await mkdir(resolve(stateFilePath, ".."), { recursive: true })
   const tempPath = `${stateFilePath}.tmp-${process.pid}`

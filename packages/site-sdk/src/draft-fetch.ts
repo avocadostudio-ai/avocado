@@ -1,5 +1,5 @@
-import { pageDocSchema } from "@ai-site-editor/shared"
-import type { PageDoc } from "@ai-site-editor/shared"
+import { pageDocSchema, siteConfigSchema } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
 
 export function getOrchestratorUrl(): string | null {
   const value = process.env.ORCHESTRATOR_URL?.trim()
@@ -90,4 +90,31 @@ export async function fetchDraftSlugs(
   }
 
   return []
+}
+
+export async function fetchDraftSiteConfig(
+  session: string,
+  siteId: string,
+  options?: { timeoutMs?: number; orchestratorUrl?: string }
+): Promise<SiteConfig> {
+  const configuredBaseUrl = options?.orchestratorUrl ?? getOrchestratorUrl()
+  if (!configuredBaseUrl) return {}
+
+  const timeout = options?.timeoutMs ?? 5000
+  const baseUrls = buildCandidateBaseUrls(configuredBaseUrl)
+
+  for (const baseUrl of baseUrls) {
+    try {
+      const url = `${baseUrl}/draft/site-config?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`
+      const res = await fetchWithTimeout(url, timeout)
+      if (!res.ok) continue
+      const payload = (await res.json()) as unknown
+      const parsed = siteConfigSchema.safeParse(payload)
+      if (parsed.success) return parsed.data
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return {}
 }

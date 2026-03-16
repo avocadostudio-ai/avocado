@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { FastifyInstance } from "fastify"
-import { pageDocSchema, type PageDoc } from "@ai-site-editor/shared"
+import { pageDocSchema, siteConfigSchema, type PageDoc, type SiteConfig } from "@ai-site-editor/shared"
 import {
   publishedPages,
   scopedSessionKey,
@@ -10,6 +10,9 @@ import {
   getSessionDraft,
   getPage,
   getSessionPages,
+  getSiteConfig,
+  setSiteConfig,
+  schedulePersistState,
   ensureHeroImageProps,
   lastPublishedScopedSession
 } from "../state/session-state.js"
@@ -114,6 +117,24 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     }
   })
 
+  app.get("/draft/site-config", async (request, reply) => {
+    const query = request.query as { session?: string; siteId?: string }
+    if (!query.session) return reply.code(400).send({ error: "session is required" })
+    const session = scopedSessionKey(query.session, query.siteId)
+    return getSiteConfig(session)
+  })
+
+  app.put("/draft/site-config", async (request, reply) => {
+    const body = (request.body ?? {}) as { session?: string; siteId?: string; config?: unknown }
+    if (!body.session) return reply.code(400).send({ error: "session is required" })
+    const parsed = siteConfigSchema.safeParse(body.config)
+    if (!parsed.success) return reply.code(400).send({ error: "invalid config", details: parsed.error.issues })
+    const session = scopedSessionKey(body.session, body.siteId)
+    setSiteConfig(session, parsed.data)
+    schedulePersistState(app.log)
+    return { status: "ok", config: getSiteConfig(session) }
+  })
+
   app.get("/publish/content", async (request, reply) => {
     const query = request.query as { session?: string; siteId?: string }
     const session = normalizeSession(query.session)
@@ -123,10 +144,12 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
       ? scopedSessionKey(session, query.siteId)
       : (lastPublishedScopedSession ?? scopedSessionKey(session, undefined))
     const pages = getSessionPages(scopedSession)
+    const siteConfig = getSiteConfig(scopedSession)
     return {
       session,
       slugs: pages.map((page) => page.slug),
       pages,
+      siteConfig,
       generatedAt: new Date().toISOString()
     }
   })
