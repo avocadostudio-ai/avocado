@@ -8,6 +8,7 @@ registerBlock("Quote", {
     author: z.string().optional(),
     role: z.string().optional(),
     imageUrl: z.string().optional(),
+    imageAlt: z.string().optional(),
   }),
   meta: {
     displayName: "Quote",
@@ -18,6 +19,7 @@ registerBlock("Quote", {
       author: f.text("Author name"),
       role: f.text("Author role / title"),
       imageUrl: f.image("Author avatar", { aspectRatio: "square", width: 128, height: 128 }),
+      imageAlt: f.imageAlt("Avatar alt text"),
     },
   }
 })
