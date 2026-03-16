@@ -1,6 +1,7 @@
 import { BlockErrorBoundary } from "@ai-site-editor/site-sdk"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
-import { SiteHeader, type NavItem } from "./site-header"
+import { SiteHeader } from "./site-header"
+import type { NavItem } from "../lib/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
 export type SitePageContentProps = {

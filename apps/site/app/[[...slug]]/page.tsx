@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache"
 import { draftMode } from "next/headers"
+import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { resolveDraftContext, isTileMode, single, buildSlug } from "@ai-site-editor/site-sdk"
 import { SitePageContent } from "../../components/site-page-content"
@@ -106,10 +107,11 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   })
 
   if (!page) {
+    if (!editorMode) notFound()
     return (
       <main>
-        <h1>{editorMode ? "Draft unavailable" : "Page not found"}</h1>
-        <p>{editorMode ? `Could not load draft content from orchestrator for ${slug}.` : `No content exists for ${slug}.`}</p>
+        <h1>Draft unavailable</h1>
+        <p>Could not load draft content from orchestrator for {slug}.</p>
       </main>
     )
   }

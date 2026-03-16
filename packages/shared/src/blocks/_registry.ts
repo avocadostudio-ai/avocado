@@ -181,9 +181,7 @@ export function getImageSpec(blockType: string, fieldPath: string): ImageSpec | 
  * Block schemas keyed by type name.
  * Prefer `registerBlock()` for new blocks; this object is kept for backwards compat.
  */
-export const blockSchemas = _blockSchemas as Record<string, z.ZodObject<any>> & {
-  [K in "Hero" | "FeatureGrid" | "Testimonials" | "FAQAccordion" | "CTA" | "Card" | "CardGrid" | "RichText" | "Stats" | "ContactForm" | "TwoColumn" | "Footer"]: z.ZodObject<any>
-}
+export const blockSchemas: Record<string, z.ZodObject<any>> = _blockSchemas
 
 export const allowedBlockTypes: string[] = []
 
