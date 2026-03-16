@@ -1,14 +1,10 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { SiteThemeToggle } from "./theme-toggle"
 import { useMobileMenu } from "../hooks/use-mobile-menu"
-
-export type NavItem = {
-  href: string
-  label: string
-  isActive: boolean
-}
+import type { NavItem } from "../lib/navigation"
 
 type SiteHeaderProps = {
   siteName: string
@@ -24,7 +20,7 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
     <>
       <header className="site-top-nav">
         <Link className="site-brand" href={homeHref}>
-          <img className="site-logo" src={siteLogo} alt={`${siteName} logo`} width={38} height={38} />
+          <Image className="site-logo" src={siteLogo} alt={`${siteName} logo`} width={38} height={38} unoptimized />
           <span className="site-brand-text">{siteName}</span>
         </Link>
         <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">

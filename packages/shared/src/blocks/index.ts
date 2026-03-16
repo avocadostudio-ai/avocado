@@ -1,5 +1,4 @@
 // Named imports trigger each module's registerBlock() side effect
-import "./contact-form.ts" // no default props export — side-effect only
 import { heroDefaultProps } from "./hero.ts"
 import { featureGridDefaultProps } from "./feature-grid.ts"
 import { testimonialsDefaultProps } from "./testimonials.ts"
