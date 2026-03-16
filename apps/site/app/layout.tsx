@@ -13,9 +13,16 @@ export const metadata: Metadata = {
   }
 }
 
+// Inline script that runs before first paint to prevent dark mode flash.
+// Reads the stored theme preference and applies the `dark` class immediately.
+const themeScript = `(function(){try{var t=localStorage.getItem('site-theme-v1');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()`
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>{children}</body>
     </html>
   )
