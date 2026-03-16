@@ -8,7 +8,27 @@ Activate this skill when working on cross-app features, debugging data flow betw
 Editor UI (4100) ←→ Orchestrator API (4200) ←→ Site Renderer (3000)
 ```
 
-pnpm monorepo: three apps + two packages. All communication is HTTP + postMessage.
+pnpm monorepo: three apps + three packages. All communication is HTTP + postMessage.
+
+## Packages
+
+- **packages/shared** — Zod schemas, block registry, type definitions
+- **packages/blocks** — block renderers (React components)
+- **packages/preview-adapter** — PreviewBridge, postMessage protocol, CSS overlays
+- **packages/site-sdk** — external integration package for third-party sites (e.g. villa)
+
+### Package entrypoints (dual src/publish)
+
+Packages use `src/` entrypoints for monorepo dev (no build step needed). For external npm publishing, `publishConfig` overrides swap to `dist/` paths. **Never change `main`/`types` to `dist/` directly** — that breaks CI since packages aren't pre-built.
+
+```
+main/types → src/index.ts          (monorepo resolution)
+publishConfig.main/types → dist/   (npm publish only)
+files → ["dist"]                   (tarball contents)
+build → tsc -p tsconfig.build.json (generates dist/)
+```
+
+Internal workspace deps use `workspace:*` protocol (not versioned specifiers like `^0.0.x`).
 
 ## apps/orchestrator (Fastify backend)
 
