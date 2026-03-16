@@ -29,18 +29,20 @@ export {
   // Backwards-compatible exports
   blockSchemas,
   allowedBlockTypes,
-  _registerBlockInternal,
   // Utility functions
   getPropDisplayName,
-  defaultPropsForType,
   defaultListItemForBlock,
-  resolveHeadingTag,
-  DEFAULT_HEADING_LEVELS,
   // Schemas & validation
   blockInstanceSchema,
   validateBlockProps,
   getBlockJsonSchema,
-} from "./blocks.ts"
+} from "./blocks/_registry.ts"
+
+export {
+  defaultPropsForType,
+  resolveHeadingTag,
+  DEFAULT_HEADING_LEVELS,
+} from "./blocks/index.ts"
 
 export {
   // Types
