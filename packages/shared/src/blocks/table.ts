@@ -7,7 +7,7 @@ registerBlock("Table", {
     title: z.string().optional(),
     headingLevel: z.string().optional(),
     headers: z.array(z.string().min(1)).min(1),
-    rows: z.array(z.array(z.string())).min(1),
+    rows: z.array(z.array(z.coerce.string())).min(1),
     striped: z.enum(["true", "false"]).default("false"),
   }),
   meta: {
