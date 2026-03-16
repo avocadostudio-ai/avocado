@@ -1,5 +1,5 @@
 import { BlockErrorBoundary } from "@ai-site-editor/site-sdk"
-import { SharedBlockRenderer } from "@ai-site-editor/blocks"
+import { SharedBlockRenderer, BlocksInitClient } from "@ai-site-editor/blocks"
 import type { SiteHeaderBlock } from "../lib/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
@@ -21,6 +21,7 @@ export function SitePageContent({ page, chromeHeader }: SitePageContentProps) {
           </div>
         ))}
       </main>
+      <BlocksInitClient />
     </>
   )
 }

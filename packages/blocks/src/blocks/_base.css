@@ -23,18 +23,22 @@ section {
   color: var(--heading);
 }
 
+/* ── Buttons ── */
 .btn-primary,
-.btn-secondary {
+.btn-secondary,
+.btn-tertiary {
   display: inline-block;
   padding: 10px 22px;
   border-radius: var(--radius-btn);
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  transition: opacity 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
   cursor: pointer;
+  border: 1.5px solid transparent;
 }
 
+/* Primary — solid brand fill */
 .btn-primary {
   background: var(--brand);
   color: var(--brand-fg);
@@ -45,34 +49,58 @@ section {
   opacity: 0.88;
 }
 
+/* Secondary — outlined */
 .btn-secondary {
   background: transparent;
   color: var(--brand);
-  border: 1.5px solid var(--brand);
+  border-color: var(--brand);
 }
 
 .btn-secondary:hover {
   background: var(--brand-subtle);
 }
 
-/* Dark overrides for buttons */
+/* Tertiary — text-only, underline for tap affordance on mobile */
+.btn-tertiary {
+  background: transparent;
+  color: var(--brand);
+  padding: 10px 16px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.btn-tertiary:hover {
+  background: var(--brand-subtle);
+  text-decoration: none;
+}
+
+/* Dark overrides */
 .dark .btn-primary {
-  background: #0f766e;
+  background: var(--brand);
   box-shadow: 0 2px 8px rgb(2 6 23 / 0.35);
 }
 
 .dark .btn-primary:hover {
   opacity: 1;
-  background: var(--brand-hover);
+  background: var(--brand-hover, var(--brand));
 }
 
 .dark .btn-secondary {
-  color: #5eead4;
-  border-color: #14b8a6;
+  color: var(--brand-subtle, #5eead4);
+  border-color: var(--brand);
 }
 
 .dark .btn-secondary:hover {
-  background: rgb(20 184 166 / 0.16);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.dark .btn-tertiary {
+  color: var(--brand-subtle, #5eead4);
+}
+
+.dark .btn-tertiary:hover {
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
 }
 
 @media (max-width: 900px) {

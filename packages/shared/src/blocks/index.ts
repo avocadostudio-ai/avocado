@@ -11,6 +11,11 @@ import { statsDefaultProps } from "./stats.ts"
 import { twoColumnDefaultProps } from "./two-column.ts"
 import { footerDefaultProps } from "./footer.ts"
 import { siteHeaderDefaultProps } from "./site-header.ts"
+import { embedDefaultProps } from "./embed.ts"
+import { bannerDefaultProps } from "./banner.ts"
+import { carouselDefaultProps } from "./carousel.ts"
+import { galleryDefaultProps } from "./gallery.ts"
+import { tabsDefaultProps } from "./tabs.ts"
 
 import type { BlockType } from "./_registry.ts"
 
@@ -27,6 +32,11 @@ const defaults: Record<string, () => Record<string, unknown>> = {
   TwoColumn: twoColumnDefaultProps,
   Footer: footerDefaultProps,
   SiteHeader: siteHeaderDefaultProps,
+  Embed: embedDefaultProps,
+  Banner: bannerDefaultProps,
+  Carousel: carouselDefaultProps,
+  Gallery: galleryDefaultProps,
+  Tabs: tabsDefaultProps,
 }
 
 const fallback: Record<string, unknown> = {

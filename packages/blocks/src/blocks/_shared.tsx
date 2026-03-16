@@ -44,6 +44,14 @@ export function SecondaryButton({ href, children, className, ...rest }: ButtonPr
   )
 }
 
+export function TertiaryButton({ href, children, className, ...rest }: ButtonProps) {
+  return (
+    <a href={href} className={["btn-tertiary", className].filter(Boolean).join(" ")} {...rest}>
+      {children}
+    </a>
+  )
+}
+
 export function renderInline(text: string) {
   const tokens: Array<string | JSX.Element> = []
   const regex = /\*\*(.+?)\*\*|\*(.+?)\*|\[(.+?)\]\((.+?)\)/g

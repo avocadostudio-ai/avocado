@@ -10,3 +10,8 @@
 @import "./stats/styles.css";
 @import "./two-column/styles.css";
 @import "./footer/styles.css";
+@import "./embed/styles.css";
+@import "./banner/styles.css";
+@import "./carousel/styles.css";
+@import "./gallery/styles.css";
+@import "./tabs/styles.css";
