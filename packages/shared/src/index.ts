@@ -46,6 +46,7 @@ export {
   // Types
   type PageMeta,
   type PageDoc,
+  type SiteConfig,
   type Operation,
   type EditPlan,
   type PatchRejectReason,
@@ -55,6 +56,7 @@ export {
   // Schemas
   pageMetaSchema,
   pageDocSchema,
+  siteConfigSchema,
   operationSchema,
   editPlanSchema,
   // Demo data

@@ -2,10 +2,9 @@ import { unstable_noStore as noStore } from "next/cache"
 import { draftMode } from "next/headers"
 import type { Metadata } from "next"
 import { resolveDraftContext, isTileMode, single, buildSlug } from "@ai-site-editor/site-sdk"
-import "../site-nav.css"
 import { SitePageContent } from "../../components/site-page-content"
 import { EditorPageWrapper } from "../../components/editor-wrapper"
-import { resolveContentSource, getPage, getNavSlugs } from "../../lib/content"
+import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../../lib/content"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
 
@@ -18,23 +17,8 @@ const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.
 
 // --- Site-specific presentation helpers ---
 
-const SITE_DISPLAY_OVERRIDES: Record<string, { name?: string; logo?: string }> = {
-  "avocado-stories": { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" }
-}
-
-function siteNameFromId(siteId: string) {
-  const override = SITE_DISPLAY_OVERRIDES[siteId.trim().toLowerCase()]
-  if (override?.name) return override.name
+function siteNameFallback(siteId: string) {
   return siteId.split("-").filter(Boolean).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ")
-}
-
-function siteLogoFromId(siteId: string) {
-  const normalized = siteId.trim().toLowerCase()
-  const override = SITE_DISPLAY_OVERRIDES[normalized]
-  if (override?.logo) return override.logo
-  const available = new Set(["avocado-stories", "avocado-magic", "avocado-odyssey", "adventures-eg", "adventure-echo", "trailbound-expeditions"])
-  if (available.has(normalized)) return `/logos/${normalized}.svg`
-  return "/logos/default.svg"
 }
 
 function slugToLabel(route: string) {
@@ -106,14 +90,15 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const siteId = editorCtx?.siteId ?? "avocado-stories"
 
   // Fetch content
-  const [page, navSlugs] = await Promise.all([
+  const [page, navSlugs, siteConfig] = await Promise.all([
     getPage(slug, contentSource, session, siteId),
-    getNavSlugs(contentSource, session, siteId)
+    getNavSlugs(contentSource, session, siteId),
+    getSiteConfig(contentSource, session, siteId)
   ])
 
   // Build navigation
-  const siteName = siteNameFromId(siteId) || "Site"
-  const siteLogo = siteLogoFromId(siteId)
+  const siteName = siteConfig.name || siteNameFallback(siteId) || "Site"
+  const siteLogo = siteConfig.logo || "/logos/default.svg"
   const allSlugs = Array.from(new Set([...(navSlugs.length > 0 ? navSlugs : ["/", "/pricing"]), slug]))
   const orderedSlugs = allSlugs.includes("/") ? ["/", ...allSlugs.filter((r) => r !== "/")] : allSlugs
 
@@ -129,7 +114,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
 
   const navItems = orderedSlugs.map((route) => ({
     href: `${route}${editorQuery}`,
-    label: slugToLabel(route),
+    label: siteConfig.navLabels?.[route] ?? slugToLabel(route),
     isActive: route === slug
   }))
   const homeHref = `/${editorQuery}`
