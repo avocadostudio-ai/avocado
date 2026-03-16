@@ -7,7 +7,7 @@ import { isImagePath, type ApplyPatchMessage, type PatchAckMessage, type PatchRe
 type SiteMessage =
   | {
       protocol: "site-editor/v1"
-      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton"
+      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate"
       payload: Record<string, unknown>
     }
   | ({ protocol: "site-editor/v1" } & ApplyPatchMessage)
@@ -1067,6 +1067,16 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       if (event.origin !== editorOrigin) return
       const msg = event.data
       if (!msg || msg.protocol !== "site-editor/v1") return
+
+      if (msg.type === "navigate") {
+        const rawHref = String(msg.payload.href ?? "").trim()
+        if (!rawHref) return
+        const href = rawHref.startsWith("/") ? rawHref : `/${rawHref}`
+        const currentHref = `${window.location.pathname}${window.location.search}`
+        if (href === currentHref) return
+        router.push(href)
+        return
+      }
 
       if (msg.type === "applyPatch") {
         if (serverVersionRef.current !== msg.fromVersion) {
