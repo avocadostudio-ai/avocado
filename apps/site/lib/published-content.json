@@ -283,18 +283,8 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T17:12:20.454Z",
+    "updatedAt": "2026-03-16T17:13:12.507Z",
     "blocks": [
-      {
-        "id": "b_banner_1773680900785_798",
-        "type": "Banner",
-        "props": {
-          "text": "Grapefruits: bright, refreshing, and packed with wellness benefits.",
-          "variant": "info",
-          "ctaText": "Discover Benefits",
-          "ctaHref": "/"
-        }
-      },
       {
         "id": "b_hero_about",
         "type": "Hero",
