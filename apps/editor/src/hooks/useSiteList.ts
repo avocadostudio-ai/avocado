@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { RestoreSnapshot, SiteConfig } from "../lib/editor-types"
 import {
   DEFAULT_SITE_HOSTING,
@@ -8,6 +8,13 @@ import {
   sanitizeSiteId,
   siteNameFromId
 } from "../lib/editor-utils"
+
+/** Orchestrator-side site header config (name, logo, navLabels). */
+export interface HeaderConfig {
+  name?: string
+  logo?: string
+  navLabels?: Record<string, string>
+}
 
 /** Form fields for creating a new site. */
 export interface NewSiteFormState {
@@ -60,6 +67,9 @@ export function useSiteList(siteId: string, session: string) {
   const [configSiteId, setConfigSiteId] = useState<string | null>(null)
   const [restoreState, setRestoreState] = useState<RestoreState>(INITIAL_RESTORE_STATE)
   const [siteTileRefreshToken, setSiteTileRefreshToken] = useState(0)
+  const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({})
+  const [draftSlugs, setDraftSlugs] = useState<string[]>([])
+  const headerConfigDirty = useRef(false)
 
   /** Update one or more fields of the new-site form. */
   const updateNewSiteForm = useCallback(
@@ -89,6 +99,56 @@ export function useSiteList(siteId: string, session: string) {
       // Ignore storage failures.
     }
   }, [siteList])
+
+  // Fetch orchestrator-side header config on mount and when config modal opens
+  const fetchHeaderConfig = useCallback(async (targetSiteId: string) => {
+    const qs = `session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(targetSiteId)}`
+    try {
+      const [configRes, slugsRes] = await Promise.all([
+        fetch(`${orchestrator}/draft/site-config?${qs}`),
+        fetch(`${orchestrator}/draft/slugs?${qs}`)
+      ])
+      if (configRes.ok) {
+        const data = (await configRes.json()) as HeaderConfig
+        setHeaderConfig(data)
+      }
+      if (slugsRes.ok) {
+        const data = (await slugsRes.json()) as { slugs: string[] }
+        setDraftSlugs(data.slugs ?? [])
+      }
+    } catch { /* ignore */ }
+  }, [session])
+
+  // Initial fetch for the active site
+  useEffect(() => {
+    void fetchHeaderConfig(siteId)
+  }, [siteId, fetchHeaderConfig])
+
+  // Re-fetch when config modal opens (may be a different site)
+  useEffect(() => {
+    if (!configSiteId) return
+    void fetchHeaderConfig(configSiteId)
+  }, [configSiteId, fetchHeaderConfig])
+
+  const updateHeaderConfig = useCallback(
+    async (patch: Partial<HeaderConfig>) => {
+      const merged = {
+        ...headerConfig,
+        ...patch,
+        ...(patch.navLabels ? { navLabels: { ...(headerConfig.navLabels ?? {}), ...patch.navLabels } } : {})
+      }
+      setHeaderConfig(merged)
+      headerConfigDirty.current = true
+      try {
+        await fetch(`${orchestrator}/draft/site-config`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ session, siteId: configSiteId, config: merged })
+        })
+      } catch { /* ignore */ }
+    },
+    [headerConfig, session, configSiteId]
+  )
 
   const activeSiteConfig = useMemo(() => {
     const match = siteList.find((site) => site.id === siteId)
@@ -266,7 +326,11 @@ export function useSiteList(siteId: string, session: string) {
     openRestoreModal,
     restoreSnapshotForSite,
     updateConfigSite,
-    updateActiveSiteConfig
+    updateActiveSiteConfig,
+    headerConfig,
+    updateHeaderConfig,
+    headerConfigDirty,
+    draftSlugs
   }
 }
 

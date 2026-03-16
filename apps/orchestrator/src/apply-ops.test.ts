@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { createSessionFactory, postOps, getPage, getSlugs } from "./test/fixtures.js"
+import { getSiteConfig } from "./state/session-state.js"
 
 const newSession = createSessionFactory("apply-ops-test")
 
@@ -599,6 +600,91 @@ test("error: rename_page to a slug that already exists returns 400", async () =>
   assert.equal(res.statusCode, 400)
   const body = JSON.parse(res.body)
   assert.ok(body.error)
+})
+
+// ---------------------------------------------------------------------------
+// Atomicity test
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// update_site_config
+// ---------------------------------------------------------------------------
+
+test("update_site_config: sets site name", async () => {
+  const session = newSession()
+  const res = await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { name: "Acme Corp" } }]
+  })
+  assert.equal(res.statusCode, 200)
+  const config = getSiteConfig(session)
+  assert.equal(config.name, "Acme Corp")
+})
+
+test("update_site_config: sets logo", async () => {
+  const session = newSession()
+  const res = await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { logo: "https://example.com/logo.svg" } }]
+  })
+  assert.equal(res.statusCode, 200)
+  const config = getSiteConfig(session)
+  assert.equal(config.logo, "https://example.com/logo.svg")
+})
+
+test("update_site_config: sets nav label", async () => {
+  const session = newSession()
+  const res = await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { navLabels: { "/pricing": "Plans & Pricing" } } }]
+  })
+  assert.equal(res.statusCode, 200)
+  const config = getSiteConfig(session)
+  assert.deepEqual(config.navLabels, { "/pricing": "Plans & Pricing" })
+})
+
+test("update_site_config: merge-patches without clobbering existing fields", async () => {
+  const session = newSession()
+  // First set name and logo
+  await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { name: "Acme", logo: "/logo.png" } }]
+  })
+  // Then update only logo — name should survive
+  const res = await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { logo: "/new-logo.svg" } }]
+  })
+  assert.equal(res.statusCode, 200)
+  const config = getSiteConfig(session)
+  assert.equal(config.name, "Acme")
+  assert.equal(config.logo, "/new-logo.svg")
+})
+
+test("update_site_config: navLabels merge-patches existing entries", async () => {
+  const session = newSession()
+  await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { navLabels: { "/pricing": "Plans" } } }]
+  })
+  const res = await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { navLabels: { "/about": "About Us" } } }]
+  })
+  assert.equal(res.statusCode, 200)
+  const config = getSiteConfig(session)
+  assert.deepEqual(config.navLabels, { "/pricing": "Plans", "/about": "About Us" })
+})
+
+test("update_site_config: config-only plan does not throw 'no changes' error", async () => {
+  const session = newSession()
+  const res = await postOps({
+    session,
+    ops: [{ op: "update_site_config", patch: { name: "New Name" } }]
+  })
+  assert.equal(res.statusCode, 200)
+  const body = JSON.parse(res.body)
+  assert.equal(body.status, "applied")
 })
 
 // ---------------------------------------------------------------------------

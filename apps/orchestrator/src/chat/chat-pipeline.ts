@@ -1290,6 +1290,7 @@ export async function runChatPipeline(
         for (const op of resolvedPlan.ops) {
           const slugsToSnapshot: string[] = []
           if (op.op === "create_page") slugsToSnapshot.push(op.page.slug)
+          else if (op.op === "update_site_config") { /* no page slug */ }
           else slugsToSnapshot.push(op.pageSlug)
           if (op.op === "duplicate_block" && typeof op.toPageSlug === "string" && op.toPageSlug.length > 0) {
             slugsToSnapshot.push(op.toPageSlug)

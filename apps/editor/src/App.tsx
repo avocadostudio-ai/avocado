@@ -169,6 +169,7 @@ function EditorPage({
   const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
   const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
   const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints">("overview")
+  const [configModalTab, setConfigModalTab] = useState<"general" | "brief" | "deploy">("general")
   const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
   useEffect(() => { if (!sites.configSiteId) { setDriveValidation(null); setSiteConfigTab("overview") } }, [sites.configSiteId])
 
@@ -978,6 +979,12 @@ function EditorPage({
           blockType={activeBlockType}
           props={blockProps.props}
           status={blockProps.status}
+          slug={slug}
+          navLabel={sites.headerConfig.navLabels?.[slug] ?? ""}
+          onNavLabelChange={(s, label) => {
+            void sites.updateHeaderConfig({ navLabels: { [s]: label } })
+            preview.postToSite("draftUpdated", {})
+          }}
           onFieldChange={async (path, value) => {
             await chatEngine.inlineEditCommit(slug, activeBlockId!, path, value, { silent: true })
             void blockProps.refetch()
@@ -1234,51 +1241,88 @@ function EditorPage({
                 ×
               </button>
             </header>
+            <nav className="panel-tabs">
+              <button type="button" className={`panel-tab ${configModalTab === "general" ? "is-active" : ""}`} onClick={() => setConfigModalTab("general")}>General</button>
+              <button type="button" className={`panel-tab ${configModalTab === "brief" ? "is-active" : ""}`} onClick={() => setConfigModalTab("brief")}>Brief</button>
+              <button type="button" className={`panel-tab ${configModalTab === "deploy" ? "is-active" : ""}`} onClick={() => setConfigModalTab("deploy")}>Deploy</button>
+            </nav>
             <div className="sites-modal-body">
-              <div className="sites-form-grid">
-                <p className="sites-form-section-title">Core settings</p>
-                <label className="sites-form-field">
-                  <span>Site name</span>
-                  <input
-                    type="text"
-                    value={sites.configSite.name}
-                    placeholder="Site name"
-                    onChange={(e) => sites.updateConfigSite({ name: e.target.value })}
-                  />
-                </label>
-                <p className="sites-form-section-title">Editorial brief</p>
-                <div className="sites-form-field sites-form-field-wide">
-                  <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
-                    <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
-                    <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
-                    <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
-                  </div>
-                  {siteConfigTab === "overview" ? (
-                    <label className="sites-form-field">
-                      <span>Overview</span>
-                      <textarea value={sites.configSite.purpose} placeholder="What this site is for." onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
-                    </label>
-                  ) : null}
-                  {siteConfigTab === "tone" ? (
-                    <label className="sites-form-field">
-                      <span>Preferred tone</span>
-                      <textarea value={sites.configSite.tone ?? ""} placeholder="How the writing should sound." onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
-                    </label>
-                  ) : null}
-                  {siteConfigTab === "constraints" ? (
-                    <label className="sites-form-field">
-                      <span>Writing constraints</span>
-                      <textarea
-                        value={(sites.configSite.constraints ?? []).join("\n")}
-                        placeholder={"Rules for content output.\nOne per line."}
-                        onChange={(e) => sites.updateConfigSite({ constraints: e.target.value.split(/\n|,/g).map((s) => s.trim()).filter(Boolean) })}
-                        rows={8}
-                      />
-                    </label>
-                  ) : null}
+              {configModalTab === "general" ? (
+                <div className="sites-form-grid">
+                  <label className="sites-form-field">
+                    <span>Site name</span>
+                    <input
+                      type="text"
+                      value={sites.configSite.name}
+                      placeholder="Site name"
+                      onChange={(e) => sites.updateConfigSite({ name: e.target.value })}
+                    />
+                  </label>
+                  <p className="sites-form-section-title">Header</p>
+                  <label className="sites-form-field">
+                    <span>Header name</span>
+                    <input
+                      type="text"
+                      value={sites.headerConfig.name ?? ""}
+                      placeholder="Site header name"
+                      onBlur={(e) => {
+                        void sites.updateHeaderConfig({ name: e.target.value })
+                        preview.postToSite("draftUpdated", {})
+                      }}
+                      onChange={(e) => sites.updateHeaderConfig({ name: e.target.value })}
+                    />
+                  </label>
+                  <label className="sites-form-field">
+                    <span>Logo URL</span>
+                    <input
+                      type="text"
+                      value={sites.headerConfig.logo ?? ""}
+                      placeholder="https://example.com/logo.svg"
+                      onBlur={(e) => {
+                        void sites.updateHeaderConfig({ logo: e.target.value })
+                        preview.postToSite("draftUpdated", {})
+                      }}
+                      onChange={(e) => sites.updateHeaderConfig({ logo: e.target.value })}
+                    />
+                  </label>
                 </div>
-                <p className="sites-form-section-title">Settings</p>
-                <div className="sites-form-field sites-form-field-wide">
+              ) : null}
+              {configModalTab === "brief" ? (
+                <div className="sites-form-grid">
+                  <div className="sites-form-field sites-form-field-wide">
+                    <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                      <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
+                      <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
+                      <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
+                    </div>
+                    {siteConfigTab === "overview" ? (
+                      <label className="sites-form-field">
+                        <span>Overview</span>
+                        <textarea value={sites.configSite.purpose} placeholder="What this site is for." onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
+                      </label>
+                    ) : null}
+                    {siteConfigTab === "tone" ? (
+                      <label className="sites-form-field">
+                        <span>Preferred tone</span>
+                        <textarea value={sites.configSite.tone ?? ""} placeholder="How the writing should sound." onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
+                      </label>
+                    ) : null}
+                    {siteConfigTab === "constraints" ? (
+                      <label className="sites-form-field">
+                        <span>Writing constraints</span>
+                        <textarea
+                          value={(sites.configSite.constraints ?? []).join("\n")}
+                          placeholder={"Rules for content output.\nOne per line."}
+                          onChange={(e) => sites.updateConfigSite({ constraints: e.target.value.split(/\n|,/g).map((s) => s.trim()).filter(Boolean) })}
+                          rows={8}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              {configModalTab === "deploy" ? (
+                <div className="sites-form-grid">
                   <div className="sites-settings-grid">
                     <label className="sites-form-field">
                       <span>Hosting</span>
@@ -1344,7 +1388,7 @@ function EditorPage({
                     </label>
                   </div>
                 </div>
-              </div>
+              ) : null}
             </div>
             <footer className="sites-modal-footer">
               <button type="button" className="primary-btn" onClick={() => sites.setConfigSiteId(null)}>Done</button>

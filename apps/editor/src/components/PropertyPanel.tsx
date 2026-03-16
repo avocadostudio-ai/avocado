@@ -15,12 +15,21 @@ type Props = {
   onFieldChange: (fieldPath: string, value: string) => void
   onImageClick?: (fieldPath: string, currentUrl: string) => void
   onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
+  /** Current page slug for page-level settings. */
+  slug?: string
+  /** Current nav label for this page (from orchestrator site config). */
+  navLabel?: string
+  /** Called when the user edits the nav label for the current page. */
+  onNavLabelChange?: (slug: string, label: string) => void
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist }: Props) {
+export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, navLabel, onNavLabelChange }: Props) {
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
+        {slug && slug !== "/" && onNavLabelChange ? (
+          <NavLabelField slug={slug} navLabel={navLabel ?? ""} onNavLabelChange={onNavLabelChange} />
+        ) : null}
         <div className="property-panel-empty">
           <svg className="property-panel-empty-icon" viewBox="0 0 48 48" width="48" height="48" fill="none" aria-hidden="true">
             <rect x="8" y="10" width="32" height="28" rx="4" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" opacity=".45" />
@@ -51,6 +60,9 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
 
   return (
     <div className="property-panel" style={style}>
+      {slug && slug !== "/" && onNavLabelChange ? (
+        <NavLabelField slug={slug} navLabel={navLabel ?? ""} onNavLabelChange={onNavLabelChange} />
+      ) : null}
       <div className="property-panel-header">
         <div className="property-panel-block-name">{meta.displayName}</div>
       </div>
@@ -443,6 +455,31 @@ function FieldEditor({
       ) : (
         <input type={inputType} className="property-field-input" {...sharedProps} />
       )}
+    </div>
+  )
+}
+
+function NavLabelField({ slug, navLabel, onNavLabelChange }: { slug: string; navLabel: string; onNavLabelChange: (slug: string, label: string) => void }) {
+  const [local, setLocal] = useState(navLabel)
+  const [focused, setFocused] = useState(false)
+  const display = focused ? local : navLabel
+  const { debouncedCommit, flushCommit } = useDebouncedCommit((v: string) => onNavLabelChange(slug, v), 400)
+
+  return (
+    <div className="property-panel-page-section">
+      <div className="property-panel-block-name">Page</div>
+      <div className="property-field">
+        <div className="property-field-label"><span>Nav label for {slug}</span></div>
+        <input
+          type="text"
+          className="property-field-input"
+          placeholder="Default"
+          value={display}
+          onFocus={() => { setLocal(navLabel); setFocused(true) }}
+          onChange={(e) => { setLocal(e.target.value); debouncedCommit(e.target.value) }}
+          onBlur={() => { setFocused(false); flushCommit() }}
+        />
+      </div>
     </div>
   )
 }

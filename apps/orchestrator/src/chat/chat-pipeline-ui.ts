@@ -119,6 +119,7 @@ export function collectMentionedSlugsFromPlan(plan: EditPlan, fallbackSlug?: str
       push(op.afterPageSlug)
       continue
     }
+    if (op.op === "update_site_config") continue
     push(op.pageSlug)
   }
 
