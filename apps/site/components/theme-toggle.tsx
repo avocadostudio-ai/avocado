@@ -9,16 +9,14 @@ export function SiteThemeToggle() {
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
-    const stored = window.sessionStorage.getItem(SITE_THEME_STORAGE_KEY) ?? window.localStorage.getItem(SITE_THEME_STORAGE_KEY)
+    const stored = window.localStorage.getItem(SITE_THEME_STORAGE_KEY)
     const fallback = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false
     const next = stored === "dark" ? true : stored === "light" ? false : fallback
     setDarkMode(next)
   }, [])
 
   useEffect(() => {
-    const root = window.document.documentElement
-    root.classList.toggle("dark", darkMode)
-    window.sessionStorage.setItem(SITE_THEME_STORAGE_KEY, darkMode ? "dark" : "light")
+    window.document.documentElement.classList.toggle("dark", darkMode)
     window.localStorage.setItem(SITE_THEME_STORAGE_KEY, darkMode ? "dark" : "light")
   }, [darkMode])
 

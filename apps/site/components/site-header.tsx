@@ -1,9 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useEffect, useId, useRef, useState } from "react"
 import { SiteThemeToggle } from "./theme-toggle"
+import { useMobileMenu } from "../hooks/use-mobile-menu"
 
 export type NavItem = {
   href: string
@@ -19,35 +18,7 @@ type SiteHeaderProps = {
 }
 
 export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeaderProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const pathname = usePathname()
-  const mobileMenuId = useId()
-  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [pathname])
-
-  useEffect(() => {
-    if (!mobileMenuOpen) return
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!mobileMenuRef.current?.contains(event.target as Node)) {
-        setMobileMenuOpen(false)
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setMobileMenuOpen(false)
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown)
-    window.addEventListener("keydown", handleEscape)
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown)
-      window.removeEventListener("keydown", handleEscape)
-    }
-  }, [mobileMenuOpen])
+  const { isOpen, toggle, close, menuRef, toggleRef, menuId } = useMobileMenu()
 
   return (
     <>
@@ -64,14 +35,15 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
           ))}
         </nav>
         <SiteThemeToggle />
-        <div ref={mobileMenuRef} className={`site-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}>
+        <div ref={menuRef} className={`site-mobile-menu${isOpen ? " is-open" : ""}`}>
           <button
+            ref={toggleRef}
             type="button"
             className="site-mobile-menu-button"
-            aria-expanded={mobileMenuOpen}
-            aria-controls={mobileMenuId}
+            aria-expanded={isOpen}
+            aria-controls={menuId}
             aria-label="Toggle navigation menu"
-            onClick={() => setMobileMenuOpen((open) => !open)}
+            onClick={toggle}
           >
             <span className="burger-icon" aria-hidden="true">
               <i />
@@ -79,14 +51,14 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
               <i />
             </span>
           </button>
-          {mobileMenuOpen ? (
-            <nav id={mobileMenuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
+          {isOpen ? (
+            <nav id={menuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
               {navItems.map((item) => (
                 <Link
                   key={`mobile-${item.href}`}
                   href={item.href}
                   className={item.isActive ? "is-active" : undefined}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={close}
                 >
                   {item.label}
                 </Link>
@@ -95,8 +67,8 @@ export function SiteHeader({ siteName, siteLogo, homeHref, navItems }: SiteHeade
           ) : null}
         </div>
       </header>
-      {mobileMenuOpen ? (
-        <div className="site-mobile-backdrop" onClick={() => setMobileMenuOpen(false)} />
+      {isOpen ? (
+        <div className="site-mobile-backdrop" onClick={close} />
       ) : null}
     </>
   )

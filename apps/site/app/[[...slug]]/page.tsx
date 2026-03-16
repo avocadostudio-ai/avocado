@@ -7,6 +7,7 @@ import { EditorPageWrapper } from "../../components/editor-wrapper"
 import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../../lib/content"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
+import { buildNavItems } from "../../lib/navigation"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -14,20 +15,6 @@ type PageProps = {
 }
 
 const EDITOR_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" || process.env.NODE_ENV !== "production"
-
-// --- Site-specific presentation helpers ---
-
-function siteNameFallback(siteId: string) {
-  return siteId.split("-").filter(Boolean).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ")
-}
-
-function slugToLabel(route: string) {
-  if (route === "/") return "Home"
-  return route.slice(1).split("/").filter(Boolean)
-    .map((part) => part.replace(/[-_]/g, " "))
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" / ")
-}
 
 // --- Static generation ---
 
@@ -89,20 +76,18 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const session = editorCtx?.session ?? "dev"
   const siteId = editorCtx?.siteId ?? "avocado-stories"
 
-  // Fetch content
-  const [page, navSlugs, siteConfig] = await Promise.all([
+  // Fetch content — use allSettled so partial failures degrade gracefully
+  const [pageResult, navSlugsResult, siteConfigResult] = await Promise.allSettled([
     getPage(slug, contentSource, session, siteId),
     getNavSlugs(contentSource, session, siteId),
     getSiteConfig(contentSource, session, siteId)
   ])
 
-  // Build navigation
-  const siteName = siteConfig.name || siteNameFallback(siteId) || "Site"
-  const siteLogo = siteConfig.logo || "/logos/default.svg"
-  const allSlugs = Array.from(new Set([...(navSlugs.length > 0 ? navSlugs : ["/", "/pricing"]), slug]))
-  const orderedSlugs = allSlugs.includes("/") ? ["/", ...allSlugs.filter((r) => r !== "/")] : allSlugs
+  const page = pageResult.status === "fulfilled" ? pageResult.value : null
+  const navSlugs = navSlugsResult.status === "fulfilled" ? navSlugsResult.value : []
+  const siteConfig = siteConfigResult.status === "fulfilled" ? siteConfigResult.value : { name: "", logo: "" }
 
-  // Editor mode: propagate query params through nav links
+  // Build navigation
   const editorOrigin = editorCtx?.editorOrigin ?? ""
   const editorQuery = editorMode
     ? (() => {
@@ -112,12 +97,13 @@ export default async function SitePage({ params, searchParams }: PageProps) {
       })()
     : ""
 
-  const navItems = orderedSlugs.map((route) => ({
-    href: `${route}${editorQuery}`,
-    label: siteConfig.navLabels?.[route] ?? slugToLabel(route),
-    isActive: route === slug
-  }))
-  const homeHref = `/${editorQuery}`
+  const { navItems, siteName, siteLogo, homeHref } = buildNavItems({
+    navSlugs,
+    currentSlug: slug,
+    siteConfig,
+    siteId,
+    editorQuery
+  })
 
   if (!page) {
     return (
