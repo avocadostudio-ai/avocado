@@ -1933,6 +1933,15 @@ test("isPageWideRewriteRequest detects page-wide rewrite patterns", () => {
   assert.equal(isPageWideRewriteRequest("update the whole page for B2B"), true)
   assert.equal(isPageWideRewriteRequest("change the entire page to focus on SaaS"), true)
 
+  // Structural audit / review patterns
+  assert.equal(isPageWideRewriteRequest("review heading hierarchy again"), true)
+  assert.equal(isPageWideRewriteRequest("review the heading hierarchy"), true)
+  assert.equal(isPageWideRewriteRequest("fix heading structure"), true)
+  assert.equal(isPageWideRewriteRequest("audit heading levels"), true)
+  assert.equal(isPageWideRewriteRequest("check heading order"), true)
+  assert.equal(isPageWideRewriteRequest("Review Grapefruits page heading tag hierarchy"), true)
+  assert.equal(isPageWideRewriteRequest("review about page heading hierarchy"), true)
+
   // Negative cases — single-block or non-page-wide
   assert.equal(isPageWideRewriteRequest("update the hero heading"), false)
   assert.equal(isPageWideRewriteRequest("rewrite the CTA text"), false)
