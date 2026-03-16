@@ -77,31 +77,28 @@ section {
 
 /* Dark overrides */
 .dark .btn-primary {
-  background: #0f766e;
-  color: #fff;
   box-shadow: 0 2px 8px rgb(2 6 23 / 0.35);
 }
 
 .dark .btn-primary:hover {
-  opacity: 1;
-  background: #0d9488;
+  opacity: 0.88;
 }
 
 .dark .btn-secondary {
-  color: var(--brand-subtle, #5eead4);
-  border-color: var(--brand);
+  color: #5eead4;
+  border-color: #14b8a6;
 }
 
 .dark .btn-secondary:hover {
-  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  background: rgb(20 184 166 / 0.16);
 }
 
 .dark .btn-tertiary {
-  color: var(--brand-subtle, #5eead4);
+  color: #5eead4;
 }
 
 .dark .btn-tertiary:hover {
-  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  background: rgb(20 184 166 / 0.16);
 }
 
 @media (max-width: 900px) {
