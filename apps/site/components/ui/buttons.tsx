@@ -1,10 +1,12 @@
-import type { AnchorHTMLAttributes } from "react"
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from "react"
 
-type BtnProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   href: string
 }
 
-export function PrimaryButton({ href, children, className, ...rest }: BtnProps) {
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
+
+export function PrimaryLink({ href, children, className, ...rest }: LinkProps) {
   return (
     <a href={href} className={["btn-primary", className].filter(Boolean).join(" ")} {...rest}>
       {children}
@@ -12,10 +14,26 @@ export function PrimaryButton({ href, children, className, ...rest }: BtnProps) 
   )
 }
 
-export function SecondaryButton({ href, children, className, ...rest }: BtnProps) {
+export function SecondaryLink({ href, children, className, ...rest }: LinkProps) {
   return (
     <a href={href} className={["btn-secondary", className].filter(Boolean).join(" ")} {...rest}>
       {children}
     </a>
+  )
+}
+
+export function PrimaryButton({ children, className, ...rest }: ButtonProps) {
+  return (
+    <button type="button" className={["btn-primary", className].filter(Boolean).join(" ")} {...rest}>
+      {children}
+    </button>
+  )
+}
+
+export function SecondaryButton({ children, className, ...rest }: ButtonProps) {
+  return (
+    <button type="button" className={["btn-secondary", className].filter(Boolean).join(" ")} {...rest}>
+      {children}
+    </button>
   )
 }
