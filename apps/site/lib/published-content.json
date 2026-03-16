@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T16:46:26.830Z",
+    "updatedAt": "2026-03-16T16:54:17.950Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -25,26 +25,36 @@
         "props": {
           "tabs": [
             {
-              "label": "Overview",
-              "content": "Avocados come in many varieties, each with unique flavors and textures. From the creamy Hass to the buttery Fuerte, there's an avocado for every palate. Discover where these nutrient-dense fruits are grown and how they've become a global culinary staple."
-            },
-            {
-              "label": "Nutritional Benefits",
-              "content": "Avocados are nutritional powerhouses packed with vitamins C, E, K, and B-6. They contain heart-healthy monounsaturated fats that support cardiovascular health, plus potassium, magnesium, and folate. A single avocado provides lutein, beta-carotene, and omega-3 fatty acids — making them one of nature's most nutrient-dense foods."
-            },
-            {
               "label": "Recipes & Ideas",
-              "content": "From creamy avocado toast and guacamole to salads, smoothie bowls, and sushi rolls, avocados are incredibly versatile. Try slicing them into your morning eggs, blending them into pasta sauce, or using them as a healthy fat source in desserts. The possibilities are endless!"
+              "content": "Avocados are incredibly versatile and work beautifully across every meal, from sunrise to sunset. Whether you're a seasoned chef or a cooking novice, these delicious fruits inspire endless culinary creativity and bring nutrition to every plate.\n\n• **Breakfast Favorites** – Spread on whole-grain toast, blend into smoothie bowls, add to scrambled eggs, or create avocado-based omelets\n• **Lunch & Salads** – Top grain bowls, toss into green salads, layer in sandwiches, or serve alongside fresh seafood\n• **Dinner Innovation** – Blend into creamy pasta sauces, use as a healthy fat in tacos, or stuff with quinoa and roasted vegetables\n• **Snacks & Desserts** – Make silky guacamole, create chocolate avocado mousse, blend into vegan ice cream, or top with granola\n\nThe possibilities are truly endless—let your imagination guide your next avocado creation."
+            },
+            {
+              "label": "Overview",
+              "content": "Avocados come in many varieties, each with unique flavors and textures. From the creamy Hass to the buttery Fuerte, these nutrient-dense fruits have become a global culinary staple. Discover the fascinating world of avocado cultivation, the origins of different varieties, and why chefs and home cooks alike celebrate this remarkable fruit.\n\n• **Hass Avocados** – The most popular variety worldwide, known for their creamy texture and rich, buttery flavor\n• **Fuerte Avocados** – Pear-shaped with a smooth, mild taste, perfect for slicing and serving\n• **Bacon Avocados** – Thinner skin and milder flavor, ideal for fresh applications and salads\n• **Reed Avocados** – Large, round, and creamy, with a subtle, delicate taste\n\nEach variety thrives in specific climates, and sustainable farming practices ensure these trees produce fruit year after year."
             },
             {
               "label": "Sustainability",
-              "content": "Sustainable avocado farming practices protect water resources and soil health. Many growers are adopting regenerative agriculture, reducing pesticide use, and supporting biodiversity. By choosing sustainably sourced avocados, you're supporting farmers who care for the land and their communities."
+              "content": "Sustainable avocado farming practices protect water resources, soil health, and entire communities. Progressive growers worldwide are pioneering regenerative agriculture methods that benefit both the land and the people who steward it.\n\n• **Water Conservation** – Modern irrigation techniques reduce water use by up to 50% while maintaining crop health and yields\n• **Soil Health & Biodiversity** – Regenerative practices build soil organic matter, support wildlife habitats, and reduce chemical runoff\n• **Reduced Pesticide Use** – Integrated pest management and organic farming methods protect ecosystems and farmworker wellbeing\n• **Community Impact** – Fair-trade certification ensures farmers receive fair wages and investment in local education and healthcare\n\nBy choosing sustainably sourced avocados, you directly support farmers and practices that care for the land and future generations."
             },
             {
               "label": "Fun Facts",
-              "content": "Did you know? Avocados are technically a fruit, not a vegetable. They're the only fruit with significant amounts of monounsaturated fat. Plus, avocado trees can live for over 100 years, and it takes 3-4 years for a tree to produce its first fruit!"
+              "content": "Avocados are far more fascinating than most people realize. From their surprising biology to their rich cultural history, these fruits have captured human imagination for thousands of years.\n\n• **Fruit, Not Vegetable** – Avocados are botanically classified as fruits—specifically berries with a single large seed\n• **Unique Fat Profile** – Avocados are the only fruit with significant amounts of monounsaturated fat, making them nutritionally exceptional\n• **Longevity** – Avocado trees can live for over 100 years and continue producing fruit throughout their lifespan\n• **Slow Growth** – It takes 3–4 years for an avocado tree to produce its first fruit, rewarding patient growers with decades of abundance\n• **Ancient Origins** – Avocados have been cultivated for over 5,000 years, with origins in south-central Mexico where they're still celebrated today\n\nDiscover why avocados have earned their place as nature's golden treasure."
+            },
+            {
+              "label": "New Tab label",
+              "content": "New Tab content"
             }
           ]
+        }
+      },
+      {
+        "id": "b_embed_1773679987848_995",
+        "type": "Embed",
+        "props": {
+          "embedType": "youtube",
+          "url": "https://www.youtube.com/watch?v=cYPKqRIFVdU",
+          "title": "",
+          "aspectRatio": "16:9"
         }
       },
       {
