@@ -597,6 +597,30 @@ body {
   gap: 2px;
 }
 
+.property-list-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 0;
+  margin-top: 2px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
+  background: none;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.property-list-add-btn:hover {
+  color: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+}
+
 .chat-header-switch-site {
   font-size: 11px;
   font-weight: 600;
@@ -3615,4 +3639,14 @@ textarea {
 
 .editor-dark .property-list-item-toggle:hover {
   color: #2dd4bf;
+}
+
+.editor-dark .property-list-add-btn {
+  color: #64748b;
+  border-color: #334155;
+}
+
+.editor-dark .property-list-add-btn:hover {
+  color: #2dd4bf;
+  border-color: #2dd4bf;
 }

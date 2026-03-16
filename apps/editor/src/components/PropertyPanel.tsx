@@ -31,9 +31,11 @@ type Props = {
   onDeselectBlock?: () => void
   /** Called when AI assist is requested on a page-level field (SEO title, meta description, nav label). */
   onPageAiAssist?: (fieldLabel: string, fieldKind: string, currentValue: string) => void
+  /** Called when the user clicks "+ Add" on a list field. */
+  onAddListItem?: (listKey: string) => void
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist }: Props) {
+export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAddListItem }: Props) {
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
@@ -112,6 +114,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
                     onFieldChange={onFieldChange}
                     onImageClick={onImageClick}
                     onAiAssist={onAiAssist}
+                    onAddItem={onAddListItem ? () => onAddListItem(key) : undefined}
                   />
                 )
               })
@@ -295,7 +298,8 @@ function ListFieldSection({
   blockType,
   onFieldChange,
   onImageClick,
-  onAiAssist
+  onAiAssist,
+  onAddItem
 }: {
   listKey: string
   listField: ListFieldMeta
@@ -304,6 +308,7 @@ function ListFieldSection({
   onFieldChange: (fieldPath: string, value: string) => void
   onImageClick?: (fieldPath: string, currentUrl: string) => void
   onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
+  onAddItem?: () => void
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const label = listField.label ?? listKey
@@ -346,6 +351,14 @@ function ListFieldSection({
           </div>
         )
       })}
+      {onAddItem ? (
+        <button type="button" className="property-list-add-btn" onClick={onAddItem}>
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M8 3v10M3 8h10" />
+          </svg>
+          Add
+        </button>
+      ) : null}
     </div>
   )
 }

@@ -11,6 +11,7 @@ import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
 import { useBlockProps } from "./hooks/useBlockProps"
+import { usePageMeta } from "./hooks/usePageMeta"
 import { PropertyPanel } from "./components/PropertyPanel"
 import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
@@ -386,6 +387,7 @@ function EditorPage({
   const media = useMediaInput()
 
   const blockProps = useBlockProps(session, siteId, slug, activeBlockId, activeTab === "properties")
+  const pageMeta = usePageMeta(session, siteId, slug, activeTab === "properties")
 
   // Sync refs
   useEffect(() => { activeBlockIdRef.current = activeBlockId }, [activeBlockId])
@@ -536,6 +538,21 @@ function EditorPage({
 
     chatEngine.setFieldAiContext(entry)
   }, [activeBlockId, activeBlockType])
+
+  const handlePageAiAssist = useCallback((fieldLabel: string, fieldKind: string, currentValue: string) => {
+    setActiveTab("chat")
+
+    const suggestions = fieldAiSuggestions(fieldKind, fieldLabel, "Page", currentValue)
+    const entry: ChatEntry = {
+      id: `field-ai-${Date.now()}`,
+      role: "assistant",
+      text: `Editing: Page → ${fieldLabel}`,
+      fieldAiContext: { blockId: "__page__", blockType: "__page__", fieldPath: fieldLabel, fieldLabel, blockDisplayName: "Page" },
+      suggestions
+    }
+
+    chatEngine.setFieldAiContext(entry)
+  }, [])
 
   // Refresh slugs on session/site change
   useEffect(() => { void chatEngine.refreshRouteSlugs() }, [session, siteId])
@@ -1019,10 +1036,38 @@ function EditorPage({
           props={blockProps.props}
           status={blockProps.status}
           slug={slug}
+          pageName={slugLabel(slug)}
+          onDeselectBlock={() => { setActiveBlockId(undefined); setActiveBlockType(undefined) }}
           navLabel={sites.headerConfig.navLabels?.[slug] ?? ""}
           onNavLabelChange={(s, label) => {
             void sites.updateHeaderConfig({ navLabels: { [s]: label } })
             preview.postToSite("draftUpdated", {})
+          }}
+          pageMeta={pageMeta.meta}
+          onPageMetaChange={(field, value) => {
+            const nextMeta = { ...pageMeta.meta, [field]: value }
+            pageMeta.setMeta(nextMeta)
+            void (async () => {
+              try {
+                const res = await fetch(`${orchestrator}/ops`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    session,
+                    siteId,
+                    ops: [{ op: "update_page_meta", pageSlug: slug, patch: { [field]: value } }]
+                  })
+                })
+                const data = (await res.json()) as { status?: string }
+                if (!res.ok || data.status !== "applied") {
+                  void pageMeta.refetch()
+                  return
+                }
+                preview.postToSite("draftUpdated", {})
+              } catch {
+                void pageMeta.refetch()
+              }
+            })()
           }}
           onFieldChange={async (path, value) => {
             await chatEngine.inlineEditCommit(slug, activeBlockId!, path, value, { silent: true })
@@ -1033,6 +1078,11 @@ function EditorPage({
             setImagePickerTarget({ slug, blockId: activeBlockId, editablePath: fieldPath, currentUrl })
           }}
           onAiAssist={handleFieldAiAssist}
+          onPageAiAssist={handlePageAiAssist}
+          onAddListItem={activeBlockId && activeBlockType ? (listKey) => {
+            void chatEngine.addListItem(slug, activeBlockId, activeBlockType, listKey)
+              .then(() => blockProps.refetch())
+          } : undefined}
         />
 
         <div
