@@ -25,7 +25,7 @@ export type ChatEngineSharedDeps = {
   setActiveBlockId: (id: string | undefined) => void
   setActiveBlockType: (type: string | undefined) => void
   setActiveEditablePath: (path: string | undefined) => void
-  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton", payload: Record<string, unknown>) => void
+  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
   componentManifest?: EditorComponentsManifest | null
   siteCapabilities?: SiteCapabilities

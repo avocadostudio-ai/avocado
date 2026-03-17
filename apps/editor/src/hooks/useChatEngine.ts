@@ -44,7 +44,7 @@ export type ChatEngineConfig = {
   setActiveBlockId: (id: string | undefined) => void
   setActiveBlockType: (type: string | undefined) => void
   setActiveEditablePath: (path: string | undefined) => void
-  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton", payload: Record<string, unknown>) => void
+  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
   setAvailableSlugs: (slugs: string[]) => void
   setIsLoadingSlugs: (loading: boolean) => void
@@ -53,6 +53,7 @@ export type ChatEngineConfig = {
   siteCapabilities?: SiteCapabilities
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
+  onApplied?: () => void
 }
 
 function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
@@ -87,7 +88,8 @@ export function useChatEngine(config: ChatEngineConfig) {
     componentManifest,
     siteCapabilities,
     allowStructuralEdits,
-    getBlockDefaultProps
+    getBlockDefaultProps,
+    onApplied
   } = config
 
   const activeSiteOrigin = resolveSiteOrigin(activeSiteConfig)
@@ -218,6 +220,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void refreshRouteSlugs()
+      onApplied?.()
     }
   }
 

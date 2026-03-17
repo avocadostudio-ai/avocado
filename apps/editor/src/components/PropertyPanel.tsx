@@ -1,10 +1,36 @@
-import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
+import { useState, useEffect, useCallback, useRef, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
 import { getAllBlockMeta, DEFAULT_HEADING_LEVELS, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
-import { WandSparkles } from "lucide-react"
+import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
+import { WandSparkles, Sparkles, Pencil } from "lucide-react"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
 const noop = () => {}
+
+/** Scroll-into-view + flash when this field becomes the highlighted path. */
+function useFieldHighlight(fieldPath: string | undefined, highlightPath: string | undefined) {
+  const ref = useRef<HTMLDivElement>(null)
+  const prevPath = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!fieldPath || !highlightPath || highlightPath !== fieldPath) {
+      prevPath.current = highlightPath
+      return
+    }
+    // Only flash on a *change* to this path (not on mount with it already set)
+    if (prevPath.current === highlightPath) return
+    prevPath.current = highlightPath
+
+    const el = ref.current
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    el.classList.add("property-field--flash")
+    const timer = setTimeout(() => el.classList.remove("property-field--flash"), 1800)
+    return () => { clearTimeout(timer); el.classList.remove("property-field--flash") }
+  }, [fieldPath, highlightPath])
+
+  return ref
+}
 
 type Props = {
   style?: CSSProperties
@@ -31,32 +57,35 @@ type Props = {
   onDeselectBlock?: () => void
   /** Called when AI assist is requested on a page-level field (SEO title, meta description, nav label). */
   onPageAiAssist?: (fieldLabel: string, fieldKind: string, currentValue: string) => void
+  /** Called when a quick action is selected from the AI dropdown on a block field. */
+  onAiQuickAction?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void
+  /** Called when a quick action is selected from the AI dropdown on a page-level field. */
+  onPageAiQuickAction?: (fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void
+  /** Whether AI is currently processing a request. */
+  aiLoading?: boolean
+  /** The field path currently being AI-edited (for targeted shimmer). */
+  aiLoadingPath?: string
   /** Called when the user clicks "+ Add" on a list field. */
   onAddListItem?: (listKey: string) => void
+  /** The field path currently selected in the preview (for scroll+flash). */
+  highlightPath?: string
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAddListItem }: Props) {
+export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading, aiLoadingPath, onAddListItem, highlightPath }: Props) {
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
-        <div className="property-panel-context property-panel-context--page">
-          <svg className="property-panel-context-icon" viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-            <rect x="2" y="1.5" width="12" height="13" rx="2" stroke="currentColor" strokeWidth="1.3" />
-            <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-          </svg>
-          <div className="property-panel-context-text">
-            <span className="property-panel-context-label property-panel-context-label--page">Editing: Page</span>
-            {pageName ? <span className="property-panel-context-name">{pageName}</span> : null}
-          </div>
-        </div>
         {slug && slug !== "/" && onNavLabelChange ? (
-          <NavLabelField slug={slug} navLabel={navLabel ?? ""} onNavLabelChange={onNavLabelChange} onAiAssist={onPageAiAssist} />
+          <NavLabelField slug={slug} navLabel={navLabel ?? ""} onNavLabelChange={onNavLabelChange} onAiAssist={onPageAiAssist} onAiQuickAction={onPageAiQuickAction} aiLoading={aiLoading} fieldShimmer={aiLoading === true && aiLoadingPath === "Nav label"} />
         ) : null}
         {slug && onPageMetaChange ? (
           <PageMetaFields
             pageMeta={pageMeta ?? {}}
             onPageMetaChange={onPageMetaChange}
             onAiAssist={onPageAiAssist}
+            onAiQuickAction={onPageAiQuickAction}
+            aiLoading={aiLoading}
+            aiLoadingPath={aiLoadingPath}
           />
         ) : null}
       </div>
@@ -84,14 +113,11 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
           <rect x="9.5" y="9.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
         </svg>
         <div className="property-panel-context-text">
-          <span className="property-panel-context-label property-panel-context-label--component">Editing: {meta.displayName}</span>
-          {pageName ? (
-            <span className="property-panel-context-breadcrumb">
-              <button type="button" className="property-panel-context-breadcrumb-link" onClick={onDeselectBlock}>Page</button>
-              <span className="property-panel-context-breadcrumb-sep" aria-hidden="true">&rarr;</span>
-              <span>{pageName}</span>
-            </span>
-          ) : null}
+          <span className="property-panel-context-breadcrumb">
+            <button type="button" className="property-panel-context-breadcrumb-link" onClick={onDeselectBlock}>Page</button>
+            <span className="property-panel-context-breadcrumb-sep" aria-hidden="true">&rsaquo;</span>
+            <span className="property-panel-context-breadcrumb-current">{meta.displayName}</span>
+          </span>
         </div>
       </div>
       {status === "loading" && !props ? (
@@ -100,7 +126,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
         <div className="property-panel-empty">Failed to load block properties</div>
       ) : props ? (
         <div className="property-panel-fields">
-          {renderFieldEntries(Object.entries(meta.fields), props, "", blockType, onFieldChange, onImageClick, onAiAssist)}
+          {renderFieldEntries(Object.entries(meta.fields), props, "", blockType, onFieldChange, onImageClick, onAiAssist, onAiQuickAction, aiLoading, aiLoadingPath, highlightPath)}
           {meta.listFields
             ? Object.entries(meta.listFields).map(([key, listField]) => {
                 const items = Array.isArray(props[key]) ? (props[key] as Record<string, unknown>[]) : []
@@ -114,6 +140,10 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
                     onFieldChange={onFieldChange}
                     onImageClick={onImageClick}
                     onAiAssist={onAiAssist}
+                    onAiQuickAction={onAiQuickAction}
+                    aiLoading={aiLoading}
+                    aiLoadingPath={aiLoadingPath}
+                    highlightPath={highlightPath}
                     onAddItem={onAddListItem ? () => onAddListItem(key) : undefined}
                   />
                 )
@@ -153,7 +183,11 @@ function renderFieldEntries(
   blockType: string | undefined,
   onFieldChange: (fieldPath: string, value: string) => void,
   onImageClick?: (fieldPath: string, currentUrl: string) => void,
-  onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
+  onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void,
+  onAiQuickAction?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void,
+  aiLoading?: boolean,
+  aiLoadingPath?: string,
+  highlightPath?: string
 ): ReactNode[] {
   const pairedAltKeys = new Set<string>()
 
@@ -186,11 +220,15 @@ function renderFieldEntries(
         <ImageFieldWidget
           key={key}
           label={field.label ?? key}
+          blockType={blockType}
           imageUrl={data[key] == null ? "" : String(data[key])}
           altText={altValue}
           onChangeClick={() => onImageClick?.(pathPrefix + key, data[key] == null ? "" : String(data[key]))}
           onAltCommit={altKey ? (v) => onFieldChange(pathPrefix + altKey, v) : undefined}
           onAltAiAssist={altKey && onAiAssist ? () => onAiAssist(pathPrefix + altKey, "Alt text", "imageAlt", altValue ?? "") : undefined}
+          onAltAiQuickAction={altKey && onAiQuickAction ? (actionText: string) => onAiQuickAction(pathPrefix + altKey, "Alt text", "imageAlt", altValue ?? "", actionText) : undefined}
+          aiLoading={aiLoading}
+          fieldShimmer={aiLoading === true && altKey != null && aiLoadingPath === pathPrefix + altKey}
         />
       )
     } else {
@@ -205,6 +243,13 @@ function renderFieldEntries(
           onAiAssist={AI_ELIGIBLE_KINDS.has(field.kind) && onAiAssist
             ? () => onAiAssist(pathPrefix + key, field.label ?? key, field.kind, data[key] == null ? "" : String(data[key]))
             : undefined}
+          onAiQuickAction={AI_ELIGIBLE_KINDS.has(field.kind) && onAiQuickAction
+            ? (actionText: string) => onAiQuickAction(pathPrefix + key, field.label ?? key, field.kind, data[key] == null ? "" : String(data[key]), actionText)
+            : undefined}
+          aiLoading={aiLoading}
+          fieldShimmer={aiLoading === true && aiLoadingPath === pathPrefix + key}
+          highlightPath={highlightPath}
+          fieldPath={pathPrefix + key}
         />
       )
     }
@@ -213,28 +258,147 @@ function renderFieldEntries(
   return nodes
 }
 
-function SparkleButton({ onClick }: { onClick: () => void }) {
+function SparkleButton({ onClick, fieldKind, fieldLabel, blockType, currentValue, onQuickAction, onCustomPrompt, aiLoading }: {
+  onClick: () => void
+  fieldKind?: string
+  fieldLabel?: string
+  blockType?: string
+  currentValue?: string
+  onQuickAction?: (actionText: string) => void
+  onCustomPrompt?: () => void
+  aiLoading?: boolean
+}) {
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (onQuickAction && fieldKind && fieldLabel && blockType !== undefined) {
+      setAnchorRect(e.currentTarget.getBoundingClientRect())
+    } else {
+      onClick()
+    }
+  }
+
   return (
-    <button type="button" className="property-field-ai-btn" onClick={onClick} title="AI suggestions">
-      <WandSparkles size={14} aria-hidden="true" />
-    </button>
+    <>
+      <button type="button" className={`property-field-ai-btn${aiLoading ? " property-field-ai-btn--loading" : ""}`} onClick={handleClick} title="AI suggestions">
+        {aiLoading ? <Sparkles size={14} aria-hidden="true" /> : <WandSparkles size={14} aria-hidden="true" />}
+      </button>
+      {anchorRect && fieldKind && fieldLabel && blockType !== undefined && (
+        <AiQuickActionsDropdown
+          anchorRect={anchorRect}
+          fieldKind={fieldKind}
+          fieldLabel={fieldLabel}
+          blockType={blockType}
+          currentValue={currentValue ?? ""}
+          aiLoading={aiLoading}
+          onSelect={(actionText) => {
+            setAnchorRect(null)
+            onQuickAction?.(actionText)
+          }}
+          onCustomPrompt={() => {
+            setAnchorRect(null)
+            ;(onCustomPrompt ?? onClick)()
+          }}
+          onDismiss={() => setAnchorRect(null)}
+        />
+      )}
+    </>
+  )
+}
+
+function AiQuickActionsDropdown({
+  anchorRect,
+  fieldKind,
+  fieldLabel,
+  blockType,
+  currentValue,
+  aiLoading,
+  onSelect,
+  onCustomPrompt,
+  onDismiss
+}: {
+  anchorRect: DOMRect
+  fieldKind: string
+  fieldLabel: string
+  blockType: string
+  currentValue: string
+  aiLoading?: boolean
+  onSelect: (actionText: string) => void
+  onCustomPrompt: () => void
+  onDismiss: () => void
+}) {
+  const actions = fieldAiQuickActions(fieldKind, fieldLabel, blockType, currentValue)
+
+  // Position: below the button, flipping above if near viewport bottom
+  const spaceBelow = window.innerHeight - anchorRect.bottom
+  const flipAbove = spaceBelow < 160
+  const top = flipAbove ? undefined : anchorRect.bottom + 4
+  const bottom = flipAbove ? window.innerHeight - anchorRect.top + 4 : undefined
+  const right = window.innerWidth - anchorRect.right
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDismiss()
+    }
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  }, [onDismiss])
+
+  return (
+    <>
+      <div className="ai-quick-actions-backdrop" onClick={onDismiss} />
+      <div
+        className="ai-quick-actions-menu"
+        style={{ top, bottom, right }}
+      >
+        {actions.map((action) => (
+          <button
+            key={action}
+            type="button"
+            className="ai-quick-actions-item"
+            disabled={aiLoading}
+            onClick={() => onSelect(action)}
+          >
+            <WandSparkles size={12} aria-hidden="true" />
+            {action}
+          </button>
+        ))}
+        <div className="ai-quick-actions-divider" />
+        <button
+          type="button"
+          className="ai-quick-actions-item ai-quick-actions-item--custom"
+          onClick={onCustomPrompt}
+        >
+          <Pencil size={12} aria-hidden="true" />
+          Custom prompt...
+        </button>
+      </div>
+    </>
   )
 }
 
 function ImageFieldWidget({
   label,
+  blockType,
   imageUrl,
   altText,
   onChangeClick,
   onAltCommit,
-  onAltAiAssist
+  onAltAiAssist,
+  onAltAiQuickAction,
+  aiLoading,
+  fieldShimmer
 }: {
   label: string
+  blockType?: string
   imageUrl: string
   altText?: string
   onChangeClick: () => void
   onAltCommit?: (value: string) => void
   onAltAiAssist?: () => void
+  onAltAiQuickAction?: (actionText: string) => void
+  aiLoading?: boolean
+  fieldShimmer?: boolean
 }) {
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
@@ -270,20 +434,22 @@ function ImageFieldWidget({
           <div className="property-field-image-alt-group">
             <div className="property-field-image-alt-label">
               <span>Alt text</span>
-              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} /> : null}
             </div>
-            <input
-              type="text"
-              className="property-field-image-alt"
-              placeholder="Describe what's in this image"
-              value={displayAlt}
-              onFocus={() => { setAltLocal(altText ?? ""); setAltFocused(true) }}
-              onChange={(e) => { setAltLocal(e.target.value); debouncedAltCommit(e.target.value) }}
-              onBlur={() => {
-                setAltFocused(false)
-                flushAltCommit()
-              }}
-            />
+            <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
+              <input
+                type="text"
+                className="property-field-image-alt"
+                placeholder="Describe what's in this image"
+                value={displayAlt}
+                onFocus={() => { setAltLocal(altText ?? ""); setAltFocused(true) }}
+                onChange={(e) => { setAltLocal(e.target.value); debouncedAltCommit(e.target.value) }}
+                onBlur={() => {
+                  setAltFocused(false)
+                  flushAltCommit()
+                }}
+              />
+              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} fieldKind="imageAlt" fieldLabel="Alt text" blockType={blockType ?? ""} currentValue={altText ?? ""} onQuickAction={onAltAiQuickAction} onCustomPrompt={onAltAiAssist} aiLoading={aiLoading} /> : null}
+            </div>
           </div>
         )}
       </div>
@@ -299,6 +465,10 @@ function ListFieldSection({
   onFieldChange,
   onImageClick,
   onAiAssist,
+  onAiQuickAction,
+  aiLoading,
+  aiLoadingPath,
+  highlightPath,
   onAddItem
 }: {
   listKey: string
@@ -308,10 +478,28 @@ function ListFieldSection({
   onFieldChange: (fieldPath: string, value: string) => void
   onImageClick?: (fieldPath: string, currentUrl: string) => void
   onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
+  onAiQuickAction?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void
+  aiLoading?: boolean
+  aiLoadingPath?: string
+  highlightPath?: string
   onAddItem?: () => void
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const label = listField.label ?? listKey
+
+  // Auto-expand list item when its child field is selected in preview
+  useEffect(() => {
+    if (!highlightPath) return
+    const prefix = `${listKey}[`
+    if (!highlightPath.startsWith(prefix)) return
+    const afterBracket = highlightPath.slice(prefix.length)
+    const closingBracket = afterBracket.indexOf("]")
+    if (closingBracket < 0) return
+    const idx = Number(afterBracket.slice(0, closingBracket))
+    if (!Number.isNaN(idx) && idx >= 0 && idx < items.length) {
+      setExpandedIndex(idx)
+    }
+  }, [highlightPath, listKey, items.length])
 
   return (
     <div className="property-list-section">
@@ -344,7 +532,11 @@ function ListFieldSection({
                   blockType,
                   onFieldChange,
                   onImageClick,
-                  onAiAssist
+                  onAiAssist,
+                  onAiQuickAction,
+                  aiLoading,
+                  aiLoadingPath,
+                  highlightPath
                 )}
               </div>
             ) : null}
@@ -378,7 +570,12 @@ function FieldEditor({
   value,
   blockType,
   onCommit,
-  onAiAssist
+  onAiAssist,
+  onAiQuickAction,
+  aiLoading,
+  fieldShimmer,
+  highlightPath,
+  fieldPath
 }: {
   fieldKey: string
   field: FieldMeta
@@ -386,11 +583,17 @@ function FieldEditor({
   blockType?: string | undefined
   onCommit: (value: string) => void
   onAiAssist?: () => void
+  onAiQuickAction?: (actionText: string) => void
+  aiLoading?: boolean
+  fieldShimmer?: boolean
+  highlightPath?: string
+  fieldPath?: string
 }) {
   const stringValue = value == null ? "" : String(value)
   const [localValue, setLocalValue] = useState(stringValue)
   const [focused, setFocused] = useState(false)
   const { debouncedCommit, flushCommit } = useDebouncedCommit(onCommit, 400)
+  const flashRef = useFieldHighlight(fieldPath, highlightPath)
 
   // Sync from props when not focused
   const displayValue = focused ? localValue : stringValue
@@ -481,24 +684,26 @@ function FieldEditor({
   } as const
 
   return (
-    <div className="property-field">
+    <div className="property-field" ref={flashRef}>
       <div className="property-field-label">
         <span>
           {label}
           {field.required && <span className="property-field-required">*</span>}
         </span>
-        {onAiAssist ? <SparkleButton onClick={onAiAssist} /> : null}
       </div>
-      {useTextarea ? (
-        <textarea className="property-field-textarea" rows={3} {...sharedProps} />
-      ) : (
-        <input type={inputType} className="property-field-input" {...sharedProps} />
-      )}
+      <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
+        {useTextarea ? (
+          <textarea className="property-field-textarea" rows={3} {...sharedProps} />
+        ) : (
+          <input type={inputType} className="property-field-input" {...sharedProps} />
+        )}
+        {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={field.kind} fieldLabel={field.label ?? fieldKey} blockType={blockType ?? ""} currentValue={stringValue} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={aiLoading} /> : null}
+      </div>
     </div>
   )
 }
 
-function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist }: { slug: string; navLabel: string; onNavLabelChange: (slug: string, label: string) => void; onAiAssist?: (fieldLabel: string, fieldKind: string, currentValue: string) => void }) {
+function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist, onAiQuickAction, aiLoading, fieldShimmer }: { slug: string; navLabel: string; onNavLabelChange: (slug: string, label: string) => void; onAiAssist?: (fieldLabel: string, fieldKind: string, currentValue: string) => void; onAiQuickAction?: (fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void; aiLoading?: boolean; fieldShimmer?: boolean }) {
   const [local, setLocal] = useState(navLabel)
   const [focused, setFocused] = useState(false)
   const display = focused ? local : navLabel
@@ -508,18 +713,20 @@ function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist }: { slug:
     <div className="property-panel-page-section">
       <div className="property-field">
         <div className="property-field-label">
-          <span>Nav label for {slug}</span>
-          {onAiAssist ? <SparkleButton onClick={() => onAiAssist("Nav label", "text", navLabel)} /> : null}
+          <span>Menu label</span>
         </div>
-        <input
-          type="text"
-          className="property-field-input"
-          placeholder="Default"
-          value={display}
-          onFocus={() => { setLocal(navLabel); setFocused(true) }}
-          onChange={(e) => { setLocal(e.target.value); debouncedCommit(e.target.value) }}
-          onBlur={() => { setFocused(false); flushCommit() }}
-        />
+        <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
+          <input
+            type="text"
+            className="property-field-input"
+            placeholder="Page"
+            value={display}
+            onFocus={() => { setLocal(navLabel); setFocused(true) }}
+            onChange={(e) => { setLocal(e.target.value); debouncedCommit(e.target.value) }}
+            onBlur={() => { setFocused(false); flushCommit() }}
+          />
+          {onAiAssist ? <SparkleButton onClick={() => onAiAssist("Nav label", "text", navLabel)} fieldKind="text" fieldLabel="Nav label" blockType="Page" currentValue={navLabel} onQuickAction={onAiQuickAction ? (actionText: string) => onAiQuickAction("Nav label", "text", navLabel, actionText) : undefined} onCustomPrompt={() => onAiAssist("Nav label", "text", navLabel)} aiLoading={aiLoading} /> : null}
+        </div>
       </div>
     </div>
   )
@@ -528,34 +735,52 @@ function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist }: { slug:
 function PageMetaFields({
   pageMeta,
   onPageMetaChange,
-  onAiAssist
+  onAiAssist,
+  onAiQuickAction,
+  aiLoading,
+  aiLoadingPath
 }: {
   pageMeta: { title?: string; description?: string; ogImage?: string }
   onPageMetaChange: (field: "title" | "description" | "ogImage", value: string) => void
   onAiAssist?: (fieldLabel: string, fieldKind: string, currentValue: string) => void
+  onAiQuickAction?: (fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void
+  aiLoading?: boolean
+  aiLoadingPath?: string
 }) {
   return (
     <div className="property-panel-page-section">
       <div className="property-panel-block-name">SEO</div>
       <PageMetaField
         label="SEO title"
+        fieldKind="text"
+        blockType="Page"
         value={pageMeta.title ?? ""}
         placeholder="Defaults to page title"
         recommendedMax={60}
         onCommit={(value) => onPageMetaChange("title", value)}
         onAiAssist={onAiAssist ? () => onAiAssist("SEO title", "text", pageMeta.title ?? "") : undefined}
+        onAiQuickAction={onAiQuickAction ? (actionText: string) => onAiQuickAction("SEO title", "text", pageMeta.title ?? "", actionText) : undefined}
+        aiLoading={aiLoading}
+        fieldShimmer={aiLoading === true && aiLoadingPath === "SEO title"}
       />
       <PageMetaField
         label="Meta description"
+        fieldKind="richtext"
+        blockType="Page"
         value={pageMeta.description ?? ""}
         placeholder="Defaults to generated description"
         multiline
         recommendedMax={160}
         onCommit={(value) => onPageMetaChange("description", value)}
         onAiAssist={onAiAssist ? () => onAiAssist("Meta description", "richtext", pageMeta.description ?? "") : undefined}
+        onAiQuickAction={onAiQuickAction ? (actionText: string) => onAiQuickAction("Meta description", "richtext", pageMeta.description ?? "", actionText) : undefined}
+        aiLoading={aiLoading}
+        fieldShimmer={aiLoading === true && aiLoadingPath === "Meta description"}
       />
       <PageMetaField
         label="Open Graph image URL"
+        fieldKind="url"
+        blockType="Page"
         value={pageMeta.ogImage ?? ""}
         placeholder="https://..."
         onCommit={(value) => onPageMetaChange("ogImage", value)}
@@ -566,20 +791,30 @@ function PageMetaFields({
 
 function PageMetaField({
   label,
+  fieldKind,
+  blockType,
   value,
   placeholder,
   multiline,
   recommendedMax,
   onCommit,
-  onAiAssist
+  onAiAssist,
+  onAiQuickAction,
+  aiLoading,
+  fieldShimmer
 }: {
   label: string
+  fieldKind?: string
+  blockType?: string
   value: string
   placeholder?: string
   multiline?: boolean
   recommendedMax?: number
   onCommit: (value: string) => void
   onAiAssist?: () => void
+  onAiQuickAction?: (actionText: string) => void
+  aiLoading?: boolean
+  fieldShimmer?: boolean
 }) {
   const [local, setLocal] = useState(value)
   const [focused, setFocused] = useState(false)
@@ -606,13 +841,15 @@ function PageMetaField({
     <div className="property-field">
       <div className="property-field-label">
         <span>{label}</span>
-        {onAiAssist ? <SparkleButton onClick={onAiAssist} /> : null}
       </div>
-      {multiline ? (
-        <textarea className="property-field-textarea" rows={3} {...shared} />
-      ) : (
-        <input type="text" className="property-field-input" {...shared} />
-      )}
+      <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
+        {multiline ? (
+          <textarea className="property-field-textarea" rows={3} {...shared} />
+        ) : (
+          <input type="text" className="property-field-input" {...shared} />
+        )}
+        {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={fieldKind} fieldLabel={label} blockType={blockType} currentValue={focused ? local : value} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={aiLoading} /> : null}
+      </div>
       {recommendedMax != null && (
         <span className={`property-field-char-count${charLen > recommendedMax ? " property-field-char-count--over" : ""}`}>
           {charLen} / {recommendedMax}

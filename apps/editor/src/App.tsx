@@ -17,7 +17,7 @@ import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, isImagePath, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
-import { fieldAiSuggestions } from "./lib/field-ai-suggestions"
+import { fieldAiSuggestions, fieldAiQuickActions } from "./lib/field-ai-suggestions"
 import { manifestUnavailableChanges } from "./lib/integration-context"
 import {
   DEBUG_MODE_STORAGE_KEY,
@@ -184,6 +184,7 @@ function EditorPage({
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
+  const onAppliedRef = useRef<(() => void) | undefined>(undefined)
   const draftPrimedRef = useRef(false)
   const draftPrimedOriginRef = useRef<string | null>(null)
   const slugSyncedFromPreviewRef = useRef(false)
@@ -379,7 +380,8 @@ function EditorPage({
     componentManifest: componentManifest.manifest,
     siteCapabilities: componentManifest.siteCapabilities,
     allowStructuralEdits: componentManifest.allowStructuralEdits,
-    getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null
+    getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null,
+    onApplied: () => { onAppliedRef.current?.() }
   })
 
   const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult)
@@ -388,6 +390,11 @@ function EditorPage({
 
   const blockProps = useBlockProps(session, siteId, slug, activeBlockId, activeTab === "properties")
   const pageMeta = usePageMeta(session, siteId, slug, activeTab === "properties")
+  onAppliedRef.current = () => {
+    void blockProps.refetch()
+    void pageMeta.refetch()
+    preview.postToSite("aiFieldLoading", { blockId: "", active: false })
+  }
 
   // Sync refs
   useEffect(() => { activeBlockIdRef.current = activeBlockId }, [activeBlockId])
@@ -552,6 +559,37 @@ function EditorPage({
     }
 
     chatEngine.setFieldAiContext(entry)
+  }, [])
+
+  const handleFieldAiQuickAction = useCallback((fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => {
+    if (!activeBlockId || !activeBlockType) return
+    const allMeta = getAllBlockMeta()
+    const blockDisplayName = allMeta[activeBlockType]?.displayName ?? activeBlockType
+
+    setActiveEditablePath(fieldPath)
+    preview.postToSite("aiFieldLoading", { blockId: activeBlockId, editablePath: fieldPath, active: true })
+
+    const entry: ChatEntry = {
+      id: `field-ai-${Date.now()}`,
+      role: "assistant",
+      text: `Editing: ${blockDisplayName} → ${fieldLabel}`,
+      fieldAiContext: { blockId: activeBlockId, blockType: activeBlockType, fieldPath, fieldLabel, blockDisplayName }
+    }
+    chatEngine.setFieldAiContext(entry)
+    void chatEngine.submitChat(actionText)
+  }, [activeBlockId, activeBlockType])
+
+  const handlePageAiQuickAction = useCallback((fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => {
+    setActiveEditablePath(fieldLabel)
+
+    const entry: ChatEntry = {
+      id: `field-ai-${Date.now()}`,
+      role: "assistant",
+      text: `Editing: Page → ${fieldLabel}`,
+      fieldAiContext: { blockId: "__page__", blockType: "__page__", fieldPath: fieldLabel, fieldLabel, blockDisplayName: "Page" }
+    }
+    chatEngine.setFieldAiContext(entry)
+    void chatEngine.submitChat(actionText)
   }, [])
 
   // Refresh slugs on session/site change
@@ -723,7 +761,17 @@ function EditorPage({
         <header className="chat-header">
           <div className="chat-header-top">
             <div className="chat-header-site-name">
-              {activeSiteConfig.name} <a href="/sites" className="chat-header-switch-site">All sites</a>
+              {activeSiteConfig.name}
+              <button
+                type="button"
+                className="chat-header-icon-btn"
+                aria-label="Site settings"
+                title="Site settings"
+                onClick={() => sites.setConfigSiteId(siteId)}
+              >
+                <Settings size={14} aria-hidden="true" />
+              </button>
+              <a href="/sites" className="chat-header-switch-site">All sites</a>
             </div>
             <div className="chat-header-right">
               {componentManifest.status === "degraded" ? (
@@ -737,61 +785,48 @@ function EditorPage({
               <button
                 type="button"
                 className="chat-header-icon-btn"
-                aria-label="Site settings"
-                title="Site settings"
-                onClick={() => sites.setConfigSiteId(siteId)}
-              >
-                <Settings size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="chat-header-icon-btn"
                 aria-label="More options"
                 onClick={() => setShowSettingsModal(true)}
                 ref={settingsButtonRef}
               >
                 <Ellipsis size={14} aria-hidden="true" />
               </button>
-            </div>
-          </div>
-          <div className="chat-header-controls">
-            <label className="chat-header-slug">
-              <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
-                {routeOptions.map((route) => (
-                  <option key={route} value={route}>
-                    {slugLabel(route)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="chat-header-primary-actions">
               <button type="button" className="publish-preview-btn" onClick={() => void publish.publishSite()} disabled={chatEngine.isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
                 {publish.publishInProgress ? "Publishing" : "Publish"}
               </button>
+              {publish.publishStatus ? (
+                <>
+                  {publish.publishStatus.inspectUrl ? (
+                    <a className="publish-view-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
+                      View deploy
+                    </a>
+                  ) : null}
+                  {liveSiteUrl ? (
+                    <a
+                      className="live-site-icon-btn"
+                      href={liveSiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Open live site"
+                      title="Open live site"
+                    >
+                      <ExternalLink size={16} aria-hidden="true" />
+                    </a>
+                  ) : null}
+                </>
+              ) : null}
             </div>
-            {publish.publishStatus ? (
-              <>
-                {publish.publishStatus.inspectUrl ? (
-                  <a className="publish-view-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
-                    View deploy
-                  </a>
-                ) : null}
-                {liveSiteUrl ? (
-                  <a
-                    className="live-site-icon-btn"
-                    href={liveSiteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open live site"
-                    title="Open live site"
-                  >
-                    <ExternalLink size={16} aria-hidden="true" />
-                  </a>
-                ) : null}
-              </>
-            ) : null}
           </div>
+          <label className="chat-header-slug">
+            <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
+              {routeOptions.map((route) => (
+                <option key={route} value={route}>
+                  {slugLabel(route)}
+                </option>
+              ))}
+            </select>
+          </label>
         </header>
 
         <nav className="panel-tabs">
@@ -1079,6 +1114,11 @@ function EditorPage({
           }}
           onAiAssist={handleFieldAiAssist}
           onPageAiAssist={handlePageAiAssist}
+          onAiQuickAction={handleFieldAiQuickAction}
+          onPageAiQuickAction={handlePageAiQuickAction}
+          aiLoading={chatEngine.isLoading}
+          aiLoadingPath={activeEditablePath}
+          highlightPath={activeEditablePath}
           onAddListItem={activeBlockId && activeBlockType ? (listKey) => {
             void chatEngine.addListItem(slug, activeBlockId, activeBlockType, listKey)
               .then(() => blockProps.refetch())
@@ -1088,6 +1128,7 @@ function EditorPage({
         <div
           ref={splitHandleRef}
           className="composer-splitter"
+          style={{ display: activeTab === "chat" ? "" : "none" }}
           role="separator"
           aria-orientation="horizontal"
           aria-label="Resize input panel"
@@ -1097,7 +1138,7 @@ function EditorPage({
           }}
         />
 
-        <footer className="composer">
+        <footer className="composer" style={{ display: activeTab === "chat" ? "" : "none" }}>
           <ClaudeStyleChatInput
             message={message}
             isLoading={chatEngine.isLoading}

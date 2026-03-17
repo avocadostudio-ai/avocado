@@ -488,6 +488,20 @@
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
+/* Horizontal list items (e.g. Tabs): controls top-left, + at bottom-center */
+.editor-list-horizontal > .editor-list-item-controls {
+  right: auto;
+  left: 8px;
+}
+
+.editor-list-horizontal > .editor-list-item-add {
+  top: auto;
+  right: auto;
+  bottom: -17px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 [data-editor-active] .editor-selectable [data-editable-label] {
   position: relative;
 }
@@ -652,6 +666,10 @@
     bottom: -22px;
   }
 
+  .editor-list-horizontal > .editor-list-item-add {
+    bottom: -22px;
+  }
+
   .editor-selected-add-top {
     top: -22px;
   }
@@ -812,9 +830,50 @@
   to   { filter: blur(0) saturate(1); transform: scale(1); opacity: 1; }
 }
 
+/* AI field loading shimmer — injected child div to avoid ::before/::after conflicts */
+.aifx-shimmer-overlay {
+  position: absolute;
+  inset: -22%;
+  z-index: 23;
+  pointer-events: none;
+  background: linear-gradient(
+    108deg,
+    transparent 22%,
+    rgba(var(--editor-selected-rgb), 0.03) 34%,
+    rgba(var(--editor-selected-rgb), 0.16) 49%,
+    rgba(var(--editor-selected-rgb), 0.03) 64%,
+    transparent 78%
+  );
+  animation: aifx-wave 1.5s ease-in-out infinite;
+}
+
+.aifx-shimmer-sparkle {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  z-index: 24;
+  pointer-events: none;
+  color: rgb(var(--editor-selected-rgb));
+  animation: aifx-sparkle-blink 1s ease-in-out infinite;
+}
+
+.aifx-shimmer-sparkle svg {
+  display: block;
+  filter: drop-shadow(0 0 3px rgba(var(--editor-selected-rgb), 0.5));
+}
+
+@keyframes aifx-sparkle-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.85); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aifx-updated::before,
   .aifx-updated::after {
+    animation: none !important;
+  }
+  .aifx-shimmer-overlay,
+  .aifx-shimmer-sparkle {
     animation: none !important;
   }
   .editor-block-entering {
