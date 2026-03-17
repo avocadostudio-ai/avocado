@@ -3,59 +3,20 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-17T12:59:41.429Z",
+    "updatedAt": "2026-03-17T20:06:46.412Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Avocado Mastery Awaits",
-          "subheading": "Elevate Your Plate. Transform Your Health. Lead the Movement.",
-          "ctaText": "Start Your Avocado Journey",
+          "heading": "Join the Avocado Community",
+          "subheading": "Share your favorite recipes, connect with fellow food lovers, and celebrate the vibrant culture of avocado cuisine from around the world.",
+          "ctaText": "Explore Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "/generated-images/var_1773752381425_95i2o3.png",
-          "imageAlt": "AI-generated Hero image featuring fresh avocados cut half",
+          "imageUrl": "https://images.unsplash.com/photo-1632670952530-0614e8582534?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxOHx8d2VsY29tZSUyMHRvJTIweW91ciUyMGF2b2NhZG8lMjBzdG9yeSUyMGhlcm98ZW58MXwwfHx8MTc3Mzc3Nzk3M3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "beautifully plated avocado toast with fresh toppings",
           "imagePosition": "right",
-          "secondaryCtaText": ""
-        }
-      },
-      {
-        "id": "b_tabs_1773679560096_781",
-        "type": "Tabs",
-        "props": {
-          "tabs": [
-            {
-              "label": "Overview",
-              "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
-            },
-            {
-              "label": "Recipes & Ideas",
-              "content": "• **Breakfast** – Toast, smoothie bowls, eggs, omelets\n• **Lunch & Salads** – Grain bowls, salads, seafood\n• **Dinner** – Tacos, pasta, stuffed vegetables\n• **Snacks & Desserts** – Guacamole, chocolate mousse, vegan ice cream, parfaits"
-            },
-            {
-              "label": "Sustainability",
-              "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
-            },
-            {
-              "label": "Fun Facts",
-              "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
-            },
-            {
-              "label": "Selection & Storage Tips",
-              "content": "• **Selection** – Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n• **Ripeness** – Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n• **Storage** – Keep unripe at room temperature; refrigerate when ripe (lasts 3–5 days)\n• **Cut Avocados** – Preserve with lemon juice and plastic wrap; use within 1–2 days\n\nMaster these techniques for perfect avocados whenever you need them."
-            }
-          ]
-        }
-      },
-      {
-        "id": "b_video_1773685338972_965",
-        "type": "Video",
-        "props": {
-          "src": "https://www.youtube.com/watch?xv=cYPKqRIFVdU",
-          "title": "",
-          "posterUrl": "",
-          "autoplay": "false",
-          "loop": "false"
+          "secondaryCtaText": "Share Your Story"
         }
       },
       {
@@ -110,6 +71,45 @@
         }
       },
       {
+        "id": "b_tabs_1773679560096_781",
+        "type": "Tabs",
+        "props": {
+          "tabs": [
+            {
+              "label": "Overview",
+              "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
+            },
+            {
+              "label": "Recipes & Ideas",
+              "content": "• **Breakfast** – Toast, smoothie bowls, eggs, omelets\n• **Lunch & Salads** – Grain bowls, salads, seafood\n• **Dinner** – Tacos, pasta, stuffed vegetables\n• **Snacks & Desserts** – Guacamole, chocolate mousse, vegan ice cream, parfaits"
+            },
+            {
+              "label": "Sustainability",
+              "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
+            },
+            {
+              "label": "Fun Facts",
+              "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
+            },
+            {
+              "label": "Selection & Storage Tips",
+              "content": "• **Selection** – Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n• **Ripeness** – Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n• **Storage** – Keep unripe at room temperature; refrigerate when ripe (lasts 3–5 days)\n• **Cut Avocados** – Preserve with lemon juice and plastic wrap; use within 1–2 days\n\nMaster these techniques for perfect avocados whenever you need them."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_video_1773685338972_965",
+        "type": "Video",
+        "props": {
+          "src": "https://www.youtube.com/watch?xv=cYPKqRIFVdU",
+          "title": "",
+          "posterUrl": "",
+          "autoplay": "false",
+          "loop": "false"
+        }
+      },
+      {
         "id": "b_richtext_1771982675835",
         "type": "RichText",
         "props": {
@@ -145,7 +145,7 @@
           "title": "Join the Avocado Movement",
           "description": "Experience the richness and health benefits of premium avocados. Perfect for every meal, every time.",
           "ctaText": "Get Started",
-          "ctaHref": "/signup"
+          "ctaHref": "/community"
         }
       }
     ],
@@ -153,6 +153,97 @@
       "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
       "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
     }
+  },
+  {
+    "id": "p_olives",
+    "slug": "/olives",
+    "title": "Olives",
+    "updatedAt": "2026-03-17T20:12:19.275Z",
+    "blocks": [
+      {
+        "id": "b_hero_1772048325072",
+        "type": "Hero",
+        "props": {
+          "heading": "Finest Olive Oils 🫒",
+          "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
+          "ctaText": "Shop the Collection",
+          "ctaHref": "/shop",
+          "imageUrl": "/generated-images/var_1773434968055_8g99nk.png",
+          "imageAlt": "Three fresh green olives on white marble surface with delicate drops of virgin olive oil, minimalist and elegant photography, soft natural lighting, clean and sophisticated composition",
+          "imagePosition": "right"
+        }
+      },
+      {
+        "id": "b_cardgrid_1772048497347",
+        "type": "CardGrid",
+        "props": {
+          "title": "Key Health Benefits of Olive Oil",
+          "cards": [
+            {
+              "title": "Rich in Healthy Fats",
+              "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
+              "ctaText": "Learn More",
+              "ctaHref": "/health-benefits#healthy-fats",
+              "imageUrl": "/generated-images/var_1773435042084_wvet78.png",
+              "imageAlt": "Fresh green olives on a neutral warm olive-toned background, minimalist product photography, soft natural lighting, clean composition"
+            },
+            {
+              "title": "High in Antioxidants",
+              "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
+              "ctaText": "Discover More",
+              "ctaHref": "/health-benefits#antioxidants",
+              "imageUrl": "/generated-images/var_1773435061562_6hf8s6.png",
+              "imageAlt": "Golden-green olives arranged on a neutral warm olive-toned background, professional product photography, soft diffused lighting, elegant and simple"
+            },
+            {
+              "title": "Anti-inflammatory Properties",
+              "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
+              "ctaText": "Read More",
+              "ctaHref": "/health-benefits#anti-inflammatory",
+              "imageUrl": "/generated-images/var_1773435080764_6ocahu.png",
+              "imageAlt": "Glossy olives with olive oil drops on neutral warm olive-toned background, luxury product photography, sophisticated lighting, minimal aesthetic"
+            },
+            {
+              "title": "Supports Heart Health",
+              "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
+              "ctaText": "Find Out More",
+              "ctaHref": "/health-benefits#heart-health",
+              "imageUrl": "/generated-images/var_1773435101045_1y544z.png",
+              "imageAlt": "Beautiful ripe olives on neutral warm olive-toned background, artisanal product photography, natural soft lighting, clean and inviting composition"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1773778195147",
+        "type": "RichText",
+        "props": {
+          "title": "Olive Varieties & Origin Stories",
+          "body": "**Arbequina** — Hailing from Catalonia, these petite golden olives deliver a buttery, delicate flavor with hints of almond and green apple. Perfect for everyday cooking and dipping.\n\n**Koroneiki** — Greece's pride, these small dark olives produce oil with a peppery finish and herbaceous notes. A staple of the Mediterranean diet, ideal for finishing dishes and robust salads.\n\n**Frantoio** — Tuscany's heritage variety yields an intense, grassy oil bursting with complexity. Best used raw or drizzled over soups—its bold character shines brightest when uncooked."
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773778311735",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Storage & Cooking Tips",
+          "items": [
+            {
+              "q": "How should I store olive oil to keep it fresh?",
+              "a": "Store olive oil in a cool, dark place away from heat and direct sunlight. A pantry or cabinet is ideal. Keep the bottle tightly sealed to prevent oxidation. Extra virgin olive oil is best consumed within 18–24 months of harvest for optimal flavor."
+            },
+            {
+              "q": "Which olive oils pair best with specific dishes?",
+              "a": "Buttery Arbequina pairs beautifully with mild cheeses and vegetables. Peppery Koroneiki complements hearty salads and grilled meats. Bold Frantoio shines over soups, pasta, and roasted root vegetables."
+            },
+            {
+              "q": "Does olive oil go bad or expire?",
+              "a": "Olive oil doesn't truly \"expire,\" but it degrades over time. Look for rancid or musty aromas—a sign it's past its prime. When in doubt, replace oils older than 2 years."
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "p_oranges",
@@ -245,15 +336,15 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-16T18:20:30.143Z",
+    "updatedAt": "2026-03-17T20:13:02.144Z",
     "blocks": [
       {
         "id": "b_hero_about",
         "type": "Hero",
         "props": {
           "heading": "Grapefruits",
-          "subheading": "Discover the bright, refreshing world of grapefruits—a vibrant citrus fruit packed with wellness benefits, tangy flavor, and endless culinary possibilities.",
-          "ctaText": "Explore Grapefruits",
+          "subheading": "Entdecken Sie die leuchtende, erfrischende Welt der Grapefruits — eine lebendige Zitrusfrucht voller Wellness-Vorteile, würzigem Geschmack und endlosen kulinarischen Möglichkeiten.",
+          "ctaText": "Grapefruits erkunden",
           "ctaHref": "/grapefruits",
           "imageUrl": "https://images.unsplash.com/photo-1528826194825-a71b700fe80b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxMzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
           "imageAlt": "slice grapefruit",
@@ -264,7 +355,7 @@
         "id": "b_quote_1773680990550_137",
         "type": "Quote",
         "props": {
-          "quote": "The best way to predict the future is to create it.",
+          "quote": "Die beste Art, die Zukunft vorherzusagen, ist, sie zu schaffen.",
           "author": "Peter Drucker",
           "role": "Management Consultant",
           "imageUrl": "https://images.unsplash.com/flagged/photo-1570612861542-284f4c12e75f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxwZXJzb258ZW58MXwwfHx8MTc3MzY4NDg4NXww&ixlib=rb-4.1.0&q=80&w=1080",
@@ -275,37 +366,37 @@
         "id": "b_table_1773681049002_351",
         "type": "Table",
         "props": {
-          "title": "Grapefruit Varieties & Nutrition Guide",
+          "title": "Grapefruit-Sorten & Ernährungsleitfaden",
           "headers": [
-            "Variety",
-            "Flavor Profile",
+            "Sorte",
+            "Geschmacksprofil",
             "Vitamin C",
-            "Best Season"
+            "Beste Jahreszeit"
           ],
           "rows": [
             [
-              "Pink/Red",
-              "Sweet & tangy",
-              "High",
-              "Winter–Spring"
+              "Rosa/Rot",
+              "Süß und würzig",
+              "Hoch",
+              "Winter–Frühling"
             ],
             [
-              "White",
-              "Tart & bitter",
-              "High",
-              "Year-round"
+              "Weiß",
+              "Herb und bitter",
+              "Hoch",
+              "Ganzjährig"
             ],
             [
               "Star Ruby",
-              "Sweet & juicy",
-              "Very high",
-              "Winter–Spring"
+              "Süß und saftig",
+              "Sehr hoch",
+              "Winter–Frühling"
             ],
             [
               "Pomelo",
-              "Mild & sweet",
-              "Moderate",
-              "Fall–Winter"
+              "Mild und süß",
+              "Moderat",
+              "Herbst–Winter"
             ]
           ],
           "striped": "true"
@@ -319,24 +410,24 @@
             {
               "imageUrl": "https://images.unsplash.com/photo-1568651239222-7af48d48d3eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8cGluayUyMGdyYXBlZnJ1aXR8ZW58MXwwfHx8MTc3MzY4NTE1N3ww&ixlib=rb-4.1.0&q=80&w=1080",
               "imageAlt": "shallow focus photo of sliced orange fruit",
-              "heading": "Pink Grapefruit",
-              "description": "Sweet and tangy perfection in every bite",
+              "heading": "Rosa Grapefruit",
+              "description": "Süße und würzige Perfektion in jedem Bissen",
               "ctaText": "",
               "ctaHref": ""
             },
             {
               "imageUrl": "https://images.unsplash.com/photo-1670259382864-c532bcf1fa5e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjdXQlMjBncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxOTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
               "imageAlt": "a fruit cut in half",
-              "heading": "Packed with Nutrients",
-              "description": "Rich in vitamin C, potassium, and antioxidants for daily wellness",
+              "heading": "Reich an Nährstoffen",
+              "description": "Reich an Vitamin C, Kalium und Antioxidantien für tägliches Wohlbefinden",
               "ctaText": "",
               "ctaHref": ""
             },
             {
               "imageUrl": "https://images.unsplash.com/photo-1718833051058-4caaf174ed27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNnx8bWFueSUyMGdyYXBlZnJ1aXRzfGVufDF8MHx8fDE3NzM2ODUyMTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
               "imageAlt": "A pile of oranges sitting next to each other",
-              "heading": "Endless Culinary Uses",
-              "description": "From breakfast juice to salads and desserts—versatile and delicious",
+              "heading": "Endlose kulinarische Verwendungen",
+              "description": "Vom Frühstückssaft über Salate bis zu Desserts – vielseitig und köstlich",
               "ctaText": "",
               "ctaHref": ""
             }
@@ -349,190 +440,155 @@
         "id": "b_faqaccordion_1773558915222",
         "type": "FAQAccordion",
         "props": {
-          "title": "Frequently asked questions",
+          "title": "Häufig gestellte Fragen",
           "items": [
             {
-              "q": "How fast can we publish?",
-              "a": "Most teams ship updates in minutes."
+              "q": "Wie schnell können wir veröffentlichen?",
+              "a": "Die meisten Teams stellen Updates innerhalb von Minuten bereit."
             },
             {
-              "q": "Can we revise later?",
-              "a": "Yes, every block can be updated anytime."
+              "q": "Können wir später überarbeiten?",
+              "a": "Ja, jeder Block kann jederzeit aktualisiert werden."
             },
             {
-              "q": "How do I pick a ripe grapefruit?",
-              "a": "Choose grapefruits that feel heavy for their size and have a smooth, unblemished skin. They should yield slightly to gentle pressure, indicating they're juicy and ready to enjoy."
+              "q": "Wie wähle ich eine reife Grapefruit aus?",
+              "a": "Wählen Sie Grapefruits, die sich für ihre Größe schwer anfühlen und eine glatte, makellose Haut haben. Sie sollten bei leichtem Druck leicht nachgeben, was darauf hindeutet, dass sie saftig und verzehrbereit sind."
             }
           ]
         }
       }
     ],
     "meta": {
-      "title": "About Grapefruits | Health, Varieties & Benefits",
-      "description": "Discover grapefruit varieties, nutrition facts, and wellness benefits. Learn how to select, store, and enjoy this vibrant citrus fruit in your daily meals.",
+      "title": "Grapefruit-Sorten, Gesundheit & Vorteile | Avocado Stories",
+      "description": "Entdecken Sie Grapefruit-Sorten, Nährwertfakten und Wellness-Vorteile. Erfahren Sie, wie Sie diese lebendige Zitrusfrucht auswählen, lagern und täglich genießen.",
       "ogImage": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
     }
   },
   {
-    "id": "p_olives",
-    "slug": "/olives",
-    "title": "Olives",
-    "updatedAt": "2026-03-15T19:53:36.150Z",
+    "id": "p_community",
+    "slug": "/community",
+    "title": "Community",
+    "updatedAt": "2026-03-17T18:20:06.593Z",
     "blocks": [
       {
-        "id": "b_hero_1772048325072",
+        "id": "b_hero_new-page",
         "type": "Hero",
         "props": {
-          "heading": "Finest Olive Oils 🫒 Keep it concise and direct.",
-          "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
-          "ctaText": "Shop the Collection",
-          "ctaHref": "/shop",
-          "imageUrl": "/generated-images/var_1773434968055_8g99nk.png",
-          "imageAlt": "Three fresh green olives on white marble surface with delicate drops of virgin olive oil, minimalist and elegant photography, soft natural lighting, clean and sophisticated composition"
-        }
-      },
-      {
-        "id": "b_cardgrid_1772048497347",
-        "type": "CardGrid",
-        "props": {
-          "title": "Key Health Benefits of Olive Oil",
-          "cards": [
-            {
-              "title": "Rich in Healthy Fats",
-              "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
-              "ctaText": "Learn More",
-              "ctaHref": "/health-benefits#healthy-fats",
-              "imageUrl": "/generated-images/var_1773435042084_wvet78.png",
-              "imageAlt": "Fresh green olives on a neutral warm olive-toned background, minimalist product photography, soft natural lighting, clean composition"
-            },
-            {
-              "title": "High in Antioxidants",
-              "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
-              "ctaText": "Discover More",
-              "ctaHref": "/health-benefits#antioxidants",
-              "imageUrl": "/generated-images/var_1773435061562_6hf8s6.png",
-              "imageAlt": "Golden-green olives arranged on a neutral warm olive-toned background, professional product photography, soft diffused lighting, elegant and simple"
-            },
-            {
-              "title": "Anti-inflammatory Properties",
-              "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
-              "ctaText": "Read More",
-              "ctaHref": "/health-benefits#anti-inflammatory",
-              "imageUrl": "/generated-images/var_1773435080764_6ocahu.png",
-              "imageAlt": "Glossy olives with olive oil drops on neutral warm olive-toned background, luxury product photography, sophisticated lighting, minimal aesthetic"
-            },
-            {
-              "title": "Supports Heart Health",
-              "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
-              "ctaText": "Find Out More",
-              "ctaHref": "/health-benefits#heart-health",
-              "imageUrl": "/generated-images/var_1773435101045_1y544z.png",
-              "imageAlt": "Beautiful ripe olives on neutral warm olive-toned background, artisanal product photography, natural soft lighting, clean and inviting composition"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_winter_jam_competition",
-    "slug": "/winter-jam-competition",
-    "title": "Winter Jam Competition",
-    "updatedAt": "2026-03-17T07:19:13.552Z",
-    "blocks": [
-      {
-        "id": "b_hero_winter-jam-competition",
-        "type": "Hero",
-        "props": {
-          "heading": "Winter Jam Competition",
-          "subheading": "Celebrate homemade flavors. Enter now and compete for glory and prizes.",
-          "ctaText": "Enter Competition",
+          "heading": "Join Our Community Today",
+          "subheading": "Sign up in seconds and start exploring. No credit card required.",
+          "ctaText": "Create Free Account",
           "ctaHref": "/",
-          "imageUrl": "https://images.unsplash.com/photo-1668603486705-68ac8ff9405b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMnx8d2ludGVyJTIwamFtfGVufDF8MHx8fDE3NzM3MzEyMDd8MA&ixlib=rb-4.1.0&q=80&w=1080",
-          "imageAlt": "a plate of dessert",
+          "imageUrl": "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxDb21tdW5pdHl8ZW58MXwwfHx8MTc3Mzc2NzIyNHww&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "person in red sweater holding babys hand",
           "imagePosition": "right"
         }
       },
       {
-        "id": "b_richtext_1773731193159",
-        "type": "RichText",
+        "id": "b_featuregrid_1773767196470",
+        "type": "FeatureGrid",
         "props": {
-          "title": "Competition Details",
-          "body": "## How It Works\n\nOur Winter Jam Competition invites home jam makers of all skill levels to showcase their finest creations. Whether you've been preserving for years or just discovered your passion for jam making, this is your moment to shine.\n\n## Eligibility\n\nOpen to all amateur jam makers aged 18 and over. Commercial jam producers may enter the professional category. All entries must be homemade and original recipes.\n\n## Judging Criteria\n\nEntries are evaluated on taste (40%), texture and consistency (30%), creativity and innovation (20%), and presentation (10%). Winners in each category are announced in January.\n\n## Submission Details\n\n- **Entry Deadline:** December 20, 2024\n- **Submission:** Mail or drop off two 8oz jars of your entry with the completed entry form\n- **Entry Fee:** $15 per entry (supports venue and prizes)\n- **Categories:** Fruit Preserves, Savory & Spiced, Experimental & Fusion, and Student (under 25)"
+          "title": "Why Join Us",
+          "features": [
+            {
+              "title": "Instant Setup",
+              "description": "Get started in under 60 seconds. No complicated forms or lengthy verification."
+            },
+            {
+              "title": "Free Forever",
+              "description": "Access core features at no cost. Upgrade anytime to unlock premium benefits."
+            },
+            {
+              "title": "Your Data, Your Control",
+              "description": "Complete privacy and security. We never sell your data to third parties."
+            },
+            {
+              "title": "24/7 Support",
+              "description": "Our support team is always here to help you succeed on your journey."
+            }
+          ]
         }
       },
       {
-        "id": "b_stats_1773731193159",
+        "id": "b_stats_1773767196470",
         "type": "Stats",
         "props": {
-          "title": "By The Numbers",
+          "title": "Trusted by Members Worldwide",
           "stats": [
             {
-              "value": "$5,000+",
-              "label": "Total Prize Pool"
+              "value": "50K+",
+              "label": "Active Members"
             },
             {
-              "value": "250+",
-              "label": "Expected Entries"
+              "value": "99%",
+              "label": "Satisfaction Rate"
             },
             {
-              "value": "12",
-              "label": "Expert Judges"
+              "value": "150+",
+              "label": "Countries"
             },
             {
-              "value": "4",
-              "label": "Competition Categories"
+              "value": "4.9★",
+              "label": "Average Rating"
             }
           ]
         }
       },
       {
-        "id": "b_faqaccordion_1773731193159",
-        "type": "FAQAccordion",
+        "id": "b_testimonials_1773767196470",
+        "type": "Testimonials",
         "props": {
-          "title": "Frequently Asked Questions",
+          "title": "What Members Say",
           "items": [
             {
-              "q": "What is the entry fee?",
-              "a": "The entry fee is $15 per jam entry. This supports the competition venue, judging panel honorariums, and prize awards. Proceeds from entry fees also fund next year's competition expansion."
+              "quote": "Signing up was so easy. I was exploring the platform within minutes. Highly recommend!",
+              "author": "Sarah Chen"
             },
             {
-              "q": "How are entries judged?",
-              "a": "A panel of 12 expert judges—including professional chefs, food critics, and jam artisans—tastes and evaluates each entry blind (without knowing the maker). Judging is based on taste (40%), texture (30%), creativity (20%), and presentation (10%)."
+              "quote": "The free tier is incredibly generous. I've been using it for 6 months without spending a dime.",
+              "author": "Marcus Rodriguez"
             },
             {
-              "q": "Can I ship my entry or must I deliver it in person?",
-              "a": "Local entries (within 50 miles) can be dropped off at our collection site or mailed to arrive by December 20. Out-of-area entries must be shipped via insulated mail to ensure freshness. Include a copy of your entry form with your shipment."
-            },
-            {
-              "q": "Are there any eligibility restrictions?",
-              "a": "The competition is open to all amateur jam makers aged 18+. Professional jam producers may enter the Professional category. All recipes must be original and homemade—store-bought or commercially produced jams are not eligible."
-            },
-            {
-              "q": "When will winners be announced?",
-              "a": "Winners in each category will be announced on January 10, 2025, at our Winter Jam Awards Celebration event. All participants are invited to attend and celebrate."
-            },
-            {
-              "q": "Can I use recipes from cookbooks or online sources?",
-              "a": "Yes—you may adapt published recipes, but we encourage innovation. Document your recipe and any modifications you made. Judges appreciate both traditional mastery and creative experimentation."
+              "quote": "Best decision I made. The community and support team are amazing.",
+              "author": "Emily Watson"
             }
           ]
         }
       },
       {
-        "id": "b_cta_1773731193159",
+        "id": "b_faqaccordion_1773767196470",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Signup Questions",
+          "items": [
+            {
+              "q": "Is my credit card required to sign up?",
+              "a": "No. You can create a free account and explore all core features without entering payment information. Only when you upgrade to premium will we ask for billing details."
+            },
+            {
+              "q": "How long does signup take?",
+              "a": "Less than a minute. Just provide your email, create a password, and verify your email address. You'll be ready to go in seconds."
+            },
+            {
+              "q": "What happens to my data after I sign up?",
+              "a": "Your data is encrypted and stored securely. We never share or sell your information to third parties. You own your data and can export or delete it anytime."
+            },
+            {
+              "q": "Can I cancel my account?",
+              "a": "Yes. You can cancel anytime with one click. No questions asked, no cancellation fees."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773767196470",
         "type": "CTA",
         "props": {
-          "title": "Ready to Compete?",
-          "description": "Join jam makers from across the region. Enter by December 20, 2024, and be part of the celebration.",
-          "ctaText": "Register Now",
-          "ctaHref": "/"
+          "title": "Ready to Get Started?",
+          "description": "Join thousands of members who are already part of our community. Sign up now and unlock exclusive features.",
+          "ctaText": "Sign Up Free",
+          "ctaHref": "/community"
         }
       }
-    ],
-    "meta": {
-      "title": "Winter Jam Competition | Avocado Stories",
-      "description": "Enter our Winter Jam Competition and showcase your homemade jam creations. Prize pool, expert judging, and multiple categories. Register by December 20."
-    }
+    ]
   }
 ]
