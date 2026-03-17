@@ -194,6 +194,9 @@ export function useChatEngine(config: ChatEngineConfig) {
       planApproval.setPendingPlanId(null)
       planApproval.setPendingPlanMessage(null)
     }
+    if (data.status === "applied") {
+      setLatestStreamFocusBlockId(data.focusBlockId ?? null)
+    }
     if (data.continuation?.chainId) {
       setContinuationChainId(data.continuation.chainId)
     } else {
@@ -532,10 +535,11 @@ export function useChatEngine(config: ChatEngineConfig) {
 
         if (payload.type === "op_candidate") {
           const idx = Number(payload.index ?? 0)
+          const candidateBlockId = blockIdFromOperation(payload.op)
+          if (candidateBlockId) setLatestStreamFocusBlockId(candidateBlockId)
           if (!liveDraftBlockId) {
-            const derived = blockIdFromOperation(payload.op)
-            if (derived) {
-              liveDraftBlockId = derived
+            if (candidateBlockId) {
+              liveDraftBlockId = candidateBlockId
               if (liveDraftText.trim().length > 0) {
                 liveDraftActive = true
                 sendLiveDraft(true)

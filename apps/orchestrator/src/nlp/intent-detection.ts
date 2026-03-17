@@ -16,7 +16,8 @@ import {
   EACH_BLOCK_TYPE_PATTERN,
   PAGE_WIDE_REWRITE_PATTERNS,
   BATCH_REORDER_PATTERNS,
-  PAGE_LIST_PATTERNS
+  PAGE_LIST_PATTERNS,
+  CONTENT_QUERY_PATTERNS
 } from "./intent-patterns.js"
 
 // Re-export for backward compatibility
@@ -214,6 +215,13 @@ export function isPageListQuery(message: string) {
   // requests that happen to mention "the pages", not listing queries.
   if (/\b(?:add|create|generate|build|make|draft|update|link|remove|delete)\b.*\bpages?\b/.test(m)) return false
   return PAGE_LIST_PATTERNS.some((re) => re.test(m))
+}
+
+export function isContentQuery(message: string) {
+  const m = normalizeForIntent(message)
+  // Exclude messages with clear edit/mutation verbs
+  if (/\b(?:add|create|remove|delete|update|change|replace|move|rewrite|translate|rename)\b/.test(m)) return false
+  return CONTENT_QUERY_PATTERNS.some((re) => re.test(m))
 }
 
 export function isAdviceQuery(message: string) {

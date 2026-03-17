@@ -14,6 +14,7 @@ import {
   isBatchAddRequest,
   isBlockCatalogQuery,
   isInfoQuery,
+  isContentQuery,
   isPageListQuery,
   plannerMessageWithPendingContext,
   buildSiteContextBlock,
@@ -738,6 +739,9 @@ export async function runChatPipeline(
 
   emitStatus("Analyzing your request...")
 
+  // Content queries (read-only questions about page content) need full props for the LLM
+  const contentQuery = body.message ? isContentQuery(body.message) : false
+
   const contextPack = plannerContextPack({
     session: body.session,
     slug: effectiveSlug,
@@ -746,7 +750,7 @@ export async function runChatPipeline(
     activeBlockId: planningActiveBlockId,
     activeBlockType: body.activeBlockType,
     activeEditablePath: planningActiveEditablePath,
-    includeFullProps: translationScope === "page"
+    includeFullProps: translationScope === "page" || contentQuery
   })
   const compactContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_COMPACT_CONTEXT_EXPERIMENT ?? "").trim())
   const minimalContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_MINIMAL_CONTEXT_EXPERIMENT ?? "").trim())
@@ -754,7 +758,7 @@ export async function runChatPipeline(
     compactContextExperimentEnabled
       ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
       : contextPack
-  const useMinimalPlannerContext = minimalContextExperimentEnabled && shouldUseMinimalPlannerContext({
+  const useMinimalPlannerContext = !contentQuery && minimalContextExperimentEnabled && shouldUseMinimalPlannerContext({
     message: plannerMessage,
     translationScope,
     activeBlockId: planningActiveBlockId,
@@ -1082,6 +1086,54 @@ export async function runChatPipeline(
         promptLength: plannerMessage.length,
         totalDurationMs: planReadyAtMs
       })
+    }
+
+    if (resolvedPlan.intent === "content_answer") {
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: body.session!,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource: source,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "content_answer",
+        intent: resolvedPlan.intent,
+        opCount: 0,
+        opTypes: [],
+        plannerTier,
+        ...plannerContextTelemetryFields,
+        ...timingFields()
+      })
+      if (body.message) pushChatHistory(body.session!, body.message, resolvedPlan.summary_for_user)
+      return {
+        done: true as const,
+        response: {
+          code: 200,
+          payload: withDebugPayload({
+            status: "info",
+            summary: resolvedPlan.summary_for_user,
+            changes: resolvedPlan.change_log,
+            mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug),
+            suggestions: resolvedPlan.suggested_next_actions ?? [],
+            previewVersion: versions.get(body.session!) ?? 0,
+            plannerSource: source,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult, {
+            outcome: "content_answer",
+            intent: resolvedPlan.intent,
+            opCount: 0,
+            opTypes: [],
+            ...usageFields
+          })
+        }
+      }
     }
 
     if (resolvedPlan.intent === "needs_clarification") {
@@ -1771,38 +1823,7 @@ export async function runChatPipeline(
     if (forcedOutcome.done) return forcedOutcome.response
   }
 
-  const forcedSelectedRewritePlan = deterministicSelectedTextRewritePlan({
-    slug: effectiveSlug,
-    message: plannerMessage,
-    currentPage: current,
-    activeBlockId: planningActiveBlockId,
-    activeEditablePath: planningActiveEditablePath
-  })
-  if (forcedSelectedRewritePlan) {
-    markPlanningFinish()
-    ctx.chatTelemetry.push({
-      id: chatRequestId,
-      at: new Date().toISOString(),
-      phase: "forced_plan",
-      session: body.session,
-      requestedSlug,
-      effectiveSlug,
-      plannerSource,
-      modelKey,
-      modelUsed,
-      promptHash,
-      promptExcerpt,
-      promptLength: plannerMessage.length,
-      outcome: "forced_rewrite_selected_text",
-      intent: forcedSelectedRewritePlan.intent,
-      opCount: forcedSelectedRewritePlan.ops.length,
-      opTypes: forcedSelectedRewritePlan.ops.map((op) => op.op),
-      plannerTier: "forced_deterministic",
-      ...timingFields()
-    })
-    const forcedOutcome = await respondFromPlan(forcedSelectedRewritePlan, plannerSource, applyMode, undefined, "forced_deterministic")
-    if (forcedOutcome.done) return forcedOutcome.response
-  }
+  // Deterministic selected-text rewrite disabled — let AI planner handle creative rewrites.
 
   const forcedCreatePlan = deterministicCreatePagePlan({ session: body.session, message: plannerMessage })
   if (forcedCreatePlan) {
@@ -1878,7 +1899,7 @@ export async function runChatPipeline(
     }
   }
 
-  const isHighConfidence = isHighConfidenceDeterministicCase({
+  const isHighConfidence = !contentQuery && isHighConfidenceDeterministicCase({
     message: plannerMessage,
     currentPage: current,
     activeBlockId: planningActiveBlockId,
@@ -1943,6 +1964,7 @@ export async function runChatPipeline(
 
   const llmIntentRouterEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_LLM_INTENT_ROUTER ?? "1").trim())
   const shouldTryLlmIntentRouter =
+    !contentQuery &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic")
@@ -2121,7 +2143,7 @@ export async function runChatPipeline(
     throwIfCanceled(options?.signal)
     planningAttempts = attempt
     try {
-      emitStatus(attempt === 1 ? "Calling AI model..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
+      emitStatus(attempt === 1 ? "Thinking..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
       const result = await raceCancel(generatePlanImpl({
         message: plannerMessage,
         slug: effectiveSlug,

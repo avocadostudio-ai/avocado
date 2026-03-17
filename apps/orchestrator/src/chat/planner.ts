@@ -43,7 +43,7 @@ export const PlannerOutputError = PlannerError
 export const isPlannerOutputError = isPlannerError
 
 const rawPlanCandidateSchema = z.looseObject({
-  intent: z.enum(["edit_plan", "needs_clarification"]).optional(),
+  intent: z.enum(["edit_plan", "needs_clarification", "content_answer"]).optional(),
   summary_for_user: z.string().optional(),
   change_log: z.array(z.string()).optional(),
   ops: z.array(z.record(z.string(), z.unknown())).optional(),
@@ -633,6 +633,7 @@ export async function generatePlanWithOpenAI(args: {
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
     "If request is ambiguous, return intent=needs_clarification and no ops.",
+    "If the user asks a read-only question about page content (e.g. 'list all CTA buttons', 'what images are on this page', 'show me all links and their URLs', 'how many sections are there'), return intent=content_answer with empty ops[]. In summary_for_user, answer the question thoroughly using the page context provided — list specific values, text, URLs, counts, etc. Use markdown tables or bullet lists for clarity. In change_log, include one entry per item found. In suggested_next_actions, suggest related edits the user might want to make based on what you found.",
     "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",

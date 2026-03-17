@@ -203,29 +203,9 @@ export function deterministicSelectedTextRewritePlan(args: {
       .replace(/\s{2,}/g, " ")
       .trim()
 
-  if (!isRewriteLikeMessage(args.message)) return null
-  if (inferTranslationScopeFromMessage(args.message) !== "none") return null
-  if (!args.activeBlockId) return null
-  if (typeof args.activeEditablePath !== "string" || !/^[a-zA-Z0-9_]+$/.test(args.activeEditablePath)) return null
-
-  const target = args.currentPage.blocks.find((block) => block.id === args.activeBlockId)
-  if (!target) return null
-  const props = target.props as Record<string, unknown>
-
-  const key = args.activeEditablePath
-  const existing = props[key]
-  if (typeof existing !== "string" || existing.trim().length === 0) return null
-
-  const rewritten = sanitizeRewriteToPlainText(rewriteFromExisting(existing, args.message))
-  if (rewritten === existing) return null
-
-  const changedLabel = key.replace(/([A-Z])/g, " $1").toLowerCase()
-  return {
-    intent: "edit_plan",
-    summary_for_user: "Rewrite the selected text content to match your request.",
-    change_log: [`Rewrite selected ${changedLabel}.`],
-    ops: [{ op: "update_props", pageSlug: args.slug, blockId: target.id, patch: { [key]: rewritten } }]
-  } satisfies EditPlan
+  // Disabled: deterministic rewrite is too simplistic (word substitutions / appending "today").
+  // Let the AI planner handle rewrite requests so it can generate a proper creative rewrite.
+  return null
 }
 
 export function shouldReturnDeterministicClarification(message: string) {

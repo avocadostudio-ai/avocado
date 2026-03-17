@@ -198,7 +198,7 @@
 .editor-block-toolbar {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 48px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -848,12 +848,14 @@
   background: linear-gradient(
     108deg,
     transparent 22%,
-    rgba(var(--editor-selected-rgb), 0.03) 34%,
-    rgba(var(--editor-selected-rgb), 0.16) 49%,
-    rgba(var(--editor-selected-rgb), 0.03) 64%,
+    rgba(208, 214, 221, 0.04) 34%,
+    rgba(219, 224, 231, 0.24) 49%,
+    rgba(247, 250, 252, 0.2) 56%,
+    rgba(208, 214, 221, 0.05) 64%,
     transparent 78%
   );
-  animation: aifx-wave 1.5s ease-in-out infinite;
+  animation: aifx-wave 1.45s ease-in-out infinite;
+  mix-blend-mode: screen;
 }
 
 .aifx-shimmer-sparkle {
@@ -862,13 +864,36 @@
   right: 4px;
   z-index: 24;
   pointer-events: none;
-  color: rgb(var(--editor-selected-rgb));
+  color: rgb(232, 236, 241);
   animation: aifx-sparkle-blink 1s ease-in-out infinite;
 }
 
 .aifx-shimmer-sparkle svg {
   display: block;
-  filter: drop-shadow(0 0 3px rgba(var(--editor-selected-rgb), 0.5));
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 6px rgba(170, 178, 186, 0.45));
+}
+
+@media (prefers-color-scheme: light) {
+  .aifx-shimmer-overlay {
+    background: linear-gradient(
+      108deg,
+      transparent 18%,
+      rgba(210, 216, 223, 0.08) 32%,
+      rgba(226, 231, 237, 0.34) 47%,
+      rgba(255, 255, 255, 0.34) 54%,
+      rgba(216, 222, 229, 0.1) 68%,
+      transparent 84%
+    );
+    animation-duration: 1.2s;
+  }
+
+  .aifx-shimmer-sparkle {
+    color: rgb(242, 246, 251);
+  }
+
+  .aifx-shimmer-sparkle svg {
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.98)) drop-shadow(0 0 10px rgba(180, 189, 198, 0.6));
+  }
 }
 
 @keyframes aifx-sparkle-blink {

@@ -178,7 +178,7 @@ export const operationSchema = z.discriminatedUnion("op", [
 export type Operation = z.infer<typeof operationSchema>
 
 export const editPlanSchema = z.object({
-  intent: z.enum(["edit_plan", "needs_clarification"]),
+  intent: z.enum(["edit_plan", "needs_clarification", "content_answer"]),
   summary_for_user: z.string().min(1),
   change_log: z.array(z.string()),
   ops: z.array(operationSchema),

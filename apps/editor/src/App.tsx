@@ -208,6 +208,7 @@ function EditorPage({
   const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
   const [selectionModeEnabled, setSelectionModeEnabled] = useState(false)
   const [anchorRect, setAnchorRect] = useState<AnchorRect>(null)
+  const [anchoredExpanded, setAnchoredExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
   const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configModalTab, setConfigModalTab] = useState<"general" | "brief" | "deploy">("general")
@@ -229,6 +230,8 @@ function EditorPage({
   const lastStructuralNoticeAtRef = useRef(0)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
   const anchoredComposerRef = useRef<HTMLDivElement>(null)
+  const shimmerTargetRef = useRef<{ blockId: string; editablePath: string } | null>(null)
+  const shimmerActiveRef = useRef(false)
 
   const routeOptions = useMemo(() => {
     const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
@@ -399,6 +402,11 @@ function EditorPage({
   }), [componentManifest.allowStructuralEdits, setSlugFromPreview, slug])
 
   const preview = usePreviewBridge(slug, previewCallbacks, activeSiteOrigin)
+  const previewPostToSiteRef = useRef(preview.postToSite)
+
+  useEffect(() => {
+    previewPostToSiteRef.current = preview.postToSite
+  }, [preview.postToSite])
 
   const toggleSelectionMode = useCallback((force?: boolean) => {
     const next = force ?? !selectionModeEnabled
@@ -461,7 +469,6 @@ function EditorPage({
   onAppliedRef.current = () => {
     void blockProps.refetch()
     void pageMeta.refetch()
-    preview.postToSite("aiFieldLoading", { blockId: "", active: false })
   }
 
   // Sync refs
@@ -581,6 +588,30 @@ function EditorPage({
     preview.postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })
   }, [showNestedLabels])
 
+  // Keep iframe shimmer aligned to the actual component being processed.
+  useEffect(() => {
+    const postToSite = previewPostToSiteRef.current
+    if (!chatEngine.isLoading) {
+      if (shimmerActiveRef.current) {
+        postToSite("aiFieldLoading", { blockId: "", active: false })
+      }
+      shimmerTargetRef.current = null
+      shimmerActiveRef.current = false
+      return
+    }
+
+    const blockId = chatEngine.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? ""
+    if (!blockId) return
+    const editablePath = blockId === (activeBlockIdRef.current ?? "") ? (activeEditablePathRef.current ?? "") : ""
+    const previous = shimmerTargetRef.current
+    if (previous && previous.blockId === blockId && previous.editablePath === editablePath && shimmerActiveRef.current) {
+      return
+    }
+    postToSite("aiFieldLoading", { blockId, editablePath, active: true })
+    shimmerTargetRef.current = { blockId, editablePath }
+    shimmerActiveRef.current = true
+  }, [chatEngine.isLoading, chatEngine.latestStreamFocusBlockId])
+
   // Re-sync selection mode after route changes (preview bridge re-mounts and loses the attribute)
   useEffect(() => {
     if (selectionModeEnabled) {
@@ -607,6 +638,11 @@ function EditorPage({
     if (!activeBlockId) setAnchorRect(null)
   }, [activeBlockId])
 
+  // Reset expanded state when anchor target changes
+  useEffect(() => {
+    setAnchoredExpanded(false)
+  }, [anchorRect])
+
   // Clear anchor on window resize
   useEffect(() => {
     const onResize = () => setAnchorRect(null)
@@ -626,42 +662,32 @@ function EditorPage({
     const iframeRect = iframeEl.getBoundingClientRect()
 
     const COMPOSER_WIDTH = 380
-    const GAP = activeEditablePath ? 12 : 32
-    const COMPOSER_MIN_H = 80
+    const ICON_SIZE = 36
+    const BLOCK_ACTION_SIZE = 26
+    const CORNER_INSET = 8
 
-    const blockTopInViewport = iframeRect.top + anchorRect.top
-    const blockBottomInViewport = blockTopInViewport + anchorRect.height
+    const elementTop = iframeRect.top + anchorRect.top
+    const elementBottom = elementTop + anchorRect.height
 
-    // Check if block is offscreen in iframe
-    if (blockBottomInViewport < iframeRect.top || blockTopInViewport > iframeRect.bottom) return null
+    // Check if element is offscreen in iframe
+    if (elementBottom < iframeRect.top || elementTop > iframeRect.bottom) return null
 
-    // Try below the block
-    let top: number
-    if (blockBottomInViewport + GAP + COMPOSER_MIN_H <= window.innerHeight) {
-      top = blockBottomInViewport + GAP
-    } else if (blockTopInViewport - GAP - COMPOSER_MIN_H >= 0) {
-      // Try above the block
-      top = blockTopInViewport - GAP - COMPOSER_MIN_H
-    } else {
-      return null
-    }
-
-    // Center horizontally on block, clamped within iframe bounds
-    const blockCenterX = iframeRect.left + anchorRect.left + anchorRect.width / 2
-    let left = blockCenterX - COMPOSER_WIDTH / 2
-    left = Math.max(iframeRect.left, Math.min(left, iframeRect.right - COMPOSER_WIDTH))
+    // Top-right corner, aligned with the block action row.
+    const top = elementTop + CORNER_INSET - (ICON_SIZE - BLOCK_ACTION_SIZE) / 2
+    let left = iframeRect.left + anchorRect.left + anchorRect.width - ICON_SIZE - CORNER_INSET
+    left = Math.max(iframeRect.left + CORNER_INSET, Math.min(left, iframeRect.right - ICON_SIZE - CORNER_INSET))
 
     return { top, left, width: COMPOSER_WIDTH }
-  }, [anchorRect, selectionModeEnabled, activeBlockId, activeEditablePath, preview.iframeRef])
+  }, [anchorRect, selectionModeEnabled, activeBlockId, preview.iframeRef])
 
-  // Auto-focus anchored composer textarea
+  // Auto-focus anchored composer textarea when expanded
   useEffect(() => {
-    if (anchoredPosition) {
+    if (anchoredPosition && anchoredExpanded) {
       requestAnimationFrame(() => {
         anchoredComposerRef.current?.querySelector("textarea")?.focus()
       })
     }
-  }, [!!anchoredPosition])
+  }, [!!anchoredPosition, anchoredExpanded])
 
   const handleFieldAiAssist = useCallback((fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => {
     if (!activeBlockId || !activeBlockType) return
@@ -705,6 +731,8 @@ function EditorPage({
 
     setActiveEditablePath(fieldPath)
     preview.postToSite("aiFieldLoading", { blockId: activeBlockId, editablePath: fieldPath, active: true })
+    shimmerTargetRef.current = { blockId: activeBlockId, editablePath: fieldPath }
+    shimmerActiveRef.current = true
 
     const entry: ChatEntry = {
       id: `field-ai-${Date.now()}`,
@@ -1356,25 +1384,36 @@ function EditorPage({
       {anchoredPosition ? (
         <div
           ref={anchoredComposerRef}
-          className="composer composer--anchored"
-          style={{ top: anchoredPosition.top, left: anchoredPosition.left, width: anchoredPosition.width }}
+          className={`composer--anchored${anchoredExpanded ? " is-expanded" : ""}`}
+          style={{ top: anchoredPosition.top, left: anchoredPosition.left, width: anchoredExpanded ? anchoredPosition.width : undefined }}
         >
-          <ClaudeStyleChatInput
-            message={message}
-            isLoading={chatEngine.isLoading}
-            hasUserEntry={hasUserEntry}
-            onMessageChange={setMessage}
-            onSubmit={(explicitMessage) => {
-              setMessage("")
-              void chatEngine.submitChat(explicitMessage, message)
-            }}
-            onTranscribeAudio={media.transcribeAudio}
-            onInterpretImage={media.interpretPastedImage}
-            onUploadImage={media.uploadPastedImage}
-            onCancel={chatEngine.cancelChat}
-            onAutoHeightChange={() => {}}
-            compact
-          />
+          {anchoredExpanded ? (
+            <ClaudeStyleChatInput
+              message={message}
+              isLoading={chatEngine.isLoading}
+              hasUserEntry={hasUserEntry}
+              onMessageChange={setMessage}
+              onSubmit={(explicitMessage) => {
+                setMessage("")
+                void chatEngine.submitChat(explicitMessage, message)
+              }}
+              onTranscribeAudio={media.transcribeAudio}
+              onInterpretImage={media.interpretPastedImage}
+              onUploadImage={media.uploadPastedImage}
+              onCancel={chatEngine.cancelChat}
+              onAutoHeightChange={() => {}}
+              compact
+            />
+          ) : (
+            <button
+              type="button"
+              className="anchored-pill-trigger"
+              onClick={() => setAnchoredExpanded(true)}
+              aria-label="Edit this element"
+            >
+              <Sparkles size={14} />
+            </button>
+          )}
         </div>
       ) : null}
 

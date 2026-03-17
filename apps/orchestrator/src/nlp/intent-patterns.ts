@@ -173,6 +173,24 @@ export const PAGE_LIST_PATTERNS: RegExp[] = [
 ]
 
 // ---------------------------------------------------------------------------
+// Content queries — read-only questions about what's on the page
+// "list all CTA buttons", "what images are on this page", "show me all links"
+// ---------------------------------------------------------------------------
+
+export const CONTENT_QUERY_PATTERNS: RegExp[] = [
+  /\b(?:list|show|display|enumerate|find|what are)\b.*\b(?:cta|buttons?|links?|images?|headings?|titles?|texts?|urls?|hrefs?|sections?|blocks?)/,
+  /\b(?:what|which|where|how many)\b.*\b(?:cta|buttons?|links?|images?|headings?|titles?|urls?|hrefs?)\b/,
+  /\b(?:list|show|find)\s+(?:me\s+)?(?:all|every|each)\b.*\b(?:on|in|across)\s+(?:this|the)\s+(?:page|site)\b/,
+  /\bhow\s+many\s+(?:cta|button|link|image|heading|section|block|card|feature|item|testimonial)/,
+  /\bwhat\s+(?:does|is)\s+(?:the|this)\s+(?:page|site)\s+(?:about|contain|have|include)\b/,
+  /\bwhat\s+(?:content|copy|text)\s+(?:is|does)\b.*\b(?:on|in)\s+(?:this|the)\s+page\b/,
+  /\bsummarize\s+(?:this|the)\s+(?:page|content)\b/,
+  /\bwhat\s+(?:blocks?|sections?)\s+(?:are|is)\s+(?:on|in)\s+(?:this|the)\s+page\b/,
+  /\b(?:list|show|tell me)\b.*\b(?:all|every)\b.*\b(?:blocks?|sections?|components?)\b.*\b(?:on|in)\b/,
+  /\b(?:audit|review|check|inspect|analyze)\s+(?:the\s+)?(?:page|content|copy|text|links?|images?|buttons?)\b/,
+]
+
+// ---------------------------------------------------------------------------
 // Exception modifier — "except", "but not", "other than", "all but"
 // ---------------------------------------------------------------------------
 

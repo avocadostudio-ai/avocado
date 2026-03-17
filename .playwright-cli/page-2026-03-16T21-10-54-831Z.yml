@@ -1,0 +1,143 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - text: Adventure Atlas
+          - link "All sites" [ref=e8] [cursor=pointer]:
+            - /url: /sites
+        - generic [ref=e9]:
+          - button "Site settings" [ref=e10] [cursor=pointer]:
+            - img [ref=e11]
+          - button "More options" [ref=e14] [cursor=pointer]:
+            - img [ref=e15]
+      - generic [ref=e19]:
+        - combobox [ref=e21]:
+          - option "Home (/)"
+          - option "Oranges (/oranges)" [selected]
+          - option "Grapefruits (/grapefruits)"
+          - option "Olives (/olives)"
+          - option "Test (/test)"
+        - button "Publish" [ref=e23] [cursor=pointer]
+    - navigation [ref=e24]:
+      - button "Chat" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+        - text: Chat
+      - button "Properties" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+        - text: Properties
+    - article [ref=e32]:
+      - paragraph [ref=e34]: Let's shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.
+      - generic [ref=e35]:
+        - button "Add testimonials below hero" [ref=e36] [cursor=pointer]
+        - button "Change the hero headline" [ref=e37] [cursor=pointer]
+        - button "Create a new /about page" [ref=e38] [cursor=pointer]
+        - button "Add a FAQ section" [ref=e39] [cursor=pointer]
+    - separator "Resize input panel"
+    - generic [ref=e41]:
+      - textbox "Ask anything" [ref=e43]
+      - generic [ref=e44]:
+        - button "Add image" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+        - group "Voice and send actions" [ref=e47]:
+          - button "Start voice input" [ref=e48] [cursor=pointer]:
+            - img [ref=e49]
+          - button "Send message" [disabled] [ref=e52]:
+            - img [ref=e54]
+            - img [ref=e57]
+  - iframe [ref=e60]:
+    - generic [active] [ref=f1e1]:
+      - banner [ref=f1e2]:
+        - link "Avocado Stories logo Avocado Stories" [ref=f1e3] [cursor=pointer]:
+          - /url: /?session=dev&siteId=adventure-atlas&editorOrigin=http%3A%2F%2Flocalhost%3A4100
+          - img "Avocado Stories logo" [ref=f1e4]
+          - generic [ref=f1e5]: Avocado Stories
+        - button "Switch site to dark mode" [ref=f1e6] [cursor=pointer]:
+          - img [ref=f1e7]
+        - button "Toggle navigation menu" [ref=f1e10] [cursor=pointer]
+      - main [ref=f1e15]:
+        - generic [ref=f1e16]:
+          - generic [ref=f1e18]: Hero
+          - generic [ref=f1e20]:
+            - generic [ref=f1e21]:
+              - heading "Fresh & Vibrant Oranges heading" [level=1] [ref=f1e22]
+              - paragraph [ref=f1e23]: Discover the vibrant world of citrus fruits. subheading
+              - link "Learn More ctaText" [ref=f1e25] [cursor=pointer]:
+                - /url: /oranges
+            - img "generate an orange with a smiley on it" [ref=f1e27]: Hero block image
+          - text: Hero
+        - generic [ref=f1e28]:
+          - generic [ref=f1e30]: RichText
+          - generic [ref=f1e32]:
+            - heading "The Wonders of Oranges title" [level=2] [ref=f1e33]
+            - generic [ref=f1e34]:
+              - paragraph [ref=f1e35]:
+                - strong [ref=f1e36]: Oranges
+                - text: are among the most beloved fruits globally, cherished not only for their
+                - strong [ref=f1e37]: delicious taste
+                - text: "but also for their nutritional benefits. Here are some intriguing insights about oranges:"
+              - list [ref=f1e38]:
+                - listitem [ref=f1e39]:
+                  - strong [ref=f1e40]: Rich in Vitamin C
+                  - text: ", oranges play a crucial role in boosting the immune system and maintaining skin health."
+                - listitem [ref=f1e41]: The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.
+                - listitem [ref=f1e42]:
+                  - text: With over
+                  - strong [ref=f1e43]: 600 varieties
+                  - text: ", oranges offer a diverse range of flavors and uses."
+                - listitem [ref=f1e44]: Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.
+                - listitem [ref=f1e45]: Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.
+              - paragraph [ref=f1e46]: Discover more about the diverse benefits and culinary uses of oranges on our page.
+              - text: body
+          - text: RichText
+        - generic [ref=f1e47]:
+          - generic [ref=f1e49]: Stats
+          - generic [ref=f1e51]:
+            - heading "Orange Nutrition & Global Impact title" [level=2] [ref=f1e52]
+            - generic [ref=f1e53]:
+              - generic [ref=f1e54]:
+                - generic [ref=f1e55]: 53mg stats[0].value
+                - generic [ref=f1e56]: Vitamin C per medium orange stats[0].label
+              - generic [ref=f1e57]:
+                - generic [ref=f1e58]: 120M+ stats[1].value
+                - generic [ref=f1e59]: Tons produced annually worldwide stats[1].label
+              - generic [ref=f1e60]:
+                - generic [ref=f1e61]: 600+ stats[2].value
+                - generic [ref=f1e62]: Varieties grown globally stats[2].label
+          - text: Stats
+        - generic [ref=f1e63]:
+          - generic [ref=f1e65]: CardGrid
+          - generic [ref=f1e67]:
+            - heading "Discover Oranges title" [level=2] [ref=f1e68]
+            - generic [ref=f1e69]:
+              - article [ref=f1e70]:
+                - generic [ref=f1e71]:
+                  - img "Several orange slices on a dark background" [ref=f1e72]
+                  - text: cards[0].imageUrl
+                - heading "Orange Varieties cards[0].title" [level=3] [ref=f1e73]
+                - paragraph [ref=f1e74]: From bright Valencia to zesty Blood oranges, explore the diverse world of orange cultivars. Each variety brings its own flavor profile and best uses, whether fresh, juiced, or cooked. cards[0].description
+                - link "Learn varieties cards[0].ctaText" [ref=f1e75] [cursor=pointer]:
+                  - /url: /oranges
+                - text: cards[0]
+              - article [ref=f1e76]:
+                - generic [ref=f1e77]:
+                  - img "orange fruit on clear glass bowl" [ref=f1e78]
+                  - text: cards[1].imageUrl
+                - heading "Health & Wellness cards[1].title" [level=3] [ref=f1e79]
+                - paragraph [ref=f1e80]: Discover how oranges support your wellbeing. Packed with vitamin C and fiber, they boost immunity, skin health, and digestion. A simple, delicious way to nourish your body. cards[1].description
+                - link "Explore benefits cards[1].ctaText" [ref=f1e81] [cursor=pointer]:
+                  - /url: /oranges
+                - text: cards[1]
+              - article [ref=f1e82]:
+                - generic [ref=f1e83]:
+                  - img "A pile of fresh, ripe oranges" [ref=f1e84]
+                  - text: cards[2].imageUrl
+                - heading "Culinary Inspiration cards[2].title" [level=3] [ref=f1e85]
+                - paragraph [ref=f1e86]: Transform your kitchen with orange-infused recipes. From fresh juices and zesty marmalades to savory dishes and baked goods, oranges bring brightness and depth to every meal. cards[2].description
+                - link "Get recipes cards[2].ctaText" [ref=f1e87] [cursor=pointer]:
+                  - /url: /oranges
+                - text: cards[2]
+          - text: CardGrid
+      - button "Open Next.js Dev Tools" [ref=f1e93] [cursor=pointer]:
+        - img [ref=f1e94]
+      - alert [ref=f1e97]

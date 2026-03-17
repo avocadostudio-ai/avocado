@@ -1,0 +1,82 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - text: Avocado Stories
+          - link "All sites" [ref=e8] [cursor=pointer]:
+            - /url: /sites
+        - generic [ref=e9]:
+          - button "Site settings" [ref=e10] [cursor=pointer]:
+            - img [ref=e11]
+          - button "More options" [ref=e14] [cursor=pointer]:
+            - img [ref=e15]
+      - generic [ref=e19]:
+        - combobox [ref=e21]:
+          - option "Home (/)"
+          - option "Pricing (/pricing)" [selected]
+        - button "Publish" [ref=e23] [cursor=pointer]
+    - navigation [ref=e24]:
+      - button "Chat" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+        - text: Chat
+      - button "Properties" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+        - text: Properties
+    - article [ref=e32]:
+      - paragraph [ref=e34]: Let's shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.
+      - generic [ref=e35]:
+        - button "Add testimonials below hero" [ref=e36] [cursor=pointer]
+        - button "Change the hero headline" [ref=e37] [cursor=pointer]
+        - button "Create a new /about page" [ref=e38] [cursor=pointer]
+        - button "Add a FAQ section" [ref=e39] [cursor=pointer]
+    - separator "Resize input panel"
+    - generic [ref=e41]:
+      - textbox "Ask anything" [ref=e43]
+      - generic [ref=e44]:
+        - button "Add image" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+        - group "Voice and send actions" [ref=e47]:
+          - button "Start voice input" [ref=e48] [cursor=pointer]:
+            - img [ref=e49]
+          - button "Send message" [disabled] [ref=e52]:
+            - img [ref=e54]
+            - img [ref=e57]
+  - generic [ref=e60]:
+    - iframe [ref=e61]:
+      - generic [active] [ref=f1e1]:
+        - banner [ref=f1e2]:
+          - link "Avocado Stories logo Avocado Stories" [ref=f1e3] [cursor=pointer]:
+            - /url: /?session=dev&siteId=avocado-stories&editorOrigin=http%3A%2F%2Flocalhost%3A4100
+            - img "Avocado Stories logo" [ref=f1e4]
+            - generic [ref=f1e5]: Avocado Stories
+          - button "Switch site to dark mode" [ref=f1e6] [cursor=pointer]:
+            - img [ref=f1e7]
+          - button "Toggle navigation menu" [ref=f1e10] [cursor=pointer]
+        - main [ref=f1e15]:
+          - generic [ref=f1e16]:
+            - generic [ref=f1e18]: Hero
+            - generic [ref=f1e20]:
+              - generic [ref=f1e21]:
+                - heading "Pricing that grows with you heading" [level=1] [ref=f1e22]
+                - paragraph [ref=f1e23]: Start free, upgrade when you're ready. subheading
+                - link "Choose Plan ctaText" [ref=f1e25] [cursor=pointer]:
+                  - /url: /
+              - img "Abstract generated illustration for the pricing hero" [ref=f1e27]: Hero block image
+            - text: Hero
+          - generic [ref=f1e28]:
+            - generic [ref=f1e30]: FAQAccordion
+            - generic [ref=f1e32]:
+              - heading "Pricing FAQ title" [level=2] [ref=f1e33]
+              - group [ref=f1e34]:
+                - generic "Can I cancel anytime? items[0].q" [ref=f1e35] [cursor=pointer]
+                - text: items[0].a
+              - group [ref=f1e36]:
+                - generic "Do you offer support? items[1].q" [ref=f1e37] [cursor=pointer]
+                - text: items[1].a
+            - text: FAQAccordion
+        - button "Open Next.js Dev Tools" [ref=f1e43] [cursor=pointer]:
+          - img [ref=f1e44]
+        - alert [ref=f1e47]
+    - iframe [ref=e62]:
+      
