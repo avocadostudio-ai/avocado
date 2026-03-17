@@ -49,12 +49,19 @@ body {
   border-radius: 0;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
   display: grid;
-  grid-template-rows: auto auto minmax(120px, 1fr) 10px var(--composer-height, 220px);
   min-height: 0;
   height: 100%;
   overflow: hidden;
   grid-column: 2;
   grid-row: 1;
+}
+
+.chat-panel--chat {
+  grid-template-rows: auto auto minmax(120px, 1fr) 10px var(--composer-height, 220px);
+}
+
+.chat-panel--properties {
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .chat-header {
