@@ -71,6 +71,74 @@ export function readPathValue(root: unknown, path: string) {
   return current
 }
 
+/**
+ * Given block props and an editablePath targeting an alt-text field,
+ * resolve the companion image URL for vision-powered alt text generation.
+ *
+ * Examples:
+ *  - "imageAlt"           → props.imageUrl
+ *  - "cards[2].imageAlt"  → props.cards[2].imageUrl
+ *  - "items[0].image.alt" → props.items[0].image.src
+ */
+export function resolveImageUrlForAltField(blockProps: Record<string, unknown>, editablePath: string): string | undefined {
+  if (!editablePath) return undefined
+  // Only trigger for paths ending in an alt-text field
+  if (!/(^|[.])imageAlt$/.test(editablePath) && !/(^|[.])alt$/.test(editablePath)) return undefined
+
+  let companionPath: string
+  if (editablePath.endsWith(".alt")) {
+    // e.g. "items[0].image.alt" → "items[0].image.src"
+    companionPath = editablePath.replace(/\.alt$/, ".src")
+  } else {
+    // e.g. "imageAlt" or "cards[2].imageAlt" → "imageUrl" or "cards[2].imageUrl"
+    companionPath = editablePath.replace(/imageAlt$/, "imageUrl")
+  }
+
+  const value = readPathValue(blockProps, companionPath)
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function isLocalUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "[::1]"
+  } catch {
+    return false
+  }
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml"
+}
+
+/**
+ * Fetch an image URL and return base64 + media type.
+ * For localhost URLs the AI APIs can't reach, we fetch locally.
+ * For remote URLs, returns null so the caller can use the URL directly.
+ */
+export async function fetchImageAsBase64(url: string): Promise<{ base64: string; mediaType: string } | null> {
+  if (!isLocalUrl(url)) return null
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const buffer = Buffer.from(await res.arrayBuffer())
+    const contentType = res.headers.get("content-type")
+    let mediaType = contentType?.split(";")[0]?.trim() ?? ""
+    if (!mediaType || mediaType === "application/octet-stream") {
+      const ext = url.match(/(\.[a-z]+)(?:\?|$)/i)?.[1]?.toLowerCase() ?? ""
+      mediaType = MIME_BY_EXT[ext] ?? "image/jpeg"
+    }
+    return { base64: buffer.toString("base64"), mediaType }
+  } catch {
+    return null
+  }
+}
+
 export function selectedBlockSnapshot(args: { currentPage: PageDoc; activeBlockId?: string; activeEditablePath?: string }) {
   if (!args.activeBlockId) return null
   const block = args.currentPage.blocks.find((item) => item.id === args.activeBlockId)
@@ -587,7 +655,13 @@ export function plannerContextPack(args: {
       blockId: activeBlockId ?? null,
       blockType: activeBlockType ?? null,
       editablePath: activeEditablePath ?? null,
-      block: selectedBlockSnapshot({ currentPage, activeBlockId, activeEditablePath })
+      block: selectedBlockSnapshot({ currentPage, activeBlockId, activeEditablePath }),
+      imageUrlForVision: activeBlockId && activeEditablePath
+        ? resolveImageUrlForAltField(
+            (currentPage.blocks.find((b) => b.id === activeBlockId)?.props ?? {}) as Record<string, unknown>,
+            activeEditablePath
+          ) ?? null
+        : null
     },
     neighbors: {
       previous: neighbors.previous ? { id: neighbors.previous.id, type: neighbors.previous.type } : null,

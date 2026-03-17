@@ -12,6 +12,7 @@ import {
   type ParsedIntent,
   extractAudienceTarget,
   blockContractsSummary,
+  fetchImageAsBase64,
   pageMetaContractSummary,
   intentSchema,
   plannerContextPack
@@ -692,7 +693,13 @@ export async function generatePlanWithOpenAI(args: {
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
     `Allowed block types: ${effectiveBlockTypes.join(", ")}.`,
-    ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : [])
+    ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : []),
+    ...(args.contextPack.selected?.imageUrlForVision
+      ? [
+          "An image is attached for the field being edited. Describe its visual content accurately for the alt text. Be specific about what's depicted (objects, people, actions, setting) in 1-2 concise sentences. Do not mention 'AI-generated' or image metadata.",
+          `Return an update_props operation setting the "${args.contextPack.selected.editablePath}" field on block "${args.contextPack.selected.blockId}" to your generated alt text description. This is an edit_plan, not needs_clarification.`
+        ]
+      : [])
   ].join("\n")
 
   const includeContracts =
@@ -718,6 +725,21 @@ export async function generatePlanWithOpenAI(args: {
     feedback: args.feedback ?? null
   }
   const strictJson = schemaContext.meta.strictJsonEnabled
+
+  const imageUrlForVision = typeof args.contextPack.selected?.imageUrlForVision === "string"
+    ? args.contextPack.selected.imageUrlForVision
+    : null
+  const imageBase64 = imageUrlForVision ? await fetchImageAsBase64(imageUrlForVision) : null
+  const visionImageUrl = imageBase64
+    ? `data:${imageBase64.mediaType};base64,${imageBase64.base64}`
+    : imageUrlForVision
+  const openaiUserContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> | string =
+    visionImageUrl
+      ? [
+          { type: "image_url", image_url: { url: visionImageUrl, detail: "low" } },
+          { type: "text", text: JSON.stringify(user) }
+        ]
+      : JSON.stringify(user)
 
   let raw = ""
   let usage: TokenUsage = { ...ZERO_USAGE }
@@ -752,7 +774,7 @@ export async function generatePlanWithOpenAI(args: {
       messages: [
         { role: "system", content: system },
         ...(args.history ?? []),
-        { role: "user", content: JSON.stringify(user) }
+        { role: "user", content: openaiUserContent }
       ],
     })
     let sawRefusal = false
@@ -804,7 +826,7 @@ export async function generatePlanWithOpenAI(args: {
       messages: [
         { role: "system", content: system },
         ...(args.history ?? []),
-        { role: "user", content: JSON.stringify(user) }
+        { role: "user", content: openaiUserContent }
       ],
     })
     const refusal = extractCompletionRefusal(completion)

@@ -9,6 +9,7 @@ import {
 import {
   type ParsedIntent,
   extractAudienceTarget,
+  fetchImageAsBase64,
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
@@ -269,7 +270,13 @@ export async function generatePlanWithAnthropic(args: {
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
     `Allowed block types: ${effectiveBlockTypes.join(", ")}.`,
-    ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : [])
+    ...(args.siteContextBlock ? [`\n[site context]\n${args.siteContextBlock}\n[/site context]`] : []),
+    ...(args.contextPack.selected?.imageUrlForVision
+      ? [
+          "An image is attached for the field being edited. Describe its visual content accurately for the alt text. Be specific about what's depicted (objects, people, actions, setting) in 1-2 concise sentences. Do not mention 'AI-generated' or image metadata.",
+          `Return an update_props operation setting the "${args.contextPack.selected.editablePath}" field on block "${args.contextPack.selected.blockId}" to your generated alt text description. This is an edit_plan, not needs_clarification.`
+        ]
+      : [])
   ].join("\n")
 
   const includeContracts =
@@ -294,6 +301,19 @@ export async function generatePlanWithAnthropic(args: {
     ...schemaContext.payload,
     feedback: args.feedback ?? null
   }
+
+  const imageUrlForVision = typeof args.contextPack.selected?.imageUrlForVision === "string"
+    ? args.contextPack.selected.imageUrlForVision
+    : null
+  const imageBase64 = imageUrlForVision ? await fetchImageAsBase64(imageUrlForVision) : null
+  const userContent: Anthropic.MessageParam["content"] = imageUrlForVision
+    ? [
+        imageBase64
+          ? { type: "image" as const, source: { type: "base64" as const, media_type: imageBase64.mediaType as "image/jpeg", data: imageBase64.base64 } }
+          : { type: "image" as const, source: { type: "url" as const, url: imageUrlForVision } },
+        { type: "text" as const, text: JSON.stringify(user) }
+      ]
+    : JSON.stringify(user)
 
   const historyMessages: Anthropic.MessageParam[] = (args.history ?? []).map((h) => ({
     role: h.role as "user" | "assistant",
@@ -335,7 +355,7 @@ export async function generatePlanWithAnthropic(args: {
   if (runtimeTools.length > 0) {
     const loopMessages: Anthropic.MessageParam[] = [
       ...historyMessages,
-      { role: "user", content: JSON.stringify(user) }
+      { role: "user", content: userContent }
     ]
 
     for (let turn = 0; turn < maxToolTurns; turn += 1) {
@@ -467,7 +487,7 @@ export async function generatePlanWithAnthropic(args: {
         tool_choice: { type: "tool", name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
-          { role: "user", content: JSON.stringify(user) }
+          { role: "user", content: userContent }
         ],
       })
       for await (const event of stream as AsyncIterable<{
@@ -543,7 +563,7 @@ export async function generatePlanWithAnthropic(args: {
         tool_choice: { type: "tool", name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
-          { role: "user", content: JSON.stringify(user) }
+          { role: "user", content: userContent }
         ],
       })
       usage = extractUsage(response)
@@ -578,7 +598,7 @@ export async function generatePlanWithAnthropic(args: {
       },
       messages: [
         ...historyMessages,
-        { role: "user", content: JSON.stringify(user) }
+        { role: "user", content: userContent }
       ],
     })
     usage = extractUsage(response)
