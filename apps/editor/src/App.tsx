@@ -276,10 +276,6 @@ function EditorPage({
       setActiveBlockType(blockType)
       setActiveEditablePath(editablePath)
       if (blockId) preview.postToSite("highlightBlock", { blockId, editablePath: editablePath ?? null })
-      // Open image picker when an image field is clicked
-      if (blockId && editablePath && isImagePath(editablePath)) {
-        setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl: editableValue })
-      }
     },
     onRouteChanged: (newSlug) => {
       setSlugFromPreview(newSlug)
@@ -713,6 +709,7 @@ function EditorPage({
   const streamLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."))
   const streamTextLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Updating..." : "Thinking"))
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
+  const chatPanelClassName = `chat-panel ${activeTab === "properties" ? "chat-panel--properties" : "chat-panel--chat"}`
   const hasUserEntry = chatEngine.chatLog.some((entry) => entry.role === "user")
   const buildCopyPayload = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
     const lines: string[] = []
@@ -757,7 +754,7 @@ function EditorPage({
 
   return (
     <div className="layout">
-      <aside className="chat-panel" ref={chatPanelRef} style={chatPanelStyle}>
+      <aside className={chatPanelClassName} ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
           <div className="chat-header-top">
             <div className="chat-header-site-name">
