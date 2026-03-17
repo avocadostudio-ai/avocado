@@ -3,18 +3,18 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-16T18:23:04.356Z",
+    "updatedAt": "2026-03-17T12:59:41.429Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Discover the Endless Aroma with Every Avocado 🥑",
-          "subheading": "From creamy avocado toast breakfasts to vibrant salads and beyond — discover how avocados transform ordinary meals into extraordinary moments.",
-          "ctaText": "Explore Avocado Recipes",
+          "heading": "Avocado Mastery Awaits",
+          "subheading": "Elevate Your Plate. Transform Your Health. Lead the Movement.",
+          "ctaText": "Start Your Avocado Journey",
           "ctaHref": "/recipes",
-          "imageUrl": "/generated-images/gdrive_1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s.webp",
-          "imageAlt": "Fresh sliced avocado on a wooden cutting board with vibrant ingredients ready for meal preparation",
+          "imageUrl": "/generated-images/var_1773752381425_95i2o3.png",
+          "imageAlt": "AI-generated Hero image featuring fresh avocados cut half",
           "imagePosition": "right",
           "secondaryCtaText": ""
         }
@@ -26,23 +26,23 @@
           "tabs": [
             {
               "label": "Overview",
-              "content": "Avocados come in many varieties, each with unique flavors and textures. From the creamy Hass to the buttery Fuerte, these nutrient-dense fruits have become a global culinary staple. Discover the fascinating world of avocado cultivation, the origins of different varieties, and why chefs and home cooks alike celebrate this remarkable fruit.\n\n• **Hass Avocados** – The most popular variety worldwide, known for their creamy texture and rich, buttery flavor\n• **Fuerte Avocados** – Pear-shaped with a smooth, mild taste, perfect for slicing and serving\n• **Bacon Avocados** – Thinner skin and milder flavor, ideal for fresh applications and salads\n• **Reed Avocados** – Large, round, and creamy, with a subtle, delicate taste\n\nEach variety thrives in specific climates, and sustainable farming practices ensure these trees produce fruit year after year."
+              "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
             },
             {
               "label": "Recipes & Ideas",
-              "content": "Avocados are incredibly versatile and work beautifully across every meal, from sunrise to sunset. Whether you're a seasoned chef or a cooking novice, these delicious fruits inspire endless culinary creativity and bring nutrition to every plate.\n\n• **Breakfast Favorites** – Spread on whole-grain toast, blend into smoothie bowls, add to scrambled eggs, or create avocado-based omelets\n• **Lunch & Salads** – Top grain bowls, toss into green salads, layer in sandwiches, or serve alongside fresh seafood\n• **Dinner Innovation** – Blend into creamy pasta sauces, use as a healthy fat in tacos, or stuff with quinoa and roasted vegetables\n• **Snacks & Desserts** – Make silky guacamole, create chocolate avocado mousse, blend into vegan ice cream, or top with granola\n\nThe possibilities are truly endless—let your imagination guide your next avocado creation."
+              "content": "• **Breakfast** – Toast, smoothie bowls, eggs, omelets\n• **Lunch & Salads** – Grain bowls, salads, seafood\n• **Dinner** – Tacos, pasta, stuffed vegetables\n• **Snacks & Desserts** – Guacamole, chocolate mousse, vegan ice cream, parfaits"
             },
             {
               "label": "Sustainability",
-              "content": "Sustainable avocado farming practices protect water resources, soil health, and entire communities. Progressive growers worldwide are pioneering regenerative agriculture methods that benefit both the land and the people who steward it.\n\n• **Water Conservation** – Modern irrigation techniques reduce water use by up to 50% while maintaining crop health and yields\n• **Soil Health & Biodiversity** – Regenerative practices build soil organic matter, support wildlife habitats, and reduce chemical runoff\n• **Reduced Pesticide Use** – Integrated pest management and organic farming methods protect ecosystems and farmworker wellbeing\n• **Community Impact** – Fair-trade certification ensures farmers receive fair wages and investment in local education and healthcare\n\nBy choosing sustainably sourced avocados, you directly support farmers and practices that care for the land and future generations."
+              "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
             },
             {
               "label": "Fun Facts",
-              "content": "Avocados are far more fascinating than most people realize. From their surprising biology to their rich cultural history, these fruits have captured human imagination for thousands of years.\n\n• **Fruit, Not Vegetable** – Avocados are botanically classified as fruits—specifically berries with a single large seed\n• **Unique Fat Profile** – Avocados are the only fruit with significant amounts of monounsaturated fat, making them nutritionally exceptional\n• **Longevity** – Avocado trees can live for over 100 years and continue producing fruit throughout their lifespan\n• **Slow Growth** – It takes 3–4 years for an avocado tree to produce its first fruit, rewarding patient growers with decades of abundance\n• **Ancient Origins** – Avocados have been cultivated for over 5,000 years, with origins in south-central Mexico where they're still celebrated today\n\nDiscover why avocados have earned their place as nature's golden treasure."
+              "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
             },
             {
               "label": "Selection & Storage Tips",
-              "content": "Choosing the perfect avocado and storing it correctly ensures you always have creamy, delicious fruit ready when you need it. Learn the secrets that experienced produce enthusiasts use to select peak ripeness and extend freshness throughout the week.\n\n• **Selection Tips** – Gently squeeze to check firmness, look for dark green or blackish skin (variety-dependent), and choose avocados that yield slightly to palm pressure without feeling mushy\n• **Ripeness Check** – Place in a paper bag with an apple or banana to speed ripening naturally, or test readiness by inserting a small knife near the pit—it should slide in smoothly\n• **Storage Methods** – Keep unripe avocados at room temperature; once ripe, store in the refrigerator (lasts 3–5 days); cut halves can be preserved with lemon juice and plastic wrap\n• **Troubleshooting** – If avocados ripen too quickly, refrigerate immediately; if purchased too firm, use a paper bag method; for browning flesh, store with pit intact and use within 1–2 days\n\nMaster these simple techniques and you'll always have perfect avocados on hand for any meal inspiration."
+              "content": "• **Selection** – Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n• **Ripeness** – Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n• **Storage** – Keep unripe at room temperature; refrigerate when ripe (lasts 3–5 days)\n• **Cut Avocados** – Preserve with lemon juice and plastic wrap; use within 1–2 days\n\nMaster these techniques for perfect avocados whenever you need them."
             }
           ]
         }
@@ -67,7 +67,7 @@
           "cards": [
             {
               "title": "🥑 Avocado Culinary Delights",
-              "description": "Explore endless recipe ideas and creative ways to enjoy avocados—from simple breakfasts to elegant dinners that make every meal feel fresh and inspired.",
+              "description": "Master 100+ recipes: from quick breakfast spreads to restaurant-quality dinners. Transform simple avocados into culinary masterpieces that impress every time.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
               "imageUrl": "/generated-images/gdrive_1NwnCLmDBnwWplCTlmQaHbJ0aQZ5HdXEp.webp",
@@ -75,7 +75,7 @@
             },
             {
               "title": "🥑 Avocado Wellness",
-              "description": "Discover how avocados nourish your body with heart-healthy fats, essential vitamins, and powerful antioxidants that support wellness and vitality in everyday life.",
+              "description": "Heart-healthy fats, vitamins, and antioxidants that boost energy and vitality. Elevate your health, one avocado at a time.",
               "ctaText": "Explore",
               "ctaHref": "/avocado-wellness",
               "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -98,10 +98,6 @@
         "props": {
           "title": "Avocado Impact",
           "stats": [
-            {
-              "value": "Avocado Lovers",
-              "label": "250K+"
-            },
             {
               "value": "100%",
               "label": "sustainable farms featured"
@@ -437,5 +433,106 @@
         }
       }
     ]
+  },
+  {
+    "id": "p_winter_jam_competition",
+    "slug": "/winter-jam-competition",
+    "title": "Winter Jam Competition",
+    "updatedAt": "2026-03-17T07:19:13.552Z",
+    "blocks": [
+      {
+        "id": "b_hero_winter-jam-competition",
+        "type": "Hero",
+        "props": {
+          "heading": "Winter Jam Competition",
+          "subheading": "Celebrate homemade flavors. Enter now and compete for glory and prizes.",
+          "ctaText": "Enter Competition",
+          "ctaHref": "/",
+          "imageUrl": "https://images.unsplash.com/photo-1668603486705-68ac8ff9405b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxMnx8d2ludGVyJTIwamFtfGVufDF8MHx8fDE3NzM3MzEyMDd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "a plate of dessert",
+          "imagePosition": "right"
+        }
+      },
+      {
+        "id": "b_richtext_1773731193159",
+        "type": "RichText",
+        "props": {
+          "title": "Competition Details",
+          "body": "## How It Works\n\nOur Winter Jam Competition invites home jam makers of all skill levels to showcase their finest creations. Whether you've been preserving for years or just discovered your passion for jam making, this is your moment to shine.\n\n## Eligibility\n\nOpen to all amateur jam makers aged 18 and over. Commercial jam producers may enter the professional category. All entries must be homemade and original recipes.\n\n## Judging Criteria\n\nEntries are evaluated on taste (40%), texture and consistency (30%), creativity and innovation (20%), and presentation (10%). Winners in each category are announced in January.\n\n## Submission Details\n\n- **Entry Deadline:** December 20, 2024\n- **Submission:** Mail or drop off two 8oz jars of your entry with the completed entry form\n- **Entry Fee:** $15 per entry (supports venue and prizes)\n- **Categories:** Fruit Preserves, Savory & Spiced, Experimental & Fusion, and Student (under 25)"
+        }
+      },
+      {
+        "id": "b_stats_1773731193159",
+        "type": "Stats",
+        "props": {
+          "title": "By The Numbers",
+          "stats": [
+            {
+              "value": "$5,000+",
+              "label": "Total Prize Pool"
+            },
+            {
+              "value": "250+",
+              "label": "Expected Entries"
+            },
+            {
+              "value": "12",
+              "label": "Expert Judges"
+            },
+            {
+              "value": "4",
+              "label": "Competition Categories"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773731193159",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Frequently Asked Questions",
+          "items": [
+            {
+              "q": "What is the entry fee?",
+              "a": "The entry fee is $15 per jam entry. This supports the competition venue, judging panel honorariums, and prize awards. Proceeds from entry fees also fund next year's competition expansion."
+            },
+            {
+              "q": "How are entries judged?",
+              "a": "A panel of 12 expert judges—including professional chefs, food critics, and jam artisans—tastes and evaluates each entry blind (without knowing the maker). Judging is based on taste (40%), texture (30%), creativity (20%), and presentation (10%)."
+            },
+            {
+              "q": "Can I ship my entry or must I deliver it in person?",
+              "a": "Local entries (within 50 miles) can be dropped off at our collection site or mailed to arrive by December 20. Out-of-area entries must be shipped via insulated mail to ensure freshness. Include a copy of your entry form with your shipment."
+            },
+            {
+              "q": "Are there any eligibility restrictions?",
+              "a": "The competition is open to all amateur jam makers aged 18+. Professional jam producers may enter the Professional category. All recipes must be original and homemade—store-bought or commercially produced jams are not eligible."
+            },
+            {
+              "q": "When will winners be announced?",
+              "a": "Winners in each category will be announced on January 10, 2025, at our Winter Jam Awards Celebration event. All participants are invited to attend and celebrate."
+            },
+            {
+              "q": "Can I use recipes from cookbooks or online sources?",
+              "a": "Yes—you may adapt published recipes, but we encourage innovation. Document your recipe and any modifications you made. Judges appreciate both traditional mastery and creative experimentation."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773731193159",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to Compete?",
+          "description": "Join jam makers from across the region. Enter by December 20, 2024, and be part of the celebration.",
+          "ctaText": "Register Now",
+          "ctaHref": "/"
+        }
+      }
+    ],
+    "meta": {
+      "title": "Winter Jam Competition | Avocado Stories",
+      "description": "Enter our Winter Jam Competition and showcase your homemade jam creations. Prize pool, expert judging, and multiple categories. Register by December 20."
+    }
   }
 ]
