@@ -438,14 +438,29 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       }
     }
 
-    const blockOrder = () =>
-      Array.from(document.querySelectorAll<HTMLElement>("[data-block-id]"))
+    const orderedBlockNodes = () => {
+      const main = document.querySelector("main.editor-mode, main")
+      const directChildren = main
+        ? Array.from(main.children).filter((node): node is HTMLElement => node instanceof HTMLElement && node.hasAttribute("data-block-id"))
+        : []
+      if (directChildren.length > 0) return directChildren
+      return Array.from(document.querySelectorAll<HTMLElement>("[data-block-id]"))
+    }
+
+    const blockOrderIndex = (blockId: string, preferredNode?: HTMLElement | null) => {
+      const nodes = orderedBlockNodes()
+      const order = nodes
         .map((node) => node.getAttribute("data-block-id"))
         .filter((id): id is string => Boolean(id && id.length > 0))
+      if (preferredNode && preferredNode.isConnected) {
+        const preferredIndex = nodes.indexOf(preferredNode)
+        if (preferredIndex !== -1) return { idx: preferredIndex, order }
+      }
+      return { idx: order.findIndex((id) => id === blockId), order }
+    }
 
-    const computeMoveAfter = (blockId: string, direction: "up" | "down") => {
-      const order = blockOrder()
-      const idx = order.findIndex((id) => id === blockId)
+    const computeMoveAfter = (blockId: string, direction: "up" | "down", preferredNode?: HTMLElement | null) => {
+      const { idx, order } = blockOrderIndex(blockId, preferredNode)
       if (idx === -1) return { canMove: false, afterBlockId: null as string | null }
       if (direction === "up") {
         if (idx === 0) return { canMove: false, afterBlockId: null as string | null }
@@ -455,9 +470,8 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       return { canMove: true, afterBlockId: order[idx + 1] ?? null }
     }
 
-    const computeInsertBefore = (blockId: string) => {
-      const order = blockOrder()
-      const idx = order.findIndex((id) => id === blockId)
+    const computeInsertBefore = (blockId: string, preferredNode?: HTMLElement | null) => {
+      const { idx, order } = blockOrderIndex(blockId, preferredNode)
       if (idx <= 0) return { afterBlockId: null as string | null, beforeBlockId: blockId }
       return { afterBlockId: order[idx - 1] ?? null, beforeBlockId: blockId }
     }
@@ -746,7 +760,11 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       }
     }
 
+    let observer: MutationObserver | null = null
+
     const mountGlobalImageButtons = () => {
+      // Prevent MutationObserver feedback loops while rebuilding image buttons.
+      observer?.disconnect()
       document.querySelectorAll(".editor-image-change-btn").forEach((el) => el.remove())
       document.querySelectorAll<HTMLElement>(".editor-selectable [data-editable-target]").forEach((el) => {
         const path = el.getAttribute("data-editable-target") ?? ""
@@ -768,17 +786,14 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const btn = document.createElement("button")
         btn.className = "editor-image-change-btn"
         btn.title = "Change image"
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'
-        btn.addEventListener("click", (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          window.parent.postMessage(
-            { protocol: "site-editor/v1", type: "openImagePicker", payload: { slug: currentSlug, blockId, editablePath: path, currentUrl } },
-            editorOrigin
-          )
-        })
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>'
+        btn.setAttribute("data-image-slug", currentSlug)
+        btn.setAttribute("data-image-block-id", blockId)
+        btn.setAttribute("data-image-path", path)
+        if (currentUrl) btn.setAttribute("data-image-current-url", currentUrl)
         el.append(btn)
       })
+      if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true })
     }
 
     const ensureBlockBadges = () => {
@@ -856,12 +871,13 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       moveUpBtn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} up`)
       moveUpBtn.title = "Move up"
       moveUpBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>'
-      const upResult = computeMoveAfter(blockId, "up")
+      const upResult = computeMoveAfter(blockId, "up", match)
       moveUpBtn.disabled = !upResult.canMove
+      if (!upResult.canMove) moveUpBtn.title = "Already at the top"
       moveUpBtn.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
-        const move = computeMoveAfter(blockId, "up")
+        const move = computeMoveAfter(blockId, "up", match)
         if (!move.canMove) return
         pendingScrollAnchorYRef.current = match.getBoundingClientRect().top
         pendingScrollIntoViewRef.current = true
@@ -877,12 +893,13 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       moveDownBtn.setAttribute("aria-label", `Move ${match.getAttribute("data-block-type") ?? "block"} down`)
       moveDownBtn.title = "Move down"
       moveDownBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m19 12-7 7-7-7"/><path d="M12 5v14"/></svg>'
-      const downResult = computeMoveAfter(blockId, "down")
+      const downResult = computeMoveAfter(blockId, "down", match)
       moveDownBtn.disabled = !downResult.canMove
+      if (!downResult.canMove) moveDownBtn.title = "Already at the bottom"
       moveDownBtn.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
-        const move = computeMoveAfter(blockId, "down")
+        const move = computeMoveAfter(blockId, "down", match)
         if (!move.canMove) return
         pendingScrollAnchorYRef.current = match.getBoundingClientRect().top
         pendingScrollIntoViewRef.current = true
@@ -920,7 +937,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       addTopBtn.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
-        const anchor = computeInsertBefore(blockId)
+        const anchor = computeInsertBefore(blockId, match)
         window.parent.postMessage(
           {
             protocol: "site-editor/v1",
@@ -1038,9 +1055,27 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         target?.closest(".editor-list-item-delete") ||
         target?.closest(".editor-list-item-add") ||
         target?.closest(".editor-list-item-move") ||
-        target?.closest(".editor-delete-confirm") ||
-        target?.closest(".editor-image-change-btn")
+        target?.closest(".editor-delete-confirm")
       ) {
+        return
+      }
+      const imgBtn = target?.closest<HTMLElement>(".editor-image-change-btn")
+      if (imgBtn) {
+        event.preventDefault()
+        event.stopPropagation()
+        window.parent.postMessage(
+          {
+            protocol: "site-editor/v1",
+            type: "openImagePicker",
+            payload: {
+              slug: imgBtn.getAttribute("data-image-slug") || pathname || "/",
+              blockId: imgBtn.getAttribute("data-image-block-id") || "",
+              editablePath: imgBtn.getAttribute("data-image-path") || "",
+              currentUrl: imgBtn.getAttribute("data-image-current-url") || undefined
+            }
+          },
+          editorOrigin
+        )
         return
       }
       const node = target?.closest<HTMLElement>("[data-block-id]")
@@ -1357,7 +1392,8 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       if (!blockId) return
 
       const direction = event.key === "ArrowUp" ? "up" : "down"
-      const result = computeMoveAfter(blockId, direction)
+      const selectedNode = document.querySelector<HTMLElement>(".editor-highlight[data-block-id]")
+      const result = computeMoveAfter(blockId, direction, selectedNode)
       if (!result.canMove) return
 
       event.preventDefault()
@@ -1429,7 +1465,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
 
     ensureBlockBadges()
     mountGlobalImageButtons()
-    const observer = new MutationObserver(() => {
+    observer = new MutationObserver(() => {
       ensureBlockBadges()
       scheduleImageButtons()
       scheduleDetectNewBlocks()
@@ -1450,7 +1486,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       restoreLiveDraftOriginals()
       clearLiveDraft()
       removeSelectedDeleteHandle()
-      observer.disconnect()
+      observer?.disconnect()
       document.removeEventListener("click", onClick, true)
       document.removeEventListener("dblclick", onDoubleClick, true)
       document.removeEventListener("pointermove", onPointerMove, true)
