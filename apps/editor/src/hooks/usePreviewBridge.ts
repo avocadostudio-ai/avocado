@@ -4,8 +4,10 @@ import type { SiteMessage } from "../lib/editor-types"
 import { siteOrigin as defaultSiteOrigin } from "../lib/editor-utils"
 import { parseOptionalString, parseString } from "../lib/parse-utils"
 
+export type AnchorRect = { top: number; left: number; width: number; height: number } | null
+
 export type PreviewBridgeCallbacks = {
-  onBlockClicked: (slug: string, blockId: string | undefined, blockType: string | undefined, editablePath: string | undefined, editableValue: string | undefined) => void
+  onBlockClicked: (slug: string, blockId: string | undefined, blockType: string | undefined, editablePath: string | undefined, editableValue: string | undefined, anchorRect: AnchorRect) => void
   onRouteChanged: (slug: string) => void
   onBlockReordered: (slug: string, blockId: string, afterBlockId: string | undefined) => void
   onBlockDeleteRequested: (slug: string, blockId: string) => void
@@ -15,6 +17,7 @@ export type PreviewBridgeCallbacks = {
   onListItemMoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex: number | undefined) => void
   onInlineTextCommitted: (slug: string, blockId: string, editablePath: string, value: string) => void
   onOpenImagePicker: (slug: string, blockId: string, editablePath: string, currentUrl: string | undefined) => void
+  onIframeScrolled?: () => void
 }
 
 export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks, targetOrigin?: string) {
@@ -82,7 +85,19 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const nextBlockType = parseOptionalString(rawBlockType)
         const nextPath = parseOptionalString(rawPath)
         const nextValue = parseOptionalString(msg.payload.editableValue)
-        callbacks.onBlockClicked(String(msg.payload.slug ?? "/"), nextBlockId, nextBlockType, nextPath, nextValue)
+        const rawRect = msg.payload.anchorRect
+        let anchorRect: AnchorRect = null
+        if (rawRect && typeof rawRect === "object" && "top" in rawRect) {
+          const r = rawRect as Record<string, unknown>
+          if (typeof r.top === "number" && typeof r.left === "number" && typeof r.width === "number" && typeof r.height === "number") {
+            anchorRect = { top: r.top, left: r.left, width: r.width, height: r.height }
+          }
+        }
+        callbacks.onBlockClicked(String(msg.payload.slug ?? "/"), nextBlockId, nextBlockType, nextPath, nextValue, anchorRect)
+      }
+
+      if (msg.type === "iframeScrolled") {
+        callbacks.onIframeScrolled?.()
       }
 
       if (msg.type === "routeChanged") {

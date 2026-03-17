@@ -14,10 +14,11 @@ type Props = {
   onAutoHeightChange: (height: number) => void
   selectionModeEnabled?: boolean
   onToggleSelectionMode?: () => void
+  compact?: boolean
 }
 
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange, selectionModeEnabled, onToggleSelectionMode } = props
+  const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange, selectionModeEnabled, onToggleSelectionMode, compact } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -300,7 +301,7 @@ export default function ClaudeStyleChatInput(props: Props) {
         {imagePasteError ? <div className="composer-input-note composer-input-note-error">{imagePasteError}</div> : null}
       </div>
       <div className="composer-actions">
-        {!isRecording && (
+        {!compact && !isRecording && (
           <>
             <button
               type="button"
@@ -327,7 +328,7 @@ export default function ClaudeStyleChatInput(props: Props) {
         )}
         <div className="composer-actions-spacer" />
         <div className="composer-actions-right" role="group" aria-label="Voice and send actions">
-          {isRecording ? (
+          {!compact && isRecording ? (
             <>
               <button type="button" className="composer-ghost-btn" onClick={cancelRecording} disabled={isLoading || isTranscribing} aria-label="Cancel voice input">
                 <X size={16} />
@@ -338,15 +339,17 @@ export default function ClaudeStyleChatInput(props: Props) {
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className="composer-ghost-btn"
-                onClick={() => void handleMicClick()}
-                disabled={isLoading || isTranscribing}
-                aria-label="Start voice input"
-              >
-                <Mic size={16} />
-              </button>
+              {!compact && (
+                <button
+                  type="button"
+                  className="composer-ghost-btn"
+                  onClick={() => void handleMicClick()}
+                  disabled={isLoading || isTranscribing}
+                  aria-label="Start voice input"
+                >
+                  <Mic size={16} />
+                </button>
+              )}
               <button
                 type="button"
                 className={`composer-send-btn${isLoading && onCancel ? " is-stop" : ""}`}

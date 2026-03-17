@@ -1120,7 +1120,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           pendingListItemMovePathRef.current = null
           setChildSelectionLock(null)
           window.parent.postMessage(
-            { protocol: "site-editor/v1", type: "blockClicked", payload: { slug, blockId: null, blockType: null, editablePath: null } },
+            { protocol: "site-editor/v1", type: "blockClicked", payload: { slug, blockId: null, blockType: null, editablePath: null, anchorRect: null } },
             editorOrigin
           )
         }
@@ -1172,7 +1172,14 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         {
           protocol: "site-editor/v1",
           type: "blockClicked",
-          payload: { slug, blockId, blockType, editablePath: editablePath ?? null, editableValue }
+          payload: {
+            slug, blockId, blockType, editablePath: editablePath ?? null, editableValue,
+            anchorRect: (() => {
+              const anchorNode = (childNode && node.contains(childNode)) ? childNode : node
+              const r = anchorNode.getBoundingClientRect()
+              return { top: r.top, left: r.left, width: r.width, height: r.height }
+            })()
+          }
         },
         editorOrigin
       )
@@ -1500,11 +1507,19 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
     })
     if (document.body) observer.observe(document.body, { childList: true, subtree: true })
 
+    const onScroll = () => {
+      window.parent.postMessage(
+        { protocol: "site-editor/v1", type: "iframeScrolled", payload: {} },
+        editorOrigin
+      )
+    }
+
     document.addEventListener("click", onClick, true)
     document.addEventListener("dblclick", onDoubleClick, true)
     document.addEventListener("pointermove", onPointerMove, true)
     document.addEventListener("keydown", onKeyDown, true)
     window.addEventListener("message", onMessage)
+    window.addEventListener("scroll", onScroll, { passive: true })
 
     return () => {
       if (detectNewBlocksRaf !== null) cancelAnimationFrame(detectNewBlocksRaf)
@@ -1520,6 +1535,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       document.removeEventListener("pointermove", onPointerMove, true)
       document.removeEventListener("keydown", onKeyDown, true)
       window.removeEventListener("message", onMessage)
+      window.removeEventListener("scroll", onScroll)
       document.querySelectorAll(".aifx-shimmer-overlay, .aifx-shimmer-sparkle, .editor-image-change-btn").forEach((el) => el.remove())
       document.documentElement.removeAttribute("data-editor-active")
       document.documentElement.removeAttribute("data-editor-selection-mode")
