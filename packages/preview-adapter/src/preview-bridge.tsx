@@ -4,6 +4,64 @@ import { useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { isImagePath, type ApplyPatchMessage, type PatchAckMessage, type PatchRejectReason, type ResetToServerMessage } from "@ai-site-editor/shared"
 
+/** Lightweight markdown-to-HTML for live draft streaming. Mirrors _shared.tsx renderRichTextContent but outputs HTML strings. */
+function markdownToHtml(md: string): string {
+  const escaped = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+
+  function inlineToHtml(text: string): string {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
+  }
+
+  const normalized = escaped
+    .replace(/\r\n?/g, "\n")
+    .replace(/([.!?])([A-Z])/g, "$1 $2")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+
+  // Single-line content (titles, headings, descriptions): inline-only, no <p> wrapper
+  if (!normalized.includes("\n")) {
+    return inlineToHtml(normalized)
+  }
+
+  const blocks = normalized.split(/\n\s*\n+/).filter(Boolean)
+
+  return blocks
+    .map((block) => {
+      const lines = block.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+      if (lines.length === 0) return ""
+
+      // Heading
+      const hMatch = /^(#{1,6})\s+(.+)$/.exec(lines[0])
+      if (hMatch) {
+        let html = `<h3>${inlineToHtml(hMatch[2].trim())}</h3>`
+        const rest = lines.slice(1).join(" ").trim()
+        if (rest) html += `<p>${inlineToHtml(rest)}</p>`
+        return html
+      }
+
+      // Unordered list
+      const ulItems = lines.map((l) => /^\s*[-*+•]\s+(.+)$/.exec(l)?.[1]?.trim() ?? null)
+      if (ulItems.every((i) => i !== null)) {
+        return `<ul>${ulItems.map((i) => `<li>${inlineToHtml(i!)}</li>`).join("")}</ul>`
+      }
+
+      // Ordered list
+      const olItems = lines.map((l) => /^\s*\d+[.)]\s+(.+)$/.exec(l)?.[1]?.trim() ?? null)
+      if (olItems.every((i) => i !== null)) {
+        return `<ol>${olItems.map((i) => `<li>${inlineToHtml(i!)}</li>`).join("")}</ol>`
+      }
+
+      return `<p>${inlineToHtml(block)}</p>`
+    })
+    .join("")
+}
+
 type SiteMessage =
   | {
       protocol: "site-editor/v1"
@@ -133,21 +191,37 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const block = findBlockNode(blockId)
       if (!block) return
 
+      const switchingBlock = liveDraftActiveBlockId !== null && liveDraftActiveBlockId !== blockId
+      if (switchingBlock) {
+        restoreLiveDraftOriginals()
+        clearLiveDraft()
+      }
+
       // Inject streamed text into editable DOM nodes if fields provided
       if (fields && typeof fields === "object") {
+        const nextPaths = new Set(Object.keys(fields))
+        // Restore stale paths so a new target field takes over immediately.
+        for (const [node, html] of [...liveDraftOriginals.entries()]) {
+          const path = node.getAttribute("data-editable-target") ?? ""
+          if (!nextPaths.has(path)) {
+            node.innerHTML = html
+            node.classList.remove("editor-live-typing")
+            liveDraftOriginals.delete(node)
+          }
+        }
         for (const [path, value] of Object.entries(fields)) {
+          if (isImagePath(path)) continue
           const node = findEditableNode(block, path)
           if (!node) continue
           if (!liveDraftOriginals.has(node)) {
             liveDraftOriginals.set(node, node.innerHTML)
           }
-          node.textContent = value
+          node.innerHTML = markdownToHtml(value)
           node.classList.add("editor-live-typing")
         }
       }
 
       if (liveDraftActiveBlockId === blockId) return
-      clearLiveDraft()
       block.classList.add("editor-live-draft-active")
       liveDraftActiveBlockId = blockId
       setLiveDraftBadge(block, true)
