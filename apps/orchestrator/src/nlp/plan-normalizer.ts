@@ -1,5 +1,6 @@
 import {
   allowedBlockTypes,
+  defaultPropsForType as sharedDefaultPropsForType,
   type BlockType,
   type Operation,
   type PageDoc
@@ -223,112 +224,7 @@ export function nextBlockId(type: BlockType, page: PageDoc) {
 // ---------------------------------------------------------------------------
 
 export function defaultPropsForType(type: BlockType) {
-  if (type === "Hero") {
-    return {
-      heading: "Build with confidence",
-      subheading: "Make changes safely with instant preview.",
-      ctaText: "Get Started",
-      ctaHref: "/",
-      imageUrl: "/hero-generated.svg",
-      imageAlt: "Abstract generated illustration"
-    }
-  }
-  if (type === "FeatureGrid") {
-    return {
-      title: "Key features",
-      features: [
-        { title: "Fast setup", description: "Launch quickly with guided defaults." },
-        { title: "Safe edits", description: "Structured operations keep content valid." },
-        { title: "Live updates", description: "Preview changes immediately." }
-      ]
-    }
-  }
-  if (type === "Testimonials") {
-    return {
-      title: "What customers say",
-      items: [
-        { quote: "We launched faster than expected.", author: "Alex" },
-        { quote: "Editing is straightforward for the whole team.", author: "Jordan" }
-      ]
-    }
-  }
-  if (type === "FAQAccordion") {
-    return {
-      title: "Frequently asked questions",
-      items: [
-        { q: "How fast can we publish?", a: "Most teams ship updates in minutes." },
-        { q: "Can we revise later?", a: "Yes, every block can be updated anytime." }
-      ]
-    }
-  }
-  if (type === "Card") {
-    return {
-      title: "Launch faster",
-      description: "Go from idea to published changes in minutes.",
-      ctaText: "Learn more",
-      ctaHref: "/pricing"
-    }
-  }
-  if (type === "RichText") {
-    return {
-      title: "",
-      body: "Add your content here.\n\nUse a second paragraph to break up the text into readable sections."
-    }
-  }
-  if (type === "CardGrid") {
-    return {
-      title: "Explore more",
-      cards: [
-        {
-          title: "Fast setup",
-          description: "Create and ship updates quickly.",
-          ctaText: "Get started",
-          ctaHref: "/"
-        },
-        {
-          title: "Safe updates",
-          description: "Schema-validated edits reduce breakage.",
-          ctaText: "See how",
-          ctaHref: "/pricing"
-        },
-        {
-          title: "Team workflow",
-          description: "Collaborate with clear, reviewable changes.",
-          ctaText: "Read guide",
-          ctaHref: "/"
-        }
-      ]
-    }
-  }
-  if (type === "Stats") {
-    return {
-      title: "By the numbers",
-      stats: [
-        { value: "10k+", label: "Active users" },
-        { value: "99.9%", label: "Uptime" },
-        { value: "24/7", label: "Support" }
-      ]
-    }
-  }
-  if (type === "TwoColumn") {
-    return {
-      variant: "default",
-      left: [
-        { type: "heading", text: "Built for teams" },
-        { type: "paragraph", text: "Ship changes quickly with a clear, reliable workflow." },
-        { type: "cta", label: "Learn more", href: "/" }
-      ],
-      right: [
-        { type: "image", src: "/hero-generated.svg", alt: "Team collaborating on a website update" }
-      ]
-    }
-  }
-  return {
-    title: "Ready to get started?",
-    description: "Apply your next change in seconds.",
-    ctaText: "Start now",
-    ctaHref: "/"
-  }
+  return sharedDefaultPropsForType(type)
 }
 
 // ---------------------------------------------------------------------------
@@ -1190,6 +1086,12 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
   }
   if (!root.summary_for_user && typeof root.summary === "string") {
     root.summary_for_user = root.summary // common model alias
+  }
+  if (typeof root.suggested_next_actions === "string") {
+    root.suggested_next_actions = root.suggested_next_actions
+      .split(/\n|[,;]/)
+      .map((s: string) => s.replace(/^\s*[-•*\d.)\]]+\s*/, "").trim())
+      .filter(Boolean)
   }
   if (!Array.isArray(root.change_log)) {
     root.change_log = reorderedOps.map((op: any) => {
