@@ -89,6 +89,7 @@ import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, normalize
 import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation } from "./chat-pipeline-context.js"
 import { buildAiInsightChanges, buildMetaChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
+import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
 
 let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
 export function setGeneratePlanWithOpenAIForTests(fn?: typeof generatePlanWithOpenAI) {
@@ -468,17 +469,17 @@ export async function runChatPipeline(
   )
 
   const requestedProvider = body.provider ?? (ctx.availableProviders[0] as AIProvider | undefined)
-  const provider: AIProvider = (() => {
-    if (requestedProvider && ctx.availableProviders.includes(requestedProvider)) return requestedProvider
-    // Prefer Anthropic by default when available (user can always override via UI/provider param).
-    if (!body.provider && ctx.availableProviders.includes("anthropic") && process.env.ANTHROPIC_API_KEY) return "anthropic"
-    if (!body.provider && ctx.availableProviders.includes("openai") && process.env.OPENAI_API_KEY) return "openai"
-    return ctx.availableProviders[0] ?? "openai"
-  })()
-  const baseModelKey =
-    body.modelKey && ctx.modelLookup[provider][body.modelKey]
-      ? body.modelKey
-      : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const provider: AIProvider = resolveEffectiveProvider({
+    requestedProvider,
+    availableProviders: ctx.availableProviders,
+    fallbackProvider: ctx.availableProviders[0] ?? "openai"
+  })
+  const baseModelKey = resolveModelKeyForProvider({
+    requestedModelKey: body.modelKey,
+    provider,
+    modelLookup: ctx.modelLookup,
+    defaultModelKey: (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  })
   const modelKey =
     !body.modelKey &&
     baseModelKey !== "fast" &&
@@ -487,11 +488,7 @@ export async function runChatPipeline(
       ? ("fast" as const)
       : baseModelKey
   const modelUsed = ctx.modelLookup[provider][modelKey]
-  const plannerSource: "openai" | "anthropic" | "demo" =
-    provider === "anthropic" && process.env.ANTHROPIC_API_KEY ? "anthropic" :
-    provider === "openai" && process.env.OPENAI_API_KEY ? "openai" :
-    process.env.OPENAI_API_KEY ? "openai" :
-    process.env.ANTHROPIC_API_KEY ? "anthropic" : "demo"
+  const plannerSource: "openai" | "anthropic" | "demo" = resolvePlannerSource(provider)
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
   const pipelineStartedAtMs = Date.now()
