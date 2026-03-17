@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
+import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
 import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery } from "./nlp/intent-detection.js"
@@ -2389,6 +2389,32 @@ test("editPlanSchema accepts plans without suggested_next_actions (backward comp
   assert.equal(result.data.suggested_next_actions, undefined)
 })
 
+test("normalizePlanCandidate coerces suggested_next_actions string to array", () => {
+  const raw = {
+    intent: "content_answer",
+    summary_for_user: "Here are the CTA buttons.",
+    change_log: [],
+    ops: [],
+    suggested_next_actions: "Create the missing pages\nUpdate CTA destinations"
+  }
+  const result = normalizePlanCandidate(raw as any, { defaultSlug: "/" }) as Record<string, unknown>
+  assert.ok(Array.isArray(result.suggested_next_actions), "should be array after normalization")
+  assert.deepEqual(result.suggested_next_actions, ["Create the missing pages", "Update CTA destinations"])
+})
+
+test("normalizePlanCandidate coerces comma-separated suggested_next_actions string", () => {
+  const raw = {
+    intent: "content_answer",
+    summary_for_user: "Found content.",
+    change_log: [],
+    ops: [],
+    suggested_next_actions: "Add a hero block, Update the heading, Remove the CTA"
+  }
+  const result = normalizePlanCandidate(raw as any, { defaultSlug: "/" }) as Record<string, unknown>
+  assert.ok(Array.isArray(result.suggested_next_actions))
+  assert.equal((result.suggested_next_actions as string[]).length, 3)
+})
+
 // ---------------------------------------------------------------------------
 // humanizeArrayPath tests
 // ---------------------------------------------------------------------------
@@ -2645,6 +2671,14 @@ test("plannerDefaultProps for TwoColumn produces valid block props", () => {
   assert.equal(result.success, true, "TwoColumn default props from plan-normalizer must pass Zod validation")
   assert.ok(Array.isArray(props.left), "TwoColumn defaults must include left array")
   assert.ok(Array.isArray(props.right), "TwoColumn defaults must include right array")
+})
+
+test("plannerDefaultProps for every allowedBlockType passes Zod validation", () => {
+  for (const type of allowedBlockTypes) {
+    const props = plannerDefaultProps(type)
+    const result = validateBlockProps(type, props)
+    assert.equal(result.success, true, `Default props for ${type} must pass Zod validation`)
+  }
 })
 
 test("isPageListQuery detects page-listing requests", () => {
