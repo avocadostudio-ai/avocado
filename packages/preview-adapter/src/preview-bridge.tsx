@@ -7,7 +7,7 @@ import { isImagePath, type ApplyPatchMessage, type PatchAckMessage, type PatchRe
 type SiteMessage =
   | {
       protocol: "site-editor/v1"
-      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate"
+      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading"
       payload: Record<string, unknown>
     }
   | ({ protocol: "site-editor/v1" } & ApplyPatchMessage)
@@ -506,6 +506,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const lastByList = new Map<string, { listKey: string; index: number; root: HTMLElement }>()
       const sortedIndicesByList = new Map<string, number[]>()
       const rootByListAndIndex = new Map<string, Map<number, HTMLElement>>()
+      const firstNodeByListAndIndex = new Map<string, Map<number, HTMLElement>>()
       for (const group of resolved) {
         perListCounts.set(group.listKey, (perListCounts.get(group.listKey) ?? 0) + 1)
         const currentLast = lastByList.get(group.listKey)
@@ -516,6 +517,8 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         sortedIndicesByList.get(group.listKey)?.push(group.index)
         if (!rootByListAndIndex.has(group.listKey)) rootByListAndIndex.set(group.listKey, new Map())
         rootByListAndIndex.get(group.listKey)?.set(group.index, group.root)
+        if (!firstNodeByListAndIndex.has(group.listKey)) firstNodeByListAndIndex.set(group.listKey, new Map())
+        firstNodeByListAndIndex.get(group.listKey)?.set(group.index, group.nodes[0])
       }
       for (const [key, indices] of sortedIndicesByList.entries()) {
         sortedIndicesByList.set(key, [...new Set(indices)].sort((a, b) => a - b))
@@ -549,6 +552,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const root = group.root
         if (root.querySelector(".editor-list-item-delete")) continue
         root.classList.add("editor-item-has-delete")
+        if (horizontalByList.get(group.listKey)) root.classList.add("editor-list-horizontal")
         root.setAttribute("data-editor-list-key", group.listKey)
         root.setAttribute("data-editor-list-index", String(group.index))
         const controls = document.createElement("div")
@@ -1023,6 +1027,27 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         },
         editorOrigin
       )
+
+      // Allow tab switching — onclick handlers don't fire because capture-phase
+      // stopPropagation prevents bubble-phase delivery. Switch tabs directly.
+      const tabBtn = target?.closest<HTMLElement>(".tabs-block__tab")
+      if (tabBtn) {
+        const tabsBlock = tabBtn.closest<HTMLElement>(".tabs-block")
+        if (tabsBlock) {
+          const allTabs = tabsBlock.querySelectorAll<HTMLElement>(".tabs-block__tab")
+          const allPanels = tabsBlock.querySelectorAll<HTMLElement>(".tabs-block__panel")
+          const idx = Array.from(allTabs).indexOf(tabBtn)
+          if (idx >= 0) {
+            allTabs.forEach((b, j) => {
+              b.classList.toggle("tabs-block__tab--active", idx === j)
+              b.setAttribute("aria-selected", idx === j ? "true" : "false")
+            })
+            allPanels.forEach((p, j) => {
+              p.style.display = idx === j ? "" : "none"
+            })
+          }
+        }
+      }
     }
 
     const onDoubleClick = (event: MouseEvent) => {
@@ -1185,6 +1210,39 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       if (msg.type === "removeSkeleton") {
         removeSkeletons()
       }
+
+      if (msg.type === "aiFieldLoading") {
+        const blockId = String(msg.payload.blockId ?? "")
+        const editablePath = String(msg.payload.editablePath ?? "")
+        const active = Boolean(msg.payload.active)
+        // Remove all existing shimmer overlays/sparkles and restore inline styles
+        document.querySelectorAll(".aifx-shimmer-sparkle").forEach((el) => el.remove())
+        document.querySelectorAll(".aifx-shimmer-overlay").forEach((el) => {
+          const parent = el.parentElement
+          el.remove()
+          if (parent) {
+            parent.style.removeProperty("overflow")
+            if (!parent.style.cssText.trim()) parent.removeAttribute("style")
+          }
+        })
+        if (active && blockId) {
+          const block = findBlockNode(blockId)
+          if (block) {
+            const target = editablePath ? findEditableNode(block, editablePath) : block
+            if (target) {
+              const overlay = document.createElement("div")
+              overlay.className = "aifx-shimmer-overlay"
+              const sparkle = document.createElement("div")
+              sparkle.className = "aifx-shimmer-sparkle"
+              sparkle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>'
+              target.style.position = target.style.position || "relative"
+              target.style.overflow = "hidden"
+              target.appendChild(overlay)
+              target.appendChild(sparkle)
+            }
+          }
+        }
+      }
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1302,6 +1360,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       document.removeEventListener("pointermove", onPointerMove, true)
       document.removeEventListener("keydown", onKeyDown, true)
       window.removeEventListener("message", onMessage)
+      document.querySelectorAll(".aifx-shimmer-overlay, .aifx-shimmer-sparkle").forEach((el) => el.remove())
       document.documentElement.removeAttribute("data-editor-active")
     }
   }, [editorOrigin, router, slug])

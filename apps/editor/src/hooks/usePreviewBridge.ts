@@ -23,7 +23,7 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
   const pendingTxBySlug = useRef<Map<string, { txId: string; timer: ReturnType<typeof setTimeout> }>>(new Map())
 
   const postToSite = (
-    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate",
+    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading",
     payload: Record<string, unknown>
   ) => {
     iframeRef.current?.contentWindow?.postMessage(
