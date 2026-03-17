@@ -284,9 +284,12 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
 
       source.onmessage = (event) => {
         let payload: {
-          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error"
+          type: "status" | "token" | "field_draft" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error"
           message?: string
           text?: string
+          blockId?: string
+          editablePath?: string
+          value?: string
           stage?: string
           label?: string
           elapsedMs?: number
@@ -320,11 +323,19 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           const text = payload.text ?? ""
           if (text) {
             args.setStreamTokenCount((prev) => prev + text.length)
-            if (liveDraftBlockId) {
-              liveDraftText += text
-              liveDraftActive = true
-              scheduleLiveDraftFlush()
-            }
+          }
+        }
+
+        if (payload.type === "field_draft") {
+          const blockId = typeof payload.blockId === "string" ? payload.blockId : ""
+          const editablePath = typeof payload.editablePath === "string" ? payload.editablePath : ""
+          const value = typeof payload.value === "string" ? payload.value : ""
+          if (blockId && editablePath) {
+            liveDraftBlockId = blockId
+            args.setLatestStreamFocusBlockId(blockId)
+            liveDraftFields = { [editablePath]: value }
+            liveDraftActive = true
+            scheduleLiveDraftFlush()
           }
         }
 

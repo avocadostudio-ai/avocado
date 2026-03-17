@@ -96,22 +96,30 @@ export function comparableTokens(value: string) {
     .filter((token) => token.length > 2 && !stopwords.has(token))
 }
 
+function stemMatch(a: string, b: string) {
+  if (a === b) return true
+  const minLen = Math.min(a.length, b.length)
+  if (minLen < 4) return false
+  const prefixLen = Math.min(minLen, Math.max(4, Math.floor(minLen * 0.75)))
+  return a.slice(0, prefixLen) === b.slice(0, prefixLen)
+}
+
 export function isRedundantChangeLine(summary: string | undefined, line: string) {
   const summaryNorm = normalizeComparableText(summary ?? "")
   const lineNorm = normalizeComparableText(line)
   if (!summaryNorm || !lineNorm) return false
   if (lineNorm === summaryNorm || lineNorm.includes(summaryNorm) || summaryNorm.includes(lineNorm)) return true
 
-  const summaryTokens = new Set(comparableTokens(summaryNorm))
-  const lineTokens = new Set(comparableTokens(lineNorm))
-  if (summaryTokens.size === 0 || lineTokens.size === 0) return false
+  const summaryTokens = comparableTokens(summaryNorm)
+  const lineTokens = comparableTokens(lineNorm)
+  if (summaryTokens.length === 0 || lineTokens.length === 0) return false
 
   let overlap = 0
-  for (const token of lineTokens) {
-    if (summaryTokens.has(token)) overlap += 1
+  for (const lt of lineTokens) {
+    if (summaryTokens.some((st) => stemMatch(st, lt))) overlap += 1
   }
 
-  const coverLine = overlap / lineTokens.size
-  const coverSummary = overlap / summaryTokens.size
-  return coverLine >= 0.55 || coverSummary >= 0.55
+  const coverLine = overlap / lineTokens.length
+  const coverSummary = overlap / summaryTokens.length
+  return coverLine >= 0.45 || coverSummary >= 0.45
 }

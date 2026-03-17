@@ -17,10 +17,12 @@ import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageW
 import {
   extractJsonObject,
   normalizeOpName,
-  normalizePlanCandidate
+  normalizePlanCandidate,
+  repairJson
 } from "../nlp/plan-normalizer.js"
 import {
   buildPlannerSchemaContext,
+  extractUpdatePropsFieldDraftsFromPlanBuffer,
   extractOpsFromPlanBuffer,
   extractSummaryFromPlanBuffer,
   isChatStrictPrimaryOpMode,
@@ -122,7 +124,10 @@ export async function parseIntentWithAnthropic(args: {
 export type PlannerAnthropicClient = {
   messages: {
     create: (args: unknown) => Promise<Anthropic.Messages.Message>
-    stream?: (args: unknown) => AsyncIterable<unknown> & { finalMessage: () => Promise<unknown> }
+    stream?: (
+      args: unknown,
+      options?: { headers?: Record<string, string> }
+    ) => AsyncIterable<unknown> & { finalMessage: () => Promise<unknown> }
   }
 }
 
@@ -169,6 +174,7 @@ export async function generatePlanWithAnthropic(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
+  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
   onChangeLogEntry?: (entry: string) => void
@@ -203,12 +209,16 @@ export async function generatePlanWithAnthropic(args: {
     "You are an editing planner for a website builder.",
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
+    "Emit top-level keys in this exact order: intent, summary_for_user, change_log, ops, suggested_next_actions. Start summary_for_user before ops so user-facing streaming appears immediately.",
     "If request is ambiguous, return intent=needs_clarification and no ops.",
+    "Requests for structured data (schema.org), JSON-LD, microdata, or rich snippets are outside the editor's capabilities — they require code changes. Return intent=needs_clarification explaining this, and suggest using update_page_meta to improve SEO metadata (title, description) instead.",
     "If the user asks a read-only question about page content (e.g. 'list all CTA buttons', 'what images are on this page', 'show me all links and their URLs', 'how many sections are there'), return intent=content_answer with empty ops[]. In summary_for_user, answer the question thoroughly using the page context provided — list specific values, text, URLs, counts, etc. Use markdown tables or bullet lists for clarity. In change_log, include one entry per item found. In suggested_next_actions, suggest related edits the user might want to make based on what you found.",
     "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
     "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
+    "For edit_plan intent: summary_for_user must be ONE short sentence (max ~20 words) confirming what will happen. Do NOT elaborate, explain why, or describe the content being added — let change_log carry the detail. Bad: 'I'll add a RichText section about blueberry varieties right after the FeatureGrid.' Good: 'Adding a **text section** about blueberry varieties after the features grid.'",
+    "change_log entries should add specific detail NOT already in summary_for_user — e.g. list the actual content, items, or values being set. Do not paraphrase the summary.",
     "In summary_for_user, use simple markdown for readability: **bold** for key terms or labels, and bullet lists (- item) when listing multiple items, recommendations, or observations. Keep it scannable — avoid walls of text.",
     "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page, update_page_meta, update_site_config.",
     "Use update_page_meta to set SEO metadata (title, description, ogImage) on a page. Patch is merge-patch: only supplied keys update. Set a field to empty string to clear it.",
@@ -227,6 +237,7 @@ export async function generatePlanWithAnthropic(args: {
     "If the user asks to create a page showcasing, demonstrating, or featuring all available components/block types (even with typos like 'componenzs'), generate a create_page op containing one block of each allowed block type. Fill all block props with themed sample content matching the user's topic. This is a clear, actionable request — do not return needs_clarification.",
     "For add_block, use exact prop names from blockContracts. Common mistakes: use 'title' not 'heading' for section titles (except Hero which uses 'heading'), use 'q'/'a' not 'question'/'answer' for FAQ items, use 'quote' not 'testimonial' for Testimonials items.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
+    "For update_props object key order, emit keys exactly as: op, pageSlug (if present), blockId, patch.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
@@ -266,7 +277,7 @@ export async function generatePlanWithAnthropic(args: {
         ]
       : []),
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
-    "Never mention internal block IDs (b_hero_*, b_featuregrid_*, etc.), prop names (imageUrl, imageAlt), or system settings in summary_for_user or change_log. Use human-friendly descriptions instead (e.g. 'Update the Hero image' not 'Update imageUrl on b_hero_123').",
+    "Never mention internal block IDs (b_hero_*, b_featuregrid_*, etc.), prop names (imageUrl, imageAlt), or system settings in summary_for_user, change_log, or suggested_next_actions. Also avoid raw block type names like 'RichText', 'FeatureGrid', 'CardGrid', 'FAQAccordion' — use natural descriptions instead: 'text section', 'features grid', 'card grid', 'FAQ section'. Exception: 'Hero', 'CTA', and 'Testimonials' are fine as-is since users understand these terms.",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
@@ -284,7 +295,8 @@ export async function generatePlanWithAnthropic(args: {
     batchOverride ||
     pageWideTranslation ||
     /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
-    /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/.test(args.message.toLowerCase())
+    /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
+    /\d{2,3}\s*char/i.test(args.message)
   const schemaContext = buildPlannerSchemaContext({
     message: args.message,
     contextPack: args.contextPack,
@@ -324,7 +336,11 @@ export async function generatePlanWithAnthropic(args: {
   const submitPlanToolDef: Anthropic.Messages.Tool = {
     name: "submit_edit_plan",
     description: "Submit the structured EditPlan JSON.",
-    input_schema: editPlanJsonSchema
+    input_schema: editPlanJsonSchema,
+    eager_input_streaming: true
+  }
+  const anthropicFineGrainedStreamHeaders = {
+    "anthropic-beta": "fine-grained-tool-streaming-2025-05-14"
   }
   const runtimeToolNameByAlias = new Map<string, string>()
   const usedAliases = new Set<string>(["submit_edit_plan"])
@@ -351,7 +367,38 @@ export async function generatePlanWithAnthropic(args: {
   let streamedOpsCount = 0
   let lastSummaryLen = 0
   let emittedChangeLogCount = 0
+  const emittedFieldDraftByKey = new Map<string, string>()
   const maxToolTurns = 6
+  const emitProgressFromToolJson = (toolJsonBuf: string) => {
+    if (args.onFieldDraft) {
+      const fieldDrafts = extractUpdatePropsFieldDraftsFromPlanBuffer(toolJsonBuf)
+      for (const draft of fieldDrafts) {
+        const key = `${draft.opIndex}:${draft.blockId}:${draft.editablePath}`
+        const prev = emittedFieldDraftByKey.get(key)
+        if (prev === draft.value) continue
+        emittedFieldDraftByKey.set(key, draft.value)
+        args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value })
+      }
+    }
+    if (args.onSummaryChunk || args.onChangeLogEntry) {
+      const extracted = extractSummaryFromPlanBuffer(toolJsonBuf)
+      if (extracted.summary && extracted.summary.length > lastSummaryLen) {
+        args.onSummaryChunk?.(extracted.summary.slice(lastSummaryLen))
+        lastSummaryLen = extracted.summary.length
+      }
+      for (let i = emittedChangeLogCount; i < extracted.changeLog.length; i++) {
+        args.onChangeLogEntry?.(extracted.changeLog[i]!)
+      }
+      emittedChangeLogCount = extracted.changeLog.length
+    }
+    if (args.onPlannedOp) {
+      const next = extractOpsFromPlanBuffer(toolJsonBuf, streamedOpsCount)
+      streamedOpsCount = next.nextEmittedCount
+      for (let idx = 0; idx < next.newOps.length; idx += 1) {
+        args.onPlannedOp(next.newOps[idx]!, streamedOpsCount - next.newOps.length + idx + 1)
+      }
+    }
+  }
 
   if (runtimeTools.length > 0) {
     const loopMessages: Anthropic.MessageParam[] = [
@@ -360,14 +407,62 @@ export async function generatePlanWithAnthropic(args: {
     ]
 
     for (let turn = 0; turn < maxToolTurns; turn += 1) {
-      const response = await client.messages.create({
-        model: args.model,
-        max_tokens: 8192,
-        system: anthropicSystemPromptWithCache(system),
-        tools: toolDefs,
-        tool_choice: { type: "auto" },
-        messages: loopMessages
-      })
+      let response: Anthropic.Messages.Message
+      let emittedTextDeltas = false
+      if (client.messages.stream) {
+        const stream = client.messages.stream({
+          model: args.model,
+          max_tokens: 8192,
+          system: anthropicSystemPromptWithCache(system),
+          tools: toolDefs,
+          tool_choice: { type: "auto" },
+          messages: loopMessages
+        }, {
+          headers: anthropicFineGrainedStreamHeaders
+        })
+        const toolNameByIndex = new Map<number, string>()
+        const submitToolJsonByIndex = new Map<number, string>()
+        for await (const event of stream as AsyncIterable<{
+          type?: string
+          index?: number
+          content_block?: { type?: string; name?: string }
+          delta?: { type?: string; partial_json?: string; text?: string }
+        }>) {
+          if (event.type === "content_block_start") {
+            const idx = typeof event.index === "number" ? event.index : -1
+            if (idx >= 0 && event.content_block?.type === "tool_use" && typeof event.content_block.name === "string") {
+              toolNameByIndex.set(idx, event.content_block.name)
+            }
+            continue
+          }
+          if (event.type !== "content_block_delta") continue
+          if (event.delta?.type === "text_delta") {
+            const text = event.delta.text ?? ""
+            if (text.length > 0) {
+              emittedTextDeltas = true
+              args.onToken?.(text)
+            }
+            continue
+          }
+          if (event.delta?.type !== "input_json_delta") continue
+          const idx = typeof event.index === "number" ? event.index : -1
+          if (idx < 0 || toolNameByIndex.get(idx) !== "submit_edit_plan") continue
+          const nextBuf = (submitToolJsonByIndex.get(idx) ?? "") + (event.delta.partial_json ?? "")
+          submitToolJsonByIndex.set(idx, nextBuf)
+          emitProgressFromToolJson(nextBuf)
+        }
+        const finalMessage = await stream.finalMessage()
+        response = finalMessage as Anthropic.Messages.Message
+      } else {
+        response = await client.messages.create({
+          model: args.model,
+          max_tokens: 8192,
+          system: anthropicSystemPromptWithCache(system),
+          tools: toolDefs,
+          tool_choice: { type: "auto" },
+          messages: loopMessages
+        })
+      }
       usage = sumTokenUsage(usage, extractUsage(response))
 
       if ((response as { stop_reason?: string }).stop_reason === "max_tokens") {
@@ -381,9 +476,11 @@ export async function generatePlanWithAnthropic(args: {
         throw new Error("Model response was truncated (max_tokens reached)")
       }
 
-      for (const block of response.content) {
-        if (block.type === "text" && "text" in block && typeof block.text === "string" && args.onToken) {
-          args.onToken(block.text)
+      if (args.onToken && !emittedTextDeltas) {
+        for (const block of response.content) {
+          if (block.type === "text" && "text" in block && typeof block.text === "string") {
+            args.onToken(block.text)
+          }
         }
       }
 
@@ -490,6 +587,8 @@ export async function generatePlanWithAnthropic(args: {
           ...historyMessages,
           { role: "user", content: userContent }
         ],
+      }, {
+        headers: anthropicFineGrainedStreamHeaders
       })
       for await (const event of stream as AsyncIterable<{
         type?: string
@@ -498,24 +597,7 @@ export async function generatePlanWithAnthropic(args: {
         if (event.type === "content_block_delta") {
           if (event.delta?.type === "input_json_delta") {
             toolJsonBuf += event.delta.partial_json ?? ""
-            if (args.onSummaryChunk || args.onChangeLogEntry) {
-              const extracted = extractSummaryFromPlanBuffer(toolJsonBuf)
-              if (extracted.summary && extracted.summary.length > lastSummaryLen) {
-                args.onSummaryChunk?.(extracted.summary.slice(lastSummaryLen))
-                lastSummaryLen = extracted.summary.length
-              }
-              for (let i = emittedChangeLogCount; i < extracted.changeLog.length; i++) {
-                args.onChangeLogEntry?.(extracted.changeLog[i]!)
-              }
-              emittedChangeLogCount = extracted.changeLog.length
-            }
-            if (args.onPlannedOp) {
-              const next = extractOpsFromPlanBuffer(toolJsonBuf, streamedOpsCount)
-              streamedOpsCount = next.nextEmittedCount
-              for (let idx = 0; idx < next.newOps.length; idx += 1) {
-                args.onPlannedOp(next.newOps[idx]!, streamedOpsCount - next.newOps.length + idx + 1)
-              }
-            }
+            emitProgressFromToolJson(toolJsonBuf)
           } else if (event.delta?.type === "text_delta") {
             textBuf += event.delta.text ?? ""
             args.onToken(event.delta.text ?? "")
@@ -542,18 +624,31 @@ export async function generatePlanWithAnthropic(args: {
         try {
           parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
         } catch {
-          args.log?.warn({
-            event: "anthropic_planner_malformed_tool_json",
-            model: args.model,
-            toolJsonBufPreview: toolJsonBuf.slice(0, 500),
-            toolJsonBufLength: toolJsonBuf.length
-          }, "Anthropic planner: malformed JSON from tool stream, falling through to text extraction")
-          // Fall through to text extraction
+          // Try JSON repair before falling through
+          try {
+            parsed = JSON.parse(repairJson(toolJsonBuf)) as Record<string, unknown>
+            args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model }, "Anthropic planner: repaired malformed tool JSON")
+          } catch {
+            args.log?.warn({
+              event: "anthropic_planner_malformed_tool_json",
+              model: args.model,
+              toolJsonBufPreview: toolJsonBuf.slice(0, 500),
+              toolJsonBufLength: toolJsonBuf.length
+            }, "Anthropic planner: malformed JSON from tool stream, falling through to text extraction")
+          }
         }
       }
       if (!parsed && textBuf.length > 0) {
         const jsonText = extractJsonObject(textBuf)
-        if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+        if (jsonText) {
+          try {
+            parsed = JSON.parse(jsonText) as Record<string, unknown>
+          } catch {
+            try {
+              parsed = JSON.parse(repairJson(jsonText)) as Record<string, unknown>
+            } catch { /* fall through to non-parsed state */ }
+          }
+        }
       }
     } else {
       const response = await client.messages.create({

@@ -142,3 +142,150 @@ test("generatePlanWithAnthropic executes runtime tool calls before submit_edit_p
   assert.deepEqual(executedTools, ["unsplash.search"])
   assert.equal(usage.totalTokens, 27)
 })
+
+test("generatePlanWithAnthropic streams submit_edit_plan progress in runtime tool loop", async () => {
+  const registry = new ToolRegistry()
+  registry.registerBuiltin(
+    {
+      name: "unsplash.search",
+      description: "Search",
+      capability: "read",
+      timeoutMs: 1000,
+      retryPolicy: { maxAttempts: 1 },
+      idempotent: true,
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["query"],
+        properties: { query: { type: "string" } }
+      },
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["items"],
+        properties: {
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["imageUrl"],
+              properties: { imageUrl: { type: "string" } }
+            }
+          }
+        }
+      }
+    },
+    async () => ({ items: [{ imageUrl: "https://images.unsplash.com/photo-1" }] })
+  )
+  const runtime: ToolRuntime = {
+    registry,
+    executor: new ToolExecutor(registry, { info: () => {}, warn: () => {} }),
+    defaultPolicy: { autoRunRead: true, requireApprovalForWrite: true }
+  }
+
+  const finalInput = {
+    intent: "edit_plan",
+    summary_for_user: "Will update hero heading",
+    change_log: ["Will update hero heading."],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/",
+        blockId: "b_hero_home",
+        patch: { heading: "Hello" }
+      }
+    ]
+  }
+
+  let createCalls = 0
+  let streamCalls = 0
+  const client: PlannerAnthropicClient = {
+    messages: {
+      create: async () => {
+        createCalls += 1
+        throw new Error("messages.create should not be used when stream is available")
+      },
+      stream: () => {
+        streamCalls += 1
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield {
+              type: "content_block_start",
+              index: 0,
+              content_block: { type: "tool_use", id: "toolu_submit", name: "submit_edit_plan", input: {} }
+            }
+            yield {
+              type: "content_block_delta",
+              index: 0,
+              delta: { type: "input_json_delta", partial_json: '{"intent":"edit_plan","summary_for_user":"Will update hero heading","change_log":["Will update hero heading."],"ops":[{"op":"update_props","pageSlug":"/","blockId":"b_hero_home","patch":{"heading":"H' }
+            }
+            yield {
+              type: "content_block_delta",
+              index: 0,
+              delta: { type: "input_json_delta", partial_json: "el" }
+            }
+            yield {
+              type: "content_block_delta",
+              index: 0,
+              delta: { type: "input_json_delta", partial_json: 'lo"}}]}' }
+            }
+          },
+          finalMessage: async () =>
+            ({
+              stop_reason: "tool_use",
+              content: [
+                {
+                  type: "tool_use",
+                  id: "toolu_submit",
+                  name: "submit_edit_plan",
+                  input: finalInput
+                }
+              ],
+              usage: { input_tokens: 7, output_tokens: 5, total_tokens: 12 }
+            }) as unknown as Anthropic.Messages.Message
+        } as unknown as AsyncIterable<unknown> & { finalMessage: () => Promise<unknown> }
+      }
+    }
+  }
+
+  const streamedFieldValues: string[] = []
+  let streamedSummary = ""
+  const streamedChanges: string[] = []
+
+  const { plan } = await generatePlanWithAnthropic({
+    message: "rewrite hero heading",
+    slug: "/",
+    currentPage: makePage(),
+    contextPack: {
+      route: "/",
+      pageRoutes: ["/"],
+      selected: { blockId: "b_hero_home", editablePath: "heading", block: null },
+      neighbors: { previous: null, next: null },
+      pageOutline: [{ id: "b_hero_home", type: "Hero", props: { heading: "Welcome" }, arrayProps: [] }],
+      resolvedReferences: { target: null, anchor: null, mentionedBlocks: [] },
+      recentSuccessfulEdits: []
+    } as unknown as ReturnType<typeof plannerContextPack>,
+    model: "claude-sonnet-4-6",
+    toolRuntime: runtime,
+    onToken: () => {},
+    onFieldDraft: (draft) => {
+      if (draft.blockId === "b_hero_home" && draft.editablePath === "heading") streamedFieldValues.push(draft.value)
+    },
+    onSummaryChunk: (text) => {
+      streamedSummary += text
+    },
+    onChangeLogEntry: (entry) => {
+      streamedChanges.push(entry)
+    },
+    client
+  })
+
+  assert.equal(createCalls, 0)
+  assert.equal(streamCalls, 1)
+  assert.equal(plan.intent, "edit_plan")
+  assert.equal(plan.ops[0]?.op, "update_props")
+  assert.ok(streamedFieldValues.includes("H"))
+  assert.equal(streamedFieldValues[streamedFieldValues.length - 1], "Hello")
+  assert.ok(streamedSummary.includes("Will update hero heading"))
+  assert.ok(streamedChanges.some((entry) => entry.includes("update hero heading")))
+})

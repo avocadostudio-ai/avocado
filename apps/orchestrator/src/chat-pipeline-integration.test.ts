@@ -1287,6 +1287,101 @@ test("chat stream emits op_applied events for mocked multi-op plan", async (t) =
   assert.equal(result?.status, "applied")
 })
 
+test("chat stream emits field_draft events before op_applied for mocked planner drafts", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Updated hero heading.",
+    change_log: ["Changed hero heading."],
+    ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: `Streaming ${Date.now()}` } }]
+  }
+  setGeneratePlanWithOpenAIForTests(async (args) => {
+    args.onFieldDraft?.({ blockId: "b_hero_home", editablePath: "heading", value: "S" })
+    args.onFieldDraft?.({ blockId: "b_hero_home", editablePath: "heading", value: "St" })
+    args.onFieldDraft?.({ blockId: "b_hero_home", editablePath: "heading", value: "Str" })
+    return { plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
+  })
+
+  const response = await app.inject({
+    method: "GET",
+    url: `/chat/stream?session=${encodeURIComponent(session)}&slug=${encodeURIComponent("/")}&message=${encodeURIComponent("update hero heading")}`
+  })
+  assert.equal(response.statusCode, 200)
+
+  const events = parseSseData(response.body)
+  const fieldDraftEvents = events.filter((event) => event.type === "field_draft")
+  assert.equal(fieldDraftEvents.length, 3)
+  assert.deepEqual(fieldDraftEvents.map((event) => event.value), ["S", "St", "Str"])
+
+  const firstFieldDraftIndex = events.findIndex((event) => event.type === "field_draft")
+  const firstOpAppliedIndex = events.findIndex((event) => event.type === "op_applied")
+  assert.ok(firstFieldDraftIndex >= 0, "expected at least one field_draft event")
+  assert.ok(firstOpAppliedIndex >= 0, "expected op_applied event")
+  assert.ok(firstFieldDraftIndex < firstOpAppliedIndex, "field_draft should be emitted before op_applied")
+})
+
+test("chat stream afterSeq replay includes field_draft events", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Updated hero heading.",
+    change_log: ["Changed hero heading."],
+    ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: `Replay ${Date.now()}` } }]
+  }
+  setGeneratePlanWithOpenAIForTests(async (args) => {
+    args.onFieldDraft?.({ blockId: "b_hero_home", editablePath: "heading", value: "R" })
+    args.onFieldDraft?.({ blockId: "b_hero_home", editablePath: "heading", value: "Re" })
+    return { plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }
+  })
+
+  const startRes = await app.inject({
+    method: "POST",
+    url: "/chat/start",
+    headers: { "content-type": "application/json" },
+    payload: { session, slug: "/", message: "update hero heading replay" }
+  })
+  assert.equal(startRes.statusCode, 200)
+  const { streamId } = startRes.json() as { streamId: string }
+
+  const streamRes = await app.inject({
+    method: "GET",
+    url: `/chat/stream?streamId=${streamId}`
+  })
+  assert.equal(streamRes.statusCode, 200)
+  const events = parseSseData(streamRes.body)
+  const firstFieldDraft = events.find((event) => event.type === "field_draft" && typeof event._seq === "number")
+  assert.ok(firstFieldDraft, "expected a field_draft event with sequence number")
+  const firstFieldDraftSeq = Number(firstFieldDraft._seq)
+  assert.ok(Number.isFinite(firstFieldDraftSeq) && firstFieldDraftSeq > 0)
+
+  const replayRes = await app.inject({
+    method: "GET",
+    url: `/chat/stream?streamId=${streamId}&afterSeq=${firstFieldDraftSeq - 1}`
+  })
+  assert.equal(replayRes.statusCode, 200)
+  const replayEvents = parseSseData(replayRes.body)
+  assert.ok(
+    replayEvents.some((event) => event.type === "field_draft"),
+    "expected replay to include at least one field_draft event"
+  )
+})
+
 test("chat telemetry includes received -> plan_generated -> result phases for mocked planner run", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"

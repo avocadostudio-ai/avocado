@@ -65,7 +65,7 @@ function reorderCreatePageFirst(ops: unknown[]): unknown[] {
 }
 
 // ---------------------------------------------------------------------------
-// JSON extraction
+// JSON extraction & repair
 // ---------------------------------------------------------------------------
 
 export function extractJsonObject(input: string) {
@@ -73,6 +73,22 @@ export function extractJsonObject(input: string) {
   const end = input.lastIndexOf("}")
   if (start === -1 || end === -1 || end <= start) return null
   return input.slice(start, end + 1)
+}
+
+/**
+ * Attempt to repair common JSON malformations from LLM output:
+ * - Bare `-` used as markdown bullets inside arrays: `[- "item"]` → `["item"]`
+ * - Trailing commas before `]` or `}`
+ * Returns repaired string or original if no repair was needed.
+ */
+export function repairJson(raw: string): string {
+  let result = raw
+  // Fix markdown bullets inside JSON arrays: [- "...", - "..."] → ["...", "..."]
+  // Match `- ` after `[` or `,` (with optional whitespace) when not inside a string
+  result = result.replace(/(\[|,)\s*-\s+(?=")/g, "$1 ")
+  // Fix trailing commas: [item,] or {key: value,}
+  result = result.replace(/,\s*([}\]])/g, "$1")
+  return result
 }
 
 // ---------------------------------------------------------------------------
