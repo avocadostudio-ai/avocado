@@ -66,7 +66,7 @@ sequenceDiagram
     participant Build as Vercel Build
 
     Note over Build: Build time (on deploy)
-    Build->>+Orchestrator: GET /publish/content?session=dev
+    Build->>+Orchestrator: GET /publish/content?session=dev&siteId=avocado-stories
     Orchestrator-->>-Build: { pages: [...] }
     Build->>Build: Write published-content.json
     Build->>Build: next build → generateStaticParams() → SSG

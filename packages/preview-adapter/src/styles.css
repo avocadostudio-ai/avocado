@@ -26,11 +26,11 @@
   mix-blend-mode: screen;
 }
 
-[data-editor-active] .editor-selectable:hover {
+[data-editor-selection-mode] .editor-selectable:hover {
   cursor: pointer;
 }
 
-[data-editor-active] .editor-selectable:hover::before {
+[data-editor-selection-mode] .editor-selectable:hover::before {
   opacity: 1;
   inset: 0;
   border: var(--editor-selected-border-width) solid rgb(var(--editor-accent-rgb));
@@ -88,15 +88,15 @@
   letter-spacing: 0.02em;
 }
 
-[data-editor-active] .editor-selectable:hover > .editor-block-badge {
+[data-editor-selection-mode] .editor-selectable:hover > .editor-block-badge {
   opacity: 1;
 }
 
-[data-editor-active] .editor-selectable:hover > .editor-block-badge .editor-block-badge-label {
+[data-editor-selection-mode] .editor-selectable:hover > .editor-block-badge .editor-block-badge-label {
   background: rgba(var(--editor-accent-rgb), 0.97);
 }
 
-[data-editor-active] .editor-selectable:hover::after {
+[data-editor-selection-mode] .editor-selectable:hover::after {
   opacity: 1;
   background: rgba(var(--editor-accent-rgb), 0.97);
 }

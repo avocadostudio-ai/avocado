@@ -151,6 +151,7 @@ Environment variables:
 - `ORCHESTRATOR_URL` (optional): if set, site reads draft content from orchestrator; if missing or unavailable, site falls back to built-in published pages.
 - `SITE_RENDER_MODE` (`static` or `dynamic`): controls whether this route prebuilds known published slugs (`static`) or skips static slug generation (`dynamic`).
 - `SITE_PUBLISH_SESSION` (default `dev`): session that static build sync pulls from orchestrator.
+- `SITE_PUBLISH_SITE_ID` (required when `ORCHESTRATOR_URL` is set): site namespace used for `/publish/content` sync.
 - `DRAFT_MODE_SECRET` (required for draft preview entry via `/api/draft`)
 - `NEXT_PUBLIC_ENABLE_EDITOR=0` (recommended for public site)
 - `NEXT_PUBLIC_EDITOR_ORIGIN` (optional; only relevant when editor mode is enabled)

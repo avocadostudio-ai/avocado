@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp, Check, Mic, Plus, Square, X } from "lucide-react"
+import { ArrowUp, Check, Mic, MousePointerClick, Plus, Square, X } from "lucide-react"
 
 type Props = {
   message: string
@@ -12,10 +12,12 @@ type Props = {
   onUploadImage: (blob: Blob, mimeType: string) => Promise<string>
   onCancel?: () => void
   onAutoHeightChange: (height: number) => void
+  selectionModeEnabled?: boolean
+  onToggleSelectionMode?: () => void
 }
 
 export default function ClaudeStyleChatInput(props: Props) {
-  const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange } = props
+  const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange, selectionModeEnabled, onToggleSelectionMode } = props
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -263,7 +265,7 @@ export default function ClaudeStyleChatInput(props: Props) {
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}
-          placeholder="Ask anything"
+          placeholder="Ask for a change"
           value={message}
           onChange={(e) => {
             onMessageChange(e.target.value)
@@ -299,15 +301,29 @@ export default function ClaudeStyleChatInput(props: Props) {
       </div>
       <div className="composer-actions">
         {!isRecording && (
-          <button
-            type="button"
-            className="composer-ghost-btn composer-plus-btn"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || isUploadingImage || isAnalyzingImage}
-            aria-label="Add image"
-          >
-            <Plus size={16} />
-          </button>
+          <>
+            <button
+              type="button"
+              className="composer-ghost-btn composer-plus-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploadingImage || isAnalyzingImage}
+              aria-label="Add image"
+            >
+              <Plus size={16} />
+            </button>
+            {onToggleSelectionMode && (
+              <button
+                type="button"
+                className={`composer-ghost-btn composer-selector-btn${selectionModeEnabled ? " is-active" : ""}`}
+                onClick={onToggleSelectionMode}
+                disabled={isLoading}
+                aria-label={selectionModeEnabled ? "Exit selector mode" : "Select an element"}
+                aria-pressed={selectionModeEnabled}
+              >
+                <MousePointerClick size={16} />
+              </button>
+            )}
+          </>
         )}
         <div className="composer-actions-spacer" />
         <div className="composer-actions-right" role="group" aria-label="Voice and send actions">

@@ -74,7 +74,7 @@ export function parseCreatePageRequest(message: string) {
   if (!hasPageWord) return null
   const explicitCreatePhrase =
     /\b(create|generate|make|build|draft)\b[^.\n]{0,24}\b(new\s+)?pages?\b/.test(lower) ||
-    /\badd\s+(a\s+|new\s+)pages?\b/.test(lower) ||
+    /\badd\s+(a\s+)?(new\s+)?[^.\n]{0,24}\bpages?\b/.test(lower) ||
     /\bnew\s+pages?\b/.test(lower)
   const hasCreateVerb = /\b(create|generate|add|make|build|draft)\b/.test(lower)
   const hasRouteHint = /\/[a-z0-9/_-]*/i.test(stripped)

@@ -15,7 +15,7 @@ import { usePageMeta } from "./hooks/usePageMeta"
 import { PropertyPanel } from "./components/PropertyPanel"
 import { useComponentManifest } from "./hooks/useComponentManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
-import { allowedBlockTypes, getAllBlockMeta, isImagePath, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
+import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
 import { fieldAiSuggestions, fieldAiQuickActions } from "./lib/field-ai-suggestions"
 import { manifestUnavailableChanges } from "./lib/integration-context"
@@ -170,6 +170,7 @@ function EditorPage({
   const [imagePickerTarget, setImagePickerTarget] = useState<{ slug: string; blockId: string; editablePath: string; currentUrl?: string } | null>(null)
   const imagePickerOpen = imagePickerTarget !== null
   const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
+  const [selectionModeEnabled, setSelectionModeEnabled] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
   const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configModalTab, setConfigModalTab] = useState<"general" | "brief" | "deploy">("general")
@@ -341,6 +342,9 @@ function EditorPage({
       setActiveEditablePath(undefined)
       void chatEngine.moveListItem(newSlug, blockId, blockType, listKey, index, afterIndex)
     },
+    onOpenImagePicker: (newSlug, blockId, editablePath, currentUrl) => {
+      setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl })
+    },
     onInlineTextCommitted: (newSlug, blockId, editablePath, value) => {
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       if (editablePath) {
@@ -352,6 +356,23 @@ function EditorPage({
   }), [componentManifest.allowStructuralEdits, setSlugFromPreview, slug])
 
   const preview = usePreviewBridge(slug, previewCallbacks, activeSiteOrigin)
+
+  const toggleSelectionMode = useCallback((force?: boolean) => {
+    const next = force ?? !selectionModeEnabled
+    setSelectionModeEnabled(next)
+    preview.postToSite("setSelectionMode", { enabled: next })
+  }, [selectionModeEnabled, preview])
+
+  // Esc exits selection mode without clearing existing block selection
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectionModeEnabled) {
+        toggleSelectionMode(false)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [selectionModeEnabled, toggleSelectionMode])
 
   const chatEngine = useChatEngine({
     session,
@@ -1150,6 +1171,8 @@ function EditorPage({
             onUploadImage={media.uploadPastedImage}
             onCancel={chatEngine.cancelChat}
             onAutoHeightChange={handleComposerAutoHeight}
+            selectionModeEnabled={selectionModeEnabled}
+            onToggleSelectionMode={() => toggleSelectionMode()}
           />
         </footer>
       </aside>

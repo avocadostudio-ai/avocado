@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "node:test"
 import assert from "node:assert/strict"
 import type { PageDoc, Operation } from "@ai-site-editor/shared"
-import { draftPages } from "../state/session-state.js"
+import { draftPages, getSiteConfig, setSiteConfig } from "../state/session-state.js"
 import {
   applyOpsAtomically,
   validateOperations,
@@ -668,6 +668,23 @@ describe("ops-engine: atomicity", () => {
     seedSession(makePage())
     // An empty ops list produces no changes
     assert.throws(() => applyOpsAtomically(TEST_SESSION, []), /no changes/)
+  })
+
+  it("rolls back site config changes when a later op fails", () => {
+    seedSession(makePage())
+    setSiteConfig(TEST_SESSION, { name: "Original Name", logo: "/logos/original.svg", navLabels: { "/": "Home" } })
+
+    assert.throws(() =>
+      applyOpsAtomically(TEST_SESSION, [
+        { op: "update_site_config", patch: { name: "Should Not Persist", navLabels: { "/pricing": "Plans" } } },
+        { op: "remove_block", pageSlug: "/", blockId: "b_nonexistent" }
+      ])
+    )
+
+    const config = getSiteConfig(TEST_SESSION)
+    assert.equal(config.name, "Original Name")
+    assert.equal(config.logo, "/logos/original.svg")
+    assert.deepEqual(config.navLabels, { "/": "Home" })
   })
 })
 

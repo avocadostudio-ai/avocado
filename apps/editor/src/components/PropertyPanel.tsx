@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
+import { useState, useEffect, useCallback, useRef, useLayoutEffect, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
 import { getAllBlockMeta, DEFAULT_HEADING_LEVELS, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
@@ -756,6 +756,8 @@ function PageMetaFields({
         blockType="Page"
         value={pageMeta.title ?? ""}
         placeholder="Defaults to page title"
+        multiline
+        autosizeRows={{ min: 2, max: 2 }}
         recommendedMax={60}
         onCommit={(value) => onPageMetaChange("title", value)}
         onAiAssist={onAiAssist ? () => onAiAssist("SEO title", "text", pageMeta.title ?? "") : undefined}
@@ -770,6 +772,7 @@ function PageMetaFields({
         value={pageMeta.description ?? ""}
         placeholder="Defaults to generated description"
         multiline
+        autosizeRows={{ min: 3, max: 6 }}
         recommendedMax={160}
         onCommit={(value) => onPageMetaChange("description", value)}
         onAiAssist={onAiAssist ? () => onAiAssist("Meta description", "richtext", pageMeta.description ?? "") : undefined}
@@ -796,6 +799,7 @@ function PageMetaField({
   value,
   placeholder,
   multiline,
+  autosizeRows,
   recommendedMax,
   onCommit,
   onAiAssist,
@@ -809,6 +813,7 @@ function PageMetaField({
   value: string
   placeholder?: string
   multiline?: boolean
+  autosizeRows?: { min: number; max: number }
   recommendedMax?: number
   onCommit: (value: string) => void
   onAiAssist?: () => void
@@ -818,8 +823,40 @@ function PageMetaField({
 }) {
   const [local, setLocal] = useState(value)
   const [focused, setFocused] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const display = focused ? local : value
   const { debouncedCommit, flushCommit } = useDebouncedCommit(onCommit, 400)
+  const autosizeEnabled = multiline === true && autosizeRows != null
+
+  const syncTextareaHeight = useCallback(() => {
+    if (!autosizeEnabled || !textareaRef.current || !autosizeRows) return
+    const textarea = textareaRef.current
+    const styles = getComputedStyle(textarea)
+    const lineHeight = Number.parseFloat(styles.lineHeight)
+    const fontSize = Number.parseFloat(styles.fontSize) || 15
+    const effectiveLineHeight = Number.isFinite(lineHeight) ? lineHeight : fontSize * 1.2
+    const paddingY = (Number.parseFloat(styles.paddingTop) || 0) + (Number.parseFloat(styles.paddingBottom) || 0)
+    const borderY = (Number.parseFloat(styles.borderTopWidth) || 0) + (Number.parseFloat(styles.borderBottomWidth) || 0)
+    const minHeight = autosizeRows.min * effectiveLineHeight + paddingY + borderY
+    const maxHeight = autosizeRows.max * effectiveLineHeight + paddingY + borderY
+
+    textarea.style.height = "0px"
+    const naturalHeight = textarea.scrollHeight
+    const target = Math.max(minHeight, Math.min(maxHeight, naturalHeight))
+    textarea.style.height = `${target}px`
+    textarea.style.overflowY = naturalHeight > maxHeight ? "auto" : "hidden"
+  }, [autosizeEnabled, autosizeRows])
+
+  useLayoutEffect(() => {
+    syncTextareaHeight()
+  }, [syncTextareaHeight, display, focused, value])
+
+  useEffect(() => {
+    if (!autosizeEnabled) return
+    const onResize = () => syncTextareaHeight()
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [autosizeEnabled, syncTextareaHeight])
 
   const shared = {
     placeholder,
@@ -844,7 +881,12 @@ function PageMetaField({
       </div>
       <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
         {multiline ? (
-          <textarea className="property-field-textarea" rows={3} {...shared} />
+          <textarea
+            ref={autosizeEnabled ? textareaRef : undefined}
+            className={`property-field-textarea${autosizeEnabled ? " property-field-textarea--autosize" : ""}`}
+            rows={autosizeRows?.min ?? 3}
+            {...shared}
+          />
         ) : (
           <input type="text" className="property-field-input" {...shared} />
         )}

@@ -432,6 +432,8 @@ export function isHighConfidenceDeterministicCase(args: {
   if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
   // Counted multi-block add without enough named types → needs LLM for content generation
   if (action === "add" && isBatchAddRequest(raw) && extractMentionedBlockTypes(raw).length < 2) return false
+  // Case: page-level delete — "delete this page", "remove the page"
+  if (action === "remove" && /\b(delete|remove)\b.*\bpage\b/i.test(raw) && !inferBlockTypeFromText(raw)) return true
   if (action === "remove" && inferBlockTypeFromText(raw)) return true
   if (action === "remove" && args.activeBlockId && /\b(this|selected|it)\b/i.test(raw)) return true
   // "add CTA directing to recipes" = needs LLM for content-aware props

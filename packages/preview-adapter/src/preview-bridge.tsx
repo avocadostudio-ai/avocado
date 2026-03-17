@@ -7,7 +7,7 @@ import { isImagePath, type ApplyPatchMessage, type PatchAckMessage, type PatchRe
 type SiteMessage =
   | {
       protocol: "site-editor/v1"
-      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading"
+      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading" | "setSelectionMode"
       payload: Record<string, unknown>
     }
   | ({ protocol: "site-editor/v1" } & ApplyPatchMessage)
@@ -1078,6 +1078,10 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         )
         return
       }
+      // When selection mode is off, let clicks pass through to the page natively
+      const selectionModeOn = document.documentElement.hasAttribute("data-editor-selection-mode")
+      if (!selectionModeOn) return
+
       const node = target?.closest<HTMLElement>("[data-block-id]")
       if (!node) {
         const hadSelection = !!document.querySelector(".editor-highlight")
@@ -1170,6 +1174,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
     }
 
     const onDoubleClick = (event: MouseEvent) => {
+      if (!document.documentElement.hasAttribute("data-editor-selection-mode")) return
       const target = event.target as HTMLElement | null
       const childNode = target?.closest<HTMLElement>("[data-editable-target]")
       if (!childNode) return
@@ -1189,6 +1194,10 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
     }
 
     const onPointerMove = (event: PointerEvent) => {
+      if (!document.documentElement.hasAttribute("data-editor-selection-mode")) {
+        setHoveredListItem(null)
+        return
+      }
       if (childSelectionLockRef.current) {
         setHoveredListItem(null)
         return
@@ -1219,6 +1228,16 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const currentHref = `${window.location.pathname}${window.location.search}`
         if (href === currentHref) return
         router.push(href)
+        return
+      }
+
+      if (msg.type === "setSelectionMode") {
+        const enabled = !!msg.payload.enabled
+        if (enabled) {
+          document.documentElement.setAttribute("data-editor-selection-mode", "")
+        } else {
+          document.documentElement.removeAttribute("data-editor-selection-mode")
+        }
         return
       }
 
@@ -1494,6 +1513,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       window.removeEventListener("message", onMessage)
       document.querySelectorAll(".aifx-shimmer-overlay, .aifx-shimmer-sparkle, .editor-image-change-btn").forEach((el) => el.remove())
       document.documentElement.removeAttribute("data-editor-active")
+      document.documentElement.removeAttribute("data-editor-selection-mode")
     }
   }, [editorOrigin, router, slug])
 
