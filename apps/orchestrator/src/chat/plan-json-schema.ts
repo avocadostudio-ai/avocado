@@ -17,8 +17,8 @@ export const editPlanJsonSchema = {
   properties: {
     intent: {
       type: "string",
-      enum: ["edit_plan", "needs_clarification"],
-      description: "Whether this is a concrete edit plan or a clarification request."
+      enum: ["edit_plan", "needs_clarification", "content_answer"],
+      description: "Whether this is a concrete edit plan, a clarification request, or a read-only answer about page content."
     },
     summary_for_user: {
       type: "string",
