@@ -21,7 +21,8 @@ import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageW
 import {
   extractJsonObject,
   inferBlockTypeFromText,
-  normalizePlanCandidate
+  normalizePlanCandidate,
+  repairJson
 } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 import { editPlanJsonSchema, intentJsonSchema } from "./plan-json-schema.js"
@@ -253,7 +254,7 @@ export function buildPlannerSchemaContext(args: {
 }): { payload: PlannerSchemaContextPayload; meta: PlannerSchemaContextMeta } {
   const strictJsonEnabled = isStrictJsonResponseEnabled()
   const targetBlockTypes = pickTargetBlockTypes({ message: args.message, contextPack: args.contextPack })
-  const includePageMetaContract = /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/i.test(args.message)
+  const includePageMetaContract = /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/i.test(args.message) || /\d{2,3}\s*char/i.test(args.message)
 
   if (!isAdaptiveSchemaContextEnabled()) {
     const payload: PlannerSchemaContextPayload = args.legacyIncludeContracts
@@ -527,6 +528,219 @@ export function extractOpsFromPlanBuffer(raw: string, emittedCount: number) {
   }
 }
 
+export type StreamedFieldDraft = {
+  opIndex: number
+  blockId: string
+  editablePath: string
+  value: string
+}
+
+function decodeJsonStringFragment(fragment: string) {
+  let out = ""
+  for (let i = 0; i < fragment.length; i += 1) {
+    const ch = fragment[i]!
+    if (ch !== "\\") {
+      out += ch
+      continue
+    }
+    const next = fragment[i + 1]
+    if (!next) break
+    i += 1
+    if (next === "n") out += "\n"
+    else if (next === "t") out += "\t"
+    else if (next === "r") out += "\r"
+    else if (next === "b") out += "\b"
+    else if (next === "f") out += "\f"
+    else if (next === '"' || next === "\\" || next === "/") out += next
+    else if (next === "u") {
+      const hex = fragment.slice(i + 1, i + 5)
+      if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+        out += String.fromCharCode(Number.parseInt(hex, 16))
+        i += 4
+      }
+    } else {
+      out += next
+    }
+  }
+  return out
+}
+
+function parseJsonStringValueFragment(rawValue: string, closed: boolean) {
+  if (closed) {
+    try {
+      return JSON.parse(`"${rawValue}"`) as string
+    } catch {
+      // Fall through to permissive decoder for malformed edge fragments.
+    }
+  }
+  return decodeJsonStringFragment(rawValue)
+}
+
+function findFirstObjectLiteral(raw: string, fromIndex: number) {
+  let inString = false
+  let escape = false
+  let depth = 0
+  let objStart = -1
+  for (let i = fromIndex; i < raw.length; i += 1) {
+    const ch = raw[i]!
+    if (inString) {
+      if (escape) escape = false
+      else if (ch === "\\") escape = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') {
+      inString = true
+      continue
+    }
+    if (ch === "{") {
+      if (depth === 0) objStart = i
+      depth += 1
+      continue
+    }
+    if (ch === "}") {
+      if (depth > 0) depth -= 1
+      if (depth === 0 && objStart >= 0) {
+        return { body: raw.slice(objStart + 1, i), closed: true as const }
+      }
+      continue
+    }
+  }
+  if (objStart >= 0) {
+    return { body: raw.slice(objStart + 1), closed: false as const }
+  }
+  return null
+}
+
+function extractUpdatePropsDraftsFromPartialOp(raw: string, opIndex: number) {
+  const opMatch = /"op"\s*:\s*"((?:\\.|[^"\\])*)(?:"|$)/.exec(raw)
+  if (opMatch) {
+    const opClosed = opMatch[0].endsWith('"')
+    const opName = parseJsonStringValueFragment(opMatch[1] ?? "", opClosed).trim()
+    if (opName && opName !== "update_props") return [] as StreamedFieldDraft[]
+  } else if (/"(?:listKey|index)"\s*:/.test(raw)) {
+    // Ignore update_item-like partial ops before "op" arrives.
+    return [] as StreamedFieldDraft[]
+  }
+
+  const blockIdMatch = /"blockId"\s*:\s*"((?:\\.|[^"\\])*)(?:"|$)/.exec(raw)
+  if (!blockIdMatch) return [] as StreamedFieldDraft[]
+  const blockIdClosed = blockIdMatch[0].endsWith('"')
+  const blockId = parseJsonStringValueFragment(blockIdMatch[1] ?? "", blockIdClosed).trim()
+  if (!blockId) return [] as StreamedFieldDraft[]
+
+  const patchKeyIdx = raw.indexOf('"patch"')
+  if (patchKeyIdx < 0) return [] as StreamedFieldDraft[]
+  const patchObj = findFirstObjectLiteral(raw, patchKeyIdx)
+  if (!patchObj) return [] as StreamedFieldDraft[]
+
+  const drafts: StreamedFieldDraft[] = []
+  const entryRegex = /"([^"\\]+)"\s*:\s*"((?:\\.|[^"\\])*)(?:"|$)/g
+  let match: RegExpExecArray | null
+  while ((match = entryRegex.exec(patchObj.body)) !== null) {
+    const editablePath = match[1]?.trim()
+    if (!editablePath) continue
+    const fullMatch = match[0] ?? ""
+    const valueClosed = fullMatch.endsWith('"')
+    const value = parseJsonStringValueFragment(match[2] ?? "", valueClosed)
+    drafts.push({ opIndex, blockId, editablePath, value })
+  }
+  return drafts
+}
+
+function extractUpdatePropsDraftsFromCompleteOp(raw: string, opIndex: number) {
+  try {
+    const parsed = JSON.parse(raw) as Operation
+    if (parsed.op !== "update_props") return [] as StreamedFieldDraft[]
+    const blockId = String(parsed.blockId ?? "").trim()
+    if (!blockId) return [] as StreamedFieldDraft[]
+    const patch = parsed.patch && typeof parsed.patch === "object" ? parsed.patch as Record<string, unknown> : null
+    if (!patch) return [] as StreamedFieldDraft[]
+    return Object.entries(patch)
+      .filter(([, value]) => typeof value === "string")
+      .map(([editablePath, value]) => ({ opIndex, blockId, editablePath, value: value as string }))
+  } catch {
+    return [] as StreamedFieldDraft[]
+  }
+}
+
+export function extractUpdatePropsFieldDraftsFromPlanBuffer(raw: string) {
+  const opsKeyIdx = raw.indexOf('"ops"')
+  if (opsKeyIdx < 0) return [] as StreamedFieldDraft[]
+  const arrStart = raw.indexOf("[", opsKeyIdx)
+  if (arrStart < 0) return [] as StreamedFieldDraft[]
+
+  const objectSnippets: Array<{ opIndex: number; snippet: string; complete: boolean }> = []
+  let inString = false
+  let escape = false
+  let arrDepth = 0
+  let objDepth = 0
+  let objStart = -1
+  let objectCount = 0
+  let arrayClosed = false
+
+  for (let i = arrStart; i < raw.length; i += 1) {
+    const ch = raw[i]!
+    if (inString) {
+      if (escape) {
+        escape = false
+      } else if (ch === "\\") {
+        escape = true
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (ch === '"') {
+      inString = true
+      continue
+    }
+    if (ch === "[") {
+      arrDepth += 1
+      continue
+    }
+    if (ch === "]") {
+      if (arrDepth > 0) arrDepth -= 1
+      if (arrDepth === 0) {
+        arrayClosed = true
+        break
+      }
+      continue
+    }
+    if (arrDepth !== 1) continue
+
+    if (ch === "{") {
+      if (objDepth === 0) objStart = i
+      objDepth += 1
+      continue
+    }
+    if (ch === "}") {
+      if (objDepth > 0) objDepth -= 1
+      if (objDepth === 0 && objStart >= 0) {
+        objectCount += 1
+        objectSnippets.push({ opIndex: objectCount, snippet: raw.slice(objStart, i + 1), complete: true })
+        objStart = -1
+      }
+    }
+  }
+
+  if (!arrayClosed && arrDepth >= 1 && objDepth > 0 && objStart >= 0) {
+    objectCount += 1
+    objectSnippets.push({ opIndex: objectCount, snippet: raw.slice(objStart), complete: false })
+  }
+
+  const drafts: StreamedFieldDraft[] = []
+  for (const entry of objectSnippets) {
+    if (entry.complete) {
+      drafts.push(...extractUpdatePropsDraftsFromCompleteOp(entry.snippet, entry.opIndex))
+    } else {
+      drafts.push(...extractUpdatePropsDraftsFromPartialOp(entry.snippet, entry.opIndex))
+    }
+  }
+  return drafts
+}
+
 export async function parseIntentWithOpenAI(args: {
   message: string
   slug: string
@@ -601,6 +815,7 @@ export async function generatePlanWithOpenAI(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
+  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
   onChangeLogEntry?: (entry: string) => void
@@ -632,6 +847,7 @@ export async function generatePlanWithOpenAI(args: {
     "You are an editing planner for a website builder.",
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
+    "Emit top-level keys in this exact order: intent, summary_for_user, change_log, ops, suggested_next_actions. Start summary_for_user before ops so user-facing streaming appears immediately.",
     "If request is ambiguous, return intent=needs_clarification and no ops.",
     "If the user asks a read-only question about page content (e.g. 'list all CTA buttons', 'what images are on this page', 'show me all links and their URLs', 'how many sections are there'), return intent=content_answer with empty ops[]. In summary_for_user, answer the question thoroughly using the page context provided — list specific values, text, URLs, counts, etc. Use markdown tables or bullet lists for clarity. In change_log, include one entry per item found. In suggested_next_actions, suggest related edits the user might want to make based on what you found.",
     "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
@@ -639,6 +855,7 @@ export async function generatePlanWithOpenAI(args: {
     "Include any important assumption briefly in summary_for_user and change_log.",
     "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
     "In summary_for_user, use simple markdown for readability: **bold** for key terms or labels, and bullet lists (- item) when listing multiple items, recommendations, or observations. Keep it scannable — avoid walls of text.",
+    "Requests for structured data (schema.org), JSON-LD, microdata, or rich snippets are outside the editor's capabilities — they require code changes. Return intent=needs_clarification explaining this, and suggest using update_page_meta to improve SEO metadata (title, description) instead.",
     "Use only these operation names exactly: create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page, update_page_meta, update_site_config.",
     "Use update_page_meta to set SEO metadata (title, description, ogImage) on a page. Patch is merge-patch: only supplied keys update. Set a field to empty string to clear it.",
     "Use update_site_config to change the site name, logo URL, or navigation labels. Patch is merge-patch: only supplied keys update. navLabels is a slug→label map (e.g. { \"/pricing\": \"Plans & Pricing\" }).",
@@ -656,6 +873,7 @@ export async function generatePlanWithOpenAI(args: {
     "If the user asks to create a page showcasing, demonstrating, or featuring all available components/block types (even with typos like 'componenzs'), generate a create_page op containing one block of each allowed block type. Fill all block props with themed sample content matching the user's topic. This is a clear, actionable request — do not return needs_clarification.",
     "For add_block, use exact prop names from blockContracts. Common mistakes: use 'title' not 'heading' for section titles (except Hero which uses 'heading'), use 'q'/'a' not 'question'/'answer' for FAQ items, use 'quote' not 'testimonial' for Testimonials items.",
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
+    "For update_props object key order, emit keys exactly as: op, pageSlug (if present), blockId, patch.",
     "Do not return no-op updates: patch must change at least one effective value.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
@@ -707,7 +925,8 @@ export async function generatePlanWithOpenAI(args: {
     batchOverride ||
     pageWideTranslation ||
     /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
-    /\b(seo|meta|metadata|og\s*image|open\s*graph)\b/.test(args.message.toLowerCase())
+    /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
+    /\d{2,3}\s*char/i.test(args.message)
   const schemaContext = buildPlannerSchemaContext({
     message: args.message,
     contextPack: args.contextPack,
@@ -747,6 +966,7 @@ export async function generatePlanWithOpenAI(args: {
   let streamedOpsCount = 0
   let lastSummaryLen = 0
   let emittedChangeLogCount = 0
+  const emittedFieldDraftByKey = new Map<string, string>()
   if (isResponsesOnlyModel(args.model)) {
     const response = await client.responses.create({
       model: args.model,
@@ -790,6 +1010,16 @@ export async function generatePlanWithOpenAI(args: {
       if (typeof delta !== "string" || delta.length === 0) continue
       raw += delta
       args.onToken(delta)
+      if (args.onFieldDraft) {
+        const fieldDrafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
+        for (const draft of fieldDrafts) {
+          const key = `${draft.opIndex}:${draft.blockId}:${draft.editablePath}`
+          const prev = emittedFieldDraftByKey.get(key)
+          if (prev === draft.value) continue
+          emittedFieldDraftByKey.set(key, draft.value)
+          args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value })
+        }
+      }
       if (args.onSummaryChunk || args.onChangeLogEntry) {
         const extracted = extractSummaryFromPlanBuffer(raw)
         if (extracted.summary && extracted.summary.length > lastSummaryLen) {
@@ -848,8 +1078,16 @@ export async function generatePlanWithOpenAI(args: {
   let parsedJson: unknown
   try {
     parsedJson = JSON.parse(jsonText)
-  } catch {
-    throw toPlannerError("malformed_output", "Model returned malformed JSON", true)
+  } catch (err) {
+    // Attempt JSON repair before giving up
+    try {
+      parsedJson = JSON.parse(repairJson(jsonText))
+    } catch {
+      const posMatch = err instanceof SyntaxError ? /position (\d+)/i.exec(err.message) : null
+      const pos = posMatch?.[1]
+      const snippet = pos ? jsonText.slice(Math.max(0, Number(pos) - 30), Number(pos) + 30) : jsonText.slice(0, 200)
+      throw toPlannerError("malformed_output", `Model returned malformed JSON: ${(err as Error).message}. Near: …${snippet}…`, true)
+    }
   }
 
   const rawCandidateResult = rawPlanCandidateSchema.safeParse(parsedJson)

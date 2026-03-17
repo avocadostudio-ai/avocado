@@ -388,6 +388,13 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       const result = await runChatPipeline(pipelineCtx, scopedQuery, {
         signal: abortSignal,
         onPlanningToken: (token) => emit("token", { type: "token", text: token }),
+        onFieldDraft: (event) =>
+          emit("field_draft", {
+            type: "field_draft",
+            blockId: event.blockId,
+            editablePath: event.editablePath,
+            value: event.value
+          }),
         onSummaryChunk: (text) => emit("summary_token", { type: "summary_token", text }),
         onChangeLogEntry: (entry) => emit("changelog_entry", { type: "changelog_entry", entry }),
         onPlannedOp: (event) =>

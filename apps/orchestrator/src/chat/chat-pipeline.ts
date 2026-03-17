@@ -284,6 +284,7 @@ export async function runChatPipeline(
   body: ChatRequestBody,
   options?: {
     onPlanningToken?: (token: string) => void
+    onFieldDraft?: (event: { blockId: string; editablePath: string; value: string }) => void
     onPlannedOp?: (event: { index: number; op: Operation }) => void
     onSummaryChunk?: (text: string) => void
     onChangeLogEntry?: (entry: string) => void
@@ -516,7 +517,7 @@ export async function runChatPipeline(
   const onPlanningToken = (token: string) => {
     if (firstPlanningTokenMs === null) {
       firstPlanningTokenMs = Date.now() - pipelineStartedAtMs
-      emitStatus("Generating plan...")
+      emitStatusTone("generating_plan")
       if (!stageTimeline.some((item) => item.stage === "first_token")) {
         stageTimeline.push({ stage: "first_token", atMs: firstPlanningTokenMs })
       }
@@ -574,6 +575,78 @@ export async function runChatPipeline(
       },
       "Chat pipeline status update"
     )
+  }
+
+  type PipelineStatusTone =
+    | "analyzing"
+    | "planning"
+    | "understanding"
+    | "breaking_down"
+    | "generating_plan"
+    | "resolving_assets"
+    | "applying"
+    | "validating"
+    | "repairing"
+    | "thinking"
+
+  const pipelineStatusVariants: Record<PipelineStatusTone, readonly string[]> = {
+    analyzing: [
+      "Analyzing your request...",
+      "Reviewing your request...",
+      "Looking over your request..."
+    ],
+    planning: [
+      "Planning edits...",
+      "Drafting the edit plan...",
+      "Mapping out the changes..."
+    ],
+    understanding: [
+      "Understanding your request...",
+      "Interpreting your request...",
+      "Confirming intent..."
+    ],
+    breaking_down: [
+      "Breaking down your request...",
+      "Splitting your request into steps...",
+      "Organizing requested changes..."
+    ],
+    generating_plan: [
+      "Generating plan...",
+      "Composing edit plan...",
+      "Building execution plan..."
+    ],
+    resolving_assets: [
+      "Resolving image assets...",
+      "Collecting image assets...",
+      "Preparing image assets..."
+    ],
+    applying: [
+      "Applying changes...",
+      "Applying edits...",
+      "Updating draft..."
+    ],
+    validating: [
+      "Validating plan...",
+      "Checking plan integrity...",
+      "Reviewing plan safety..."
+    ],
+    repairing: [
+      "Repairing plan and retrying...",
+      "Fixing plan details and retrying...",
+      "Adjusting plan and trying again..."
+    ],
+    thinking: [
+      "Thinking...",
+      "Working through the request...",
+      "Refining the plan..."
+    ]
+  }
+  const pipelineStatusCursor = new Map<PipelineStatusTone, number>()
+  const emitStatusTone = (tone: PipelineStatusTone) => {
+    const variants = pipelineStatusVariants[tone]
+    const nextIdx = (pipelineStatusCursor.get(tone) ?? 0) % variants.length
+    pipelineStatusCursor.set(tone, nextIdx + 1)
+    emitStatus(variants[nextIdx] ?? variants[0] ?? "Working...")
   }
 
   const planningDurationMs = () =>
@@ -734,7 +807,7 @@ export async function runChatPipeline(
     }
   }
 
-  emitStatus("Analyzing your request...")
+  emitStatusTone("analyzing")
 
   // Content queries (read-only questions about page content) need full props for the LLM
   const contentQuery = body.message ? isContentQuery(body.message) : false
@@ -1006,7 +1079,7 @@ export async function runChatPipeline(
         // Keep legacy rewrite path as fallback only when native tool path did not already resolve image candidates.
         if (!usedNativeUnsplashTool && !usedNativeImageTool) {
           const imageResolutionStartMs = Date.now()
-          emitStatus("Resolving image assets...")
+          emitStatusTone("resolving_assets")
           resolvedPlan = await withUnsplashHeroImage({
             plan: resolvedPlan,
             message: plannerMessage,
@@ -1329,7 +1402,7 @@ export async function runChatPipeline(
       // could theoretically produce malformed ops; this catches them early.
       validateOperations(resolvedPlan.ops)
 
-      emitStatus("Applying changes...")
+      emitStatusTone("applying")
       applyStartedAtMs = Date.now()
       const hasPageStructuralOps = resolvedPlan.ops.some(
         (op) => op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
@@ -1706,7 +1779,7 @@ export async function runChatPipeline(
     try {
       if (pending.pendingImageOps && pending.pendingImageOps.length > 0) {
         const imageResolutionStartMs = Date.now()
-        emitStatus("Resolving image assets...")
+        emitStatusTone("resolving_assets")
         const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
         const planClone = structuredClone(approvalPlan)
 
@@ -1792,7 +1865,7 @@ export async function runChatPipeline(
   const applyMode = executionMode === "plan_only" ? "plan_only" : "apply_now"
 
   markPlanningStart()
-  emitStatus("Planning edits...")
+  emitStatusTone("planning")
   const forcedDuplicatePlan = deterministicDuplicatePagePlan({ session: body.session, message: plannerMessage, effectiveSlug })
   if (forcedDuplicatePlan) {
     markPlanningFinish()
@@ -1852,7 +1925,7 @@ export async function runChatPipeline(
   if (plannerSource === "demo") {
     markPlanningStart()
     try {
-      emitStatus("Planning edits...")
+      emitStatusTone("planning")
       const demoPlan = demoPlanFromMessageImpl(plannerMessage, effectiveSlug, planningActiveBlockId, body.activeBlockType)
       markPlanningFinish()
       const outcome = await respondFromPlan(demoPlan, "demo", applyMode, undefined, "demo")
@@ -1912,7 +1985,7 @@ export async function runChatPipeline(
     })
 
     if (deterministicIntent) {
-      emitStatus("Planning edits...")
+      emitStatusTone("planning")
       const deterministicPlan = compileDeterministicPlan({
         session: body.session,
         intent: deterministicIntent,
@@ -1968,7 +2041,7 @@ export async function runChatPipeline(
 
   if (shouldTryLlmIntentRouter) {
     try {
-      emitStatus("Understanding your request...")
+      emitStatusTone("understanding")
       const routerModel =
         ctx.modelLookup[provider]?.fast ??
         ctx.modelLookup[provider]?.balanced ??
@@ -1996,7 +2069,7 @@ export async function runChatPipeline(
               model: routerModel
             })
 
-      emitStatus("Planning edits...")
+      emitStatusTone("planning")
       const routedPlan = compileDeterministicPlan({
         session: body.session,
         intent: routedIntent,
@@ -2073,7 +2146,7 @@ export async function runChatPipeline(
     (plannerSource === "openai" || plannerSource === "anthropic")
   ) {
     try {
-      emitStatus("Breaking down your request...")
+      emitStatusTone("breaking_down")
       // Always use OpenAI for decomposition — it's a lightweight JSON task that
       // doesn't need the full Anthropic planner, and avoids model/provider mismatch.
       const decomposerModel =
@@ -2140,7 +2213,8 @@ export async function runChatPipeline(
     throwIfCanceled(options?.signal)
     planningAttempts = attempt
     try {
-      emitStatus(attempt === 1 ? "Thinking..." : `Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
+      if (attempt === 1) emitStatusTone("thinking")
+      else emitStatus(`Retrying plan generation (${attempt}/${maxPlanningAttempts})...`)
       const result = await raceCancel(generatePlanImpl({
         message: plannerMessage,
         slug: effectiveSlug,
@@ -2190,6 +2264,7 @@ export async function runChatPipeline(
           : undefined,
         log: ctx.log,
         onToken: onPlanningToken,
+        onFieldDraft: options?.onFieldDraft,
         onSummaryChunk: options?.onSummaryChunk,
         onChangeLogEntry: options?.onChangeLogEntry,
         onPlannedOp: incrementalPlanStreamEnabled
@@ -2210,7 +2285,7 @@ export async function runChatPipeline(
         plannerContextTelemetryFields.strictJsonEnabled = result.schemaContext.strictJsonEnabled
       }
       markPlanningFinish()
-      emitStatus("Validating plan...")
+      emitStatusTone("validating")
       break
     } catch (error) {
       if (isCancelError(error)) throw error
@@ -2382,7 +2457,7 @@ export async function runChatPipeline(
   let repairedPlan: EditPlan
   try {
     throwIfCanceled(options?.signal)
-    emitStatus("Repairing plan and retrying...")
+    emitStatusTone("repairing")
     ctx.chatTelemetry.push({
       id: chatRequestId,
       at: new Date().toISOString(),
@@ -2417,6 +2492,7 @@ export async function runChatPipeline(
       forceFullSchemaContracts: true,
       siteContextBlock,
       onToken: onPlanningToken,
+      onFieldDraft: options?.onFieldDraft,
       onSummaryChunk: options?.onSummaryChunk,
       onChangeLogEntry: options?.onChangeLogEntry,
       onPlannedOp: incrementalPlanStreamEnabled

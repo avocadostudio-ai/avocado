@@ -118,6 +118,9 @@ Pages Router support is not available — the SDK uses App Router APIs (`draftMo
 
 - [Chat troubleshooting playbook](docs/observability/chat-behavior-troubleshooting.md)
 - [Dev server runbook](docs/operations/dev-server-runbook.md)
+- [Avocado transformation demo runbook](docs/testing/avocado-transformation-demo-runbook.md)
+- `pnpm demo:avocado:check` (demo preflight verification)
+- `pnpm demo:60s:human` (headed, humanized Playwright demo run)
 - [Product improvement backlog](docs/planning/things-to-improve.md)
 
 ## Planner Command Test Set

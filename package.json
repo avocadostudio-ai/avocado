@@ -13,6 +13,7 @@
     "dev:logs": "./scripts/devctl.sh logs",
     "dev:doctor": "./scripts/devctl.sh doctor",
     "demo:avocado:check": "./scripts/demo-avocado-check.sh",
+    "demo:60s:human": "./scripts/demo-60s-humanized-playwright.sh",
     "docs:c4:render": "./scripts/render-c4.sh",
     "dev:site": "pnpm --filter @ai-site-editor/site dev",
     "dev:editor": "pnpm --filter @ai-site-editor/editor dev",

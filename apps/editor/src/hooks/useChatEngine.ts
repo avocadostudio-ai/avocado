@@ -141,6 +141,22 @@ export function useChatEngine(config: ChatEngineConfig) {
   const [streamingText, setStreamingText] = useState<string | null>(null)
   const [streamingChanges, setStreamingChanges] = useState<string[]>([])
   const [streamSteps, setStreamSteps] = useState<{ label: string; done: boolean }[]>([])
+  const [fieldDraftDebugEnabled, setFieldDraftDebugEnabled] = useState(false)
+  const [fieldDraftDebug, setFieldDraftDebug] = useState<{
+    eventsPerSecond: number
+    charsPerSecond: number
+    totalEvents: number
+    totalChars: number
+    typingLagChars: number
+    activeTarget: string | null
+  }>({
+    eventsPerSecond: 0,
+    charsPerSecond: 0,
+    totalEvents: 0,
+    totalChars: 0,
+    typingLagChars: 0,
+    activeTarget: null
+  })
 
   // Track last sent message so server-forced plan_only can populate pendingPlanMessage
   const lastSentMessageRef = useRef<string | null>(null)
@@ -373,9 +389,26 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftBlockId: string | null = activeBlockIdRef.current ?? null
       let liveDraftText = ""
       let liveDraftFlushTimer: number | null = null
+      let liveDraftTypingTimer: number | null = null
+      let liveDraftDeferredEndTimer: number | null = null
+      let liveDraftTypingTarget: { blockId: string; editablePath: string } | null = null
+      let liveDraftTypingRendered = ""
+      let liveDraftTypingDesired = ""
+      let liveDraftEndDeferred = false
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
+      let sawFieldDraftThisRun = false
       let currentStepLabel: string | null = null
+      const debugDraftEnabled = fieldDraftDebugEnabled
+      let debugFlushTimer: number | null = null
+      const debugFieldEventAtMs: number[] = []
+      const debugFieldCharAt: Array<{ at: number; chars: number }> = []
+      const debugPrevValueLenByField = new Map<string, number>()
+      let debugTotalFieldEvents = 0
+      let debugTotalFieldChars = 0
+      let debugTypingLagChars = 0
+      let debugActiveTarget: string | null = null
+      let debugNeedsFlush = false
 
       /** Advance the progress stepper: mark previous step done, add new active step */
       const normalizeStepLabel = (s: string) =>
@@ -415,6 +448,44 @@ export function useChatEngine(config: ChatEngineConfig) {
         })
       }
 
+      const clearDebugFlushTimer = () => {
+        if (debugFlushTimer === null) return
+        window.clearTimeout(debugFlushTimer)
+        debugFlushTimer = null
+      }
+
+      const flushFieldDraftDebug = () => {
+        if (!debugDraftEnabled || !debugNeedsFlush) return
+        debugNeedsFlush = false
+        const now = Date.now()
+        const windowStart = now - 1000
+        while (debugFieldEventAtMs.length > 0 && debugFieldEventAtMs[0]! < windowStart) {
+          debugFieldEventAtMs.shift()
+        }
+        while (debugFieldCharAt.length > 0 && debugFieldCharAt[0]!.at < windowStart) {
+          debugFieldCharAt.shift()
+        }
+        const charsPerSecond = debugFieldCharAt.reduce((sum, item) => sum + item.chars, 0)
+        setFieldDraftDebug({
+          eventsPerSecond: debugFieldEventAtMs.length,
+          charsPerSecond,
+          totalEvents: debugTotalFieldEvents,
+          totalChars: debugTotalFieldChars,
+          typingLagChars: debugTypingLagChars,
+          activeTarget: debugActiveTarget
+        })
+      }
+
+      const scheduleFieldDraftDebugFlush = () => {
+        if (!debugDraftEnabled) return
+        debugNeedsFlush = true
+        if (debugFlushTimer !== null) return
+        debugFlushTimer = window.setTimeout(() => {
+          debugFlushTimer = null
+          flushFieldDraftDebug()
+        }, 120)
+      }
+
       const clearLiveDraftTimer = () => {
         if (liveDraftFlushTimer === null) return
         window.clearTimeout(liveDraftFlushTimer)
@@ -429,8 +500,154 @@ export function useChatEngine(config: ChatEngineConfig) {
         }, 16)
       }
 
+      const clearLiveDraftTypingTimer = () => {
+        if (liveDraftTypingTimer === null) return
+        window.clearTimeout(liveDraftTypingTimer)
+        liveDraftTypingTimer = null
+      }
+
+      const clearLiveDraftDeferredEndTimer = () => {
+        if (liveDraftDeferredEndTimer === null) return
+        window.clearTimeout(liveDraftDeferredEndTimer)
+        liveDraftDeferredEndTimer = null
+      }
+
+      const resetLiveDraftTyping = () => {
+        clearLiveDraftTypingTimer()
+        clearLiveDraftDeferredEndTimer()
+        liveDraftEndDeferred = false
+        liveDraftTypingTarget = null
+        liveDraftTypingRendered = ""
+        liveDraftTypingDesired = ""
+        debugTypingLagChars = 0
+        debugActiveTarget = null
+        scheduleFieldDraftDebugFlush()
+      }
+
+      const shouldAnimateFieldDraftText = (editablePath: string, value: string) => {
+        const path = editablePath.toLowerCase()
+        if (/(^|[.\]])(imageurl|href|url|src|ctahref)(?=$|[.[\]])/.test(path)) return false
+        const trimmed = value.trim()
+        if (/^(https?:\/\/|\/|#|data:|mailto:|tel:)/i.test(trimmed)) return false
+        return true
+      }
+
+      const commonPrefixLength = (a: string, b: string) => {
+        const max = Math.min(a.length, b.length)
+        let idx = 0
+        while (idx < max && a[idx] === b[idx]) idx += 1
+        return idx
+      }
+
+      const runLiveDraftTypingTick = () => {
+        const target = liveDraftTypingTarget
+        if (!target) return
+        if (!liveDraftActive || liveDraftBlockId !== target.blockId) return
+        if (liveDraftTypingRendered === liveDraftTypingDesired) {
+          debugTypingLagChars = 0
+          scheduleFieldDraftDebugFlush()
+          if (liveDraftEndDeferred) {
+            clearLiveDraftDeferredEndTimer()
+            liveDraftDeferredEndTimer = window.setTimeout(() => {
+              liveDraftDeferredEndTimer = null
+              if (!liveDraftEndDeferred) return
+              if (liveDraftTypingRendered !== liveDraftTypingDesired) return
+              liveDraftEndDeferred = false
+              endLiveDraft()
+            }, 64)
+          }
+          return
+        }
+
+        const lcp = commonPrefixLength(liveDraftTypingRendered, liveDraftTypingDesired)
+        if (liveDraftTypingRendered.length > lcp) {
+          const backlog = liveDraftTypingRendered.length - lcp
+          const deleteStep = backlog > 40 ? 3 : backlog > 15 ? 2 : 1
+          liveDraftTypingRendered = liveDraftTypingRendered.slice(0, Math.max(lcp, liveDraftTypingRendered.length - deleteStep))
+        } else {
+          const backlog = liveDraftTypingDesired.length - liveDraftTypingRendered.length
+          const advance =
+            backlog > 140 ? 6 :
+            backlog > 90 ? 5 :
+            backlog > 60 ? 4 :
+            backlog > 30 ? 3 :
+            backlog > 10 ? 2 : 1
+          liveDraftTypingRendered = liveDraftTypingDesired.slice(0, Math.min(liveDraftTypingDesired.length, liveDraftTypingRendered.length + advance))
+        }
+
+        liveDraftFields = { [target.editablePath]: liveDraftTypingRendered }
+        debugTypingLagChars = Math.max(0, liveDraftTypingDesired.length - liveDraftTypingRendered.length)
+        scheduleFieldDraftDebugFlush()
+        scheduleLiveDraftFlush()
+
+        if (liveDraftTypingRendered !== liveDraftTypingDesired) {
+          const backlog = liveDraftTypingDesired.length - liveDraftTypingRendered.length
+          const nextChar = liveDraftTypingDesired[liveDraftTypingRendered.length] ?? ""
+          const delayMs =
+            nextChar === "\n" ? 78 :
+            /[.!?]/.test(nextChar) ? 68 :
+            /[,;:]/.test(nextChar) ? 42 :
+            /\s/.test(nextChar) ? 12 :
+            backlog > 120 ? 3 :
+            backlog > 70 ? 5 :
+            backlog > 30 ? 7 : 9
+          if (liveDraftTypingTimer === null) {
+            liveDraftTypingTimer = window.setTimeout(() => {
+              liveDraftTypingTimer = null
+              runLiveDraftTypingTick()
+            }, delayMs)
+          }
+        }
+      }
+
+      const deferEndLiveDraftUntilTypingSettles = () => {
+        liveDraftEndDeferred = true
+        clearLiveDraftDeferredEndTimer()
+        runLiveDraftTypingTick()
+      }
+
+      const beginOrUpdateLiveDraftTyping = (blockId: string, editablePath: string, value: string) => {
+        liveDraftEndDeferred = false
+        clearLiveDraftDeferredEndTimer()
+        if (!shouldAnimateFieldDraftText(editablePath, value)) {
+          resetLiveDraftTyping()
+          liveDraftBlockId = blockId
+          liveDraftFields = { [editablePath]: value }
+          liveDraftActive = true
+          scheduleLiveDraftFlush()
+          return
+        }
+
+        const switchedTarget =
+          !liveDraftTypingTarget ||
+          liveDraftTypingTarget.blockId !== blockId ||
+          liveDraftTypingTarget.editablePath !== editablePath
+
+        liveDraftBlockId = blockId
+        liveDraftActive = true
+
+        if (switchedTarget) {
+          clearLiveDraftTypingTimer()
+          liveDraftTypingTarget = { blockId, editablePath }
+          liveDraftTypingRendered = ""
+          liveDraftTypingDesired = value
+          debugActiveTarget = `${blockId}:${editablePath}`
+          liveDraftFields = { [editablePath]: "" }
+          scheduleLiveDraftFlush()
+          scheduleFieldDraftDebugFlush()
+          runLiveDraftTypingTick()
+          return
+        }
+
+        liveDraftTypingDesired = value
+        debugActiveTarget = `${blockId}:${editablePath}`
+        scheduleFieldDraftDebugFlush()
+        runLiveDraftTypingTick()
+      }
+
       const endLiveDraft = () => {
         clearLiveDraftTimer()
+        resetLiveDraftTyping()
         if (!liveDraftBlockId && !liveDraftActive) return
         liveDraftActive = false
         sendLiveDraft(true)
@@ -465,10 +682,13 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       source.onmessage = (event) => {
         let payload: {
-          type: "status" | "token" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error" | "canceled" | "summary_token" | "changelog_entry" | "image_progress"
+          type: "status" | "token" | "field_draft" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error" | "canceled" | "summary_token" | "changelog_entry" | "image_progress"
           _seq?: number
           message?: string
           text?: string
+          blockId?: string
+          editablePath?: string
+          value?: string
           stage?: string
           label?: string
           percent?: number
@@ -514,11 +734,30 @@ export function useChatEngine(config: ChatEngineConfig) {
           const text = payload.text ?? ""
           if (text) {
             setStreamTokenCount((prev) => prev + text.length)
-            if (liveDraftBlockId) {
-              liveDraftText += text
-              liveDraftActive = true
-              scheduleLiveDraftFlush()
+          }
+        }
+
+        if (payload.type === "field_draft") {
+          const blockId = typeof payload.blockId === "string" ? payload.blockId : ""
+          const editablePath = typeof payload.editablePath === "string" ? payload.editablePath : ""
+          const value = typeof payload.value === "string" ? payload.value : ""
+          if (blockId && editablePath) {
+            sawFieldDraftThisRun = true
+            if (debugDraftEnabled) {
+              const now = Date.now()
+              const fieldKey = `${blockId}:${editablePath}`
+              const prevLen = debugPrevValueLenByField.get(fieldKey) ?? 0
+              const deltaChars = Math.max(1, Math.abs(value.length - prevLen))
+              debugPrevValueLenByField.set(fieldKey, value.length)
+              debugTotalFieldEvents += 1
+              debugTotalFieldChars += deltaChars
+              debugFieldEventAtMs.push(now)
+              debugFieldCharAt.push({ at: now, chars: deltaChars })
+              debugActiveTarget = fieldKey
+              scheduleFieldDraftDebugFlush()
             }
+            setLatestStreamFocusBlockId(blockId)
+            beginOrUpdateLiveDraftTyping(blockId, editablePath, value)
           }
         }
 
@@ -557,7 +796,7 @@ export function useChatEngine(config: ChatEngineConfig) {
                opRecord.block && typeof (opRecord.block as Record<string, unknown>).props === "object"
                  ? (opRecord.block as Record<string, unknown>).props : null) as Record<string, unknown> | null
 
-            if (rawFields) {
+            if (rawFields && !sawFieldDraftThisRun) {
               const fields: Record<string, string> = {}
               for (const [key, value] of Object.entries(rawFields)) {
                 if (typeof value === "string" && value.trim()) {
@@ -604,7 +843,15 @@ export function useChatEngine(config: ChatEngineConfig) {
         if (payload.type === "op_applied") {
           setStreamingText(null)
           setStreamingChanges([])
-          if (liveDraftActive) endLiveDraft()
+          if (liveDraftActive) {
+            const typingInProgress =
+              Boolean(liveDraftTypingTarget) && liveDraftTypingRendered !== liveDraftTypingDesired
+            if (sawFieldDraftThisRun && typingInProgress) {
+              deferEndLiveDraftUntilTypingSettles()
+            } else {
+              endLiveDraft()
+            }
+          }
           postToSite("removeSkeleton", {})
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
@@ -680,6 +927,8 @@ export function useChatEngine(config: ChatEngineConfig) {
             setStreamingText(null)
             setStreamingChanges([])
             setStreamSteps([])
+            flushFieldDraftDebug()
+            clearDebugFlushTimer()
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -687,6 +936,27 @@ export function useChatEngine(config: ChatEngineConfig) {
             if (payload.result?.focusBlockId) setLatestStreamFocusBlockId(payload.result.focusBlockId)
             source.close()
             resolve(true)
+          }
+
+          const pendingTypedDraft =
+            sawFieldDraftThisRun &&
+            Boolean(liveDraftTypingTarget) &&
+            liveDraftTypingRendered !== liveDraftTypingDesired
+          if (pendingTypedDraft) {
+            const waitStartedAt = Date.now()
+            const maxWaitMs = 900
+            const waitForTypedDraft = () => {
+              const stillPending =
+                Boolean(liveDraftTypingTarget) &&
+                liveDraftTypingRendered !== liveDraftTypingDesired
+              if (!stillPending || Date.now() - waitStartedAt >= maxWaitMs) {
+                completeFinal()
+                return
+              }
+              window.setTimeout(waitForTypedDraft, 16)
+            }
+            waitForTypedDraft()
+            return
           }
 
           const elapsedSinceLastOp = lastOpAppliedAt > 0 ? Date.now() - lastOpAppliedAt : Number.POSITIVE_INFINITY
@@ -715,6 +985,8 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           setStreamSteps([])
+          flushFieldDraftDebug()
+          clearDebugFlushTimer()
           clearOpRefreshTimer()
           endLiveDraft()
           pendingFocusBlockId = null
@@ -734,6 +1006,8 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           setStreamSteps([])
+          flushFieldDraftDebug()
+          clearDebugFlushTimer()
           clearOpRefreshTimer()
           endLiveDraft()
           pendingFocusBlockId = null
@@ -769,6 +1043,8 @@ export function useChatEngine(config: ChatEngineConfig) {
             setStreamingText(null)
             setStreamingChanges([])
             setStreamSteps([])
+            flushFieldDraftDebug()
+            clearDebugFlushTimer()
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -787,6 +1063,8 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           setStreamSteps([])
+          flushFieldDraftDebug()
+          clearDebugFlushTimer()
           clearOpRefreshTimer()
           endLiveDraft()
           if (pendingFocusBlockId !== null) flushOpRefresh()
@@ -800,6 +1078,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         setStreamTokenCount(0)
         setStreamingText(null)
         setStreamingChanges([])
+        flushFieldDraftDebug()
+        clearDebugFlushTimer()
         clearOpRefreshTimer()
         endLiveDraft()
         pendingFocusBlockId = null
@@ -942,8 +1222,16 @@ export function useChatEngine(config: ChatEngineConfig) {
     lastSentMessageRef.current = finalMessage
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: finalMessage }])
     setIsLoading(true)
-    setStreamStatus(useStreaming ? "Connecting..." : null)
+    setStreamStatus(useStreaming ? "Thinking..." : null)
     setStreamTokenCount(0)
+    setFieldDraftDebug({
+      eventsPerSecond: 0,
+      charsPerSecond: 0,
+      totalEvents: 0,
+      totalChars: 0,
+      typingLagChars: 0,
+      activeTarget: null
+    })
     setLatestStreamFocusBlockId(null)
     try {
       if (isVariationRequest(finalMessage)) {
@@ -982,6 +1270,9 @@ export function useChatEngine(config: ChatEngineConfig) {
     isLoading,
     streamStatus,
     streamTokenCount,
+    fieldDraftDebugEnabled,
+    setFieldDraftDebugEnabled,
+    fieldDraftDebug,
     imageProgress,
     streamingText,
     streamingChanges,

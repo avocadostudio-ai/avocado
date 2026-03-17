@@ -34,7 +34,7 @@ body {
 .layout {
   height: 100vh;
   display: grid;
-  grid-template-columns: 1fr minmax(370px, 420px);
+  grid-template-columns: 1fr minmax(390px, 450px);
   column-gap: 10px;
   row-gap: 14px;
   padding: 0;
@@ -1211,8 +1211,26 @@ textarea {
   padding-left: 1.3em;
 }
 
+.msg-main ol {
+  margin: 0.3em 0 0.5em;
+  padding-left: 1.45em;
+}
+
 .msg-main li {
   margin-bottom: 0.15em;
+}
+
+.msg-main a {
+  color: #165dcc;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.msg-main blockquote {
+  margin: 0.45em 0 0.65em;
+  padding: 0.12em 0 0.12em 0.7em;
+  border-left: 3px solid rgba(22, 93, 204, 0.3);
+  color: #334155;
 }
 
 .msg-main table {
@@ -1243,6 +1261,23 @@ textarea {
   padding: 0.1em 0.35em;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.06);
+}
+
+.msg-main pre {
+  margin: 0.45em 0 0.65em;
+  padding: 0.5em 0.7em;
+  border-radius: 8px;
+  overflow-x: auto;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.msg-main pre code {
+  display: block;
+  font-size: 0.88em;
+  line-height: 1.5;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
 }
 
 .msg-status {
@@ -1572,6 +1607,15 @@ textarea {
   margin-top: 6px;
   font-size: 14px;
   line-height: 1.45;
+}
+
+.streaming-debug-inline {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .streaming-jump-btn {
@@ -3591,6 +3635,10 @@ textarea {
   color: #f8fafc;
 }
 
+.editor-dark .streaming-debug-inline {
+  color: #94a3b8;
+}
+
 .editor-dark .msg-user {
   background: #0f766e;
   border-color: transparent;
@@ -3599,6 +3647,23 @@ textarea {
 
 .editor-dark .msg-main code {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.editor-dark .msg-main a {
+  color: #93c5fd;
+}
+
+.editor-dark .msg-main blockquote {
+  border-left-color: rgba(147, 197, 253, 0.45);
+  color: #cbd5e1;
+}
+
+.editor-dark .msg-main pre {
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.editor-dark .msg-main pre code {
+  background: transparent;
 }
 
 .editor-dark .msg-main th,

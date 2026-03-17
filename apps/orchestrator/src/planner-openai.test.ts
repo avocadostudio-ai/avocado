@@ -584,6 +584,40 @@ test("buildPlannerSchemaContext downgrades from full when schema budget is tiny"
   }
 })
 
+test("buildPlannerSchemaContext includes pageMetaContract for description/char-limit messages", () => {
+  const previousAdaptive = process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+  process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = "1"
+  try {
+    const currentPage = demoPublishedPages()[0]
+    for (const msg of [
+      "Fit within 160 characters",
+      "update the description to be shorter",
+      "Add structured data (schema.org) for berries",
+    ]) {
+      const contextPack = plannerContextPack({
+        session: "planner-openai-test",
+        slug: "/",
+        message: msg,
+        currentPage
+      })
+      const result = buildPlannerSchemaContext({
+        message: msg,
+        contextPack,
+        batchOverride: false,
+        pageWideTranslation: false,
+        legacyIncludeContracts: true
+      })
+      assert.ok(
+        result.payload.pageMetaContract,
+        `pageMetaContract should be included for: "${msg}"`
+      )
+    }
+  } finally {
+    if (previousAdaptive === undefined) delete process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT
+    else process.env.CHAT_ADAPTIVE_SCHEMA_CONTEXT = previousAdaptive
+  }
+})
+
 test("generatePlanWithOpenAI uses strict response_format when CHAT_STRICT_JSON_RESPONSE is enabled", async () => {
   const previous = process.env.CHAT_STRICT_JSON_RESPONSE
   process.env.CHAT_STRICT_JSON_RESPONSE = "1"
