@@ -110,6 +110,7 @@ export type SiteMessage =
         | "listItemRemoveRequested"
         | "listItemMoveRequested"
         | "openImagePicker"
+        | "iframeScrolled"
       payload: Record<string, unknown>
     }
   | ({ source: "site-editor/v1" } & PatchAckMessage)

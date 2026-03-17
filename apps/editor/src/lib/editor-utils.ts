@@ -52,6 +52,7 @@ export {
   resolveDefaultModelKey,
   resolveDefaultProvider,
   resolveDefaultChatDarkMode,
+  resolveAnchoredComposerEnabled,
   mergedVariationProps,
   splitAiInsightChanges
 } from "./defaults"

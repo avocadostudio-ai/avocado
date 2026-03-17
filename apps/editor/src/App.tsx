@@ -6,7 +6,7 @@ import { VariationScaledPreview } from "./components/VariationScaledPreview"
 import { SitesPage } from "./components/SitesPage"
 import { ImagePickerModal } from "./components/ImagePickerModal"
 import { useSiteList } from "./hooks/useSiteList"
-import { usePreviewBridge, type PreviewBridgeCallbacks } from "./hooks/usePreviewBridge"
+import { usePreviewBridge, type PreviewBridgeCallbacks, type AnchorRect } from "./hooks/usePreviewBridge"
 import { useChatEngine } from "./hooks/useChatEngine"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
@@ -38,6 +38,7 @@ import {
   resolveDefaultModelKey,
   resolveDefaultProvider,
   resolveEditorSiteId,
+  resolveAnchoredComposerEnabled,
   slugLabel
 } from "./lib/editor-utils"
 
@@ -61,6 +62,7 @@ function renderSimpleMarkdown(text: string) {
   const lines = text.split("\n")
   const elements: (React.ReactNode)[] = []
   let listItems: string[] = []
+  let tableRows: string[] = []
 
   const flushList = () => {
     if (listItems.length === 0) return
@@ -72,6 +74,32 @@ function renderSimpleMarkdown(text: string) {
       </ul>
     )
     listItems = []
+  }
+
+  const flushTable = () => {
+    if (tableRows.length === 0) return
+    const parseCells = (row: string) =>
+      row.replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim())
+    const isSeparator = (row: string) => /^\|[\s\-:|]+\|$/.test(row)
+
+    const headerCells = parseCells(tableRows[0])
+    const bodyRows = tableRows.slice(1).filter(r => !isSeparator(r))
+
+    elements.push(
+      <table key={`table-${elements.length}`}>
+        <thead>
+          <tr>{headerCells.map((c, i) => <th key={i}>{inlineMarkdown(c)}</th>)}</tr>
+        </thead>
+        <tbody>
+          {bodyRows.map((row, ri) => (
+            <tr key={ri}>
+              {parseCells(row).map((c, ci) => <td key={ci}>{inlineMarkdown(c)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+    tableRows = []
   }
 
   const inlineMarkdown = (line: string) => {
@@ -91,6 +119,13 @@ function renderSimpleMarkdown(text: string) {
   }
 
   for (const line of lines) {
+    if (/^\|.+\|$/.test(line.trim())) {
+      flushList()
+      tableRows.push(line.trim())
+      continue
+    }
+    flushTable()
+
     const listMatch = /^\s*[-*•]\s+(.+)$/.exec(line)
     if (listMatch) {
       listItems.push(listMatch[1])
@@ -103,6 +138,7 @@ function renderSimpleMarkdown(text: string) {
     elements.push(<p key={`p-${elements.length}`}>{inlineMarkdown(line)}</p>)
   }
   flushList()
+  flushTable()
 
   return <>{elements}</>
 }
@@ -171,6 +207,7 @@ function EditorPage({
   const imagePickerOpen = imagePickerTarget !== null
   const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
   const [selectionModeEnabled, setSelectionModeEnabled] = useState(false)
+  const [anchorRect, setAnchorRect] = useState<AnchorRect>(null)
   const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
   const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configModalTab, setConfigModalTab] = useState<"general" | "brief" | "deploy">("general")
@@ -191,6 +228,7 @@ function EditorPage({
   const slugSyncedFromPreviewRef = useRef(false)
   const lastStructuralNoticeAtRef = useRef(0)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
+  const anchoredComposerRef = useRef<HTMLDivElement>(null)
 
   const routeOptions = useMemo(() => {
     const raw = Array.from(new Set([...availableSlugs, slug].filter(Boolean)))
@@ -268,7 +306,7 @@ function EditorPage({
   }, [])
 
   const previewCallbacks = useMemo<PreviewBridgeCallbacks>(() => ({
-    onBlockClicked: (newSlug, blockId, blockType, editablePath, editableValue) => {
+    onBlockClicked: (newSlug, blockId, blockType, editablePath, editableValue, rect) => {
       setSlugFromPreview(newSlug)
       activeBlockIdRef.current = blockId
       activeBlockTypeRef.current = blockType
@@ -276,12 +314,14 @@ function EditorPage({
       setActiveBlockId(blockId)
       setActiveBlockType(blockType)
       setActiveEditablePath(editablePath)
+      setAnchorRect(blockId ? rect : null)
       if (blockId) preview.postToSite("highlightBlock", { blockId, editablePath: editablePath ?? null })
     },
     onRouteChanged: (newSlug) => {
       setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
+      setAnchorRect(null)
     },
     onBlockReordered: (newSlug, blockId, afterBlockId) => {
       if (!componentManifest.allowStructuralEdits) {
@@ -352,6 +392,9 @@ function EditorPage({
         setActiveEditablePath(editablePath)
       }
       void chatEngine.inlineEditCommit(newSlug, blockId, editablePath, value)
+    },
+    onIframeScrolled: () => {
+      setAnchorRect(null)
     }
   }), [componentManifest.allowStructuralEdits, setSlugFromPreview, slug])
 
@@ -367,6 +410,7 @@ function EditorPage({
       setActiveEditablePath(undefined)
       activeBlockIdRef.current = undefined
       activeEditablePathRef.current = undefined
+      setAnchorRect(null)
     }
   }, [selectionModeEnabled, preview])
 
@@ -557,6 +601,67 @@ function EditorPage({
     // if (activeBlockId && !message.trim()) setActiveTab("properties")
     chatEngine.clearFieldAiContext()
   }, [activeBlockId])
+
+  // Clear anchor when activeBlockId is cleared
+  useEffect(() => {
+    if (!activeBlockId) setAnchorRect(null)
+  }, [activeBlockId])
+
+  // Clear anchor on window resize
+  useEffect(() => {
+    const onResize = () => setAnchorRect(null)
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
+  // Compute anchored composer position
+  const anchoredComposerEnabled = resolveAnchoredComposerEnabled()
+  const anchoredPosition = useMemo(() => {
+    if (!anchoredComposerEnabled) return null
+    if (!anchorRect || !selectionModeEnabled || !activeBlockId) return null
+    if (typeof window === "undefined" || window.innerWidth <= 1040) return null
+
+    const iframeEl = preview.iframeRef.current
+    if (!iframeEl) return null
+    const iframeRect = iframeEl.getBoundingClientRect()
+
+    const COMPOSER_WIDTH = 380
+    const GAP = activeEditablePath ? 12 : 32
+    const COMPOSER_MIN_H = 80
+
+    const blockTopInViewport = iframeRect.top + anchorRect.top
+    const blockBottomInViewport = blockTopInViewport + anchorRect.height
+
+    // Check if block is offscreen in iframe
+    if (blockBottomInViewport < iframeRect.top || blockTopInViewport > iframeRect.bottom) return null
+
+    // Try below the block
+    let top: number
+    if (blockBottomInViewport + GAP + COMPOSER_MIN_H <= window.innerHeight) {
+      top = blockBottomInViewport + GAP
+    } else if (blockTopInViewport - GAP - COMPOSER_MIN_H >= 0) {
+      // Try above the block
+      top = blockTopInViewport - GAP - COMPOSER_MIN_H
+    } else {
+      return null
+    }
+
+    // Center horizontally on block, clamped within iframe bounds
+    const blockCenterX = iframeRect.left + anchorRect.left + anchorRect.width / 2
+    let left = blockCenterX - COMPOSER_WIDTH / 2
+    left = Math.max(iframeRect.left, Math.min(left, iframeRect.right - COMPOSER_WIDTH))
+
+    return { top, left, width: COMPOSER_WIDTH }
+  }, [anchorRect, selectionModeEnabled, activeBlockId, activeEditablePath, preview.iframeRef])
+
+  // Auto-focus anchored composer textarea
+  useEffect(() => {
+    if (anchoredPosition) {
+      requestAnimationFrame(() => {
+        anchoredComposerRef.current?.querySelector("textarea")?.focus()
+      })
+    }
+  }, [!!anchoredPosition])
 
   const handleFieldAiAssist = useCallback((fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => {
     if (!activeBlockId || !activeBlockType) return
@@ -788,6 +893,22 @@ function EditorPage({
     }
   }, [buildCopyPayload])
 
+  const buildDebugSummary = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
+    if (!entry.debug) return "Expand details"
+    const parts: string[] = []
+    if (entry.debug.outcome) parts.push(entry.debug.outcome.replace(/_/g, " "))
+    if (typeof entry.debug.opCount === "number") {
+      const count = entry.debug.opCount
+      parts.push(`${count} op${count === 1 ? "" : "s"}`)
+    }
+    if (entry.debug.intent) parts.push(`intent: ${entry.debug.intent.replace(/_/g, " ")}`)
+    if (Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0) {
+      const totalMs = entry.debug.timeline[entry.debug.timeline.length - 1]?.atMs
+      if (typeof totalMs === "number") parts.push(`${totalMs}ms`)
+    }
+    return parts.join(" · ") || "Expand details"
+  }, [])
+
   return (
     <div className="layout">
       <aside className={chatPanelClassName} ref={chatPanelRef} style={chatPanelStyle}>
@@ -862,10 +983,27 @@ function EditorPage({
           </label>
         </header>
 
-        <nav className="panel-tabs">
-          <button type="button" className={`panel-tab ${activeTab === "chat" ? "is-active" : ""}`} onClick={() => setActiveTab("chat")}><Bot size={14} /> Chat</button>
-          <button type="button" className={`panel-tab ${activeTab === "properties" ? "is-active" : ""}`} onClick={() => setActiveTab("properties")}>
-            <SlidersHorizontal size={14} /> Properties{activeBlockId ? <span className="panel-tab-dot" /> : null}
+        <nav className="panel-tabs panel-tabs-main">
+          <button
+            type="button"
+            className={`panel-tab panel-tab-main ${activeTab === "chat" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("chat")}
+            aria-label="Chat"
+            title="Chat"
+          >
+            <Bot size={14} />
+            <span className="panel-tab-label">Chat</span>
+          </button>
+          <button
+            type="button"
+            className={`panel-tab panel-tab-main ${activeTab === "properties" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("properties")}
+            aria-label="Properties"
+            title="Properties"
+          >
+            <SlidersHorizontal size={14} />
+            <span className="panel-tab-label">Properties</span>
+            {activeBlockId ? <span className="panel-tab-dot" /> : null}
           </button>
         </nav>
 
@@ -970,37 +1108,45 @@ function EditorPage({
                 </ul>
               ) : null}
               {showDebugDetails && entry.role === "assistant" && entry.debug ? (
-                <div className="msg-debug">
-                  <div className="msg-debug-title-row">
-                    <div className="msg-debug-title">Debug</div>
-                    <button
-                      type="button"
-                      className="msg-debug-copy-btn"
-                      onClick={() => void copyAssistantBubble(entry)}
-                      aria-label={copiedDebugEntryId === entry.id ? "Copied" : "Copy debug bubble"}
-                      title={copiedDebugEntryId === entry.id ? "Copied" : "Copy"}
-                    >
-                      {copiedDebugEntryId === entry.id ? (
-                        <Check aria-hidden="true" size={14} />
-                      ) : (
-                        <Copy aria-hidden="true" size={14} />
-                      )}
-                    </button>
-                  </div>
-                  <ul>
-                    {entry.debug.traceId ? <li>traceId: {entry.debug.traceId}</li> : null}
-                    {entry.debug.promptHash ? <li>promptHash: {entry.debug.promptHash}</li> : null}
-                    {entry.debug.outcome ? <li>outcome: {entry.debug.outcome}</li> : null}
-                    {entry.debug.reasonCategory ? <li>reason: {entry.debug.reasonCategory}</li> : null}
-                    {entry.debug.intent ? <li>intent: {entry.debug.intent}</li> : null}
-                    {typeof entry.debug.opCount === "number" ? <li>opCount: {entry.debug.opCount}</li> : null}
-                    {typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0 ? <li>skippedOps: {entry.debug.skippedOpCount}</li> : null}
-                    {Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0 ? <li>ops: {entry.debug.opTypes.join(", ")}</li> : null}
-                    {Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0 ? (
-                      <li>timeline: {entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")}</li>
-                    ) : null}
-                    {entry.debug.promptExcerpt ? <li>prompt: {entry.debug.promptExcerpt}</li> : null}
-                  </ul>
+                <div className="msg-debug-shell">
+                  <details className="msg-debug-details">
+                    <summary className="msg-debug-summary">
+                      <span className="msg-debug-summary-left">
+                        <span className="msg-debug-title">Debug</span>
+                        <span className="msg-debug-summary-text">{buildDebugSummary(entry)}</span>
+                      </span>
+                      <span className="msg-debug-chevron" aria-hidden="true" />
+                    </summary>
+                    <div className="msg-debug">
+                      <ul>
+                        {entry.debug.traceId ? <li>traceId: {entry.debug.traceId}</li> : null}
+                        {entry.debug.promptHash ? <li>promptHash: {entry.debug.promptHash}</li> : null}
+                        {entry.debug.outcome ? <li>outcome: {entry.debug.outcome}</li> : null}
+                        {entry.debug.reasonCategory ? <li>reason: {entry.debug.reasonCategory}</li> : null}
+                        {entry.debug.intent ? <li>intent: {entry.debug.intent}</li> : null}
+                        {typeof entry.debug.opCount === "number" ? <li>opCount: {entry.debug.opCount}</li> : null}
+                        {typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0 ? <li>skippedOps: {entry.debug.skippedOpCount}</li> : null}
+                        {Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0 ? <li>ops: {entry.debug.opTypes.join(", ")}</li> : null}
+                        {Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0 ? (
+                          <li>timeline: {entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")}</li>
+                        ) : null}
+                        {entry.debug.promptExcerpt ? <li>prompt: {entry.debug.promptExcerpt}</li> : null}
+                      </ul>
+                    </div>
+                  </details>
+                  <button
+                    type="button"
+                    className="msg-debug-copy-btn"
+                    onClick={() => void copyAssistantBubble(entry)}
+                    aria-label={copiedDebugEntryId === entry.id ? "Copied" : "Copy debug bubble"}
+                    title={copiedDebugEntryId === entry.id ? "Copied" : "Copy"}
+                  >
+                    {copiedDebugEntryId === entry.id ? (
+                      <Check aria-hidden="true" size={14} />
+                    ) : (
+                      <Copy aria-hidden="true" size={14} />
+                    )}
+                  </button>
                 </div>
               ) : null}
               {entry.canUndo || entry.wasUndone ? (
@@ -1206,6 +1352,31 @@ function EditorPage({
           }}
         />
       </section>
+
+      {anchoredPosition ? (
+        <div
+          ref={anchoredComposerRef}
+          className="composer composer--anchored"
+          style={{ top: anchoredPosition.top, left: anchoredPosition.left, width: anchoredPosition.width }}
+        >
+          <ClaudeStyleChatInput
+            message={message}
+            isLoading={chatEngine.isLoading}
+            hasUserEntry={hasUserEntry}
+            onMessageChange={setMessage}
+            onSubmit={(explicitMessage) => {
+              setMessage("")
+              void chatEngine.submitChat(explicitMessage, message)
+            }}
+            onTranscribeAudio={media.transcribeAudio}
+            onInterpretImage={media.interpretPastedImage}
+            onUploadImage={media.uploadPastedImage}
+            onCancel={chatEngine.cancelChat}
+            onAutoHeightChange={() => {}}
+            compact
+          />
+        </div>
+      ) : null}
 
       {chatEngine.variationModal ? (() => {
         const vm = chatEngine.variationModal

@@ -50,6 +50,20 @@ export function resolveDefaultChatDarkMode() {
   return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false
 }
 
+export const ANCHORED_COMPOSER_STORAGE_KEY = "editor-anchored-composer-v1"
+
+export function resolveAnchoredComposerEnabled() {
+  // env override takes priority
+  const envVal = (import.meta.env.VITE_ANCHORED_COMPOSER as string | undefined) ?? ""
+  if (/^(0|false|no|off)$/i.test(envVal)) return false
+  if (/^(1|true|yes|on)$/i.test(envVal)) return true
+  // fall back to localStorage, default on
+  if (typeof window === "undefined") return true
+  const stored = window.localStorage.getItem(ANCHORED_COMPOSER_STORAGE_KEY)
+  if (stored === "0" || stored === "false") return false
+  return true
+}
+
 export function mergedVariationProps(baseProps: Record<string, unknown>, patch: Record<string, unknown>) {
   return { ...baseProps, ...patch }
 }
