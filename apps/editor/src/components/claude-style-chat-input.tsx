@@ -265,7 +265,7 @@ export default function ClaudeStyleChatInput(props: Props) {
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}
-          placeholder="Ask for a change"
+          placeholder="Tell me what to change"
           value={message}
           onChange={(e) => {
             onMessageChange(e.target.value)

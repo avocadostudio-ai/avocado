@@ -766,6 +766,11 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       // Prevent MutationObserver feedback loops while rebuilding image buttons.
       observer?.disconnect()
       document.querySelectorAll(".editor-image-change-btn").forEach((el) => el.remove())
+      // Only show image picker buttons when selection mode is active
+      if (!document.documentElement.hasAttribute("data-editor-selection-mode")) {
+        if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true })
+        return
+      }
       document.querySelectorAll<HTMLElement>(".editor-selectable [data-editable-target]").forEach((el) => {
         const path = el.getAttribute("data-editable-target") ?? ""
         if (!isImagePath(path)) return
@@ -1078,6 +1083,27 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         )
         return
       }
+      // Tab switching must work regardless of selection mode — React re-renders
+      // destroy the .onclick handlers set by initTabs, so we handle it here.
+      const tabBtn = target?.closest<HTMLElement>(".tabs-block__tab")
+      if (tabBtn) {
+        const tabsBlock = tabBtn.closest<HTMLElement>(".tabs-block")
+        if (tabsBlock) {
+          const allTabs = tabsBlock.querySelectorAll<HTMLElement>(".tabs-block__tab")
+          const allPanels = tabsBlock.querySelectorAll<HTMLElement>(".tabs-block__panel")
+          const idx = Array.from(allTabs).indexOf(tabBtn)
+          if (idx >= 0) {
+            allTabs.forEach((b, j) => {
+              b.classList.toggle("tabs-block__tab--active", idx === j)
+              b.setAttribute("aria-selected", idx === j ? "true" : "false")
+            })
+            allPanels.forEach((p, j) => {
+              p.style.display = idx === j ? "" : "none"
+            })
+          }
+        }
+      }
+
       // When selection mode is off, let clicks pass through to the page natively
       const selectionModeOn = document.documentElement.hasAttribute("data-editor-selection-mode")
       if (!selectionModeOn) return
@@ -1151,26 +1177,6 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         editorOrigin
       )
 
-      // Allow tab switching — onclick handlers don't fire because capture-phase
-      // stopPropagation prevents bubble-phase delivery. Switch tabs directly.
-      const tabBtn = target?.closest<HTMLElement>(".tabs-block__tab")
-      if (tabBtn) {
-        const tabsBlock = tabBtn.closest<HTMLElement>(".tabs-block")
-        if (tabsBlock) {
-          const allTabs = tabsBlock.querySelectorAll<HTMLElement>(".tabs-block__tab")
-          const allPanels = tabsBlock.querySelectorAll<HTMLElement>(".tabs-block__panel")
-          const idx = Array.from(allTabs).indexOf(tabBtn)
-          if (idx >= 0) {
-            allTabs.forEach((b, j) => {
-              b.classList.toggle("tabs-block__tab--active", idx === j)
-              b.setAttribute("aria-selected", idx === j ? "true" : "false")
-            })
-            allPanels.forEach((p, j) => {
-              p.style.display = idx === j ? "" : "none"
-            })
-          }
-        }
-      }
     }
 
     const onDoubleClick = (event: MouseEvent) => {
@@ -1235,8 +1241,11 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const enabled = !!msg.payload.enabled
         if (enabled) {
           document.documentElement.setAttribute("data-editor-selection-mode", "")
+          mountGlobalImageButtons()
         } else {
           document.documentElement.removeAttribute("data-editor-selection-mode")
+          // Remove image picker buttons when selection mode is off
+          document.querySelectorAll(".editor-image-change-btn").forEach((el) => el.remove())
         }
         return
       }

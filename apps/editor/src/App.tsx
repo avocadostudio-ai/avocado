@@ -361,6 +361,13 @@ function EditorPage({
     const next = force ?? !selectionModeEnabled
     setSelectionModeEnabled(next)
     preview.postToSite("setSelectionMode", { enabled: next })
+    if (!next) {
+      setActiveBlockId(undefined)
+      setActiveBlockType(undefined)
+      setActiveEditablePath(undefined)
+      activeBlockIdRef.current = undefined
+      activeEditablePathRef.current = undefined
+    }
   }, [selectionModeEnabled, preview])
 
   // Esc exits selection mode without clearing existing block selection
@@ -530,16 +537,24 @@ function EditorPage({
     preview.postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })
   }, [showNestedLabels])
 
+  // Re-sync selection mode after route changes (preview bridge re-mounts and loses the attribute)
+  useEffect(() => {
+    if (selectionModeEnabled) {
+      preview.postToSite("setSelectionMode", { enabled: true })
+    }
+  }, [slug])
+
   // Highlight active block sync
   useEffect(() => {
     if (!activeBlockId) return
     preview.postToSite("highlightBlock", { blockId: activeBlockId, editablePath: activeEditablePath ?? null })
   }, [activeBlockId, activeEditablePath])
 
-  // Auto-switch to Properties tab when a block is selected (unless user is typing),
+  // Update Properties tab when a block is selected (only if already on properties tab),
   // and clear any field-AI context entries from a previous block
+  // NOTE: auto-switch to properties tab on selection is temporarily disabled
   useEffect(() => {
-    if (activeBlockId && !message.trim()) setActiveTab("properties")
+    // if (activeBlockId && !message.trim()) setActiveTab("properties")
     chatEngine.clearFieldAiContext()
   }, [activeBlockId])
 
