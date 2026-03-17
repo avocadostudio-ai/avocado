@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-17T20:44:41.389Z",
+    "updatedAt": "2026-03-17T21:26:41.211Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -13,8 +13,8 @@
           "subheading": "Join a vibrant community of avocado lovers. Share recipes, stories, and sustainable practices.",
           "ctaText": "Explore Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "https://images.unsplash.com/photo-1632670952530-0614e8582534?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxOHx8d2VsY29tZSUyMHRvJTIweW91ciUyMGF2b2NhZG8lMjBzdG9yeSUyMGhlcm98ZW58MXwwfHx8MTc3Mzc3Nzk3M3ww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-          "imageAlt": "beautifully plated avocado toast with fresh toppings",
+          "imageUrl": "https://images.unsplash.com/photo-1704960961383-67dd63756199?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw5fHxmcmVzaCUyMGF2b2NhZG8lMjBwcm9mZXNzaW9uYWwlMjBtb2Rlcm58ZW58MXwwfHx8MTc3Mzc4MDM1MXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "fresh avocado cut in half on a clean surface",
           "imagePosition": "right",
           "secondaryCtaText": "Share Your Story"
         }
@@ -23,7 +23,7 @@
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Explore Avocado Stories",
+          "title": "Learn Avocado Wisdom",
           "subtitle": "Discover recipes, health insights, and sustainable practices that celebrate avocados in every part of your life.",
           "cards": [
             {
@@ -51,6 +51,14 @@
               "imageAlt": "Natural eco-friendly scene showing a ripe avocado cut in half on a rustic wooden table beside a small avocado plant growing from a seed in a clay pot, soft natural sunlight, lush green garden background with bokeh, sustainable farming concept, farm-to-table food story, vibrant green tones, realistic food photography, minimal composition, high detail, cinematic lighting"
             }
           ]
+        }
+      },
+      {
+        "id": "b_richtext_1771982675835",
+        "type": "RichText",
+        "props": {
+          "title": "Why Avocados Matter—For Every Person",
+          "body": "## Daily Serving Guide\n\n½–1 avocado daily delivers heart health, sustained energy, and lasting fullness.\n\n## Your Avocado Path\n\n**Home Cooks**: Nail recipes and flavor pairings that make avocados shine.\n\n**Wellness Seekers**: Fuel your body with avocado nutrition for heart health and energy.\n\n**Farmers & Growers**: Build regenerative practices that grow better avocados.\n\n**Sustainability Advocates**: Trace fair trade, water stewardship, and environmental impact."
         }
       },
       {
@@ -110,14 +118,6 @@
         }
       },
       {
-        "id": "b_richtext_1771982675835",
-        "type": "RichText",
-        "props": {
-          "title": "Discover the Magic of Avocados",
-          "body": "## Nutritional Benefits of Avocados\n\nAvocados are not only delicious, but also packed with essential nutrients. They're an excellent source of vitamins C, E, K, and B-6, along with riboflavin, niacin, folate, pantothenic acid, magnesium, and potassium.\n\n## Heart-Healthy Fats\n\nAvocados also contain lutein, beta-carotene, and omega-3 fatty acids. Plus, avocados are known for their heart-healthy monounsaturated fats, which may help lower bad cholesterol and reduce the risk of heart disease.\n\n## Enjoy Avocados Today\n\nExperience the magic of avocados in your meals today!"
-        }
-      },
-      {
         "id": "b_faqaccordion_1773150551758",
         "type": "FAQAccordion",
         "props": {
@@ -136,6 +136,14 @@
               "a": "Sustainable avocado farming is possible and important. Look for growers who prioritize water conservation and ethical practices. By choosing responsibly grown avocados, you support both your health and the planet."
             }
           ]
+        }
+      },
+      {
+        "id": "b_richtext_1773782083093_683",
+        "type": "RichText",
+        "props": {
+          "title": "Four Audiences, One Avocado Passion",
+          "body": "Whether you're a home cook perfecting guacamole, a wellness enthusiast exploring nutrition, a farmer building regenerative practices, or an advocate for sustainable food systems—avocados unite us.\n\n**Home Cooks & Culinary Explorers** discover recipes, techniques, and unexpected flavor pairings that turn avocados into everyday magic. From toast to salads to creative fusion, learn how to make avocados shine on every plate.\n\n**Wellness Seekers** explore how avocado nutrition supports heart health, sustained energy, and whole-body vitality. Rich in healthy fats, antioxidants, and essential minerals, avocados are a true superfood for those who care about their health.\n\n**Farmers & Growers** dive into regenerative agriculture, soil health, and sustainable farming methods that produce better avocados while healing the land. Share innovations and celebrate the craft of growing exceptional fruit.\n\n**Sustainability Advocates** trace the story behind every avocado—fair trade practices, water stewardship, and environmental impact. Learn how conscious choices drive positive change in global agriculture.\n\nYour avocado journey starts here. Explore the segments below to find your community and passion."
         }
       },
       {
@@ -336,15 +344,15 @@
     "id": "p_grapefruits",
     "slug": "/grapefruits",
     "title": "Grapefruits",
-    "updatedAt": "2026-03-17T20:13:02.144Z",
+    "updatedAt": "2026-03-17T20:53:58.678Z",
     "blocks": [
       {
         "id": "b_hero_about",
         "type": "Hero",
         "props": {
           "heading": "Grapefruits",
-          "subheading": "Entdecken Sie die leuchtende, erfrischende Welt der Grapefruits — eine lebendige Zitrusfrucht voller Wellness-Vorteile, würzigem Geschmack und endlosen kulinarischen Möglichkeiten.",
-          "ctaText": "Grapefruits erkunden",
+          "subheading": "Discover the vibrant, refreshing world of grapefruits — a citrus fruit full of wellness benefits, zesty flavor, and endless culinary possibilities.",
+          "ctaText": "Explore Grapefruits",
           "ctaHref": "/grapefruits",
           "imageUrl": "https://images.unsplash.com/photo-1528826194825-a71b700fe80b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxMzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
           "imageAlt": "slice grapefruit",
@@ -355,7 +363,7 @@
         "id": "b_quote_1773680990550_137",
         "type": "Quote",
         "props": {
-          "quote": "Die beste Art, die Zukunft vorherzusagen, ist, sie zu schaffen.",
+          "quote": "The best way to predict the future is to create it.",
           "author": "Peter Drucker",
           "role": "Management Consultant",
           "imageUrl": "https://images.unsplash.com/flagged/photo-1570612861542-284f4c12e75f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxwZXJzb258ZW58MXwwfHx8MTc3MzY4NDg4NXww&ixlib=rb-4.1.0&q=80&w=1080",
@@ -366,37 +374,37 @@
         "id": "b_table_1773681049002_351",
         "type": "Table",
         "props": {
-          "title": "Grapefruit-Sorten & Ernährungsleitfaden",
+          "title": "Grapefruit Varieties & Nutrition Guide",
           "headers": [
-            "Sorte",
-            "Geschmacksprofil",
+            "Variety",
+            "Flavor Profile",
             "Vitamin C",
-            "Beste Jahreszeit"
+            "Best Season"
           ],
           "rows": [
             [
-              "Rosa/Rot",
-              "Süß und würzig",
-              "Hoch",
-              "Winter–Frühling"
+              "Pink/Red",
+              "Sweet and tart",
+              "High",
+              "Winter–Spring"
             ],
             [
-              "Weiß",
-              "Herb und bitter",
-              "Hoch",
-              "Ganzjährig"
+              "White",
+              "Tart and bitter",
+              "High",
+              "Year-round"
             ],
             [
               "Star Ruby",
-              "Süß und saftig",
-              "Sehr hoch",
-              "Winter–Frühling"
+              "Sweet and juicy",
+              "Very high",
+              "Winter–Spring"
             ],
             [
               "Pomelo",
-              "Mild und süß",
-              "Moderat",
-              "Herbst–Winter"
+              "Mild and sweet",
+              "Moderate",
+              "Fall–Winter"
             ]
           ],
           "striped": "true"
@@ -409,25 +417,25 @@
           "items": [
             {
               "imageUrl": "https://images.unsplash.com/photo-1568651239222-7af48d48d3eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8cGluayUyMGdyYXBlZnJ1aXR8ZW58MXwwfHx8MTc3MzY4NTE1N3ww&ixlib=rb-4.1.0&q=80&w=1080",
-              "imageAlt": "shallow focus photo of sliced orange fruit",
-              "heading": "Rosa Grapefruit",
-              "description": "Süße und würzige Perfektion in jedem Bissen",
+              "imageAlt": "shallow focus photo of sliced pink grapefruit",
+              "heading": "Pink Grapefruit",
+              "description": "Sweet and tart perfection in every bite",
               "ctaText": "",
               "ctaHref": ""
             },
             {
               "imageUrl": "https://images.unsplash.com/photo-1670259382864-c532bcf1fa5e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjdXQlMjBncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxOTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "imageAlt": "a fruit cut in half",
-              "heading": "Reich an Nährstoffen",
-              "description": "Reich an Vitamin C, Kalium und Antioxidantien für tägliches Wohlbefinden",
+              "imageAlt": "a grapefruit cut in half",
+              "heading": "Rich in Nutrients",
+              "description": "Rich in vitamin C, potassium, and antioxidants for daily wellness",
               "ctaText": "",
               "ctaHref": ""
             },
             {
               "imageUrl": "https://images.unsplash.com/photo-1718833051058-4caaf174ed27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNnx8bWFueSUyMGdyYXBlZnJ1aXRzfGVufDF8MHx8fDE3NzM2ODUyMTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "imageAlt": "A pile of oranges sitting next to each other",
-              "heading": "Endlose kulinarische Verwendungen",
-              "description": "Vom Frühstückssaft über Salate bis zu Desserts – vielseitig und köstlich",
+              "imageAlt": "many grapefruits sitting next to each other",
+              "heading": "Endless Culinary Uses",
+              "description": "From breakfast juice to salads and desserts – versatile and delicious",
               "ctaText": "",
               "ctaHref": ""
             }
@@ -440,27 +448,27 @@
         "id": "b_faqaccordion_1773558915222",
         "type": "FAQAccordion",
         "props": {
-          "title": "Häufig gestellte Fragen",
+          "title": "Frequently Asked Questions",
           "items": [
             {
-              "q": "Wie schnell können wir veröffentlichen?",
-              "a": "Die meisten Teams stellen Updates innerhalb von Minuten bereit."
+              "q": "How quickly can we publish?",
+              "a": "Most teams deploy updates within minutes."
             },
             {
-              "q": "Können wir später überarbeiten?",
-              "a": "Ja, jeder Block kann jederzeit aktualisiert werden."
+              "q": "Can we revise later?",
+              "a": "Yes, every block can be updated at any time."
             },
             {
-              "q": "Wie wähle ich eine reife Grapefruit aus?",
-              "a": "Wählen Sie Grapefruits, die sich für ihre Größe schwer anfühlen und eine glatte, makellose Haut haben. Sie sollten bei leichtem Druck leicht nachgeben, was darauf hindeutet, dass sie saftig und verzehrbereit sind."
+              "q": "How do I select a ripe grapefruit?",
+              "a": "Choose grapefruits that feel heavy for their size and have a smooth, unblemished skin. They should give slightly to gentle pressure, indicating they are juicy and ready to eat."
             }
           ]
         }
       }
     ],
     "meta": {
-      "title": "Grapefruit-Sorten, Gesundheit & Vorteile | Avocado Stories",
-      "description": "Entdecken Sie Grapefruit-Sorten, Nährwertfakten und Wellness-Vorteile. Erfahren Sie, wie Sie diese lebendige Zitrusfrucht auswählen, lagern und täglich genießen.",
+      "title": "Grapefruit Varieties, Health & Benefits | Avocado Stories",
+      "description": "Discover grapefruit varieties, nutrition facts, and wellness benefits. Learn how to select, store, and enjoy this vibrant citrus fruit daily.",
       "ogImage": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
     }
   },
@@ -590,5 +598,107 @@
         }
       }
     ]
+  },
+  {
+    "id": "p_blueberriy_lovers",
+    "slug": "/blueberriy-lovers",
+    "title": "Blueberriy Lovers",
+    "updatedAt": "2026-03-17T21:53:00.075Z",
+    "blocks": [
+      {
+        "id": "b_hero_blueberriy-lovers",
+        "type": "Hero",
+        "props": {
+          "heading": "Blueberriy Lovers Unite",
+          "subheading": "Discover the world's finest blueberries—packed with antioxidants, bursting with flavor. Join our community of passionate blueberry enthusiasts.",
+          "ctaText": "Explore Our Collection",
+          "ctaHref": "/community",
+          "imageUrl": "https://images.unsplash.com/photo-1628104017776-50e38eb63041?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycmllcyUyMGZyZXNoJTIwaGFydmVzdHxlbnwxfDB8fHwxNzczNzgzNDg5fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "imageAlt": "Fresh ripe blueberries on the vine",
+          "imagePosition": "right",
+          "secondaryCtaText": "Learn More",
+          "secondaryCtaHref": "/"
+        }
+      },
+      {
+        "id": "b_featuregrid_1773783519651",
+        "type": "FeatureGrid",
+        "props": {
+          "title": "Why Blueberries?",
+          "features": [
+            {
+              "title": "Antioxidant Powerhouse",
+              "description": "Loaded with anthocyanins and other powerful antioxidants that support overall wellness and vitality."
+            },
+            {
+              "title": "Natural Energy Boost",
+              "description": "Rich in vitamins and natural sugars, perfect for sustained energy throughout your day."
+            },
+            {
+              "title": "Versatile & Delicious",
+              "description": "Perfect fresh, frozen, baked, or blended—endless culinary possibilities await."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_richtext_1773784054786",
+        "type": "RichText",
+        "props": {
+          "title": "Blueberry Varieties",
+          "body": "# Highbush Blueberries\n\nThe most common variety grown commercially, highbush blueberries thrive in cooler climates. They produce large, firm berries with a balanced sweet-tart flavor, making them perfect for fresh eating, baking, and preserving.\n\n# Lowbush Blueberries\n\nNative to North America, lowbush varieties are smaller and intensely flavored with deep blue color. Often called 'wild blueberries,' they pack the highest antioxidant content and are favored by health enthusiasts and gourmet chefs alike.\n\n# Rabbiteye Blueberries\n\nOriginally from the southeastern United States, rabbiteye varieties are heat-tolerant and drought-resistant. Their medium-sized berries offer a unique tart finish and excellent shelf life, ideal for warm-climate growers.\n\n# Southern Highbush Blueberries\n\nBred for warm climates, southern highbush varieties combine the best traits of their parents: large berries, sweet flavor, and heat tolerance. They're revolutionizing blueberry cultivation in previously unsuitable regions."
+        }
+      },
+      {
+        "id": "b_video_1773784186502",
+        "type": "Video",
+        "props": {
+          "src": "https://www.youtube.com/watch?v=z1sy6wO00MU",
+          "title": "Blueberry Harvest & Growing Tips",
+          "posterUrl": "https://images.unsplash.com/photo-1628104017776-50e38eb63041?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycmllcyUyMGZyZXNoJTIwaGFydmVzdHxlbnwxfDB8fHwxNzczNzgzNDg5fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+          "autoplay": "false",
+          "loop": "false"
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773784186501",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Blueberry FAQs",
+          "items": [
+            {
+              "q": "What are the health benefits of blueberries?",
+              "a": "Blueberries are rich in antioxidants, vitamin C, and fiber. They support heart health, improve brain function, and help regulate blood sugar. Regular consumption may reduce inflammation and support healthy aging."
+            },
+            {
+              "q": "How do I grow blueberries at home?",
+              "a": "Blueberries prefer acidic soil (pH 4.5–5.5) and full sun (6+ hours daily). Plant in well-draining soil, water regularly, and prune annually for best yields. Most varieties produce fruit in 2–3 years."
+            },
+            {
+              "q": "How should I store fresh blueberries?",
+              "a": "Store unwashed blueberries in a sealed container in the refrigerator for up to two weeks, or freeze them on a baking sheet before transferring to freezer bags for up to 10 months."
+            },
+            {
+              "q": "Which blueberry variety is best for my climate?",
+              "a": "Highbush varieties thrive in cooler climates; southern highbush in warm regions; rabbiteye in hot, dry areas; and lowbush (wild) in northern zones. Choose based on your USDA hardiness zone and available sunlight."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773784068524",
+        "type": "CTA",
+        "props": {
+          "title": "Join Our Blueberry Community",
+          "description": "Attend exclusive blueberry events, gain early access to premium varieties, and network with passionate growers and collectors worldwide.",
+          "ctaText": "Join Now",
+          "ctaHref": "/community"
+        }
+      }
+    ],
+    "meta": {
+      "title": "Blueberry Varieties, Growing Tips & Community Guide",
+      "description": "Learn about blueberry varieties, growing guides, and health benefits. Join our community of growers and enthusiasts. Discover highbush, lowbush, and rabbiteye blueberries."
+    }
   }
 ]
