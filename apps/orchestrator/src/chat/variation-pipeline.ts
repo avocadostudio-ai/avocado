@@ -9,6 +9,7 @@ import { openAIChatOptionsForModel } from "./planner.js"
 import { extractJsonObject } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, estimateUsd, ZERO_USAGE } from "../telemetry/usage.js"
 import { anthropicSystemPromptWithCache } from "./anthropic-cache.js"
+import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
 import {
   deriveVariationImageIntent,
   buildVariationImageQuery,
@@ -610,15 +611,20 @@ export async function runVariationPipeline(
   }
 
   const requestedProvider = body.provider ?? (ctx.availableProviders[0] as AIProvider | undefined)
-  const provider: AIProvider = requestedProvider && ctx.availableProviders.includes(requestedProvider) ? requestedProvider : "openai"
-  const modelKey = body.modelKey && ctx.modelLookup[provider][body.modelKey] ? body.modelKey : (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  const provider: AIProvider = resolveEffectiveProvider({
+    requestedProvider,
+    availableProviders: ctx.availableProviders,
+    fallbackProvider: "openai"
+  })
+  const modelKey = resolveModelKeyForProvider({
+    requestedModelKey: body.modelKey,
+    provider,
+    modelLookup: ctx.modelLookup,
+    defaultModelKey: (process.env.OPENAI_MODEL_KEY as ModelKey | undefined) ?? "balanced"
+  })
   const modelUsed = ctx.modelLookup[provider][modelKey]
   const count = requestedVariationCount(contextualMessage)
-  const plannerSource: "openai" | "anthropic" | "demo" =
-    provider === "anthropic" && process.env.ANTHROPIC_API_KEY ? "anthropic" :
-    provider === "openai" && process.env.OPENAI_API_KEY ? "openai" :
-    process.env.OPENAI_API_KEY ? "openai" :
-    process.env.ANTHROPIC_API_KEY ? "anthropic" : "demo"
+  const plannerSource: "openai" | "anthropic" | "demo" = resolvePlannerSource(provider)
 
   let variations: VariationOption[] = []
   let generatorUsage: TokenUsage | undefined
