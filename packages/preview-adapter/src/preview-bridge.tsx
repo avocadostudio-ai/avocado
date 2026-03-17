@@ -505,7 +505,6 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const perListCounts = new Map<string, number>()
       const lastByList = new Map<string, { listKey: string; index: number; root: HTMLElement }>()
       const sortedIndicesByList = new Map<string, number[]>()
-      const rootByListAndIndex = new Map<string, Map<number, HTMLElement>>()
       const firstNodeByListAndIndex = new Map<string, Map<number, HTMLElement>>()
       for (const group of resolved) {
         perListCounts.set(group.listKey, (perListCounts.get(group.listKey) ?? 0) + 1)
@@ -515,8 +514,6 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         }
         if (!sortedIndicesByList.has(group.listKey)) sortedIndicesByList.set(group.listKey, [])
         sortedIndicesByList.get(group.listKey)?.push(group.index)
-        if (!rootByListAndIndex.has(group.listKey)) rootByListAndIndex.set(group.listKey, new Map())
-        rootByListAndIndex.get(group.listKey)?.set(group.index, group.root)
         if (!firstNodeByListAndIndex.has(group.listKey)) firstNodeByListAndIndex.set(group.listKey, new Map())
         firstNodeByListAndIndex.get(group.listKey)?.set(group.index, group.nodes[0])
       }
@@ -529,9 +526,11 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           horizontalByList.set(listKey, false)
           continue
         }
-        const roots = rootByListAndIndex.get(listKey)
-        const first = roots?.get(order[0]!)
-        const second = roots?.get(order[1]!)
+        // Use first editable nodes (not roots) — roots may be the same shared
+        // ancestor (e.g. Tabs where label + content share section__inner).
+        const nodes = firstNodeByListAndIndex.get(listKey)
+        const first = nodes?.get(order[0]!)
+        const second = nodes?.get(order[1]!)
         if (!first || !second) {
           horizontalByList.set(listKey, false)
           continue
@@ -570,14 +569,52 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
           event.preventDefault()
           event.stopPropagation()
           if (del.disabled) return
-          window.parent.postMessage(
-            {
-              protocol: "site-editor/v1",
-              type: "listItemRemoveRequested",
-              payload: { slug, blockId, blockType, listKey: group.listKey, index: group.index }
-            },
-            editorOrigin
-          )
+
+          // If confirm popover already showing, dismiss it
+          const existing = controls.querySelector(".editor-delete-confirm")
+          if (existing) {
+            existing.remove()
+            if (deleteConfirmTimerRef.current) {
+              window.clearTimeout(deleteConfirmTimerRef.current)
+              deleteConfirmTimerRef.current = null
+            }
+            return
+          }
+
+          // Remove any other open confirm popovers
+          document.querySelectorAll(".editor-list-item-controls .editor-delete-confirm").forEach((el) => el.remove())
+
+          const popover = document.createElement("div")
+          popover.className = "editor-delete-confirm editor-delete-confirm--list"
+          const label = document.createElement("span")
+          label.textContent = "Delete item?"
+          const confirmBtn = document.createElement("button")
+          confirmBtn.type = "button"
+          confirmBtn.className = "editor-delete-confirm-btn"
+          confirmBtn.textContent = "Confirm"
+          confirmBtn.addEventListener("click", (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            popover.remove()
+            if (deleteConfirmTimerRef.current) {
+              window.clearTimeout(deleteConfirmTimerRef.current)
+              deleteConfirmTimerRef.current = null
+            }
+            window.parent.postMessage(
+              {
+                protocol: "site-editor/v1",
+                type: "listItemRemoveRequested",
+                payload: { slug, blockId, blockType, listKey: group.listKey, index: group.index }
+              },
+              editorOrigin
+            )
+          })
+          popover.append(label, confirmBtn)
+          controls.append(popover)
+          deleteConfirmTimerRef.current = window.setTimeout(() => {
+            popover.remove()
+            deleteConfirmTimerRef.current = null
+          }, 3500)
         })
         const order = sortedIndicesByList.get(group.listKey) ?? []
         const pos = order.findIndex((idx) => idx === group.index)
@@ -694,8 +731,54 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
             editorOrigin
           )
         })
-        entry.root.append(add)
+        const isHorizontal = horizontalByList.get(entry.listKey)
+        if (isHorizontal) {
+          add.classList.add("editor-list-item-add--inline")
+          const controls = entry.root.querySelector(".editor-list-item-controls")
+          if (controls) {
+            controls.append(add)
+          } else {
+            entry.root.append(add)
+          }
+        } else {
+          entry.root.append(add)
+        }
       }
+    }
+
+    const mountGlobalImageButtons = () => {
+      document.querySelectorAll(".editor-image-change-btn").forEach((el) => el.remove())
+      document.querySelectorAll<HTMLElement>(".editor-selectable [data-editable-target]").forEach((el) => {
+        const path = el.getAttribute("data-editable-target") ?? ""
+        if (!isImagePath(path)) return
+        const block = el.closest<HTMLElement>("[data-block-id]")
+        if (!block) return
+        const blockId = block.getAttribute("data-block-id") ?? ""
+        const currentSlug = pathname || "/"
+
+        const img = el.querySelector<HTMLImageElement>("img")
+        const currentUrl = img?.getAttribute("src") ?? undefined
+
+        // Ensure parent is positioned for absolute button placement
+        const style = window.getComputedStyle(el)
+        if (style.position === "static") {
+          el.style.position = "relative"
+        }
+
+        const btn = document.createElement("button")
+        btn.className = "editor-image-change-btn"
+        btn.title = "Change image"
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'
+        btn.addEventListener("click", (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          window.parent.postMessage(
+            { protocol: "site-editor/v1", type: "openImagePicker", payload: { slug: currentSlug, blockId, editablePath: path, currentUrl } },
+            editorOrigin
+          )
+        })
+        el.append(btn)
+      })
     }
 
     const ensureBlockBadges = () => {
@@ -955,7 +1038,8 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         target?.closest(".editor-list-item-delete") ||
         target?.closest(".editor-list-item-add") ||
         target?.closest(".editor-list-item-move") ||
-        target?.closest(".editor-delete-confirm")
+        target?.closest(".editor-delete-confirm") ||
+        target?.closest(".editor-image-change-btn")
       ) {
         return
       }
@@ -1334,9 +1418,20 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       })
     }
 
+    let imageButtonsRaf: number | null = null
+    const scheduleImageButtons = () => {
+      if (imageButtonsRaf !== null) return
+      imageButtonsRaf = requestAnimationFrame(() => {
+        imageButtonsRaf = null
+        mountGlobalImageButtons()
+      })
+    }
+
     ensureBlockBadges()
+    mountGlobalImageButtons()
     const observer = new MutationObserver(() => {
       ensureBlockBadges()
+      scheduleImageButtons()
       scheduleDetectNewBlocks()
     })
     if (document.body) observer.observe(document.body, { childList: true, subtree: true })
@@ -1349,6 +1444,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
 
     return () => {
       if (detectNewBlocksRaf !== null) cancelAnimationFrame(detectNewBlocksRaf)
+      if (imageButtonsRaf !== null) cancelAnimationFrame(imageButtonsRaf)
       cancelInlineEdit()
       clearChildFocus()
       restoreLiveDraftOriginals()
@@ -1360,7 +1456,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       document.removeEventListener("pointermove", onPointerMove, true)
       document.removeEventListener("keydown", onKeyDown, true)
       window.removeEventListener("message", onMessage)
-      document.querySelectorAll(".aifx-shimmer-overlay, .aifx-shimmer-sparkle").forEach((el) => el.remove())
+      document.querySelectorAll(".aifx-shimmer-overlay, .aifx-shimmer-sparkle, .editor-image-change-btn").forEach((el) => el.remove())
       document.documentElement.removeAttribute("data-editor-active")
     }
   }, [editorOrigin, router, slug])

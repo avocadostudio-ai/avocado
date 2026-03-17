@@ -410,9 +410,9 @@
 .editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover > .editor-list-item-controls,
 .editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within > .editor-list-item-controls,
 .editor-item-has-delete.editor-item-selected > .editor-list-item-controls,
-.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover > .editor-list-item-add,
-.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within > .editor-list-item-add,
-.editor-item-has-delete.editor-item-selected > .editor-list-item-add,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover .editor-list-item-add,
+.editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within .editor-list-item-add,
+.editor-item-has-delete.editor-item-selected .editor-list-item-add,
 .editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:hover .editor-list-item-delete,
 .editor-highlight:not(.editor-child-selected):not(.editor-child-selection-locked) .editor-item-has-delete:focus-within .editor-list-item-delete,
 .editor-item-has-delete.editor-item-selected .editor-list-item-delete,
@@ -488,18 +488,15 @@
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
-/* Horizontal list items (e.g. Tabs): controls top-left, + at bottom-center */
-.editor-list-horizontal > .editor-list-item-controls {
-  right: auto;
-  left: 8px;
-}
-
-.editor-list-horizontal > .editor-list-item-add {
-  top: auto;
-  right: auto;
-  bottom: -17px;
-  left: 50%;
-  transform: translateX(-50%);
+/* Inline + button inside controls bar for horizontal lists (e.g. Tabs) */
+.editor-list-item-add--inline {
+  position: static;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  box-shadow: none;
+  margin-left: 6px;
+  transform: none;
 }
 
 [data-editor-active] .editor-selectable [data-editable-label] {
@@ -578,11 +575,13 @@
   display: none !important;
 }
 
-.editor-child-highlight {
+.editor-child-highlight,
+.editor-item-selected {
   box-shadow: inset 0 0 0 1.5px rgba(var(--editor-selected-rgb), 0.5) !important;
 }
 
-.editor-child-highlight:not(a):not(.btn-primary):not(.btn-secondary) {
+.editor-child-highlight:not(a):not(.btn-primary):not(.btn-secondary),
+.editor-item-selected:not(a):not(.btn-primary):not(.btn-secondary) {
   background: rgba(var(--editor-selected-rgb), 0.04);
 }
 
@@ -606,6 +605,20 @@
   gap: 8px;
   z-index: 25;
   white-space: nowrap;
+}
+
+.editor-delete-confirm--list {
+  position: static;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 10px;
+  margin-left: 6px;
+  order: 99;
+}
+
+.editor-delete-confirm--list .editor-delete-confirm-btn {
+  height: 18px;
+  font-size: 10px;
 }
 
 .editor-delete-confirm-btn {
@@ -648,7 +661,7 @@
   }
 
   .editor-item-has-delete.editor-item-selected > .editor-list-item-controls,
-  .editor-item-has-delete.editor-item-selected > .editor-list-item-add,
+  .editor-item-has-delete.editor-item-selected .editor-list-item-add,
   .editor-item-has-delete.editor-item-selected .editor-list-item-delete,
   .editor-item-has-delete.editor-item-selected .editor-list-item-move {
     opacity: 1;
@@ -663,10 +676,6 @@
   }
 
   .editor-selected-add-bottom {
-    bottom: -22px;
-  }
-
-  .editor-list-horizontal > .editor-list-item-add {
     bottom: -22px;
   }
 
@@ -865,6 +874,46 @@
 @keyframes aifx-sparkle-blink {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.3; transform: scale(0.85); }
+}
+
+/* Image change hover button */
+.editor-image-change-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 24;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(var(--editor-accent-rgb), 0.92);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+}
+
+[data-editor-active] [data-editable-target]:hover > .editor-image-change-btn,
+[data-editor-active] .editor-highlight [data-editable-target] > .editor-image-change-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.editor-image-change-btn:hover {
+  background: rgba(var(--editor-accent-rgb), 1);
+}
+
+.editor-image-change-btn:focus {
+  outline: none;
+}
+
+.editor-image-change-btn:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
 @media (prefers-reduced-motion: reduce) {
