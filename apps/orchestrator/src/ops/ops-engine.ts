@@ -328,18 +328,19 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
   const skippedOps: SkippedOperation[] = []
   let orderChanged = false
   let configChanged = false
+  const originalSiteConfig = getSiteConfig(session)
+  let stagedSiteConfig = originalSiteConfig
 
   for (let opIndex = 0; opIndex < ops.length; opIndex += 1) {
     const op = ops[opIndex]
     if (op.op === "update_site_config") {
-      const current = getSiteConfig(session)
-      const merged = { ...current }
+      const merged = { ...stagedSiteConfig }
       if (op.patch.name !== undefined) merged.name = op.patch.name
       if (op.patch.logo !== undefined) merged.logo = op.patch.logo
       if (op.patch.navLabels !== undefined) {
-        merged.navLabels = { ...(current.navLabels ?? {}), ...op.patch.navLabels }
+        merged.navLabels = { ...(stagedSiteConfig.navLabels ?? {}), ...op.patch.navLabels }
       }
-      setSiteConfig(session, merged)
+      stagedSiteConfig = merged
       configChanged = true
       continue
     }
@@ -759,6 +760,9 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
   sessionDraft.clear()
   for (const [route, page] of staged) {
     setPage(session, page)
+  }
+  if (configChanged) {
+    setSiteConfig(session, stagedSiteConfig)
   }
   return {
     appliedCount: Math.max(0, ops.length - skippedOps.length),

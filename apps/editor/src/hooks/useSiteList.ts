@@ -132,6 +132,7 @@ export function useSiteList(siteId: string, session: string) {
 
   const updateHeaderConfig = useCallback(
     async (patch: Partial<HeaderConfig>) => {
+      const targetSiteId = configSiteId ?? siteId
       const merged = {
         ...headerConfig,
         ...patch,
@@ -143,11 +144,11 @@ export function useSiteList(siteId: string, session: string) {
         await fetch(`${orchestrator}/draft/site-config`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ session, siteId: configSiteId, config: merged })
+          body: JSON.stringify({ session, siteId: targetSiteId, config: merged })
         })
       } catch { /* ignore */ }
     },
-    [headerConfig, session, configSiteId]
+    [headerConfig, session, configSiteId, siteId]
   )
 
   const activeSiteConfig = useMemo(() => {

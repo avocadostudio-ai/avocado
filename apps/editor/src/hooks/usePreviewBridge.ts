@@ -14,6 +14,7 @@ export type PreviewBridgeCallbacks = {
   onListItemRemoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number) => void
   onListItemMoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex: number | undefined) => void
   onInlineTextCommitted: (slug: string, blockId: string, editablePath: string, value: string) => void
+  onOpenImagePicker: (slug: string, blockId: string, editablePath: string, currentUrl: string | undefined) => void
 }
 
 export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks, targetOrigin?: string) {
@@ -23,7 +24,7 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
   const pendingTxBySlug = useRef<Map<string, { txId: string; timer: ReturnType<typeof setTimeout> }>>(new Map())
 
   const postToSite = (
-    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading",
+    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading" | "setSelectionMode",
     payload: Record<string, unknown>
   ) => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -134,6 +135,14 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const index = typeof msg.payload.index === "number" && Number.isInteger(msg.payload.index) ? msg.payload.index : -1
         const afterIndex = typeof msg.payload.afterIndex === "number" && Number.isInteger(msg.payload.afterIndex) ? msg.payload.afterIndex : undefined
         callbacks.onListItemMoveRequested(nextSlug, blockId, blockType, listKey, index, afterIndex)
+      }
+
+      if (msg.type === "openImagePicker") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const blockId = parseString(msg.payload.blockId, "")
+        const editablePath = parseString(msg.payload.editablePath, "")
+        const currentUrl = parseOptionalString(msg.payload.currentUrl)
+        callbacks.onOpenImagePicker(nextSlug, blockId, editablePath, currentUrl)
       }
 
       if (msg.type === "inlineTextCommitted") {

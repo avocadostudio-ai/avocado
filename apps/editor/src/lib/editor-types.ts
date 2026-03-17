@@ -109,6 +109,7 @@ export type SiteMessage =
         | "listItemAddRequested"
         | "listItemRemoveRequested"
         | "listItemMoveRequested"
+        | "openImagePicker"
       payload: Record<string, unknown>
     }
   | ({ source: "site-editor/v1" } & PatchAckMessage)

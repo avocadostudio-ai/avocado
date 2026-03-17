@@ -56,6 +56,7 @@ test("parseCreatePageRequest prompt matrix", () => {
     { prompt: "create new page /test2", expected: "/test2" },
     { prompt: "generate a new page /about-us", expected: "/about-us" },
     { prompt: "add new page about cherries", expected: "/cherries" },
+    { prompt: "add a new landing page about winter jam competition", expected: "/winter-jam-competition" },
     { prompt: "create page for startup founders", expected: "/for-startup-founders" },
     { prompt: "add a page for pomegranates", expected: "/pomegranates" },
     { prompt: "add a CTA corresponding to intent of this page", expected: null },
@@ -737,6 +738,26 @@ test("isHighConfidenceDeterministicCase handles 'remove this' with activeBlockId
   assert.equal(
     isHighConfidenceDeterministicCase({ message: "remove this", currentPage }),
     false
+  )
+})
+
+test("isHighConfidenceDeterministicCase returns true for page-level delete requests", () => {
+  const currentPage = demoPublishedPages()[0]
+  for (const msg of ["delete this page", "remove this page", "remove the current page", "delete the page"]) {
+    assert.equal(
+      isHighConfidenceDeterministicCase({ message: msg, currentPage }),
+      true,
+      `Expected true for "${msg}"`
+    )
+  }
+})
+
+test("isHighConfidenceDeterministicCase returns true for 'delete the hero from this page' (block-remove, not page-delete)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "delete the hero from this page", currentPage }),
+    true,
+    "Should match via block-remove path since 'hero' is a recognized block type"
   )
 })
 

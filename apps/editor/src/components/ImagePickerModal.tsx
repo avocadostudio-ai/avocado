@@ -53,8 +53,17 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const [loadingMore, setLoadingMore] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestIdRef = useRef(0)
+
+  useEffect(() => {
+    if (!open && searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current)
+      searchTimerRef.current = null
+    }
+  }, [open])
 
   const fetchDriveImages = useCallback(async (q?: string, refresh?: boolean) => {
+    const id = ++requestIdRef.current
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -63,28 +72,33 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
       if (gdriveFolderId?.trim()) params.set("folderId", gdriveFolderId.trim())
       if (refresh) params.set("refresh", "1")
       const res = await fetch(`${orchestrator}/gdrive/images?${params}`)
+      if (id !== requestIdRef.current) return
       if (!res.ok) { setItems([]); return }
       const data = (await res.json()) as { items: ImageItem[] }
+      if (id !== requestIdRef.current) return
       setItems(data.items.map((item) => ({
         ...item,
         imageUrl: `${orchestrator}/gdrive/images/${item.id}`,
         thumbUrl: item.thumbUrl || `${orchestrator}/gdrive/images/${item.id}`
       })))
-    } catch { setItems([]) }
-    finally { setLoading(false) }
+    } catch { if (id === requestIdRef.current) setItems([]) }
+    finally { if (id === requestIdRef.current) setLoading(false) }
   }, [gdriveFolderId])
 
   const fetchUnsplashImages = useCallback(async (q?: string, page = 1) => {
     if (!q) { setItems([]); setHasMoreUnsplash(false); return }
+    const id = ++requestIdRef.current
     if (page === 1) setLoading(true); else setLoadingMore(true)
     try {
       const res = await fetch(`${orchestrator}/unsplash/search?q=${encodeURIComponent(q)}&limit=20&page=${page}`)
+      if (id !== requestIdRef.current) return
       if (!res.ok) { if (page === 1) setItems([]); setHasMoreUnsplash(false); return }
       const data = (await res.json()) as { items: ImageItem[]; totalPages: number }
+      if (id !== requestIdRef.current) return
       setItems((prev) => page === 1 ? data.items : [...prev, ...data.items])
       setHasMoreUnsplash(page < data.totalPages)
-    } catch { if (page === 1) setItems([]); setHasMoreUnsplash(false) }
-    finally { if (page === 1) setLoading(false); else setLoadingMore(false) }
+    } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMoreUnsplash(false) } }
+    finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
   }, [])
 
   // Reset state on open / tab switch
@@ -203,7 +217,6 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
         <div style={S.header}>
           <div style={S.headerLeft}>
             <span style={S.title}>Asset Picker</span>
-            {currentUrl && <img src={currentUrl} alt="" style={S.currentImg} />}
           </div>
           <button onClick={onClose} style={S.closeBtn} aria-label="Close"><X size={18} /></button>
         </div>
@@ -223,7 +236,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
         {isGridTab && (
           <>
             <div style={S.searchBar}>
-              <Search size={15} style={{ color: "#64748b", flexShrink: 0 }} />
+              <Search size={15} style={{ color: "#88a1c6", flexShrink: 0 }} />
               <input
                 type="text"
                 placeholder={activeTab === "unsplash" ? "Search Unsplash photos..." : "Search Drive images..."}
@@ -276,7 +289,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
               )}
               {loadingMore && (
                 <div style={S.loadMoreRow}>
-                  <span style={{ fontSize: 13, color: "#94a3b8" }}>Loading...</span>
+                  <span style={{ fontSize: 13, color: "#9cb2d0" }}>Loading...</span>
                 </div>
               )}
             </div>
@@ -359,13 +372,14 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
 
 const S: Record<string, React.CSSProperties> = {
   overlay: {
-    position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+    position: "fixed", inset: 0, background: "rgba(2, 6, 14, 0.72)",
     display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
   },
   modal: {
-    background: "#1e293b", borderRadius: 14, width: 640, maxWidth: "92vw", height: "80vh",
-    display: "flex", flexDirection: "column", color: "#e2e8f0",
-    boxShadow: "0 24px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.05)"
+    background: "linear-gradient(180deg, #1a2740 0%, #15233a 45%, #111c31 100%)",
+    borderRadius: 14, width: 640, maxWidth: "92vw", height: "80vh",
+    display: "flex", flexDirection: "column", color: "#e7eefb",
+    boxShadow: "0 28px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(145, 170, 210, 0.24)"
   },
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 20px 6px"
@@ -373,13 +387,9 @@ const S: Record<string, React.CSSProperties> = {
   headerLeft: {
     display: "flex", alignItems: "center", gap: 14
   },
-  title: { fontWeight: 600, fontSize: 17 },
-  currentImg: {
-    height: 40, width: 64, objectFit: "cover", borderRadius: 6,
-    border: "1px solid rgba(255,255,255,0.1)"
-  },
+  title: { fontWeight: 600, fontSize: 17, color: "#f2f7ff" },
   closeBtn: {
-    background: "none", border: "none", color: "#94a3b8", cursor: "pointer",
+    background: "none", border: "none", color: "#9db1cd", cursor: "pointer",
     padding: 6, borderRadius: 6, display: "flex"
   },
 
@@ -387,23 +397,23 @@ const S: Record<string, React.CSSProperties> = {
   tabs: { display: "flex", gap: 6, padding: "10px 20px 14px" },
   tab: {
     display: "inline-flex", alignItems: "center", gap: 6,
-    background: "transparent", border: "1px solid #334155", borderRadius: 8,
-    padding: "8px 16px", color: "#94a3b8", fontSize: 13, cursor: "pointer",
+    background: "rgba(9, 17, 31, 0.35)", border: "1px solid #375071", borderRadius: 8,
+    padding: "8px 16px", color: "#9db1cc", fontSize: 13, cursor: "pointer",
     fontWeight: 500, transition: "all .15s"
   },
-  tabActive: { background: "#334155", color: "#f1f5f9", borderColor: "#475569" },
+  tabActive: { background: "#304a71", color: "#f4f8ff", borderColor: "#8daede", boxShadow: "inset 0 0 0 1px rgba(173, 201, 239, 0.2)" },
 
   // Search
   searchBar: {
     display: "flex", alignItems: "center", gap: 8, margin: "0 20px 10px",
-    padding: "9px 12px", background: "#0f172a", borderRadius: 10, border: "1px solid #1e293b"
+    padding: "9px 12px", background: "#0b1425", borderRadius: 10, border: "1px solid #2b4161"
   },
   searchInput: {
     flex: 1, background: "transparent", border: "none", outline: "none",
-    color: "#f1f5f9", fontSize: 14
+    color: "#edf4ff", fontSize: 14
   },
   refreshBtn: {
-    background: "none", border: "none", color: "#64748b", cursor: "pointer",
+    background: "none", border: "none", color: "#8fa6c9", cursor: "pointer",
     padding: 4, borderRadius: 6, display: "flex", flexShrink: 0,
     transition: "color .15s"
   },
@@ -415,35 +425,35 @@ const S: Record<string, React.CSSProperties> = {
   },
   grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 },
   card: {
-    background: "#0f172a", border: "2px solid transparent", borderRadius: 10,
+    background: "#0d182d", border: "2px solid transparent", borderRadius: 10,
     padding: 0, cursor: "pointer", display: "flex", flexDirection: "column",
     overflow: "hidden", textAlign: "left"
   },
-  cardSelected: { borderColor: "#3b82f6", boxShadow: "0 0 0 1px #3b82f6" },
+  cardSelected: { borderColor: "#63a4ff", boxShadow: "0 0 0 1px #63a4ff, 0 8px 20px rgba(38, 116, 230, 0.35)" },
   cardImg: { width: "100%", aspectRatio: "4/3", objectFit: "cover" },
   cardLabel: {
-    fontSize: 11, color: "#94a3b8", padding: "5px 6px", lineHeight: 1.35,
+    fontSize: 11, color: "#afc2de", padding: "5px 6px", lineHeight: 1.35,
     overflow: "hidden", display: "-webkit-box",
     WebkitLineClamp: 2, WebkitBoxOrient: "vertical"
   },
 
-  status: { padding: "48px 0", textAlign: "center", color: "#475569", fontSize: 14 },
+  status: { padding: "48px 0", textAlign: "center", color: "#7f95b8", fontSize: 14 },
   loadMoreRow: { display: "flex", justifyContent: "center", padding: "12px 0 4px" },
   loadMoreBtn: {
-    background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 8,
+    background: "#2c456a", color: "#eff5ff", border: "1px solid #5e7eac", borderRadius: 8,
     padding: "8px 24px", fontSize: 13, fontWeight: 500, cursor: "pointer"
   },
 
   // Form area (upload / generate)
   formArea: { padding: "4px 20px 8px" },
   input: {
-    width: "100%", padding: "10px 12px", background: "#0f172a",
-    border: "1px solid #334155", borderRadius: 10, color: "#f1f5f9",
+    width: "100%", padding: "10px 12px", background: "#0b1425",
+    border: "1px solid #355073", borderRadius: 10, color: "#edf4ff",
     fontSize: 14, outline: "none", boxSizing: "border-box"
   },
   textarea: {
-    width: "100%", padding: "10px 12px", background: "#0f172a",
-    border: "1px solid #334155", borderRadius: 10, color: "#f1f5f9",
+    width: "100%", padding: "10px 12px", background: "#0b1425",
+    border: "1px solid #355073", borderRadius: 10, color: "#edf4ff",
     fontSize: 14, outline: "none", boxSizing: "border-box",
     resize: "vertical", fontFamily: "inherit"
   },
@@ -451,13 +461,13 @@ const S: Record<string, React.CSSProperties> = {
   uploadBtn: {
     display: "flex", alignItems: "center", gap: 8, width: "100%",
     justifyContent: "center", padding: "14px 20px", background: "transparent",
-    color: "#94a3b8", border: "2px dashed #334155", borderRadius: 12,
+    color: "#afc2de", border: "2px dashed #3f5f88", borderRadius: 12,
     fontSize: 14, cursor: "pointer", transition: "border-color .15s"
   },
 
   divider: {
     display: "flex", alignItems: "center", gap: 12, margin: "16px 0",
-    color: "#475569", fontSize: 12
+    color: "#7389aa", fontSize: 12
   },
   dividerText: {
     flex: "none", padding: "0 4px"
@@ -465,23 +475,23 @@ const S: Record<string, React.CSSProperties> = {
 
   previewRow: {
     display: "flex", alignItems: "center", gap: 12, marginTop: 14,
-    padding: 10, background: "#0f172a", borderRadius: 10
+    padding: 10, background: "#0b1425", borderRadius: 10, border: "1px solid #304a6b"
   },
   previewImg: {
     width: 120, height: 80, objectFit: "cover", borderRadius: 8, flexShrink: 0
   },
-  previewLabel: { fontSize: 13, color: "#94a3b8" },
+  previewLabel: { fontSize: 13, color: "#afc2de" },
 
   generateBtn: {
     display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10,
-    padding: "9px 18px", background: "#7c3aed", color: "white",
-    border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer"
+    padding: "9px 18px", background: "#2f79dc", color: "white",
+    border: "1px solid #6fa8f2", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer"
   },
 
   // Footer
   footer: { padding: "10px 20px 18px", display: "flex", justifyContent: "flex-end" },
   submitBtn: {
-    background: "#3b82f6", color: "white", border: "none", borderRadius: 10,
+    background: "#346ec2", color: "white", border: "1px solid #5f90da", borderRadius: 10,
     padding: "10px 28px", fontSize: 14, fontWeight: 500, cursor: "pointer"
   },
   disabled: { opacity: 0.4, cursor: "not-allowed" }
