@@ -18,7 +18,7 @@ function hasOrchestratorUrl(): boolean {
 // Lazy-load orchestrator fetch so published builds don't bundle it
 let draftFetchersPromise: ReturnType<typeof loadDraftFetchers> | null = null
 function loadDraftFetchers() {
-  return import("@ai-site-editor/site-sdk").then(
+  return import("@ai-site-editor/site-sdk/draft").then(
     ({ fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig }) => ({ fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig })
   )
 }

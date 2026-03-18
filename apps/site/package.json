@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
-    "@ai-site-editor/preview-adapter": "workspace:*",
     "@ai-site-editor/shared": "workspace:*",
     "@ai-site-editor/site-sdk": "workspace:*",
     "@tailwindcss/postcss": "^4.2.1",
