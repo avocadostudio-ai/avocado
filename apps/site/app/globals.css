@@ -501,26 +501,22 @@ main {
     justify-content: center;
   }
 
-  .site-mobile-menu.is-open {
-    width: 100%;
-    margin-top: 10px;
-    order: 4;
-  }
-
   .site-nav-links-mobile {
-    position: static;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
     width: 100%;
     max-height: min(65vh, 520px);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 0;
-    margin-top: 8px;
-    padding: 6px 12px;
-    border: 1px solid var(--nav-border);
-    border-radius: var(--radius-dropdown);
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--nav-border);
     background: var(--brand-subtle);
     box-shadow: 0 8px 18px rgb(0 0 0 / 0.08);
+    z-index: 20;
   }
 
   .site-nav-links-mobile a {
