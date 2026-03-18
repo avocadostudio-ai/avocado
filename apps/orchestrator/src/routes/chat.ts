@@ -13,7 +13,10 @@ import {
   type VariationRequestBody,
   runVariationPipeline
 } from "../chat/variation-pipeline.js"
-import { scopedSessionKey } from "../state/session-state.js"
+import { scopedSessionKey, getPage } from "../state/session-state.js"
+import { inferDeterministicIntent, isHighConfidenceDeterministicCase } from "../nlp/deterministic-planner.js"
+import { sanitizeMessageForPlanning } from "../chat/chat-pipeline-translation.js"
+import { shouldUseLlmIntentRouter } from "../chat/chat-pipeline-context.js"
 import type { RouteContext } from "./route-context.js"
 
 // ---------------------------------------------------------------------------
@@ -164,6 +167,56 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
     const body = request.body as VariationRequestBody
     const result = await runVariationPipeline(pipelineCtx, { ...body, session: scopedSessionKey(body.session, body.siteId) })
     return reply.code(result.code).send(result.payload)
+  })
+
+  // -------------------------------------------------------------------------
+  // POST /chat/prefetch — lightweight intent inference on partial user input
+  // Called by the editor as the user types (debounced). Returns whether the
+  // request is likely deterministic and an estimated latency so the UI can
+  // show "This edit will be instant" vs "This will take a few seconds".
+  // -------------------------------------------------------------------------
+  app.post("/chat/prefetch", async (request, reply) => {
+    const body = request.body as { session?: string; siteId?: string; slug?: string; message?: string; activeBlockId?: string; activeEditablePath?: string }
+    if (!body.session || !body.slug || !body.message) {
+      return reply.code(400).send({ error: "session, slug, and message are required" })
+    }
+    const session = scopedSessionKey(body.session, body.siteId)
+    const currentPage = getPage(session, body.slug)
+    if (!currentPage) {
+      return reply.code(404).send({ error: "page not found" })
+    }
+    const sanitized = sanitizeMessageForPlanning(body.message)
+    if (!sanitized) {
+      return reply.code(200).send({ likelyDeterministic: false, estimatedLatency: "slow" })
+    }
+
+    const highConfidence = isHighConfidenceDeterministicCase({
+      message: sanitized,
+      currentPage,
+      activeBlockId: body.activeBlockId,
+      activeEditablePath: body.activeEditablePath
+    })
+
+    if (highConfidence) {
+      const intent = inferDeterministicIntent({
+        message: sanitized,
+        currentPage,
+        activeBlockId: body.activeBlockId,
+        activeEditablePath: body.activeEditablePath
+      })
+      return reply.code(200).send({
+        likelyDeterministic: Boolean(intent),
+        estimatedLatency: intent ? "instant" : "moderate",
+        inferredAction: intent?.action ?? null
+      })
+    }
+
+    const likelyRouterCandidate = shouldUseLlmIntentRouter(sanitized)
+    return reply.code(200).send({
+      likelyDeterministic: false,
+      estimatedLatency: likelyRouterCandidate ? "moderate" : "slow",
+      inferredAction: null
+    })
   })
 
   app.post("/chat/start", async (request, reply) => {

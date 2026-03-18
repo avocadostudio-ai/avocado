@@ -10,6 +10,7 @@
     "./styles.css": "./src/blocks/styles.css"
   },
   "scripts": {
+    "test": "NODE_ENV=test tsx --test src/blocks/*/renderer.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.10",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3"
   }
 }

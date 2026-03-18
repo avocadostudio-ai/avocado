@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Bot, Check, Copy, Ellipsis, ExternalLink, Settings, SlidersHorizontal, Sparkles } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
@@ -56,6 +58,10 @@ const PROVIDER_LABELS: Record<AIProvider, string> = {
 
 function selectionValue(provider: AIProvider, model: ModelKey) {
   return `${provider}:${model}`
+}
+
+function renderFinalMarkdown(text: string) {
+  return <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
 }
 
 function renderSimpleMarkdown(text: string) {
@@ -253,6 +259,27 @@ function renderSimpleMarkdown(text: string) {
     tableRows = []
   }
 
+  const flushLists = () => {
+    flushList()
+    flushOrderedList()
+  }
+
+  const flushFlowBlocks = () => {
+    flushLists()
+    flushQuote()
+    flushTable()
+  }
+
+  const pushHeading = (level: number, content: string) => {
+    const key = `h-${elements.length}`
+    if (level === 1) elements.push(<h1 key={key}>{inlineMarkdown(content)}</h1>)
+    else if (level === 2) elements.push(<h2 key={key}>{inlineMarkdown(content)}</h2>)
+    else if (level === 3) elements.push(<h3 key={key}>{inlineMarkdown(content)}</h3>)
+    else if (level === 4) elements.push(<h4 key={key}>{inlineMarkdown(content)}</h4>)
+    else if (level === 5) elements.push(<h5 key={key}>{inlineMarkdown(content)}</h5>)
+    else elements.push(<h6 key={key}>{inlineMarkdown(content)}</h6>)
+  }
+
   for (const line of lines) {
     const trimmed = line.trim()
     if (inCodeFence) {
@@ -265,10 +292,7 @@ function renderSimpleMarkdown(text: string) {
     }
 
     if (/^```/.test(trimmed)) {
-      flushList()
-      flushOrderedList()
-      flushQuote()
-      flushTable()
+      flushFlowBlocks()
       inCodeFence = true
       codeFenceLanguage = trimmed.slice(3).trim()
       codeFenceLines = []
@@ -276,8 +300,7 @@ function renderSimpleMarkdown(text: string) {
     }
 
     if (/^\|.+\|$/.test(trimmed)) {
-      flushList()
-      flushOrderedList()
+      flushLists()
       flushQuote()
       tableRows.push(trimmed)
       continue
@@ -286,8 +309,7 @@ function renderSimpleMarkdown(text: string) {
 
     const quoteMatch = /^\s*>\s?(.*)$/.exec(line)
     if (quoteMatch) {
-      flushList()
-      flushOrderedList()
+      flushLists()
       quoteLines.push(quoteMatch[1] ?? "")
       continue
     }
@@ -306,19 +328,13 @@ function renderSimpleMarkdown(text: string) {
       listItems.push(listMatch[1])
       continue
     }
-    flushList()
-    flushOrderedList()
+    flushLists()
 
     const headingMatch = /^\s{0,3}(#{1,6})\s+(.+)$/.exec(line)
     if (headingMatch) {
       const level = Math.min(6, Math.max(1, headingMatch[1]?.length ?? 1))
       const content = headingMatch[2] ?? ""
-      if (level === 1) elements.push(<h1 key={`h-${elements.length}`}>{inlineMarkdown(content)}</h1>)
-      else if (level === 2) elements.push(<h2 key={`h-${elements.length}`}>{inlineMarkdown(content)}</h2>)
-      else if (level === 3) elements.push(<h3 key={`h-${elements.length}`}>{inlineMarkdown(content)}</h3>)
-      else if (level === 4) elements.push(<h4 key={`h-${elements.length}`}>{inlineMarkdown(content)}</h4>)
-      else if (level === 5) elements.push(<h5 key={`h-${elements.length}`}>{inlineMarkdown(content)}</h5>)
-      else elements.push(<h6 key={`h-${elements.length}`}>{inlineMarkdown(content)}</h6>)
+      pushHeading(level, content)
       continue
     }
 
@@ -327,8 +343,7 @@ function renderSimpleMarkdown(text: string) {
     }
     elements.push(<p key={`p-${elements.length}`}>{inlineMarkdown(line)}</p>)
   }
-  flushList()
-  flushOrderedList()
+  flushLists()
   flushQuote()
   flushTable()
   flushCodeFence()
@@ -1235,7 +1250,7 @@ function EditorPage({
               key={entry.id}
               className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""} ${entry.fieldAiContext ? "msg-field-context" : ""}`}
             >
-              <div className="msg-main">{entry.role === "assistant" ? renderSimpleMarkdown(entry.text) : entry.text}</div>
+              <div className="msg-main">{entry.role === "assistant" ? renderFinalMarkdown(entry.text) : entry.text}</div>
               {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
               {(entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line)).length > 0 ? (
                 <ul className="msg-list">
@@ -1806,13 +1821,22 @@ function EditorPage({
                   }}
                   aria-label="Select AI model"
                 >
-                  {(availableProviders.length > 0 ? availableProviders : [provider]).flatMap((p) =>
-                    (Object.keys(MODEL_LABELS[p]) as ModelKey[]).map((m) => (
-                      <option key={selectionValue(p, m)} value={selectionValue(p, m)}>
-                        {PROVIDER_LABELS[p]} {MODEL_LABELS[p][m]}
-                      </option>
-                    ))
-                  )}
+                  {(availableProviders.length > 0 ? availableProviders : [provider]).flatMap((p) => [
+                    <option key={selectionValue(p, "fast")} value={selectionValue(p, "fast")}>
+                      {PROVIDER_LABELS[p]} {MODEL_LABELS[p].fast}
+                    </option>,
+                  ])}
+                  <optgroup label="Advanced">
+                    {(availableProviders.length > 0 ? availableProviders : [provider]).flatMap((p) =>
+                      (Object.keys(MODEL_LABELS[p]) as ModelKey[])
+                        .filter((m) => m !== "fast")
+                        .map((m) => (
+                          <option key={selectionValue(p, m)} value={selectionValue(p, m)}>
+                            {PROVIDER_LABELS[p]} {MODEL_LABELS[p][m]}
+                          </option>
+                        ))
+                    )}
+                  </optgroup>
                 </select>
               </label>
               <button type="button" className="settings-link-btn settings-link-btn-danger" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>

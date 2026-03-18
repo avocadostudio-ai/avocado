@@ -6,7 +6,20 @@ import { isRewriteLikeMessage } from "./chat-pipeline-deterministic.js"
 export function shouldPreferFastModelForMessage(message: string) {
   if (inferTranslationScopeFromMessage(message) !== "none") return false
   if (isStandalonePageOperation(message)) return false
-  return isRewriteLikeMessage(message)
+  if (isRewriteLikeMessage(message)) return true
+  // Simple targeted prop edits — single-block text/label/emoji modifications
+  // don't need the balanced model. Fast is sufficient.
+  const lower = message.toLowerCase()
+  if (isSingleBlockPropEdit(lower)) return true
+  return false
+}
+
+function isSingleBlockPropEdit(lower: string) {
+  // Action verb + small cosmetic target (emojis, icons, labels, text, links)
+  const cosmeticTarget = /\b(emojis?|icons?|labels?|names?|titles?|text|headings?|links?)\b/
+  if (!cosmeticTarget.test(lower)) return false
+  // Must have a simple action verb — not create/build/generate (which imply complex content)
+  return /\b(add|remove|strip|delete|drop|clear|change|update|put|set|replace)\b/.test(lower)
 }
 
 export function shouldUseLlmIntentRouter(message: string) {

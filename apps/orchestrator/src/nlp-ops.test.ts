@@ -3,10 +3,10 @@ import assert from "node:assert/strict"
 import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
-import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning } from "./chat/chat-pipeline.js"
+import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage } from "./chat/chat-pipeline.js"
 
 test("blockSupportsImageAtPath checks schema support", () => {
   // Hero has top-level imageUrl
@@ -815,6 +815,17 @@ test("isHighConfidenceDeterministicCase returns false for add with content direc
       currentPage
     }),
     true
+  )
+})
+
+test("isHighConfidenceDeterministicCase returns false for rewrite constraints that quote banned words", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({
+      message: "Rewrite the hero so it sounds confident and modern. Keep heading under 8 words, avoid cliches like 'unlock' or 'journey', keep CTA intact.",
+      currentPage
+    }),
+    false
   )
 })
 
@@ -2360,6 +2371,27 @@ test("compileDeterministicPlan keeps deterministic handling when quoted text is 
   }
 })
 
+test("compileDeterministicPlan defers rewrite to AI when quoted text is only a banned-word constraint", () => {
+  const currentPage = demoPublishedPages()[0]
+  const hero = currentPage.blocks.find((b) => b.type === "Hero")
+  assert.ok(hero)
+  const original = process.env.OPENAI_API_KEY
+  try {
+    process.env.OPENAI_API_KEY = "sk-test-fake"
+    const plan = compileDeterministicPlan({
+      session: "test-rewrite-constraint-quoted",
+      intent: { action: "update", target_block_ref: hero!.id },
+      message: "Rewrite the hero so it sounds confident and modern. Keep heading under 8 words, avoid cliches like 'unlock' or 'journey', keep CTA intact.",
+      slug: "/",
+      currentPage
+    })
+    assert.equal(plan, null, "should return null to defer to AI planner for constraint-heavy rewrite")
+  } finally {
+    if (original === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = original
+  }
+})
+
 // ---------------------------------------------------------------------------
 // suggested_next_actions schema tests
 // ---------------------------------------------------------------------------
@@ -2719,6 +2751,36 @@ test("isLikelyClarificationFollowUp returns false for 'translate this page to ge
   assert.equal(isLikelyClarificationFollowUp("redesign this page"), false)
   assert.equal(isLikelyClarificationFollowUp("refocus this page on SaaS"), false)
   assert.equal(isLikelyClarificationFollowUp("rebuild this page"), false)
+})
+
+test("isInfoQuery detects 'what tabs do we have' as info query", () => {
+  assert.equal(isInfoQuery("what tabs do we have"), true)
+  assert.equal(isInfoQuery("what items do we have"), true)
+  assert.equal(isInfoQuery("what cards do we have"), true)
+  assert.equal(isInfoQuery("which pages do we have"), true)
+  assert.equal(isInfoQuery("what features does this have"), true)
+  assert.equal(isInfoQuery("what images do we have"), true)
+  // Edit requests should NOT match
+  assert.equal(isInfoQuery("add a new tab"), false)
+  assert.equal(isInfoQuery("rewrite the hero heading"), false)
+})
+
+test("shouldPreferFastModelForMessage prefers fast for simple prop edits", () => {
+  // Simple targeted removals → fast model
+  assert.equal(shouldPreferFastModelForMessage("remove emojis from tab labels"), true)
+  assert.equal(shouldPreferFastModelForMessage("strip icons from the labels"), true)
+  assert.equal(shouldPreferFastModelForMessage("delete the emoji from link text"), true)
+  assert.equal(shouldPreferFastModelForMessage("clear all icons from labels"), true)
+  // Simple targeted additions → fast model
+  assert.equal(shouldPreferFastModelForMessage("add emojis to tab names"), true)
+  assert.equal(shouldPreferFastModelForMessage("put icons before the labels"), true)
+  assert.equal(shouldPreferFastModelForMessage("change the heading text"), true)
+  assert.equal(shouldPreferFastModelForMessage("update the link labels"), true)
+  // Rewrites → fast model (existing behavior)
+  assert.equal(shouldPreferFastModelForMessage("rewrite the heading"), true)
+  // Complex requests → NOT fast
+  assert.equal(shouldPreferFastModelForMessage("translate this page to german"), false)
+  assert.equal(shouldPreferFastModelForMessage("create a new about page"), false)
 })
 
 test("editPlanJsonSchema ops items must NOT have additionalProperties:false", async () => {

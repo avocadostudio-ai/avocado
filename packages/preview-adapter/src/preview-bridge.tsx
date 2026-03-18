@@ -1444,8 +1444,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const blockId = String(msg.payload.blockId ?? "")
         const editablePath = String(msg.payload.editablePath ?? "")
         const active = Boolean(msg.payload.active)
-        // Remove all existing shimmer overlays/sparkles and restore inline styles
-        document.querySelectorAll(".aifx-shimmer-sparkle").forEach((el) => el.remove())
+        // Remove all existing shimmer overlays and restore inline styles
         document.querySelectorAll(".aifx-shimmer-overlay").forEach((el) => {
           const parent = el.parentElement as HTMLElement | null
           el.remove()
@@ -1455,8 +1454,6 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
               if (prevOverflow.length > 0) parent.style.overflow = prevOverflow
               else parent.style.removeProperty("overflow")
               parent.removeAttribute("data-aifx-prev-overflow")
-            } else {
-              parent.style.removeProperty("overflow")
             }
             const prevPosition = parent.getAttribute("data-aifx-prev-position")
             if (prevPosition !== null) {
@@ -1476,17 +1473,13 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
               overlay.className = "aifx-shimmer-overlay"
               const sparkle = document.createElement("div")
               sparkle.className = "aifx-shimmer-sparkle"
-              sparkle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>'
+              sparkle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>'
+              overlay.appendChild(sparkle)
               if (!target.hasAttribute("data-aifx-prev-position")) {
                 target.setAttribute("data-aifx-prev-position", target.style.position)
               }
-              if (!target.hasAttribute("data-aifx-prev-overflow")) {
-                target.setAttribute("data-aifx-prev-overflow", target.style.overflow)
-              }
               target.style.position = target.style.position || "relative"
-              target.style.overflow = "hidden"
               target.appendChild(overlay)
-              target.appendChild(sparkle)
             }
           }
         }

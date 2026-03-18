@@ -98,5 +98,249 @@
     "id": "natural_language_add_social_proof",
     "prompt": "Homepage needs social proof under hero.",
     "expectedOps": ["add_block"]
+  },
+
+  {
+    "id": "landing_page_saas_founders",
+    "prompt": "Build a landing page at /for-startups targeting SaaS founders. Include a hero with a bold headline, a feature grid showing 3 key benefits, customer testimonials, and a CTA to book a demo.",
+    "expectedOps": ["create_page", "add_block", "add_block", "add_block", "add_block"]
+  },
+  {
+    "id": "landing_page_event",
+    "prompt": "Create an event landing page at /summit-2026 with a hero banner, a schedule table, speaker cards, and a registration CTA.",
+    "expectedOps": ["create_page", "add_block", "add_block", "add_block", "add_block"]
+  },
+  {
+    "id": "landing_page_product_launch",
+    "prompt": "I'm launching a new product. Make a page at /launch with a video embed of our demo, a feature grid, stats showing traction numbers, and a signup CTA at the bottom.",
+    "expectedOps": ["create_page", "add_block", "add_block", "add_block", "add_block"]
+  },
+  {
+    "id": "landing_page_portfolio",
+    "prompt": "Create a portfolio page at /work with a hero, a gallery of project screenshots, and a quote from a happy client.",
+    "expectedOps": ["create_page", "add_block", "add_block", "add_block"]
+  },
+  {
+    "id": "landing_page_minimal",
+    "prompt": "Make a simple about page at /about with just a rich text section explaining who we are.",
+    "expectedOps": ["create_page", "add_block"]
+  },
+
+  {
+    "id": "add_stats_block",
+    "prompt": "Add a Stats section to / showing 4 metrics: 10k+ users, 99.9% uptime, 50ms latency, 200+ integrations.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_card_grid_block",
+    "prompt": "On /pricing, add a card grid with three pricing tiers: Starter, Pro, and Enterprise.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_feature_grid_block",
+    "prompt": "Add a feature grid to / highlighting speed, security, and scalability.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_two_column_block",
+    "prompt": "On /about, add a two-column layout with our mission on the left and a team photo on the right.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_rich_text_block",
+    "prompt": "Add a rich text block to /terms with our terms of service content.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_gallery_block",
+    "prompt": "On /portfolio, add an image gallery showcasing our recent projects.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_carousel_block",
+    "prompt": "Add a testimonial carousel to / with rotating customer quotes.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_table_block",
+    "prompt": "On /pricing, add a comparison table with features in rows and plan tiers in columns.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_tabs_block",
+    "prompt": "Add a tabbed section to /docs with tabs for Setup, Configuration, and API Reference.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_banner_block",
+    "prompt": "Put a promotion banner at the top of / announcing our Black Friday sale.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_quote_block",
+    "prompt": "Add a customer quote to /about from our CEO about the company vision.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_video_block",
+    "prompt": "On /, add a product demo video section.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "add_embed_block",
+    "prompt": "Embed our Calendly scheduling widget on /contact.",
+    "expectedOps": ["add_block"]
+  },
+
+  {
+    "id": "rewrite_tone_formal",
+    "prompt": "Rewrite the hero on / to sound more professional and corporate.",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "rewrite_audience_pivot",
+    "prompt": "Update the homepage hero and CTA to target enterprise buyers instead of individual developers.",
+    "expectedOps": ["update_props", "update_props"]
+  },
+  {
+    "id": "rewrite_seo_optimize",
+    "prompt": "Optimize the hero heading and subheading on / for the keyword 'project management software'.",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "rewrite_shorten_copy",
+    "prompt": "The feature grid descriptions on / are too long. Make each one a single punchy sentence.",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "rewrite_add_urgency",
+    "prompt": "Add urgency to the CTA on /pricing. Make it feel like a limited-time offer.",
+    "expectedOps": ["update_props"]
+  },
+
+  {
+    "id": "seo_set_page_meta",
+    "prompt": "Set the SEO title for / to 'Best Project Management Tool 2026' and the description to 'Ship projects faster with AI-powered task management.'",
+    "expectedOps": ["update_page_meta"]
+  },
+  {
+    "id": "seo_og_image",
+    "prompt": "Set the Open Graph image for /pricing to https://example.com/og-pricing.png.",
+    "expectedOps": ["update_page_meta"]
+  },
+  {
+    "id": "seo_multi_page",
+    "prompt": "Add SEO metadata to both / and /pricing. Homepage should target 'AI editor' and pricing should target 'pricing plans'.",
+    "expectedOps": ["update_page_meta", "update_page_meta"]
+  },
+  {
+    "id": "seo_natural_language",
+    "prompt": "Make sure the homepage shows up well in Google. Write a good title and description for it.",
+    "expectedOps": ["update_page_meta"]
+  },
+  {
+    "id": "seo_and_content_sync",
+    "prompt": "Update the hero heading on / to 'Ship Faster with AI' and also update the page's SEO title to match.",
+    "expectedOps": ["update_props", "update_page_meta"]
+  },
+
+  {
+    "id": "site_config_name_logo",
+    "prompt": "Change the site name to 'Acme Inc' and update the logo to https://acme.com/logo.svg.",
+    "expectedOps": ["update_site_config"]
+  },
+  {
+    "id": "site_config_nav_labels",
+    "prompt": "Rename the 'Pricing' nav link to 'Plans & Pricing' and the 'About' link to 'Our Story'.",
+    "expectedOps": ["update_site_config"]
+  },
+  {
+    "id": "site_config_rebrand",
+    "prompt": "We're rebranding from 'Acme' to 'Nova'. Update the site name, and change the homepage hero heading to reflect the new brand.",
+    "expectedOps": ["update_site_config", "update_props"]
+  },
+
+  {
+    "id": "multi_page_duplicate_customize",
+    "prompt": "Duplicate /pricing to /pricing-enterprise and change the hero heading on the new page to 'Enterprise Plans'.",
+    "expectedOps": ["duplicate_page", "update_props"]
+  },
+  {
+    "id": "multi_page_restructure",
+    "prompt": "Remove the /about page and rename /team to /about.",
+    "expectedOps": ["remove_page", "rename_page"]
+  },
+  {
+    "id": "multi_page_create_and_nav",
+    "prompt": "Create a /blog page with a hero and a card grid for articles, then move it after /about in the navigation.",
+    "expectedOps": ["create_page", "add_block", "add_block", "move_page"]
+  },
+  {
+    "id": "multi_page_consistent_cta",
+    "prompt": "Update the CTA button text on both / and /pricing to say 'Start Free Trial'.",
+    "expectedOps": ["update_props", "update_props"]
+  },
+
+  {
+    "id": "image_hero_update",
+    "prompt": "Replace the hero image on / with this Unsplash photo: https://images.unsplash.com/photo-1497366216548-37526070297c?w=1536&h=1024&fit=crop",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "image_gallery_add",
+    "prompt": "Add a photo gallery to /about with these Unsplash images: https://images.unsplash.com/photo-1522071820081-009f0129c71c and https://images.unsplash.com/photo-1497366216548-37526070297c",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "image_alt_text",
+    "prompt": "Update the alt text on the hero image on / to 'Team collaborating on a whiteboard'.",
+    "expectedOps": ["update_props"]
+  },
+
+  {
+    "id": "complex_page_overhaul",
+    "prompt": "On /pricing, remove the testimonials block, add a comparison table after the hero, and move the FAQ section to the bottom.",
+    "expectedOps": ["remove_block", "add_block", "move_block"]
+  },
+  {
+    "id": "complex_seasonal_update",
+    "prompt": "It's Black Friday. Add a banner at the top of /, update the CTA to say '50% off today only', and add a Stats block showing the discount.",
+    "expectedOps": ["add_block", "update_props", "add_block"]
+  },
+  {
+    "id": "complex_testimonial_refresh",
+    "prompt": "On /, replace the second testimonial with a quote from Jane at Acme, add a new testimonial from Bob at Nova, and remove the last one.",
+    "expectedOps": ["update_item", "add_item", "remove_item"]
+  },
+  {
+    "id": "complex_new_section_with_items",
+    "prompt": "Add an FAQ section to /about with 3 questions: 'What do you do?', 'Where are you located?', and 'How can I contact you?'.",
+    "expectedOps": ["add_block"]
+  },
+
+  {
+    "id": "edge_ordinal_ref",
+    "prompt": "Move the second section on / above the first one.",
+    "expectedOps": ["move_block"]
+  },
+  {
+    "id": "edge_no_page_specified",
+    "prompt": "Add a testimonials section.",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "edge_mixed_language",
+    "prompt": "Cambia el titulo del hero en / a 'Construye mas rapido con IA'.",
+    "expectedOps": ["update_props"]
+  },
+  {
+    "id": "edge_very_long_content",
+    "prompt": "Add a rich text block to /terms with the following: 'These Terms of Service govern your use of our platform. By accessing or using the service, you agree to be bound by these terms. If you do not agree, you may not use the service. We reserve the right to modify these terms at any time.'",
+    "expectedOps": ["add_block"]
+  },
+  {
+    "id": "edge_conflicting_instructions",
+    "prompt": "On /pricing, add a testimonials section and also remove all social proof.",
+    "expectedOps": ["add_block", "remove_block"]
   }
 ]

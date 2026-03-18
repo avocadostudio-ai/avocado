@@ -69,6 +69,90 @@ export function isNonEmptyString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0
 }
 
+function normalizeUpdatePropsPatch(op: Extract<EditPlan["ops"][number], { op: "update_props" }>) {
+  const rawPatch = op.patch as Record<string, unknown>
+  if (
+    rawPatch &&
+    typeof rawPatch.props === "object" &&
+    rawPatch.props !== null &&
+    !Array.isArray(rawPatch.props)
+  ) {
+    return rawPatch.props as Record<string, unknown>
+  }
+  return rawPatch
+}
+
+function isExplicitMultiTargetCtaRequest(message: string) {
+  const lower = message.toLowerCase()
+  const mentionsCta = /\bcta\b/.test(lower)
+  const mentionsHeroTarget = /\bhero\b/.test(lower)
+  const mentionsFooterTarget = /\bfooter\b/.test(lower) || /\bcta section\b/.test(lower)
+  const asksMultipleTargets = /\b(both|all|each)\b/.test(lower) || (mentionsHeroTarget && mentionsFooterTarget)
+  return mentionsCta && asksMultipleTargets && mentionsHeroTarget && mentionsFooterTarget
+}
+
+function shouldKeepLinksUnchanged(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    /\bkeep\b[^.\n]{0,80}\b(?:links?|hrefs?|urls?)\b[^.\n]{0,80}\bunchanged\b/.test(lower) ||
+    /\b(?:without|don't|do not)\b[^.\n]{0,80}\bchange\b[^.\n]{0,80}\b(?:links?|hrefs?|urls?)\b/.test(lower)
+  )
+}
+
+export function findExplicitCtaTargetCoverageGap(args: {
+  plan: EditPlan
+  message: string
+  currentPage: PageDoc
+  slug: string
+}) {
+  if (!isExplicitMultiTargetCtaRequest(args.message)) return null
+  if (args.plan.intent !== "edit_plan") return null
+
+  const hero = args.currentPage.blocks.find((block) => block.type === "Hero")
+  const footerCta = args.currentPage.blocks.find((block) => block.type === "CTA")
+  if (!hero || !footerCta) return null
+
+  const heroOps = args.plan.ops.filter(
+    (op): op is Extract<EditPlan["ops"][number], { op: "update_props" }> =>
+      op.op === "update_props" && op.pageSlug === args.slug && op.blockId === hero.id
+  )
+  const footerOps = args.plan.ops.filter(
+    (op): op is Extract<EditPlan["ops"][number], { op: "update_props" }> =>
+      op.op === "update_props" && op.pageSlug === args.slug && op.blockId === footerCta.id
+  )
+
+  const heroCurrentCta = String((hero.props as Record<string, unknown>).ctaText ?? "")
+  const footerCurrentCta = String((footerCta.props as Record<string, unknown>).ctaText ?? "")
+  const heroCovered = heroOps.some((op) => {
+    const patch = normalizeUpdatePropsPatch(op)
+    const next = patch.ctaText
+    return typeof next === "string" && next.trim().length > 0 && next.trim() !== heroCurrentCta.trim()
+  })
+  const footerCovered = footerOps.some((op) => {
+    const patch = normalizeUpdatePropsPatch(op)
+    const next = patch.ctaText
+    return typeof next === "string" && next.trim().length > 0 && next.trim() !== footerCurrentCta.trim()
+  })
+
+  const missingTargets: string[] = []
+  if (!heroCovered) missingTargets.push("hero CTA text")
+  if (!footerCovered) missingTargets.push("footer CTA text")
+  if (missingTargets.length > 0) {
+    return `Invalid explicit CTA target coverage. Missing updates for: ${missingTargets.join(", ")}.`
+  }
+
+  if (!shouldKeepLinksUnchanged(args.message)) return null
+  const linkChanged = [...heroOps, ...footerOps].some((op) => {
+    const patch = normalizeUpdatePropsPatch(op)
+    return Object.prototype.hasOwnProperty.call(patch, "ctaHref")
+  })
+  if (linkChanged) {
+    return "Invalid explicit CTA target coverage. Request says to keep links unchanged, but plan modifies CTA links."
+  }
+
+  return null
+}
+
 export function findFullPageTranslationCoverageGap(args: {
   plan: EditPlan
   message: string

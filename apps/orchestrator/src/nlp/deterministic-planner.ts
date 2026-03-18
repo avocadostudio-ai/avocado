@@ -163,7 +163,8 @@ export const intentSchema = z.object({
   anchor_block_ref: z.string().min(1).nullish(),
   patch: z.record(z.string(), z.unknown()).nullish(),
   summary: z.string().min(1).nullish(),
-  assumption: z.string().min(1).nullish()
+  assumption: z.string().min(1).nullish(),
+  complexity: z.enum(["simple", "standard"]).nullish()
 })
 export type ParsedIntent = z.infer<typeof intentSchema>
 
@@ -184,6 +185,18 @@ function isHeroLayoutRequest(message: string) {
   const mentionsSide = /\b(left|right|left-side|right-side)\b/.test(lower)
   const mentionsSwap = /\b(swap|flip|reverse)\b/.test(lower) && /\b(image|photo|picture)\b/.test(lower) && /\b(text|copy|content)\b/.test(lower)
   return (mentionsVisual && mentionsSide) || mentionsSwap
+}
+
+function hasQuotedConstraintOnlyText(message: string) {
+  if (!quotedText(message)) return false
+  return (
+    /\b(?:avoid|without|exclude|ban|forbid|never use|do not use|don't use)\b[^.\n]{0,140}["'][^"']+["']/i.test(message) ||
+    /\b(?:avoid|without|exclude)\b[^.\n]{0,140}\b(?:cliche|cliches|buzzword|buzzwords)\b[^.\n]{0,140}["'][^"']+["']/i.test(message)
+  )
+}
+
+function hasQuotedReplacementDirective(message: string) {
+  return /\b(?:set|change|update|edit|replace|rewrite|reword|rephrase)\b[^.\n]{0,160}\b(?:to|as|with)\b[^.\n]{0,40}["'][^"']+["']/i.test(message)
 }
 
 function inferActionFromMessage(message: string): ParsedIntent["action"] | null {
@@ -441,7 +454,11 @@ export function isHighConfidenceDeterministicCase(args: {
   if (action === "add" && inferBlockTypeFromText(raw)) return true
 
   // Case 4: Simple update with clear block type reference and quoted value
-  if (action === "update" && inferBlockTypeFromText(raw) && quotedText(raw)) return true
+  if (action === "update" && inferBlockTypeFromText(raw) && quotedText(raw)) {
+    if (hasQuotedConstraintOnlyText(raw)) return false
+    if (isRewriteRequest(raw) && !hasQuotedReplacementDirective(raw)) return false
+    return true
+  }
 
   return false
 }
@@ -709,7 +726,11 @@ export function compileDeterministicPlan(args: {
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
 
-  if (process.env.OPENAI_API_KEY && isRewriteRequest(message) && !quotedText(message)) return null
+  if (
+    process.env.OPENAI_API_KEY &&
+    isRewriteRequest(message) &&
+    (!hasQuotedReplacementDirective(message) || hasQuotedConstraintOnlyText(message))
+  ) return null
 
   const hasConditionalQualifier = /\bif\s+(required|needed|necessary)\b/.test(lowerMessage)
   const asksSectionReorder =

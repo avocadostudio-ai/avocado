@@ -1206,6 +1206,23 @@ textarea {
   margin-bottom: 0;
 }
 
+.msg-main h1,
+.msg-main h2,
+.msg-main h3,
+.msg-main h4,
+.msg-main h5,
+.msg-main h6 {
+  margin: 0.25em 0 0.45em;
+  line-height: 1.35;
+}
+
+.msg-main h1 { font-size: 1.12em; }
+.msg-main h2 { font-size: 1.07em; }
+.msg-main h3,
+.msg-main h4,
+.msg-main h5,
+.msg-main h6 { font-size: 1.01em; }
+
 .msg-main ul {
   margin: 0.3em 0 0.5em;
   padding-left: 1.3em;
@@ -1231,6 +1248,10 @@ textarea {
   padding: 0.12em 0 0.12em 0.7em;
   border-left: 3px solid rgba(22, 93, 204, 0.3);
   color: #334155;
+}
+
+.msg-main blockquote p {
+  margin: 0.15em 0;
 }
 
 .msg-main table {

@@ -39,7 +39,9 @@ import {
   bumpVersion,
   pushRecentEdit,
   pushChatHistory,
-  schedulePersistState
+  schedulePersistState,
+  getContextCache,
+  setContextCache
 } from "../state/session-state.js"
 import {
   toErrorDetail,
@@ -64,7 +66,7 @@ import {
   inferDeterministicIntent,
   isHighConfidenceDeterministicCase
 } from "../nlp/deterministic-planner.js"
-import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI } from "./planner.js"
+import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI, type PlannerSchemaContextMeta } from "./planner.js"
 import {
   CancelError as _CancelError,
   isCancelError as _isCancelError
@@ -78,14 +80,14 @@ import type { ToolRuntime } from "../tools/runtime.js"
 // Re-exports from extracted modules (for backwards compat with external importers)
 // ---------------------------------------------------------------------------
 export { sentenceCase, firstUrlFromText, preferredImageAltText, collectMentionedSlugsFromPlan, collectMentionedSlugsFromOps, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
-export { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, isNonEmptyString, findFullPageTranslationCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
+export { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, isNonEmptyString, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
 export { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation } from "./chat-pipeline-context.js"
 export { isRewriteLikeMessage, isPerformanceAwareMessage, isLikelyTextField, collectChangedTextFields, buildMetaChangeLogEntries, buildAiInsightChanges, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
 export { blockHasImageUrlProp, parsePath, getValueAtPath, setValueAtPath, deleteValueAtPath, extractIndexedQueries, extractReferencedItemIndices, blockSupportsImageAtPath, detectImagePaths, imageQueryFromItem, shouldPopulateAllChildImages, findImageTargets, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, shouldResolveCreatePageHeroImage, resolveHeroImageForCreatePage, detectImageOps } from "./chat-pipeline-image.js"
 
 // Internal imports from extracted modules (used by this file)
 import { collectMentionedSlugsFromPlan, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
-import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, normalizeVariationTypos, findFullPageTranslationCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
+import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, normalizeVariationTypos, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
 import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation } from "./chat-pipeline-context.js"
 import { buildAiInsightChanges, buildMetaChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
@@ -191,18 +193,26 @@ export type DeferredCreatePageImage = {
 // Utility
 // ---------------------------------------------------------------------------
 
-/** Build a compact page directory from the session draft for the system prompt. */
+/** Build a compact page directory from the session draft for the system prompt.
+ *  Results are cached per session and invalidated when pages change. */
 function buildPageDirectory(session: string): string {
+  const cached = getContextCache(session)
+  const currentVersion = versions.get(session) ?? 0
+  if (cached && cached.version === currentVersion && typeof cached.pageDirectory === "string") {
+    return cached.pageDirectory
+  }
   const draft = getSessionDraft(session)
   if (draft.size === 0) return ""
   const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
-  return slugs
+  const result = slugs
     .map((slug) => {
       const page = draft.get(slug)!
       const blockTypes = page.blocks.map((b) => b.type).join(", ")
       return `  ${slug} "${page.title}" (${blockTypes})`
     })
     .join("\n")
+  setContextCache(session, { version: currentVersion, pageDirectory: result })
+  return result
 }
 
 function isVariationRequestMessage(message: string) {
@@ -488,7 +498,7 @@ export async function runChatPipeline(
     shouldPreferFastModelForMessage(plannerMessage)
       ? ("fast" as const)
       : baseModelKey
-  const modelUsed = ctx.modelLookup[provider][modelKey]
+  let modelUsed = ctx.modelLookup[provider][modelKey]
   const plannerSource: "openai" | "anthropic" | "demo" = resolvePlannerSource(provider)
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
@@ -824,11 +834,14 @@ export async function runChatPipeline(
   })
   const compactContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_COMPACT_CONTEXT_EXPERIMENT ?? "").trim())
   const minimalContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_MINIMAL_CONTEXT_EXPERIMENT ?? "").trim())
+  // Simple single-block prop edits always get compact context — no need to
+  // send full props for every block when we're just tweaking one.
+  const isSimplePropEdit = !contentQuery && shouldPreferFastModelForMessage(plannerMessage)
   const basePlannerContext =
-    compactContextExperimentEnabled
+    (compactContextExperimentEnabled || isSimplePropEdit)
       ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
       : contextPack
-  const useMinimalPlannerContext = !contentQuery && minimalContextExperimentEnabled && shouldUseMinimalPlannerContext({
+  const useMinimalPlannerContext = !contentQuery && (minimalContextExperimentEnabled || isSimplePropEdit) && shouldUseMinimalPlannerContext({
     message: plannerMessage,
     translationScope,
     activeBlockId: planningActiveBlockId,
@@ -916,7 +929,7 @@ export async function runChatPipeline(
     plan: EditPlan,
     source: "openai" | "anthropic" | "demo",
     applyMode: "apply_now" | "plan_only" = "apply_now",
-    optionsOverride?: { preResolvedPlan?: boolean },
+    optionsOverride?: { preResolvedPlan?: boolean; preApplied?: boolean; undoSnapshot?: PageDoc },
     plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
   ) => {
     const usageFields = planUsage ? {
@@ -1047,8 +1060,8 @@ export async function runChatPipeline(
           resolvedPlan.change_log = [...resolvedPlan.change_log, pendingImageMessage]
         }
       } else {
-        // Emit plan metadata and progress markers before blocking image resolution
-        // so the UI gets instant feedback (e.g. "Created page /about.") while images load.
+        // Emit plan metadata and progress markers so the UI gets instant feedback
+        // while images resolve in the background after ops are applied.
         options?.onPlanMeta?.({
           intent: resolvedPlan.intent,
           summary: resolvedPlan.summary_for_user,
@@ -1076,8 +1089,25 @@ export async function runChatPipeline(
           })
         }
 
-        // Keep legacy rewrite path as fallback only when native tool path did not already resolve image candidates.
-        if (!usedNativeUnsplashTool && !usedNativeImageTool) {
+        // Defer image resolution: apply text/structural ops immediately, then
+        // resolve images in the background and patch them in via follow-up events.
+        // This avoids blocking the user for 1-15s while images are fetched/generated.
+        const deferImageResolution = !/^(0|false|no|off)$/i.test((process.env.CHAT_DEFER_IMAGE_RESOLUTION ?? "1").trim())
+        if (!usedNativeUnsplashTool && !usedNativeImageTool && deferImageResolution) {
+          // Tag the plan with deferred image metadata so the apply step can
+          // resolve images after text ops are visible.
+          ;(resolvedPlan as EditPlan & { _deferredImageResolution?: true })._deferredImageResolution = true
+          ;(resolvedPlan as EditPlan & { _deferredImageArgs?: unknown })._deferredImageArgs = {
+            message: plannerMessage,
+            slug: effectiveSlug,
+            currentPage: current,
+            activeBlockId: planningActiveBlockId,
+            activeEditablePath: planningActiveEditablePath,
+            chatRequestId,
+            gdriveFolderId
+          }
+        } else if (!usedNativeUnsplashTool && !usedNativeImageTool) {
+          // Legacy blocking path (deferred disabled via env)
           const imageResolutionStartMs = Date.now()
           emitStatusTone("resolving_assets")
           resolvedPlan = await withUnsplashHeroImage({
@@ -1127,6 +1157,14 @@ export async function runChatPipeline(
       })
       if (translationCoverageGap) return { done: false as const, reason: translationCoverageGap }
     }
+
+    const explicitCtaCoverageGap = findExplicitCtaTargetCoverageGap({
+      plan: resolvedPlan,
+      message: plannerMessage,
+      currentPage: current,
+      slug: effectiveSlug
+    })
+    if (explicitCtaCoverageGap) return { done: false as const, reason: explicitCtaCoverageGap }
 
     // Emit plan metadata if not already emitted (deferred image path and other branches skip the early emit above)
     if (!stageTimeline.some((item) => item.stage === "first_structured_progress")) {
@@ -1396,7 +1434,13 @@ export async function runChatPipeline(
 
     let applyStartedAtMs: number | null = null
     let skippedOps: SkippedOperation[] = []
+
+    // When ops were already applied incrementally during LLM streaming (preApplied),
+    // skip the validation/apply step and go straight to post-apply bookkeeping.
+    const skipApply = Boolean(optionsOverride?.preApplied)
+
     try {
+      if (!skipApply) {
       // Validate ops against the canonical Zod schema at the NLP → ops-engine
       // boundary. Post-planner transforms (image rewriting, UI normalization)
       // could theoretically produce malformed ops; this catches them early.
@@ -1605,7 +1649,81 @@ export async function runChatPipeline(
           }
         }
       }
-      pushUndo(body.session!, effectiveSlug, previous)
+
+      // Deferred image resolution for non-create_page ops: resolve images after
+      // text/structural ops are already visible in the preview, then patch them in.
+      const deferredImageArgs = (resolvedPlan as EditPlan & { _deferredImageResolution?: boolean; _deferredImageArgs?: {
+        message: string; slug: string; currentPage: PageDoc; activeBlockId?: string; activeEditablePath?: string; chatRequestId: string; gdriveFolderId?: string
+      } })._deferredImageArgs
+      if ((resolvedPlan as EditPlan & { _deferredImageResolution?: boolean })._deferredImageResolution && deferredImageArgs && options?.onOpApplied) {
+        try {
+          const imageResolutionStartMs = Date.now()
+          emitStatusTone("resolving_assets")
+          const resolvedImagePlan = await raceCancel(withUnsplashHeroImage({
+            plan: resolvedPlan,
+            message: deferredImageArgs.message,
+            slug: deferredImageArgs.slug,
+            currentPage: deferredImageArgs.currentPage,
+            activeBlockId: deferredImageArgs.activeBlockId,
+            activeEditablePath: deferredImageArgs.activeEditablePath,
+            chatRequestId: deferredImageArgs.chatRequestId,
+            gdriveFolderId: deferredImageArgs.gdriveFolderId,
+            log: ctx.log,
+            onStatusUpdate: options?.onStatusUpdate,
+            onImageProgress: options?.onImageProgress
+          }), options?.signal)
+          imageResolutionDurationMs += Date.now() - imageResolutionStartMs
+
+          // Find image-bearing ops that changed between the original and resolved plan
+          for (const resolvedOp of resolvedImagePlan.ops) {
+            if (resolvedOp.op !== "update_props") continue
+            const origOp = resolvedPlan.ops.find((o) => o.op === "update_props" && o.blockId === resolvedOp.blockId && o.pageSlug === resolvedOp.pageSlug)
+            const resolvedPatch = resolvedOp.patch as Record<string, unknown>
+            const origPatch = origOp && origOp.op === "update_props" ? (origOp.patch as Record<string, unknown>) : {}
+            const resolvedProps = (typeof resolvedPatch.props === "object" && resolvedPatch.props !== null && !Array.isArray(resolvedPatch.props))
+              ? resolvedPatch.props as Record<string, unknown> : resolvedPatch
+            const origProps = (typeof origPatch.props === "object" && origPatch.props !== null && !Array.isArray(origPatch.props))
+              ? origPatch.props as Record<string, unknown> : origPatch
+            const imageUrl = resolvedProps.imageUrl
+            if (typeof imageUrl === "string" && imageUrl.length > 0 && imageUrl !== origProps.imageUrl) {
+              const patchOp: Operation = {
+                op: "update_props",
+                pageSlug: resolvedOp.pageSlug,
+                blockId: resolvedOp.blockId,
+                patch: {
+                  props: {
+                    imageUrl,
+                    ...(typeof resolvedProps.imageAlt === "string" ? { imageAlt: resolvedProps.imageAlt } : {})
+                  }
+                }
+              }
+              applyOpsAtomically(body.session!, [patchOp], { componentsManifest })
+              const patchVersion = bumpVersion(body.session!)
+              options.onOpApplied({
+                index: 1,
+                total: 1,
+                op: patchOp,
+                previewVersion: patchVersion,
+                focusBlockId: resolvedOp.blockId
+              })
+              resolvedPlan.change_log = [...resolvedPlan.change_log, "Resolved image."]
+            }
+          }
+        } catch (deferredErr) {
+          if (isCancelError(deferredErr)) throw deferredErr
+          ctx.log.warn(
+            { event: "deferred_image_resolution_failed", chatRequestId, error: toErrorDetail(deferredErr) },
+            "Deferred image resolution failed — preview remains without images"
+          )
+        }
+      }
+
+      } // end if (!skipApply)
+
+      const undoSnapshot = skipApply && optionsOverride?.undoSnapshot
+        ? optionsOverride.undoSnapshot
+        : previous
+      pushUndo(body.session!, effectiveSlug, undoSnapshot)
       pendingClarificationBySession.delete(body.session!)
       pendingApprovalPlanBySession.delete(body.session!)
       const planUpdatedSlug = pickUpdatedSlug(body.session!, effectiveSlug, resolvedPlan.ops)
@@ -2039,7 +2157,249 @@ export async function runChatPipeline(
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic")
 
-  if (shouldTryLlmIntentRouter) {
+  // --- Parallel intent router + full planner ---
+  // When intent routing is enabled, launch both the fast intent router and the
+  // full planner concurrently. The router gets a ~200ms head start. If it succeeds
+  // and produces a valid plan, we abort the full planner and return immediately.
+  // If it fails, the full planner is already running — no wasted time.
+  const parallelPlannerEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_PARALLEL_PLANNER ?? "1").trim())
+  const routerHeadStartMs = Math.max(0, Math.min(Number(process.env.CHAT_ROUTER_HEAD_START_MS ?? 200), 1000))
+
+  const generatePlanImpl = plannerSource === "anthropic" ? generatePlanWithAnthropicImpl : generatePlanWithOpenAIImpl
+  const maxPlanningAttempts = 3
+  let initialPlan: EditPlan | null = null
+  const planningErrors: string[] = []
+
+  if (shouldTryLlmIntentRouter && parallelPlannerEnabled) {
+    const routerModel =
+      ctx.modelLookup[provider]?.fast ??
+      ctx.modelLookup[provider]?.balanced ??
+      modelUsed
+
+    // AbortController for the full planner — allows router success to cancel it
+    const fullPlannerAbort = new AbortController()
+    const combinedSignal = options?.signal
+      ? AbortSignal.any([options.signal, fullPlannerAbort.signal])
+      : fullPlannerAbort.signal
+
+    // Track router completion for complexity downgrade
+    let routerComplexity: "simple" | "standard" | null = null
+
+    // Intent router promise
+    emitStatusTone("understanding")
+    const routerPromise = (async () => {
+      const routedIntent =
+        plannerSource === "anthropic"
+          ? await parseIntentWithAnthropicImpl({
+              message: plannerMessage,
+              slug: effectiveSlug,
+              currentPage: current,
+              activeBlockId: planningActiveBlockId,
+              activeBlockType: body.activeBlockType,
+              activeEditablePath: planningActiveEditablePath,
+              model: routerModel,
+              log: ctx.log
+            })
+          : await parseIntentWithOpenAIImpl({
+              message: plannerMessage,
+              slug: effectiveSlug,
+              currentPage: current,
+              activeBlockId: planningActiveBlockId,
+              activeBlockType: body.activeBlockType,
+              activeEditablePath: planningActiveEditablePath,
+              model: routerModel
+            })
+
+      const routedPlan = compileDeterministicPlan({
+        session: body.session!,
+        intent: routedIntent,
+        message: plannerMessage,
+        slug: effectiveSlug,
+        currentPage: current,
+        activeBlockId: planningActiveBlockId,
+        activeEditablePath: planningActiveEditablePath
+      })
+
+      routerComplexity = routedIntent.complexity ?? null
+
+      if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
+        return { plan: routedPlan, outcome: "llm_router_plan_ready" as const }
+      }
+      if (routedPlan?.intent === "needs_clarification" && shouldReturnDeterministicClarification(plannerMessage)) {
+        return { plan: routedPlan, outcome: "llm_router_needs_clarification" as const }
+      }
+      return null // Router didn't produce a usable result
+    })()
+
+    // Full planner promise — starts after head-start delay.
+    // When the regex heuristic already suspects a simple edit, we await the
+    // router fully (adds ~200-500ms) to get the LLM complexity signal — worth
+    // it because the fast model saves 5-10s on the main plan.
+    const likelySimple = shouldPreferFastModelForMessage(plannerMessage)
+
+    const fullPlannerPromise = (async () => {
+      if (likelySimple) {
+        // Await the router to get its complexity verdict before choosing model
+        try { await routerPromise } catch { /* router failure is non-fatal */ }
+      } else if (routerHeadStartMs > 0) {
+        await sleepMs(routerHeadStartMs)
+      }
+      throwIfCanceled(combinedSignal)
+
+      // Use router's complexity signal to downgrade model when appropriate
+      let plannerModel = modelUsed
+      if (routerComplexity === "simple" && ctx.modelLookup[provider]?.fast) {
+        plannerModel = ctx.modelLookup[provider].fast
+        ctx.log.info({ event: "complexity_downgrade", from: modelUsed, to: plannerModel }, "Router signaled simple — downgrading planner to fast model")
+      }
+
+      markPlanningStart()
+      emitStatusTone("thinking")
+      const result = await raceCancel(generatePlanImpl({
+        message: plannerMessage,
+        slug: effectiveSlug,
+        currentPage: current,
+        contextPack: plannerContext,
+        model: plannerModel,
+        history: sessionChatHistory,
+        siteContextBlock,
+        toolRuntime: plannerSource === "anthropic" ? ctx.toolRuntime : undefined,
+        toolCallContext: plannerSource === "anthropic"
+          ? {
+              siteId: body.siteId ?? "default",
+              sessionId: body.session ?? "dev",
+              traceId: chatRequestId,
+              gdriveFolderId
+            }
+          : undefined,
+        onStatusUpdate: options?.onStatusUpdate,
+        onImageProgress: options?.onImageProgress,
+        onToolExecution: plannerSource === "anthropic"
+          ? (event) => {
+              if (event.ok && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
+              if (event.ok && event.toolName === "image.generate") usedNativeImageTool = true
+              ctx.chatTelemetry.push({
+                id: chatRequestId,
+                at: new Date().toISOString(),
+                phase: "tool_call",
+                session: body.session ?? "dev",
+                requestedSlug,
+                effectiveSlug,
+                plannerSource,
+                modelKey,
+                modelUsed,
+                promptHash,
+                promptExcerpt,
+                promptLength: plannerMessage.length,
+                toolName: event.toolName,
+                toolOk: event.ok,
+                toolLatencyMs: event.latencyMs,
+                toolAttempts: event.attempts,
+                toolErrorCode: event.errorCode,
+                correlationId: event.traceId,
+                outcome: event.ok ? "tool_ok" : "tool_error",
+                ...timingFields()
+              })
+            }
+          : undefined,
+        log: ctx.log,
+        onToken: onPlanningToken,
+        onFieldDraft: options?.onFieldDraft,
+        onSummaryChunk: options?.onSummaryChunk,
+        onChangeLogEntry: options?.onChangeLogEntry,
+        onPlannedOp: incrementalPlanStreamEnabled
+          ? (op, index) => {
+              markFirstStructuredProgress()
+              options?.onPlannedOp?.({ op, index })
+            }
+          : undefined,
+        manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
+        signal: combinedSignal
+      }), combinedSignal)
+      return result
+    })()
+
+    // Helper to extract plan result from the full planner promise
+    const consumeFullPlannerResult = (plannerResult: { plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }) => {
+      initialPlan = plannerResult.plan
+      planUsage = plannerResult.usage
+      if (plannerResult.schemaContext) {
+        plannerContextTelemetryFields.contractMode = plannerResult.schemaContext.contractMode
+        plannerContextTelemetryFields.contractBytes = plannerResult.schemaContext.contractBytes
+        plannerContextTelemetryFields.contractBlockCount = plannerResult.schemaContext.contractBlockCount
+        plannerContextTelemetryFields.strictJsonEnabled = plannerResult.schemaContext.strictJsonEnabled
+      }
+      markPlanningFinish()
+      emitStatusTone("validating")
+    }
+
+    // Race: router vs full planner
+    try {
+      const routerResult = await Promise.race([
+        routerPromise.then((r) => ({ source: "router" as const, result: r })),
+        fullPlannerPromise.then((r) => ({ source: "planner" as const, result: r }))
+      ])
+
+      if (routerResult.source === "router" && routerResult.result) {
+        // Router won with a usable plan — try to use it
+        const { plan: routedPlan, outcome } = routerResult.result
+        markPlanningFinish()
+        emitStatusTone("planning")
+        ctx.chatTelemetry.push({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "deterministic_plan_generated",
+          session: body.session,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome,
+          intent: routedPlan.intent,
+          opCount: routedPlan.ops.length,
+          opTypes: routedPlan.ops.map((op) => op.op),
+          plannerTier: "llm_intent_router",
+          ...timingFields()
+        })
+        const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
+        if (routedOutcome.done) {
+          // Success — abort the full planner (fire and forget)
+          fullPlannerAbort.abort("router_succeeded")
+          fullPlannerPromise.catch(() => {}) // Suppress unhandled rejection
+          return routedOutcome.response
+        }
+        // Router plan failed validation — fall through to wait for full planner
+      }
+
+      if (routerResult.source === "router") {
+        // Router returned null or failed validation — await the full planner
+        try {
+          const plannerResult = await fullPlannerPromise
+          consumeFullPlannerResult(plannerResult)
+        } catch (plannerFallbackError) {
+          if (isCancelError(plannerFallbackError)) throw plannerFallbackError
+          // Full planner also failed — fall through to retry loop
+        }
+      } else {
+        // Full planner won the race — use its result
+        consumeFullPlannerResult(routerResult.result as { plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta })
+        // Let router finish in the background (no side effects)
+        routerPromise.catch(() => {})
+      }
+    } catch (parallelError) {
+      if (isCancelError(parallelError)) throw parallelError
+      // Both failed — fall through to sequential full planner retry loop
+      fullPlannerAbort.abort("parallel_error")
+      fullPlannerPromise.catch(() => {})
+      routerPromise.catch(() => {})
+      ctx.log.warn({ err: toErrorDetail(parallelError), event: "parallel_planner_error" }, "Parallel intent router + planner failed, falling back to sequential planner")
+    }
+  } else if (shouldTryLlmIntentRouter) {
+    // Sequential intent router (parallel disabled via env)
     try {
       emitStatusTone("understanding")
       const routerModel =
@@ -2131,6 +2491,13 @@ export async function runChatPipeline(
         const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
         if (routedOutcome.done) return routedOutcome.response
       }
+      // Router couldn't produce a deterministic plan, but if it signaled
+      // "simple" complexity we can downgrade the full planner to the fast model.
+      if (routedIntent.complexity === "simple" && ctx.modelLookup[provider]?.fast) {
+        const fastModel = ctx.modelLookup[provider].fast
+        ctx.log.info({ event: "complexity_downgrade", from: modelUsed, to: fastModel }, "Router signaled simple — downgrading planner to fast model")
+        modelUsed = fastModel
+      }
     } catch {
       // If router fails, fall back to the full planner.
     }
@@ -2140,6 +2507,7 @@ export async function runChatPipeline(
   // If the message looks like a multi-step request and we haven't already entered a chain,
   // decompose it into steps and execute only the first one through the normal planner.
   if (
+    !initialPlan &&
     executionMode === "auto" &&
     !continuationChainBySession.has(body.session) &&
     isMultiStepCandidate(plannerMessage) &&
@@ -2203,13 +2571,24 @@ export async function runChatPipeline(
     }
   }
 
-  const generatePlanImpl = plannerSource === "anthropic" ? generatePlanWithAnthropicImpl : generatePlanWithOpenAIImpl
-  const maxPlanningAttempts = 3
-  let initialPlan: EditPlan | null = null
-  const planningErrors: string[] = []
   markPlanningStart()
 
-  for (let attempt = 1; attempt <= maxPlanningAttempts; attempt += 1) {
+  // Streamed per-op apply: apply ops as they stream from the LLM, so the user
+  // sees changes at ~800ms intervals instead of waiting for the full plan.
+  const streamedPerOpApplyEnabled =
+    incrementalApplyEnabled &&
+    incrementalPlanStreamEnabled &&
+    !/^(0|false|no|off)$/i.test((process.env.CHAT_STREAMED_OP_APPLY ?? "1").trim()) &&
+    Boolean(options?.onOpApplied)
+  const streamApplyState = {
+    appliedCount: 0,
+    failedAtIndex: null as number | null,
+    hasStructuralOps: false,
+    rollbackSnapshot: null as PageDoc | null
+  }
+
+  // Skip the planning loop if the parallel race already produced an initialPlan
+  for (let attempt = initialPlan ? maxPlanningAttempts + 1 : 1; attempt <= maxPlanningAttempts; attempt += 1) {
     throwIfCanceled(options?.signal)
     planningAttempts = attempt
     try {
@@ -2271,6 +2650,59 @@ export async function runChatPipeline(
           ? (op, index) => {
               markFirstStructuredProgress()
               options?.onPlannedOp?.({ op, index })
+
+              // Streamed per-op apply: validate and apply each op as it streams
+              // in from the LLM, so the user sees changes progressively instead
+              // of waiting for the entire plan.
+              if (streamedPerOpApplyEnabled && options?.onOpApplied) {
+                try {
+                  // Take a snapshot before the first streamed op
+                  if (streamApplyState.appliedCount === 0) {
+                    const existingPage = getPage(body.session!, effectiveSlug)
+                    if (existingPage) {
+                      streamApplyState.rollbackSnapshot = structuredClone(existingPage)
+                    }
+                  }
+                  // Skip structural ops (create_page, rename, etc.) — they need
+                  // the full plan context and can't be applied incrementally.
+                  const isStructural = op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
+                  if (isStructural) {
+                    streamApplyState.hasStructuralOps = true
+                    return
+                  }
+                  validateOperations([op])
+                  const stepResult = applyOpsAtomically(body.session!, [op], { componentsManifest })
+                  if (stepResult.skippedOps.length > 0) {
+                    options?.onOpSkipped?.({
+                      index,
+                      total: index, // total unknown during streaming
+                      op,
+                      reason: stepResult.skippedOps[0]!.reason
+                    })
+                    return
+                  }
+                  streamApplyState.appliedCount += 1
+                  if (firstApplyMs === null) {
+                    firstApplyMs = Date.now() - pipelineStartedAtMs
+                    stageTimeline.push({ stage: "first_op_applied", atMs: firstApplyMs })
+                  }
+                  const previewVersion = bumpVersion(body.session!)
+                  options.onOpApplied({
+                    index,
+                    total: index, // total unknown during streaming
+                    op,
+                    previewVersion,
+                    focusBlockId: pickFocusBlockId([op])
+                  })
+                } catch (streamApplyErr) {
+                  // If an op fails, mark for full rollback+re-apply after streaming
+                  streamApplyState.failedAtIndex = index
+                  ctx.log.warn(
+                    { event: "streamed_op_apply_failed", chatRequestId, opIndex: index, error: toErrorDetail(streamApplyErr) },
+                    "Streamed op apply failed — will re-apply full plan after streaming"
+                  )
+                }
+              }
             }
           : undefined,
         manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
@@ -2447,7 +2879,26 @@ export async function runChatPipeline(
     }
   }
 
-  const initialOutcome = await respondFromPlan(initialPlan, plannerSource, applyMode, undefined, "full_llm")
+  // If streamed per-op apply already applied all ops successfully and no structural
+  // ops are pending, skip the normal apply step in respondFromPlan.
+  const streamedApplyComplete =
+    streamedPerOpApplyEnabled &&
+    streamApplyState.appliedCount > 0 &&
+    streamApplyState.failedAtIndex === null &&
+    !streamApplyState.hasStructuralOps
+  // If streamed apply partially failed, roll back and let respondFromPlan re-apply everything
+  if (streamedPerOpApplyEnabled && streamApplyState.failedAtIndex !== null && streamApplyState.rollbackSnapshot) {
+    setPage(body.session!, { ...streamApplyState.rollbackSnapshot, slug: effectiveSlug })
+  }
+  const initialOutcome = await respondFromPlan(
+    initialPlan,
+    plannerSource,
+    applyMode,
+    streamedApplyComplete
+      ? { preApplied: true, undoSnapshot: streamApplyState.rollbackSnapshot ?? undefined }
+      : undefined,
+    "full_llm"
+  )
   if (initialOutcome.done) return initialOutcome.response
 
   if (!isDeterministicRepairEligible(initialOutcome.reason)) {
@@ -2480,7 +2931,9 @@ export async function runChatPipeline(
     plannerContextTelemetryFields.schemaRetryUsed = true
     const repairFeedback = /full-page translation coverage/i.test(initialOutcome.reason)
       ? `${initialOutcome.reason}. Repair for translation completeness: include missing translated text fields for list children across all affected blocks. Preserve links/hrefs unchanged.`
-      : buildDeterministicRepairFeedback(initialOutcome.reason)
+      : /explicit cta target coverage/i.test(initialOutcome.reason)
+        ? `${initialOutcome.reason}. Repair for multi-target CTA completeness: update both hero and footer CTA text targets requested by the user, keep all CTA links/hrefs unchanged, and preserve user constraints such as punctuation bans.`
+        : buildDeterministicRepairFeedback(initialOutcome.reason)
     const repairResult = await raceCancel(generatePlanImpl({
       message: plannerMessage,
       slug: effectiveSlug,
@@ -2572,6 +3025,7 @@ export async function runChatPipeline(
   const repairedOutcome = await respondFromPlan(repairedPlan, plannerSource, applyMode)
   if (repairedOutcome.done) return repairedOutcome.response
   const repairedReason = repairedOutcome.reason
+  const ctaCoverageRepairFailed = /explicit cta target coverage/i.test(repairedReason)
   ctx.chatTelemetry.push({
     id: chatRequestId,
     at: new Date().toISOString(),
@@ -2591,6 +3045,21 @@ export async function runChatPipeline(
     ...plannerContextTelemetryFields,
     ...timingFields()
   })
+  if (ctaCoverageRepairFailed) {
+    return {
+      code: 200,
+      payload: withDebugPayload({
+        status: "needs_clarification",
+        summary: "Please confirm the exact CTA wording for both the hero CTA and footer CTA so I can apply both safely.",
+        changes: [],
+        mentionedSlugs: [effectiveSlug],
+        previewVersion: versions.get(body.session) ?? 0,
+        plannerSource,
+        modelUsed,
+        modelKey
+      }, { outcome: "needs_clarification", reasonCategory: "schema_violation" })
+    }
+  }
   return {
     code: 400,
     payload: withDebugPayload({
