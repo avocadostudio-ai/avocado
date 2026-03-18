@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Bot, Check, Copy, Ellipsis, ExternalLink, Settings, SlidersHorizontal, Sparkles } from "lucide-react"
+import { Bot, Check, Copy, Ellipsis, ExternalLink, Settings, SlidersHorizontal } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
@@ -595,6 +595,9 @@ function EditorPage({
     },
     onOpenImagePicker: (newSlug, blockId, editablePath, currentUrl) => {
       setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl })
+    },
+    onEditBlockRequested: (_slug, _blockId) => {
+      setAnchoredExpanded(true)
     },
     onInlineTextCommitted: (newSlug, blockId, editablePath, value) => {
       if (newSlug !== slug) setSlugFromPreview(newSlug)
@@ -1596,39 +1599,28 @@ function EditorPage({
         />
       </section>
 
-      {anchoredPosition ? (
+      {anchoredPosition && anchoredExpanded ? (
         <div
           ref={anchoredComposerRef}
-          className={`composer--anchored${anchoredExpanded ? " is-expanded" : ""}`}
-          style={{ top: anchoredPosition.top, left: anchoredPosition.left, width: anchoredExpanded ? anchoredPosition.width : undefined }}
+          className="composer--anchored is-expanded"
+          style={{ top: anchoredPosition.top, left: anchoredPosition.left, width: anchoredPosition.width }}
         >
-          {anchoredExpanded ? (
-            <ClaudeStyleChatInput
-              message={message}
-              isLoading={chatEngine.isLoading}
-              hasUserEntry={hasUserEntry}
-              onMessageChange={setMessage}
-              onSubmit={(explicitMessage) => {
-                setMessage("")
-                void chatEngine.submitChat(explicitMessage, message)
-              }}
-              onTranscribeAudio={media.transcribeAudio}
-              onInterpretImage={media.interpretPastedImage}
-              onUploadImage={media.uploadPastedImage}
-              onCancel={chatEngine.cancelChat}
-              onAutoHeightChange={() => {}}
-              compact
-            />
-          ) : (
-            <button
-              type="button"
-              className="anchored-pill-trigger"
-              onClick={() => setAnchoredExpanded(true)}
-              aria-label="Edit this element"
-            >
-              <Sparkles size={14} />
-            </button>
-          )}
+          <ClaudeStyleChatInput
+            message={message}
+            isLoading={chatEngine.isLoading}
+            hasUserEntry={hasUserEntry}
+            onMessageChange={setMessage}
+            onSubmit={(explicitMessage) => {
+              setMessage("")
+              void chatEngine.submitChat(explicitMessage, message)
+            }}
+            onTranscribeAudio={media.transcribeAudio}
+            onInterpretImage={media.interpretPastedImage}
+            onUploadImage={media.uploadPastedImage}
+            onCancel={chatEngine.cancelChat}
+            onAutoHeightChange={() => {}}
+            compact
+          />
         </div>
       ) : null}
 

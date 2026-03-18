@@ -198,7 +198,7 @@
 .editor-block-toolbar {
   position: absolute;
   top: 8px;
-  right: 48px;
+  right: 16px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -237,6 +237,40 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
+}
+
+.editor-selected-edit {
+  border: 0;
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 23;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.editor-selected-edit svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-selected-edit:hover {
+  background: rgba(15, 23, 42, 1);
 }
 
 .editor-selected-move {
@@ -400,6 +434,8 @@
 .editor-highlight:focus-within > .editor-selected-add,
 .editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) .editor-selected-delete,
 .editor-highlight:focus-within .editor-selected-delete,
+.editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) .editor-selected-edit,
+.editor-highlight:focus-within .editor-selected-edit,
 .editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) .editor-selected-move,
 .editor-highlight:focus-within .editor-selected-move {
   opacity: 1;
@@ -427,10 +463,12 @@
 .editor-highlight.editor-child-selected > .editor-block-toolbar,
 .editor-highlight.editor-child-selected > .editor-selected-add,
 .editor-highlight.editor-child-selected > .editor-selected-delete,
+.editor-highlight.editor-child-selected > .editor-selected-edit,
 .editor-highlight.editor-child-selected > .editor-selected-move,
 .editor-highlight.editor-child-hovering > .editor-block-toolbar,
 .editor-highlight.editor-child-hovering > .editor-selected-add,
 .editor-highlight.editor-child-hovering > .editor-selected-delete,
+.editor-highlight.editor-child-hovering > .editor-selected-edit,
 .editor-highlight.editor-child-hovering > .editor-selected-move {
   opacity: 0;
   visibility: hidden;
@@ -645,6 +683,7 @@
   .editor-block-toolbar,
   .editor-selected-add,
   .editor-selected-delete,
+  .editor-selected-edit,
   .editor-selected-move {
     opacity: 1;
     visibility: visible;
@@ -862,26 +901,32 @@
   mix-blend-mode: screen;
 }
 
+/* Force toolbar visible while AI shimmer is active */
+.editor-block-toolbar:has(.aifx-shimmer-sparkle) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 .aifx-shimmer-sparkle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  position: static;
   z-index: 1;
-  width: clamp(10px, 28%, 18px);
-  height: clamp(10px, 28%, 18px);
-  display: inline-flex;
+  width: 28px !important;
+  height: 28px !important;
+  flex-shrink: 0;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  color: rgb(232, 236, 241);
-  transform-origin: 100% 0;
+  color: #fff !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border-radius: 50% !important;
   animation: aifx-sparkle-blink 1s ease-in-out infinite;
 }
 
 .aifx-shimmer-sparkle svg {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 13px;
+  height: 13px;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 6px rgba(170, 178, 186, 0.45));
 }
 
@@ -899,18 +944,14 @@
     animation-duration: 1.2s;
   }
 
-  .aifx-shimmer-sparkle {
-    color: rgb(242, 246, 251);
-  }
-
   .aifx-shimmer-sparkle svg {
-    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.98)) drop-shadow(0 0 10px rgba(180, 189, 198, 0.6));
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.28));
   }
 }
 
 @keyframes aifx-sparkle-blink {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.85); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.8); }
 }
 
 @keyframes aifx-shimmer-sweep {

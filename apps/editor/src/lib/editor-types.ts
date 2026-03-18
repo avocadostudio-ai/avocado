@@ -110,6 +110,7 @@ export type SiteMessage =
         | "listItemRemoveRequested"
         | "listItemMoveRequested"
         | "openImagePicker"
+        | "editBlockRequested"
         | "iframeScrolled"
       payload: Record<string, unknown>
     }
