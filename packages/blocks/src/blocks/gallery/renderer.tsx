@@ -1,6 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
-import { renderInline } from "../_shared"
+import { renderInline, BlockImage } from "../_shared"
 
 const colsClass: Record<string, string> = {
   "2": "gallery__grid--2",
@@ -31,10 +31,13 @@ export function Gallery(props: Record<string, unknown>): JSX.Element {
             return (
               <figure key={idx} className="gallery__item">
                 {imageUrl.length > 0 && (
-                  <img
+                  <BlockImage
                     className="gallery__image"
                     src={imageUrl}
                     alt={alt}
+                    width={800}
+                    height={600}
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     loading={idx < 4 ? "eager" : "lazy"}
                   />
                 )}

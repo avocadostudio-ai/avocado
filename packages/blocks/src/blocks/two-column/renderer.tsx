@@ -1,6 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
-import { PrimaryButton, renderRichTextContent } from "../_shared"
+import { PrimaryButton, renderRichTextContent, BlockImage } from "../_shared"
 
 function TwoColumnChild({ item, headingTag }: { item: Record<string, unknown>; headingTag: keyof JSX.IntrinsicElements }) {
   const childType = String(item.type ?? "")
@@ -56,9 +56,12 @@ function TwoColumnChild({ item, headingTag }: { item: Record<string, unknown>; h
   if (childType === "image") {
     return (
       <div className="two-column__media" data-editable-target="imageUrl" data-editable-target-label="Image">
-        <img
+        <BlockImage
           src={String(item.src ?? "")}
           alt={String(item.alt ?? "")}
+          width={768}
+          height={1024}
+          sizes="(max-width: 768px) 100vw, 50vw"
           data-editable-label="Image"
         />
       </div>

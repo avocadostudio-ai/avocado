@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { renderRichTextContent } from "../_shared"
+import { renderRichTextContent, BlockImage } from "../_shared"
 
 export function Quote(props: Record<string, unknown>): JSX.Element {
   const quote = String(props.quote ?? "")
@@ -24,7 +24,7 @@ export function Quote(props: Record<string, unknown>): JSX.Element {
         {(author.length > 0 || role.length > 0) && (
           <div className="quote-block__attribution">
             {imageUrl.length > 0 && (
-              <img className="quote-block__avatar" src={imageUrl} alt={author || "Author"} width={48} height={48} />
+              <BlockImage className="quote-block__avatar" src={imageUrl} alt={author || "Author"} width={48} height={48} />
             )}
             <div className="quote-block__author-info">
               {author.length > 0 && (

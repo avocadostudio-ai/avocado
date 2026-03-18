@@ -1,5 +1,7 @@
 import type { AnchorHTMLAttributes, JSX, ReactNode } from "react"
 
+export { BlockImage, type BlockImageProps } from "./block-image"
+
 export function decodeSoftHyphenEntities(input: string) {
   return input
     .replace(/&amp;shy;/gi, "&shy;")

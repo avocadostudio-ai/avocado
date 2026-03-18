@@ -1,6 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
-import { PrimaryButton } from "../_shared"
+import { PrimaryButton, BlockImage } from "../_shared"
 
 export function CardGrid(props: Record<string, unknown>) {
   const cards = Array.isArray(props.cards) ? props.cards : []
@@ -28,10 +28,13 @@ export function CardGrid(props: Record<string, unknown>) {
                     data-editable-target-label={`cards[${idx}].imageUrl`}
                     data-editable-label={`cards[${idx}].imageUrl`}
                   >
-                    <img
+                    <BlockImage
                       src={imageUrl}
                       alt={imageAlt.length > 0 ? imageAlt : "Card image"}
                       className="card__image"
+                      width={768}
+                      height={512}
+                      sizes="(max-width: 768px) 100vw, 33vw"
                       loading="lazy"
                     />
                   </div>

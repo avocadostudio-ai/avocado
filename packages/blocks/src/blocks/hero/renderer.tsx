@@ -1,6 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
-import { PrimaryButton, SecondaryButton } from "../_shared"
+import { PrimaryButton, SecondaryButton, BlockImage } from "../_shared"
 
 export function Hero(props: Record<string, unknown>) {
   const imagePosition = String(props.imagePosition ?? "right") === "left" ? "left" : "right"
@@ -38,9 +38,13 @@ export function Hero(props: Record<string, unknown>) {
           </div>
         </div>
         <div className="hero__media" data-editable-target="imageUrl" data-editable-target-label="Hero block image">
-          <img
+          <BlockImage
             src={String(props.imageUrl ?? "/hero-generated.svg")}
             alt={String(props.imageAlt ?? "Hero image")}
+            width={1536}
+            height={1024}
+            sizes="(max-width: 900px) 100vw, 50vw"
+            priority
             data-editable-label="Hero block image"
           />
         </div>
