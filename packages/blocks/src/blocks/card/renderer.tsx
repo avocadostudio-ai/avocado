@@ -1,6 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
-import { PrimaryButton } from "../_shared"
+import { PrimaryButton, BlockImage } from "../_shared"
 
 export function Card(props: Record<string, unknown>) {
   const imageUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
@@ -12,7 +12,7 @@ export function Card(props: Record<string, unknown>) {
         <article className="card">
           {imageUrl.length > 0 && (
             <div className="card__image-wrap" data-editable-target="imageUrl" data-editable-target-label="image">
-              <img src={imageUrl} alt={imageAlt.length > 0 ? imageAlt : "Card image"} className="card__image" loading="lazy" />
+              <BlockImage src={imageUrl} alt={imageAlt.length > 0 ? imageAlt : "Card image"} className="card__image" width={768} height={512} sizes="(max-width: 768px) 100vw, 50vw" loading="lazy" />
             </div>
           )}
           <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">

@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { renderInline, PrimaryButton } from "../_shared"
+import { renderInline, PrimaryButton, BlockImage } from "../_shared"
 
 export function Carousel(props: Record<string, unknown>): JSX.Element {
   const items = Array.isArray(props.items) ? props.items : []
@@ -25,10 +25,14 @@ export function Carousel(props: Record<string, unknown>): JSX.Element {
             return (
               <div key={idx} className="carousel__slide">
                 {imageUrl.length > 0 && (
-                  <img
+                  <BlockImage
                     className="carousel__image"
                     src={imageUrl}
                     alt={imageAlt}
+                    width={1200}
+                    height={600}
+                    sizes="(max-width: 900px) 100vw, 80vw"
+                    priority={idx === 0}
                     loading={idx === 0 ? "eager" : "lazy"}
                   />
                 )}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback, useId } from "react"
+import { BlockImage } from "../_shared"
 
 type NavLink = { label: string; href: string }
 
@@ -77,8 +78,7 @@ export function SiteHeader(props: Record<string, unknown>) {
     <>
       <header className="site-top-nav" data-block-chrome="true">
         <a className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" />
+          <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" />
           <span className="site-brand-text">{siteName}</span>
         </a>
         <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">

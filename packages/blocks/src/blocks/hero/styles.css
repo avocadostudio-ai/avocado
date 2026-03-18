@@ -48,8 +48,8 @@
 }
 
 .hero__media img {
-  width: 100%;
-  height: auto;
+  width: 100% !important;
+  height: auto !important;
   display: block;
   object-fit: cover;
   background: var(--placeholder-img);
