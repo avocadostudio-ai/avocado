@@ -498,7 +498,7 @@ export async function runChatPipeline(
     shouldPreferFastModelForMessage(plannerMessage)
       ? ("fast" as const)
       : baseModelKey
-  let modelUsed = ctx.modelLookup[provider][modelKey]
+  const modelUsed = ctx.modelLookup[provider][modelKey]
   const plannerSource: "openai" | "anthropic" | "demo" = resolvePlannerSource(provider)
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
@@ -834,14 +834,12 @@ export async function runChatPipeline(
   })
   const compactContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_COMPACT_CONTEXT_EXPERIMENT ?? "").trim())
   const minimalContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_MINIMAL_CONTEXT_EXPERIMENT ?? "").trim())
-  // Simple single-block prop edits always get compact context — no need to
-  // send full props for every block when we're just tweaking one.
-  const isSimplePropEdit = !contentQuery && shouldPreferFastModelForMessage(plannerMessage)
+  const isLightweightEdit = !contentQuery && shouldPreferFastModelForMessage(plannerMessage)
   const basePlannerContext =
-    (compactContextExperimentEnabled || isSimplePropEdit)
+    (compactContextExperimentEnabled || isLightweightEdit)
       ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
       : contextPack
-  const useMinimalPlannerContext = !contentQuery && (minimalContextExperimentEnabled || isSimplePropEdit) && shouldUseMinimalPlannerContext({
+  const useMinimalPlannerContext = !contentQuery && (minimalContextExperimentEnabled || isLightweightEdit) && shouldUseMinimalPlannerContext({
     message: plannerMessage,
     translationScope,
     activeBlockId: planningActiveBlockId,
@@ -2235,10 +2233,13 @@ export async function runChatPipeline(
     // When the regex heuristic already suspects a simple edit, we await the
     // router fully (adds ~200-500ms) to get the LLM complexity signal — worth
     // it because the fast model saves 5-10s on the main plan.
+    // Exception: if the model is already "fast" (heuristic already selected it),
+    // skip the await — the router can't downgrade further.
     const likelySimple = shouldPreferFastModelForMessage(plannerMessage)
+    const alreadyFastModel = modelKey === "fast"
 
     const fullPlannerPromise = (async () => {
-      if (likelySimple) {
+      if (likelySimple && !alreadyFastModel) {
         // Await the router to get its complexity verdict before choosing model
         try { await routerPromise } catch { /* router failure is non-fatal */ }
       } else if (routerHeadStartMs > 0) {
@@ -2261,10 +2262,10 @@ export async function runChatPipeline(
         currentPage: current,
         contextPack: plannerContext,
         model: plannerModel,
-        history: sessionChatHistory,
-        siteContextBlock,
-        toolRuntime: plannerSource === "anthropic" ? ctx.toolRuntime : undefined,
-        toolCallContext: plannerSource === "anthropic"
+        history: isLightweightEdit ? [] : sessionChatHistory,
+        siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
+        toolRuntime: plannerSource === "anthropic" && !isLightweightEdit ? ctx.toolRuntime : undefined,
+        toolCallContext: plannerSource === "anthropic" && !isLightweightEdit
           ? {
               siteId: body.siteId ?? "default",
               sessionId: body.session ?? "dev",
@@ -2274,7 +2275,7 @@ export async function runChatPipeline(
           : undefined,
         onStatusUpdate: options?.onStatusUpdate,
         onImageProgress: options?.onImageProgress,
-        onToolExecution: plannerSource === "anthropic"
+        onToolExecution: plannerSource === "anthropic" && !isLightweightEdit
           ? (event) => {
               if (event.ok && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
               if (event.ok && event.toolName === "image.generate") usedNativeImageTool = true
@@ -2314,6 +2315,7 @@ export async function runChatPipeline(
             }
           : undefined,
         manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
+        lightweight: routerComplexity === "simple" || likelySimple,
         signal: combinedSignal
       }), combinedSignal)
       return result
@@ -2491,13 +2493,6 @@ export async function runChatPipeline(
         const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
         if (routedOutcome.done) return routedOutcome.response
       }
-      // Router couldn't produce a deterministic plan, but if it signaled
-      // "simple" complexity we can downgrade the full planner to the fast model.
-      if (routedIntent.complexity === "simple" && ctx.modelLookup[provider]?.fast) {
-        const fastModel = ctx.modelLookup[provider].fast
-        ctx.log.info({ event: "complexity_downgrade", from: modelUsed, to: fastModel }, "Router signaled simple — downgrading planner to fast model")
-        modelUsed = fastModel
-      }
     } catch {
       // If router fails, fall back to the full planner.
     }
@@ -2600,10 +2595,10 @@ export async function runChatPipeline(
         currentPage: current,
         contextPack: plannerContext,
         model: modelUsed,
-        history: sessionChatHistory,
-        siteContextBlock,
-        toolRuntime: plannerSource === "anthropic" ? ctx.toolRuntime : undefined,
-        toolCallContext: plannerSource === "anthropic"
+        history: isLightweightEdit ? [] : sessionChatHistory,
+        siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
+        toolRuntime: plannerSource === "anthropic" && !isLightweightEdit ? ctx.toolRuntime : undefined,
+        toolCallContext: plannerSource === "anthropic" && !isLightweightEdit
           ? {
               siteId: body.siteId ?? "default",
               sessionId: body.session ?? "dev",
@@ -2613,7 +2608,7 @@ export async function runChatPipeline(
           : undefined,
         onStatusUpdate: options?.onStatusUpdate,
         onImageProgress: options?.onImageProgress,
-        onToolExecution: plannerSource === "anthropic"
+        onToolExecution: plannerSource === "anthropic" && !isLightweightEdit
           ? (event) => {
               if (event.ok && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
               if (event.ok && event.toolName === "image.generate") usedNativeImageTool = true
@@ -2706,6 +2701,7 @@ export async function runChatPipeline(
             }
           : undefined,
         manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
+        lightweight: shouldPreferFastModelForMessage(plannerMessage),
         signal: options?.signal
       }), options?.signal)
       initialPlan = result.plan

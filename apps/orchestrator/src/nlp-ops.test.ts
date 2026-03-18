@@ -58,7 +58,9 @@ test("parseCreatePageRequest prompt matrix", () => {
     { prompt: "add new page about cherries", expected: "/cherries" },
     { prompt: "add a new landing page about winter jam competition", expected: "/winter-jam-competition" },
     { prompt: "create page for startup founders", expected: "/for-startup-founders" },
-    { prompt: "add a page for pomegranates", expected: "/pomegranates" },
+    { prompt: "add a page for pomegranates", expected: "/for-pomegranates" },
+    { prompt: "Create a new page about avocado recipes with a Hero section, a feature highlights grid", expected: "/avocado-recipes" },
+    { prompt: "create page about cooking tips including hero and FAQ", expected: "/cooking-tips" },
     { prompt: "add a CTA corresponding to intent of this page", expected: null },
     { prompt: "improve this page", expected: null },
     { prompt: "delete this page", expected: null },
@@ -354,7 +356,13 @@ test("requestsContentGeneration detects content-generation requests", () => {
     "add new page about cherries",
     "create landing page for startup founders"
   ]
+  // Topic + enumerated block types → content generation (defer to LLM)
+  const topicWithBlocks = [
+    "Create a new page about avocado recipes with a Hero section, a feature highlights grid, a card grid, an FAQ section, and a CTA",
+    "create page about cooking tips with hero, card, faq and cta sections",
+  ]
   for (const prompt of positives) assert.equal(requestsContentGeneration(prompt), true, prompt)
+  for (const prompt of topicWithBlocks) assert.equal(requestsContentGeneration(prompt), true, prompt)
   for (const prompt of negatives) assert.equal(requestsContentGeneration(prompt), false, prompt)
 })
 
@@ -1892,6 +1900,15 @@ test("isBatchAddRequest treats populate/update-all as batch overrides", () => {
   assert.equal(isBatchAddRequest("update the hero heading"), false)
 })
 
+test("isBatchAddRequest detects 'add more content to this page' as batch override", () => {
+  assert.equal(isBatchAddRequest("add more content to this page"), true)
+  assert.equal(isBatchAddRequest("add content to the page"), true)
+  assert.equal(isBatchAddRequest("add more sections to this page"), true)
+  assert.equal(isBatchAddRequest("expand this page"), true)
+  assert.equal(isBatchAddRequest("flesh out this page"), true)
+  assert.equal(isBatchAddRequest("enrich the page"), true)
+})
+
 test("isBatchAddRequest matches counted add with adjectives between number and noun", () => {
   assert.equal(isBatchAddRequest("Add 3 audience-targeted sections for beginner home cooks, nutrition-focused families, and premium food enthusiasts"), true)
   assert.equal(isBatchAddRequest("add 3 new sections"), true, "regression: 'new' still works as adjective")
@@ -2783,9 +2800,12 @@ test("shouldPreferFastModelForMessage prefers fast for simple prop edits", () =>
   assert.equal(shouldPreferFastModelForMessage("create a new about page"), false)
 })
 
-test("editPlanJsonSchema ops items must NOT have additionalProperties:false", async () => {
+test("editPlanJsonSchema ops items declares all operation fields for strict mode compatibility", async () => {
   const { editPlanJsonSchema } = await import("./chat/plan-json-schema.js")
   const opsItems = editPlanJsonSchema.properties.ops.items as Record<string, unknown>
-  assert.notEqual(opsItems.additionalProperties, false,
-    "ops items schema must not set additionalProperties:false — smaller models (Haiku) follow it literally and strip block/pageSlug/props fields")
+  const props = (opsItems as { properties?: Record<string, unknown> }).properties ?? {}
+  // All common op fields must be declared so they survive additionalProperties:false
+  for (const field of ["op", "pageSlug", "blockId", "patch", "block", "page", "listKey", "index", "item"]) {
+    assert.ok(props[field], `ops items schema must declare '${field}' for OpenAI strict mode`)
+  }
 })

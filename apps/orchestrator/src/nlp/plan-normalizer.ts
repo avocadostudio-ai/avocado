@@ -91,6 +91,61 @@ export function repairJson(raw: string): string {
   return result
 }
 
+/**
+ * Attempt multiple JSON repair strategies. Returns the first one that
+ * produces parseable JSON, or throws the original error.
+ */
+export function repairAndParseJson(raw: string): unknown {
+  // Strategy 1: basic repair
+  const basic = repairJson(raw)
+  try { return JSON.parse(basic) } catch {}
+
+  // Strategy 2: fix "no number after minus sign" by replacing bare `-`
+  // outside of string literals with `0`. Walk character by character to
+  // track whether we're inside a JSON string.
+  try {
+    const chars = [...basic]
+    let inString = false
+    let escaped = false
+    for (let i = 0; i < chars.length; i++) {
+      if (escaped) { escaped = false; continue }
+      if (chars[i] === "\\") { escaped = true; continue }
+      if (chars[i] === '"') { inString = !inString; continue }
+      if (!inString && chars[i] === "-") {
+        const next = chars[i + 1]
+        if (next === undefined || !/\d/.test(next)) {
+          // Bare minus not followed by digit — replace with 0
+          chars[i] = "0"
+        }
+      }
+    }
+    return JSON.parse(chars.join(""))
+  } catch {}
+
+  // Strategy 3: truncated output — close open braces/brackets in correct order
+  try {
+    let repaired = basic
+    const stack: string[] = []
+    let inStr = false
+    let esc = false
+    for (const ch of repaired) {
+      if (esc) { esc = false; continue }
+      if (ch === "\\") { esc = true; continue }
+      if (ch === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (ch === "{") stack.push("}")
+      else if (ch === "[") stack.push("]")
+      else if (ch === "}" || ch === "]") stack.pop()
+    }
+    if (inStr) repaired += '"'
+    while (stack.length > 0) repaired += stack.pop()
+    return JSON.parse(repaired)
+  } catch {}
+
+  // All strategies failed — throw original parse error
+  return JSON.parse(raw)
+}
+
 // ---------------------------------------------------------------------------
 // Operation name normalisation
 // ---------------------------------------------------------------------------

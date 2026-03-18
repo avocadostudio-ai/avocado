@@ -669,3 +669,27 @@ test("generatePlanWithOpenAI uses strict response_format when CHAT_STRICT_JSON_R
     else process.env.CHAT_STRICT_JSON_RESPONSE = previous
   }
 })
+
+// ---------------------------------------------------------------------------
+// repairAndParseJson tests
+// ---------------------------------------------------------------------------
+import { repairAndParseJson } from "./nlp/plan-normalizer.js"
+
+test("repairAndParseJson fixes bare minus sign (no number after minus)", () => {
+  // Simulate the "No number after minus sign" error: bare `-` outside a string
+  const malformed = '{"change_log": [- "Set SEO title"], "ops": []}'
+  const parsed = repairAndParseJson(malformed) as { change_log: string[] }
+  assert.ok(Array.isArray(parsed.change_log))
+})
+
+test("repairAndParseJson fixes truncated JSON by closing braces", () => {
+  const truncated = '{"intent": "edit_plan", "ops": [{"op": "update_props"'
+  const parsed = repairAndParseJson(truncated) as { intent: string }
+  assert.equal(parsed.intent, "edit_plan")
+})
+
+test("repairAndParseJson preserves minus signs inside JSON strings", () => {
+  const valid = '{"description": "150-160 chars - keep it focused"}'
+  const parsed = repairAndParseJson(valid) as { description: string }
+  assert.equal(parsed.description, "150-160 chars - keep it focused")
+})

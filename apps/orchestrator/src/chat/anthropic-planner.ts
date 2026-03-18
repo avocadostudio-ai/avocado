@@ -18,7 +18,8 @@ import {
   extractJsonObject,
   normalizeOpName,
   normalizePlanCandidate,
-  repairJson
+  repairJson,
+  repairAndParseJson
 } from "../nlp/plan-normalizer.js"
 import {
   buildPlannerSchemaContext,
@@ -207,6 +208,7 @@ export async function generatePlanWithAnthropic(args: {
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
   manifestBlockTypes?: string[]
+  lightweight?: boolean
   signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
@@ -224,7 +226,22 @@ export async function generatePlanWithAnthropic(args: {
       (entry) => entry && typeof entry === "object" && "id" in entry && (entry as { id?: unknown }).id !== selectedBlockId
     )
 
-  const system = [
+  // Lightweight system prompt for simple prop edits — ~70% fewer instructions
+  const system = args.lightweight ? [
+    "You are an editing planner for a website builder.",
+    "Return ONLY one JSON object matching EditPlan.",
+    "Never output markdown or code fences.",
+    'Emit top-level keys in this exact order: intent (string: "edit_plan"), summary_for_user (string), change_log (array of strings), ops (array of operation objects), suggested_next_actions (array of strings).',
+    'Each op object MUST include "op" (e.g. "update_props"), "blockId", and "patch".',
+    "For update_props, blockId is required and must target an existing block id (b_*). Set patch to changed props only; use existing prop keys for the target block type.",
+    "Do not return no-op updates: patch must change at least one effective value.",
+    "Use future tense in summary_for_user and change_log.",
+    "For edit_plan: summary_for_user must be ONE short sentence (max ~20 words).",
+    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases.",
+    selectedBlockId.length > 0
+      ? `Selected block is ${selectedBlockId}. Target only this block in ops.`
+      : "Respect explicit user target references when present."
+  ].join("\n") : [
     "You are an editing planner for a website builder.",
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
@@ -313,19 +330,32 @@ export async function generatePlanWithAnthropic(args: {
   ].join("\n")
 
   const includeContracts =
-    batchOverride ||
-    pageWideTranslation ||
-    /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
-    /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
-    /\d{2,3}\s*char/i.test(args.message)
-  const schemaContext = buildPlannerSchemaContext({
-    message: args.message,
-    contextPack: args.contextPack,
-    batchOverride,
-    pageWideTranslation,
-    legacyIncludeContracts: includeContracts,
-    forceFullContracts: args.forceFullSchemaContracts
-  })
+    !args.lightweight && (
+      batchOverride ||
+      pageWideTranslation ||
+      /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
+      /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
+      /\d{2,3}\s*char/i.test(args.message)
+    )
+  const schemaContext = args.lightweight
+    ? {
+        payload: {} as ReturnType<typeof buildPlannerSchemaContext>["payload"],
+        meta: {
+          contractMode: "minimal" as const,
+          contractBytes: 0,
+          contractBlockCount: 0,
+          targetBlockTypes: [] as string[],
+          strictJsonEnabled: false
+        }
+      }
+    : buildPlannerSchemaContext({
+        message: args.message,
+        contextPack: args.contextPack,
+        batchOverride,
+        pageWideTranslation,
+        legacyIncludeContracts: includeContracts,
+        forceFullContracts: args.forceFullSchemaContracts
+      })
 
   const user = {
     request: args.message,
@@ -647,7 +677,7 @@ export async function generatePlanWithAnthropic(args: {
         } catch {
           // Try JSON repair before falling through
           try {
-            parsed = JSON.parse(repairJson(toolJsonBuf)) as Record<string, unknown>
+            parsed = repairAndParseJson(toolJsonBuf) as Record<string, unknown>
             args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model }, "Anthropic planner: repaired malformed tool JSON")
           } catch {
             args.log?.warn({
@@ -666,7 +696,7 @@ export async function generatePlanWithAnthropic(args: {
             parsed = JSON.parse(jsonText) as Record<string, unknown>
           } catch {
             try {
-              parsed = JSON.parse(repairJson(jsonText)) as Record<string, unknown>
+              parsed = repairAndParseJson(jsonText) as Record<string, unknown>
             } catch { /* fall through to non-parsed state */ }
           }
         }
