@@ -3,14 +3,14 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T21:52:34.928Z",
+    "updatedAt": "2026-03-18T22:07:33.946Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
           "heading": "Nourish Your Body with Science-Backed Nutrition.",
-          "subheading": "Avocados are rich in monounsaturated fats, potassium, and vitamin E. Explore research-supported recipes, evidence-based nutrition guides, and expert insights to optimize your health through whole-food wellness.",
+          "subheading": "Avocados deliver heart-healthy fats and vital nutrients. Explore science-backed recipes, wellness tips, and expert guidance to enhance your nutrition.",
           "ctaText": "Explore the Science",
           "ctaHref": "/nutrition-facts",
           "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxBdm9jYWRvfGVufDF8MHx8fDE3NzM3NTIyMjl8MA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -31,8 +31,8 @@
               "description": "Master 100+ recipes: from quick breakfast spreads to restaurant-quality dinners. Transform simple avocados into culinary masterpieces that impress every time.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
-              "imageUrl": "/generated-images/gdrive_1NwnCLmDBnwWplCTlmQaHbJ0aQZ5HdXEp.webp",
-              "imageAlt": "avocado6"
+              "imageUrl": "/generated-images/gdrive_1ql_bdk2KM_27u01rkMd8KoiCRJ_R7UOy.webp",
+              "imageAlt": "avocado3"
             },
             {
               "title": "🥑 Avocado Wellness",
@@ -68,12 +68,16 @@
           "title": "Avocado Impact",
           "stats": [
             {
-              "value": "100%",
-              "label": "sustainable farms featured"
+              "value": "12B+",
+              "label": "avocados grown globally annually"
             },
             {
-              "value": "1.5B+",
-              "label": "avocados consumed yearly"
+              "value": "95M",
+              "label": "tons produced worldwide"
+            },
+            {
+              "value": "3M+",
+              "label": "farms in the industry"
             }
           ]
         }
@@ -84,23 +88,23 @@
         "props": {
           "tabs": [
             {
-              "label": "🌟 Overview",
+              "label": "Overview",
               "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
             },
             {
-              "label": "🍽️ Recipes & Ideas",
+              "label": "Recipes & Ideas",
               "content": "• **Breakfast** – Toast, smoothie bowls, eggs, omelets\n• **Lunch & Salads** – Grain bowls, salads, seafood\n• **Dinner** – Tacos, pasta, stuffed vegetables\n• **Snacks & Desserts** – Guacamole, chocolate mousse, vegan ice cream, parfaits"
             },
             {
-              "label": "🌱 Sustainability",
+              "label": "Sustainability",
               "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
             },
             {
-              "label": "🎉 Fun Facts",
+              "label": "Fun Facts",
               "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
             },
             {
-              "label": "🛒 Selection & Storage Tips",
+              "label": "Selection & Storage Tips",
               "content": "• **Selection** – Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n• **Ripeness** – Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n• **Storage** – Keep unripe at room temperature; refrigerate when ripe (lasts 3–5 days)\n• **Cut Avocados** – Preserve with lemon juice and plastic wrap; use within 1–2 days\n\nMaster these techniques for perfect avocados whenever you need them."
             }
           ]
