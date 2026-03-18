@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T07:28:41.699Z",
+    "updatedAt": "2026-03-18T07:35:04.951Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -13,8 +13,8 @@
           "subheading": "Join a vibrant community of avocado lovers. Share recipes, stories, and sustainable practices.",
           "ctaText": "Explore Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "/generated-images/gdrive_1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s.webp",
-          "imageAlt": "avocado4",
+          "imageUrl": "/generated-images/gdrive_1qqjJCmSesclNmOP5Xa3pobCu0d3FP7LC.webp",
+          "imageAlt": "avocado1",
           "imagePosition": "right",
           "secondaryCtaText": "Share Your Story"
         }
