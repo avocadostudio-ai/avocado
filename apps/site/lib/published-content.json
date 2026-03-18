@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T07:43:17.931Z",
+    "updatedAt": "2026-03-18T08:39:58.871Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -13,8 +13,8 @@
           "subheading": "Join a vibrant community of avocado lovers. Share recipes, stories, and sustainable practices.",
           "ctaText": "Explore Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "/generated-images/gdrive_1qqjJCmSesclNmOP5Xa3pobCu0d3FP7LC.webp",
-          "imageAlt": "avocado1",
+          "imageUrl": "/generated-images/gdrive_1Mz2BGfVvnqfSjdvkX1WDglO96x5gn2jS.webp",
+          "imageAlt": "avocado5",
           "imagePosition": "right",
           "secondaryCtaText": "Share Your Story"
         }
@@ -84,7 +84,7 @@
         "props": {
           "tabs": [
             {
-              "label": "📋 Overview",
+              "label": "🌟 Overview",
               "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
             },
             {
@@ -96,7 +96,7 @@
               "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
             },
             {
-              "label": "✨ Fun Facts",
+              "label": "🎉 Fun Facts",
               "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
             },
             {
@@ -700,5 +700,61 @@
       "title": "Blueberry Varieties, Growing Tips & Community Guide",
       "description": "Learn about blueberry varieties, growing guides, and health benefits. Join our community of growers and enthusiasts. Discover highbush, lowbush, and rabbiteye blueberries."
     }
+  },
+  {
+    "id": "p_avocado_recipes",
+    "slug": "/avocado-recipes",
+    "title": "Avocado Recipes",
+    "updatedAt": "2026-03-18T10:51:36.788Z",
+    "blocks": [
+      {
+        "id": "b_hero_avocado-recipes",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover Delicious Avocado Recipes",
+          "subheading": "From simple toast to gourmet dishes, explore our collection of avocado recipes for every occasion.",
+          "ctaText": "Browse Recipes",
+          "ctaHref": "/",
+          "imageUrl": "/generated-images/var_1773831093461_xy4tak.png",
+          "imageAlt": "Flat lay composition of avocado recipes scene: open cookbook with avocado recipes, fresh cut avocados, lime, salt, olive oil, herbs, and cooking ingredients arranged artfully on a wooden table with natural lighting, neutral background",
+          "imagePosition": "right"
+        }
+      },
+      {
+        "id": "b_faq_avocado-recipes",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Recipe Questions",
+          "items": [
+            {
+              "q": "How do I select a ripe avocado?",
+              "a": "A ripe avocado should yield slightly to gentle pressure. Look for dark green skin and check that the stem comes away easily. If it's too soft, it may be overripe; if too hard, wait a day or two."
+            },
+            {
+              "q": "Can I prepare avocado recipes ahead of time?",
+              "a": "Most avocado dishes are best enjoyed fresh. However, you can prep ingredients in advance and assemble just before serving. Store cut avocados with the pit in and cover tightly with plastic wrap to minimize browning."
+            },
+            {
+              "q": "What are the best pairings with avocado?",
+              "a": "Avocados pair beautifully with lime, cilantro, tomato, cucumber, and red onion. They also work well with eggs, toast, fish, and creamy pasta dishes for added richness."
+            },
+            {
+              "q": "How do I prevent browning?",
+              "a": "Store cut avocados with the pit intact, wrap in plastic wrap, and refrigerate. You can also brush the cut surface with lemon or lime juice, which slows oxidation and adds flavor."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_avocado-recipes",
+        "type": "CTA",
+        "props": {
+          "title": "Start Cooking Today",
+          "description": "Join thousands of home cooks creating amazing avocado dishes. Get access to our full recipe collection, tips, and seasonal specials.",
+          "ctaText": "Explore All Recipes",
+          "ctaHref": "/avocado-recipes"
+        }
+      }
+    ]
   }
 ]
