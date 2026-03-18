@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
+import { SettingsModal } from "./components/SettingsModal"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
 import { SitesPage } from "./components/SitesPage"
 import { ImagePickerModal } from "./components/ImagePickerModal"
@@ -405,7 +406,6 @@ function EditorPage({
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showDebugDetails, setShowDebugDetails] = useState(() => resolveDefaultDebugMode())
   const [composerHeight, setComposerHeight] = useState(56)
-  const [settingsPopoverPos, setSettingsPopoverPos] = useState<{ top: number; left: number } | null>(null)
   const [addBlockPicker, setAddBlockPicker] = useState<{ slug: string; afterBlockId?: string; beforeBlockId?: string } | null>(null)
   const [addBlockSearch, setAddBlockSearch] = useState("")
   const [isAddingBlock, setIsAddingBlock] = useState(false)
@@ -426,8 +426,6 @@ function EditorPage({
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLElement>(null)
   const splitHandleRef = useRef<HTMLDivElement>(null)
-  const settingsButtonRef = useRef<HTMLButtonElement>(null)
-  const settingsPopoverRef = useRef<HTMLDivElement>(null)
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
@@ -1017,43 +1015,6 @@ function EditorPage({
     return () => window.removeEventListener("resize", onWindowResize)
   }, [])
 
-  // Settings popover positioning
-  useEffect(() => {
-    if (!showSettingsModal) return
-    const updatePopoverPosition = () => {
-      const button = settingsButtonRef.current
-      const popover = settingsPopoverRef.current
-      if (!button) return
-      const rect = button.getBoundingClientRect()
-      const gap = 8
-      const minEdge = 8
-      const popoverWidth = popover?.offsetWidth ?? Math.min(360, window.innerWidth - minEdge * 2)
-      const popoverHeight = popover?.offsetHeight ?? 320
-      const maxLeft = Math.max(minEdge, window.innerWidth - popoverWidth - minEdge)
-      const left = Math.min(maxLeft, Math.max(minEdge, rect.right - popoverWidth))
-
-      const spaceBelow = window.innerHeight - rect.bottom - minEdge
-      const spaceAbove = rect.top - minEdge
-      const preferredTop = rect.bottom + gap
-      const preferredTopAbove = rect.top - popoverHeight - gap
-      const topCandidate = spaceBelow < popoverHeight + gap && spaceAbove > spaceBelow ? preferredTopAbove : preferredTop
-
-      const maxTop = Math.max(minEdge, window.innerHeight - popoverHeight - minEdge)
-      const top = Math.min(maxTop, Math.max(minEdge, topCandidate))
-      setSettingsPopoverPos({ top, left })
-    }
-    updatePopoverPosition()
-    window.addEventListener("resize", updatePopoverPosition)
-    window.addEventListener("scroll", updatePopoverPosition, true)
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setShowSettingsModal(false) }
-    window.addEventListener("keydown", onKeyDown)
-    return () => {
-      window.removeEventListener("keydown", onKeyDown)
-      window.removeEventListener("resize", updatePopoverPosition)
-      window.removeEventListener("scroll", updatePopoverPosition, true)
-    }
-  }, [showSettingsModal])
-
   // Variation modal escape
   useEffect(() => {
     if (!chatEngine.variationModal) return
@@ -1181,7 +1142,6 @@ function EditorPage({
                 className="chat-header-icon-btn"
                 aria-label="More options"
                 onClick={() => setShowSettingsModal(true)}
-                ref={settingsButtonRef}
               >
                 <Ellipsis size={14} aria-hidden="true" />
               </button>
@@ -1758,86 +1718,25 @@ function EditorPage({
         </div>
       ) : null}
 
-      {showSettingsModal ? (
-        <div className="settings-popover-backdrop" onClick={() => setShowSettingsModal(false)}>
-          <div
-            ref={settingsPopoverRef}
-            className="settings-modal settings-modal-popover"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Developer mode"
-            onClick={(e) => e.stopPropagation()}
-            style={settingsPopoverPos ? { top: settingsPopoverPos.top, left: settingsPopoverPos.left } : undefined}
-          >
-            <div className="settings-modal-header">
-              <h2>Developer mode</h2>
-              <button type="button" className="settings-close-btn" aria-label="Close" onClick={() => setShowSettingsModal(false)}>
-                ×
-              </button>
-            </div>
-            <div className="settings-modal-body">
-              <div className="settings-toggle-list" role="group" aria-label="Developer toggles">
-                <label className="inline-toggle">
-                  <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
-                  <span>Streaming</span>
-                </label>
-                <label className="inline-toggle">
-                  <input type="checkbox" checked={showNestedLabels} onChange={(e) => setShowNestedLabels(e.target.checked)} />
-                  <span>Nested labels</span>
-                </label>
-                <label className="inline-toggle">
-                  <input type="checkbox" checked={chatDarkMode} onChange={(e) => onSetChatDarkMode(e.target.checked)} />
-                  <span>Dark mode</span>
-                </label>
-                <label className="inline-toggle">
-                  <input type="checkbox" checked={showDebugDetails} onChange={(e) => setShowDebugDetails(e.target.checked)} />
-                  <span>Debug mode</span>
-                </label>
-                <label className="inline-toggle">
-                  <input
-                    type="checkbox"
-                    checked={chatEngine.fieldDraftDebugEnabled}
-                    onChange={(e) => chatEngine.setFieldDraftDebugEnabled(e.target.checked)}
-                  />
-                  <span>Field draft telemetry</span>
-                </label>
-              </div>
-              <label className="settings-model-picker">
-                <span className="settings-field-label">Model</span>
-                <select
-                  value={selectionValue(provider, modelKey)}
-                  onChange={(e) => {
-                    const [nextProvider, nextModel] = e.target.value.split(":") as [AIProvider, ModelKey]
-                    setProvider(nextProvider)
-                    setModelKey(nextModel)
-                  }}
-                  aria-label="Select AI model"
-                >
-                  {(availableProviders.length > 0 ? availableProviders : [provider]).flatMap((p) => [
-                    <option key={selectionValue(p, "fast")} value={selectionValue(p, "fast")}>
-                      {PROVIDER_LABELS[p]} {MODEL_LABELS[p].fast}
-                    </option>,
-                  ])}
-                  <optgroup label="Advanced">
-                    {(availableProviders.length > 0 ? availableProviders : [provider]).flatMap((p) =>
-                      (Object.keys(MODEL_LABELS[p]) as ModelKey[])
-                        .filter((m) => m !== "fast")
-                        .map((m) => (
-                          <option key={selectionValue(p, m)} value={selectionValue(p, m)}>
-                            {PROVIDER_LABELS[p]} {MODEL_LABELS[p][m]}
-                          </option>
-                        ))
-                    )}
-                  </optgroup>
-                </select>
-              </label>
-              <button type="button" className="settings-link-btn settings-link-btn-danger" onClick={() => { chatEngine.clearChat(); setShowSettingsModal(false) }}>
-                Clear chat
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <SettingsModal
+        open={showSettingsModal}
+        onOpenChange={setShowSettingsModal}
+        useStreaming={useStreaming}
+        onStreamingChange={setUseStreaming}
+        showNestedLabels={showNestedLabels}
+        onNestedLabelsChange={setShowNestedLabels}
+        chatDarkMode={chatDarkMode}
+        onDarkModeChange={onSetChatDarkMode}
+        showDebugDetails={showDebugDetails}
+        onDebugDetailsChange={setShowDebugDetails}
+        fieldDraftDebugEnabled={chatEngine.fieldDraftDebugEnabled}
+        onFieldDraftDebugChange={chatEngine.setFieldDraftDebugEnabled}
+        provider={provider}
+        modelKey={modelKey}
+        availableProviders={availableProviders}
+        onModelChange={(p, m) => { setProvider(p); setModelKey(m) }}
+        onClearChat={chatEngine.clearChat}
+      />
 
       {sites.configSite ? (
         <div className="sites-modal-backdrop" onClick={() => sites.setConfigSiteId(null)}>

@@ -12,11 +12,18 @@
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
     "@ai-site-editor/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.2.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.1",
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
