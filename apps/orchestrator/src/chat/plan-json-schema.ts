@@ -33,15 +33,28 @@ export const editPlanJsonSchema = {
       type: "array",
       items: {
         type: "object",
+        additionalProperties: false,
         properties: {
-          op: {
-            type: "string",
-            description: "Operation name, e.g. add_block, update_props, remove_block, etc."
-          }
+          op: { type: "string", description: "Operation name" },
+          pageSlug: { type: "string" },
+          blockId: { type: "string" },
+          afterBlockId: { type: "string" },
+          newBlockId: { type: "string" },
+          toPageSlug: { type: "string" },
+          newPageSlug: { type: "string" },
+          newTitle: { type: "string" },
+          afterPageSlug: { type: "string" },
+          listKey: { type: "string" },
+          index: { type: "integer" },
+          afterIndex: { type: "integer" },
+          patch: { type: "object" },
+          block: { type: "object" },
+          page: { type: "object" },
+          item: { type: "object" }
         },
         required: ["op"]
       },
-      description: "Array of operations to apply. Each must have an 'op' field plus operation-specific fields (pageSlug, block, patch, blockId, etc.)."
+      description: "Array of operations. Each has 'op' plus operation-specific fields."
     },
     suggested_next_actions: {
       type: "array",
