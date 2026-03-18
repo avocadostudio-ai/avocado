@@ -1568,8 +1568,54 @@ test("chat redirects variation-like typo prompt to clarification instead of plan
   assert.equal(payload.status, "needs_clarification")
   assert.equal(payload.debug?.outcome, "variation_request_redirect")
   assert.equal(payload.debug?.reasonCategory, "ambiguity")
-  assert.match(String(payload.summary), /variations mode/i)
+  assert.match(String(payload.summary), /select a block/i)
   assert.ok(Array.isArray(payload.suggestions))
+})
+
+test("chat redirects 'show me 3 variants' without activeBlockId to clarification", async () => {
+  const session = newSession()
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "show me 3 variants"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as {
+    status?: string
+    summary?: string
+    debug?: { outcome?: string; reasonCategory?: string }
+    suggestions?: string[]
+  }
+  assert.equal(payload.status, "needs_clarification")
+  assert.equal(payload.debug?.outcome, "variation_request_redirect")
+  assert.match(String(payload.summary), /select a block/i)
+})
+
+test("chat routes 'show me 3 variants' with activeBlockId to variation pipeline", async () => {
+  const session = newSession()
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "show me 3 variants",
+      activeBlockId: "b_hero_home",
+      activeBlockType: "Hero",
+      provider: "demo"
+    }
+  })
+
+  // The variation pipeline should respond (either success or error, but NOT needs_clarification)
+  const payload = response.json() as { status?: string; error?: string; variations?: unknown[] }
+  assert.notEqual(payload.status, "needs_clarification", "should not redirect to clarification when activeBlockId is set")
 })
 
 test("chat returns repair_failed when deterministic repair generation throws", async (t) => {
