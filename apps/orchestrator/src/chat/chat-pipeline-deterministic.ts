@@ -25,7 +25,8 @@ export function isRewriteLikeMessage(message: string) {
     /\bredo\b.*\b(copy|text|wording|messaging)\b/.test(lower) ||
     /\bmake\b.*\b(shorter|clearer|crisper|concise)\b/.test(lower) ||
     /\bimprove\b.*\b(copy|text|wording|messaging)\b/.test(lower) ||
-    /\bchange\b.*\b(tone|copy|wording|text|messaging)\b/.test(lower)
+    /\bchange\b.*\b(tone|copy|wording|text|messaging)\b/.test(lower) ||
+    /\breview\b.*\b(copy|text|wording|content|messaging)\b.*\bfor\b/.test(lower)
   )
 }
 
