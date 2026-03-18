@@ -501,15 +501,10 @@ main {
     justify-content: center;
   }
 
-  .site-mobile-menu[open] {
+  .site-mobile-menu.is-open {
     width: 100%;
     margin-top: 10px;
     order: 4;
-  }
-
-  .site-mobile-menu[open] summary {
-    margin-left: auto;
-    width: fit-content;
   }
 
   .site-nav-links-mobile {
