@@ -29,6 +29,41 @@
   display: block;
 }
 
+.video-block__facade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-block__facade-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-block__facade-play {
+  position: relative;
+  z-index: 1;
+  width: 68px;
+  height: 48px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.video-block__facade:hover .video-block__facade-play {
+  opacity: 1;
+}
+
 .video-block__caption {
   margin: 0;
   font-size: 0.95rem;
