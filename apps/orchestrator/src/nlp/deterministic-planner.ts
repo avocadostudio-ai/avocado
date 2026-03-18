@@ -10,6 +10,7 @@ import {
   extractRouteMentions,
   normalizeRouteCandidate,
   parseCreatePageRequest,
+  requestsContentGeneration,
   toSeedSlug
 } from "./intent-helpers.js"
 import {
@@ -440,7 +441,8 @@ export function isHighConfidenceDeterministicCase(args: {
   }
   const action = inferActionFromMessage(raw)
   // Case: create_page — "create a new /about page", "create a new test page"
-  if (action === "add" && parseCreatePageRequest(raw)) return true
+  // Defer to LLM when user wants content generation (topic + block types enumerated)
+  if (action === "add" && parseCreatePageRequest(raw) && !requestsContentGeneration(raw)) return true
   // "add X to each/every card" = bulk item update — needs LLM for content generation
   if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
   // Counted multi-block add without enough named types → needs LLM for content generation
@@ -451,7 +453,8 @@ export function isHighConfidenceDeterministicCase(args: {
   if (action === "remove" && args.activeBlockId && /\b(this|selected|it)\b/i.test(raw)) return true
   // "add CTA directing to recipes" = needs LLM for content-aware props
   if (action === "add" && inferBlockTypeFromText(raw) && hasContentDirective(raw)) return false
-  if (action === "add" && inferBlockTypeFromText(raw)) return true
+  // Defer to LLM when topic + multiple block types are enumerated (needs content generation)
+  if (action === "add" && inferBlockTypeFromText(raw) && !requestsContentGeneration(raw)) return true
 
   // Case 4: Simple update with clear block type reference and quoted value
   if (action === "update" && inferBlockTypeFromText(raw) && quotedText(raw)) {

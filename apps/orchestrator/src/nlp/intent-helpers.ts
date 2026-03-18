@@ -95,7 +95,9 @@ export function parseCreatePageRequest(message: string) {
 
   const aboutTopic = lower.match(/\b(?:new\s+)?page\s+(?:about|on|for)\s+([a-z0-9 -]{2,60})\b/)?.[1]
   if (aboutTopic) {
-    const seed = toSeedSlug(aboutTopic)
+    // Trim at structural words that introduce block layout ("with a Hero section...")
+    const trimmed = aboutTopic.replace(/\s+(?:with|including|containing|featuring|that\s+has|having)\s+.*$/, "").trim()
+    const seed = toSeedSlug(trimmed || aboutTopic)
     if (seed) return `/${seed}`
   }
 
@@ -158,5 +160,11 @@ export function requestsContentGeneration(message: string) {
   const withoutRoutes = lower.replace(/\/[a-z0-9/_-]+/g, "")
   const hasExplicitBlockTypes =
     /\b(hero|cta|call to action|rich\s?text|text\s+(?:section|block)|feature|testimonial|faq|card)\b/.test(withoutRoutes)
+  // When a topic is specified AND multiple block types are enumerated
+  // (e.g. "page about avocado recipes with a Hero, CardGrid, FAQ"),
+  // defer to the LLM — the user wants AI-generated content, not empty scaffolds.
+  const hasTopic = /\bpage\s+(?:about|on|for)\s+[a-z]/.test(lower)
+  const blockTypeMatches = withoutRoutes.match(/\b(hero|cta|call to action|rich\s?text|text\s+(?:section|block)|feature|testimonial|faq|card)\b/g)
+  if (hasTopic && blockTypeMatches && blockTypeMatches.length >= 2) return true
   return asksContent && !hasExplicitBlockTypes
 }

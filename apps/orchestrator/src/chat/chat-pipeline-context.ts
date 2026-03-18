@@ -119,6 +119,7 @@ export function shouldUseMinimalPlannerContext(args: {
   const lower = args.message.toLowerCase()
   return (
     isRewriteLikeMessage(lower) ||
+    isSingleBlockPropEdit(lower) ||
     /\b(replace|change|update|set|edit|rewrite|rephrase)\b/.test(lower)
   )
 }

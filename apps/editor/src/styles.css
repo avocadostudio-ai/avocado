@@ -1108,7 +1108,7 @@ textarea {
 
 .msg-user {
   align-self: flex-end;
-  background: #d3f1ee;
+  background: #e0e7ff;
   max-width: 80%;
 }
 
@@ -1305,7 +1305,7 @@ textarea {
   margin-top: 7px;
   font-size: 13px;
   font-weight: 500;
-  color: #667085;
+  color: #4b5563;
   letter-spacing: 0;
 }
 
@@ -1577,12 +1577,12 @@ textarea {
   line-height: 1.45;
   letter-spacing: 0;
   font-weight: 500;
-  color: #667085;
+  color: #4b5563;
   background-image: linear-gradient(
     110deg,
-    #7888a0 0%, #5b9bd5 20%, #93c5fd 40%,
-    #bddcff 50%, #93c5fd 60%, #5b9bd5 80%,
-    #7888a0 100%
+    #4b5563 0%, #3b5998 20%, #4a7cc9 40%,
+    #6b8fd4 50%, #4a7cc9 60%, #3b5998 80%,
+    #4b5563 100%
   );
   background-size: 300% 100%;
   background-position: 100% 50%;
@@ -1605,7 +1605,7 @@ textarea {
 .stream-step {
   font-size: 13px;
   line-height: 1.45;
-  color: #94a3b8;
+  color: #4b5563;
   padding-left: 16px;
   position: relative;
 }
@@ -1615,7 +1615,7 @@ textarea {
   position: absolute;
   left: 0;
   font-size: 11px;
-  color: #22c55e;
+  color: #16a34a;
   font-weight: 600;
 }
 
@@ -3658,6 +3658,28 @@ textarea {
 
 .editor-dark .streaming-debug-inline {
   color: #94a3b8;
+}
+
+.editor-dark .msg-status {
+  color: #94a3b8;
+}
+
+.editor-dark .stream-step {
+  color: #94a3b8;
+}
+
+.editor-dark .stream-step::before {
+  color: #22c55e;
+}
+
+.editor-dark .streaming-pill-status-text {
+  color: #94a3b8;
+  background-image: linear-gradient(
+    110deg,
+    #7888a0 0%, #5b9bd5 20%, #93c5fd 40%,
+    #bddcff 50%, #93c5fd 60%, #5b9bd5 80%,
+    #7888a0 100%
+  );
 }
 
 .editor-dark .msg-user {

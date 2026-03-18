@@ -15,7 +15,7 @@ import {
 let _openaiSingleton: OpenAI | null = null
 function getOpenAIClient(): OpenAI {
   if (!_openaiSingleton) {
-    _openaiSingleton = getOpenAIClient()
+    _openaiSingleton = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   }
   return _openaiSingleton
 }
@@ -38,10 +38,11 @@ import {
   extractJsonObject,
   inferBlockTypeFromText,
   normalizePlanCandidate,
-  repairJson
+  repairJson,
+  repairAndParseJson
 } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
-import { editPlanJsonSchema, intentJsonSchema } from "./plan-json-schema.js"
+import { intentJsonSchema } from "./plan-json-schema.js"
 import type { ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
 import {
@@ -843,6 +844,7 @@ export async function generatePlanWithOpenAI(args: {
   siteContextBlock?: string | null
   forceFullSchemaContracts?: boolean
   manifestBlockTypes?: string[]
+  lightweight?: boolean
   signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
@@ -860,7 +862,22 @@ export async function generatePlanWithOpenAI(args: {
       (entry) => entry && typeof entry === "object" && "id" in entry && (entry as { id?: unknown }).id !== selectedBlockId
     )
 
-  const system = [
+  // Lightweight system prompt for simple prop edits — ~70% fewer instructions
+  const system = args.lightweight ? [
+    "You are an editing planner for a website builder.",
+    "Return ONLY one JSON object matching EditPlan.",
+    "Never output markdown or code fences.",
+    'Emit top-level keys in this exact order: intent (string: "edit_plan"), summary_for_user (string), change_log (array of strings), ops (array of operation objects), suggested_next_actions (array of strings).',
+    'Each op object MUST include "op" (e.g. "update_props"), "blockId", and "patch".',
+    "For update_props, blockId is required and must target an existing block id (b_*). Set patch to changed props only; use existing prop keys for the target block type.",
+    "Do not return no-op updates: patch must change at least one effective value.",
+    "Use future tense in summary_for_user and change_log.",
+    "For edit_plan: summary_for_user must be ONE short sentence (max ~20 words).",
+    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases.",
+    selectedBlockId.length > 0
+      ? `Selected block is ${selectedBlockId}. Target only this block in ops.`
+      : "Respect explicit user target references when present."
+  ].join("\n") : [
     "You are an editing planner for a website builder.",
     "Return ONLY one JSON object matching EditPlan.",
     "Never output markdown or code fences.",
@@ -941,19 +958,32 @@ export async function generatePlanWithOpenAI(args: {
   ].join("\n")
 
   const includeContracts =
-    batchOverride ||
-    pageWideTranslation ||
-    /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
-    /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
-    /\d{2,3}\s*char/i.test(args.message)
-  const schemaContext = buildPlannerSchemaContext({
-    message: args.message,
-    contextPack: args.contextPack,
-    batchOverride,
-    pageWideTranslation,
-    legacyIncludeContracts: includeContracts,
-    forceFullContracts: args.forceFullSchemaContracts
-  })
+    !args.lightweight && (
+      batchOverride ||
+      pageWideTranslation ||
+      /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
+      /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
+      /\d{2,3}\s*char/i.test(args.message)
+    )
+  const schemaContext = args.lightweight
+    ? {
+        payload: {} as PlannerSchemaContextPayload,
+        meta: {
+          contractMode: "minimal" as PlannerContractMode,
+          contractBytes: 0,
+          contractBlockCount: 0,
+          targetBlockTypes: [] as string[],
+          strictJsonEnabled: false
+        }
+      }
+    : buildPlannerSchemaContext({
+        message: args.message,
+        contextPack: args.contextPack,
+        batchOverride,
+        pageWideTranslation,
+        legacyIncludeContracts: includeContracts,
+        forceFullContracts: args.forceFullSchemaContracts
+      })
 
   const user = {
     request: args.message,
@@ -963,7 +993,6 @@ export async function generatePlanWithOpenAI(args: {
     ...schemaContext.payload,
     feedback: args.feedback ?? null
   }
-  const strictJson = schemaContext.meta.strictJsonEnabled
 
   const imageUrlForVision = typeof args.contextPack.selected?.imageUrlForVision === "string"
     ? args.contextPack.selected.imageUrlForVision
@@ -1007,10 +1036,7 @@ export async function generatePlanWithOpenAI(args: {
       model: args.model,
       ...openAIChatOptionsForModel(args.model),
       stream: true,
-      response_format: {
-        type: "json_schema" as const,
-        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: strictJson }
-      },
+      response_format: { type: "json_object" as const },
       messages: [
         { role: "system", content: system },
         ...(args.history ?? []),
@@ -1069,10 +1095,7 @@ export async function generatePlanWithOpenAI(args: {
     const completion = await client.chat.completions.create({
       model: args.model,
       ...openAIChatOptionsForModel(args.model),
-      response_format: {
-        type: "json_schema" as const,
-        json_schema: { name: "EditPlan", schema: editPlanJsonSchema, strict: strictJson }
-      },
+      response_format: { type: "json_object" as const },
       messages: [
         { role: "system", content: system },
         ...(args.history ?? []),
@@ -1098,9 +1121,9 @@ export async function generatePlanWithOpenAI(args: {
   try {
     parsedJson = JSON.parse(jsonText)
   } catch (err) {
-    // Attempt JSON repair before giving up
+    // Attempt multiple repair strategies before giving up
     try {
-      parsedJson = JSON.parse(repairJson(jsonText))
+      parsedJson = repairAndParseJson(jsonText)
     } catch {
       const posMatch = err instanceof SyntaxError ? /position (\d+)/i.exec(err.message) : null
       const pos = posMatch?.[1]

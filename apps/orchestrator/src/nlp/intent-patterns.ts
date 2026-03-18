@@ -51,7 +51,11 @@ export const BATCH_ADD_PATTERNS: RegExp[] = [
   // "showcasing/featuring all (available) components/blocks" — page creation with all block types
   new RegExp(String.raw`\b(?:showcas\w*|featuring|demonstrat\w*)\s+(?:all\s+)?(?:(?:the\s+)?available\s+)?${UNIT}\b`),
   // "all available componenzs" and similar typos — fuzzy match for "all available" + unit-like word
-  /\ball\s+(?:available|existing)\s+\w*(?:componen|block|section|element|widget)\w*\b/
+  /\ball\s+(?:available|existing)\s+\w*(?:componen|block|section|element|widget)\w*\b/,
+  // "add more content/sections to this page", "add content to the page"
+  /\badd\s+(?:more\s+)?(?:content|sections?)\s+(?:to\s+)?(?:this|the)\s+page\b/,
+  // "expand this page", "flesh out this page", "enrich this page"
+  /\b(?:expand|flesh\s+out|enrich|grow|extend|bulk\s+up)\s+(?:this|the)\s+page\b/
 ]
 
 // ---------------------------------------------------------------------------
