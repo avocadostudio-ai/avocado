@@ -48,7 +48,36 @@ type CreateChatTransportsArgs = {
   enablePatchTransport: boolean
 }
 
+/** Detect if a /chat response is actually a VariationResult routed through the chat pipeline. */
+function isVariationResult(data: unknown): data is VariationResponse & { status: "ok"; variations: NonNullable<VariationResponse["variations"]> } {
+  const d = data as Record<string, unknown>
+  return d.status === "ok" && Array.isArray(d.variations) && d.variations.length > 0
+}
+
 export function createChatTransports(args: CreateChatTransportsArgs) {
+  /** Handle a /chat response that may be a VariationResult routed through the chat pipeline. */
+  function applyChatOrVariationResult(data: AssistantResponse, messageText: string) {
+    if (isVariationResult(data)) {
+      const selectedBlockId = args.activeBlockIdRef.current
+      const selectedBlockType = args.activeBlockTypeRef.current
+      args.setVariationModal({
+        requestText: messageText,
+        blockId: data.blockId ?? selectedBlockId ?? "",
+        blockType: data.blockType ?? selectedBlockType ?? "",
+        pageSlug: data.pageSlug ?? args.slugRef.current,
+        baseProps: (data.baseProps && typeof data.baseProps === "object" ? data.baseProps : {}) as Record<string, unknown>,
+        options: data.variations
+      })
+      args.pushAssistantFromResult({
+        status: "info",
+        summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
+        changes: [`Block: ${data.blockType ?? selectedBlockType}`, `Options: ${data.variations.length}`]
+      })
+      return
+    }
+    args.applyChatResult(data)
+  }
+
   async function submitChatHttp(finalMessage: string, options?: ChatMessagePayload) {
     const contextPayload = buildSiteContextPayload(args.siteId, args.activeSiteConfig)
     const res = await fetch(`${args.orchestrator}/chat`, {
@@ -71,7 +100,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
     })
 
     const data = (await res.json()) as AssistantResponse
-    args.applyChatResult(data)
+    applyChatOrVariationResult(data, finalMessage)
   }
 
   async function submitVariations(finalMessage: string) {
@@ -468,7 +497,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
-            if (payload.result) args.applyChatResult(payload.result)
+            if (payload.result) applyChatOrVariationResult(payload.result, finalMessage)
             if (payload.result?.focusBlockId) args.setLatestStreamFocusBlockId(payload.result.focusBlockId)
             source.close()
             resolve(true)
@@ -500,7 +529,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           endLiveDraft()
           pendingFocusBlockId = null
           if (payload.result) {
-            args.applyChatResult(payload.result)
+            applyChatOrVariationResult(payload.result, finalMessage)
           } else {
             args.pushAssistantFromResult({ status: "error", summary: "Streaming request failed.", changes: [] })
           }

@@ -247,4 +247,5 @@ export function normalizeVariationTypos(text: string) {
     .replace(/\bvariaqtions?\b/gi, "variations")
     .replace(/\bvariatons?\b/gi, "variations")
     .replace(/\bvaritions?\b/gi, "variations")
+    .replace(/\bvariants?\b/gi, (m) => m.endsWith("s") ? "variations" : "variation")
 }

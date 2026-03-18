@@ -92,6 +92,7 @@ import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlann
 import { buildAiInsightChanges, buildMetaChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
+import { runVariationPipeline } from "./variation-pipeline.js"
 
 let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
 export function setGeneratePlanWithOpenAIForTests(fn?: typeof generatePlanWithOpenAI) {
@@ -797,18 +798,36 @@ export async function runChatPipeline(
     }
   }
   if (body.message && isVariationRequestMessage(body.message)) {
-    const suggestions = [
-      "Use the Variations action after selecting the target block.",
-      "Example: select Hero, then generate 4 variations."
-    ]
-    pendingClarificationBySession.set(body.session, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
+    if (body.activeBlockId) {
+      // Route to the dedicated variation pipeline and return its result directly.
+      // The editor detects the VariationResult shape (status "ok" + variations array)
+      // and opens the variation modal, same as it does for /chat/variations responses.
+      const variationResult = await runVariationPipeline(ctx, {
+        session: body.session,
+        slug: effectiveSlug,
+        message: body.message,
+        activeBlockId: body.activeBlockId,
+        activeBlockType: body.activeBlockType,
+        modelKey,
+        provider: body.provider,
+        sitePurpose: body.sitePurpose,
+        siteHosting: body.siteHosting,
+        businessContext: body.businessContext,
+        siteContext: body.siteContext
+      })
+      return variationResult as { code: number; payload: ChatResult | { error: string } }
+    }
+    // No block selected — ask which block
     return {
       code: 200,
       payload: withDebugPayload({
         status: "needs_clarification",
-        summary: "Variation requests are handled in block variations mode.",
+        summary: "Select a block first, then ask for variants.",
         changes: [],
-        suggestions,
+        suggestions: [
+          "Click on a block to select it, then try again.",
+          "Example: select the Hero block, then say 'generate 3 variations'."
+        ],
         previewVersion: versions.get(body.session) ?? 0,
         plannerSource,
         modelUsed,
