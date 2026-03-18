@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T10:52:11.561Z",
+    "updatedAt": "2026-03-18T14:12:33.368Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -23,8 +23,8 @@
         "id": "b_cardgrid_1771979444550",
         "type": "CardGrid",
         "props": {
-          "title": "Learn Avocado Wisdom",
-          "subtitle": "Discover recipes, health insights, and sustainable practices that celebrate avocados in every part of your life.",
+          "title": "Discover Your Avocado Path",
+          "subtitle": "Three paths to avocado mastery—cook like a pro, nourish your body, or champion sustainability. Find your passion.",
           "cards": [
             {
               "title": "🥑 Avocado Culinary Delights",
@@ -700,5 +700,57 @@
       "title": "Blueberry Varieties, Growing Tips & Community Guide",
       "description": "Learn about blueberry varieties, growing guides, and health benefits. Join our community of growers and enthusiasts. Discover highbush, lowbush, and rabbiteye blueberries."
     }
+  },
+  {
+    "id": "p_recipes",
+    "slug": "/recipes",
+    "title": "Recipes",
+    "updatedAt": "2026-03-18T18:47:10.926Z",
+    "blocks": [
+      {
+        "id": "b_hero_1773859607736",
+        "type": "Hero",
+        "props": {
+          "heading": "Discover Amazing Recipes",
+          "subheading": "Explore delicious avocado recipes from our community",
+          "ctaText": "Browse Recipes",
+          "ctaHref": "/recipes",
+          "imageUrl": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1536&h=1024&fit=crop",
+          "imageAlt": "avocado recipe inspiration",
+          "imagePosition": "right"
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773859607737",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Recipe Questions",
+          "items": [
+            {
+              "q": "What are some easy beginner-friendly avocado recipes?",
+              "a": "Start with simple classics like guacamole, avocado toast, or avocado salads. These require minimal prep and let the avocado's natural flavor shine."
+            },
+            {
+              "q": "How do I prevent avocado from browning in my recipes?",
+              "a": "Toss cut avocado with a bit of lemon or lime juice immediately after cutting. You can also store it with the pit in an airtight container."
+            },
+            {
+              "q": "Can I cook with avocado?",
+              "a": "Yes! Avocado works well in warm dishes, though high heat can affect its creamy texture. Add it after cooking or use it in low-heat recipes for best results."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773859607737",
+        "type": "CTA",
+        "props": {
+          "title": "Share Your Recipe",
+          "description": "Have a favorite avocado recipe? Contribute to our community collection and inspire other avocado lovers.",
+          "ctaText": "Submit Recipe",
+          "ctaHref": "/community"
+        }
+      }
+    ]
   }
 ]
