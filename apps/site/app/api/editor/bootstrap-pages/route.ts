@@ -1,4 +1,4 @@
-import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk"
+import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk/routes"
 import { getPublishedPage, getPublishedSlugs } from "../../../../lib/published-content-api"
 
 export const { GET, OPTIONS } = createBootstrapPagesHandler(() => {

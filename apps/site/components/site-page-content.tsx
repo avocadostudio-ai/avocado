@@ -1,5 +1,4 @@
-import { BlockErrorBoundary } from "@ai-site-editor/site-sdk"
-import { SharedBlockRenderer, BlocksInitClient } from "@ai-site-editor/blocks"
+import { BlockErrorBoundary, SharedBlockRenderer, BlocksInitClient } from "@ai-site-editor/blocks"
 import type { SiteHeaderBlock } from "../lib/navigation"
 import type { PageDoc } from "../lib/site-contract"
 

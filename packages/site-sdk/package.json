@@ -6,6 +6,9 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./draft": "./src/draft.ts",
+    "./editor": "./src/editor.ts",
+    "./routes": "./src/routes.ts",
     "./editor-manifest": "./src/editor-manifest.ts"
   },
   "repository": {
@@ -23,6 +26,18 @@
         "import": "./dist/index.js",
         "types": "./dist/index.d.ts"
       },
+      "./draft": {
+        "import": "./dist/draft.js",
+        "types": "./dist/draft.d.ts"
+      },
+      "./editor": {
+        "import": "./dist/editor.js",
+        "types": "./dist/editor.d.ts"
+      },
+      "./routes": {
+        "import": "./dist/routes.js",
+        "types": "./dist/routes.d.ts"
+      },
       "./editor-manifest": {
         "import": "./dist/editor-manifest.js",
         "types": "./dist/editor-manifest.d.ts"
@@ -35,6 +50,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-site-editor/blocks": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*",
     "@ai-site-editor/shared": "workspace:*",
     "zod": "^4.3.6"

@@ -99,9 +99,6 @@ importers:
       '@ai-site-editor/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
-      '@ai-site-editor/preview-adapter':
-        specifier: workspace:*
-        version: link:../../packages/preview-adapter
       '@ai-site-editor/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -205,6 +202,9 @@ importers:
 
   packages/site-sdk:
     dependencies:
+      '@ai-site-editor/blocks':
+        specifier: workspace:*
+        version: link:../blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../preview-adapter
