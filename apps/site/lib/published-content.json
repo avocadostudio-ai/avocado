@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T22:07:33.946Z",
+    "updatedAt": "2026-03-18T22:19:30.453Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
@@ -28,7 +28,7 @@
           "cards": [
             {
               "title": "🥑 Avocado Culinary Delights",
-              "description": "Master 100+ recipes: from quick breakfast spreads to restaurant-quality dinners. Transform simple avocados into culinary masterpieces that impress every time.",
+              "description": "Master 100+ recipes and transform avocados into culinary masterpieces.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
               "imageUrl": "/generated-images/gdrive_1ql_bdk2KM_27u01rkMd8KoiCRJ_R7UOy.webp",
@@ -36,7 +36,7 @@
             },
             {
               "title": "🥑 Avocado Wellness",
-              "description": "Heart-healthy fats, vitamins, and antioxidants that boost energy and vitality. Elevate your health, one avocado at a time.",
+              "description": "Heart-healthy fats and antioxidants to boost your health.",
               "ctaText": "Explore",
               "ctaHref": "/avocado-wellness",
               "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -44,11 +44,11 @@
             },
             {
               "title": "🥑 Avocado Sustainability",
-              "description": "Learn about ethical farming practices and sustainable agriculture that protects our planet while bringing the freshest, most responsibly grown avocados to your table.",
+              "description": "Ethical farming practices for responsibly grown avocados and a healthier planet.",
               "ctaText": "Learn More",
               "ctaHref": "/avocado-sustainability",
-              "imageUrl": "/generated-images/var_1773437186829_m3fsk2.png",
-              "imageAlt": "Natural eco-friendly scene showing a ripe avocado cut in half on a rustic wooden table beside a small avocado plant growing from a seed in a clay pot, soft natural sunlight, lush green garden background with bokeh, sustainable farming concept, farm-to-table food story, vibrant green tones, realistic food photography, minimal composition, high detail, cinematic lighting"
+              "imageUrl": "/generated-images/var_1773872370443_poycxy.png",
+              "imageAlt": "AI-generated CardGrid image featuring natural eco-friendly scene showing"
             }
           ]
         }
