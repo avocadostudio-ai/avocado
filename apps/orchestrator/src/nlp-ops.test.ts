@@ -6,7 +6,7 @@ import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePa
 import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
-import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage } from "./chat/chat-pipeline.js"
+import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage, isRewriteLikeMessage } from "./chat/chat-pipeline.js"
 
 test("blockSupportsImageAtPath checks schema support", () => {
   // Hero has top-level imageUrl
@@ -2808,4 +2808,12 @@ test("editPlanJsonSchema ops items declares all operation fields for strict mode
   for (const field of ["op", "pageSlug", "blockId", "patch", "block", "page", "listKey", "index", "item"]) {
     assert.ok(props[field], `ops items schema must declare '${field}' for OpenAI strict mode`)
   }
+})
+
+test("isRewriteLikeMessage matches 'review copy for readability'", () => {
+  assert.equal(isRewriteLikeMessage("review copy for readability"), true)
+  assert.equal(isRewriteLikeMessage("review text for clarity"), true)
+  assert.equal(isRewriteLikeMessage("review content for tone"), true)
+  // plain "review" without copy/text target should not match
+  assert.equal(isRewriteLikeMessage("review this page"), false)
 })
