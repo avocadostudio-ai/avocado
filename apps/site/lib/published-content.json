@@ -3,20 +3,20 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T14:12:33.368Z",
+    "updatedAt": "2026-03-18T21:52:34.928Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Celebrate Avocados. Share Your Story.",
-          "subheading": "Join a vibrant community of avocado lovers. Share recipes, stories, and sustainable practices.",
-          "ctaText": "Explore Recipes",
-          "ctaHref": "/recipes",
-          "imageUrl": "/generated-images/gdrive_1_HW-zOmY2ci50hGBk0HYex9QviNOFM_s.webp",
-          "imageAlt": "avocado4",
+          "heading": "Nourish Your Body with Science-Backed Nutrition.",
+          "subheading": "Avocados are rich in monounsaturated fats, potassium, and vitamin E. Explore research-supported recipes, evidence-based nutrition guides, and expert insights to optimize your health through whole-food wellness.",
+          "ctaText": "Explore the Science",
+          "ctaHref": "/nutrition-facts",
+          "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxBdm9jYWRvfGVufDF8MHx8fDE3NzM3NTIyMjl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "sliced green and yellow fruit",
           "imagePosition": "right",
-          "secondaryCtaText": "Share Your Story"
+          "secondaryCtaText": "Read Research Studies"
         }
       },
       {
@@ -57,8 +57,8 @@
         "id": "b_richtext_1771982675835",
         "type": "RichText",
         "props": {
-          "title": "Why Avocados Matter—For Every Person",
-          "body": "## Daily Serving Guide\n\n½–1 avocado daily delivers heart health, sustained energy, and lasting fullness.\n\n## Your Avocado Path\n\n- **Home Cooks**: Nail recipes and flavor pairings that make avocados shine.\n- **Wellness Seekers**: Fuel your body with avocado nutrition for heart health and energy.\n- **Farmers & Growers**: Build regenerative practices that grow better avocados.\n- **Sustainability Advocates**: Trace fair trade, water stewardship, and environmental impact."
+          "title": "Avocados for Everyone—Health, Flavor & Sustainability",
+          "body": "## Daily Avocado Benefits\n\nEnjoy ½–1 avocado daily for vibrant heart health, sustained energy, and natural satiety that keeps you satisfied longer.\n\n## Find Your Avocado Journey\n\n- **Home Cooks**: Master recipes and discover flavor combinations that celebrate avocado's rich, creamy texture.\n- **Wellness Enthusiasts**: Nourish your body with healthy fats, potassium, and antioxidants for optimal heart and brain health.\n- **Growers & Farmers**: Embrace regenerative practices that strengthen soil, conserve water, and build thriving ecosystems.\n- **Sustainability Advocates**: Join the movement—supporting fair trade, ethical sourcing, and environmental stewardship."
         }
       },
       {
