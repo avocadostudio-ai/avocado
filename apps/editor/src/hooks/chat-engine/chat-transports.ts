@@ -534,5 +534,45 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
     })
   }
 
-  return { submitChatHttp, submitVariations, submitChatStream }
+  // -------------------------------------------------------------------------
+  // Prefetch — call as user types (debounced) to warm up deterministic intent.
+  // Returns estimated latency class so UI can hint "instant" vs "a few seconds".
+  // -------------------------------------------------------------------------
+  let prefetchAbort: AbortController | null = null
+  async function prefetchIntent(partialMessage: string): Promise<{
+    likelyDeterministic: boolean
+    estimatedLatency: "instant" | "moderate" | "slow"
+    inferredAction: string | null
+  } | null> {
+    // Abort previous in-flight prefetch
+    prefetchAbort?.abort()
+    prefetchAbort = new AbortController()
+    const { signal } = prefetchAbort
+
+    try {
+      const res = await fetch(`${args.orchestrator}/chat/prefetch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session: args.session,
+          siteId: args.siteId,
+          slug: args.slugRef.current,
+          message: partialMessage,
+          activeBlockId: args.activeBlockIdRef.current,
+          activeEditablePath: args.activeEditablePathRef.current
+        }),
+        signal
+      })
+      if (!res.ok) return null
+      return await res.json() as {
+        likelyDeterministic: boolean
+        estimatedLatency: "instant" | "moderate" | "slow"
+        inferredAction: string | null
+      }
+    } catch {
+      return null // Aborted or network error — silently ignore
+    }
+  }
+
+  return { submitChatHttp, submitVariations, submitChatStream, prefetchIntent }
 }

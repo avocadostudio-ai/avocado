@@ -252,15 +252,34 @@ export function getSessionPages(session: string) {
   return slugs.map((slug) => structuredClone(draft.get(slug)!))
 }
 
+// ---------------------------------------------------------------------------
+// Context cache — invalidated on setPage / removePage / bumpVersion
+// ---------------------------------------------------------------------------
+const _contextCache = new Map<string, { version: number; pageDirectory?: string }>()
+
+export function getContextCache(session: string) {
+  return _contextCache.get(session)
+}
+
+export function setContextCache(session: string, entry: { version: number; pageDirectory?: string }) {
+  _contextCache.set(session, entry)
+}
+
+function invalidateContextCache(session: string) {
+  _contextCache.delete(session)
+}
+
 export function setPage(session: string, page: PageDoc) {
   const sessionDraft = getSessionDraft(session)
   ensureHeroImageProps(page)
   sessionDraft.set(page.slug, page)
+  invalidateContextCache(session)
 }
 
 export function removePage(session: string, slug: string) {
   const sessionDraft = getSessionDraft(session)
   sessionDraft.delete(slug)
+  invalidateContextCache(session)
 }
 
 export function pushUndo(session: string, slug: string, snapshot: PageDoc) {
@@ -277,6 +296,7 @@ export function bumpVersion(session: string) {
   const current = versions.get(session) ?? 0
   const next = current + 1
   versions.set(session, next)
+  invalidateContextCache(session)
   return next
 }
 

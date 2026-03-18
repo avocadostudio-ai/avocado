@@ -8,6 +8,22 @@ import {
   type Operation,
   type PageDoc
 } from "@ai-site-editor/shared"
+
+// ---------------------------------------------------------------------------
+// Singleton OpenAI client — reuses connection pool across requests.
+// ---------------------------------------------------------------------------
+let _openaiSingleton: OpenAI | null = null
+function getOpenAIClient(): OpenAI {
+  if (!_openaiSingleton) {
+    _openaiSingleton = getOpenAIClient()
+  }
+  return _openaiSingleton
+}
+
+/** Reset the singleton (useful for tests that swap API keys). */
+export function resetOpenAIClient() {
+  _openaiSingleton = null
+}
 import {
   type ParsedIntent,
   extractAudienceTarget,
@@ -751,7 +767,7 @@ export async function parseIntentWithOpenAI(args: {
   model: string
   client?: PlannerOpenAIClient
 }): Promise<ParsedIntent> {
-  const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
+  const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
   const system = [
     "You extract editing intent for a website editor.",
     "Return ONLY one JSON object. No markdown.",
@@ -760,7 +776,8 @@ export async function parseIntentWithOpenAI(args: {
     "If the user asks what is editable/available, use action=info.",
     "Use explicit block references when present (id/type words like hero/faq/cta).",
     "For move/add with placement words, set position to top/bottom/before/after and anchor_block_ref when relevant.",
-    "For update, include patch with only requested fields."
+    "For update, include patch with only requested fields.",
+    'Set complexity to "simple" when the request targets a single block with a straightforward edit (add/remove emoji, change a label, update one field). Set complexity to "standard" for multi-block edits, page creation, translation, content generation, or anything requiring creative judgment.'
   ].join("\n")
 
   const user = {
@@ -828,7 +845,7 @@ export async function generatePlanWithOpenAI(args: {
   manifestBlockTypes?: string[]
   signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
-  const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as PlannerOpenAIClient)
+  const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
   const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
@@ -875,6 +892,8 @@ export async function generatePlanWithOpenAI(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "For update_props object key order, emit keys exactly as: op, pageSlug (if present), blockId, patch.",
     "Do not return no-op updates: patch must change at least one effective value.",
+    "If the user explicitly names multiple targets (for example hero CTA and footer CTA), include updates for every named target in the same plan.",
+    "When the user gives hard constraints like words/punctuation to avoid, generated copy must strictly honor those constraints.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
     "If rewrite/rephrase of a specific field is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first. This does NOT apply to page-wide rewrite/refocus/rebrand requests — those should generate update_props ops across all blocks.",

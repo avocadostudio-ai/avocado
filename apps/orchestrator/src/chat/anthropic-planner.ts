@@ -35,6 +35,24 @@ import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthro
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
 
+// ---------------------------------------------------------------------------
+// Singleton Anthropic client — reuses HTTP/2 connection pool across requests.
+// Lazily initialized on first use so module-level import doesn't throw if
+// ANTHROPIC_API_KEY isn't set yet.
+// ---------------------------------------------------------------------------
+let _anthropicSingleton: Anthropic | null = null
+function getAnthropicClient(): Anthropic {
+  if (!_anthropicSingleton) {
+    _anthropicSingleton = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  }
+  return _anthropicSingleton
+}
+
+/** Reset the singleton (useful for tests that swap API keys). */
+export function resetAnthropicClient() {
+  _anthropicSingleton = null
+}
+
 
 export async function parseIntentWithAnthropic(args: {
   message: string
@@ -46,7 +64,7 @@ export async function parseIntentWithAnthropic(args: {
   model: string
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
 }): Promise<ParsedIntent> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const client = getAnthropicClient()
   const system = [
     "You extract editing intent for a website editor.",
     "Return ONLY one JSON object. No markdown.",
@@ -55,7 +73,8 @@ export async function parseIntentWithAnthropic(args: {
     "If the user asks what is editable/available, use action=info.",
     "Use explicit block references when present (id/type words like hero/faq/cta).",
     "For move/add with placement words, set position to top/bottom/before/after and anchor_block_ref when relevant.",
-    "For update, include patch with only requested fields."
+    "For update, include patch with only requested fields.",
+    'Set complexity to "simple" when the request targets a single block with a straightforward edit (add/remove emoji, change a label, update one field). Set complexity to "standard" for multi-block edits, page creation, translation, content generation, or anything requiring creative judgment.'
   ].join("\n")
 
   const user = {
@@ -190,7 +209,7 @@ export async function generatePlanWithAnthropic(args: {
   manifestBlockTypes?: string[]
   signal?: AbortSignal
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
-  const client = args.client ?? (new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) as unknown as PlannerAnthropicClient)
+  const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
   const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
@@ -239,6 +258,8 @@ export async function generatePlanWithAnthropic(args: {
     "For update_props, set patch to changed props only; use existing prop keys for the target block type.",
     "For update_props object key order, emit keys exactly as: op, pageSlug (if present), blockId, patch.",
     "Do not return no-op updates: patch must change at least one effective value.",
+    "If the user explicitly names multiple targets (for example hero CTA and footer CTA), include updates for every named target in the same plan.",
+    "When the user gives hard constraints like words/punctuation to avoid, generated copy must strictly honor those constraints.",
     "If contextPack.selected.editablePath is present, treat it as the primary target unless the user clearly requests a different target.",
     "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
     "If rewrite/rephrase of a specific field is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first. This does NOT apply to page-wide rewrite/refocus/rebrand requests — those should generate update_props ops across all blocks.",

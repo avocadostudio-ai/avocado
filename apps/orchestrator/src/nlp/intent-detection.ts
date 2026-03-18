@@ -205,7 +205,8 @@ export function isInfoQuery(message: string) {
     /\bwhat\s+content\b/.test(m) ||
     /\bcontent\s+elements?\b/.test(m) ||
     /\b(which|what)\s+fields?\b/.test(m) ||
-    /\bwhat\s+prop(ertie)?s?\b/.test(m)
+    /\bwhat\s+prop(ertie)?s?\b/.test(m) ||
+    /\b(?:what|which)\s+(?:tabs?|items?|cards?|features?|links?|images?|pages?|columns?)\s+(?:do|does|can|are)\s+(?:we|i|you|it|this)\s+have\b/.test(m)
   )
 }
 

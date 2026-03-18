@@ -54,3 +54,16 @@ test(`${BLOCK_TYPE}: schema rejects invalid columns value`, () => {
   })
   assert.equal(result.success, false)
 })
+
+test(`${BLOCK_TYPE}: realistic full-props with Unsplash gallery`, () => {
+  const result = validateBlockProps(BLOCK_TYPE, {
+    images: [
+      { imageUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=600&fit=crop", caption: "Modern office space" },
+      { imageUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=600&fit=crop", caption: "Team brainstorm session" },
+      { imageUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop", caption: "Analytics dashboard" },
+      { imageUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f2?w=800&h=600&fit=crop", caption: "Server infrastructure" },
+    ],
+    columns: "4",
+  })
+  assert.equal(result.success, true)
+})

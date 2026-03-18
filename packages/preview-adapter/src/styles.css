@@ -842,9 +842,11 @@
 /* AI field loading shimmer — injected child div to avoid ::before/::after conflicts */
 .aifx-shimmer-overlay {
   position: absolute;
-  inset: -22%;
+  inset: 0;
   z-index: 23;
   pointer-events: none;
+  border-radius: inherit;
+  overflow: clip;
   background: linear-gradient(
     108deg,
     transparent 22%,
@@ -854,22 +856,32 @@
     rgba(208, 214, 221, 0.05) 64%,
     transparent 78%
   );
-  animation: aifx-wave 1.45s ease-in-out infinite;
+  background-size: 220% 100%;
+  background-position: 160% 0;
+  animation: aifx-shimmer-sweep 1.45s linear infinite;
   mix-blend-mode: screen;
 }
 
 .aifx-shimmer-sparkle {
   position: absolute;
-  top: 2px;
-  right: 4px;
-  z-index: 24;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  width: clamp(10px, 28%, 18px);
+  height: clamp(10px, 28%, 18px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
   color: rgb(232, 236, 241);
+  transform-origin: 100% 0;
   animation: aifx-sparkle-blink 1s ease-in-out infinite;
 }
 
 .aifx-shimmer-sparkle svg {
   display: block;
+  width: 100%;
+  height: 100%;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 6px rgba(170, 178, 186, 0.45));
 }
 
@@ -901,6 +913,12 @@
   50% { opacity: 0.3; transform: scale(0.85); }
 }
 
+@keyframes aifx-shimmer-sweep {
+  to {
+    background-position: -60% 0;
+  }
+}
+
 /* Image change hover button */
 .editor-image-change-btn {
   position: absolute;
@@ -924,7 +942,7 @@
 }
 
 [data-editor-active] [data-editable-target]:hover > .editor-image-change-btn,
-[data-editor-active] .editor-highlight [data-editable-target] > .editor-image-change-btn {
+[data-editor-active] [data-editable-target]:focus-within > .editor-image-change-btn {
   opacity: 1;
   pointer-events: auto;
 }

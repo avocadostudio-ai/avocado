@@ -70,7 +70,8 @@ const intentSchemaForAI = z.object({
   anchor_block_ref: z.string().nullable(),
   patch: z.record(z.string(), z.unknown()).nullable(),
   summary: z.string().nullable(),
-  assumption: z.string().nullable()
+  assumption: z.string().nullable(),
+  complexity: z.enum(["simple", "standard"]).nullable()
 })
 
 function stripSchemaKey(obj: Record<string, unknown>): Record<string, unknown> {

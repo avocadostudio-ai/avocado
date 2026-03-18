@@ -120,7 +120,9 @@ const CANONICAL_OPS = [
   "rename_page",
   "remove_page",
   "move_page",
-  "duplicate_page"
+  "duplicate_page",
+  "update_page_meta",
+  "update_site_config"
 ] as const
 type CanonicalOp = (typeof CANONICAL_OPS)[number]
 
@@ -185,7 +187,15 @@ const OP_ALIASES: Record<string, CanonicalOp> = {
   copy_page: "duplicate_page",
   copypage: "duplicate_page",
   clone_page: "duplicate_page",
-  clonepage: "duplicate_page"
+  clonepage: "duplicate_page",
+  update_page_meta: "update_page_meta",
+  updatepagemeta: "update_page_meta",
+  set_page_meta: "update_page_meta",
+  setpagemeta: "update_page_meta",
+  update_site_config: "update_site_config",
+  updatesiteconfig: "update_site_config",
+  set_site_config: "update_site_config",
+  setsiteconfig: "update_site_config"
 }
 
 function parseArgs(argv: string[]) {
@@ -276,7 +286,7 @@ function buildOpsJsonEvalUserPrompt(prompt: string, cardinality: OpsCardinality)
   return [
     "Task: infer website-editor operation command(s) for this request.",
     "Allowed commands only:",
-    "create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page.",
+    "create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page, update_page_meta, update_site_config.",
     "Return strict JSON only in this exact shape: {\"ops\":[{\"op\":\"...\"}]}",
     cardinalityInstruction,
     "Use only allowed command names.",
@@ -350,6 +360,8 @@ function detectOpsFromText(text: string): CanonicalOp[] {
   contains(/\b(remove|delete)[_\s-]?page\b/, "remove_page")
   contains(/\b(move|reorder)[_\s-]?page\b/, "move_page")
   contains(/\b(duplicate|copy|clone)[_\s-]?page\b/, "duplicate_page")
+  contains(/\bupdate[_\s-]?page[_\s-]?meta\b|\bset[_\s-]?page[_\s-]?meta\b|\bseo[_\s-]?(title|desc|meta)\b|\bpage[_\s-]?meta\b/, "update_page_meta")
+  contains(/\bupdate[_\s-]?site[_\s-]?config\b|\bset[_\s-]?site[_\s-]?config\b|\bsite[_\s-]?(name|config|settings)\b/, "update_site_config")
 
   return Array.from(detected)
 }
