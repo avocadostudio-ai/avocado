@@ -702,10 +702,10 @@
     }
   },
   {
-    "id": "p_avocado_recipes",
-    "slug": "/avocado-recipes",
-    "title": "Avocado Recipes",
-    "updatedAt": "2026-03-18T10:51:36.788Z",
+    "id": "p_recipes",
+    "slug": "/recipes",
+    "title": "Recipes",
+    "updatedAt": "2026-03-18T10:51:53.800Z",
     "blocks": [
       {
         "id": "b_hero_avocado-recipes",
@@ -752,7 +752,7 @@
           "title": "Start Cooking Today",
           "description": "Join thousands of home cooks creating amazing avocado dishes. Get access to our full recipe collection, tips, and seasonal specials.",
           "ctaText": "Explore All Recipes",
-          "ctaHref": "/avocado-recipes"
+          "ctaHref": "/recipes"
         }
       }
     ]
