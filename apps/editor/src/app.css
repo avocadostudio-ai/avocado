@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  /* Map existing editor CSS vars to shadcn semantic tokens */
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--panel);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: #fff;
+  --color-secondary: var(--soft);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--soft);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--soft);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fff;
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+
+  --radius: 0.625rem;
+
+  --font-sans: "Manrope", sans-serif;
+}
+
+/* Dark mode variant hooks into existing .editor-dark class */
+@variant dark (&:where(.editor-dark, .editor-dark *));
+
+/*
+ * Unlayered overrides — must beat styles.css which is also unlayered.
+ * styles.css sets `label { color: var(--muted); font-size: 12px }` for
+ * the property panel.  Reset those inside shadcn dialogs / portals.
+ */
+[data-slot="dialog-content"] label,
+[data-slot="select-content"] label {
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Override shadcn semantic tokens for dark mode. */
+.editor-dark {
+  color: var(--color-foreground);
+  --color-background: #111827;
+  --color-foreground: #f8fafc;
+  --color-card: #111827;
+  --color-card-foreground: #f8fafc;
+  --color-popover: #1e293b;
+  --color-popover-foreground: #e2e8f0;
+  --color-primary: #0d9488;
+  --color-primary-foreground: #f0fdfa;
+  --color-secondary: #162235;
+  --color-secondary-foreground: #f8fafc;
+  --color-muted: #1e293b;
+  --color-muted-foreground: #cbd5e1;
+  --color-accent: #1e293b;
+  --color-accent-foreground: #e2e8f0;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #fff;
+  --color-border: #334155;
+  --color-input: #3b4e66;
+  --color-ring: #0d9488;
+}
