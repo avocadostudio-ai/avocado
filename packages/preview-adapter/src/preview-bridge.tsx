@@ -1034,9 +1034,24 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const previousSelectedBlockId = selectedBlockRef.current
       const previousEditablePath = selectedEditablePathRef.current
       const effectivePath = editablePath ?? (previousSelectedBlockId === blockId ? previousEditablePath ?? undefined : undefined)
+      const editBtn = document.createElement("button")
+      editBtn.type = "button"
+      editBtn.className = "editor-selected-edit"
+      editBtn.setAttribute("aria-label", "Edit with AI")
+      editBtn.title = "Edit with AI"
+      editBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>'
+      editBtn.addEventListener("click", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        window.parent.postMessage(
+          { protocol: "site-editor/v1", type: "editBlockRequested", payload: { slug, blockId } },
+          editorOrigin
+        )
+      })
+
       const isChromeBlock = match.querySelector("[data-block-chrome]") !== null || match.matches("[data-block-chrome]")
       if (!isChromeBlock) {
-        toolbar.append(moveUpBtn, moveDownBtn)
+        toolbar.append(editBtn, moveUpBtn, moveDownBtn)
         match.prepend(toolbar)
         match.prepend(addTopBtn)
         match.append(addBtn)
@@ -1129,6 +1144,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       if (
         target?.closest(".editor-block-delete") ||
         target?.closest(".editor-selected-delete") ||
+        target?.closest(".editor-selected-edit") ||
         target?.closest(".editor-selected-move") ||
         target?.closest(".editor-selected-add") ||
         target?.closest(".editor-list-item-delete") ||
@@ -1445,6 +1461,7 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
         const editablePath = String(msg.payload.editablePath ?? "")
         const active = Boolean(msg.payload.active)
         // Remove all existing shimmer overlays and restore inline styles
+        document.querySelectorAll(".aifx-shimmer-sparkle").forEach((el) => el.remove())
         document.querySelectorAll(".aifx-shimmer-overlay").forEach((el) => {
           const parent = el.parentElement as HTMLElement | null
           el.remove()
@@ -1474,12 +1491,19 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
               const sparkle = document.createElement("div")
               sparkle.className = "aifx-shimmer-sparkle"
               sparkle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>'
-              overlay.appendChild(sparkle)
               if (!target.hasAttribute("data-aifx-prev-position")) {
                 target.setAttribute("data-aifx-prev-position", target.style.position)
               }
               target.style.position = target.style.position || "relative"
               target.appendChild(overlay)
+              // Append sparkle to toolbar (inherits show/hide), fallback to target
+              const highlight = block.closest(".editor-highlight") ?? block
+              const toolbar = highlight.querySelector(".editor-block-toolbar")
+              if (toolbar) {
+                toolbar.appendChild(sparkle)
+              } else {
+                target.appendChild(sparkle)
+              }
             }
           }
         }

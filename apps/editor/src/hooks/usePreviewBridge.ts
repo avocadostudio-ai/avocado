@@ -17,6 +17,7 @@ export type PreviewBridgeCallbacks = {
   onListItemMoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex: number | undefined) => void
   onInlineTextCommitted: (slug: string, blockId: string, editablePath: string, value: string) => void
   onOpenImagePicker: (slug: string, blockId: string, editablePath: string, currentUrl: string | undefined) => void
+  onEditBlockRequested: (slug: string, blockId: string) => void
   onIframeScrolled?: () => void
 }
 
@@ -150,6 +151,12 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const index = typeof msg.payload.index === "number" && Number.isInteger(msg.payload.index) ? msg.payload.index : -1
         const afterIndex = typeof msg.payload.afterIndex === "number" && Number.isInteger(msg.payload.afterIndex) ? msg.payload.afterIndex : undefined
         callbacks.onListItemMoveRequested(nextSlug, blockId, blockType, listKey, index, afterIndex)
+      }
+
+      if (msg.type === "editBlockRequested") {
+        const nextSlug = String(msg.payload.slug ?? slug)
+        const blockId = parseString(msg.payload.blockId, "")
+        callbacks.onEditBlockRequested(nextSlug, blockId)
       }
 
       if (msg.type === "openImagePicker") {
