@@ -135,6 +135,30 @@ function escapeControlCharsInStrings(raw: string): string {
 }
 
 /**
+ * Close unclosed braces, brackets, and strings in a truncated JSON string.
+ * Walks the string tracking nesting context and appends the necessary
+ * closing characters.
+ */
+function closeOpenBrackets(input: string): string {
+  const stack: string[] = []
+  let inStr = false
+  let esc = false
+  for (const ch of input) {
+    if (esc) { esc = false; continue }
+    if (ch === "\\") { esc = true; continue }
+    if (ch === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (ch === "{") stack.push("}")
+    else if (ch === "[") stack.push("]")
+    else if (ch === "}" || ch === "]") stack.pop()
+  }
+  let result = input
+  if (inStr) result += '"'
+  while (stack.length > 0) result += stack.pop()
+  return result
+}
+
+/**
  * Attempt multiple JSON repair strategies. Returns the first one that
  * produces parseable JSON, or throws the original error.
  */
@@ -167,22 +191,30 @@ export function repairAndParseJson(raw: string): unknown {
 
   // Strategy 3: truncated output — close open braces/brackets in correct order
   try {
-    let repaired = basic
-    const stack: string[] = []
-    let inStr = false
-    let esc = false
-    for (const ch of repaired) {
-      if (esc) { esc = false; continue }
-      if (ch === "\\") { esc = true; continue }
-      if (ch === '"') { inStr = !inStr; continue }
-      if (inStr) continue
-      if (ch === "{") stack.push("}")
-      else if (ch === "[") stack.push("]")
-      else if (ch === "}" || ch === "]") stack.pop()
+    return JSON.parse(closeOpenBrackets(basic))
+  } catch {}
+
+  // Strategy 4: truncate at last valid key-value boundary
+  // The model produced valid JSON for some fields but then broke into raw
+  // markdown (e.g., bare bullet lists instead of JSON arrays). Collect all
+  // comma positions outside strings, then try truncating at each from right
+  // to left until we get valid JSON.
+  try {
+    const commaPositions: number[] = []
+    let inStr4 = false
+    let esc4 = false
+    for (let i = 0; i < basic.length; i++) {
+      if (esc4) { esc4 = false; continue }
+      if (basic[i] === "\\") { esc4 = true; continue }
+      if (basic[i] === '"') { inStr4 = !inStr4; continue }
+      if (!inStr4 && basic[i] === ",") commaPositions.push(i)
     }
-    if (inStr) repaired += '"'
-    while (stack.length > 0) repaired += stack.pop()
-    return JSON.parse(repaired)
+    // Try last 10 positions max — truncating further is unlikely to yield useful content
+    const startIdx = Math.max(0, commaPositions.length - 10)
+    for (let ci = commaPositions.length - 1; ci >= startIdx; ci--) {
+      const truncated = basic.slice(0, commaPositions[ci]!)
+      try { return JSON.parse(closeOpenBrackets(truncated)) } catch {}
+    }
   } catch {}
 
   // All strategies failed — throw original parse error
@@ -1204,6 +1236,12 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
   if (typeof root.suggested_next_actions === "string") {
     root.suggested_next_actions = root.suggested_next_actions
       .split(/\n|[,;]/)
+      .map((s: string) => s.replace(/^\s*[-•*\d.)\]]+\s*/, "").trim())
+      .filter(Boolean)
+  }
+  if (typeof root.change_log === "string") {
+    root.change_log = root.change_log
+      .split(/\n/)
       .map((s: string) => s.replace(/^\s*[-•*\d.)\]]+\s*/, "").trim())
       .filter(Boolean)
   }

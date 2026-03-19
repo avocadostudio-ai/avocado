@@ -1077,7 +1077,13 @@ export function compileDeterministicPlan(args: {
     }
   }
 
-  if (intent.action === "info" || (intent.action === "clarify" && !activeEditablePath)) {
+  if (intent.action === "info") {
+    // Let the full planner handle info queries — it produces detailed
+    // block descriptions via the submit_edit_plan tool.
+    return null
+  }
+
+  if (intent.action === "clarify" && !activeEditablePath) {
     return {
       intent: "needs_clarification",
       summary_for_user: intent.summary ?? "Please specify the section and exact change you want.",
