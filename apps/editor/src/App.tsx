@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import Settings2Icon from "./components/settings2-icon"
 import { SettingsModal } from "./components/SettingsModal"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
 import { SitesPage } from "./components/SitesPage"
 import { ImagePickerModal } from "./components/ImagePickerModal"
@@ -1760,170 +1761,166 @@ function EditorPage({
         onClearChat={chatEngine.clearChat}
       />
 
-      {sites.configSite ? (
-        <div className="sites-modal-backdrop" onClick={() => sites.setConfigSiteId(null)}>
-          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Site config" onClick={(e) => e.stopPropagation()}>
-            <header className="sites-modal-header">
-              <h2>Site Config</h2>
-              <button type="button" className="settings-close-btn" onClick={() => sites.setConfigSiteId(null)} aria-label="Close">
-                ×
-              </button>
-            </header>
-            <nav className="panel-tabs">
-              <button type="button" className={`panel-tab ${configModalTab === "general" ? "is-active" : ""}`} onClick={() => setConfigModalTab("general")}>General</button>
-              <button type="button" className={`panel-tab ${configModalTab === "brief" ? "is-active" : ""}`} onClick={() => setConfigModalTab("brief")}>Brief</button>
-              <button type="button" className={`panel-tab ${configModalTab === "deploy" ? "is-active" : ""}`} onClick={() => setConfigModalTab("deploy")}>Deploy</button>
-            </nav>
-            <div className="sites-modal-body">
-              {configModalTab === "general" ? (
-                <div className="sites-form-grid">
-                  <label className="sites-form-field">
-                    <span>Site name</span>
-                    <input
-                      type="text"
-                      value={sites.configSite.name}
-                      placeholder="Site name"
-                      onChange={(e) => sites.updateConfigSite({ name: e.target.value })}
-                    />
-                  </label>
-                  <p className="sites-form-section-title">Header</p>
-                  <label className="sites-form-field">
-                    <span>Header name</span>
-                    <input
-                      type="text"
-                      value={sites.headerConfig.name ?? ""}
-                      placeholder="Site header name"
-                      onBlur={(e) => {
-                        void sites.updateHeaderConfig({ name: e.target.value })
-                        preview.postToSite("draftUpdated", {})
-                      }}
-                      onChange={(e) => sites.updateHeaderConfig({ name: e.target.value })}
-                    />
-                  </label>
-                  <label className="sites-form-field">
-                    <span>Logo URL</span>
-                    <input
-                      type="text"
-                      value={sites.headerConfig.logo ?? ""}
-                      placeholder="https://example.com/logo.svg"
-                      onBlur={(e) => {
-                        void sites.updateHeaderConfig({ logo: e.target.value })
-                        preview.postToSite("draftUpdated", {})
-                      }}
-                      onChange={(e) => sites.updateHeaderConfig({ logo: e.target.value })}
-                    />
-                  </label>
-                </div>
-              ) : null}
-              {configModalTab === "brief" ? (
-                <div className="sites-form-grid">
-                  <div className="sites-form-field sites-form-field-wide">
-                    <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
-                      <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
-                      <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
-                      <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
-                    </div>
-                    {siteConfigTab === "overview" ? (
-                      <label className="sites-form-field">
-                        <span>Overview</span>
-                        <textarea value={sites.configSite.purpose} placeholder="What this site is for." onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
-                      </label>
-                    ) : null}
-                    {siteConfigTab === "tone" ? (
-                      <label className="sites-form-field">
-                        <span>Preferred tone</span>
-                        <textarea value={sites.configSite.tone ?? ""} placeholder="How the writing should sound." onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
-                      </label>
-                    ) : null}
-                    {siteConfigTab === "constraints" ? (
-                      <label className="sites-form-field">
-                        <span>Writing constraints</span>
-                        <textarea
-                          value={(sites.configSite.constraints ?? []).join("\n")}
-                          placeholder={"Rules for content output.\nOne per line."}
-                          onChange={(e) => sites.updateConfigSite({ constraints: e.target.value.split(/\n|,/g).map((s) => s.trim()).filter(Boolean) })}
-                          rows={8}
-                        />
-                      </label>
-                    ) : null}
+      <Sheet open={!!sites.configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg gap-0 p-0 font-sans text-foreground text-sm">
+          <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
+            <SheetTitle className="text-base font-bold tracking-tight">Site Config</SheetTitle>
+          </SheetHeader>
+          {sites.configSite ? (
+            <>
+              <nav className="panel-tabs">
+                <button type="button" className={`panel-tab ${configModalTab === "general" ? "is-active" : ""}`} onClick={() => setConfigModalTab("general")}>General</button>
+                <button type="button" className={`panel-tab ${configModalTab === "brief" ? "is-active" : ""}`} onClick={() => setConfigModalTab("brief")}>Brief</button>
+                <button type="button" className={`panel-tab ${configModalTab === "deploy" ? "is-active" : ""}`} onClick={() => setConfigModalTab("deploy")}>Deploy</button>
+              </nav>
+              <div className="sites-modal-body">
+                {configModalTab === "general" ? (
+                  <div className="sites-form-grid">
+                    <label className="sites-form-field">
+                      <span>Site name</span>
+                      <input
+                        type="text"
+                        value={sites.configSite.name}
+                        placeholder="Site name"
+                        onChange={(e) => sites.updateConfigSite({ name: e.target.value })}
+                      />
+                    </label>
+                    <p className="sites-form-section-title">Header</p>
+                    <label className="sites-form-field">
+                      <span>Header name</span>
+                      <input
+                        type="text"
+                        value={sites.headerConfig.name ?? ""}
+                        placeholder="Site header name"
+                        onBlur={(e) => {
+                          void sites.updateHeaderConfig({ name: e.target.value })
+                          preview.postToSite("draftUpdated", {})
+                        }}
+                        onChange={(e) => sites.updateHeaderConfig({ name: e.target.value })}
+                      />
+                    </label>
+                    <label className="sites-form-field">
+                      <span>Logo URL</span>
+                      <input
+                        type="text"
+                        value={sites.headerConfig.logo ?? ""}
+                        placeholder="https://example.com/logo.svg"
+                        onBlur={(e) => {
+                          void sites.updateHeaderConfig({ logo: e.target.value })
+                          preview.postToSite("draftUpdated", {})
+                        }}
+                        onChange={(e) => sites.updateHeaderConfig({ logo: e.target.value })}
+                      />
+                    </label>
                   </div>
-                </div>
-              ) : null}
-              {configModalTab === "deploy" ? (
-                <div className="sites-form-grid">
-                  <div className="sites-settings-grid">
-                    <label className="sites-form-field">
-                      <span>Hosting</span>
-                      <input type="text" value={sites.configSite.hosting} placeholder="Vercel production site" onChange={(e) => sites.updateConfigSite({ hosting: e.target.value })} />
-                    </label>
-                    <label className="sites-form-field">
-                      <span>Vercel project ID</span>
-                      <input type="text" value={sites.configSite.vercelProjectId ?? ""} placeholder="prj_..." onChange={(e) => sites.updateConfigSite({ vercelProjectId: e.target.value })} />
-                    </label>
-                    <label className="sites-form-field">
-                      <span>Vercel team ID</span>
-                      <input type="text" value={sites.configSite.vercelTeamId ?? ""} placeholder="team_..." onChange={(e) => sites.updateConfigSite({ vercelTeamId: e.target.value })} />
-                    </label>
-                    <label className="sites-form-field">
-                      <span>Vercel production URL</span>
-                      <input type="url" value={sites.configSite.vercelProductionUrl ?? ""} placeholder="https://example.vercel.app" onChange={(e) => sites.updateConfigSite({ vercelProductionUrl: e.target.value })} />
-                    </label>
-                    <label className="sites-form-field sites-form-field-wide">
-                      <span>Vercel deploy hook URL</span>
-                      <input type="url" value={sites.configSite.vercelDeployHookUrl ?? ""} placeholder="https://api.vercel.com/v1/integrations/deploy/..." onChange={(e) => sites.updateConfigSite({ vercelDeployHookUrl: e.target.value })} />
-                    </label>
-                    <label className="sites-form-field sites-form-field-wide">
-                      <span>Google Drive folder ID</span>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <input
-                          type="text"
-                          value={sites.configSite.gdriveFolderId ?? ""}
-                          placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
-                          onChange={(e) => { sites.updateConfigSite({ gdriveFolderId: e.target.value }); setDriveValidation(null) }}
-                          style={{ flex: 1 }}
-                        />
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          style={{ whiteSpace: "nowrap", padding: "6px 12px", fontSize: 13 }}
-                          disabled={!sites.configSite.gdriveFolderId?.trim() || driveValidation?.status === "loading"}
-                          onClick={async () => {
-                            const folderId = sites.configSite!.gdriveFolderId?.trim()
-                            if (!folderId) return
-                            setDriveValidation({ status: "loading" })
-                            try {
-                              const res = await fetch(`${orchestrator}/gdrive/images?folderId=${encodeURIComponent(folderId)}&limit=1`)
-                              if (res.ok) {
-                                const data = (await res.json()) as { items: unknown[] }
-                                setDriveValidation({ status: "ok", message: `Connected (${data.items.length > 0 ? "images found" : "folder empty"})` })
-                              } else {
-                                const data = (await res.json().catch(() => ({}))) as { error?: string }
-                                setDriveValidation({ status: "error", message: data.error ?? `HTTP ${res.status}` })
-                              }
-                            } catch {
-                              setDriveValidation({ status: "error", message: "Could not reach orchestrator" })
-                            }
-                          }}
-                        >
-                          {driveValidation?.status === "loading" ? "Testing..." : "Test"}
-                        </button>
+                ) : null}
+                {configModalTab === "brief" ? (
+                  <div className="sites-form-grid">
+                    <div className="sites-form-field sites-form-field-wide">
+                      <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                        <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
+                        <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
+                        <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
                       </div>
-                      {driveValidation && driveValidation.status !== "loading" && (
-                        <span style={{ fontSize: 12, marginTop: 4, color: driveValidation.status === "ok" ? "#4ade80" : "#f87171" }}>
-                          {driveValidation.message}
-                        </span>
-                      )}
-                    </label>
+                      {siteConfigTab === "overview" ? (
+                        <label className="sites-form-field">
+                          <span>Overview</span>
+                          <textarea value={sites.configSite.purpose} placeholder="What this site is for." onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
+                        </label>
+                      ) : null}
+                      {siteConfigTab === "tone" ? (
+                        <label className="sites-form-field">
+                          <span>Preferred tone</span>
+                          <textarea value={sites.configSite.tone ?? ""} placeholder="How the writing should sound." onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
+                        </label>
+                      ) : null}
+                      {siteConfigTab === "constraints" ? (
+                        <label className="sites-form-field">
+                          <span>Writing constraints</span>
+                          <textarea
+                            value={(sites.configSite.constraints ?? []).join("\n")}
+                            placeholder={"Rules for content output.\nOne per line."}
+                            onChange={(e) => sites.updateConfigSite({ constraints: e.target.value.split(/\n|,/g).map((s) => s.trim()).filter(Boolean) })}
+                            rows={8}
+                          />
+                        </label>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ) : null}
-            </div>
-            <footer className="sites-modal-footer">
-              <button type="button" className="primary-btn" onClick={() => sites.setConfigSiteId(null)}>Done</button>
-            </footer>
-          </section>
-        </div>
-      ) : null}
+                ) : null}
+                {configModalTab === "deploy" ? (
+                  <div className="sites-form-grid">
+                    <div className="sites-settings-grid">
+                      <label className="sites-form-field">
+                        <span>Hosting</span>
+                        <input type="text" value={sites.configSite.hosting} placeholder="Vercel production site" onChange={(e) => sites.updateConfigSite({ hosting: e.target.value })} />
+                      </label>
+                      <label className="sites-form-field">
+                        <span>Vercel project ID</span>
+                        <input type="text" value={sites.configSite.vercelProjectId ?? ""} placeholder="prj_..." onChange={(e) => sites.updateConfigSite({ vercelProjectId: e.target.value })} />
+                      </label>
+                      <label className="sites-form-field">
+                        <span>Vercel team ID</span>
+                        <input type="text" value={sites.configSite.vercelTeamId ?? ""} placeholder="team_..." onChange={(e) => sites.updateConfigSite({ vercelTeamId: e.target.value })} />
+                      </label>
+                      <label className="sites-form-field">
+                        <span>Vercel production URL</span>
+                        <input type="url" value={sites.configSite.vercelProductionUrl ?? ""} placeholder="https://example.vercel.app" onChange={(e) => sites.updateConfigSite({ vercelProductionUrl: e.target.value })} />
+                      </label>
+                      <label className="sites-form-field sites-form-field-wide">
+                        <span>Vercel deploy hook URL</span>
+                        <input type="url" value={sites.configSite.vercelDeployHookUrl ?? ""} placeholder="https://api.vercel.com/v1/integrations/deploy/..." onChange={(e) => sites.updateConfigSite({ vercelDeployHookUrl: e.target.value })} />
+                      </label>
+                      <label className="sites-form-field sites-form-field-wide">
+                        <span>Google Drive folder ID</span>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={sites.configSite.gdriveFolderId ?? ""}
+                            placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+                            onChange={(e) => { sites.updateConfigSite({ gdriveFolderId: e.target.value }); setDriveValidation(null) }}
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            style={{ whiteSpace: "nowrap", padding: "6px 12px", fontSize: 13 }}
+                            disabled={!sites.configSite.gdriveFolderId?.trim() || driveValidation?.status === "loading"}
+                            onClick={async () => {
+                              const folderId = sites.configSite!.gdriveFolderId?.trim()
+                              if (!folderId) return
+                              setDriveValidation({ status: "loading" })
+                              try {
+                                const res = await fetch(`${orchestrator}/gdrive/images?folderId=${encodeURIComponent(folderId)}&limit=1`)
+                                if (res.ok) {
+                                  const data = (await res.json()) as { items: unknown[] }
+                                  setDriveValidation({ status: "ok", message: `Connected (${data.items.length > 0 ? "images found" : "folder empty"})` })
+                                } else {
+                                  const data = (await res.json().catch(() => ({}))) as { error?: string }
+                                  setDriveValidation({ status: "error", message: data.error ?? `HTTP ${res.status}` })
+                                }
+                              } catch {
+                                setDriveValidation({ status: "error", message: "Could not reach orchestrator" })
+                              }
+                            }}
+                          >
+                            {driveValidation?.status === "loading" ? "Testing..." : "Test"}
+                          </button>
+                        </div>
+                        {driveValidation && driveValidation.status !== "loading" && (
+                          <span style={{ fontSize: 12, marginTop: 4, color: driveValidation.status === "ok" ? "#4ade80" : "#f87171" }}>
+                            {driveValidation.message}
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       <ImagePickerModal
         open={imagePickerOpen}

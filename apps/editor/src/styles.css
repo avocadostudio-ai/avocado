@@ -2603,6 +2603,18 @@ textarea {
   }
 }
 
+[data-slot="sheet-content"] .sites-form-grid {
+  grid-template-columns: 1fr;
+}
+
+[data-slot="sheet-content"] .sites-form-field-wide {
+  grid-column: auto;
+}
+
+[data-slot="sheet-content"] .sites-settings-grid {
+  grid-template-columns: 1fr;
+}
+
 .settings-close-btn {
   width: 30px;
   height: 30px;

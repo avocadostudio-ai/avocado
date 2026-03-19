@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { editorComponentsManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, orchestrator, resolveSiteOrigin } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
@@ -322,15 +323,12 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           </section>
         </div>
       ) : null}
-      {sites.configSite ? (
-        <div className="sites-modal-backdrop" onClick={() => sites.setConfigSiteId(null)}>
-          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Site config" onClick={(event) => event.stopPropagation()}>
-            <header className="sites-modal-header">
-              <h2>Site Config</h2>
-              <button type="button" className="settings-close-btn" onClick={() => sites.setConfigSiteId(null)} aria-label="Close">
-                ×
-              </button>
-            </header>
+      <Sheet open={!!sites.configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg gap-0 p-0 font-sans text-foreground text-sm">
+          <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
+            <SheetTitle className="text-base font-bold tracking-tight">Site Config</SheetTitle>
+          </SheetHeader>
+          {sites.configSite ? (
             <div className="sites-modal-body">
               <div className="sites-form-grid">
                 <p className="sites-form-section-title">Core settings</p>
@@ -494,14 +492,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 </div>
               </div>
             </div>
-            <footer className="sites-modal-footer">
-              <button type="button" className="primary-btn" onClick={() => sites.setConfigSiteId(null)}>
-                Done
-              </button>
-            </footer>
-          </section>
-        </div>
-      ) : null}
+          ) : null}
+        </SheetContent>
+      </Sheet>
       {sites.restoreState.siteId ? (
         <div className="sites-modal-backdrop" onClick={() => sites.updateRestoreState({ siteId: null })}>
           <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Version history" onClick={(event) => event.stopPropagation()}>
