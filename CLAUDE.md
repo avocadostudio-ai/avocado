@@ -26,11 +26,22 @@ pnpm typecheck
 ## Tests
 
 ```bash
-# Run all tests (orchestrator)
+# Run all tests across monorepo
 pnpm test
 
-# Run orchestrator tests directly
-pnpm --filter @ai-site-editor/orchestrator test
+# Fast unit tests only (orchestrator + blocks)
+pnpm test:unit
+
+# E2E tests only (requires API keys)
+pnpm test:e2e
+
+# Orchestrator test categories
+pnpm --filter @ai-site-editor/orchestrator test:unit         # ~28 pure-function tests, <2s
+pnpm --filter @ai-site-editor/orchestrator test:integration   # ~4 Fastify inject tests, <3s
+pnpm --filter @ai-site-editor/orchestrator test:e2e           # ~2 LLM tests, 30s+ (needs API keys)
+pnpm --filter @ai-site-editor/orchestrator test:chat          # chat domain subset
+pnpm --filter @ai-site-editor/orchestrator test:ops           # ops domain subset
+pnpm --filter @ai-site-editor/orchestrator test:nlp           # nlp domain subset
 
 # Run with coverage
 pnpm --filter @ai-site-editor/orchestrator coverage
