@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Eraser } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AIProvider, ModelKey } from "@/lib/editor-types"
 
@@ -100,13 +101,13 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-w-[340px] gap-0 rounded-2xl p-0 font-sans text-foreground text-sm", chatDarkMode && "editor-dark")} showCloseButton={true}>
-        <DialogHeader className="px-4 pt-3.5 pb-2.5 border-b border-border">
+      <DialogContent className={cn("max-w-[280px] gap-0 rounded-2xl p-0 font-sans text-foreground text-sm", chatDarkMode && "editor-dark")} showCloseButton={true}>
+        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border">
           <DialogTitle className="text-base font-bold tracking-tight">Developer mode</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4 px-4 py-3">
-          <div className="grid gap-1" role="group" aria-label="Developer toggles">
+        <div className="grid gap-5 px-5 py-5">
+          <div className="grid gap-0" role="group" aria-label="Developer toggles">
             <ToggleRow label="Streaming" checked={useStreaming} onCheckedChange={onStreamingChange} />
             <ToggleRow label="Nested labels" checked={showNestedLabels} onCheckedChange={onNestedLabelsChange} />
             <ToggleRow label="Dark mode" checked={chatDarkMode} onCheckedChange={onDarkModeChange} />
@@ -135,6 +136,7 @@ export function SettingsModal({
           </div>
 
           <Button variant="destructive" size="sm" className="w-full" onClick={handleClearChat}>
+            <Eraser className="size-4" />
             Clear chat
           </Button>
         </div>
@@ -153,11 +155,11 @@ function ToggleRow({
   onCheckedChange: (value: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/60 px-3 py-2">
-      <Label className="text-[13px] font-medium cursor-pointer text-foreground" htmlFor={`toggle-${label}`}>
+    <div className="flex items-center justify-between gap-3 py-3 border-b border-border last:border-0">
+      <Label className="text-[14px] font-normal cursor-pointer text-foreground" htmlFor={`toggle-${label}`}>
         {label}
       </Label>
-      <Switch id={`toggle-${label}`} size="sm" checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch id={`toggle-${label}`} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }
