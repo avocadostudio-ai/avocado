@@ -32,7 +32,7 @@ Use this page as the entry point for connecting the AI Site Editor to your websi
 |---|---|---|
 | **Framework-Agnostic SPI** | Teams on Remix, Nuxt, SvelteKit, custom stacks | [site-provider-spi.md](site-provider-spi.md) |
 
-The SPI defines a REST contract (`GET /pages`, `PUT /pages/{id}/content`, etc.) for non-Next.js integrations. The contract is documented but not yet wired into the orchestrator. See [reduce-nextjs-coupling-plan.md](../planning/reduce-nextjs-coupling-plan.md) for rationale.
+The SPI defines a REST contract (`GET /pages`, `PUT /pages/{id}/content`, etc.) for non-Next.js integrations. The contract is documented but not yet wired into the orchestrator. See [reduce-nextjs-coupling.md](../planning/reduce-nextjs-coupling.md) for rationale.
 
 ## For dev teams using AI coding tools
 

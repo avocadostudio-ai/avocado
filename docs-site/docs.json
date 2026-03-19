@@ -39,7 +39,7 @@
             "pages": [
               "operations/dev-server-runbook",
               "operations/vercel-deployment",
-              "operations/streaming-optimistic-patch-transport-checklist"
+              "operations/streaming-patch-checklist"
             ]
           }
         ]
@@ -64,10 +64,10 @@
           {
             "group": "Observability",
             "pages": [
-              "observability/chat-behavior-troubleshooting",
+              "observability/chat-troubleshooting",
               "observability/chat-telemetry-events",
               "observability/token-usage-tracking",
-              "observability/observability-as-correctness-tracing-plan"
+              "observability/e2e-tracing"
             ]
           },
           {
