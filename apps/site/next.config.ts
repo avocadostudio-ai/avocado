@@ -11,16 +11,18 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost" },
     ],
   },
-  webpack: (config) => {
-    // Watch workspace packages through symlinks for HMR
-    config.watchOptions = {
-      ...config.watchOptions,
-      followSymlinks: true,
-    }
-    // Resolve workspace symlinks to their real paths so webpack tracks them
-    config.resolve = {
-      ...config.resolve,
-      symlinks: false,
+  webpack: (config, { dev }) => {
+    if (dev) {
+      // Watch workspace packages through symlinks for HMR
+      config.watchOptions = {
+        ...config.watchOptions,
+        followSymlinks: true,
+      }
+      // Resolve workspace symlinks to their real paths so webpack tracks them
+      config.resolve = {
+        ...config.resolve,
+        symlinks: false,
+      }
     }
     return config
   },
