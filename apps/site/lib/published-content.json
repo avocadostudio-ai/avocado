@@ -3,15 +3,15 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-18T22:19:30.453Z",
+    "updatedAt": "2026-03-19T18:58:47.175Z",
     "blocks": [
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
           "heading": "Nourish Your Body with Science-Backed Nutrition.",
-          "subheading": "Avocados deliver heart-healthy fats and vital nutrients. Explore science-backed recipes, wellness tips, and expert guidance to enhance your nutrition.",
-          "ctaText": "Explore the Science",
+          "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
+          "ctaText": "Get Started Free",
           "ctaHref": "/nutrition-facts",
           "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxBdm9jYWRvfGVufDF8MHx8fDE3NzM3NTIyMjl8MA&ixlib=rb-4.1.0&q=80&w=1080",
           "imageAlt": "sliced green and yellow fruit",
@@ -28,7 +28,7 @@
           "cards": [
             {
               "title": "🥑 Avocado Culinary Delights",
-              "description": "Master 100+ recipes and transform avocados into culinary masterpieces.",
+              "description": "Unlock restaurant-quality meals in minutes. 50+ proven recipes to impress everyone at your table.",
               "ctaText": "Try Now",
               "ctaHref": "/avocado-culinary",
               "imageUrl": "/generated-images/gdrive_1ql_bdk2KM_27u01rkMd8KoiCRJ_R7UOy.webp",
@@ -36,7 +36,7 @@
             },
             {
               "title": "🥑 Avocado Wellness",
-              "description": "Heart-healthy fats and antioxidants to boost your health.",
+              "description": "Transform your energy & heart health today. Trusted by 100K+ nutrition-conscious individuals worldwide.",
               "ctaText": "Explore",
               "ctaHref": "/avocado-wellness",
               "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -44,7 +44,7 @@
             },
             {
               "title": "🥑 Avocado Sustainability",
-              "description": "Ethical farming practices for responsibly grown avocados and a healthier planet.",
+              "description": "Join the movement for ethical farming. Your choices directly support communities & planet.",
               "ctaText": "Learn More",
               "ctaHref": "/avocado-sustainability",
               "imageUrl": "/generated-images/var_1773872370443_poycxy.png",
@@ -58,7 +58,7 @@
         "type": "RichText",
         "props": {
           "title": "Avocados for Everyone—Health, Flavor & Sustainability",
-          "body": "## Daily Avocado Benefits\n\nEnjoy ½–1 avocado daily for vibrant heart health, sustained energy, and natural satiety that keeps you satisfied longer.\n\n## Find Your Avocado Journey\n\n- **Home Cooks**: Master recipes and discover flavor combinations that celebrate avocado's rich, creamy texture.\n- **Wellness Enthusiasts**: Nourish your body with healthy fats, potassium, and antioxidants for optimal heart and brain health.\n- **Growers & Farmers**: Embrace regenerative practices that strengthen soil, conserve water, and build thriving ecosystems.\n- **Sustainability Advocates**: Join the movement—supporting fair trade, ethical sourcing, and environmental stewardship."
+          "body": "## Daily Avocado Benefits\n\nEnjoy ½–1 avocado daily for vibrant heart health, sustained energy, and natural satiety that keeps you satisfied longer.\n\n## Find Your Avocado Journey\n\n- Home Cooks: Master recipes and discover flavor combinations that celebrate avocado's rich, creamy texture.\n- Wellness Enthusiasts: Nourish your body with healthy fats, potassium, and antioxidants for optimal heart and brain health.\n- Growers & Farmers: Embrace regenerative practices that strengthen soil, conserve water, and build thriving ecosystems.\n- Sustainability Advocates: Join the movement—supporting fair trade, ethical sourcing, and environmental stewardship."
         }
       },
       {
@@ -69,15 +69,15 @@
           "stats": [
             {
               "value": "12B+",
-              "label": "avocados grown globally annually"
+              "label": "avocados in tested recipes you can master today"
             },
             {
               "value": "95M",
-              "label": "tons produced worldwide"
+              "label": "servings for sustained energy & heart health"
             },
             {
               "value": "3M+",
-              "label": "farms in the industry"
+              "label": "wellness enthusiasts exploring nutrition science"
             }
           ]
         }
@@ -154,9 +154,9 @@
         "id": "b_cta_1771983958937",
         "type": "CTA",
         "props": {
-          "title": "Join the Avocado Movement",
-          "description": "Experience the richness and health benefits of premium avocados. Perfect for every meal, every time.",
-          "ctaText": "Get Started",
+          "title": "Start Your Avocado Journey Today",
+          "description": "Join 50K+ food lovers exploring recipes, wellness, and sustainable farming.",
+          "ctaText": "Join Free",
           "ctaHref": "/community"
         }
       }
@@ -706,53 +706,103 @@
     }
   },
   {
-    "id": "p_recipes",
-    "slug": "/recipes",
-    "title": "Recipes",
-    "updatedAt": "2026-03-18T18:47:10.926Z",
+    "id": "p_for_recipes",
+    "slug": "/for-recipes",
+    "title": "For Recipes",
+    "updatedAt": "2026-03-19T19:15:06.829Z",
     "blocks": [
       {
-        "id": "b_hero_1773859607736",
+        "id": "b_hero_for-recipes",
         "type": "Hero",
         "props": {
-          "heading": "Discover Amazing Recipes",
-          "subheading": "Explore delicious avocado recipes from our community",
+          "heading": "Recipes Made Simple",
+          "subheading": "Discover easy, delicious recipes for every kitchen skill level.",
           "ctaText": "Browse Recipes",
-          "ctaHref": "/recipes",
-          "imageUrl": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1536&h=1024&fit=crop",
-          "imageAlt": "avocado recipe inspiration",
+          "ctaHref": "/olives",
+          "imageUrl": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
+          "imageAlt": "Fresh ingredients and cooking preparation",
           "imagePosition": "right"
         }
       },
       {
-        "id": "b_faqaccordion_1773859607737",
-        "type": "FAQAccordion",
+        "id": "b_stats_1773947687526",
+        "type": "Stats",
         "props": {
-          "title": "Recipe Questions",
-          "items": [
+          "title": "Recipe Stats",
+          "stats": [
             {
-              "q": "What are some easy beginner-friendly avocado recipes?",
-              "a": "Start with simple classics like guacamole, avocado toast, or avocado salads. These require minimal prep and let the avocado's natural flavor shine."
+              "value": "2,500+",
+              "label": "Recipes"
             },
             {
-              "q": "How do I prevent avocado from browning in my recipes?",
-              "a": "Toss cut avocado with a bit of lemon or lime juice immediately after cutting. You can also store it with the pit in an airtight container."
+              "value": "50k+",
+              "label": "Home Cooks"
             },
             {
-              "q": "Can I cook with avocado?",
-              "a": "Yes! Avocado works well in warm dishes, though high heat can affect its creamy texture. Add it after cooking or use it in low-heat recipes for best results."
+              "value": "4.8★",
+              "label": "Average Rating"
             }
           ]
         }
       },
       {
-        "id": "b_cta_1773859607737",
+        "id": "b_featuregrid_1773947612365",
+        "type": "FeatureGrid",
+        "props": {
+          "title": "Cook Like a Pro",
+          "features": [
+            {
+              "title": "Quick & Delicious",
+              "description": "Transform everyday ingredients into restaurant-quality dishes in your own kitchen."
+            },
+            {
+              "title": "Flavor Combinations",
+              "description": "Master the art of pairing fruits and vegetables to elevate every meal."
+            },
+            {
+              "title": "Kitchen Confidence",
+              "description": "Follow step-by-step guides that make cooking accessible, no matter your skill level."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_1773947679848",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Cooking Help",
+          "items": [
+            {
+              "q": "How do I know how long prep will take?",
+              "a": "Most recipes include prep and cook time at the top. Start by reading through the entire recipe, then add 5–10 minutes for setup. As you practice, you'll work faster."
+            },
+            {
+              "q": "Can I substitute ingredients?",
+              "a": "Yes! Swap seasonal vegetables freely, use different oils, or swap dairy-free alternatives. Check if an ingredient affects texture or flavor—for example, butter and oil behave differently in baking."
+            },
+            {
+              "q": "Which recipes are best for beginners?",
+              "a": "Look for recipes with 5–7 ingredients, simple techniques (no special tools), and 30 minutes or less cook time. Start there, then build skills with more complex recipes."
+            },
+            {
+              "q": "How should I store leftovers?",
+              "a": "Cool food to room temperature, then transfer to airtight containers. Most cooked dishes keep 3–4 days in the fridge. Label with the date to stay organized."
+            },
+            {
+              "q": "What's the best way to learn a new cooking technique?",
+              "a": "Watch a short video first, then follow a trusted recipe step-by-step. Practice the same technique 2–3 times before moving on. Don't skip mise en place—prep all ingredients before you start cooking."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1773947706826",
         "type": "CTA",
         "props": {
-          "title": "Share Your Recipe",
-          "description": "Have a favorite avocado recipe? Contribute to our community collection and inspire other avocado lovers.",
-          "ctaText": "Submit Recipe",
-          "ctaHref": "/community"
+          "title": "Ready to get started?",
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Start now",
+          "ctaHref": "/"
         }
       }
     ]
