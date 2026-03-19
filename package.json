@@ -21,6 +21,8 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --if-present test",
+    "test:unit": "pnpm --filter @ai-site-editor/orchestrator test:unit && pnpm --filter @ai-site-editor/blocks test",
+    "test:e2e": "pnpm --filter @ai-site-editor/orchestrator test:e2e",
     "render:whoami": "render whoami",
     "render:workspace": "render workspace current",
     "render:services": "render services --output text",
