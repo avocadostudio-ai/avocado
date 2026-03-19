@@ -9,9 +9,11 @@ export type UndoHistoryDeps = {
   isLoading: boolean
   activeEditablePathRef: React.RefObject<string | undefined>
   setActiveEditablePath: (value: string | undefined) => void
+  setSlug: (slug: string) => void
   postToSite: (type: "draftUpdated", payload: Record<string, unknown>) => void
   setChatLog: React.Dispatch<React.SetStateAction<ChatEntry[]>>
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean }) => void
+  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) => void
+  refreshRouteSlugs: () => Promise<string[]>
 }
 
 export function useUndoHistory(deps: UndoHistoryDeps) {
@@ -21,10 +23,18 @@ export function useUndoHistory(deps: UndoHistoryDeps) {
     if (deps.isLoading || undoInFlightEntryId) return
     setUndoInFlightEntryId(entryId)
     try {
+      // Find the target entry to get its undoSlug (the slug that was affected)
+      let targetUndoSlug = deps.slugRef.current
+      deps.setChatLog((prev) => {
+        const target = prev.find((e) => e.id === entryId)
+        if (target?.undoSlug) targetUndoSlug = target.undoSlug
+        return prev
+      })
+
       const res = await fetch(`${orchestrator}/history/undo`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session: deps.session, siteId: deps.siteId, slug: deps.slugRef.current })
+        body: JSON.stringify({ session: deps.session, siteId: deps.siteId, slug: targetUndoSlug })
       })
       const data = (await res.json()) as HistoryResponse
       if (!res.ok || data.status !== "applied") {
@@ -38,6 +48,13 @@ export function useUndoHistory(deps: UndoHistoryDeps) {
 
       deps.activeEditablePathRef.current = undefined
       deps.setActiveEditablePath(undefined)
+
+      // Navigate if the undo response signals a page change (e.g. after undoing create/delete)
+      if (typeof data.navigateToSlug === "string" && data.navigateToSlug.length > 0) {
+        deps.setSlug(data.navigateToSlug)
+        void deps.refreshRouteSlugs()
+      }
+
       deps.postToSite("draftUpdated", { focusBlockId: null })
       deps.setChatLog((prev) => {
         const targetIndex = prev.findIndex((entry) => entry.id === entryId)

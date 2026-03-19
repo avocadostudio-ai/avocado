@@ -168,7 +168,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const routeOptionsRef = useRef(routeOptions)
   routeOptionsRef.current = routeOptions
 
-  function pushAssistantFromResult(data: AssistantResponse, options?: { canUndo?: boolean }) {
+  function pushAssistantFromResult(data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) {
     const errors = normalizeValidationErrors(data.validationErrors)
     const parsedChanges = splitAiInsightChanges(data.changes)
     const entry: ChatEntry = {
@@ -178,6 +178,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       status: data.status,
       canUndo: options?.canUndo ?? false,
       wasUndone: false,
+      undoSlug: options?.undoSlug,
       changes: parsedChanges.changes,
       mentionedSlugs: Array.isArray(data.mentionedSlugs) ? data.mentionedSlugs.filter((s): s is string => typeof s === "string") : [],
       suggestions: data.suggestions ?? [],
@@ -218,7 +219,12 @@ export function useChatEngine(config: ChatEngineConfig) {
     } else {
       setContinuationChainId(null)
     }
-    pushAssistantFromResult(data, { canUndo: data.status === "applied" })
+    // undoSlug tells the editor which slug's undo stack to pop.
+    // Server sends it explicitly; fall back to current slug for older responses.
+    const undoSlug = typeof data.undoSlug === "string" && data.undoSlug.length > 0
+      ? data.undoSlug
+      : slugRef.current
+    pushAssistantFromResult(data, { canUndo: data.status === "applied", undoSlug })
     if (data.status === "applied") {
       const currentSlug = slugRef.current
       const nextSlug = parseString(data.updatedSlug, currentSlug)
@@ -1181,9 +1187,11 @@ export function useChatEngine(config: ChatEngineConfig) {
     isLoading,
     activeEditablePathRef,
     setActiveEditablePath,
+    setSlug,
     postToSite,
     setChatLog,
-    pushAssistantFromResult
+    pushAssistantFromResult,
+    refreshRouteSlugs
   })
 
   async function continueChain(chainId: string) {

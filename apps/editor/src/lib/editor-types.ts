@@ -34,6 +34,7 @@ export type AssistantResponse = {
   }
   focusBlockId?: string
   updatedSlug?: string
+  undoSlug?: string
   suggestions?: string[]
   debug?: {
     traceId?: string
@@ -137,6 +138,7 @@ export type ChatEntry = {
   status?: string
   canUndo?: boolean
   wasUndone?: boolean
+  undoSlug?: string
   changes?: string[]
   mentionedSlugs?: string[]
   suggestions?: string[]
@@ -168,6 +170,7 @@ export type ApplyOpsResponse = {
 export type HistoryResponse = {
   status?: string
   previewVersion?: number
+  navigateToSlug?: string
   error?: string
 }
 
