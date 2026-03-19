@@ -93,6 +93,7 @@ export type ChatResult = {
     promptExcerpt: string
     outcome?: string
     reasonCategory?: GuardrailErrorCategory
+    reason?: string
     intent?: EditPlan["intent"]
     opTypes?: string[]
     opCount?: number
@@ -102,6 +103,11 @@ export type ChatResult = {
     cacheCreationInputTokens?: number
     cacheReadInputTokens?: number
     estimatedUsd?: number | null
+    plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
+    modelUsed?: string
+    plannerSource?: "openai" | "anthropic" | "demo"
+    planningAttempts?: number
+    executionMode?: string
     skippedOpCount?: number
     skippedOps?: Array<{
       index: number

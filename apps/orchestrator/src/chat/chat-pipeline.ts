@@ -688,6 +688,10 @@ export async function runChatPipeline(
       traceId: chatRequestId,
       promptHash,
       promptExcerpt,
+      modelUsed,
+      plannerSource,
+      executionMode,
+      ...(planningAttempts > 1 ? { planningAttempts } : {}),
       timeline: (() => {
         if (!doneStageMarked) {
           doneStageMarked = true
@@ -1421,7 +1425,7 @@ export async function runChatPipeline(
             plannerSource: source,
             modelUsed,
             modelKey
-          } satisfies ChatResult, { outcome: "no_effective_change" })
+          } satisfies ChatResult, { outcome: "no_effective_change", plannerTier })
         }
       }
     }
@@ -1803,6 +1807,7 @@ export async function runChatPipeline(
             opTypes: resolvedPlan.ops.map((op) => op.op),
             skippedOpCount: skippedOps.length,
             skippedOps,
+            plannerTier,
             ...usageFields
           })
         }
@@ -1847,7 +1852,7 @@ export async function runChatPipeline(
               plannerSource: source,
               modelUsed,
               modelKey
-            } satisfies ChatResult, { outcome: "no_effective_change" })
+            } satisfies ChatResult, { outcome: "no_effective_change", plannerTier })
           }
         }
       }
@@ -2099,7 +2104,7 @@ export async function runChatPipeline(
           plannerSource: "demo",
           modelUsed,
           modelKey
-        }, { outcome: "planner_exception", reasonCategory: classifyGuardrailError(reason) })
+        }, { outcome: "planner_exception", reasonCategory: classifyGuardrailError(reason), reason: reason.slice(0, 300), plannerTier: "demo" })
       }
     }
   }
@@ -2814,7 +2819,7 @@ export async function runChatPipeline(
             plannerSource,
             modelUsed,
             modelKey
-          }, { outcome: "planning_incomplete", reasonCategory })
+          }, { outcome: "planning_incomplete", reasonCategory, reason: reason.slice(0, 300), plannerTier: "full_llm" })
         }
       }
       planningErrors.push(`Attempt ${attempt} planning failed: ${reason}`)
@@ -2853,7 +2858,7 @@ export async function runChatPipeline(
             plannerSource,
             modelUsed,
             modelKey
-          }, { outcome: "planning_exhausted", reasonCategory })
+          }, { outcome: "planning_exhausted", reasonCategory, reason: reason.slice(0, 300), plannerTier: "full_llm" })
         }
       }
     }
@@ -2890,7 +2895,7 @@ export async function runChatPipeline(
         plannerSource,
         modelUsed,
         modelKey
-      }, { outcome: "planning_missing" })
+      }, { outcome: "planning_missing", plannerTier: "full_llm" })
     }
   }
 
@@ -3033,7 +3038,7 @@ export async function runChatPipeline(
         plannerSource,
         modelUsed,
         modelKey
-      }, { outcome: "repair_failed", reasonCategory: classifyGuardrailError(reason) })
+      }, { outcome: "repair_failed", reasonCategory: classifyGuardrailError(reason), reason: reason.slice(0, 300), plannerTier: "full_llm" })
     }
   }
 
@@ -3086,6 +3091,6 @@ export async function runChatPipeline(
       plannerSource,
       modelUsed,
       modelKey
-    }, { outcome: "repair_failed", reasonCategory: "schema_violation" })
+    }, { outcome: "repair_failed", reasonCategory: "schema_violation", reason: repairedReason.slice(0, 300), plannerTier: "full_llm" })
   }
 }

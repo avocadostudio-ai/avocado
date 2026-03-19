@@ -83,6 +83,10 @@ export function extractJsonObject(input: string) {
  */
 export function repairJson(raw: string): string {
   let result = raw
+  // Escape unescaped control characters (newlines, tabs, etc.) inside JSON
+  // string values. LLMs with eager_input_streaming often emit literal control
+  // chars in markdown-formatted text.
+  result = escapeControlCharsInStrings(result)
   // Fix markdown bullets inside JSON arrays: [- "...", - "..."] → ["...", "..."]
   // Match `- ` after `[` or `,` (with optional whitespace) when not inside a string
   result = result.replace(/(\[|,)\s*-\s+(?=")/g, "$1 ")
@@ -92,11 +96,50 @@ export function repairJson(raw: string): string {
 }
 
 /**
+ * Escape unescaped control characters (newlines, tabs, etc.) that appear
+ * inside JSON string values. Walks character-by-character tracking string
+ * context so control chars outside strings are left untouched.
+ */
+function escapeControlCharsInStrings(raw: string): string {
+  const out: string[] = []
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < raw.length; i++) {
+    const code = raw.charCodeAt(i)
+    if (escaped) {
+      escaped = false
+      out.push(raw[i])
+      continue
+    }
+    if (raw[i] === "\\") {
+      escaped = true
+      out.push(raw[i])
+      continue
+    }
+    if (raw[i] === '"') {
+      inString = !inString
+      out.push(raw[i])
+      continue
+    }
+    if (inString && code <= 0x1f) {
+      // Replace unescaped control characters inside strings
+      if (code === 0x0a) { out.push("\\n"); continue }
+      if (code === 0x0d) { out.push("\\r"); continue }
+      if (code === 0x09) { out.push("\\t"); continue }
+      out.push("\\u" + code.toString(16).padStart(4, "0"))
+      continue
+    }
+    out.push(raw[i])
+  }
+  return out.join("")
+}
+
+/**
  * Attempt multiple JSON repair strategies. Returns the first one that
  * produces parseable JSON, or throws the original error.
  */
 export function repairAndParseJson(raw: string): unknown {
-  // Strategy 1: basic repair
+  // Strategy 1: basic repair (includes control char escaping + markdown bullet fix)
   const basic = repairJson(raw)
   try { return JSON.parse(basic) } catch {}
 

@@ -119,7 +119,15 @@ export function classifyGuardrailError(reason: string): GuardrailErrorCategory {
   if (isNoEffectiveChangeError(reason)) return "no_effective_change"
   if (lower.includes("refused planning output")) return "planner_refusal"
   if (lower.includes("incomplete planning output") || lower.includes("returned no planning output")) return "incomplete_output"
-  if (lower.includes("did not return json") || lower.includes("malformed json") || lower.includes("raw planner output shape is invalid")) {
+  if (
+    lower.includes("did not return json") ||
+    lower.includes("malformed json") ||
+    lower.includes("raw planner output shape is invalid") ||
+    lower.includes("expected ',' or '}'") ||
+    lower.includes("no number after minus") ||
+    lower.includes("unexpected token") ||
+    lower.includes("in json at position")
+  ) {
     return "malformed_output"
   }
   if (

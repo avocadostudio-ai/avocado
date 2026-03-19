@@ -1034,24 +1034,24 @@ function PreviewBridgeInner({ slug, editorOrigin }: { slug: string; editorOrigin
       const previousSelectedBlockId = selectedBlockRef.current
       const previousEditablePath = selectedEditablePathRef.current
       const effectivePath = editablePath ?? (previousSelectedBlockId === blockId ? previousEditablePath ?? undefined : undefined)
-      const editBtn = document.createElement("button")
-      editBtn.type = "button"
-      editBtn.className = "editor-selected-edit"
-      editBtn.setAttribute("aria-label", "Edit with AI")
-      editBtn.title = "Edit with AI"
-      editBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>'
-      editBtn.addEventListener("click", (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        window.parent.postMessage(
-          { protocol: "site-editor/v1", type: "editBlockRequested", payload: { slug, blockId } },
-          editorOrigin
-        )
-      })
+      // const editBtn = document.createElement("button")
+      // editBtn.type = "button"
+      // editBtn.className = "editor-selected-edit"
+      // editBtn.setAttribute("aria-label", "Edit with AI")
+      // editBtn.title = "Edit with AI"
+      // editBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>'
+      // editBtn.addEventListener("click", (event) => {
+      //   event.preventDefault()
+      //   event.stopPropagation()
+      //   window.parent.postMessage(
+      //     { protocol: "site-editor/v1", type: "editBlockRequested", payload: { slug, blockId } },
+      //     editorOrigin
+      //   )
+      // })
 
       const isChromeBlock = match.querySelector("[data-block-chrome]") !== null || match.matches("[data-block-chrome]")
       if (!isChromeBlock) {
-        toolbar.append(editBtn, moveUpBtn, moveDownBtn)
+        toolbar.append(moveUpBtn, moveDownBtn)
         match.prepend(toolbar)
         match.prepend(addTopBtn)
         match.append(addBtn)

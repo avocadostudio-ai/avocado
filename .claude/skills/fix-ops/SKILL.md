@@ -13,12 +13,22 @@ Debug
 traceId: <uuid>
 promptHash: <hash>
 outcome: applied
+reason: malformed_output
+reasonDetail: LLM did not return valid JSON (first 300 chars of error)
 intent: edit_plan
+plannerTier: full_llm
+model: gpt-4o (openai)
+planningAttempts: 2
 opCount: 1
+skippedOps: [0] update_props /about#b_hero: unchanged_value
 ops: add_block
+tokens: in:1234 out:567 total:1801
+cost: $0.0023
 timeline: request_received:0ms -> first_structured_progress:2ms -> plan_ready:2ms -> first_op_applied:4ms -> done:4ms
 prompt: add 3 blocks: hero, cardgrid and CTA [site context] Site purpose: ...
 ```
+
+Not all fields are always present — optional fields appear only when relevant (e.g. `reasonDetail` only on failures, `planningAttempts` only when >1, `tokens`/`cost` only for LLM plans).
 
 ## Ops Engine Internals
 
@@ -147,8 +157,16 @@ Extract these fields from the debug log:
 | Field | What it tells you |
 |-------|------------------|
 | `outcome` | `applied` = ops ran; `apply_failed` = ops threw; `planning_exhausted` = LLM failed; `repair_failed` = auto-repair also failed; `needs_clarification` = planner refused/returned clarification; `planning_missing` = planner returned null; `no_effective_change` = all ops skipped; `planner_exception` = LLM client threw |
+| `reason` | Error category (e.g. `malformed_output`, `schema_violation`) |
+| `reasonDetail` | Raw error string (first 300 chars) — gives the exact error for pattern-matching without reading source |
+| `plannerTier` | `deterministic` = code bug in deterministic planner; `llm_intent_router` = fast router issue; `full_llm` = prompt/model issue; `demo` = demo mode |
+| `model` | Actual model name + source (e.g. `gpt-4o (openai)`) — identifies model-specific failures |
+| `planningAttempts` | >1 means retries happened — useful for understanding latency and retry exhaustion |
 | `opCount` | Number of ops the planner generated |
 | `ops` | Comma-separated op types that were generated |
+| `skippedOps` | Detailed skip info: `[index] op_type slug#blockId: reason` — pinpoints which ops were no-ops |
+| `tokens` | `in:X out:Y total:Z` — identifies context window pressure |
+| `cost` | Estimated USD — flags unexpectedly expensive calls |
 | `timeline` | Where time was spent; if `plan_ready` is <10ms it was deterministic, not LLM |
 | `prompt` | The actual message sent to the planner (after sanitization) |
 

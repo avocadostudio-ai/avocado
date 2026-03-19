@@ -552,8 +552,14 @@ export async function generatePlanWithAnthropic(args: {
         const raw = textBlock && "text" in textBlock ? textBlock.text : ""
         const jsonText = extractJsonObject(raw)
         if (jsonText) {
-          parsed = JSON.parse(jsonText) as Record<string, unknown>
-          break
+          try {
+            parsed = JSON.parse(jsonText) as Record<string, unknown>
+          } catch {
+            try {
+              parsed = repairAndParseJson(jsonText) as Record<string, unknown>
+            } catch { /* fall through */ }
+          }
+          if (parsed) break
         }
         return {
           plan: {
@@ -656,37 +662,99 @@ export async function generatePlanWithAnthropic(args: {
           }
         }
       }
-      const finalMessage = await stream.finalMessage()
-      usage = extractUsage(finalMessage)
+      args.log?.warn({
+        event: "anthropic_path2_stream_complete",
+        model: args.model,
+        toolJsonBufLength: toolJsonBuf.length,
+        textBufLength: textBuf.length,
+        toolJsonBufPreview: toolJsonBuf.slice(0, 300),
+        toolJsonBufTail: toolJsonBuf.length > 300 ? toolJsonBuf.slice(-200) : undefined
+      }, "Anthropic Path 2: stream complete, attempting finalMessage()")
 
-      const streamStopReason = (finalMessage as { stop_reason?: string })?.stop_reason
-      if (streamStopReason === "max_tokens") {
+      // finalMessage() may throw if the SDK's internal JSON.parse fails on
+      // malformed tool input (common with eager_input_streaming).
+      // Wrap in try/catch so we can fall through to toolJsonBuf repair.
+      let finalMessage: Anthropic.Messages.Message | undefined
+      try {
+        finalMessage = await stream.finalMessage() as Anthropic.Messages.Message
+        usage = extractUsage(finalMessage)
+
+        const streamStopReason = (finalMessage as { stop_reason?: string })?.stop_reason
+        if (streamStopReason === "max_tokens") {
+          args.log?.warn({
+            event: "anthropic_planner_truncated",
+            model: args.model,
+            stopReason: streamStopReason,
+            toolJsonBufLength: toolJsonBuf.length,
+            textBufLength: textBuf.length
+          }, "Anthropic planner: response truncated (max_tokens)")
+          throw new Error("Model response was truncated (max_tokens reached)")
+        }
+
+        // Primary: extract validated tool input from finalMessage (API-guaranteed valid)
+        const finalToolBlock = (finalMessage as Anthropic.Messages.Message).content
+          ?.map((block) => asToolUseBlock(block))
+          .find((block) => block?.name === "submit_edit_plan")
+
         args.log?.warn({
-          event: "anthropic_planner_truncated",
+          event: "anthropic_path2_final_message_ok",
           model: args.model,
           stopReason: streamStopReason,
+          contentBlockTypes: finalMessage.content.map((b) => b.type),
+          hasToolBlock: !!finalToolBlock,
+          toolBlockInputType: finalToolBlock?.input ? typeof finalToolBlock.input : "none",
+          toolBlockInputKeys: finalToolBlock?.input && typeof finalToolBlock.input === "object"
+            ? Object.keys(finalToolBlock.input as Record<string, unknown>)
+            : [],
+        }, "Anthropic Path 2: finalMessage() succeeded")
+
+        if (finalToolBlock?.input && typeof finalToolBlock.input === "object") {
+          parsed = finalToolBlock.input as Record<string, unknown>
+        }
+      } catch (finalMsgErr) {
+        // Re-throw max_tokens — that's a definitive truncation, not a parse issue
+        if (finalMsgErr instanceof Error && finalMsgErr.message.includes("max_tokens")) throw finalMsgErr
+        args.log?.warn({
+          event: "anthropic_planner_final_message_failed",
+          model: args.model,
+          error: finalMsgErr instanceof Error ? finalMsgErr.message : String(finalMsgErr),
           toolJsonBufLength: toolJsonBuf.length,
-          textBufLength: textBuf.length
-        }, "Anthropic planner: response truncated (max_tokens)")
-        throw new Error("Model response was truncated (max_tokens reached)")
+          toolJsonBufPreview: toolJsonBuf.slice(0, 500),
+          toolJsonBufTail: toolJsonBuf.length > 500 ? toolJsonBuf.slice(-300) : undefined
+        }, "Anthropic planner: finalMessage() threw — falling back to streamed buffer repair")
       }
 
-      // Prefer tool_use input; fall back to text block
-      if (toolJsonBuf.length > 0) {
+      // Fallback: streamed buffer + repair (if finalMessage didn't yield tool input)
+      if (!parsed && toolJsonBuf.length > 0) {
+        args.log?.warn({
+          event: "anthropic_path2_repair_attempt",
+          model: args.model,
+          toolJsonBufLength: toolJsonBuf.length,
+          toolJsonBufFull: toolJsonBuf.length <= 2000 ? toolJsonBuf : undefined,
+          toolJsonBufPreview: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(0, 800) : undefined,
+          toolJsonBufTail: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(-500) : undefined
+        }, "Anthropic Path 2: attempting toolJsonBuf repair")
         try {
           parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
-        } catch {
-          // Try JSON repair before falling through
+          args.log?.warn({ event: "anthropic_path2_direct_parse_ok", model: args.model }, "Anthropic Path 2: direct JSON.parse succeeded")
+        } catch (directErr) {
+          args.log?.warn({
+            event: "anthropic_path2_direct_parse_failed",
+            model: args.model,
+            error: directErr instanceof Error ? directErr.message : String(directErr)
+          }, "Anthropic Path 2: direct JSON.parse failed, trying repairAndParseJson")
           try {
             parsed = repairAndParseJson(toolJsonBuf) as Record<string, unknown>
             args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model }, "Anthropic planner: repaired malformed tool JSON")
-          } catch {
+          } catch (repairErr) {
             args.log?.warn({
               event: "anthropic_planner_malformed_tool_json",
               model: args.model,
-              toolJsonBufPreview: toolJsonBuf.slice(0, 500),
-              toolJsonBufLength: toolJsonBuf.length
-            }, "Anthropic planner: malformed JSON from tool stream, falling through to text extraction")
+              repairError: repairErr instanceof Error ? repairErr.message : String(repairErr),
+              toolJsonBufFull: toolJsonBuf.length <= 2000 ? toolJsonBuf : undefined,
+              toolJsonBufPreview: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(0, 800) : undefined,
+              toolJsonBufTail: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(-500) : undefined
+            }, "Anthropic planner: all JSON repair strategies failed")
           }
         }
       }
@@ -731,7 +799,15 @@ export async function generatePlanWithAnthropic(args: {
         const textBlock = response.content.find((b) => b.type === "text")
         const raw = textBlock && "text" in textBlock ? textBlock.text : ""
         const jsonText = extractJsonObject(raw)
-        if (jsonText) parsed = JSON.parse(jsonText) as Record<string, unknown>
+        if (jsonText) {
+          try {
+            parsed = JSON.parse(jsonText) as Record<string, unknown>
+          } catch {
+            try {
+              parsed = repairAndParseJson(jsonText) as Record<string, unknown>
+            } catch { /* fall through */ }
+          }
+        }
       }
     }
   } else {
@@ -764,7 +840,14 @@ export async function generatePlanWithAnthropic(args: {
     const textBlock = response.content.find((b) => b.type === "text")
     const raw = textBlock && "text" in textBlock ? textBlock.text : ""
     if (raw.trim()) {
-      parsed = JSON.parse(raw) as Record<string, unknown>
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        try {
+          parsed = repairAndParseJson(raw) as Record<string, unknown>
+          args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model }, "Anthropic planner: repaired malformed output_config JSON")
+        } catch { /* fall through to !parsed check below */ }
+      }
     }
   }
 

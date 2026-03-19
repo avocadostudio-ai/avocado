@@ -1067,10 +1067,23 @@ function EditorPage({
       if (entry.debug.promptHash) lines.push(`promptHash: ${entry.debug.promptHash}`)
       if (entry.debug.outcome) lines.push(`outcome: ${entry.debug.outcome}`)
       if (entry.debug.reasonCategory) lines.push(`reason: ${entry.debug.reasonCategory}`)
+      if (entry.debug.reason && entry.debug.reason !== entry.debug.reasonCategory) lines.push(`reasonDetail: ${entry.debug.reason}`)
       if (entry.debug.intent) lines.push(`intent: ${entry.debug.intent}`)
+      if (entry.debug.plannerTier) lines.push(`plannerTier: ${entry.debug.plannerTier}`)
+      if (entry.debug.modelUsed) lines.push(`model: ${entry.debug.modelUsed}${entry.debug.plannerSource ? ` (${entry.debug.plannerSource})` : ""}`)
+      if (typeof entry.debug.planningAttempts === "number" && entry.debug.planningAttempts > 1) lines.push(`planningAttempts: ${entry.debug.planningAttempts}`)
       if (typeof entry.debug.opCount === "number") lines.push(`opCount: ${entry.debug.opCount}`)
-      if (typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0) lines.push(`skippedOps: ${entry.debug.skippedOpCount}`)
+      if (Array.isArray(entry.debug.skippedOps) && entry.debug.skippedOps.length > 0) {
+        const details = entry.debug.skippedOps.map((s) => `[${s.index}] ${s.op} ${s.pageSlug ?? ""}${s.blockId ? "#" + s.blockId : ""}: ${s.reason}`).join(", ")
+        lines.push(`skippedOps: ${details}`)
+      } else if (typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0) {
+        lines.push(`skippedOps: ${entry.debug.skippedOpCount}`)
+      }
       if (Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0) lines.push(`ops: ${entry.debug.opTypes.join(", ")}`)
+      if (typeof entry.debug.totalTokens === "number") {
+        lines.push(`tokens: in:${entry.debug.inputTokens ?? "?"} out:${entry.debug.outputTokens ?? "?"} total:${entry.debug.totalTokens}`)
+      }
+      if (typeof entry.debug.estimatedUsd === "number") lines.push(`cost: $${entry.debug.estimatedUsd.toFixed(4)}`)
       if (Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0) {
         const compact = entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")
         lines.push(`timeline: ${compact}`)
@@ -1103,6 +1116,7 @@ function EditorPage({
       parts.push(`${count} op${count === 1 ? "" : "s"}`)
     }
     if (entry.debug.intent) parts.push(`intent: ${entry.debug.intent.replace(/_/g, " ")}`)
+    if (entry.debug.plannerTier) parts.push(entry.debug.plannerTier.replace(/_/g, " "))
     if (Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0) {
       const totalMs = entry.debug.timeline[entry.debug.timeline.length - 1]?.atMs
       if (typeof totalMs === "number") parts.push(`${totalMs}ms`)
@@ -1323,10 +1337,18 @@ function EditorPage({
                         {entry.debug.promptHash ? <li>promptHash: {entry.debug.promptHash}</li> : null}
                         {entry.debug.outcome ? <li>outcome: {entry.debug.outcome}</li> : null}
                         {entry.debug.reasonCategory ? <li>reason: {entry.debug.reasonCategory}</li> : null}
+                        {entry.debug.reason && entry.debug.reason !== entry.debug.reasonCategory ? <li>reasonDetail: {entry.debug.reason}</li> : null}
                         {entry.debug.intent ? <li>intent: {entry.debug.intent}</li> : null}
+                        {entry.debug.plannerTier ? <li>plannerTier: {entry.debug.plannerTier}</li> : null}
+                        {entry.debug.modelUsed ? <li>model: {entry.debug.modelUsed}{entry.debug.plannerSource ? ` (${entry.debug.plannerSource})` : ""}</li> : null}
+                        {typeof entry.debug.planningAttempts === "number" && entry.debug.planningAttempts > 1 ? <li>planningAttempts: {entry.debug.planningAttempts}</li> : null}
                         {typeof entry.debug.opCount === "number" ? <li>opCount: {entry.debug.opCount}</li> : null}
-                        {typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0 ? <li>skippedOps: {entry.debug.skippedOpCount}</li> : null}
+                        {Array.isArray(entry.debug.skippedOps) && entry.debug.skippedOps.length > 0 ? (
+                          <li>skippedOps: {entry.debug.skippedOps.map((s) => `[${s.index}] ${s.op} ${s.pageSlug ?? ""}${s.blockId ? "#" + s.blockId : ""}: ${s.reason}`).join(", ")}</li>
+                        ) : typeof entry.debug.skippedOpCount === "number" && entry.debug.skippedOpCount > 0 ? <li>skippedOps: {entry.debug.skippedOpCount}</li> : null}
                         {Array.isArray(entry.debug.opTypes) && entry.debug.opTypes.length > 0 ? <li>ops: {entry.debug.opTypes.join(", ")}</li> : null}
+                        {typeof entry.debug.totalTokens === "number" ? <li>tokens: in:{entry.debug.inputTokens ?? "?"} out:{entry.debug.outputTokens ?? "?"} total:{entry.debug.totalTokens}</li> : null}
+                        {typeof entry.debug.estimatedUsd === "number" ? <li>cost: ${entry.debug.estimatedUsd.toFixed(4)}</li> : null}
                         {Array.isArray(entry.debug.timeline) && entry.debug.timeline.length > 0 ? (
                           <li>timeline: {entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")}</li>
                         ) : null}

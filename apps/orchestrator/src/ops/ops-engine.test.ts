@@ -807,6 +807,13 @@ describe("classifyGuardrailError", () => {
     assert.equal(classifyGuardrailError("Model did not return JSON"), "malformed_output")
   })
 
+  it("classifies JSON parse errors as malformed_output", () => {
+    assert.equal(classifyGuardrailError("Expected ',' or '}' after property value in JSON at position 412"), "malformed_output")
+    assert.equal(classifyGuardrailError("No number after minus sign in JSON at position 89"), "malformed_output")
+    assert.equal(classifyGuardrailError("Unexpected token \n in JSON at position 200"), "malformed_output")
+    assert.equal(classifyGuardrailError("SyntaxError: in JSON at position 50"), "malformed_output")
+  })
+
   it("falls back to internal_error", () => {
     assert.equal(classifyGuardrailError("something weird happened"), "internal_error")
   })

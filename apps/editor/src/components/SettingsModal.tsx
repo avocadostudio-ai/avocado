@@ -1,9 +1,9 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import {
@@ -100,19 +100,19 @@ export function SettingsModal({
   )
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-w-[280px] gap-0 rounded-2xl p-0 font-sans text-foreground text-sm", chatDarkMode && "editor-dark")} showCloseButton={true}>
-        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border">
-          <DialogTitle className="text-base font-bold tracking-tight">Developer mode</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className={cn("w-full max-w-none gap-0 p-0 font-sans text-foreground text-sm", chatDarkMode && "editor-dark")} showCloseButton={true}>
+        <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
+          <SheetTitle className="text-base font-bold tracking-tight">Developer mode</SheetTitle>
+        </SheetHeader>
 
         <div className="grid gap-5 px-5 py-5">
           <div className="grid gap-0" role="group" aria-label="Developer toggles">
             <ToggleRow label="Streaming" checked={useStreaming} onCheckedChange={onStreamingChange} />
             <ToggleRow label="Nested labels" checked={showNestedLabels} onCheckedChange={onNestedLabelsChange} />
+            <ToggleRow label="Field draft telemetry" checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
             <ToggleRow label="Dark mode" checked={chatDarkMode} onCheckedChange={onDarkModeChange} />
             <ToggleRow label="Debug mode" checked={showDebugDetails} onCheckedChange={onDebugDetailsChange} />
-            <ToggleRow label="Field draft telemetry" checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
           </div>
 
           <div className="grid gap-1.5 text-left">
@@ -140,8 +140,8 @@ export function SettingsModal({
             Clear chat
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
 

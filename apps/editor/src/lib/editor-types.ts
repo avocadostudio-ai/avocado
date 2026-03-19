@@ -41,6 +41,7 @@ export type AssistantResponse = {
     promptExcerpt?: string
     outcome?: string
     reasonCategory?: string
+    reason?: string
     intent?: string
     opTypes?: string[]
     opCount?: number
@@ -50,6 +51,11 @@ export type AssistantResponse = {
     cacheCreationInputTokens?: number
     cacheReadInputTokens?: number
     estimatedUsd?: number | null
+    plannerTier?: string
+    modelUsed?: string
+    plannerSource?: string
+    planningAttempts?: number
+    executionMode?: string
     skippedOpCount?: number
     skippedOps?: Array<{
       index: number
