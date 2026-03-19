@@ -2817,3 +2817,10 @@ test("isRewriteLikeMessage matches 'review copy for readability'", () => {
   // plain "review" without copy/text target should not match
   assert.equal(isRewriteLikeMessage("review this page"), false)
 })
+
+test("isRewriteLikeMessage matches optimize variants", () => {
+  assert.equal(isRewriteLikeMessage("optimize this"), true)
+  assert.equal(isRewriteLikeMessage("optimize the copy"), true)
+  assert.equal(isRewriteLikeMessage("how would you optimize this?"), true)
+  assert.equal(isRewriteLikeMessage("optimizing the hero section"), true)
+})

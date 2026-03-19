@@ -36,6 +36,32 @@ import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthro
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
 
+// Minimum text length to treat a text-only model response as meaningful
+// content (rather than discarding it in favor of the hardcoded fallback).
+const MIN_MEANINGFUL_RESPONSE_LENGTH = 20
+
+/**
+ * Try JSON.parse, then repairAndParseJson. Returns parsed object or null.
+ */
+function tryParseOrRepair(buf: string, log?: { warn: (obj: Record<string, unknown>, msg: string) => void }, model?: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(buf) as Record<string, unknown>
+  } catch {
+    try {
+      const result = repairAndParseJson(buf) as Record<string, unknown>
+      log?.warn({ event: "anthropic_planner_json_repaired", model: model ?? "unknown" }, "Anthropic planner: repaired malformed tool JSON from stream buffer")
+      return result
+    } catch (repairErr) {
+      log?.warn({
+        event: "anthropic_planner_repair_failed",
+        model: model ?? "unknown",
+        repairError: repairErr instanceof Error ? repairErr.message : String(repairErr),
+      }, "Anthropic planner: repairAndParseJson failed")
+      return null
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Singleton Anthropic client — reuses HTTP/2 connection pool across requests.
 // Lazily initialized on first use so module-level import doesn't throw if
@@ -250,7 +276,7 @@ export async function generatePlanWithAnthropic(args: {
     "Requests for structured data (schema.org), JSON-LD, microdata, or rich snippets are outside the editor's capabilities — they require code changes. Return intent=needs_clarification explaining this, and suggest using update_page_meta to improve SEO metadata (title, description) instead.",
     "If the user asks a read-only question about page content (e.g. 'list all CTA buttons', 'what images are on this page', 'show me all links and their URLs', 'how many sections are there'), return intent=content_answer with empty ops[]. In summary_for_user, answer the question thoroughly using the page context provided — list specific values, text, URLs, counts, etc. Use markdown tables or bullet lists for clarity. In change_log, include one entry per item found. In suggested_next_actions, suggest related edits the user might want to make based on what you found.",
     "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
-    "IMPORTANT: 'review copy for [quality]', 'review text for [trait]', 'improve readability', 'tighten the copy' are edit requests — generate update_props ops that rewrite the copy to achieve the stated quality goal. Do NOT return needs_clarification for these.",
+    "IMPORTANT: 'review copy for [quality]', 'review text for [trait]', 'improve readability', 'tighten the copy', 'optimize this', 'optimize the copy' are edit requests — generate update_props ops that rewrite the copy to achieve the stated quality goal. Do NOT return needs_clarification for these.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
     "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
@@ -315,7 +341,7 @@ export async function generatePlanWithAnthropic(args: {
           "Do not ask for clarification or selected text — apply the new direction across the entire page.",
         ]
       : []),
-    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next. Make them contextual to the planned change. For needs_clarification, suggest the most likely concrete answers.",
+    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next (max 6 words each). Each suggestion MUST be a logical follow-up to the specific change just made — not a generic action. Ask yourself: 'what would the user likely want to do next given THIS edit?' For example, after rewriting stats labels, suggest refining the same section ('Make the numbers bigger', 'Add a stat about X') — not unrelated actions like 'Change title' or 'Add a Testimonials section'. For needs_clarification, suggest the most likely concrete answers. Omit suggested_next_actions entirely if no contextual follow-up is obvious.",
     "Never mention internal block IDs (b_hero_*, b_featuregrid_*, etc.), prop names (imageUrl, imageAlt), or system settings in summary_for_user, change_log, or suggested_next_actions. Also avoid raw block type names like 'RichText', 'FeatureGrid', 'CardGrid', 'FAQAccordion' — use natural descriptions instead: 'text section', 'features grid', 'card grid', 'FAQ section'. Exception: 'Hero', 'CTA', and 'Testimonials' are fine as-is since users understand these terms.",
     selectedBlockId.length > 0 && !explicitOtherReference
       ? `Selected block is ${selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
@@ -474,37 +500,82 @@ export async function generatePlanWithAnthropic(args: {
         })
         const toolNameByIndex = new Map<number, string>()
         const submitToolJsonByIndex = new Map<number, string>()
-        for await (const event of stream as AsyncIterable<{
-          type?: string
-          index?: number
-          content_block?: { type?: string; name?: string }
-          delta?: { type?: string; partial_json?: string; text?: string }
-        }>) {
-          if (event.type === "content_block_start") {
+        let path1TextBuf = ""
+        // Wrap stream iteration — SDK may throw on message_stop if tool JSON is malformed
+        let path1StreamError: unknown
+        try {
+          for await (const event of stream as AsyncIterable<{
+            type?: string
+            index?: number
+            content_block?: { type?: string; name?: string }
+            delta?: { type?: string; partial_json?: string; text?: string }
+          }>) {
+            if (event.type === "content_block_start") {
+              const idx = typeof event.index === "number" ? event.index : -1
+              if (idx >= 0 && event.content_block?.type === "tool_use" && typeof event.content_block.name === "string") {
+                toolNameByIndex.set(idx, event.content_block.name)
+              }
+              continue
+            }
+            if (event.type !== "content_block_delta") continue
+            if (event.delta?.type === "text_delta") {
+              const text = event.delta.text ?? ""
+              if (text.length > 0) {
+                emittedTextDeltas = true
+                path1TextBuf += text
+                args.onToken?.(text)
+              }
+              continue
+            }
+            if (event.delta?.type !== "input_json_delta") continue
             const idx = typeof event.index === "number" ? event.index : -1
-            if (idx >= 0 && event.content_block?.type === "tool_use" && typeof event.content_block.name === "string") {
-              toolNameByIndex.set(idx, event.content_block.name)
-            }
-            continue
+            if (idx < 0 || toolNameByIndex.get(idx) !== "submit_edit_plan") continue
+            const nextBuf = (submitToolJsonByIndex.get(idx) ?? "") + (event.delta.partial_json ?? "")
+            submitToolJsonByIndex.set(idx, nextBuf)
+            emitProgressFromToolJson(nextBuf)
           }
-          if (event.type !== "content_block_delta") continue
-          if (event.delta?.type === "text_delta") {
-            const text = event.delta.text ?? ""
-            if (text.length > 0) {
-              emittedTextDeltas = true
-              args.onToken?.(text)
-            }
-            continue
-          }
-          if (event.delta?.type !== "input_json_delta") continue
-          const idx = typeof event.index === "number" ? event.index : -1
-          if (idx < 0 || toolNameByIndex.get(idx) !== "submit_edit_plan") continue
-          const nextBuf = (submitToolJsonByIndex.get(idx) ?? "") + (event.delta.partial_json ?? "")
-          submitToolJsonByIndex.set(idx, nextBuf)
-          emitProgressFromToolJson(nextBuf)
+        } catch (err) {
+          path1StreamError = err
         }
-        const finalMessage = await stream.finalMessage()
-        response = finalMessage as Anthropic.Messages.Message
+
+        // If stream threw, try to parse from accumulated buffers instead of finalMessage
+        if (path1StreamError) {
+          args.log?.warn({
+            event: "anthropic_path1_stream_loop_error",
+            model: args.model,
+            error: path1StreamError instanceof Error ? path1StreamError.message : String(path1StreamError),
+            submitToolJsonEntries: submitToolJsonByIndex.size,
+            textBufLength: path1TextBuf.length,
+          }, "Anthropic Path 1: stream loop threw (SDK JSON parse) — will attempt buffer repair")
+
+          // Find the submit_edit_plan buffer and attempt repair
+          for (const [idx, buf] of submitToolJsonByIndex) {
+            if (toolNameByIndex.get(idx) === "submit_edit_plan" && buf.length > 0) {
+              parsed = tryParseOrRepair(buf, args.log, args.model) ?? undefined
+              if (parsed) break
+            }
+          }
+          if (parsed) break
+          // Buffer repair failed. If we accumulated meaningful text, use it as
+          // an info response rather than falling through to the hardcoded fallback.
+          if (path1TextBuf.trim().length > MIN_MEANINGFUL_RESPONSE_LENGTH) {
+            return {
+              plan: {
+                intent: "needs_clarification",
+                summary_for_user: path1TextBuf.trim(),
+                change_log: [],
+                ops: []
+              },
+              usage,
+              schemaContext: schemaContext.meta
+            }
+          }
+          // If we couldn't parse, build a synthetic response to let the outer logic handle it
+          response = { content: [], stop_reason: "end_turn", usage: { input_tokens: 0, output_tokens: 0 } } as unknown as Anthropic.Messages.Message
+        } else {
+          const finalMessage = await stream.finalMessage()
+          response = finalMessage as Anthropic.Messages.Message
+        }
       } else {
         response = await client.messages.create({
           model: args.model,
@@ -560,6 +631,21 @@ export async function generatePlanWithAnthropic(args: {
             } catch { /* fall through */ }
           }
           if (parsed) break
+        }
+        // Model responded with text only (no tool call). If we have meaningful
+        // text content, treat it as an "info" response rather than discarding it.
+        const trimmed = raw.trim()
+        if (trimmed.length > MIN_MEANINGFUL_RESPONSE_LENGTH) {
+          return {
+            plan: {
+              intent: "needs_clarification",
+              summary_for_user: trimmed,
+              change_log: [],
+              ops: []
+            },
+            usage,
+            schemaContext: schemaContext.meta
+          }
         }
         return {
           plan: {
@@ -648,115 +734,75 @@ export async function generatePlanWithAnthropic(args: {
       }, {
         headers: anthropicFineGrainedStreamHeaders
       })
-      for await (const event of stream as AsyncIterable<{
-        type?: string
-        delta?: { type?: string; partial_json?: string; text?: string }
-      }>) {
-        if (event.type === "content_block_delta") {
-          if (event.delta?.type === "input_json_delta") {
-            toolJsonBuf += event.delta.partial_json ?? ""
-            emitProgressFromToolJson(toolJsonBuf)
-          } else if (event.delta?.type === "text_delta") {
-            textBuf += event.delta.text ?? ""
-            args.onToken(event.delta.text ?? "")
+      // Wrap stream iteration — SDK may throw on message_stop if tool JSON is malformed
+      let streamLoopError: unknown
+      try {
+        for await (const event of stream as AsyncIterable<{
+          type?: string
+          delta?: { type?: string; partial_json?: string; text?: string }
+        }>) {
+          if (event.type === "content_block_delta") {
+            if (event.delta?.type === "input_json_delta") {
+              toolJsonBuf += event.delta.partial_json ?? ""
+              emitProgressFromToolJson(toolJsonBuf)
+            } else if (event.delta?.type === "text_delta") {
+              textBuf += event.delta.text ?? ""
+              args.onToken(event.delta.text ?? "")
+            }
           }
         }
-      }
-      args.log?.warn({
-        event: "anthropic_path2_stream_complete",
-        model: args.model,
-        toolJsonBufLength: toolJsonBuf.length,
-        textBufLength: textBuf.length,
-        toolJsonBufPreview: toolJsonBuf.slice(0, 300),
-        toolJsonBufTail: toolJsonBuf.length > 300 ? toolJsonBuf.slice(-200) : undefined
-      }, "Anthropic Path 2: stream complete, attempting finalMessage()")
-
-      // finalMessage() may throw if the SDK's internal JSON.parse fails on
-      // malformed tool input (common with eager_input_streaming).
-      // Wrap in try/catch so we can fall through to toolJsonBuf repair.
-      let finalMessage: Anthropic.Messages.Message | undefined
-      try {
-        finalMessage = await stream.finalMessage() as Anthropic.Messages.Message
-        usage = extractUsage(finalMessage)
-
-        const streamStopReason = (finalMessage as { stop_reason?: string })?.stop_reason
-        if (streamStopReason === "max_tokens") {
-          args.log?.warn({
-            event: "anthropic_planner_truncated",
-            model: args.model,
-            stopReason: streamStopReason,
-            toolJsonBufLength: toolJsonBuf.length,
-            textBufLength: textBuf.length
-          }, "Anthropic planner: response truncated (max_tokens)")
-          throw new Error("Model response was truncated (max_tokens reached)")
-        }
-
-        // Primary: extract validated tool input from finalMessage (API-guaranteed valid)
-        const finalToolBlock = (finalMessage as Anthropic.Messages.Message).content
-          ?.map((block) => asToolUseBlock(block))
-          .find((block) => block?.name === "submit_edit_plan")
-
+      } catch (err) {
+        streamLoopError = err
         args.log?.warn({
-          event: "anthropic_path2_final_message_ok",
+          event: "anthropic_path2_stream_loop_error",
           model: args.model,
-          stopReason: streamStopReason,
-          contentBlockTypes: finalMessage.content.map((b) => b.type),
-          hasToolBlock: !!finalToolBlock,
-          toolBlockInputType: finalToolBlock?.input ? typeof finalToolBlock.input : "none",
-          toolBlockInputKeys: finalToolBlock?.input && typeof finalToolBlock.input === "object"
-            ? Object.keys(finalToolBlock.input as Record<string, unknown>)
-            : [],
-        }, "Anthropic Path 2: finalMessage() succeeded")
-
-        if (finalToolBlock?.input && typeof finalToolBlock.input === "object") {
-          parsed = finalToolBlock.input as Record<string, unknown>
-        }
-      } catch (finalMsgErr) {
-        // Re-throw max_tokens — that's a definitive truncation, not a parse issue
-        if (finalMsgErr instanceof Error && finalMsgErr.message.includes("max_tokens")) throw finalMsgErr
-        args.log?.warn({
-          event: "anthropic_planner_final_message_failed",
-          model: args.model,
-          error: finalMsgErr instanceof Error ? finalMsgErr.message : String(finalMsgErr),
+          error: err instanceof Error ? err.message : String(err),
           toolJsonBufLength: toolJsonBuf.length,
           toolJsonBufPreview: toolJsonBuf.slice(0, 500),
-          toolJsonBufTail: toolJsonBuf.length > 500 ? toolJsonBuf.slice(-300) : undefined
-        }, "Anthropic planner: finalMessage() threw — falling back to streamed buffer repair")
+        }, "Anthropic Path 2: stream loop threw (SDK JSON parse) — will attempt toolJsonBuf repair")
+      }
+
+      // If stream completed normally, try finalMessage() for validated tool input.
+      // Skip if stream threw — finalMessage() would also fail.
+      if (!streamLoopError) {
+        let finalMessage: Anthropic.Messages.Message | undefined
+        try {
+          finalMessage = await stream.finalMessage() as Anthropic.Messages.Message
+          usage = extractUsage(finalMessage)
+
+          const streamStopReason = (finalMessage as { stop_reason?: string })?.stop_reason
+          if (streamStopReason === "max_tokens") {
+            args.log?.warn({
+              event: "anthropic_planner_truncated",
+              model: args.model,
+              stopReason: streamStopReason,
+              toolJsonBufLength: toolJsonBuf.length,
+              textBufLength: textBuf.length
+            }, "Anthropic planner: response truncated (max_tokens)")
+            throw new Error("Model response was truncated (max_tokens reached)")
+          }
+
+          const finalToolBlock = (finalMessage as Anthropic.Messages.Message).content
+            ?.map((block) => asToolUseBlock(block))
+            .find((block) => block?.name === "submit_edit_plan")
+
+          if (finalToolBlock?.input && typeof finalToolBlock.input === "object") {
+            parsed = finalToolBlock.input as Record<string, unknown>
+          }
+        } catch (finalMsgErr) {
+          if (finalMsgErr instanceof Error && finalMsgErr.message.includes("max_tokens")) throw finalMsgErr
+          args.log?.warn({
+            event: "anthropic_planner_final_message_failed",
+            model: args.model,
+            error: finalMsgErr instanceof Error ? finalMsgErr.message : String(finalMsgErr),
+            toolJsonBufLength: toolJsonBuf.length,
+          }, "Anthropic planner: finalMessage() threw — falling back to streamed buffer repair")
+        }
       }
 
       // Fallback: streamed buffer + repair (if finalMessage didn't yield tool input)
       if (!parsed && toolJsonBuf.length > 0) {
-        args.log?.warn({
-          event: "anthropic_path2_repair_attempt",
-          model: args.model,
-          toolJsonBufLength: toolJsonBuf.length,
-          toolJsonBufFull: toolJsonBuf.length <= 2000 ? toolJsonBuf : undefined,
-          toolJsonBufPreview: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(0, 800) : undefined,
-          toolJsonBufTail: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(-500) : undefined
-        }, "Anthropic Path 2: attempting toolJsonBuf repair")
-        try {
-          parsed = JSON.parse(toolJsonBuf) as Record<string, unknown>
-          args.log?.warn({ event: "anthropic_path2_direct_parse_ok", model: args.model }, "Anthropic Path 2: direct JSON.parse succeeded")
-        } catch (directErr) {
-          args.log?.warn({
-            event: "anthropic_path2_direct_parse_failed",
-            model: args.model,
-            error: directErr instanceof Error ? directErr.message : String(directErr)
-          }, "Anthropic Path 2: direct JSON.parse failed, trying repairAndParseJson")
-          try {
-            parsed = repairAndParseJson(toolJsonBuf) as Record<string, unknown>
-            args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model }, "Anthropic planner: repaired malformed tool JSON")
-          } catch (repairErr) {
-            args.log?.warn({
-              event: "anthropic_planner_malformed_tool_json",
-              model: args.model,
-              repairError: repairErr instanceof Error ? repairErr.message : String(repairErr),
-              toolJsonBufFull: toolJsonBuf.length <= 2000 ? toolJsonBuf : undefined,
-              toolJsonBufPreview: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(0, 800) : undefined,
-              toolJsonBufTail: toolJsonBuf.length > 2000 ? toolJsonBuf.slice(-500) : undefined
-            }, "Anthropic planner: all JSON repair strategies failed")
-          }
-        }
+        parsed = tryParseOrRepair(toolJsonBuf, args.log, args.model) ?? undefined
       }
       if (!parsed && textBuf.length > 0) {
         const jsonText = extractJsonObject(textBuf)
