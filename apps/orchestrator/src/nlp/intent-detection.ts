@@ -77,6 +77,7 @@ export type ChatResult = {
   previewVersion: number
   focusBlockId?: string
   updatedSlug?: string
+  undoSlug?: string
   plannerSource: "openai" | "anthropic" | "demo"
   modelUsed: string
   modelKey: ModelKey

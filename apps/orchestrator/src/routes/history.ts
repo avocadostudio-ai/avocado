@@ -35,15 +35,22 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     redoList.push(current ? structuredClone(current) : null as any)
     redoMap.set(body.slug, redoList)
 
-    // null entry means "page was deleted by redo" — undo re-creates it
+    // null entry means "page didn't exist before" — undo removes it
     if (prev === null) {
       removePage(session, body.slug)
-    } else {
-      setPage(session, structuredClone(prev))
+      const previewVersion = bumpVersion(session)
+      schedulePersistState(app.log)
+      return { status: "applied", previewVersion, navigateToSlug: "/" }
     }
+
+    setPage(session, structuredClone(prev))
     const previewVersion = bumpVersion(session)
     schedulePersistState(app.log)
-    return { status: "applied", previewVersion }
+
+    // If the current page doesn't exist (was deleted), navigate to the restored page
+    const currentPageExists = current !== null
+    const navigateToSlug = !currentPageExists ? prev.slug : undefined
+    return { status: "applied", previewVersion, ...(navigateToSlug ? { navigateToSlug } : {}) }
   })
 
   app.post("/history/redo", async (request, reply) => {
@@ -70,11 +77,18 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     // null entry means "page was deleted" — redo re-deletes it
     if (next === null) {
       removePage(session, body.slug)
-    } else {
-      setPage(session, structuredClone(next))
+      const previewVersion = bumpVersion(session)
+      schedulePersistState(app.log)
+      return { status: "applied", previewVersion, navigateToSlug: "/" }
     }
+
+    setPage(session, structuredClone(next))
     const previewVersion = bumpVersion(session)
     schedulePersistState(app.log)
-    return { status: "applied", previewVersion }
+
+    // If the current page doesn't exist (was deleted), navigate to the restored page
+    const currentPageExists = current !== null
+    const navigateToSlug = !currentPageExists ? next.slug : undefined
+    return { status: "applied", previewVersion, ...(navigateToSlug ? { navigateToSlug } : {}) }
   })
 }

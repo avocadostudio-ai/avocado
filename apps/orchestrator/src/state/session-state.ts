@@ -107,8 +107,8 @@ export type PublishTracker = {
 export type PersistedState = {
   publishedPages: PageDoc[]
   draftPages: Record<string, Record<string, PageDoc>>
-  historyUndo: Record<string, Record<string, PageDoc[]>>
-  historyRedo: Record<string, Record<string, PageDoc[]>>
+  historyUndo: Record<string, Record<string, (PageDoc | null)[]>>
+  historyRedo: Record<string, Record<string, (PageDoc | null)[]>>
   versions: Record<string, number>
   recentEdits: Record<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>
   chatHistory: Record<string, Array<{ role: "user" | "assistant"; content: string }>>
@@ -122,8 +122,8 @@ export const publishedPages = new Map<string, PageDoc>()
 for (const page of demoPublishedPages()) publishedPages.set(page.slug, structuredClone(page))
 
 export const draftPages = new Map<string, Map<string, PageDoc>>()
-export const historyUndo = new Map<string, Map<string, PageDoc[]>>()
-export const historyRedo = new Map<string, Map<string, PageDoc[]>>()
+export const historyUndo = new Map<string, Map<string, (PageDoc | null)[]>>()
+export const historyRedo = new Map<string, Map<string, (PageDoc | null)[]>>()
 export const versions = new Map<string, number>()
 export const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
 export const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()
@@ -232,10 +232,10 @@ export function getSessionDraft(session: string) {
   return sessionMap
 }
 
-export function getHistoryMap(store: Map<string, Map<string, PageDoc[]>>, session: string) {
+export function getHistoryMap(store: Map<string, Map<string, (PageDoc | null)[]>>, session: string) {
   let bySession = store.get(session)
   if (!bySession) {
-    bySession = new Map<string, PageDoc[]>()
+    bySession = new Map<string, (PageDoc | null)[]>()
     store.set(session, bySession)
   }
   return bySession
@@ -282,10 +282,10 @@ export function removePage(session: string, slug: string) {
   invalidateContextCache(session)
 }
 
-export function pushUndo(session: string, slug: string, snapshot: PageDoc) {
+export function pushUndo(session: string, slug: string, snapshot: PageDoc | null) {
   const undoMap = getHistoryMap(historyUndo, session)
   const list = undoMap.get(slug) ?? []
-  list.push(structuredClone(snapshot))
+  list.push(snapshot === null ? null : structuredClone(snapshot))
   undoMap.set(slug, list)
 
   const redoMap = getHistoryMap(historyRedo, session)
@@ -351,11 +351,11 @@ export function nestedPageMapToObject(source: Map<string, Map<string, PageDoc>>)
   return out
 }
 
-export function nestedHistoryMapToObject(source: Map<string, Map<string, PageDoc[]>>) {
-  const out: Record<string, Record<string, PageDoc[]>> = {}
+export function nestedHistoryMapToObject(source: Map<string, Map<string, (PageDoc | null)[]>>) {
+  const out: Record<string, Record<string, (PageDoc | null)[]>> = {}
   for (const [session, bySlug] of source) {
     out[session] = {}
-    for (const [slug, snapshots] of bySlug) out[session][slug] = snapshots.map((item) => structuredClone(item))
+    for (const [slug, snapshots] of bySlug) out[session][slug] = snapshots.map((item) => item === null ? null : structuredClone(item))
   }
   return out
 }
@@ -376,14 +376,14 @@ export function objectToNestedPageMap(source: unknown) {
 }
 
 export function objectToNestedHistoryMap(source: unknown) {
-  const out = new Map<string, Map<string, PageDoc[]>>()
+  const out = new Map<string, Map<string, (PageDoc | null)[]>>()
   if (!source || typeof source !== "object") return out
   for (const [session, bySlugRaw] of Object.entries(source as Record<string, unknown>)) {
     if (!bySlugRaw || typeof bySlugRaw !== "object") continue
-    const bySlug = new Map<string, PageDoc[]>()
+    const bySlug = new Map<string, (PageDoc | null)[]>()
     for (const [slug, listRaw] of Object.entries(bySlugRaw as Record<string, unknown>)) {
       if (!Array.isArray(listRaw)) continue
-      bySlug.set(slug, listRaw.filter((item) => item && typeof item === "object") as PageDoc[])
+      bySlug.set(slug, listRaw.filter((item) => item === null || (item && typeof item === "object")) as (PageDoc | null)[])
     }
     out.set(session, bySlug)
   }

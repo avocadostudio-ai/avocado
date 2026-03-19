@@ -16,7 +16,7 @@ export type PlanApprovalDeps = {
   setStreamingText: (value: string | null) => void
   setStreamingChanges: (value: string[]) => void
   setStreamSteps: (value: { label: string; done: boolean }[]) => void
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean }) => void
+  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) => void
   submitChatStream: (finalMessage: string, extraParams?: Record<string, string>) => Promise<boolean>
   submitChatHttp: (finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string; continuationChainId?: string }) => Promise<void>
 }

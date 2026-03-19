@@ -31,7 +31,7 @@ export type ChatEngineSharedDeps = {
   siteCapabilities?: SiteCapabilities
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean }) => void
+  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) => void
 }
 
 export type {

@@ -1381,7 +1381,8 @@ export async function runChatPipeline(
     }
 
     const previous = getPage(body.session!, effectiveSlug)
-    if (!previous) {
+    const hasCreatePage = resolvedPlan.ops.some((op) => op.op === "create_page")
+    if (!previous && !hasCreatePage) {
       return {
         done: true as const,
         response: { code: 404, payload: { error: "page not found" } as { error: string } }
@@ -1744,7 +1745,21 @@ export async function runChatPipeline(
       const undoSnapshot = skipApply && optionsOverride?.undoSnapshot
         ? optionsOverride.undoSnapshot
         : previous
-      pushUndo(body.session!, effectiveSlug, undoSnapshot)
+      // For create_page: push null under the new page's slug (undo = delete it).
+      // For remove_page: previous was captured before apply, push it under effectiveSlug.
+      // For normal edits: push previous under effectiveSlug.
+      // undoTargetSlug tracks where the undo snapshot lives so the editor sends the right slug.
+      let undoTargetSlug = effectiveSlug
+      if (hasCreatePage) {
+        for (const op of resolvedPlan.ops) {
+          if (op.op === "create_page") {
+            pushUndo(body.session!, op.page.slug, null)
+            undoTargetSlug = op.page.slug
+          }
+        }
+      } else {
+        pushUndo(body.session!, effectiveSlug, undoSnapshot)
+      }
       pendingClarificationBySession.delete(body.session!)
       pendingApprovalPlanBySession.delete(body.session!)
       const planUpdatedSlug = pickUpdatedSlug(body.session!, effectiveSlug, resolvedPlan.ops)
@@ -1797,6 +1812,7 @@ export async function runChatPipeline(
             previewVersion,
             focusBlockId,
             updatedSlug,
+            undoSlug: undoTargetSlug,
             plannerSource: source,
             modelUsed,
             modelKey

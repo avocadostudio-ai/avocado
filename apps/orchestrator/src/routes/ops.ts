@@ -75,8 +75,14 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
       return reply.code(400).send({ error: "Structural edits are disabled for this site context." })
     }
 
-    const snapshots = new Map<string, PageDoc>()
+    const snapshots = new Map<string, PageDoc | null>()
+    const createPageSlugs: string[] = []
     for (const op of parsedOps.data) {
+      if (op.op === "create_page") {
+        createPageSlugs.push(op.page.slug)
+        continue
+      }
+      if (op.op === "update_site_config") continue
       if (!("pageSlug" in op) || typeof op.pageSlug !== "string") continue
       if (snapshots.has(op.pageSlug)) continue
       const current = getPage(session, op.pageSlug)
@@ -87,6 +93,7 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
     try {
       applyOpsAtomically(session, parsedOps.data, { componentsManifest: parsedManifest.data })
       for (const [slug, snapshot] of snapshots) pushUndo(session, slug, snapshot)
+      for (const slug of createPageSlugs) pushUndo(session, slug, null)
       const firstSlugOp = parsedOps.data.find((op) => "pageSlug" in op && typeof op.pageSlug === "string")
       const firstSlug = firstSlugOp && "pageSlug" in firstSlugOp && typeof firstSlugOp.pageSlug === "string" ? firstSlugOp.pageSlug : undefined
       const updatedSlug = firstSlug ? pickUpdatedSlug(session, firstSlug, parsedOps.data) : undefined
