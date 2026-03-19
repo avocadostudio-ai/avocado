@@ -4,7 +4,7 @@ This is the **advanced** integration path for teams not on Next.js, or for enter
 
 Related docs:
 - [Integration overview](README.md) — default fast onboarding path (Next.js embedded mode).
-- [Reduce Next.js coupling plan](../planning/reduce-nextjs-coupling-plan.md) — rationale for default vs advanced integration tiers.
+- [Reduce Next.js coupling](../planning/reduce-nextjs-coupling.md) — rationale for default vs advanced integration tiers.
 
 ## Context
 
