@@ -70,6 +70,14 @@ Scope: Improvements to pursue after the initial editor-first focus items.
 - Add a compact test suite for message compatibility and op application behavior.
 - Run it against current site integration before adding partner bridges.
 
+4. Consolidate tool schemas via Zod (eliminate JSON Schema duplication)
+- Tool manifests (`unsplash-search`, `image-generate`, `gdrive-browse`) manually duplicate JSON Schema objects and TypeScript types.
+- Replace with Zod schemas → `z.infer<>` for types, `z.toJSONSchema()` for manifests.
+- Extract shared image result item schema used by unsplash + gdrive.
+- Adds runtime validation on LLM tool call inputs (currently bare `as` casts).
+- Prevents schema drift where TS type and JSON Schema diverge silently.
+- Future consideration: evaluate `json-schema-to-ts` for a JSON Schema-first approach if we pivot away from Zod.
+
 ## Metrics to decide if we are improving
 
 1. Edit success rate

@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@ai-site-editor/shared": "workspace:*",
-    "@anthropic-ai/sdk": "^0.78.0",
+    "@anthropic-ai/sdk": "^0.80.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^9.4.0",
     "dotenv": "^17.3.1",
