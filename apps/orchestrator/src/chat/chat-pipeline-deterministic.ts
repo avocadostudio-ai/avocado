@@ -17,6 +17,7 @@ export function isRewriteLikeMessage(message: string) {
     /\breword\w*\b/.test(lower) ||
     /\bpolish\w*\b/.test(lower) ||
     /\brefin\w*\b/.test(lower) ||
+    /\boptimiz\w*\b/.test(lower) ||
     /\brefresh\w*\b/.test(lower) ||
     /\btighten\w*\b/.test(lower) ||
     /\bclarif\w*\b/.test(lower) ||
