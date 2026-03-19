@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "@ai-site-editor/blocks/styles.css";
 
+@source "../../../packages/blocks/src";
+@source "../../../packages/preview-adapter/src";
+@source "../../../packages/site-sdk/src";
+
 @theme inline {
   --color-bg-0: var(--bg-0);
   --color-bg-000: var(--bg-000);

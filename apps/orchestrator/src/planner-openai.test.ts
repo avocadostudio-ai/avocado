@@ -673,7 +673,7 @@ test("generatePlanWithOpenAI uses strict response_format when CHAT_STRICT_JSON_R
 // ---------------------------------------------------------------------------
 // repairAndParseJson tests
 // ---------------------------------------------------------------------------
-import { repairAndParseJson } from "./nlp/plan-normalizer.js"
+import { repairAndParseJson, repairJson } from "./nlp/plan-normalizer.js"
 
 test("repairAndParseJson fixes bare minus sign (no number after minus)", () => {
   // Simulate the "No number after minus sign" error: bare `-` outside a string
@@ -692,4 +692,39 @@ test("repairAndParseJson preserves minus signs inside JSON strings", () => {
   const valid = '{"description": "150-160 chars - keep it focused"}'
   const parsed = repairAndParseJson(valid) as { description: string }
   assert.equal(parsed.description, "150-160 chars - keep it focused")
+})
+
+test("repairAndParseJson fixes unescaped newlines inside JSON strings", () => {
+  // Simulate LLM producing literal newlines in summary_for_user with markdown
+  const malformed = '{"summary_for_user": "Here are some tips:\n- Be concise\n- Use bold **text**", "ops": []}'
+  const parsed = repairAndParseJson(malformed) as { summary_for_user: string; ops: unknown[] }
+  assert.ok(parsed.summary_for_user.includes("Be concise"))
+  assert.ok(parsed.summary_for_user.includes("Use bold"))
+  assert.ok(Array.isArray(parsed.ops))
+})
+
+test("repairAndParseJson fixes unescaped tabs and carriage returns", () => {
+  const malformed = '{"text": "col1\tcol2\r\nrow"}'
+  const parsed = repairAndParseJson(malformed) as { text: string }
+  assert.ok(parsed.text.includes("col1"))
+  assert.ok(parsed.text.includes("col2"))
+})
+
+test("repairJson escapes control chars inside strings (baseline)", () => {
+  // repairJson now handles control char escaping directly — no need for
+  // repairAndParseJson fallback strategies
+  const malformed = '{"summary": "line1\nline2\ttab"}'
+  const repaired = repairJson(malformed)
+  const parsed = JSON.parse(repaired) as { summary: string }
+  assert.ok(parsed.summary.includes("line1"))
+  assert.ok(parsed.summary.includes("line2"))
+  assert.ok(parsed.summary.includes("tab"))
+})
+
+test("repairJson handles combined control chars and markdown bullets", () => {
+  const malformed = '{"change_log": [- "Set title\nwith newline"], "ops": []}'
+  const repaired = repairJson(malformed)
+  const parsed = JSON.parse(repaired) as { change_log: string[]; ops: unknown[] }
+  assert.ok(parsed.change_log[0]?.includes("Set title"))
+  assert.ok(Array.isArray(parsed.ops))
 })
