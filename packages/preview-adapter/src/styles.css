@@ -541,30 +541,9 @@
   position: relative;
 }
 
+/* ::after labels hidden — keep only the blue ::before labels on hover */
 [data-editor-active] .editor-selectable [data-editable-label]::after {
-  content: attr(data-editable-label);
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translate(calc(-100% - 12px), -50%);
-  background: rgba(15, 23, 42, 0.9);
-  color: #f8fafc;
-  border-radius: 6px;
-  padding: 4px 7px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
-  z-index: 21;
-}
-
-.editor-highlight:hover [data-editable-label]::after,
-.editor-highlight [data-editable-label]:hover::after {
-  opacity: 1;
+  display: none;
 }
 
 .editor-highlight [data-editable-target] {
@@ -606,6 +585,14 @@
 
 .editor-highlight [data-editable-target]:hover::before {
   opacity: 1;
+}
+
+/* Hide parent container labels when a nested child is being hovered */
+.editor-highlight [data-editable-target]:has([data-editable-target]:hover)::before {
+  opacity: 0;
+}
+.editor-highlight [data-editable-label]:has([data-editable-label]:hover)::after {
+  opacity: 0;
 }
 
 .editor-hide-nested-labels .editor-highlight [data-editable-target]::before,
