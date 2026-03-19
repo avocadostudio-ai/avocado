@@ -1280,13 +1280,17 @@ textarea {
 .msg-errors {
   margin: 6px 0 0;
   padding-left: 17px;
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  list-style-type: disc;
+  color: #475569;
 }
 
 .msg-list li,
 .msg-errors li {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  margin-bottom: 0.4em;
 }
 
 .msg-errors {
@@ -3549,6 +3553,10 @@ textarea {
 
 .editor-dark .msg-main tr:nth-child(even) td {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.editor-dark .msg-list {
+  color: #94a3b8;
 }
 
 .editor-dark .msg-suggestion {
