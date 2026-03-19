@@ -161,9 +161,13 @@ export function postEditSuggestions(args: { plan: EditPlan; current: PageDoc; bo
     }
   }
 
-  if (!existingTypes.has("Testimonials") && suggestions.length < 3) suggestions.push("Add a Testimonials section")
-  if (!existingTypes.has("FAQAccordion") && suggestions.length < 3) suggestions.push("Add a FAQ section")
-  if (!existingTypes.has("Stats") && suggestions.length < 4) suggestions.push("Add a Stats section")
+  // Only suggest adding new sections if the edit was itself an add/remove — not after content tweaks
+  const wasStructuralEdit = plan.ops.some((op) => op.op === "add_block" || op.op === "remove_block" || op.op === "create_page")
+  if (wasStructuralEdit) {
+    if (!existingTypes.has("Testimonials") && suggestions.length < 3) suggestions.push("Add a Testimonials section")
+    if (!existingTypes.has("FAQAccordion") && suggestions.length < 3) suggestions.push("Add a FAQ section")
+    if (!existingTypes.has("Stats") && suggestions.length < 4) suggestions.push("Add a Stats section")
+  }
 
   return suggestions.slice(0, 4)
 }
