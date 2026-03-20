@@ -1492,7 +1492,7 @@ export async function runChatPipeline(
         }
 
         // Validate the whole plan from the current state before progressive apply.
-        const preflight = applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
+        const preflight = await applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
         skippedOps = preflight.skippedOps
 
         // Roll back to pre-apply state so we can replay ops progressively.
@@ -1525,7 +1525,7 @@ export async function runChatPipeline(
             throwIfCanceled(options?.signal)
             const stepStartedAtMs = Date.now()
             const op = resolvedPlan.ops[index]
-            const stepResult = applyOpsAtomically(body.session!, [op], { componentsManifest })
+            const stepResult = await applyOpsAtomically(body.session!, [op], { componentsManifest })
             if (stepResult.skippedOps.length > 0) {
               for (const skipped of stepResult.skippedOps) {
                 options?.onOpSkipped?.({
@@ -1582,7 +1582,7 @@ export async function runChatPipeline(
           throw progressiveError
         }
       } else {
-        const applyResult = applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
+        const applyResult = await applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
         skippedOps = applyResult.skippedOps
         if (applyResult.appliedCount > 0 && firstApplyMs === null) {
           firstApplyMs = Date.now() - pipelineStartedAtMs
@@ -1646,7 +1646,7 @@ export async function runChatPipeline(
                   blockId: deferred.blockId,
                   patch: { props: { imageUrl: imageResult.url, imageAlt: imageResult.alt } }
                 }
-                applyOpsAtomically(body.session!, [patchOp], { componentsManifest })
+                await applyOpsAtomically(body.session!, [patchOp], { componentsManifest })
                 const patchVersion = bumpVersion(body.session!)
                 options.onOpApplied({
                   index: 1,
@@ -1719,7 +1719,7 @@ export async function runChatPipeline(
                   }
                 }
               }
-              applyOpsAtomically(body.session!, [patchOp], { componentsManifest })
+              await applyOpsAtomically(body.session!, [patchOp], { componentsManifest })
               const patchVersion = bumpVersion(body.session!)
               options.onOpApplied({
                 index: 1,
@@ -2682,7 +2682,7 @@ export async function runChatPipeline(
         onSummaryChunk: options?.onSummaryChunk,
         onChangeLogEntry: options?.onChangeLogEntry,
         onPlannedOp: incrementalPlanStreamEnabled
-          ? (op, index) => {
+          ? async (op, index) => {
               markFirstStructuredProgress()
               options?.onPlannedOp?.({ op, index })
 
@@ -2706,7 +2706,7 @@ export async function runChatPipeline(
                     return
                   }
                   validateOperations([op])
-                  const stepResult = applyOpsAtomically(body.session!, [op], { componentsManifest })
+                  const stepResult = await applyOpsAtomically(body.session!, [op], { componentsManifest })
                   if (stepResult.skippedOps.length > 0) {
                     options?.onOpSkipped?.({
                       index,
