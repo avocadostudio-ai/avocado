@@ -10,6 +10,7 @@ import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../..
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
 import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
+import { DEFAULT_SITE_ID, DEFAULT_SESSION } from "../../lib/defaults"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -38,8 +39,8 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const contentSource = resolveContentSource(draft.isEnabled || editorFallback)
   if (contentSource === "draft") noStore()
 
-  const session = single(resolvedSearch.session) ?? "dev"
-  const siteId = single(resolvedSearch.siteId) ?? "avocado-stories"
+  const session = single(resolvedSearch.session) ?? DEFAULT_SESSION
+  const siteId = single(resolvedSearch.siteId) ?? DEFAULT_SITE_ID
 
   const page = contentSource === "draft"
     ? await getPage(slug, contentSource, session, siteId)
@@ -65,8 +66,8 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   // Resolve editor context (null when editor disabled or not in draft mode)
   const editorCtx = EDITOR_ENABLED
     ? await resolveDraftContext(resolvedSearch, {
-        defaultSession: "dev",
-        defaultSiteId: "avocado-stories",
+        defaultSession: DEFAULT_SESSION,
+        defaultSiteId: DEFAULT_SITE_ID,
         defaultEditorOrigin: process.env.NEXT_PUBLIC_EDITOR_ORIGIN?.replace(/\/+$/, "")
       })
     : null
@@ -75,8 +76,8 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   if (contentSource === "draft") noStore()
 
   const editorMode = EDITOR_ENABLED && contentSource === "draft"
-  const session = editorCtx?.session ?? "dev"
-  const siteId = editorCtx?.siteId ?? "avocado-stories"
+  const session = editorCtx?.session ?? DEFAULT_SESSION
+  const siteId = editorCtx?.siteId ?? DEFAULT_SITE_ID
 
   // Fetch content — use allSettled so partial failures degrade gracefully
   const [pageResult, navSlugsResult, siteConfigResult] = await Promise.allSettled([
@@ -110,9 +111,53 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   if (!page) {
     if (!editorMode) notFound()
     return (
-      <main>
-        <h1>Draft unavailable</h1>
-        <p>Could not load draft content from orchestrator for {slug}.</p>
+      <main
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+          gap: "20px",
+          padding: "24px",
+          textAlign: "center",
+        }}
+      >
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--body-secondary, #888)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <h1
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: 600,
+            color: "var(--heading)",
+            margin: 0,
+          }}
+        >
+          Draft unavailable
+        </h1>
+        <p
+          style={{
+            maxWidth: "28rem",
+            color: "var(--body-secondary)",
+            margin: 0,
+          }}
+        >
+          Could not load draft content from orchestrator for <code>{slug}</code>.
+          <br />
+          Make sure the orchestrator is running and try refreshing.
+        </p>
       </main>
     )
   }

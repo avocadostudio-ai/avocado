@@ -1,7 +1,6 @@
 import type { PageDoc } from "./site-contract"
 
-export const DEFAULT_SITE_DESCRIPTION =
-  "Discover practical guides, recipes, and tips for making the most of fresh avocados."
+export const DEFAULT_SITE_DESCRIPTION = "Welcome to our site."
 
 const CANDIDATE_PROP_KEYS = ["description", "subheading", "subtitle", "summary", "excerpt", "body", "text", "heading"]
 

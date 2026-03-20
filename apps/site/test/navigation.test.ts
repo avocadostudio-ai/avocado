@@ -120,5 +120,5 @@ test("buildNavItems: defaults to fallback slugs when navSlugs is empty", () => {
 
   const hrefs = result.navItems.map((n) => n.href)
   assert.ok(hrefs.includes("/"))
-  assert.ok(hrefs.includes("/pricing"))
+  assert.equal(hrefs.includes("/pricing"), false)
 })

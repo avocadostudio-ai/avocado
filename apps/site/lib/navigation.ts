@@ -65,7 +65,7 @@ export function buildNavItems(opts: {
   const siteLogo = siteConfig.logo || "/logos/default.svg"
 
   const allSlugs = Array.from(
-    new Set([...(navSlugs.length > 0 ? navSlugs : ["/", "/pricing"]), currentSlug])
+    new Set([...(navSlugs.length > 0 ? navSlugs : ["/"]), currentSlug])
   )
   const orderedSlugs = allSlugs.includes("/")
     ? ["/", ...allSlugs.filter((r) => r !== "/")]
