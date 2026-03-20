@@ -6,7 +6,7 @@ const seedPages: PageDoc[] = [
     id: "home",
     slug: "/",
     title: "Home",
-    updatedAt: new Date().toISOString(),
+    updatedAt: "2026-01-01T00:00:00.000Z",
     blocks: [
       {
         id: "hero-1",

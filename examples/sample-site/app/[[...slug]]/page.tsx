@@ -1,6 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache"
-import { notFound } from "next/navigation"
-import { buildSlug, single } from "@ai-site-editor/site-sdk"
+import { buildSlug } from "@ai-site-editor/site-sdk"
 import { resolveDraftContext, isTileMode } from "@ai-site-editor/site-sdk/draft"
 import { fetchDraftPage } from "@ai-site-editor/site-sdk/draft"
 import { getPreviewWrapperProps, EditorOverlay, TileModeStyles } from "@ai-site-editor/site-sdk/editor"
@@ -23,7 +22,7 @@ export default async function Page({ params, searchParams }: PageProps) {
         <p>
           This site is editor-only. Open the editor at{" "}
           <code>http://localhost:4100</code> and point it at{" "}
-          <code>http://localhost:3001</code> to get started.
+          <code>http://localhost:3002</code> to get started.
         </p>
       </main>
     )
@@ -38,7 +37,7 @@ export default async function Page({ params, searchParams }: PageProps) {
     return (
       <main style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", gap: "20px", padding: "24px", textAlign: "center" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Draft unavailable</h1>
-        <p style={{ maxWidth: "28rem", color: "#64748b" }}>
+        <p style={{ maxWidth: "28rem", color: "var(--body-secondary)" }}>
           Could not load draft content from orchestrator for <code>{slug}</code>.
           <br />
           Make sure the orchestrator is running and try refreshing.
