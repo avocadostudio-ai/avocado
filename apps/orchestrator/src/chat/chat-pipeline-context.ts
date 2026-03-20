@@ -3,9 +3,14 @@ import { plannerContextPack } from "../nlp/deterministic-planner.js"
 import { inferTranslationScopeFromMessage, type TranslationScope } from "./chat-pipeline-translation.js"
 import { isRewriteLikeMessage } from "./chat-pipeline-deterministic.js"
 
+function isClarificationFollowUp(message: string) {
+  return message.includes("\nClarification from user:")
+}
+
 export function shouldPreferFastModelForMessage(message: string) {
   if (inferTranslationScopeFromMessage(message) !== "none") return false
   if (isStandalonePageOperation(message)) return false
+  if (isClarificationFollowUp(message)) return false
   if (isRewriteLikeMessage(message)) return true
   // Simple targeted prop edits — single-block text/label/emoji modifications
   // don't need the balanced model. Fast is sufficient.
@@ -25,6 +30,7 @@ function isSingleBlockPropEdit(lower: string) {
 export function shouldUseLlmIntentRouter(message: string) {
   if (inferTranslationScopeFromMessage(message) !== "none") return false
   if (isStandalonePageOperation(message)) return false
+  if (isClarificationFollowUp(message)) return false
   const normalized = message.trim()
   if (normalized.length === 0 || normalized.length > 260) return false
   return (
