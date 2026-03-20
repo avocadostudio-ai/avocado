@@ -47,7 +47,7 @@ function resetState() {
 describe("ops-engine: add_block", () => {
   beforeEach(resetState)
 
-  it("appends a block to the end when no afterBlockId", () => {
+  it("appends a block to the end when no afterBlockId", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -58,13 +58,13 @@ describe("ops-engine: add_block", () => {
         props: { title: "New", description: "Desc", ctaText: "Go", ctaHref: "/" }
       }
     }
-    applyOpsAtomically(TEST_SESSION, [op])
+    await applyOpsAtomically(TEST_SESSION, [op])
     const page = getDraft("/")!
     assert.equal(page.blocks.length, 3)
     assert.equal(page.blocks[2].id, "b_new")
   })
 
-  it("inserts after a specific block", () => {
+  it("inserts after a specific block", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -76,7 +76,7 @@ describe("ops-engine: add_block", () => {
         props: { title: "Mid", description: "D", ctaText: "X", ctaHref: "/" }
       }
     }
-    applyOpsAtomically(TEST_SESSION, [op])
+    await applyOpsAtomically(TEST_SESSION, [op])
     const page = getDraft("/")!
     assert.equal(page.blocks.length, 3)
     assert.equal(page.blocks[0].id, "b_hero")
@@ -84,7 +84,7 @@ describe("ops-engine: add_block", () => {
     assert.equal(page.blocks[2].id, "b_cta")
   })
 
-  it("rejects duplicate block id", () => {
+  it("rejects duplicate block id", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -95,10 +95,10 @@ describe("ops-engine: add_block", () => {
         props: { title: "Dup", description: "D", ctaText: "X", ctaHref: "/" }
       }
     }
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /already exists/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op]), /already exists/)
   })
 
-  it("rejects invalid props", () => {
+  it("rejects invalid props", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -109,10 +109,10 @@ describe("ops-engine: add_block", () => {
         props: { title: "", description: "D", ctaText: "X", ctaHref: "/" }
       }
     }
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /Invalid props/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op]), /Invalid props/)
   })
 
-  it("rejects when afterBlockId not found", () => {
+  it("rejects when afterBlockId not found", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -124,10 +124,10 @@ describe("ops-engine: add_block", () => {
         props: { title: "New", description: "D", ctaText: "X", ctaHref: "/" }
       }
     }
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /afterBlockId/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op]), /afterBlockId/)
   })
 
-  it("rejects when page not found", () => {
+  it("rejects when page not found", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -138,10 +138,10 @@ describe("ops-engine: add_block", () => {
         props: { title: "New", description: "D", ctaText: "X", ctaHref: "/" }
       }
     }
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op]), /Page not found/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op]), /Page not found/)
   })
 
-  it("enforces manifest block type allow-list when provided", () => {
+  it("enforces manifest block type allow-list when provided", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -159,10 +159,10 @@ describe("ops-engine: add_block", () => {
         }
       }
     }
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /not declared in components manifest/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /not declared in components manifest/)
   })
 
-  it("validates props against manifest schema for known types", () => {
+  it("validates props against manifest schema for known types", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -173,10 +173,10 @@ describe("ops-engine: add_block", () => {
         props: { title: "T", description: "D", ctaText: "Go" } as Record<string, unknown>
       }
     }
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /does not match component manifest schema/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /does not match component manifest schema/)
   })
 
-  it("coerces numeric values to strings for Table rows", () => {
+  it("coerces numeric values to strings for Table rows", async () => {
     seedSession(makePage())
     const op: Operation = {
       op: "add_block",
@@ -192,7 +192,7 @@ describe("ops-engine: add_block", () => {
         } as Record<string, unknown>
       }
     }
-    const result = applyOpsAtomically(TEST_SESSION, [op])
+    const result = await applyOpsAtomically(TEST_SESSION, [op])
     assert.equal(result.appliedCount, 1)
     const page = getDraft("/")!
     const table = page.blocks.find((b) => b.id === "b_table")!
@@ -205,17 +205,17 @@ describe("ops-engine: add_block", () => {
 describe("ops-engine: remove_block", () => {
   beforeEach(resetState)
 
-  it("removes an existing block", () => {
+  it("removes an existing block", async () => {
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [{ op: "remove_block", pageSlug: "/", blockId: "b_cta" }])
+    await applyOpsAtomically(TEST_SESSION, [{ op: "remove_block", pageSlug: "/", blockId: "b_cta" }])
     const page = getDraft("/")!
     assert.equal(page.blocks.length, 1)
     assert.equal(page.blocks[0].id, "b_hero")
   })
 
-  it("rejects when blockId not found", () => {
+  it("rejects when blockId not found", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [{ op: "remove_block", pageSlug: "/", blockId: "b_nope" }]),
       /not found/
     )
@@ -225,25 +225,25 @@ describe("ops-engine: remove_block", () => {
 describe("ops-engine: move_block", () => {
   beforeEach(resetState)
 
-  it("moves a block to the top (no afterBlockId)", () => {
+  it("moves a block to the top (no afterBlockId)", async () => {
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [{ op: "move_block", pageSlug: "/", blockId: "b_cta" }])
+    await applyOpsAtomically(TEST_SESSION, [{ op: "move_block", pageSlug: "/", blockId: "b_cta" }])
     const page = getDraft("/")!
     assert.equal(page.blocks[0].id, "b_cta")
     assert.equal(page.blocks[1].id, "b_hero")
   })
 
-  it("moves a block after another", () => {
+  it("moves a block after another", async () => {
     // Add a third block first, then move it between the other two
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "add_block",
         pageSlug: "/",
         block: { id: "b_third", type: "CTA", props: { title: "T", description: "D", ctaText: "X", ctaHref: "/" } }
       }
     ])
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "move_block", pageSlug: "/", blockId: "b_third", afterBlockId: "b_hero" }
     ])
     const page = getDraft("/")!
@@ -252,9 +252,9 @@ describe("ops-engine: move_block", () => {
     assert.equal(page.blocks[2].id, "b_cta")
   })
 
-  it("rejects when blockId not found", () => {
+  it("rejects when blockId not found", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [{ op: "move_block", pageSlug: "/", blockId: "b_nope" }]),
       /not found/
     )
@@ -264,18 +264,18 @@ describe("ops-engine: move_block", () => {
 describe("ops-engine: update_props", () => {
   beforeEach(resetState)
 
-  it("updates a scalar prop", () => {
+  it("updates a scalar prop", async () => {
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { title: "Updated Title" } }
     ])
     const block = getDraft("/")!.blocks.find((b) => b.id === "b_cta")!
     assert.equal((block.props as Record<string, unknown>).title, "Updated Title")
   })
 
-  it("rejects unknown prop keys", () => {
+  it("rejects unknown prop keys", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { bogus: "value" } }
@@ -284,9 +284,9 @@ describe("ops-engine: update_props", () => {
     )
   })
 
-  it("rejects no-op patch (same value)", () => {
+  it("rejects no-op patch (same value)", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { title: "Ready?" } }
@@ -295,9 +295,9 @@ describe("ops-engine: update_props", () => {
     )
   })
 
-  it("rejects invalid value (empty string for required field)", () => {
+  it("rejects invalid value (empty string for required field)", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { title: "" } }
@@ -306,19 +306,19 @@ describe("ops-engine: update_props", () => {
     )
   })
 
-  it("handles nested props object (unwraps .props wrapper)", () => {
+  it("handles nested props object (unwraps .props wrapper)", async () => {
     seedSession(makePage())
     // The ops-engine unwraps { props: { ... } } to just { ... }
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "update_props", pageSlug: "/", blockId: "b_cta", patch: { props: { title: "Unwrapped" } } as any }
     ])
     const block = getDraft("/")!.blocks.find((b) => b.id === "b_cta")!
     assert.equal((block.props as Record<string, unknown>).title, "Unwrapped")
   })
 
-  it("rejects updates to block types missing from provided manifest", () => {
+  it("rejects updates to block types missing from provided manifest", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(
           TEST_SESSION,
@@ -333,10 +333,10 @@ describe("ops-engine: update_props", () => {
 describe("ops-engine: create_page", () => {
   beforeEach(resetState)
 
-  it("creates a new page", () => {
+  it("creates a new page", async () => {
     seedSession(makePage())
     const newPage = makePricingPage()
-    applyOpsAtomically(TEST_SESSION, [{ op: "create_page", page: newPage }])
+    await applyOpsAtomically(TEST_SESSION, [{ op: "create_page", page: newPage }])
     const page = getDraft("/pricing")
     assert.ok(page)
     assert.equal(page!.title, "Pricing")
@@ -347,24 +347,24 @@ describe("ops-engine: create_page", () => {
 describe("ops-engine: remove_page", () => {
   beforeEach(resetState)
 
-  it("removes a non-home page", () => {
+  it("removes a non-home page", async () => {
     seedSession(makePage(), makePricingPage())
-    applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/pricing" }])
+    await applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/pricing" }])
     assert.equal(getDraft("/pricing"), null)
     assert.ok(getDraft("/"))
   })
 
-  it("rejects removing the home page", () => {
+  it("rejects removing the home page", async () => {
     seedSession(makePage(), makePricingPage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/" }]),
       /Cannot remove the home page/
     )
   })
 
-  it("rejects removing the last page", () => {
+  it("rejects removing the last page", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [{ op: "remove_page", pageSlug: "/" }]),
       /Cannot remove/
     )
@@ -374,9 +374,9 @@ describe("ops-engine: remove_page", () => {
 describe("ops-engine: rename_page", () => {
   beforeEach(resetState)
 
-  it("renames a page and rewrites links in other pages", () => {
+  it("renames a page and rewrites links in other pages", async () => {
     seedSession(makePage(), makePricingPage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/plans" }
     ])
     assert.equal(getDraft("/pricing"), null)
@@ -389,17 +389,17 @@ describe("ops-engine: rename_page", () => {
     assert.equal((hero.props as Record<string, unknown>).ctaHref, "/plans")
   })
 
-  it("rejects rename to existing slug", () => {
+  it("rejects rename to existing slug", async () => {
     seedSession(makePage(), makePricingPage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [{ op: "rename_page", pageSlug: "/pricing", newPageSlug: "/" }]),
       /already exists/
     )
   })
 
-  it("rejects rename to same slug", () => {
+  it("rejects rename to same slug", async () => {
     seedSession(makePage(), makePricingPage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/pricing" }
@@ -408,12 +408,12 @@ describe("ops-engine: rename_page", () => {
     )
   })
 
-  it("preserves page position in nav order after rename", () => {
+  it("preserves page position in nav order after rename", async () => {
     seedSession(makePage(), makePricingPage(), makeFeaturePage())
     const slugsBefore = Array.from(draftPages.get(TEST_SESSION)!.keys())
     assert.deepEqual(slugsBefore, ["/", "/pricing", "/features"])
 
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/plans" }
     ])
 
@@ -425,9 +425,9 @@ describe("ops-engine: rename_page", () => {
 describe("ops-engine: duplicate_page", () => {
   beforeEach(resetState)
 
-  it("duplicates a page with auto-generated slug", () => {
+  it("duplicates a page with auto-generated slug", async () => {
     seedSession(makePage(), makePricingPage())
-    applyOpsAtomically(TEST_SESSION, [{ op: "duplicate_page", pageSlug: "/pricing" }])
+    await applyOpsAtomically(TEST_SESSION, [{ op: "duplicate_page", pageSlug: "/pricing" }])
     const copy = getDraft("/pricing-copy")
     assert.ok(copy)
     assert.equal(copy!.blocks.length, 1)
@@ -435,9 +435,9 @@ describe("ops-engine: duplicate_page", () => {
     assert.notEqual(copy!.blocks[0].id, "b_hero_pricing")
   })
 
-  it("duplicates with explicit slug and title", () => {
+  it("duplicates with explicit slug and title", async () => {
     seedSession(makePage(), makePricingPage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "duplicate_page", pageSlug: "/pricing", newPageSlug: "/enterprise", newTitle: "Enterprise" }
     ])
     const page = getDraft("/enterprise")
@@ -449,9 +449,9 @@ describe("ops-engine: duplicate_page", () => {
 describe("ops-engine: move_page", () => {
   beforeEach(resetState)
 
-  it("rejects moving the home page", () => {
+  it("rejects moving the home page", async () => {
     seedSession(makePage(), makePricingPage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [{ op: "move_page", pageSlug: "/" }]),
       /Home page.*cannot be moved/
     )
@@ -461,9 +461,9 @@ describe("ops-engine: move_page", () => {
 describe("ops-engine: duplicate_block", () => {
   beforeEach(resetState)
 
-  it("duplicates a block within the same page", () => {
+  it("duplicates a block within the same page", async () => {
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "duplicate_block", pageSlug: "/", blockId: "b_cta" }
     ])
     const page = getDraft("/")!
@@ -474,9 +474,9 @@ describe("ops-engine: duplicate_block", () => {
     assert.notEqual(page.blocks[2].id, "b_cta")
   })
 
-  it("duplicates a block to another page", () => {
+  it("duplicates a block to another page", async () => {
     seedSession(makePage(), makePricingPage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "duplicate_block", pageSlug: "/", blockId: "b_cta", toPageSlug: "/pricing" }
     ])
     const pricing = getDraft("/pricing")!
@@ -487,9 +487,9 @@ describe("ops-engine: duplicate_block", () => {
 describe("ops-engine: list item operations", () => {
   beforeEach(resetState)
 
-  it("add_item appends to list", () => {
+  it("add_item appends to list", async () => {
     seedSession(makeFeaturePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "add_item",
         pageSlug: "/features",
@@ -504,9 +504,9 @@ describe("ops-engine: list item operations", () => {
     assert.deepEqual(features[3], { title: "New", description: "New feature." })
   })
 
-  it("add_item inserts at specific position", () => {
+  it("add_item inserts at specific position", async () => {
     seedSession(makeFeaturePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "add_item",
         pageSlug: "/features",
@@ -523,9 +523,9 @@ describe("ops-engine: list item operations", () => {
     assert.equal(features[1].title, "Inserted")
   })
 
-  it("update_item patches a list item", () => {
+  it("update_item patches a list item", async () => {
     seedSession(makeFeaturePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "update_item",
         pageSlug: "/features",
@@ -543,9 +543,9 @@ describe("ops-engine: list item operations", () => {
     assert.equal(features[0].title, "Fast")
   })
 
-  it("remove_item removes from list", () => {
+  it("remove_item removes from list", async () => {
     seedSession(makeFeaturePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "remove_item",
         pageSlug: "/features",
@@ -562,10 +562,10 @@ describe("ops-engine: list item operations", () => {
     assert.equal(features[1].title, "Simple")
   })
 
-  it("move_item reorders within list", () => {
+  it("move_item reorders within list", async () => {
     seedSession(makeFeaturePage())
     // Move last item (index 2) to the front (no afterIndex = position 0)
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "move_item",
         pageSlug: "/features",
@@ -582,9 +582,9 @@ describe("ops-engine: list item operations", () => {
     assert.equal(features[2].title, "Safe")
   })
 
-  it("move_item accepts pre-move afterIndex when moving down", () => {
+  it("move_item accepts pre-move afterIndex when moving down", async () => {
     seedSession(makeFeaturePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       {
         op: "move_item",
         pageSlug: "/features",
@@ -602,9 +602,9 @@ describe("ops-engine: list item operations", () => {
     assert.equal(features[2].title, "Simple")
   })
 
-  it("rejects out-of-range index for update_item", () => {
+  it("rejects out-of-range index for update_item", async () => {
     seedSession(makeFeaturePage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           {
@@ -620,9 +620,9 @@ describe("ops-engine: list item operations", () => {
     )
   })
 
-  it("rejects invalid listKey", () => {
+  it("rejects invalid listKey", async () => {
     seedSession(makeFeaturePage())
-    assert.throws(
+    await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           {
@@ -641,11 +641,11 @@ describe("ops-engine: list item operations", () => {
 describe("ops-engine: atomicity", () => {
   beforeEach(resetState)
 
-  it("rolls back all changes when a later operation fails", () => {
+  it("rolls back all changes when a later operation fails", async () => {
     seedSession(makePage())
     const originalBlocks = getDraft("/")!.blocks.map((b) => b.id)
 
-    assert.throws(() =>
+    await assert.rejects(() =>
       applyOpsAtomically(TEST_SESSION, [
         // First op is valid
         {
@@ -664,17 +664,17 @@ describe("ops-engine: atomicity", () => {
     assert.deepEqual(currentIds, originalBlocks)
   })
 
-  it("throws when ops produce no changes", () => {
+  it("throws when ops produce no changes", async () => {
     seedSession(makePage())
     // An empty ops list produces no changes
-    assert.throws(() => applyOpsAtomically(TEST_SESSION, []), /no changes/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, []), /no changes/)
   })
 
-  it("rolls back site config changes when a later op fails", () => {
+  it("rolls back site config changes when a later op fails", async () => {
     seedSession(makePage())
     setSiteConfig(TEST_SESSION, { name: "Original Name", logo: "/logos/original.svg", navLabels: { "/": "Home" } })
 
-    assert.throws(() =>
+    await assert.rejects(() =>
       applyOpsAtomically(TEST_SESSION, [
         { op: "update_site_config", patch: { name: "Should Not Persist", navLabels: { "/pricing": "Plans" } } },
         { op: "remove_block", pageSlug: "/", blockId: "b_nonexistent" }
@@ -691,7 +691,7 @@ describe("ops-engine: atomicity", () => {
 describe("ops-engine: multi-op sequences", () => {
   beforeEach(resetState)
 
-  it("creates a page and adds a block in one atomic batch", () => {
+  it("creates a page and adds a block in one atomic batch", async () => {
     seedSession(makePage())
     const newPage: PageDoc = {
       id: "p_about",
@@ -700,7 +700,7 @@ describe("ops-engine: multi-op sequences", () => {
       updatedAt: new Date().toISOString(),
       blocks: []
     }
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "create_page", page: newPage },
       {
         op: "add_block",
@@ -862,20 +862,20 @@ describe("toErrorDetail", () => {
 describe("ops-engine: update_page_meta", () => {
   beforeEach(resetState)
 
-  it("sets meta on page with no existing meta", () => {
+  it("sets meta on page with no existing meta", async () => {
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "update_page_meta", pageSlug: "/", patch: { title: "SEO Title", description: "A great page" } }
     ])
     const page = getDraft("/")!
     assert.deepEqual(page.meta, { title: "SEO Title", description: "A great page" })
   })
 
-  it("merge-patches existing meta", () => {
+  it("merge-patches existing meta", async () => {
     const page = makePage()
     page.meta = { title: "Old Title", description: "Old desc" }
     seedSession(page)
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "update_page_meta", pageSlug: "/", patch: { description: "New desc" } }
     ])
     const updated = getDraft("/")!
@@ -883,18 +883,18 @@ describe("ops-engine: update_page_meta", () => {
     assert.equal(updated.meta!.description, "New desc")
   })
 
-  it("sets ogImage", () => {
+  it("sets ogImage", async () => {
     seedSession(makePage())
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "update_page_meta", pageSlug: "/", patch: { ogImage: "https://example.com/og.png" } }
     ])
     const page = getDraft("/")!
     assert.equal(page.meta!.ogImage, "https://example.com/og.png")
   })
 
-  it("rejects when page not found", () => {
+  it("rejects when page not found", async () => {
     seedSession(makePage())
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [
         { op: "update_page_meta", pageSlug: "/missing", patch: { title: "Nope" } }
       ]),
@@ -902,11 +902,11 @@ describe("ops-engine: update_page_meta", () => {
     )
   })
 
-  it("rejects no-op update", () => {
+  it("rejects no-op update", async () => {
     const page = makePage()
     page.meta = { title: "Same" }
     seedSession(page)
-    assert.throws(
+    await assert.rejects(
       () => applyOpsAtomically(TEST_SESSION, [
         { op: "update_page_meta", pageSlug: "/", patch: { title: "Same" } }
       ]),
@@ -914,11 +914,11 @@ describe("ops-engine: update_page_meta", () => {
     )
   })
 
-  it("clears a field with empty string", () => {
+  it("clears a field with empty string", async () => {
     const page = makePage()
     page.meta = { title: "To Remove", description: "Keep this" }
     seedSession(page)
-    applyOpsAtomically(TEST_SESSION, [
+    await applyOpsAtomically(TEST_SESSION, [
       { op: "update_page_meta", pageSlug: "/", patch: { title: "" } }
     ])
     const updated = getDraft("/")!

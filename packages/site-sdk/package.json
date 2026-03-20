@@ -7,8 +7,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./draft": "./src/draft.ts",
+    "./draft/core": "./src/draft-context-core.ts",
     "./editor": "./src/editor.ts",
     "./routes": "./src/routes.ts",
+    "./routes/core": "./src/draft-routes-core.ts",
     "./editor-manifest": "./src/editor-manifest.ts"
   },
   "repository": {
@@ -41,6 +43,14 @@
       "./editor-manifest": {
         "import": "./dist/editor-manifest.js",
         "types": "./dist/editor-manifest.d.ts"
+      },
+      "./draft/core": {
+        "import": "./dist/draft-context-core.js",
+        "types": "./dist/draft-context-core.d.ts"
+      },
+      "./routes/core": {
+        "import": "./dist/draft-routes-core.js",
+        "types": "./dist/draft-routes-core.d.ts"
       }
     }
   },
@@ -58,6 +68,9 @@
   "peerDependencies": {
     "next": ">=15.0.0",
     "react": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": { "optional": true }
   },
   "devDependencies": {
     "@types/react": "^19.0.10",

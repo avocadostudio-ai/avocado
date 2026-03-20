@@ -373,3 +373,9 @@ export async function publishViaGit(session: string) {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// PublishTarget interface & default implementation
+// ---------------------------------------------------------------------------
+export type { PublishTarget, PublishResult, PublishStatus } from "./publish-target.js"
+export { GitVercelPublishTarget } from "./git-vercel-publish-target.js"

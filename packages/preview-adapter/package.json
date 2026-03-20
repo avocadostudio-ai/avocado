@@ -6,6 +6,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./core": "./src/preview-bridge-core.tsx",
     "./styles.css": "./src/styles.css"
   },
   "repository": {
@@ -23,6 +24,10 @@
         "import": "./dist/index.js",
         "types": "./dist/index.d.ts"
       },
+      "./core": {
+        "import": "./dist/preview-bridge-core.js",
+        "types": "./dist/preview-bridge-core.d.ts"
+      },
       "./styles.css": "./src/styles.css"
     }
   },
@@ -37,6 +42,11 @@
   "peerDependencies": {
     "next": ">=15.0.0",
     "react": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/react": "^19.0.10",

@@ -564,3 +564,9 @@ export async function loadStateFromDisk(logger: FastifyBaseLogger) {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// ContentSource interface + InMemoryContentSource re-exports
+// ---------------------------------------------------------------------------
+export type { ContentSource } from "./content-source.js"
+export { InMemoryContentSource } from "./in-memory-content-source.js"

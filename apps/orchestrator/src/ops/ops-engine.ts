@@ -18,6 +18,7 @@ import {
   OperationError,
   toErrorDetail as _unifiedToErrorDetail
 } from "../errors.js"
+import type { ContentSource } from "../state/content-source.js"
 import {
   getSessionDraft,
   orderSlugsHomeFirst,
@@ -175,6 +176,7 @@ export type SkippedOperation = {
 
 export type ApplyOpsOptions = {
   componentsManifest?: EditorComponentsManifest
+  contentSource?: ContentSource
 }
 
 export function isStructuralOperation(op: Operation) {
@@ -320,7 +322,7 @@ export function validateOperations(ops: unknown[]): Operation[] {
 // Atomic operation application
 // ---------------------------------------------------------------------------
 
-export function applyOpsAtomically(session: string, ops: Operation[], options?: ApplyOpsOptions) {
+export async function applyOpsAtomically(session: string, ops: Operation[], options?: ApplyOpsOptions) {
   const manifestByType = new Map<string, EditorComponentDefinition>()
   if (options?.componentsManifest) {
     for (const component of options.componentsManifest.components) {
@@ -328,15 +330,21 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
     }
   }
 
-  const sessionDraft = getSessionDraft(session)
+  const cs = options?.contentSource
   const staged = new Map<string, PageDoc>()
-  for (const [slug, page] of sessionDraft) staged.set(slug, structuredClone(page))
+  if (cs) {
+    const pages = await cs.getSessionPages(session)
+    for (const page of pages) staged.set(page.slug, structuredClone(page))
+  } else {
+    const sessionDraft = getSessionDraft(session)
+    for (const [slug, page] of sessionDraft) staged.set(slug, structuredClone(page))
+  }
   const touchedSlugs = new Set<string>()
   const deletedSlugs = new Set<string>()
   const skippedOps: SkippedOperation[] = []
   let orderChanged = false
   let configChanged = false
-  const originalSiteConfig = getSiteConfig(session)
+  const originalSiteConfig = cs ? await cs.getSiteConfig(session) : getSiteConfig(session)
   let stagedSiteConfig = originalSiteConfig
 
   for (let opIndex = 0; opIndex < ops.length; opIndex += 1) {
@@ -765,12 +773,19 @@ export function applyOpsAtomically(session: string, ops: Operation[], options?: 
     throw new OperationError("Edit plan produced no changes", { category: "no_effective_change" })
   }
 
-  sessionDraft.clear()
-  for (const [route, page] of staged) {
-    setPage(session, page)
-  }
-  if (configChanged) {
-    setSiteConfig(session, stagedSiteConfig)
+  if (cs) {
+    // Async write-back through ContentSource
+    const currentSlugs = await cs.getSlugs(session)
+    for (const slug of currentSlugs) {
+      if (!staged.has(slug)) await cs.removePage(session, slug)
+    }
+    for (const [, page] of staged) await cs.setPage(session, page)
+    if (configChanged) await cs.setSiteConfig(session, stagedSiteConfig)
+  } else {
+    const sessionDraft = getSessionDraft(session)
+    sessionDraft.clear()
+    for (const [, page] of staged) setPage(session, page)
+    if (configChanged) setSiteConfig(session, stagedSiteConfig)
   }
   return {
     appliedCount: Math.max(0, ops.length - skippedOps.length),
