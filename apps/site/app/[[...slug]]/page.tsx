@@ -11,6 +11,7 @@ import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content
 import { derivePageDescription } from "../../lib/seo"
 import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
 import { DEFAULT_SITE_ID, DEFAULT_SESSION } from "../../lib/defaults"
+import { FileX2 } from "lucide-react"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -117,26 +118,25 @@ export default async function SitePage({ params, searchParams }: PageProps) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          minHeight: "60vh",
+          minHeight: "100vh",
           gap: "20px",
           padding: "24px",
           textAlign: "center",
         }}
       >
-        <svg
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--body-secondary, #888)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: "50%",
+            background: "rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
+          <FileX2 size={36} strokeWidth={1.5} color="var(--body-secondary, #94a3b8)" />
+        </div>
         <h1
           style={{
             fontSize: "1.5rem",
