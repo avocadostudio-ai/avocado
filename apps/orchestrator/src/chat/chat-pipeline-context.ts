@@ -1,7 +1,9 @@
-import { isStandalonePageOperation } from "../nlp/intent-helpers.js"
-import { plannerContextPack } from "../nlp/deterministic-planner.js"
+import { isStandalonePageOperation, requestsContentGeneration } from "../nlp/intent-helpers.js"
+import { inferDeterministicIntent, plannerContextPack } from "../nlp/deterministic-planner.js"
+import type { EditPlan, PageDoc } from "@ai-site-editor/shared"
 import { inferTranslationScopeFromMessage, type TranslationScope } from "./chat-pipeline-translation.js"
 import { isRewriteLikeMessage } from "./chat-pipeline-deterministic.js"
+import { isRewriteRequest } from "../nlp/deterministic-planner-patches.js"
 
 function isClarificationFollowUp(message: string) {
   return message.includes("\nClarification from user:")
@@ -145,4 +147,83 @@ export function shouldPreferFocusedTranslation(args: {
     /\btranslate\s+page\b/.test(lower)
   if (hasExplicitPageCue) return false
   return true
+}
+
+/**
+ * Uses the deterministic planner's intent analysis to classify message
+ * complexity, providing more accurate context packing decisions than
+ * the pure-regex heuristics in shouldPreferFastModelForMessage.
+ *
+ * Returns "simple" when the intent is fully resolvable from the message
+ * (add/remove/move with clear target, or update with extracted patch).
+ * Returns "standard" otherwise.
+ */
+export function classifyMessageComplexity(args: {
+  message: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+  translationScope: TranslationScope
+}): "simple" | "standard" {
+  if (args.translationScope !== "none") return "standard"
+  if (isStandalonePageOperation(args.message)) return "standard"
+
+  // Rewrites need surrounding context for tone matching even when intent is clear
+  if (isRewriteRequest(args.message)) return "standard"
+
+  const intent = inferDeterministicIntent({
+    message: args.message,
+    currentPage: args.currentPage,
+    activeBlockId: args.activeBlockId,
+    activeEditablePath: args.activeEditablePath
+  })
+
+  if (!intent?.action) return "standard"
+
+  // Structural ops (add/remove/move) with a resolved target are simple
+  if (intent.action === "add" || intent.action === "remove" || intent.action === "move") {
+    if (intent.target_block_type || intent.new_block_type || intent.target_block_ref) {
+      return "simple"
+    }
+  }
+
+  // Update with an extracted patch means the value was fully parsed from the message
+  if (intent.action === "update" && intent.patch && Object.keys(intent.patch).length > 0) {
+    return "simple"
+  }
+
+  // Update with a resolved target block but no patch — needs LLM for content
+  return "standard"
+}
+
+/**
+ * Checks whether a router plan is too shallow for the message's intent.
+ *
+ * Returns true when the message signals content generation need (e.g.,
+ * "add a compelling hero about our mission") but the router plan only
+ * has default/placeholder props. In this case the full planner should
+ * be preferred.
+ */
+export function isRouterPlanTooShallow(message: string, plan: EditPlan): boolean {
+  if (plan.intent !== "edit_plan" || plan.ops.length === 0) return false
+
+  // Check if message requests meaningful content
+  const wantsContent = requestsContentGeneration(message) ||
+    /\b(about|featuring|directing|promoting|highlighting|compelling|engaging)\b/i.test(message)
+  if (!wantsContent) return false
+
+  // Check if the plan only has add_block ops with default-looking props
+  for (const op of plan.ops) {
+    if (op.op !== "add_block") continue
+    const block = (op as { block?: { props?: Record<string, unknown> } }).block
+    if (!block?.props) continue
+
+    const values = Object.values(block.props)
+    const stringValues = values.filter((v): v is string => typeof v === "string")
+    // If all string props are short defaults (< 30 chars), the plan is shallow
+    const allShort = stringValues.length > 0 && stringValues.every(v => v.length < 30)
+    if (allShort) return true
+  }
+
+  return false
 }

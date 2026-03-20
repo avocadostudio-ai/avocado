@@ -51,6 +51,16 @@ import {
 } from "./deterministic-planner-pages.js"
 
 
+const CONTAINER_BLOCK_TYPES = /\b(carousel|slideshow|slider|cardgrid|card\s*grid|faqaccordion|faq|testimonials?|featuregrid|feature\s*grid|gallery|tabs?|table)\b/i
+
+/** Detects "remove X from/in [container]" or "remove X from slides/items/cards" — intra-block, not page-level */
+function isContainerScopedRemove(message: string): boolean {
+  const lower = message.toLowerCase()
+  if (/\b(?:from|in|within|inside)\b/.test(lower) && CONTAINER_BLOCK_TYPES.test(lower)) return true
+  if (/\b(?:from|in|within)\s+(?:all\s+)?(?:slides?|items?|cards?|questions?|entries?|rows?|features?)\b/.test(lower)) return true
+  return false
+}
+
 export function readPathValue(root: unknown, path: string) {
   if (!path) return undefined
   const parts: Array<string | number> = []
@@ -306,6 +316,10 @@ export function inferDeterministicIntent(args: {
 
   // "remove all except hero" / "delete everything but CTA" — handle deterministically for remove
   if (action === "remove" && EXCEPT_PATTERN.test(raw)) {
+    // If message scopes the remove to a specific container block (e.g. "from slides in Carousel"),
+    // this is an intra-block item operation — defer to LLM.
+    if (isContainerScopedRemove(raw)) return null
+
     let keepType = inferBlockTypeFromText(raw)
     // "this one" / "this block" / "the selected" → resolve from activeBlockId
     if (!keepType && args.activeBlockId && THIS_ONE_PATTERN.test(raw)) {
@@ -430,6 +444,7 @@ export function isHighConfidenceDeterministicCase(args: {
     // "remove all except X" can be handled deterministically when X resolves to a block type on the page
     const action = inferActionFromMessage(raw)
     if (action === "remove") {
+      if (isContainerScopedRemove(raw)) return false  // intra-block item op — defer to LLM
       let keepType = inferBlockTypeFromText(raw)
       if (!keepType && args.activeBlockId && THIS_ONE_PATTERN.test(raw)) {
         const activeBlock = args.currentPage.blocks.find((b) => b.id === args.activeBlockId)
@@ -464,6 +479,143 @@ export function isHighConfidenceDeterministicCase(args: {
   }
 
   return false
+}
+
+/**
+ * Splits a compound message ("remove the hero and add a CTA") into sub-parts
+ * at conjunction boundaries, but only when the parts contain verbs from
+ * different action categories (add vs remove, etc.).
+ *
+ * Returns null when the message is not a decomposable compound request.
+ */
+function splitCompoundMessage(raw: string): [string, string] | null {
+  // Only split when two different action-category verbs are connected by a conjunction.
+  // Pattern: <verb-group-A> ... <and|then|,> ... <verb-group-B>
+  const addVerbs = String.raw`(?:add|insert|create|include)`
+  const removeVerbs = String.raw`(?:remove|delete|clear)`
+  const conjunction = String.raw`(?:\s+and\s+|\s+then\s+|\s*,\s*(?:and\s+)?(?:then\s+)?)`
+
+  // Try add...conjunction...remove
+  const arPattern = new RegExp(
+    String.raw`(.*\b${addVerbs}\b[^,]*?)${conjunction}(\b${removeVerbs}\b.*)`,
+    "i"
+  )
+  const arMatch = raw.match(arPattern)
+  if (arMatch?.[1] && arMatch?.[2]) return [arMatch[1].trim(), arMatch[2].trim()]
+
+  // Try remove...conjunction...add
+  const raPattern = new RegExp(
+    String.raw`(.*\b${removeVerbs}\b[^,]*?)${conjunction}(\b${addVerbs}\b.*)`,
+    "i"
+  )
+  const raMatch = raw.match(raPattern)
+  if (raMatch?.[1] && raMatch?.[2]) return [raMatch[1].trim(), raMatch[2].trim()]
+
+  // Try move...conjunction...add/remove
+  const moveVerbs = String.raw`(?:move|reorder|rearrange)`
+  const updateVerbs = String.raw`(?:update|change|edit|set|replace)`
+  const pairs: Array<[string, string]> = [
+    [moveVerbs, addVerbs],
+    [moveVerbs, removeVerbs],
+    [addVerbs, updateVerbs],
+    [removeVerbs, updateVerbs],
+    [updateVerbs, addVerbs],
+    [updateVerbs, removeVerbs],
+  ]
+  for (const [a, b] of pairs) {
+    const pattern = new RegExp(
+      String.raw`(.*\b${a}\b[^,]*?)${conjunction}(\b${b}\b.*)`,
+      "i"
+    )
+    const match = raw.match(pattern)
+    if (match?.[1] && match?.[2]) return [match[1].trim(), match[2].trim()]
+  }
+
+  return null
+}
+
+/**
+ * Attempts to handle a compound message ("remove the hero and add a CTA")
+ * by decomposing it into sub-intents and running each through the
+ * deterministic planner. Returns null if any sub-intent can't be handled
+ * deterministically.
+ */
+export function tryCompoundDeterministicPlan(args: {
+  session: string
+  message: string
+  slug: string
+  currentPage: PageDoc
+  activeBlockId?: string
+  activeEditablePath?: string
+}): EditPlan | null {
+  const raw = stripSiteContextEnvelope(args.message).trim()
+  if (!raw) return null
+
+  const parts = splitCompoundMessage(raw)
+  if (!parts) return null
+
+  const [firstMsg, secondMsg] = parts
+
+  // Check both parts individually for high-confidence
+  for (const msg of [firstMsg, secondMsg]) {
+    if (!isHighConfidenceDeterministicCase({
+      message: msg,
+      currentPage: args.currentPage,
+      activeBlockId: args.activeBlockId,
+      activeEditablePath: args.activeEditablePath
+    })) return null
+  }
+
+  // Build intent + plan for first part
+  const firstIntent = inferDeterministicIntent({
+    message: firstMsg,
+    currentPage: args.currentPage,
+    activeBlockId: args.activeBlockId,
+    activeEditablePath: args.activeEditablePath
+  })
+  if (!firstIntent) return null
+
+  const firstPlan = compileDeterministicPlan({
+    session: args.session,
+    intent: firstIntent,
+    message: firstMsg,
+    slug: args.slug,
+    currentPage: args.currentPage,
+    activeBlockId: args.activeBlockId,
+    activeEditablePath: args.activeEditablePath
+  })
+  if (!firstPlan || firstPlan.intent !== "edit_plan" || firstPlan.ops.length === 0) return null
+
+  // Build intent + plan for second part
+  const secondIntent = inferDeterministicIntent({
+    message: secondMsg,
+    currentPage: args.currentPage,
+    activeBlockId: args.activeBlockId,
+    activeEditablePath: args.activeEditablePath
+  })
+  if (!secondIntent) return null
+
+  const secondPlan = compileDeterministicPlan({
+    session: args.session,
+    intent: secondIntent,
+    message: secondMsg,
+    slug: args.slug,
+    currentPage: args.currentPage,
+    activeBlockId: args.activeBlockId,
+    activeEditablePath: args.activeEditablePath
+  })
+  if (!secondPlan || secondPlan.intent !== "edit_plan" || secondPlan.ops.length === 0) return null
+
+  // Merge: removes first (so IDs are valid), then adds
+  const removeOps = [...firstPlan.ops, ...secondPlan.ops].filter(op => op.op === "remove_block" || op.op === "remove_page")
+  const otherOps = [...firstPlan.ops, ...secondPlan.ops].filter(op => op.op !== "remove_block" && op.op !== "remove_page")
+
+  return {
+    intent: "edit_plan",
+    summary_for_user: [firstPlan.summary_for_user, secondPlan.summary_for_user].join(" "),
+    change_log: [...firstPlan.change_log, ...secondPlan.change_log],
+    ops: [...removeOps, ...otherOps]
+  }
 }
 
 export function inferAddedBlockTypeFromMessage(message: string): BlockType | undefined {

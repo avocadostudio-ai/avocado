@@ -64,7 +64,8 @@ import {
   plannerContextPack,
   compileDeterministicPlan,
   inferDeterministicIntent,
-  isHighConfidenceDeterministicCase
+  isHighConfidenceDeterministicCase,
+  tryCompoundDeterministicPlan
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI, type PlannerSchemaContextMeta } from "./planner.js"
 import {
@@ -88,7 +89,7 @@ export { blockHasImageUrlProp, parsePath, getValueAtPath, setValueAtPath, delete
 // Internal imports from extracted modules (used by this file)
 import { collectMentionedSlugsFromPlan, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
 import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, normalizeVariationTypos, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
-import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation } from "./chat-pipeline-context.js"
+import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation, classifyMessageComplexity, isRouterPlanTooShallow } from "./chat-pipeline-context.js"
 import { buildAiInsightChanges, buildMetaChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
@@ -857,7 +858,16 @@ export async function runChatPipeline(
   })
   const compactContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_COMPACT_CONTEXT_EXPERIMENT ?? "").trim())
   const minimalContextExperimentEnabled = /^(1|true|yes|on)$/i.test((process.env.CHAT_MINIMAL_CONTEXT_EXPERIMENT ?? "").trim())
-  const isLightweightEdit = !contentQuery && shouldPreferFastModelForMessage(plannerMessage)
+  const intentComplexity = !contentQuery
+    ? classifyMessageComplexity({
+        message: plannerMessage,
+        currentPage: current,
+        activeBlockId: planningActiveBlockId,
+        activeEditablePath: planningActiveEditablePath,
+        translationScope
+      })
+    : ("standard" as const)
+  const isLightweightEdit = intentComplexity === "simple"
   const basePlannerContext =
     (compactContextExperimentEnabled || isLightweightEdit)
       ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
@@ -2188,6 +2198,44 @@ export async function runChatPipeline(
     }
   }
 
+  // --- Compound deterministic decomposition ---
+  // When a single deterministic check fails due to compound actions
+  // ("remove the hero and add a CTA"), try decomposing into sub-intents.
+  if (!contentQuery && !isHighConfidence) {
+    const compoundPlan = tryCompoundDeterministicPlan({
+      session: body.session,
+      message: plannerMessage,
+      slug: effectiveSlug,
+      currentPage: current,
+      activeBlockId: planningActiveBlockId,
+      activeEditablePath: planningActiveEditablePath
+    })
+    if (compoundPlan?.intent === "edit_plan" && compoundPlan.ops.length > 0) {
+      markPlanningFinish()
+      ctx.chatTelemetry.push({
+        id: chatRequestId,
+        at: new Date().toISOString(),
+        phase: "deterministic_plan_generated",
+        session: body.session,
+        requestedSlug,
+        effectiveSlug,
+        plannerSource,
+        modelKey,
+        modelUsed,
+        promptHash,
+        promptExcerpt,
+        promptLength: plannerMessage.length,
+        outcome: "compound_deterministic_plan_ready",
+        intent: compoundPlan.intent,
+        opCount: compoundPlan.ops.length,
+        opTypes: compoundPlan.ops.map((op) => op.op),
+        plannerTier: "deterministic"
+      })
+      const compoundOutcome = await respondFromPlan(compoundPlan, plannerSource, applyMode, undefined, "deterministic")
+      if (compoundOutcome.done) return compoundOutcome.response
+    }
+  }
+
   const llmIntentRouterEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_LLM_INTENT_ROUTER ?? "1").trim())
   const shouldTryLlmIntentRouter =
     !contentQuery &&
@@ -2383,36 +2431,62 @@ export async function runChatPipeline(
       ])
 
       if (routerResult.source === "router" && routerResult.result) {
-        // Router won with a usable plan — try to use it
+        // Router won with a usable plan — quality gate before using it
         const { plan: routedPlan, outcome } = routerResult.result
-        markPlanningFinish()
-        emitStatusTone("planning")
-        ctx.chatTelemetry.push({
-          id: chatRequestId,
-          at: new Date().toISOString(),
-          phase: "deterministic_plan_generated",
-          session: body.session,
-          requestedSlug,
-          effectiveSlug,
-          plannerSource,
-          modelKey,
-          modelUsed,
-          promptHash,
-          promptExcerpt,
-          promptLength: plannerMessage.length,
-          outcome,
-          intent: routedPlan.intent,
-          opCount: routedPlan.ops.length,
-          opTypes: routedPlan.ops.map((op) => op.op),
-          plannerTier: "llm_intent_router",
-          ...timingFields()
-        })
-        const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
-        if (routedOutcome.done) {
-          // Success — abort the full planner (fire and forget)
-          fullPlannerAbort.abort("router_succeeded")
-          fullPlannerPromise.catch(() => {}) // Suppress unhandled rejection
-          return routedOutcome.response
+
+        // Quality gate: if the message requests content generation but the
+        // router plan only has default/shallow props, wait briefly for the
+        // full planner which can produce richer content.
+        if (isRouterPlanTooShallow(plannerMessage, routedPlan)) {
+          ctx.log.info({ event: "router_plan_too_shallow" }, "Router plan shallow for content-generating message — waiting for full planner")
+          try {
+            const betterResult = await Promise.race([
+              fullPlannerPromise.then((r) => ({ got: "planner" as const, result: r })),
+              sleepMs(routerHeadStartMs).then(() => ({ got: "timeout" as const, result: null }))
+            ])
+            if (betterResult.got === "planner" && betterResult.result) {
+              consumeFullPlannerResult(betterResult.result)
+              routerPromise.catch(() => {})
+              // Skip to post-race handling with initialPlan set
+            } else {
+              // Planner didn't finish in time — fall through to use router plan below
+            }
+          } catch {
+            // Planner error — use the router plan
+          }
+        }
+
+        // If full planner didn't beat the router (or quality gate didn't fire), use router plan
+        if (!initialPlan) {
+          markPlanningFinish()
+          emitStatusTone("planning")
+          ctx.chatTelemetry.push({
+            id: chatRequestId,
+            at: new Date().toISOString(),
+            phase: "deterministic_plan_generated",
+            session: body.session,
+            requestedSlug,
+            effectiveSlug,
+            plannerSource,
+            modelKey,
+            modelUsed,
+            promptHash,
+            promptExcerpt,
+            promptLength: plannerMessage.length,
+            outcome,
+            intent: routedPlan.intent,
+            opCount: routedPlan.ops.length,
+            opTypes: routedPlan.ops.map((op) => op.op),
+            plannerTier: "llm_intent_router",
+            ...timingFields()
+          })
+          const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
+          if (routedOutcome.done) {
+            // Success — abort the full planner (fire and forget)
+            fullPlannerAbort.abort("router_succeeded")
+            fullPlannerPromise.catch(() => {}) // Suppress unhandled rejection
+            return routedOutcome.response
+          }
         }
         // Router plan failed validation — fall through to wait for full planner
       }
