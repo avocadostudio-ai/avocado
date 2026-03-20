@@ -11,7 +11,6 @@ import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content
 import { derivePageDescription } from "../../lib/seo"
 import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
 import { DEFAULT_SITE_ID, DEFAULT_SESSION } from "../../lib/defaults"
-import { FileX2 } from "lucide-react"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -118,25 +117,27 @@ export default async function SitePage({ params, searchParams }: PageProps) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          minHeight: "100vh",
+          minHeight: "60vh",
           gap: "20px",
           padding: "24px",
           textAlign: "center",
         }}
       >
-        <div
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: "50%",
-            background: "rgba(0,0,0,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--body-secondary, #888)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <FileX2 size={36} strokeWidth={1.5} color="var(--body-secondary, #94a3b8)" />
-        </div>
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="9.5" y1="12.5" x2="14.5" y2="17.5" />
+          <line x1="14.5" y1="12.5" x2="9.5" y2="17.5" />
+        </svg>
         <h1
           style={{
             fontSize: "1.5rem",
