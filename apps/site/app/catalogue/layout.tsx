@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
 import { getPublishedSlugs, getPublishedSiteConfig } from "../../lib/published-content-api"
 import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
+import { DEFAULT_SITE_ID } from "../../lib/defaults"
 
 const CATALOGUE_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_EDITOR === "1" ||
@@ -17,7 +18,7 @@ export default function CatalogueLayout({ children }: { children: ReactNode }) {
     navSlugs,
     currentSlug: "/catalogue",
     siteConfig,
-    siteId: "avocado-stories",
+    siteId: DEFAULT_SITE_ID,
     editorQuery: "",
   })
 

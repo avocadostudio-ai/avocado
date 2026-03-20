@@ -2,9 +2,10 @@ import "./globals.css"
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
 import { DEFAULT_SITE_DESCRIPTION } from "../lib/seo"
+import { DEFAULT_SITE_NAME } from "../lib/defaults"
 
 export const metadata: Metadata = {
-  title: { default: "Avocado Stories", template: "%s · Avocado Stories" },
+  title: { default: DEFAULT_SITE_NAME, template: `%s · ${DEFAULT_SITE_NAME}` },
   description: DEFAULT_SITE_DESCRIPTION,
   icons: {
     icon: "/icon.svg",
