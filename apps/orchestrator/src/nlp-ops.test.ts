@@ -4,7 +4,7 @@ import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSch
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
 import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery } from "./nlp/intent-detection.js"
-import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath } from "./nlp/deterministic-planner.js"
+import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath, tryCompoundDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage, isRewriteLikeMessage } from "./chat/chat-pipeline.js"
 
@@ -277,6 +277,35 @@ test("inferDeterministicIntent returns remove intent with kept type for 'remove 
   const currentPage = demoPublishedPages()[0]
   const parsed = inferDeterministicIntent({
     message: "remove all blocks except hero",
+    currentPage
+  })
+  assert.ok(parsed)
+  assert.equal(parsed.action, "remove")
+  assert.equal(parsed.target_block_type, "Hero")
+})
+
+test("inferDeterministicIntent returns null for container-scoped remove-except", () => {
+  const currentPage = demoPublishedPages()[0]
+  const result = inferDeterministicIntent({
+    message: "remove CTAs from all slides except last one in Carousel",
+    currentPage,
+    activeBlockId: currentPage.blocks[0].id
+  })
+  assert.equal(result, null)
+})
+
+test("isHighConfidenceDeterministicCase returns false for container-scoped remove-except", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "remove CTAs from all slides except last one in Carousel", currentPage }),
+    false
+  )
+})
+
+test("inferDeterministicIntent still handles page-level remove-all-except after container guard", () => {
+  const currentPage = demoPublishedPages()[0]
+  const parsed = inferDeterministicIntent({
+    message: "delete everything except Hero",
     currentPage
   })
   assert.ok(parsed)
@@ -2823,4 +2852,286 @@ test("isRewriteLikeMessage matches optimize variants", () => {
   assert.equal(isRewriteLikeMessage("optimize the copy"), true)
   assert.equal(isRewriteLikeMessage("how would you optimize this?"), true)
   assert.equal(isRewriteLikeMessage("optimizing the hero section"), true)
+})
+
+test("inferBlockTypeFromText detects carousel/gallery/tabs block types", () => {
+  assert.equal(inferBlockTypeFromText("carousel"), "Carousel")
+  assert.equal(inferBlockTypeFromText("slideshow"), "Carousel")
+  assert.equal(inferBlockTypeFromText("slider"), "Carousel")
+  assert.equal(inferBlockTypeFromText("gallery"), "Gallery")
+  assert.equal(inferBlockTypeFromText("tabs"), "Tabs")
+  assert.equal(inferBlockTypeFromText("table"), "Table")
+  assert.equal(inferBlockTypeFromText("blockquote"), "Quote")
+  assert.equal(inferBlockTypeFromText("video"), "Video")
+  assert.equal(inferBlockTypeFromText("embed"), "Embed")
+  assert.equal(inferBlockTypeFromText("banner"), "Banner")
+})
+
+test("normalizePlanCandidate coerces Carousel autoplay boolean to string", () => {
+  const plan = normalizePlanCandidate({
+    ops: [
+      {
+        op: "add_block",
+        block: {
+          type: "Carousel",
+          id: "b_carousel_test",
+          props: {
+            autoplay: true,
+            slides: [{ imageUrl: "/img.jpg", alt: "Slide" }]
+          }
+        }
+      }
+    ]
+  }) as any
+  assert.equal(plan.ops[0].block.props.autoplay, "true")
+
+  const planFalse = normalizePlanCandidate({
+    ops: [
+      {
+        op: "add_block",
+        block: {
+          type: "Carousel",
+          id: "b_carousel_test2",
+          props: {
+            autoplay: false,
+            slides: [{ imageUrl: "/img.jpg", alt: "Slide" }]
+          }
+        }
+      }
+    ]
+  }) as any
+  assert.equal(planFalse.ops[0].block.props.autoplay, "false")
+})
+
+test("normalizePlanCandidate seeds default props when add_block has no props", () => {
+  const plan = normalizePlanCandidate({
+    ops: [
+      {
+        op: "add_block",
+        block: {
+          type: "Hero",
+          id: "b_hero_test"
+        }
+      }
+    ]
+  }) as any
+  const props = plan.ops[0].block.props
+  assert.ok(props, "props should not be undefined")
+  assert.equal(typeof props, "object")
+  // Should have default Hero props
+  assert.ok("heading" in props || "title" in props, "should have heading or title from defaults")
+})
+
+test("normalizePlanCandidate: bulk add_block for all block types passes editPlanSchema", () => {
+  // Simulates what Haiku generates for "add all available components":
+  // - Some blocks have props under block.props
+  // - Some blocks have NO props at all (LLM omits them)
+  // - Carousel has boolean autoplay instead of string enum
+  // - LLM may use "slides" instead of "items" for Carousel
+  // - Some blocks have props scattered at block level (no .props wrapper)
+  const rawLlmOutput = {
+    intent: "edit_plan",
+    summary_for_user: "Adding all available component types.",
+    change_log: [
+      "Add Hero section",
+      "Add FeatureGrid",
+      "Add Testimonials",
+      "Add FAQAccordion",
+      "Add CTA",
+      "Add Card",
+      "Add CardGrid",
+      "Add RichText",
+      "Add Stats",
+      "Add TwoColumn",
+      "Add Carousel",
+      "Add Gallery",
+      "Add Tabs",
+      "Add Table",
+      "Add Quote",
+      "Add Video",
+      "Add Embed",
+      "Add Banner"
+    ],
+    ops: [
+      // Normal: block with props
+      { op: "add_block", block: { type: "Hero", id: "b_hero_1", props: { heading: "Welcome", subheading: "Hello", ctaText: "Go", ctaHref: "/", imageUrl: "/hero-generated.svg", imageAlt: "Hero" } } },
+      // Normal with props
+      { op: "add_block", block: { type: "FeatureGrid", id: "b_fg_1", props: { title: "Features", features: [{ icon: "star", title: "Fast", description: "Quick" }] } } },
+      // Missing props entirely — should get defaults
+      { op: "add_block", block: { type: "Testimonials", id: "b_testimonials_1" } },
+      { op: "add_block", block: { type: "FAQAccordion", id: "b_faq_1" } },
+      { op: "add_block", block: { type: "CTA", id: "b_cta_1" } },
+      { op: "add_block", block: { type: "Card", id: "b_card_1" } },
+      { op: "add_block", block: { type: "CardGrid", id: "b_cardgrid_1" } },
+      { op: "add_block", block: { type: "RichText", id: "b_richtext_1" } },
+      { op: "add_block", block: { type: "Stats", id: "b_stats_1" } },
+      { op: "add_block", block: { type: "TwoColumn", id: "b_twocolumn_1" } },
+      // Carousel with boolean autoplay and "slides" instead of "items" (common LLM mistake)
+      { op: "add_block", block: { type: "Carousel", id: "b_carousel_1", props: { autoplay: true, slides: [{ imageUrl: "/img.jpg", imageAlt: "Slide 1" }] } } },
+      // Gallery with "photos" instead of "images" and numeric columns (should be string enum)
+      { op: "add_block", block: { type: "Gallery", id: "b_gallery_1", props: { columns: 3, photos: [{ imageUrl: "/img.jpg", alt: "Photo 1" }] } } },
+      // Tabs with props
+      { op: "add_block", block: { type: "Tabs", id: "b_tabs_1", props: { tabs: [{ label: "Tab 1", content: "Content" }] } } },
+      // Table with "columns" and "data" instead of "headers" and "rows", boolean striped
+      { op: "add_block", block: { type: "Table", id: "b_table_1", props: { columns: ["Name", "Value"], data: [["A", "1"]], striped: true } } },
+      // Blocks with no props at all (should get defaults)
+      { op: "add_block", block: { type: "Quote", id: "b_quote_1" } },
+      // Video with boolean autoplay/loop
+      { op: "add_block", block: { type: "Video", id: "b_video_1", props: { src: "https://youtube.com/watch?v=test", autoplay: true, loop: false } } },
+      { op: "add_block", block: { type: "Embed", id: "b_embed_1" } },
+      { op: "add_block", block: { type: "Banner", id: "b_banner_1" } }
+    ]
+  }
+
+  const normalized = normalizePlanCandidate(rawLlmOutput, { defaultSlug: "/" }) as any
+
+  // Every op should have block.props as a non-null object
+  for (let i = 0; i < normalized.ops.length; i++) {
+    const op = normalized.ops[i]
+    assert.ok(op.block, `ops[${i}] should have block`)
+    assert.ok(op.block.props && typeof op.block.props === "object", `ops[${i}] (${op.block.type}) block.props should be a record, got ${typeof op.block.props}`)
+  }
+
+  // Carousel: autoplay coerced, slides→items
+  const carouselOp = normalized.ops.find((o: any) => o.block?.type === "Carousel")
+  assert.equal(carouselOp.block.props.autoplay, "true")
+  assert.ok(Array.isArray(carouselOp.block.props.items), "slides should be remapped to items")
+  assert.equal(carouselOp.block.props.slides, undefined, "slides key should be removed")
+
+  // Gallery: photos→images, numeric columns→string
+  const galleryOp = normalized.ops.find((o: any) => o.block?.type === "Gallery")
+  assert.ok(Array.isArray(galleryOp.block.props.images), "photos should be remapped to images")
+  assert.equal(galleryOp.block.props.photos, undefined)
+  assert.equal(galleryOp.block.props.columns, "3", "numeric columns should be coerced to string")
+
+  // Table: columns→headers, data→rows, boolean striped→string
+  const tableOp = normalized.ops.find((o: any) => o.block?.type === "Table")
+  assert.ok(Array.isArray(tableOp.block.props.headers), "columns should be remapped to headers")
+  assert.ok(Array.isArray(tableOp.block.props.rows), "data should be remapped to rows")
+  assert.equal(tableOp.block.props.columns, undefined)
+  assert.equal(tableOp.block.props.data, undefined)
+  assert.equal(tableOp.block.props.striped, "true", "boolean striped should be coerced to string")
+
+  // Video: boolean autoplay/loop coerced to strings
+  const videoOp = normalized.ops.find((o: any) => o.block?.type === "Video")
+  assert.equal(videoOp.block.props.autoplay, "true")
+  assert.equal(videoOp.block.props.loop, "false")
+
+  // The full normalized plan should pass editPlanSchema
+  const result = editPlanSchema.safeParse(normalized)
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    assert.fail(`editPlanSchema validation failed: ${issue?.message} at ${issue?.path?.join(".")}`)
+  }
+
+  // Each block's props should also pass its own block-level Zod schema
+  for (const op of normalized.ops) {
+    const blockType = op.block?.type
+    if (!blockType) continue
+    const propResult = validateBlockProps(blockType, op.block.props)
+    assert.ok(propResult.success, `validateBlockProps failed for ${blockType}: ${propResult.success ? "" : JSON.stringify(propResult.error?.issues?.[0])}`)
+  }
+})
+
+test("normalizePlanCandidate: add_block with props at block top level (no .props wrapper)", () => {
+  // Some LLMs put props directly on block instead of under block.props
+  const raw = {
+    intent: "edit_plan",
+    summary_for_user: "Adding a carousel.",
+    change_log: ["Add Carousel"],
+    ops: [
+      {
+        op: "add_block",
+        props: { autoplay: true, items: [{ imageUrl: "/img.jpg", imageAlt: "Slide" }] },
+        blockType: "Carousel"
+      }
+    ]
+  }
+
+  const normalized = normalizePlanCandidate(raw, { defaultSlug: "/" }) as any
+  const op = normalized.ops[0]
+  assert.ok(op.block, "should have block")
+  assert.ok(op.block.props && typeof op.block.props === "object", "block.props should be a record")
+  assert.equal(op.block.props.autoplay, "true", "autoplay should be coerced to string")
+
+  const result = editPlanSchema.safeParse(normalized)
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    assert.fail(`editPlanSchema validation failed: ${issue?.message} at ${issue?.path?.join(".")}`)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// tryCompoundDeterministicPlan
+// ---------------------------------------------------------------------------
+
+test("tryCompoundDeterministicPlan handles 'remove the hero and add a CTA'", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = tryCompoundDeterministicPlan({
+    session: "test-suite",
+    message: "remove the hero and add a CTA",
+    slug: "/",
+    currentPage
+  })
+  assert.ok(plan, "should produce a plan")
+  assert.equal(plan!.intent, "edit_plan")
+  assert.ok(plan!.ops.length >= 2, "should have at least 2 ops")
+  // Removes should come before adds
+  const removeIndex = plan!.ops.findIndex(op => op.op === "remove_block")
+  const addIndex = plan!.ops.findIndex(op => op.op === "add_block")
+  assert.ok(removeIndex >= 0, "should have a remove op")
+  assert.ok(addIndex >= 0, "should have an add op")
+  assert.ok(removeIndex < addIndex, "remove ops should come before add ops")
+})
+
+test("tryCompoundDeterministicPlan handles 'add a FAQ and remove the CTA'", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = tryCompoundDeterministicPlan({
+    session: "test-suite",
+    message: "add a FAQ and remove the CTA",
+    slug: "/",
+    currentPage
+  })
+  assert.ok(plan, "should produce a plan")
+  assert.equal(plan!.intent, "edit_plan")
+  const removeOps = plan!.ops.filter(op => op.op === "remove_block")
+  const addOps = plan!.ops.filter(op => op.op === "add_block")
+  assert.ok(removeOps.length > 0, "should have remove ops")
+  assert.ok(addOps.length > 0, "should have add ops")
+})
+
+test("tryCompoundDeterministicPlan returns null for non-compound messages", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = tryCompoundDeterministicPlan({
+    session: "test-suite",
+    message: "add a CTA",
+    slug: "/",
+    currentPage
+  })
+  assert.equal(plan, null)
+})
+
+test("tryCompoundDeterministicPlan returns null for 'add a FAQ section and make it about pricing' (not decomposable)", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = tryCompoundDeterministicPlan({
+    session: "test-suite",
+    message: "add a FAQ section and make it about pricing",
+    slug: "/",
+    currentPage
+  })
+  // "make it about pricing" is a content directive that isn't a different action verb,
+  // so splitCompoundMessage should not split this
+  assert.equal(plan, null)
+})
+
+test("tryCompoundDeterministicPlan merges summaries from both sub-plans", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = tryCompoundDeterministicPlan({
+    session: "test-suite",
+    message: "delete the hero and add a FAQ",
+    slug: "/",
+    currentPage
+  })
+  assert.ok(plan, "should produce a plan")
+  assert.ok(plan!.summary_for_user.length > 10, "summary should combine both sub-plan summaries")
 })

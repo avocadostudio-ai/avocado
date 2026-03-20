@@ -6,8 +6,11 @@ import {
   compactPlannerContextPack,
   minimalPlannerContextPack,
   shouldUseMinimalPlannerContext,
-  shouldPreferFocusedTranslation
+  shouldPreferFocusedTranslation,
+  classifyMessageComplexity,
+  isRouterPlanTooShallow
 } from "./chat-pipeline-context.js"
+import type { EditPlan, PageDoc } from "@ai-site-editor/shared"
 
 // ---------------------------------------------------------------------------
 // shouldPreferFastModelForMessage
@@ -297,4 +300,137 @@ test("shouldPreferFocusedTranslation: false when scope is not page", () => {
     inferredScope: "component",
     activeBlockId: "b_hero"
   }))
+})
+
+// ---------------------------------------------------------------------------
+// classifyMessageComplexity
+// ---------------------------------------------------------------------------
+
+function makePage(blocks?: PageDoc["blocks"]): PageDoc {
+  return {
+    id: "p_test",
+    slug: "/",
+    title: "Test",
+    updatedAt: new Date().toISOString(),
+    blocks: blocks ?? [
+      { id: "b_hero", type: "Hero", props: { heading: "Hello", subheading: "World", ctaText: "Go", ctaHref: "/", imageUrl: "/img.png", imageAlt: "alt" } },
+      { id: "b_features", type: "FeatureGrid", props: { title: "Features", features: [] } },
+      { id: "b_cta", type: "CTA", props: { title: "Ready", description: "Go", ctaText: "Click", ctaHref: "/" } }
+    ]
+  }
+}
+
+test("classifyMessageComplexity: simple for add with clear block type", () => {
+  assert.equal(classifyMessageComplexity({
+    message: "add a CTA",
+    currentPage: makePage(),
+    translationScope: "none"
+  }), "simple")
+})
+
+test("classifyMessageComplexity: simple for remove with clear block type", () => {
+  assert.equal(classifyMessageComplexity({
+    message: "remove the hero",
+    currentPage: makePage(),
+    translationScope: "none"
+  }), "simple")
+})
+
+test("classifyMessageComplexity: simple for update with quoted value", () => {
+  assert.equal(classifyMessageComplexity({
+    message: 'change the hero heading to "New Title"',
+    currentPage: makePage(),
+    activeBlockId: "b_hero",
+    translationScope: "none"
+  }), "simple")
+})
+
+test("classifyMessageComplexity: standard for translations", () => {
+  assert.equal(classifyMessageComplexity({
+    message: "translate to German",
+    currentPage: makePage(),
+    translationScope: "page"
+  }), "standard")
+})
+
+test("classifyMessageComplexity: standard for rewrites", () => {
+  assert.equal(classifyMessageComplexity({
+    message: "rewrite the hero heading",
+    currentPage: makePage(),
+    activeBlockId: "b_hero",
+    translationScope: "none"
+  }), "standard")
+})
+
+test("classifyMessageComplexity: standard for page operations", () => {
+  assert.equal(classifyMessageComplexity({
+    message: "create a new page called About",
+    currentPage: makePage(),
+    translationScope: "none"
+  }), "standard")
+})
+
+test("classifyMessageComplexity: standard for vague update without patch", () => {
+  assert.equal(classifyMessageComplexity({
+    message: "make the hero more compelling",
+    currentPage: makePage(),
+    activeBlockId: "b_hero",
+    translationScope: "none"
+  }), "standard")
+})
+
+// ---------------------------------------------------------------------------
+// isRouterPlanTooShallow
+// ---------------------------------------------------------------------------
+
+test("isRouterPlanTooShallow: false for simple messages without content cues", () => {
+  const plan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added CTA.",
+    change_log: [],
+    ops: [{ op: "add_block", pageSlug: "/", afterBlockId: "b_hero", block: { id: "b_new", type: "CTA", props: { title: "Go" } } }]
+  }
+  assert.ok(!isRouterPlanTooShallow("add a CTA", plan))
+})
+
+test("isRouterPlanTooShallow: true when content requested but plan has short defaults", () => {
+  const plan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added Hero.",
+    change_log: [],
+    ops: [{ op: "add_block", pageSlug: "/", afterBlockId: "b_cta", block: { id: "b_new", type: "Hero", props: { heading: "Title", subheading: "Sub" } } }]
+  }
+  assert.ok(isRouterPlanTooShallow("add a compelling hero about our mission statement", plan))
+})
+
+test("isRouterPlanTooShallow: false for non-edit plans", () => {
+  const plan: EditPlan = {
+    intent: "needs_clarification",
+    summary_for_user: "What?",
+    change_log: [],
+    ops: []
+  }
+  assert.ok(!isRouterPlanTooShallow("add a compelling hero about our mission", plan))
+})
+
+test("isRouterPlanTooShallow: false when plan has rich content", () => {
+  const plan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Added Hero.",
+    change_log: [],
+    ops: [{
+      op: "add_block",
+      pageSlug: "/",
+      afterBlockId: "b_cta",
+      block: {
+        id: "b_new",
+        type: "Hero",
+        props: {
+          heading: "Our Mission: Building the Future of Education Together",
+          subheading: "We believe every student deserves access to world-class learning experiences"
+        }
+      }
+    }]
+  }
+  assert.ok(!isRouterPlanTooShallow("add a compelling hero about our mission", plan))
 })
