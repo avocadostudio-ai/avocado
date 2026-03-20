@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" width="1536" height="1024">
+  <rect width="1536" height="1024" fill="#e4e4e7"/>
+  <!-- Three overlapping circles -->
+  <circle cx="620" cy="440" r="220" fill="none" stroke="#d4d4d8" stroke-width="5"/>
+  <circle cx="820" cy="380" r="280" fill="none" stroke="#c4c4c8" stroke-width="4"/>
+  <circle cx="920" cy="540" r="160" fill="#18181b" opacity="0.04"/>
+  <!-- Rounded rectangle -->
+  <rect x="500" y="320" width="200" height="200" rx="32" fill="none" stroke="#a1a1aa" stroke-width="5" transform="rotate(15 600 420)"/>
+  <!-- Small accent shapes -->
+  <circle cx="1050" cy="300" r="40" fill="#18181b" opacity="0.07"/>
+  <circle cx="450" cy="620" r="24" fill="#18181b" opacity="0.05"/>
+  <rect x="900" y="650" width="120" height="8" rx="4" fill="#d4d4d8"/>
+</svg>
