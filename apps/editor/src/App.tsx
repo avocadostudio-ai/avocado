@@ -1230,15 +1230,28 @@ function EditorPage({
             >
               <div className="msg-main">{entry.role === "assistant" ? renderFinalMarkdown(entry.text) : entry.text}</div>
               {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
-              {(entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line)).length > 0 ? (
-                <ul className="msg-list">
-                  {(entry.changes ?? [])
-                    .filter((line) => !isRedundantChangeLine(entry.text, line))
-                    .map((line, idx) => (
-                    <li key={idx}>{line}</li>
-                  ))}
-                </ul>
-              ) : null}
+              {(() => {
+                const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line))
+                if (changeLines.length === 0) return null
+                if (changeLines.length > 8) {
+                  const summaryLabel = /translat/i.test(entry.text)
+                    ? `${changeLines.length} fields translated`
+                    : `${changeLines.length} changes applied`
+                  return (
+                    <details className="msg-list-details">
+                      <summary>{summaryLabel}</summary>
+                      <ul className="msg-list">
+                        {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
+                      </ul>
+                    </details>
+                  )
+                }
+                return (
+                  <ul className="msg-list">
+                    {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
+                  </ul>
+                )
+              })()}
               {(entry.suggestions ?? []).length > 0 ? (
                 <div className="msg-suggestions">
                   {entry.suggestions?.map((line, idx) => (
@@ -1405,9 +1418,12 @@ function EditorPage({
               </div>
               {chatEngine.streamingChanges.length > 0 ? (
                 <ul className="msg-list">
-                  {chatEngine.streamingChanges.map((line, idx) => (
+                  {chatEngine.streamingChanges.slice(0, 8).map((line, idx) => (
                     <li key={idx}>{line}</li>
                   ))}
+                  {chatEngine.streamingChanges.length > 8 ? (
+                    <li className="msg-list-overflow">and {chatEngine.streamingChanges.length - 8} more…</li>
+                  ) : null}
                 </ul>
               ) : null}
               {chatEngine.streamStatus ? (
@@ -1958,8 +1974,10 @@ function EditorPage({
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
                 chatEngine.pushAssistantFromResult({ status: "applied", summary: "Changed image." }, { canUndo: true })
                 void blockProps.refetch()
+              } else {
+                console.error("[ImagePicker] ops response:", res.status, data, "request:", { session, siteId, ops })
               }
-            } catch { /* ignore */ }
+            } catch (err) { console.error("[ImagePicker] ops failed:", err) }
           })()
         }}
       />

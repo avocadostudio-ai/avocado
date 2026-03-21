@@ -1,0 +1,47 @@
+/* ── Shared two-column grid layout ────────────────────────── */
+
+.layout-grid {
+  display: grid;
+  align-items: center;
+}
+
+.layout-grid--balanced {
+  grid-template-columns: 1fr 1fr;
+}
+
+.layout-grid--content-heavy {
+  grid-template-columns: 1.15fr 1fr;
+}
+
+.layout-grid__col {
+  min-width: 0;
+}
+
+/* Image reorder: place media before content */
+.layout-grid--image-left > :first-child {
+  order: 2;
+}
+.layout-grid--image-left > :last-child {
+  order: 1;
+}
+
+/* Responsive image inside grid columns */
+.layout-grid__img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+/* Stack to single column on narrow viewports */
+@media (max-width: 900px) {
+  .layout-grid--balanced,
+  .layout-grid--content-heavy {
+    grid-template-columns: 1fr;
+  }
+
+  .layout-grid--image-left > :first-child,
+  .layout-grid--image-left > :last-child {
+    order: unset;
+  }
+}

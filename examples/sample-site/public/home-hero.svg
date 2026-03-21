@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="hbg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181b"/>
+      <stop offset="50%" stop-color="#27272a"/>
+      <stop offset="100%" stop-color="#3f3f46"/>
+    </linearGradient>
+    <linearGradient id="accent1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="accent3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="accent4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <filter id="hs" x="-15%" y="-15%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <filter id="hglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="30" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="screen-clip">
+      <rect x="168" y="148" width="464" height="290" rx="4"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="url(#hbg)"/>
+
+  <!-- Subtle dot grid -->
+  <g fill="#fff" opacity="0.04">
+    <g id="dot-row">
+      <circle r="1.5" cx="40" cy="40"/>
+      <circle r="1.5" cx="80" cy="40"/>
+      <circle r="1.5" cx="120" cy="40"/>
+      <circle r="1.5" cx="160" cy="40"/>
+      <circle r="1.5" cx="200" cy="40"/>
+      <circle r="1.5" cx="240" cy="40"/>
+      <circle r="1.5" cx="280" cy="40"/>
+      <circle r="1.5" cx="320" cy="40"/>
+      <circle r="1.5" cx="360" cy="40"/>
+      <circle r="1.5" cx="400" cy="40"/>
+      <circle r="1.5" cx="440" cy="40"/>
+      <circle r="1.5" cx="480" cy="40"/>
+      <circle r="1.5" cx="520" cy="40"/>
+      <circle r="1.5" cx="560" cy="40"/>
+      <circle r="1.5" cx="600" cy="40"/>
+      <circle r="1.5" cx="640" cy="40"/>
+      <circle r="1.5" cx="680" cy="40"/>
+      <circle r="1.5" cx="720" cy="40"/>
+      <circle r="1.5" cx="760" cy="40"/>
+    </g>
+    <use href="#dot-row" y="40"/>
+    <use href="#dot-row" y="80"/>
+    <use href="#dot-row" y="120"/>
+    <use href="#dot-row" y="160"/>
+    <use href="#dot-row" y="200"/>
+    <use href="#dot-row" y="240"/>
+    <use href="#dot-row" y="280"/>
+    <use href="#dot-row" y="320"/>
+    <use href="#dot-row" y="360"/>
+    <use href="#dot-row" y="400"/>
+    <use href="#dot-row" y="440"/>
+    <use href="#dot-row" y="480"/>
+    <use href="#dot-row" y="520"/>
+  </g>
+
+  <!-- Ambient glow orbs -->
+  <circle cx="250" cy="300" r="120" fill="#6366f1" opacity="0.08" filter="url(#hglow)"/>
+  <circle cx="550" cy="250" r="100" fill="#38bdf8" opacity="0.06" filter="url(#hglow)"/>
+  <circle cx="400" cy="450" r="80" fill="#34d399" opacity="0.05" filter="url(#hglow)"/>
+
+  <!-- Browser window mockup -->
+  <g filter="url(#hs)">
+    <!-- Window frame -->
+    <rect x="150" y="110" width="500" height="350" rx="12" fill="#1e1e22"/>
+    <!-- Title bar -->
+    <rect x="150" y="110" width="500" height="36" rx="12" fill="#2a2a2e"/>
+    <rect x="150" y="134" width="500" height="12" fill="#2a2a2e"/>
+    <!-- Traffic lights -->
+    <circle cx="174" cy="128" r="6" fill="#ff5f57"/>
+    <circle cx="194" cy="128" r="6" fill="#febc2e"/>
+    <circle cx="214" cy="128" r="6" fill="#28c840"/>
+    <!-- URL bar -->
+    <rect x="240" y="120" width="260" height="16" rx="4" fill="#1e1e22"/>
+    <text x="280" y="132" font-family="ui-monospace, monospace" font-size="8" fill="#71717a">sample-site.dev</text>
+
+    <!-- Screen content area -->
+    <g clip-path="url(#screen-clip)">
+      <rect x="168" y="148" width="464" height="290" fill="#fafafa"/>
+
+      <!-- Mini site header -->
+      <rect x="168" y="148" width="464" height="28" fill="#fff"/>
+      <rect x="168" y="176" width="464" height="1" fill="#e4e4e7"/>
+      <circle cx="186" cy="162" r="6" fill="#18181b"/>
+      <rect x="196" y="158" width="50" height="7" rx="2" fill="#18181b"/>
+      <rect x="540" y="159" width="24" height="5" rx="2" fill="#a1a1aa"/>
+      <rect x="572" y="159" width="24" height="5" rx="2" fill="#a1a1aa"/>
+      <rect x="604" y="159" width="24" height="5" rx="2" fill="#a1a1aa"/>
+
+      <!-- Mini hero section -->
+      <rect x="168" y="177" width="464" height="120" fill="linear-gradient(135deg, #fafafa, #f4f4f5)"/>
+      <rect x="190" y="200" width="160" height="10" rx="3" fill="#18181b"/>
+      <rect x="190" y="218" width="120" height="6" rx="2" fill="#71717a"/>
+      <rect x="190" y="230" width="140" height="6" rx="2" fill="#71717a"/>
+      <rect x="190" y="250" width="60" height="16" rx="4" fill="#18181b"/>
+      <text x="220" y="262" font-family="system-ui, sans-serif" font-size="7" fill="#fff" text-anchor="middle">Get Started</text>
+      <!-- Mini hero image placeholder -->
+      <rect x="500" y="190" width="110" height="80" rx="6" fill="#e4e4e7"/>
+      <circle cx="555" cy="220" r="14" fill="#d4d4d8"/>
+      <polygon points="520,260 555,235 590,260" fill="#d4d4d8"/>
+
+      <!-- Mini stats row -->
+      <rect x="168" y="297" width="464" height="50" fill="#fff"/>
+      <g fill="#18181b" font-family="system-ui, sans-serif">
+        <text x="240" y="320" font-size="12" font-weight="700" text-anchor="middle">10k+</text>
+        <text x="240" y="332" font-size="6" fill="#71717a" text-anchor="middle">Users</text>
+        <text x="330" y="320" font-size="12" font-weight="700" text-anchor="middle">99.9%</text>
+        <text x="330" y="332" font-size="6" fill="#71717a" text-anchor="middle">Uptime</text>
+        <text x="420" y="320" font-size="12" font-weight="700" text-anchor="middle">50+</text>
+        <text x="420" y="332" font-size="6" fill="#71717a" text-anchor="middle">Blocks</text>
+        <text x="510" y="320" font-size="12" font-weight="700" text-anchor="middle">24/7</text>
+        <text x="510" y="332" font-size="6" fill="#71717a" text-anchor="middle">Support</text>
+      </g>
+
+      <!-- Mini content blocks -->
+      <rect x="168" y="347" width="464" height="91" fill="#fafafa"/>
+      <rect x="190" y="360" width="100" height="8" rx="3" fill="#18181b"/>
+      <rect x="190" y="374" width="200" height="5" rx="2" fill="#a1a1aa"/>
+      <rect x="190" y="384" width="180" height="5" rx="2" fill="#a1a1aa"/>
+      <rect x="190" y="394" width="160" height="5" rx="2" fill="#a1a1aa"/>
+      <!-- Mini cards -->
+      <rect x="440" y="356" width="80" height="60" rx="6" fill="#fff" stroke="#e4e4e7" stroke-width="1"/>
+      <rect x="530" y="356" width="80" height="60" rx="6" fill="#fff" stroke="#e4e4e7" stroke-width="1"/>
+      <rect x="452" y="366" width="56" height="5" rx="2" fill="#d4d4d8"/>
+      <rect x="452" y="376" width="40" height="4" rx="2" fill="#e4e4e7"/>
+      <rect x="542" y="366" width="56" height="5" rx="2" fill="#d4d4d8"/>
+      <rect x="542" y="376" width="40" height="4" rx="2" fill="#e4e4e7"/>
+    </g>
+  </g>
+
+  <!-- Floating component cards around browser -->
+  <!-- Top-left: colored block chip -->
+  <g filter="url(#hs)" transform="rotate(-12 90 180)">
+    <rect x="40" y="150" width="100" height="60" rx="12" fill="url(#accent1)"/>
+    <rect x="54" y="166" width="40" height="5" rx="2.5" fill="#fff" opacity="0.9"/>
+    <rect x="54" y="176" width="60" height="4" rx="2" fill="#fff" opacity="0.5"/>
+    <rect x="54" y="186" width="30" height="8" rx="4" fill="#fff" opacity="0.6"/>
+  </g>
+
+  <!-- Top-right: code snippet -->
+  <g filter="url(#hs)" transform="rotate(8 710 160)">
+    <rect x="660" y="120" width="110" height="80" rx="10" fill="#1a1a2e"/>
+    <text x="674" y="146" font-family="ui-monospace, monospace" font-size="7" fill="#a78bfa">{"type":</text>
+    <text x="674" y="158" font-family="ui-monospace, monospace" font-size="7" fill="#38bdf8"> "Hero",</text>
+    <text x="674" y="170" font-family="ui-monospace, monospace" font-size="7" fill="#34d399"> "props":</text>
+    <text x="674" y="182" font-family="ui-monospace, monospace" font-size="7" fill="#71717a"> {...}}</text>
+  </g>
+
+  <!-- Bottom-left: green component -->
+  <g filter="url(#hs)" transform="rotate(6 100 470)">
+    <rect x="40" y="430" width="120" height="70" rx="12" fill="url(#accent3)"/>
+    <circle cx="70" cy="456" r="10" fill="#fff" opacity="0.3"/>
+    <rect x="86" y="451" width="50" height="5" rx="2.5" fill="#fff" opacity="0.85"/>
+    <rect x="86" y="461" width="36" height="4" rx="2" fill="#fff" opacity="0.5"/>
+    <rect x="56" y="480" width="80" height="8" rx="4" fill="#fff" opacity="0.6"/>
+  </g>
+
+  <!-- Bottom-right: orange component -->
+  <g filter="url(#hs)" transform="rotate(-6 700 480)">
+    <rect x="650" y="440" width="110" height="70" rx="12" fill="url(#accent4)"/>
+    <rect x="664" y="458" width="82" height="6" rx="3" fill="#fff" opacity="0.85"/>
+    <rect x="664" y="470" width="60" height="4" rx="2" fill="#fff" opacity="0.5"/>
+    <rect x="664" y="480" width="70" height="4" rx="2" fill="#fff" opacity="0.5"/>
+    <rect x="664" y="494" width="36" height="8" rx="4" fill="#fff" opacity="0.6"/>
+  </g>
+
+  <!-- Connector lines from components to browser -->
+  <g stroke="#fff" stroke-width="1" opacity="0.1" stroke-dasharray="5 4">
+    <line x1="140" y1="200" x2="195" y2="240"/>
+    <line x1="660" y1="170" x2="610" y2="200"/>
+    <line x1="140" y1="450" x2="210" y2="400"/>
+    <line x1="660" y1="460" x2="610" y2="410"/>
+  </g>
+
+  <!-- Bottom tagline -->
+  <text x="400" y="560" text-anchor="middle" fill="#fff" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="600" letter-spacing="0.08em" opacity="0.7">COMPOSABLE BLOCK-BASED SITES</text>
+  <text x="400" y="580" text-anchor="middle" fill="#fff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="400" letter-spacing="0.12em" opacity="0.35">SCHEMA-DRIVEN · STATIC · EXTENSIBLE</text>
+</svg>

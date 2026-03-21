@@ -178,9 +178,36 @@ export function findFullPageTranslationCoverageGap(args: {
   for (const block of args.currentPage.blocks) {
     if (!touchedBlockIds.has(block.id)) continue
     const meta = blockMeta[block.type as BlockType]
+
+    // --- Top-level scalar prop coverage ---
+    if (meta?.fields) {
+      const translatableTopLevel = Object.entries(meta.fields)
+        .filter(([, fm]) => fm.kind === "text" || fm.kind === "richtext" || fm.kind === "imageAlt")
+        .map(([key]) => key)
+
+      if (translatableTopLevel.length > 0) {
+        const coveredTopLevel = new Set<string>()
+        for (const op of args.plan.ops) {
+          if (!("pageSlug" in op) || op.pageSlug !== args.slug) continue
+          if (op.op === "update_props" && op.blockId === block.id) {
+            const patch = normalizeUpdatePropsPatch(op as Extract<EditPlan["ops"][number], { op: "update_props" }>)
+            for (const key of translatableTopLevel) {
+              if (isNonEmptyString(patch[key])) coveredTopLevel.add(key)
+            }
+          }
+        }
+
+        const blockProps = block.props as Record<string, unknown>
+        for (const key of translatableTopLevel) {
+          if (!isNonEmptyString(blockProps[key])) continue
+          if (!coveredTopLevel.has(key)) missingPaths.push(`${block.id}.${key}`)
+        }
+      }
+    }
+
+    // --- List field child coverage ---
     const listFields = meta?.listFields ?? {}
     const listEntries = Object.entries(listFields)
-    if (listEntries.length === 0) continue
 
     for (const [listKey, listMeta] of listEntries) {
       const translatableItemFields = Object.entries(listMeta.itemFields ?? {})
@@ -239,7 +266,7 @@ export function findFullPageTranslationCoverageGap(args: {
   }
 
   if (missingPaths.length === 0) return null
-  return `Invalid full-page translation coverage for list children. Missing translated fields: ${missingPaths.join(", ")}`
+  return `Invalid full-page translation coverage. Missing translated fields: ${missingPaths.join(", ")}`
 }
 
 export function normalizeVariationTypos(text: string) {
