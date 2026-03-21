@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { FastifyInstance } from "fastify"
-import { pageDocSchema, siteConfigSchema, type PageDoc, type SiteConfig } from "@ai-site-editor/shared"
+import { pageDocSchemaLenient, siteConfigSchema, type PageDoc, type SiteConfig } from "@ai-site-editor/shared"
 import {
   publishedPages,
   scopedSessionKey,
@@ -64,7 +64,7 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     let sourcePages: PageDoc[] = []
     if (Array.isArray(body.pages) && body.pages.length > 0) {
       const parsed = body.pages
-        .map((candidate) => pageDocSchema.safeParse(candidate))
+        .map((candidate) => pageDocSchemaLenient.safeParse(candidate))
         .filter((result): result is { success: true; data: PageDoc } => result.success)
         .map((result) => result.data)
       sourcePages = parsed

@@ -2,8 +2,8 @@ import { z } from "zod"
 import {
   blockSchemas,
   operationSchema,
-  type EditorComponentDefinition,
-  type EditorComponentsManifest,
+  type BlockDefinition,
+  type BlockManifest,
   type BlockType,
   type Operation,
   type PageDoc,
@@ -175,7 +175,7 @@ export type SkippedOperation = {
 }
 
 export type ApplyOpsOptions = {
-  componentsManifest?: EditorComponentsManifest
+  componentsManifest?: BlockManifest
   contentSource?: ContentSource
 }
 
@@ -242,7 +242,7 @@ function _describeValidationIssue(error: z.ZodError) {
 }
 
 function _validateWithManifestIfPresent(
-  manifestByType: Map<string, EditorComponentDefinition>,
+  manifestByType: Map<string, BlockDefinition>,
   blockType: string,
   nextProps: Record<string, unknown>
 ) {
@@ -253,7 +253,7 @@ function _validateWithManifestIfPresent(
   const manifestComponent = manifestByType.get(blockType)
   if (manifestComponent) {
     if (!validateByJsonSchemaLike(manifestComponent.propsSchema, coerced)) {
-      throw new OperationError(`Invalid props for ${blockType}: does not match component manifest schema`, { category: "schema_violation" })
+      throw new OperationError(`Invalid props for ${blockType}: does not match block manifest schema`, { category: "schema_violation" })
     }
     return coerced
   }
@@ -262,7 +262,7 @@ function _validateWithManifestIfPresent(
 }
 
 function _requireManifestComponent(
-  manifestByType: Map<string, EditorComponentDefinition>,
+  manifestByType: Map<string, BlockDefinition>,
   blockType: string,
   operationName: string
 ) {
@@ -272,7 +272,7 @@ function _requireManifestComponent(
 }
 
 function _allowedPatchKeysFromManifest(
-  manifestByType: Map<string, EditorComponentDefinition>,
+  manifestByType: Map<string, BlockDefinition>,
   blockType: string,
   fallbackKeys: string[]
 ) {
@@ -287,7 +287,7 @@ function _allowedPatchKeysFromManifest(
 }
 
 function _withValidatedBlockProps(
-  manifestByType: Map<string, EditorComponentDefinition>,
+  manifestByType: Map<string, BlockDefinition>,
   block: PageDoc["blocks"][number],
   nextProps: Record<string, unknown>
 ) {
@@ -323,9 +323,9 @@ export function validateOperations(ops: unknown[]): Operation[] {
 // ---------------------------------------------------------------------------
 
 export async function applyOpsAtomically(session: string, ops: Operation[], options?: ApplyOpsOptions) {
-  const manifestByType = new Map<string, EditorComponentDefinition>()
+  const manifestByType = new Map<string, BlockDefinition>()
   if (options?.componentsManifest) {
-    for (const component of options.componentsManifest.components) {
+    for (const component of options.componentsManifest.blocks) {
       manifestByType.set(component.type, component)
     }
   }

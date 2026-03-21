@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
 import type { FastifyBaseLogger } from "fastify"
 import { type BlockType, type PageDoc, validateBlockProps } from "@ai-site-editor/shared"
+import { buildVariationSystemPrompt } from "./prompts.js"
 import { type AIProvider, type ModelKey, getPage } from "../state/session-state.js"
 import { withSiteContext } from "../nlp/intent-detection.js"
 import { coercePatchForBlock } from "../nlp/deterministic-planner.js"
@@ -437,18 +438,12 @@ async function generateVariationsWithOpenAI(args: {
   const props = args.block.props as Record<string, unknown>
   const allowedKeys = Object.keys(props)
   const constraints = variationConstraints(args.message, args.block)
-  const system = [
-    "You generate alternative content variations for one selected website block.",
-    "Return ONLY JSON object: {\"variations\":[{\"title\":\"...\",\"summary\":\"...\",\"patch\":{...}}]}",
-    `Generate exactly ${args.count} variations.`,
-    "Each patch must only include keys from the selected block props.",
-    "Each variation must be materially different from the others.",
-    "Do not include unchanged values in patch.",
-    "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
-    ...(constraints.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
-    ...(constraints.cardsOnly && args.block.type === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
-    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."
-  ].join("\n")
+  const system = buildVariationSystemPrompt({
+    count: args.count,
+    keepTitle: constraints.keepTitle,
+    cardsOnly: constraints.cardsOnly,
+    blockType: args.block.type,
+  })
 
   const user = {
     request: args.message,
@@ -513,18 +508,12 @@ async function generateVariationsWithAnthropic(args: {
   const props = args.block.props as Record<string, unknown>
   const allowedKeys = Object.keys(props)
   const constraints = variationConstraints(args.message, args.block)
-  const system = [
-    "You generate alternative content variations for one selected website block.",
-    "Return ONLY JSON object: {\"variations\":[{\"title\":\"...\",\"summary\":\"...\",\"patch\":{...}}]}",
-    `Generate exactly ${args.count} variations.`,
-    "Each patch must only include keys from the selected block props.",
-    "Each variation must be materially different from the others.",
-    "Do not include unchanged values in patch.",
-    "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
-    ...(constraints.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
-    ...(constraints.cardsOnly && args.block.type === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
-    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."
-  ].join("\n")
+  const system = buildVariationSystemPrompt({
+    count: args.count,
+    keepTitle: constraints.keepTitle,
+    cardsOnly: constraints.cardsOnly,
+    blockType: args.block.type,
+  })
 
   const user = {
     request: args.message,

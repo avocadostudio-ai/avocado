@@ -1,4 +1,4 @@
-import type { EditorComponentsManifest } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@ai-site-editor/shared"
 import type { SiteCapabilities, SiteConfig } from "./editor-types"
 import { parseArrayOfStrings, parseString } from "./parse-utils"
 
@@ -22,8 +22,8 @@ type SiteContextPayload = {
 export function manifestUnavailableChanges(reason?: string) {
   const trimmedReason = parseString(reason, "")
   return [
-    trimmedReason.length > 0 ? `Manifest issue: ${trimmedReason}` : "Component manifest is unavailable or invalid.",
-    "Expose GET /api/editor/components and return a valid manifest to enable structural edits."
+    trimmedReason.length > 0 ? `Manifest issue: ${trimmedReason}` : "Block manifest is unavailable or invalid.",
+    "Expose GET /api/editor/blocks and return a valid manifest to enable structural edits."
   ]
 }
 
@@ -52,7 +52,7 @@ export function buildSiteContextPayload(siteId: string, activeSiteConfig: SiteCo
 
 export function withIntegrationContext<T extends Record<string, unknown>>(
   payload: T,
-  componentManifest?: EditorComponentsManifest | null,
+  componentManifest?: BlockManifest | null,
   siteCapabilities?: SiteCapabilities
 ) {
   return {

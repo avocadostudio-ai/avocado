@@ -7,7 +7,7 @@ Activate this skill when adding a new block type to the site editor. This covers
 Most integration is **automatic** once a block is registered:
 
 1. **Schema**: Importing the block file triggers `registerBlock()` → adds to `allowedBlockTypes` array
-2. **Editor manifest**: `buildComponentsManifest()` iterates `allowedBlockTypes` → derives field metadata and JSON schema automatically → editor fetches via `/api/editor/components`
+2. **Editor manifest**: `buildBlockManifest()` iterates `allowedBlockTypes` → derives field metadata and JSON schema automatically → editor fetches via `/api/editor/blocks`
 3. **Property panel**: Editor reads `BlockMeta.fields` and `listFields` → generates inputs by `kind` (text, richtext, image, enum, color, etc.)
 4. **AI planner**: `blockContractsSummary()` iterates `allowedBlockTypes` → derives allowed/required/optional props from Zod schema → feeds into LLM prompt
 5. **Inline editing**: Preview adapter finds `data-editable-target` attributes → `isFieldInlineEditable()` checks field kind
@@ -348,7 +348,7 @@ pnpm typecheck   # Must pass — all workspaces
 pnpm test        # All tests should pass
 ```
 
-The existing `buildComponentsManifest` test in `apps/site/test/editor-components-manifest.test.ts` automatically validates that every registered block has a valid schema and valid default props. This means your new block is already covered — if the schema or defaults are wrong, this test will catch it.
+The existing `buildBlockManifest` test in `apps/site/test/block-manifest.test.ts` automatically validates that every registered block has a valid schema and valid default props. This means your new block is already covered — if the schema or defaults are wrong, this test will catch it.
 
 **If typecheck fails:** fix type errors in the schema or renderer, then re-run.
 **If tests fail:** check that `defaultProps` satisfies all required schema fields and that the `registerBlock()` call has correct metadata. Fix and re-run.

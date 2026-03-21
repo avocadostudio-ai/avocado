@@ -11,7 +11,7 @@ export type SiteCapabilities = {
   manifestStatus: "loading" | "ready" | "degraded"
   reason?: string
   manifestVersion?: number
-  componentCount?: number
+  blockCount?: number
   checkedAt: string
 }
 

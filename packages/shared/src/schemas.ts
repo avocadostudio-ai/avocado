@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { blockInstanceSchema, type BlockInstance } from "./blocks/_registry.ts"
+import { blockInstanceSchema, blockInstanceSchemaLenient, type BlockInstance } from "./blocks/_registry.ts"
 
 // ---------------------------------------------------------------------------
 // Site config
@@ -37,13 +37,24 @@ export const pageMetaSchema = z.object({
   ogImage: z.string().optional()
 })
 
-export const pageDocSchema: z.ZodType<PageDoc> = z.object({
+const pageDocFields = {
   id: z.string().min(1),
   slug: z.string().min(1),
   title: z.string().min(1),
   updatedAt: z.string().min(1),
-  blocks: z.array(blockInstanceSchema),
   meta: pageMetaSchema.optional()
+}
+
+/** Lenient — accepts any block type (for ingesting content from sites with custom blocks). */
+export const pageDocSchemaLenient: z.ZodType<PageDoc> = z.object({
+  ...pageDocFields,
+  blocks: z.array(blockInstanceSchemaLenient),
+})
+
+/** Strict — rejects block types not in the shared registry. */
+export const pageDocSchema: z.ZodType<PageDoc> = z.object({
+  ...pageDocFields,
+  blocks: z.array(blockInstanceSchema),
 })
 
 // ---------------------------------------------------------------------------

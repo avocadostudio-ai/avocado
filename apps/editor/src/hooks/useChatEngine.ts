@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
-  type EditorComponentsManifest,
+  type BlockManifest,
   type Operation
 } from "@ai-site-editor/shared"
 import type {
@@ -49,7 +49,7 @@ export type ChatEngineConfig = {
   setAvailableSlugs: (slugs: string[]) => void
   setIsLoadingSlugs: (loading: boolean) => void
   routeOptions: string[]
-  componentManifest?: EditorComponentsManifest | null
+  componentManifest?: BlockManifest | null
   siteCapabilities?: SiteCapabilities
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
@@ -266,7 +266,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       // Auto-bootstrap for new site namespaces with no draft pages.
       try {
-        const bootstrapSourceRes = await fetch(`${activeSiteOrigin}/api/editor/bootstrap-pages?siteId=${encodeURIComponent(siteId)}`)
+        const bootstrapSourceRes = await fetch(`${activeSiteOrigin}/api/editor/pages?siteId=${encodeURIComponent(siteId)}`)
         if (bootstrapSourceRes.ok) {
           const bootstrapSource = (await bootstrapSourceRes.json()) as { pages?: unknown }
           if (Array.isArray(bootstrapSource.pages) && bootstrapSource.pages.length > 0) {

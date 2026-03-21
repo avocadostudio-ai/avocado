@@ -24,13 +24,13 @@ export const GET = createDraftEnableHandler()
 import { createDraftDisableHandler } from "@ai-site-editor/site-sdk"
 export const GET = createDraftDisableHandler()
 
-// app/api/editor/components/route.ts
-import { createComponentsHandler } from "@ai-site-editor/site-sdk"
-export const { GET, OPTIONS } = createComponentsHandler()
+// app/api/editor/blocks/route.ts
+import { createBlocksHandler } from "@ai-site-editor/site-sdk"
+export const { GET, OPTIONS } = createBlocksHandler()
 
-// app/api/editor/bootstrap-pages/route.ts
-import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk"
-export const { GET, OPTIONS } = createBootstrapPagesHandler(() => fetchYourPublishedPages())
+// app/api/editor/pages/route.ts
+import { createPagesHandler } from "@ai-site-editor/site-sdk"
+export const { GET, OPTIONS } = createPagesHandler(() => fetchYourPublishedPages())
 ```
 
 The SDK handles secret validation, CORS headers, cookie management, and safe redirects automatically.
@@ -79,8 +79,8 @@ http://localhost:3000/api/draft/disable?redirect=%2Fpricing
 
 ## Minimal behavior checks
 
-1. `GET /api/editor/components` returns valid component manifest JSON.
-2. `GET /api/editor/bootstrap-pages` returns `{ pages: [...] }` with published pages.
+1. `GET /api/editor/blocks` returns valid block manifest JSON.
+2. `GET /api/editor/pages` returns `{ pages: [...] }` with published pages.
 3. Wrong secret returns `401` from `/api/draft`.
 4. Valid secret redirects and sets draft cookie.
 5. `/api/draft/disable` clears draft cookie and redirects.
@@ -93,9 +93,9 @@ Run these in the site project:
 ```bash
 pnpm typecheck
 pnpm test
-curl -s http://localhost:3000/api/editor/components | jq '.version, (.components | length)'
+curl -s http://localhost:3000/api/editor/blocks | jq '.version, (.blocks | length)'
 ```
 
 Expected:
-- manifest route returns `version` and non-zero component count
+- manifest route returns `version` and non-zero block count
 - editor header shows `Manifest` (not `Degraded`)

@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
+    "@ai-site-editor/preview-adapter": "workspace:*",
+    "@ai-site-editor/shared": "workspace:*",
+    "@ai-site-editor/site-sdk": "workspace:*",
     "next": "15.2.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

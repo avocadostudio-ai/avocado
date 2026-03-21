@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { editorComponentsManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
+import { blockManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, orchestrator, resolveSiteOrigin } from "../lib/editor-utils"
@@ -47,7 +47,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
 
       await Promise.all(
         dedupedSites.map(async (site) => {
-          const url = new URL(`${resolveSiteOrigin(site)}/api/editor/components`)
+          const url = new URL(`${resolveSiteOrigin(site)}/api/editor/blocks`)
           url.searchParams.set("siteId", site.id)
           try {
             const res = await fetch(url.toString())
@@ -64,7 +64,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               return
             }
             const json = (await res.json()) as unknown
-            const parsed = editorComponentsManifestSchema.safeParse(json)
+            const parsed = blockManifestSchema.safeParse(json)
             if (!parsed.success) {
               if (!active) return
               setCapabilityBySiteId((prev) => ({
@@ -77,7 +77,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               }))
               return
             }
-            const defaultsError = validateManifestDefaultProps(parsed.data.components)
+            const defaultsError = validateManifestDefaultProps(parsed.data.blocks)
             if (defaultsError) {
               if (!active) return
               setCapabilityBySiteId((prev) => ({
@@ -95,7 +95,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               ...prev,
               [site.id]: {
                 status: "ready",
-                summary: `${parsed.data.components.length} components found`
+                summary: `${parsed.data.blocks.length} blocks found`
               }
             }))
           } catch (error) {

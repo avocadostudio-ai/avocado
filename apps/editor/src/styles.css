@@ -34,7 +34,7 @@ body {
 .layout {
   height: 100vh;
   display: grid;
-  grid-template-columns: 1fr minmax(390px, 450px);
+  grid-template-columns: 1fr minmax(390px, clamp(450px, 20vw, 600px));
   column-gap: 10px;
   row-gap: 14px;
   padding: 0;

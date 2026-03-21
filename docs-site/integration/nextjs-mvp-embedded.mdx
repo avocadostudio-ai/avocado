@@ -16,12 +16,12 @@ Related:
 
 ## Required contract
 
-1. Add component manifest endpoint:
-- `GET /api/editor/components`
+1. Add block manifest endpoint:
+- `GET /api/editor/blocks`
 - returns available component types and prop schemas for safe ops
 - generated from adopter-owned component registry (recommended)
 
-The SDK's `createComponentsHandler()` generates this automatically from the block registry.
+The SDK's `createBlocksHandler()` generates this automatically from the block registry.
 
 2. Add Draft Mode entry and exit endpoints:
 - `GET /api/draft?secret=...&redirect=/target-path`
@@ -38,14 +38,14 @@ The SDK's `createComponentsHandler()` generates this automatically from the bloc
 5. Editor iframe/bootstrap URL pattern:
 - `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>?<context>`
 
-## Component manifest shape (MVP)
+## Block manifest shape (MVP)
 
 Example response:
 
 ```json
 {
   "version": 1,
-  "components": [
+  "blocks": [
     {
       "type": "Hero",
       "displayName": "Hero",
@@ -67,7 +67,7 @@ The editor does not infer components from DOM class names.
 It matches by stable component `type` IDs.
 
 Contract:
-1. Manifest entry: `components[].type`
+1. Manifest entry: `blocks[].type`
 2. Content block: `block.type`
 3. Site renderer registry key: same `type`
 
@@ -75,7 +75,7 @@ Example:
 
 ```json
 {
-  "components": [
+  "blocks": [
     { "type": "Hero", "propsSchema": { "type": "object" } },
     { "type": "FeatureGrid", "propsSchema": { "type": "object" } }
   ]
@@ -116,7 +116,7 @@ If a block type exists in content but not in manifest:
 ## 30-minute checklist
 
 1. Implement `/api/draft` and `/api/draft/disable`.
-2. Implement `/api/editor/components`.
+2. Implement `/api/editor/blocks`.
 3. Verify `/api/draft?secret=wrong` returns `401`.
 4. Verify `/api/draft?secret=valid&redirect=/` returns redirect + draft cookie.
 5. Verify public route (no draft cookie) does not call draft backend.

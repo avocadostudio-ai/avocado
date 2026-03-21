@@ -1,14 +1,14 @@
 import { applyEditorCors, createEditorCorsOptionsHandler } from "./editor-cors.ts"
-import { buildComponentsManifest, type EditorComponentsManifest } from "./editor-manifest.ts"
+import { buildBlockManifest, type BlockManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
 
-export function createComponentsHandler(options?: {
-  getManifest?: () => EditorComponentsManifest
+export function createBlocksHandler(options?: {
+  getManifest?: () => BlockManifest
 }): {
   GET: (request: Request) => Response
   OPTIONS: (request: Request) => Response
 } {
-  const getManifest = options?.getManifest ?? buildComponentsManifest
+  const getManifest = options?.getManifest ?? buildBlockManifest
   return {
     OPTIONS: createEditorCorsOptionsHandler(),
     GET(request: Request) {
@@ -22,7 +22,7 @@ export function createComponentsHandler(options?: {
   }
 }
 
-export function createBootstrapPagesHandler(
+export function createPagesHandler(
   getPages: () => PageDoc[]
 ): {
   GET: (request: Request) => Response

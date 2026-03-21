@@ -1,4 +1,4 @@
-import { pageDocSchema, siteConfigSchema } from "@ai-site-editor/shared"
+import { pageDocSchemaLenient, siteConfigSchema } from "@ai-site-editor/shared"
 import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
 
 export function getOrchestratorUrl(): string | null {
@@ -54,7 +54,7 @@ export async function fetchEditorPage(
       const res = await fetchWithTimeout(url, timeout)
       if (!res.ok) continue
       const payload = (await res.json()) as unknown
-      const parsed = pageDocSchema.safeParse(payload)
+      const parsed = pageDocSchemaLenient.safeParse(payload)
       if (parsed.success) return parsed.data
     } catch {
       // Try the next candidate.

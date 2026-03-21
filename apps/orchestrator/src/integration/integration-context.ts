@@ -1,4 +1,4 @@
-import { editorComponentsManifestSchema, type EditorComponentsManifest } from "@ai-site-editor/shared"
+import { blockManifestSchema, type BlockManifest } from "@ai-site-editor/shared"
 import { z } from "zod"
 
 export const siteCapabilitiesSchema = z.object({
@@ -6,14 +6,14 @@ export const siteCapabilitiesSchema = z.object({
   manifestStatus: z.enum(["loading", "ready", "degraded"]),
   reason: z.string().optional(),
   manifestVersion: z.number().int().positive().optional(),
-  componentCount: z.number().int().nonnegative().optional(),
+  blockCount: z.number().int().nonnegative().optional(),
   checkedAt: z.string()
 })
 
 export type SiteCapabilities = z.infer<typeof siteCapabilitiesSchema>
 
 type IntegrationContextInput = {
-  componentsManifest?: EditorComponentsManifest | string
+  componentsManifest?: BlockManifest | string
   siteCapabilities?: SiteCapabilities | string
 }
 
@@ -21,7 +21,7 @@ type IntegrationContextParseResult =
   | {
       ok: true
       data: {
-        componentsManifest?: EditorComponentsManifest
+        componentsManifest?: BlockManifest
         siteCapabilities?: SiteCapabilities
       }
     }
@@ -46,7 +46,7 @@ export function parseIntegrationContext(input: IntegrationContextInput): Integra
     manifestPayload === "__invalid_json__"
       ? { success: false as const }
       : manifestPayload
-        ? editorComponentsManifestSchema.safeParse(manifestPayload)
+        ? blockManifestSchema.safeParse(manifestPayload)
         : { success: true as const, data: undefined }
   if (!parsedManifest.success) {
     return { ok: false, error: "invalid componentsManifest payload" }

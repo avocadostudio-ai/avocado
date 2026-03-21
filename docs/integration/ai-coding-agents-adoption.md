@@ -36,25 +36,25 @@ import { createDraftDisableHandler } from "@ai-site-editor/site-sdk"
 export const GET = createDraftDisableHandler()
 ```
 
-**`app/api/editor/components/route.ts`** — Serves component manifest to the editor
+**`app/api/editor/blocks/route.ts`** — Serves block manifest to the editor
 ```ts
-import { createComponentsHandler } from "@ai-site-editor/site-sdk"
+import { createBlocksHandler } from "@ai-site-editor/site-sdk"
 
-export const { GET, OPTIONS } = createComponentsHandler()
+export const { GET, OPTIONS } = createBlocksHandler()
 ```
 
-**`app/api/editor/bootstrap-pages/route.ts`** — Feeds published pages to the editor
+**`app/api/editor/pages/route.ts`** — Feeds published pages to the editor
 ```ts
-import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk"
+import { createPagesHandler } from "@ai-site-editor/site-sdk"
 
-export const { GET, OPTIONS } = createBootstrapPagesHandler(() => {
+export const { GET, OPTIONS } = createPagesHandler(() => {
   // Return your published pages here.
   // Each page must match: { id, slug, title, blocks: [{ id, type, props }] }
   return getYourPublishedPages()
 })
 ```
 
-The `createBootstrapPagesHandler` callback must return an array of `PageDoc` objects. Implement this to read from your CMS, database, or filesystem.
+The `createPagesHandler` callback must return an array of `PageDoc` objects. Implement this to read from your CMS, database, or filesystem.
 
 ## Step 3: Create a content loading module
 
@@ -156,15 +156,15 @@ Run these checks:
 # 1. Start all apps
 pnpm dev
 
-# 2. Check manifest endpoint returns components
-curl -s http://localhost:3000/api/editor/components | jq '.version, (.components | length)'
+# 2. Check manifest endpoint returns blocks
+curl -s http://localhost:3000/api/editor/blocks | jq '.version, (.blocks | length)'
 
 # 3. Check draft mode rejects bad secret
 curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/api/draft?secret=wrong&redirect=/"
 # Expected: 401
 
-# 4. Check bootstrap-pages returns your pages
-curl -s http://localhost:3000/api/editor/bootstrap-pages | jq '.pages | length'
+# 4. Check pages returns your pages
+curl -s http://localhost:3000/api/editor/pages | jq '.pages | length'
 ```
 
 Then open `http://localhost:4100` (the editor) — the editor header should show `Manifest` (not `Degraded`).
@@ -199,7 +199,7 @@ The editor matches blocks by stable `type` IDs — not by DOM class names or CSS
 
 Three things must share the same type string:
 
-1. **Manifest** (`/api/editor/components`): `components[].type`
+1. **Manifest** (`/api/editor/blocks`): `blocks[].type`
 2. **Content** (your `PageDoc`): `block.type`
 3. **Renderer** (your React code): the key you use to look up which component to render
 
@@ -243,7 +243,7 @@ The SDK ships with 12 built-in block types. If you use these type strings, the m
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Editor shows "Degraded" | `/api/editor/components` not responding or returning invalid JSON | Verify the route file exists and returns `{ version: 1, components: [...] }` |
+| Editor shows "Degraded" | `/api/editor/blocks` not responding or returning invalid JSON | Verify the route file exists and returns `{ version: 1, blocks: [...] }` |
 | Blocks don't highlight on hover | Missing `getPreviewWrapperProps()` on block wrapper div | Add `{...getPreviewWrapperProps(editorMode, block.id, block.type)}` to each block's container |
 | Draft mode doesn't activate | `DRAFT_MODE_SECRET` mismatch or missing | Ensure site and editor share the same secret value |
 | Editor can't reach site | CORS blocked | SDK handlers add CORS headers automatically — check that `NEXT_PUBLIC_EDITOR_ORIGIN` is set |
@@ -263,9 +263,9 @@ your-nextjs-site/
 │       │       └── route.ts      ← createDraftDisableHandler()
 │       └── editor/
 │           ├── components/
-│           │   └── route.ts      ← createComponentsHandler()
-│           └── bootstrap-pages/
-│               └── route.ts      ← createBootstrapPagesHandler(cb)
+│           │   └── route.ts      ← createBlocksHandler()
+│           └── pages/
+│               └── route.ts      ← createPagesHandler(cb)
 ├── lib/
 │   └── content.ts                ← fetchEditorPage / fetchEditorSlugs from SDK
 └── .env                          ← DRAFT_MODE_SECRET

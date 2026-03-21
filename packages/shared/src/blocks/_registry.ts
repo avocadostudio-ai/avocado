@@ -233,10 +233,16 @@ export function defaultListItemForBlock(type: BlockType, listKey: string): Recor
   return item
 }
 
-export const blockInstanceSchema = z.object({
+/** Base schema — accepts any block type. Used for ingesting external site content with custom blocks. */
+export const blockInstanceSchemaLenient = z.object({
   id: z.string().min(1),
-  type: z.string().min(1).refine((t) => t in _blockSchemas, { message: "Unknown block type" }),
+  type: z.string().min(1),
   props: z.record(z.string(), z.unknown())
+})
+
+/** Strict variant — rejects block types not in the shared registry. */
+export const blockInstanceSchema = blockInstanceSchemaLenient.extend({
+  type: z.string().min(1).refine((t) => t in _blockSchemas, { message: "Unknown block type" }),
 })
 
 export function validateBlockProps(type: string, props: unknown) {

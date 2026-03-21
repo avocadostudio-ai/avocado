@@ -52,12 +52,11 @@
 
 .site-nav-links-desktop a:hover {
   color: var(--text-100, #18181b);
-  background: var(--bg-200, #f4f4f5);
 }
 
 .site-nav-links-desktop a.is-active {
   color: var(--text-100, #18181b);
-  background: var(--bg-200, #f4f4f5);
+  font-weight: 600;
 }
 
 /* Theme toggle */

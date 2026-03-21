@@ -17,7 +17,7 @@ import { useMediaInput } from "./hooks/useMediaInput"
 import { useBlockProps } from "./hooks/useBlockProps"
 import { usePageMeta } from "./hooks/usePageMeta"
 import { PropertyPanel } from "./components/PropertyPanel"
-import { useComponentManifest } from "./hooks/useComponentManifest"
+import { useBlockManifest } from "./hooks/useBlockManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
@@ -390,7 +390,7 @@ function EditorPage({
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const { activeSiteConfig } = sites
   const activeSiteOrigin = useMemo(() => resolveSiteOrigin(activeSiteConfig), [activeSiteConfig])
-  const componentManifest = useComponentManifest(activeSiteOrigin)
+  const componentManifest = useBlockManifest(activeSiteOrigin)
 
   const [slug, setSlug] = useState("/")
   const [availableSlugs, setAvailableSlugs] = useState<string[]>(["/"])
@@ -447,8 +447,8 @@ function EditorPage({
 
   const blockTypeOptions = useMemo(() => {
     if (!componentManifest.allowStructuralEdits) return []
-    if (componentManifest.components.length > 0) {
-      return componentManifest.components
+    if (componentManifest.blocks.length > 0) {
+      return componentManifest.blocks
         .map((item) => ({
           type: item.type,
           label: item.displayName ?? item.type,
@@ -464,7 +464,7 @@ function EditorPage({
         category: meta[type]?.category ?? "content"
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [componentManifest.allowStructuralEdits, componentManifest.components])
+  }, [componentManifest.allowStructuralEdits, componentManifest.blocks])
 
   const groupedBlockTypeOptions = useMemo(() => {
     const query = addBlockSearch.trim().toLowerCase()
@@ -1547,6 +1547,8 @@ function EditorPage({
             void chatEngine.addListItem(slug, activeBlockId, activeBlockType, listKey)
               .then(() => blockProps.refetch())
           } : undefined}
+          manifestByType={componentManifest.byType}
+          siteOrigin={activeSiteOrigin}
         />
 
         <div

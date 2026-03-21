@@ -1,29 +1,29 @@
 import { getBlockJsonSchema, getBlockMeta, allowedBlockTypes, defaultPropsForType } from "@ai-site-editor/shared"
 import {
-  editorComponentSchema,
-  editorComponentsManifestSchema,
+  blockDefinitionSchema,
+  blockManifestSchema,
   validateByJsonSchemaLike,
   validateManifestDefaultProps,
-  type EditorComponentDefinition,
-  type EditorComponentsManifest
+  type BlockDefinition,
+  type BlockManifest
 } from "@ai-site-editor/shared"
 
 export {
-  editorComponentSchema,
-  editorComponentsManifestSchema,
+  blockDefinitionSchema,
+  blockManifestSchema,
   validateByJsonSchemaLike,
   validateManifestDefaultProps,
-  type EditorComponentDefinition,
-  type EditorComponentsManifest
+  type BlockDefinition,
+  type BlockManifest
 }
 
 // --- Manifest builder (cached) ---
 
-let cachedManifest: EditorComponentsManifest | undefined
+let cachedManifest: BlockManifest | undefined
 
-export function buildComponentsManifest(): EditorComponentsManifest {
+export function buildBlockManifest(): BlockManifest {
   if (cachedManifest) return cachedManifest
-  const components: EditorComponentDefinition[] = allowedBlockTypes.map((type) => {
+  const blocks: BlockDefinition[] = allowedBlockTypes.map((type) => {
     const meta = getBlockMeta(type)
     const propsSchema = getBlockJsonSchema(type)
     if (!propsSchema) throw new Error(`Missing JSON schema for block type: ${type}`)
@@ -34,6 +34,6 @@ export function buildComponentsManifest(): EditorComponentsManifest {
       defaultProps: defaultPropsForType(type)
     }
   })
-  cachedManifest = { version: 1, components }
+  cachedManifest = { version: 1, blocks }
   return cachedManifest
 }

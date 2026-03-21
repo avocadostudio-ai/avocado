@@ -173,7 +173,7 @@ describe("ops-engine: add_block", () => {
         props: { title: "T", description: "D", ctaText: "Go" } as Record<string, unknown>
       }
     }
-    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /does not match component manifest schema/)
+    await assert.rejects(() => applyOpsAtomically(TEST_SESSION, [op], { componentsManifest: CTA_ONLY_MANIFEST }), /does not match block manifest schema/)
   })
 
   it("coerces numeric values to strings for Table rows", async () => {
