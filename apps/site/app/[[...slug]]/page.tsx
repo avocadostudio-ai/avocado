@@ -3,7 +3,7 @@ import { draftMode } from "next/headers"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { buildSlug, single } from "@ai-site-editor/site-sdk"
-import { resolveDraftContext, isTileMode } from "@ai-site-editor/site-sdk/draft"
+import { resolveEditorContext } from "@ai-site-editor/site-sdk/draft"
 import { SitePageContent } from "../../components/site-page-content"
 import { EditorPageWrapper } from "../../components/editor-wrapper"
 import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../../lib/content"
@@ -65,7 +65,7 @@ export default async function SitePage({ params, searchParams }: PageProps) {
 
   // Resolve editor context (null when editor disabled or not in draft mode)
   const editorCtx = EDITOR_ENABLED
-    ? await resolveDraftContext(resolvedSearch, {
+    ? await resolveEditorContext(resolvedSearch, {
         defaultSession: DEFAULT_SESSION,
         defaultSiteId: DEFAULT_SITE_ID,
         defaultEditorOrigin: process.env.NEXT_PUBLIC_EDITOR_ORIGIN?.replace(/\/+$/, "")
@@ -170,15 +170,13 @@ export default async function SitePage({ params, searchParams }: PageProps) {
     return <SitePageContent page={page} chromeHeader={chromeHeader} />
   }
 
-  // Editor mode: wrapper with overlays, block selection, tile mode
-  const tileMode = isTileMode(resolvedSearch)
+  // Editor mode: wrapper with overlays and block selection
   return (
     <EditorPageWrapper
       page={page}
       chromeHeader={chromeHeader}
       slug={slug}
       editorOrigin={editorOrigin}
-      tileMode={tileMode}
     />
   )
 }

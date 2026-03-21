@@ -61,21 +61,21 @@ The `createBootstrapPagesHandler` takes a callback that returns your published p
 
 ## Step 2: Wire draft content loading
 
-Use `fetchDraftPage` and `fetchDraftSlugs` from the SDK to load draft content from the orchestrator:
+Use `fetchEditorPage` and `fetchEditorSlugs` from the SDK to load draft content from the orchestrator:
 
 ```ts
 // lib/content.ts
-import { fetchDraftPage, fetchDraftSlugs } from "@ai-site-editor/site-sdk"
+import { fetchEditorPage, fetchEditorSlugs } from "@ai-site-editor/site-sdk/draft"
 import { getPublishedPage, getPublishedSlugs } from "./published-content-api"
 
 export async function getPage(slug: string, isDraft: boolean, session: string, siteId: string) {
-  if (isDraft) return fetchDraftPage(slug, session, siteId)
+  if (isDraft) return fetchEditorPage(slug, session, siteId)
   return getPublishedPage(slug)
 }
 
 export async function getNavSlugs(isDraft: boolean, session: string, siteId: string) {
   if (isDraft) {
-    const slugs = await fetchDraftSlugs(session, siteId)
+    const slugs = await fetchEditorSlugs(session, siteId)
     if (slugs.length > 0) return slugs
   }
   return getPublishedSlugs()
@@ -84,15 +84,14 @@ export async function getNavSlugs(isDraft: boolean, session: string, siteId: str
 
 ## Step 3: Add editor integration to your page
 
-Use `resolveDraftContext` to detect editor sessions, and SDK UI components for the preview overlay:
+Use `resolveEditorContext` to detect editor sessions, and SDK UI components for the preview overlay:
 
 ```tsx
 // app/[[...slug]]/page.tsx
 import { draftMode } from "next/headers"
-import {
-  resolveDraftContext, isTileMode, buildSlug,
-  TileModeStyles, EditorOverlay, getPreviewWrapperProps, BlockErrorBoundary
-} from "@ai-site-editor/site-sdk"
+import { buildSlug } from "@ai-site-editor/site-sdk"
+import { resolveEditorContext } from "@ai-site-editor/site-sdk/draft"
+import { renderBlocks, EditorOverlay } from "@ai-site-editor/site-sdk/editor"
 
 export default async function SitePage({ params, searchParams }) {
   const draft = await draftMode()
@@ -101,30 +100,22 @@ export default async function SitePage({ params, searchParams }) {
   const slug = buildSlug(resolvedParams.slug)
 
   // Resolve editor context from search params and cookies
-  const editorCtx = await resolveDraftContext(resolvedSearch, {
+  const editorCtx = await resolveEditorContext(resolvedSearch, {
     defaultSession: "dev",
     defaultSiteId: "my-site"
   })
 
   const editorMode = draft.isEnabled || !!editorCtx
-  const tileMode = editorMode && isTileMode(resolvedSearch)
 
   const page = await getPage(slug, editorMode, editorCtx?.session ?? "dev", editorCtx?.siteId ?? "my-site")
   if (!page) return <main><h1>Not found</h1></main>
 
   return (
     <>
-      {tileMode && <TileModeStyles />}
       <main>
-        {page.blocks.map((block) => (
-          <div key={block.id} {...getPreviewWrapperProps(editorMode, block.id, block.type)}>
-            <BlockErrorBoundary blockId={block.id} blockType={block.type}>
-              {/* your block renderer */}
-            </BlockErrorBoundary>
-          </div>
-        ))}
+        {renderBlocks(page.blocks, { editable: editorMode })}
       </main>
-      {editorMode && !tileMode && (
+      {editorMode && (
         <EditorOverlay slug={slug} editorOrigin={editorCtx?.editorOrigin ?? ""} />
       )}
     </>
@@ -133,13 +124,10 @@ export default async function SitePage({ params, searchParams }) {
 ```
 
 Key SDK utilities used:
-- `resolveDraftContext()` — resolves session/siteId/editorOrigin from search params and cookies
-- `isTileMode()` — detects tile mode for hiding header/footer in editor preview
+- `resolveEditorContext()` — resolves session/siteId/editorOrigin from search params and cookies
 - `buildSlug()` — converts route params array to slug string (e.g., `["pricing"]` → `"/pricing"`)
-- `getPreviewWrapperProps()` — adds data attributes for the editor's block selection overlay
+- `renderBlocks()` — renders blocks with error boundaries; pass `{ editable: true }` to add editor selection attributes
 - `EditorOverlay` — renders the PostMessage bridge for editor ↔ site communication
-- `BlockErrorBoundary` — catches render errors per-block so one broken block doesn't crash the page
-- `TileModeStyles` — injects CSS to hide header/footer when previewing in tile mode
 
 ## Component manifest shape (MVP)
 
@@ -191,7 +179,7 @@ If a block type exists in content but not in manifest:
 
 1. Install `@ai-site-editor/site-sdk`.
 2. Create 4 API route files using SDK handler factories.
-3. Wire `resolveDraftContext()` and `fetchDraftPage()` into page data loading.
+3. Wire `resolveEditorContext()` and `fetchEditorPage()` into page data loading.
 4. Add `EditorOverlay`, `BlockErrorBoundary`, and `getPreviewWrapperProps()` to page renderer.
 5. Set `DRAFT_MODE_SECRET` env var.
 6. Verify `/api/draft?secret=wrong` returns `401`.

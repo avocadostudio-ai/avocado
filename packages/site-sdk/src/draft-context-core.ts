@@ -1,5 +1,6 @@
 import type { DraftContext, SearchParamsRecord } from "./types.ts"
 import { DRAFT_SESSION_COOKIE, DRAFT_SITE_COOKIE, EDITOR_ORIGIN_COOKIE, normalizeOrigin } from "./draft-common.ts"
+import { single } from "./draft-context.ts"
 
 export { single } from "./draft-context.ts"
 
@@ -17,10 +18,6 @@ export async function resolveDraftContextCore(
     defaultEditorOrigin?: string
   }
 ): Promise<DraftContext | null> {
-  function single(value: string | string[] | undefined): string | undefined {
-    return typeof value === "string" ? value : undefined
-  }
-
   const isDev = process.env.NODE_ENV !== "production"
   const isEditorParam = single(searchParams.__editor) === "1"
   const isContentStoreEnabled = isDev || adapter.isDraftMode || isEditorParam
@@ -42,8 +39,4 @@ export async function resolveDraftContextCore(
     ?? defaultEditorOrigin
 
   return { session, siteId, editorOrigin }
-}
-
-export function isTileModeCore(searchParams: SearchParamsRecord): boolean {
-  return (typeof searchParams.__tile === "string" ? searchParams.__tile : undefined) === "1"
 }

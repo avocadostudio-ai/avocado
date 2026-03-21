@@ -1,6 +1,6 @@
 export { SharedBlockRenderer } from "./renderer"
 export { BlockCatalogue } from "./catalogue"
-export { BlocksInitClient } from "./blocks-init-client"
+export { BlocksHydrator } from "./blocks-hydrator"
 export { BlockErrorBoundary } from "./block-error-boundary"
 export { rendererTypes } from "./blocks/index"
 export type { BlockImageProps } from "./blocks/block-image"

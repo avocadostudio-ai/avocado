@@ -24,17 +24,17 @@ See [nextjs-mvp-embedded.md](nextjs-mvp-embedded.md) for the full code for each 
 ## Example: `lib/content.ts`
 
 ```ts
-import { fetchDraftPage, fetchDraftSlugs } from "@ai-site-editor/site-sdk"
+import { fetchEditorPage, fetchEditorSlugs } from "@ai-site-editor/site-sdk/draft"
 import { getPublishedPage, getPublishedSlugs } from "./published-content-api"
 
 export async function getPage(slug: string, isDraft: boolean, session: string, siteId: string) {
-  if (isDraft) return fetchDraftPage(slug, session, siteId)
+  if (isDraft) return fetchEditorPage(slug, session, siteId)
   return getPublishedPage(slug)
 }
 
 export async function getNavSlugs(isDraft: boolean, session: string, siteId: string) {
   if (isDraft) {
-    const slugs = await fetchDraftSlugs(session, siteId)
+    const slugs = await fetchEditorSlugs(session, siteId)
     if (slugs.length > 0) return slugs
   }
   return getPublishedSlugs()
@@ -45,13 +45,11 @@ export async function getNavSlugs(isDraft: boolean, session: string, siteId: str
 
 ```tsx
 import { draftMode } from "next/headers"
-import {
-  resolveDraftContext, isTileMode, single, buildSlug,
-  TileModeStyles, EditorOverlay, getPreviewWrapperProps, BlockErrorBoundary
-} from "@ai-site-editor/site-sdk"
+import { buildSlug } from "@ai-site-editor/site-sdk"
+import { resolveEditorContext } from "@ai-site-editor/site-sdk/draft"
+import { renderBlocks, EditorOverlay } from "@ai-site-editor/site-sdk/editor"
 import { getPage, getNavSlugs } from "@/lib/content"
 import { getPublishedPage } from "@/lib/published-content-api"
-import { MyBlockRenderer } from "@/components/block-renderer"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -65,13 +63,12 @@ export default async function SitePage({ params, searchParams }: PageProps) {
   const slug = buildSlug(resolvedParams.slug)
 
   // Resolve editor context from search params and cookies
-  const editorCtx = await resolveDraftContext(resolvedSearch, {
+  const editorCtx = await resolveEditorContext(resolvedSearch, {
     defaultSession: "dev",
     defaultSiteId: "my-site"
   })
 
   const editorMode = draft.isEnabled || !!editorCtx
-  const tileMode = editorMode && isTileMode(resolvedSearch)
   const session = editorCtx?.session ?? "dev"
   const siteId = editorCtx?.siteId ?? "my-site"
 
@@ -81,17 +78,10 @@ export default async function SitePage({ params, searchParams }: PageProps) {
 
   return (
     <>
-      {tileMode && <TileModeStyles />}
       <main>
-        {page.blocks.map((block) => (
-          <div key={block.id} {...getPreviewWrapperProps(editorMode, block.id, block.type)}>
-            <BlockErrorBoundary blockId={block.id} blockType={block.type}>
-              <MyBlockRenderer block={block} />
-            </BlockErrorBoundary>
-          </div>
-        ))}
+        {renderBlocks(page.blocks, { editable: editorMode })}
       </main>
-      {editorMode && !tileMode && (
+      {editorMode && (
         <EditorOverlay slug={slug} editorOrigin={editorCtx?.editorOrigin ?? ""} />
       )}
     </>

@@ -77,8 +77,8 @@ Internal workspace deps use `workspace:*` protocol (not versioned specifiers lik
 **Catch-all page:** `apps/site/app/[[...slug]]/page.tsx` — `force-dynamic`, no cache. Detects editor mode via `?__editor=1`.
 
 **Data fetching:** `apps/site/lib/content-api.ts`
-- `fetchDraftPage(slug, session, siteId)` — `GET /draft/pages` from orchestrator; falls back to `published-content.json`
-- `fetchDraftSlugs(session, siteId)` — `GET /draft/slugs`; falls back to static list
+- `fetchEditorPage(slug, session, siteId)` — `GET /draft/pages` from orchestrator; falls back to `published-content.json`
+- `fetchEditorSlugs(session, siteId)` — `GET /draft/slugs`; falls back to static list
 
 **Block rendering:** `apps/site/components/block-renderer.tsx` — wraps `SharedBlockRenderer` from `@ai-site-editor/blocks` in a `<div>` with `data-block-id`, `data-block-type`, `class="editor-selectable"` when in editor mode.
 

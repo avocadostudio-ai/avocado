@@ -24,9 +24,7 @@
               "integration/index",
               "integration/editor-quickstart",
               "integration/nextjs-mvp-embedded",
-              "integration/nextjs-mvp-adoption-example",
-              "integration/tools-mvp",
-              "integration/templates/nextjs-embedded/index"
+              "integration/tools-mvp"
             ]
           }
         ]

@@ -19,7 +19,7 @@ function hasOrchestratorUrl(): boolean {
 let draftFetchersPromise: ReturnType<typeof loadDraftFetchers> | null = null
 function loadDraftFetchers() {
   return import("@ai-site-editor/site-sdk/draft").then(
-    ({ fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig }) => ({ fetchDraftPage, fetchDraftSlugs, fetchDraftSiteConfig })
+    ({ fetchEditorPage, fetchEditorSlugs, fetchEditorSiteConfig }) => ({ fetchEditorPage, fetchEditorSlugs, fetchEditorSiteConfig })
   )
 }
 function getDraftFetchers() {
@@ -34,8 +34,8 @@ export async function getPage(
   siteId: string
 ): Promise<PageDoc | null> {
   if (source === "draft") {
-    const { fetchDraftPage } = await getDraftFetchers()
-    return fetchDraftPage(slug, session, siteId)
+    const { fetchEditorPage } = await getDraftFetchers()
+    return fetchEditorPage(slug, session, siteId)
   }
   return getPublishedPage(slug)
 }
@@ -46,8 +46,8 @@ export async function getNavSlugs(
   siteId: string
 ): Promise<string[]> {
   if (source === "draft") {
-    const { fetchDraftSlugs } = await getDraftFetchers()
-    const slugs = await fetchDraftSlugs(session, siteId)
+    const { fetchEditorSlugs } = await getDraftFetchers()
+    const slugs = await fetchEditorSlugs(session, siteId)
     if (slugs.length > 0) return slugs
   }
   return getPublishedSlugs()
@@ -59,8 +59,8 @@ export async function getSiteConfig(
   siteId: string
 ): Promise<SiteConfig> {
   if (source === "draft") {
-    const { fetchDraftSiteConfig } = await getDraftFetchers()
-    return fetchDraftSiteConfig(session, siteId)
+    const { fetchEditorSiteConfig } = await getDraftFetchers()
+    return fetchEditorSiteConfig(session, siteId)
   }
   return getPublishedSiteConfig()
 }
