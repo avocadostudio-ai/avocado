@@ -3,14 +3,7 @@
 }
 
 .two-column__inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 32px;
-  align-items: center;
-}
-
-.two-column--image-left .two-column__media {
-  order: -1;
 }
 
 .two-column__text h2 {
@@ -79,19 +72,11 @@
 }
 
 .two-column__media img {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: cover;
   border-radius: var(--radius-btn);
   background: var(--placeholder-img);
 }
 
 @media (max-width: 900px) {
-  .two-column__inner {
-    grid-template-columns: 1fr;
-  }
-
   .two-column--image-left .two-column__media {
     order: 0;
   }
