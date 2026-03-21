@@ -7,9 +7,7 @@ import { resolveEditorContext, fetchEditorPage } from "@ai-site-editor/site-sdk/
 import { renderBlocks, EditorOverlay } from "@ai-site-editor/site-sdk/editor"
 import pagesData from "../../content/pages.json"
 
-type PageData = { title: string; blocks: BlockInstance[] }
-
-const pages: Record<string, PageData> = pagesData
+const pages: Record<string, { blocks: BlockInstance[] }> = pagesData
 
 const DEFAULT_SESSION = "dev"
 const DEFAULT_SITE_ID = "sample-site"
@@ -49,7 +47,6 @@ export default async function Page({ params, searchParams }: PageProps) {
     if (draftPage) {
       pageBlocks = draftPage.blocks
     } else {
-      // Fall back to static content if orchestrator is unreachable
       const staticPage = pages[slug]
       if (!staticPage) {
         return (

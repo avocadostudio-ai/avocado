@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify"
 import { z } from "zod"
-import { editorComponentsManifestSchema, operationSchema, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
+import { blockManifestSchema, operationSchema, type BlockManifest, type PageDoc } from "@ai-site-editor/shared"
 import {
   scopedSessionKey,
   getPage,
@@ -24,7 +24,7 @@ import type { RouteContext } from "./route-context.js"
 type ApplyOpsRequestBody = {
   session?: string
   siteId?: string
-  componentsManifest?: EditorComponentsManifest | string
+  componentsManifest?: BlockManifest | string
   siteCapabilities?: SiteCapabilities | string
   ops?: unknown
 }
@@ -49,7 +49,7 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
       manifestPayload === "__invalid_json__"
         ? { success: false as const }
         : manifestPayload
-          ? editorComponentsManifestSchema.safeParse(manifestPayload)
+          ? blockManifestSchema.safeParse(manifestPayload)
           : { success: true as const, data: undefined }
     if (!parsedManifest.success) return reply.code(400).send({ error: "invalid componentsManifest payload" })
     const capabilitiesPayload = (() => {

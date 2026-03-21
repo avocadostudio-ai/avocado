@@ -1,4 +1,4 @@
-import type { PageDoc, EditorComponentsManifest } from "@ai-site-editor/shared"
+import type { PageDoc, BlockManifest } from "@ai-site-editor/shared"
 import {
   draftPages,
   historyUndo,
@@ -96,9 +96,9 @@ export function makeFeaturePage(): PageDoc {
 // Manifest fixtures
 // ---------------------------------------------------------------------------
 
-export const CTA_ONLY_MANIFEST: EditorComponentsManifest = {
+export const CTA_ONLY_MANIFEST: BlockManifest = {
   version: 1,
-  components: [
+  blocks: [
     {
       type: "CTA",
       propsSchema: {

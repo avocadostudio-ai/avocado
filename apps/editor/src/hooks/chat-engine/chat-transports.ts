@@ -1,4 +1,4 @@
-import type { EditorComponentsManifest, Operation } from "@ai-site-editor/shared"
+import type { BlockManifest, Operation } from "@ai-site-editor/shared"
 import type {
   AIProvider,
   AssistantResponse,
@@ -27,7 +27,7 @@ type CreateChatTransportsArgs = {
   activeSiteConfig: SiteConfig
   modelKey: ModelKey
   provider: AIProvider
-  componentManifest?: EditorComponentsManifest | null
+  componentManifest?: BlockManifest | null
   siteCapabilities?: SiteCapabilities
   activeBlockIdRef: Ref<string | undefined>
   activeBlockTypeRef: Ref<string | undefined>

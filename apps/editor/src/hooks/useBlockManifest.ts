@@ -1,27 +1,27 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  editorComponentsManifestSchema,
+  blockManifestSchema,
   validateManifestDefaultProps,
-  type EditorComponentDefinition,
-  type EditorComponentsManifest
+  type BlockDefinition,
+  type BlockManifest
 } from "@ai-site-editor/shared"
 import { siteOrigin } from "../lib/editor-utils"
 
 type ManifestStatus = "loading" | "ready" | "degraded"
 const MANIFEST_RETRY_MS = 3000
 
-export type ComponentManifestState = {
+export type BlockManifestState = {
   status: ManifestStatus
-  components: EditorComponentDefinition[]
+  blocks: BlockDefinition[]
   version?: number
-  manifest: EditorComponentsManifest | null
+  manifest: BlockManifest | null
   reason?: string
 }
 
-export function useComponentManifest(origin?: string) {
-  const [state, setState] = useState<ComponentManifestState>({
+export function useBlockManifest(origin?: string) {
+  const [state, setState] = useState<BlockManifestState>({
     status: "loading",
-    components: [],
+    blocks: [],
     manifest: null
   })
 
@@ -32,12 +32,12 @@ export function useComponentManifest(origin?: string) {
     const run = async () => {
       try {
         const base = origin || siteOrigin
-        const res = await fetch(`${base}/api/editor/components`)
+        const res = await fetch(`${base}/api/editor/blocks`)
         if (!res.ok) {
           if (!active) return
           setState({
             status: "degraded",
-            components: [],
+            blocks: [],
             manifest: null,
             reason: `Manifest endpoint returned ${res.status}`
           })
@@ -47,12 +47,12 @@ export function useComponentManifest(origin?: string) {
           return
         }
         const payload = (await res.json()) as unknown
-        const parsed = editorComponentsManifestSchema.safeParse(payload)
+        const parsed = blockManifestSchema.safeParse(payload)
         if (!parsed.success) {
           if (!active) return
           setState({
             status: "degraded",
-            components: [],
+            blocks: [],
             manifest: null,
             reason: "Manifest response shape is invalid"
           })
@@ -62,12 +62,12 @@ export function useComponentManifest(origin?: string) {
           return
         }
 
-        const defaultValidationError = validateManifestDefaultProps(parsed.data.components)
+        const defaultValidationError = validateManifestDefaultProps(parsed.data.blocks)
         if (defaultValidationError) {
           if (!active) return
           setState({
             status: "degraded",
-            components: [],
+            blocks: [],
             manifest: null,
             reason: defaultValidationError
           })
@@ -80,7 +80,7 @@ export function useComponentManifest(origin?: string) {
         if (!active) return
         setState({
           status: "ready",
-          components: parsed.data.components,
+          blocks: parsed.data.blocks,
           version: parsed.data.version,
           manifest: parsed.data
         })
@@ -88,7 +88,7 @@ export function useComponentManifest(origin?: string) {
         if (!active) return
         setState({
           status: "degraded",
-          components: [],
+          blocks: [],
           manifest: null,
           reason: error instanceof Error ? error.message : "Manifest fetch failed"
         })
@@ -106,12 +106,12 @@ export function useComponentManifest(origin?: string) {
   }, [origin])
 
   const byType = useMemo(() => {
-    const map = new Map<string, EditorComponentDefinition>()
-    for (const component of state.components) {
-      map.set(component.type, component)
+    const map = new Map<string, BlockDefinition>()
+    for (const block of state.blocks) {
+      map.set(block.type, block)
     }
     return map
-  }, [state.components])
+  }, [state.blocks])
 
   return {
     ...state,
@@ -121,7 +121,7 @@ export function useComponentManifest(origin?: string) {
       manifestStatus: state.status,
       reason: state.reason,
       manifestVersion: state.version,
-      componentCount: state.components.length,
+      blockCount: state.blocks.length,
       checkedAt: new Date().toISOString()
     },
     allowStructuralEdits: state.status === "ready"

@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
 import {
-  editorComponentsManifestSchema,
+  blockManifestSchema,
   type EditPlan,
-  type EditorComponentsManifest,
+  type BlockManifest,
   type Operation,
   type PageDoc
 } from "@ai-site-editor/shared"
@@ -365,12 +365,12 @@ export async function runChatPipeline(
     manifestPayload === "__invalid_json__"
       ? { success: false as const }
       : manifestPayload
-        ? editorComponentsManifestSchema.safeParse(manifestPayload)
+        ? blockManifestSchema.safeParse(manifestPayload)
         : { success: true as const, data: undefined }
   if (!parsedManifest.success) {
     return { code: 400, payload: { error: "invalid componentsManifest payload" } }
   }
-  const componentsManifest: EditorComponentsManifest | undefined = parsedManifest.data
+  const componentsManifest: BlockManifest | undefined = parsedManifest.data
   const capabilitiesPayload = (() => {
     if (!body.siteCapabilities) return undefined
     if (typeof body.siteCapabilities !== "string") return body.siteCapabilities
@@ -1490,7 +1490,7 @@ export async function runChatPipeline(
           payload: withDebugPayload({
             status: "needs_clarification",
             summary: `Structural edits are disabled for this site context.${reason}`,
-            changes: ["Expose GET /api/editor/components with a valid manifest to enable structural operations."],
+            changes: ["Expose GET /api/editor/blocks with a valid manifest to enable structural operations."],
             mentionedSlugs: [effectiveSlug],
             previewVersion: versions.get(body.session!) ?? 0,
             plannerSource: source,
@@ -2442,7 +2442,7 @@ export async function runChatPipeline(
               options?.onPlannedOp?.({ op, index })
             }
           : undefined,
-        manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
+        manifestBlockTypes: componentsManifest ? componentsManifest.blocks.map(c => c.type) : undefined,
         lightweight: routerComplexity === "simple" || likelySimple,
         signal: combinedSignal
       }), combinedSignal)
@@ -2855,7 +2855,7 @@ export async function runChatPipeline(
               }
             }
           : undefined,
-        manifestBlockTypes: componentsManifest ? componentsManifest.components.map(c => c.type) : undefined,
+        manifestBlockTypes: componentsManifest ? componentsManifest.blocks.map(c => c.type) : undefined,
         lightweight: shouldPreferFastModelForMessage(plannerMessage),
         signal: options?.signal
       }), options?.signal)

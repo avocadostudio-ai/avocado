@@ -2,7 +2,7 @@
 
 ## Current Delivery Reality
 - The implemented integration path is Next.js 15+ with App Router, using `@ai-site-editor/site-sdk` route factories and Draft Mode flows.
-- Structural editing is manifest-driven (`/api/editor/components`). If manifest validation fails, the editor runs in degraded mode and blocks structural edits.
+- Structural editing is manifest-driven (`/api/editor/blocks`). If manifest validation fails, the editor runs in degraded mode and blocks structural edits.
 - Preview editing works by combining orchestrator draft content with site rendering wrappers (`data-block-id`, `data-editable-target`) and overlay bridge messaging.
 - Publish is implemented through orchestrator modes (`git` and `deploy_hook`), with git-based publish as the current practical default for production snapshots.
 - Non-Next.js integrations and provider/SPI adapters are documented as target design, not implemented runtime paths.
@@ -49,7 +49,7 @@ For Next.js App Router adopters, the product should deliver a repeatable, low-ri
 
 ## Known Failure Modes
 1. Manifest degraded mode
-- Trigger: `/api/editor/components` missing, invalid, or failing validation.
+- Trigger: `/api/editor/blocks` missing, invalid, or failing validation.
 - Impact: structural edits disabled; editor must communicate remediation path.
 
 2. Draft unavailable

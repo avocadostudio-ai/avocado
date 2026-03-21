@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type EditorComponentsManifest, type PageDoc } from "@ai-site-editor/shared"
+import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type BlockManifest, type PageDoc } from "@ai-site-editor/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
 import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
 import { type GuardrailErrorCategory } from "../errors.js"
@@ -28,7 +28,7 @@ export const siteCapabilitiesSchema = z.object({
   manifestStatus: z.enum(["loading", "ready", "degraded"]),
   reason: z.string().optional(),
   manifestVersion: z.number().int().positive().optional(),
-  componentCount: z.number().int().nonnegative().optional(),
+  blockCount: z.number().int().nonnegative().optional(),
   checkedAt: z.string()
 })
 
@@ -37,7 +37,7 @@ export type SiteCapabilities = z.infer<typeof siteCapabilitiesSchema>
 export type ChatRequestBody = {
   session?: string
   siteId?: string
-  componentsManifest?: EditorComponentsManifest | string
+  componentsManifest?: BlockManifest | string
   siteCapabilities?: SiteCapabilities | string
   sitePurpose?: string
   siteHosting?: string

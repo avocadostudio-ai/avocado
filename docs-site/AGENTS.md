@@ -15,7 +15,7 @@
 - **Orchestrator**: the Fastify backend that handles AI planning, operations, and state (`apps/orchestrator`)
 - **Block**: a typed content component (Hero, FeatureGrid, etc.) with validated props
 - **Operation / op**: a structured, schema-validated edit action (not a freeform code change)
-- **Manifest**: the component manifest JSON from `/api/editor/components` that tells the editor what blocks are available
+- **Manifest**: the block manifest JSON from `/api/editor/blocks` that tells the editor what blocks are available
 - **Draft mode**: Next.js cookie-based preview mode used to switch between published and draft content
 - **SPI**: Service Provider Interface — the advanced REST API contract for non-Next.js integrations
 

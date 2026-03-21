@@ -1,14 +1,15 @@
 export { getConfiguredDraftSecret, getSafeInternalRedirectPath, validateDraftSecret, type DraftSecretValidationResult } from "./draft-mode.ts"
 export { isImagePath, toAltPath } from "./editable-path.ts"
 export {
-  editorComponentSchema,
-  editorComponentsManifestSchema,
+  blockDefinitionSchema,
+  blockManifestSchema,
   jsonSchemaLikeSchema,
   validateByJsonSchemaLike,
   validateManifestDefaultProps,
-  type EditorComponentDefinition,
-  type EditorComponentsManifest
-} from "./editor-components-manifest.ts"
+  deriveFieldMetaFromSchema,
+  type BlockDefinition,
+  type BlockManifest
+} from "./block-manifest.ts"
 
 export {
   // Types
@@ -36,6 +37,7 @@ export {
   defaultListItemForBlock,
   // Schemas & validation
   blockInstanceSchema,
+  blockInstanceSchemaLenient,
   validateBlockProps,
   getBlockJsonSchema,
 } from "./blocks/_registry.ts"
@@ -60,6 +62,7 @@ export {
   // Schemas
   pageMetaSchema,
   pageDocSchema,
+  pageDocSchemaLenient,
   siteConfigSchema,
   operationSchema,
   editPlanSchema,

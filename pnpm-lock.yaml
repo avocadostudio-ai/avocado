@@ -169,6 +169,9 @@ importers:
       '@ai-site-editor/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
+      '@ai-site-editor/preview-adapter':
+        specifier: workspace:*
+        version: link:../../packages/preview-adapter
       '@ai-site-editor/shared':
         specifier: workspace:*
         version: link:../../packages/shared

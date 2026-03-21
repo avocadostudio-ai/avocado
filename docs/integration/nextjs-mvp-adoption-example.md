@@ -15,8 +15,8 @@ Create API routes (4 one-liner files):
 ```
 app/api/draft/route.ts              → createDraftEnableHandler()
 app/api/draft/disable/route.ts      → createDraftDisableHandler()
-app/api/editor/components/route.ts  → createComponentsHandler()
-app/api/editor/bootstrap-pages/route.ts → createBootstrapPagesHandler(cb)
+app/api/editor/blocks/route.ts  → createBlocksHandler()
+app/api/editor/pages/route.ts → createPagesHandler(cb)
 ```
 
 See [nextjs-mvp-embedded.md](nextjs-mvp-embedded.md) for the full code for each file.

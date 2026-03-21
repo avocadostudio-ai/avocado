@@ -1,4 +1,4 @@
-import type { Operation, EditorComponentsManifest } from "@ai-site-editor/shared"
+import type { Operation, BlockManifest } from "@ai-site-editor/shared"
 import type { ApplyOpsResponse, AssistantResponse, SiteCapabilities } from "../../lib/editor-types"
 import { manifestUnavailableChanges, withIntegrationContext } from "../../lib/integration-context"
 
@@ -42,7 +42,7 @@ export async function postOpsRequest(args: {
   session: string
   siteId: string
   ops: Array<Record<string, unknown>>
-  componentManifest?: EditorComponentsManifest | null
+  componentManifest?: BlockManifest | null
   siteCapabilities?: SiteCapabilities
 }) {
   return await fetch(`${args.orchestrator}/ops`, {

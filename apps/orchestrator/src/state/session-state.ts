@@ -168,8 +168,11 @@ export function ensureHeroImageProps(page: PageDoc) {
   for (const block of page.blocks) {
     const props = block.props as Record<string, unknown>
     if (block.type === "Hero") {
+      // Skip imageUrl fallback if the block uses carouselImages instead
       if (typeof props.imageUrl !== "string" || props.imageUrl.length === 0) {
-        props.imageUrl = "/hero-generated.svg"
+        if (!Array.isArray(props.carouselImages) || props.carouselImages.length === 0) {
+          props.imageUrl = "/hero-generated.svg"
+        }
       }
       if (typeof props.imageAlt !== "string" || props.imageAlt.length === 0) {
         props.imageAlt =

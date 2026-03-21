@@ -6,7 +6,7 @@ Start here first:
 - `docs/integration/README.md`
 
 MVP requirement:
-- Expose `GET /api/editor/components` so the editor/orchestrator knows which components are safely editable.
+- Expose `GET /api/editor/blocks` so the editor/orchestrator knows which components are safely editable.
 - Without this manifest, run in degraded mode (read-only preview or text-only edits).
 
 Recommended:
@@ -58,8 +58,8 @@ http://localhost:3000/api/draft/disable?redirect=%2Fpricing
 
 ## Minimal behavior checks
 
-1. `GET /api/editor/components` returns valid component manifest JSON.
-2. `GET /api/editor/bootstrap-pages` returns `{ pages: [...] }` with published pages.
+1. `GET /api/editor/blocks` returns valid block manifest JSON.
+2. `GET /api/editor/pages` returns `{ pages: [...] }` with published pages.
 3. Wrong secret returns `401` from `/api/draft`.
 4. Valid secret redirects and sets draft cookie.
 5. `/api/draft/disable` clears draft cookie and redirects.
@@ -72,9 +72,9 @@ Run these in the site project:
 ```bash
 pnpm typecheck
 pnpm test
-curl -s http://localhost:3000/api/editor/components | jq '.version, (.components | length)'
+curl -s http://localhost:3000/api/editor/blocks | jq '.version, (.blocks | length)'
 ```
 
 Expected:
-- manifest route returns `version` and non-zero component count
+- manifest route returns `version` and non-zero block count
 - editor header shows `Manifest` (not `Degraded`)

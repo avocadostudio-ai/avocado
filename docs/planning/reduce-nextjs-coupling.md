@@ -10,7 +10,7 @@ Today, our fastest onboarding path is tightly shaped around Next.js conventions:
 
 - Next Draft Mode enable/disable flow.
 - App Router route handlers and file layout.
-- Fixed endpoint assumptions in docs/templates (`/api/draft`, `/api/editor/components`, `/api/editor/bootstrap-pages`).
+- Fixed endpoint assumptions in docs/templates (`/api/draft`, `/api/editor/blocks`, `/api/editor/pages`).
 
 This is good for MVP velocity, but it creates friction for teams on Remix, Nuxt, SvelteKit, Astro, custom Node stacks, or existing CMS frontends.
 
@@ -62,7 +62,7 @@ Best served by a formal provider/SPI surface.
 Define a framework-neutral capability contract:
 
 - `getManifest`
-- `getBootstrapPages`
+- `getPages`
 - `enablePreview`
 - `disablePreview`
 - `getPage` (draft/published-aware)

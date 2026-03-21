@@ -34,7 +34,7 @@ export function buildSiteDraftEnableUrl(pathname: string, params: Record<string,
     if (!direct.searchParams.has("__editor")) direct.searchParams.set("__editor", "1")
     return direct.toString()
   }
-  const entry = new URL(`${base}/api/draft`)
+  const entry = new URL(`${base}/api/editor/draft`)
   entry.searchParams.set("secret", siteDraftSecret)
   entry.searchParams.set("redirect", redirectPath)
   return entry.toString()
@@ -43,7 +43,7 @@ export function buildSiteDraftEnableUrl(pathname: string, params: Record<string,
 export function buildSiteDraftDisableUrl(pathname: string, params: Record<string, string | undefined>, origin?: string) {
   const base = origin || siteOrigin
   const redirectPath = buildSitePathWithQuery(pathname, params)
-  const entry = new URL(`${base}/api/draft/disable`)
+  const entry = new URL(`${base}/api/editor/draft/disable`)
   entry.searchParams.set("redirect", redirectPath)
   return entry.toString()
 }

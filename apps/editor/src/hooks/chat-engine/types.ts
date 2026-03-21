@@ -1,4 +1,4 @@
-import type { EditorComponentsManifest, Operation } from "@ai-site-editor/shared"
+import type { BlockManifest, Operation } from "@ai-site-editor/shared"
 import type {
   ApplyOpsResponse,
   AssistantResponse,
@@ -27,7 +27,7 @@ export type ChatEngineSharedDeps = {
   setActiveEditablePath: (path: string | undefined) => void
   postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
-  componentManifest?: EditorComponentsManifest | null
+  componentManifest?: BlockManifest | null
   siteCapabilities?: SiteCapabilities
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null

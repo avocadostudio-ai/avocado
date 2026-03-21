@@ -62,8 +62,7 @@
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
-    "zod": "^4.3.6"
+    "@ai-site-editor/shared": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=15.0.0",

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SITE_ORIGIN="${1:-http://localhost:3000}"
-ENDPOINT="${SITE_ORIGIN%/}/api/editor/components"
+ENDPOINT="${SITE_ORIGIN%/}/api/editor/blocks"
 
 echo "Checking manifest endpoint: ${ENDPOINT}"
 

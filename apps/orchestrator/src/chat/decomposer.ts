@@ -1,5 +1,6 @@
 import OpenAI from "openai"
 import type { PageDoc } from "@ai-site-editor/shared"
+import { buildDecomposerSystemPrompt } from "./prompts.js"
 
 // ---------------------------------------------------------------------------
 // Heuristic: does this message look like a multi-step request?
@@ -51,23 +52,12 @@ export async function decomposeRequest(args: {
     })
     .join("\n")
 
-  const systemPrompt = `You break complex website editing requests into sequential steps.
-
-Each step must be a complete, self-contained instruction that can be executed independently by a website editor AI. Include specific details (page names, slugs, content references) so each step is unambiguous.
-
-Return JSON: { "steps": string[], "labels": string[] }
-- steps: full instruction text for each step
-- labels: 3-6 word button labels for UI (e.g. "Create /about page")
-- If the request is already simple (single page edit, single block change), return exactly 1 step.
-- When creating multiple pages, each page creation should be its own step.
-- When updating existing content to reference new pages (e.g. linking CTAs), put that in a final step.
-- Include page context (card titles, block content) in each step so it can execute standalone.
-
-Current page: ${slug}
-Page title: "${currentPage.title}"
-Blocks:
-${blocksSummary}
-${siteContextBlock ? `\nSite context:\n${siteContextBlock}` : ""}`
+  const systemPrompt = buildDecomposerSystemPrompt({
+    slug,
+    pageTitle: currentPage.title,
+    blocksSummary,
+    siteContextBlock,
+  })
 
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as { chat: { completions: { create: (a: unknown) => any } } })
 

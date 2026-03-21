@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
-import { getAllBlockMeta, DEFAULT_HEADING_LEVELS, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, type BlockDefinition, type BlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
 import { WandSparkles, Sparkles, Pencil } from "lucide-react"
@@ -69,9 +69,13 @@ type Props = {
   onAddListItem?: (listKey: string) => void
   /** The field path currently selected in the preview (for scroll+flash). */
   highlightPath?: string
+  /** Manifest block definitions by type — used as fallback for custom blocks not in the shared registry. */
+  manifestByType?: Map<string, BlockDefinition>
+  /** Origin of the active site — used to resolve relative image URLs for thumbnails. */
+  siteOrigin?: string
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading, aiLoadingPath, onAddListItem, highlightPath }: Props) {
+export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading, aiLoadingPath, onAddListItem, highlightPath, manifestByType, siteOrigin }: Props) {
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
@@ -93,7 +97,42 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
   }
 
   const allMeta = getAllBlockMeta()
-  const meta = allMeta[blockType]
+  let meta: BlockMeta | undefined = allMeta[blockType]
+
+  if (manifestByType) {
+    const def = manifestByType.get(blockType)
+    if (def) {
+      const derived = deriveFieldMetaFromSchema(def.propsSchema)
+      if (!meta) {
+        // Custom block not in shared registry — use manifest-derived metadata
+        meta = {
+          displayName: def.displayName ?? blockType,
+          fields: derived.fields,
+          listFields: Object.keys(derived.listFields).length > 0 ? derived.listFields : undefined,
+        }
+      } else {
+        // Block exists in shared registry — merge in any extra fields from
+        // the manifest that the registry doesn't know about (e.g. villa Hero
+        // has carouselImages/logoUrl not in the shared Hero definition).
+        const extraFields: Record<string, FieldMeta> = {}
+        for (const [key, fm] of Object.entries(derived.fields)) {
+          if (!(key in meta.fields)) extraFields[key] = fm
+        }
+        const extraListFields: Record<string, ListFieldMeta> = {}
+        for (const [key, lf] of Object.entries(derived.listFields)) {
+          if (!meta.listFields || !(key in meta.listFields)) extraListFields[key] = lf
+        }
+        if (Object.keys(extraFields).length > 0 || Object.keys(extraListFields).length > 0) {
+          meta = {
+            ...meta,
+            fields: { ...meta.fields, ...extraFields },
+            listFields: { ...(meta.listFields ?? {}), ...extraListFields },
+          }
+          if (meta.listFields && Object.keys(meta.listFields).length === 0) meta.listFields = undefined
+        }
+      }
+    }
+  }
 
   if (!meta) {
     return (
@@ -126,7 +165,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
         <div className="property-panel-empty">Failed to load block properties</div>
       ) : props ? (
         <div className="property-panel-fields">
-          {renderFieldEntries(Object.entries(meta.fields), props, "", blockType, onFieldChange, onImageClick, onAiAssist, onAiQuickAction, aiLoading, aiLoadingPath, highlightPath)}
+          {renderFieldEntries(Object.entries(meta.fields), props, "", blockType, onFieldChange, onImageClick, onAiAssist, onAiQuickAction, aiLoading, aiLoadingPath, highlightPath, siteOrigin)}
           {meta.listFields
             ? Object.entries(meta.listFields).map(([key, listField]) => {
                 const items = Array.isArray(props[key]) ? (props[key] as Record<string, unknown>[]) : []
@@ -145,6 +184,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
                     aiLoadingPath={aiLoadingPath}
                     highlightPath={highlightPath}
                     onAddItem={onAddListItem ? () => onAddListItem(key) : undefined}
+                    siteOrigin={siteOrigin}
                   />
                 )
               })
@@ -188,7 +228,8 @@ function renderFieldEntries(
   onAiQuickAction?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void,
   aiLoading?: boolean,
   aiLoadingPath?: string,
-  highlightPath?: string
+  highlightPath?: string,
+  siteOrigin?: string
 ): ReactNode[] {
   const pairedAltKeys = new Set<string>()
 
@@ -230,6 +271,7 @@ function renderFieldEntries(
           onAltAiQuickAction={altKey && onAiQuickAction ? (actionText: string) => onAiQuickAction(pathPrefix + altKey, "Alt text", "imageAlt", altValue ?? "", actionText) : undefined}
           aiLoading={aiLoading}
           fieldShimmer={aiLoading === true && altKey != null && aiLoadingPath === pathPrefix + altKey}
+          siteOrigin={siteOrigin}
         />
       )
     } else {
@@ -378,6 +420,13 @@ function AiQuickActionsDropdown({
   )
 }
 
+function resolveImageUrl(url: string, origin?: string): string {
+  if (!url || !origin) return url
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith("/")) return `${origin}${url}`
+  return url
+}
+
 function ImageFieldWidget({
   label,
   blockType,
@@ -388,7 +437,8 @@ function ImageFieldWidget({
   onAltAiAssist,
   onAltAiQuickAction,
   aiLoading,
-  fieldShimmer
+  fieldShimmer,
+  siteOrigin
 }: {
   label: string
   blockType?: string
@@ -400,6 +450,7 @@ function ImageFieldWidget({
   onAltAiQuickAction?: (actionText: string) => void
   aiLoading?: boolean
   fieldShimmer?: boolean
+  siteOrigin?: string
 }) {
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
@@ -415,7 +466,7 @@ function ImageFieldWidget({
           {imageUrl && !imgBroken ? (
             <img
               className="property-field-image-thumb"
-              src={imageUrl}
+              src={resolveImageUrl(imageUrl, siteOrigin)}
               alt=""
               onError={() => setImgBroken(true)}
             />
@@ -471,7 +522,8 @@ function ListFieldSection({
   aiLoading,
   aiLoadingPath,
   highlightPath,
-  onAddItem
+  onAddItem,
+  siteOrigin
 }: {
   listKey: string
   listField: ListFieldMeta
@@ -485,6 +537,7 @@ function ListFieldSection({
   aiLoadingPath?: string
   highlightPath?: string
   onAddItem?: () => void
+  siteOrigin?: string
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const label = listField.label ?? listKey
@@ -538,7 +591,8 @@ function ListFieldSection({
                   onAiQuickAction,
                   aiLoading,
                   aiLoadingPath,
-                  highlightPath
+                  highlightPath,
+                  siteOrigin
                 )}
               </div>
             ) : null}

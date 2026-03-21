@@ -38,26 +38,26 @@ import { createDraftDisableHandler } from "@ai-site-editor/site-sdk"
 export const GET = createDraftDisableHandler()
 ```
 
-**`app/api/editor/components/route.ts`**
+**`app/api/editor/blocks/route.ts`**
 ```ts
-import { createComponentsHandler } from "@ai-site-editor/site-sdk"
+import { createBlocksHandler } from "@ai-site-editor/site-sdk"
 
-export const { GET, OPTIONS } = createComponentsHandler()
+export const { GET, OPTIONS } = createBlocksHandler()
 ```
 
-**`app/api/editor/bootstrap-pages/route.ts`**
+**`app/api/editor/pages/route.ts`**
 ```ts
-import { createBootstrapPagesHandler } from "@ai-site-editor/site-sdk"
+import { createPagesHandler } from "@ai-site-editor/site-sdk"
 import { getPublishedPage, getPublishedSlugs } from "@/lib/published-content-api"
 
-export const { GET, OPTIONS } = createBootstrapPagesHandler(() => {
+export const { GET, OPTIONS } = createPagesHandler(() => {
   return getPublishedSlugs()
     .map((slug) => getPublishedPage(slug))
     .filter((page): page is NonNullable<typeof page> => page !== null)
 })
 ```
 
-The `createBootstrapPagesHandler` takes a callback that returns your published pages. Implement `getPublishedPage` and `getPublishedSlugs` to read from your CMS, file system, or database.
+The `createPagesHandler` takes a callback that returns your published pages. Implement `getPublishedPage` and `getPublishedSlugs` to read from your CMS, file system, or database.
 
 ## Step 2: Wire draft content loading
 
@@ -129,14 +129,14 @@ Key SDK utilities used:
 - `renderBlocks()` — renders blocks with error boundaries; pass `{ editable: true }` to add editor selection attributes
 - `EditorOverlay` — renders the PostMessage bridge for editor ↔ site communication
 
-## Component manifest shape (MVP)
+## Block manifest shape (MVP)
 
-The SDK's `createComponentsHandler()` generates this automatically from the block registry:
+The SDK's `createBlocksHandler()` generates this automatically from the block registry:
 
 ```json
 {
   "version": 1,
-  "components": [
+  "blocks": [
     {
       "type": "Hero",
       "displayName": "Hero",
@@ -158,7 +158,7 @@ The editor does not infer components from DOM class names.
 It matches by stable component `type` IDs.
 
 Contract:
-1. Manifest entry: `components[].type`
+1. Manifest entry: `blocks[].type`
 2. Content block: `block.type`
 3. Site renderer registry key: same `type`
 
@@ -184,7 +184,7 @@ If a block type exists in content but not in manifest:
 5. Set `DRAFT_MODE_SECRET` env var.
 6. Verify `/api/draft?secret=wrong` returns `401`.
 7. Verify `/api/draft?secret=valid&redirect=/` redirects and sets draft cookie.
-8. Verify `/api/editor/components` returns manifest JSON.
+8. Verify `/api/editor/blocks` returns manifest JSON.
 9. Confirm editor header shows `Manifest` (not `Degraded`).
 
 ## Optional later upgrade

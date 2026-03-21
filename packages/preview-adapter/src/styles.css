@@ -6,8 +6,13 @@
   --editor-accent-strong: rgb(var(--editor-accent-rgb));
   --editor-accent-soft: rgba(var(--editor-accent-rgb), 0.35);
   position: relative;
-  overflow: visible;
   transition: transform 220ms ease, opacity 220ms ease;
+}
+
+/* Only override overflow when block needs visible badges/overlays */
+[data-editor-selection-mode] .editor-selectable:hover,
+[data-editor-active] .editor-selectable.editor-highlight {
+  overflow: visible;
 }
 
 [data-editor-active] .editor-selectable::before {

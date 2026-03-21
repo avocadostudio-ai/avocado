@@ -1,12 +1,20 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  output: "export",
   transpilePackages: [
     "@ai-site-editor/blocks",
+    "@ai-site-editor/preview-adapter",
+    "@ai-site-editor/site-sdk",
   ],
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "plus.unsplash.com" },
+      { protocol: "https", hostname: "oaidalleapiprodscus.blob.core.windows.net" },
+      { protocol: "https", hostname: "**.blob.core.windows.net" },
+      { protocol: "https", hostname: "placehold.co" },
+      { protocol: "http", hostname: "localhost" },
+    ],
   },
 }
 

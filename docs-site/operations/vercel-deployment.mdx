@@ -208,7 +208,7 @@ The block selector requires a working postMessage channel between editor iframe 
 
 3. **Origin mismatch in postMessage** — `event.origin` never has a trailing slash. If `NEXT_PUBLIC_EDITOR_ORIGIN` or `VITE_SITE_ORIGIN` has a trailing slash, all messages are silently dropped. Always omit trailing slashes.
 
-4. **Missing `/api/editor/bootstrap-pages`** — the editor calls this on the site to seed the orchestrator with initial content. Without it, the orchestrator has no draft pages and the site shows "Draft unavailable".
+4. **Missing `/api/editor/pages`** — the editor calls this on the site to seed the orchestrator with initial content. Without it, the orchestrator has no draft pages and the site shows "Draft unavailable".
 
 5. **CORS on orchestrator** — `ORCHESTRATOR_CORS_ORIGINS` must include both the editor and site origins.
 

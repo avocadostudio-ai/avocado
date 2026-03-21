@@ -14,14 +14,14 @@ Related docs:
 ## MVP integration model
 
 - Source of truth: adopter-owned component registry in code.
-- Transport contract: `GET /api/editor/components` manifest JSON generated from that registry.
+- Transport contract: `GET /api/editor/blocks` manifest JSON generated from that registry.
 - Preview bootstrap: Next.js Draft Mode (`/api/draft`, `/api/draft/disable`).
 - Fallback behavior: if manifest is missing/invalid, editor runs in degraded mode (no structural edits).
 
 ## Required endpoints
 
-- `GET /api/editor/components` — component manifest for structural edits
-- `GET /api/editor/bootstrap-pages` — returns `{ pages: PageDoc[] }` of published content; the editor calls this to seed the orchestrator with initial draft content when a session has no pages yet
+- `GET /api/editor/blocks` — block manifest for structural edits
+- `GET /api/editor/pages` — returns `{ pages: PageDoc[] }` of published content; the editor calls this to seed the orchestrator with initial draft content when a session has no pages yet
 - `GET /api/draft?secret=...&redirect=...` — enables Next.js draft mode and redirects
 - `GET /api/draft/disable?redirect=...` — disables draft mode and redirects
 
@@ -36,9 +36,9 @@ Related docs:
 ## Adoption checklist
 
 1. Add local component registry in site code.
-2. Generate manifest from registry and expose `/api/editor/components`.
+2. Generate manifest from registry and expose `/api/editor/blocks`.
 3. Add draft mode routes and secret validation.
-4. Verify CORS for editor origin on `/api/editor/components` in local/dev.
+4. Verify CORS for editor origin on `/api/editor/blocks` in local/dev.
 5. Confirm editor header shows `Manifest` (not `Degraded`).
 
 ## Quick validation script
