@@ -56,18 +56,6 @@ export function SiteHeader(props: Record<string, unknown>) {
     }
   }, [isOpen])
 
-  // Theme toggle
-  const [darkMode, setDarkMode] = useState(false)
-  useEffect(() => {
-    const stored = window.localStorage.getItem("site-theme-v1")
-    const fallback = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false
-    setDarkMode(stored === "dark" ? true : stored === "light" ? false : fallback)
-  }, [])
-  useEffect(() => {
-    window.document.documentElement.classList.toggle("dark", darkMode)
-    window.localStorage.setItem("site-theme-v1", darkMode ? "dark" : "light")
-  }, [darkMode])
-
   const isActive = (href: string) => {
     if (!activePath) return false
     const clean = href.split("?")[0]
@@ -94,19 +82,6 @@ export function SiteHeader(props: Record<string, unknown>) {
             </a>
           ))}
         </nav>
-        <button
-          type="button"
-          className="site-theme-toggle"
-          aria-label={darkMode ? "Switch site to light mode" : "Switch site to dark mode"}
-          title={darkMode ? "Light mode" : "Dark mode"}
-          onClick={() => setDarkMode((v) => !v)}
-        >
-          {darkMode ? (
-            <svg className="site-theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></svg>
-          ) : (
-            <svg className="site-theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>
-          )}
-        </button>
         <div ref={menuRef} className={`site-mobile-menu${isOpen ? " is-open" : ""}`}>
           <button
             ref={toggleRef}

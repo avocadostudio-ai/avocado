@@ -1,3 +1,5 @@
+"use client"
+
 import { useEffect, useRef } from "react"
 import { isImagePath, type ApplyPatchMessage, type PatchAckMessage, type PatchRejectReason, type ResetToServerMessage } from "@ai-site-editor/shared"
 
@@ -98,6 +100,7 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
   const selectedEditablePathRef = useRef<string | null>(null)
   const pendingListItemMovePathRef = useRef<string | null>(null)
   const childSelectionLockRef = useRef<{ blockId: string; listKey: string; index: number; position?: number } | null>(null)
+  const selectionModeRef = useRef(false)
   const skipParentAnimationOnceRef = useRef(false)
   const deleteConfirmTimerRef = useRef<number | null>(null)
   const inlineEditingRef = useRef<{
@@ -1345,6 +1348,7 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
 
       if (msg.type === "setSelectionMode") {
         const enabled = !!msg.payload.enabled
+        selectionModeRef.current = enabled
         if (enabled) {
           document.documentElement.setAttribute("data-editor-selection-mode", "")
           mountGlobalImageButtons()
@@ -1615,6 +1619,11 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
         imageButtonsRaf = null
         mountGlobalImageButtons()
       })
+    }
+
+    // Restore selection mode if it was active before effect re-run
+    if (selectionModeRef.current) {
+      document.documentElement.setAttribute("data-editor-selection-mode", "")
     }
 
     ensureBlockBadges()

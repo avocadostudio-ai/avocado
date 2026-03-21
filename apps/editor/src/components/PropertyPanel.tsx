@@ -158,6 +158,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
 /** Detect if `altKey` is the companion imageAlt for `imageKey` (e.g. imageUrl → imageAlt). */
 function isAltFor(imageKey: string, altKey: string): boolean {
   if (imageKey === "imageUrl" && altKey === "imageAlt") return true
+  if (imageKey === "src" && altKey === "alt") return true
   if (imageKey.endsWith(".src") && altKey === imageKey.replace(/\.src$/, ".alt")) return true
   return false
 }
@@ -402,6 +403,7 @@ function ImageFieldWidget({
 }) {
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
+  const [imgBroken, setImgBroken] = useState(false)
   const displayAlt = altFocused ? altLocal : (altText ?? "")
   const { debouncedCommit: debouncedAltCommit, flushCommit: flushAltCommit } = useDebouncedCommit(onAltCommit ?? noop, 400)
 
@@ -410,12 +412,12 @@ function ImageFieldWidget({
       <div className="property-field-label"><span>{label}</span></div>
       <div className="property-field-image-widget">
         <div className="property-field-image-preview">
-          {imageUrl ? (
+          {imageUrl && !imgBroken ? (
             <img
               className="property-field-image-thumb"
               src={imageUrl}
               alt=""
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+              onError={() => setImgBroken(true)}
             />
           ) : (
             <div className="property-field-image-thumb property-field-image-placeholder">

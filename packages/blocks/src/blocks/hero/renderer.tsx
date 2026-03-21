@@ -4,12 +4,13 @@ import { PrimaryButton, SecondaryButton, BlockImage } from "../_shared"
 
 export function Hero(props: Record<string, unknown>) {
   const imagePosition = String(props.imagePosition ?? "right") === "left" ? "left" : "right"
-  const heroClass = imagePosition === "left" ? "hero hero--image-left" : "hero hero--image-right"
+  const imageLeftClass = imagePosition === "left" ? " layout-grid--image-left hero--image-left" : ""
+  const heroClass = `hero${imageLeftClass}`
   const HeadingTag = resolveHeadingTag("Hero", props) as keyof JSX.IntrinsicElements
   return (
     <section className={heroClass}>
-      <div className="section__inner hero__inner">
-        <div className="hero__content">
+      <div className="section__inner hero__inner layout-grid layout-grid--content-heavy">
+        <div className="hero__content layout-grid__col">
           <HeadingTag data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
             {String(props.heading ?? "")}
           </HeadingTag>
@@ -37,8 +38,9 @@ export function Hero(props: Record<string, unknown>) {
             )}
           </div>
         </div>
-        <div className="hero__media" data-editable-target="imageUrl" data-editable-target-label="Hero block image">
+        <div className="hero__media layout-grid__col" data-editable-target="imageUrl" data-editable-target-label="Hero block image">
           <BlockImage
+            className="layout-grid__img"
             src={String(props.imageUrl ?? "/hero-generated.svg")}
             alt={String(props.imageAlt ?? "Hero image")}
             width={1536}

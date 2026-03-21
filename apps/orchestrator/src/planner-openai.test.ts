@@ -673,7 +673,7 @@ test("generatePlanWithOpenAI uses strict response_format when CHAT_STRICT_JSON_R
 // ---------------------------------------------------------------------------
 // repairAndParseJson tests
 // ---------------------------------------------------------------------------
-import { repairAndParseJson, repairJson } from "./nlp/plan-normalizer.js"
+import { repairAndParseJson, repairAndParseJsonWithMeta, repairJson } from "./nlp/plan-normalizer.js"
 
 test("repairAndParseJson fixes bare minus sign (no number after minus)", () => {
   // Simulate the "No number after minus sign" error: bare `-` outside a string
@@ -727,4 +727,93 @@ test("repairJson handles combined control chars and markdown bullets", () => {
   const parsed = JSON.parse(repaired) as { change_log: string[]; ops: unknown[] }
   assert.ok(parsed.change_log[0]?.includes("Set title"))
   assert.ok(Array.isArray(parsed.ops))
+})
+
+// ---------------------------------------------------------------------------
+// repairAndParseJsonWithMeta tests
+// ---------------------------------------------------------------------------
+
+test("repairAndParseJsonWithMeta returns basic_repair strategy for control char fix", () => {
+  const malformed = '{"summary": "line1\\nline2"}'
+  const result = repairAndParseJsonWithMeta(malformed)
+  assert.equal(result.strategy, "basic_repair")
+  assert.ok(result.parsed)
+})
+
+test("repairAndParseJsonWithMeta returns bare_minus_fix with mutationCount", () => {
+  // Use a case where basic_repair doesn't fix it but bare minus does:
+  // bare `-` as a numeric value (not in array with markdown bullet pattern)
+  const malformed = '{"value": -, "name": "test"}'
+  const result = repairAndParseJsonWithMeta(malformed)
+  assert.equal(result.strategy, "bare_minus_fix")
+  assert.equal(typeof result.mutationCount, "number")
+  assert.ok(result.mutationCount! >= 1)
+})
+
+test("repairAndParseJsonWithMeta returns close_brackets for truncated JSON", () => {
+  const truncated = '{"intent": "edit_plan", "ops": [{"op": "update_props"'
+  const result = repairAndParseJsonWithMeta(truncated)
+  assert.equal(result.strategy, "close_brackets")
+  assert.equal((result.parsed as { intent: string }).intent, "edit_plan")
+})
+
+test("repairAndParseJsonWithMeta returns truncate_at_boundary with discardedBytes", () => {
+  // Valid JSON prefix followed by raw markdown that breaks parsing
+  const broken = '{"intent": "edit_plan", "ops": [{"op": "update_props"}], "summary": this is not json at all'
+  const result = repairAndParseJsonWithMeta(broken)
+  assert.equal(result.strategy, "truncate_at_boundary")
+  assert.equal(typeof result.discardedBytes, "number")
+  assert.ok(result.discardedBytes! > 0)
+})
+
+test("repairAndParseJsonWithMeta backward compat: repairAndParseJson returns parsed value only", () => {
+  const truncated = '{"intent": "edit_plan", "ops": [{"op": "update_props"'
+  const result = repairAndParseJson(truncated)
+  assert.equal((result as { intent: string }).intent, "edit_plan")
+})
+
+// ---------------------------------------------------------------------------
+// cleanupImagePlaceholders — recursive deep clearing
+// ---------------------------------------------------------------------------
+import { cleanupImagePlaceholders, isGeneratingPlaceholder, GENERATING_IMAGE_PLACEHOLDER } from "./chat/chat-pipeline.js"
+import { getSessionDraft, setPage, bumpVersion } from "./state/session-state.js"
+
+test("cleanupImagePlaceholders clears nested array placeholders", () => {
+  const session = `test-cleanup-${Date.now()}`
+  // Set up a page with nested image placeholders (e.g. cards array)
+  setPage(session, {
+    slug: "test",
+    title: "Test",
+    blocks: [
+      {
+        id: "hero-1",
+        type: "Hero",
+        props: { imageUrl: GENERATING_IMAGE_PLACEHOLDER, title: "Hello" }
+      },
+      {
+        id: "cards-1",
+        type: "CardGrid",
+        props: {
+          cards: [
+            { title: "Card 1", imageUrl: GENERATING_IMAGE_PLACEHOLDER },
+            { title: "Card 2", imageUrl: "https://example.com/real.jpg" },
+            { title: "Card 3", imageUrl: GENERATING_IMAGE_PLACEHOLDER }
+          ]
+        }
+      }
+    ]
+  } as any)
+  bumpVersion(session)
+
+  const cleared = cleanupImagePlaceholders(session)
+  assert.equal(cleared, 3, "should clear 3 placeholders (1 hero + 2 cards)")
+
+  const draft = getSessionDraft(session)
+  const page = draft.get("test")!
+  const heroProps = page.blocks[0]!.props as Record<string, unknown>
+  assert.equal(heroProps.imageUrl, "")
+  const cardProps = page.blocks[1]!.props as { cards: Array<{ imageUrl: string }> }
+  assert.equal(cardProps.cards[0]!.imageUrl, "")
+  assert.equal(cardProps.cards[1]!.imageUrl, "https://example.com/real.jpg")
+  assert.equal(cardProps.cards[2]!.imageUrl, "")
 })

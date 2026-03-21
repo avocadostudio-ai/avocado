@@ -2,7 +2,7 @@ import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
 import { PrimaryButton, renderRichTextContent, BlockImage } from "../_shared"
 
-function TwoColumnChild({ item, headingTag }: { item: Record<string, unknown>; headingTag: keyof JSX.IntrinsicElements }) {
+function TwoColumnChild({ item, headingTag, pathPrefix }: { item: Record<string, unknown>; headingTag: keyof JSX.IntrinsicElements; pathPrefix: string }) {
   const childType = String(item.type ?? "")
   const HeadingTag = headingTag
 
@@ -55,8 +55,9 @@ function TwoColumnChild({ item, headingTag }: { item: Record<string, unknown>; h
 
   if (childType === "image") {
     return (
-      <div className="two-column__media" data-editable-target="imageUrl" data-editable-target-label="Image">
+      <div className="two-column__media" data-editable-target={`${pathPrefix}.src`} data-editable-target-label="Image">
         <BlockImage
+          className="layout-grid__img"
           src={String(item.src ?? "")}
           alt={String(item.alt ?? "")}
           width={768}
@@ -83,15 +84,15 @@ export function TwoColumn(props: Record<string, unknown>) {
 
   return (
     <section className={`two-column${accentClass}`}>
-      <div className="section__inner two-column__inner">
-        <div className="two-column__text">
+      <div className="section__inner two-column__inner layout-grid layout-grid--balanced">
+        <div className="two-column__text layout-grid__col">
           {leftItems.map((item, i) => (
-            <TwoColumnChild key={`l-${i}`} item={item} headingTag={HeadingTag} />
+            <TwoColumnChild key={`l-${i}`} item={item} headingTag={HeadingTag} pathPrefix={`left[${i}]`} />
           ))}
         </div>
-        <div className="two-column__text">
+        <div className="two-column__text layout-grid__col">
           {rightItems.map((item, i) => (
-            <TwoColumnChild key={`r-${i}`} item={item} headingTag={HeadingTag} />
+            <TwoColumnChild key={`r-${i}`} item={item} headingTag={HeadingTag} pathPrefix={`right[${i}]`} />
           ))}
         </div>
       </div>

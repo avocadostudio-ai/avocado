@@ -3135,3 +3135,39 @@ test("tryCompoundDeterministicPlan merges summaries from both sub-plans", () => 
   assert.ok(plan, "should produce a plan")
   assert.ok(plan!.summary_for_user.length > 10, "summary should combine both sub-plan summaries")
 })
+
+// ---------------------------------------------------------------------------
+// Block type case normalization
+// ---------------------------------------------------------------------------
+
+test("normalizePlanCandidate fixes lowercase 'hero' → 'Hero' in add_block block.type", () => {
+  const plan = normalizePlanCandidate(
+    {
+      op: "add_block",
+      block: { id: "b_hero_1", type: "hero", props: { heading: "Hello" } },
+      pageSlug: "/",
+      summary_for_user: "Added hero"
+    },
+    { defaultSlug: "/" }
+  ) as any
+  assert.strictEqual(plan.block.type, "Hero")
+})
+
+test("normalizePlanCandidate fixes 'google_map' → 'Embed' via inferBlockTypeFromText fallback", () => {
+  const plan = normalizePlanCandidate(
+    {
+      op: "add_block",
+      block: { id: "b_map_1", type: "google_map", props: {} },
+      pageSlug: "/",
+      summary_for_user: "Added map"
+    },
+    { defaultSlug: "/" }
+  ) as any
+  assert.strictEqual(plan.block.type, "Embed")
+})
+
+test("inferBlockTypeFromText maps 'map' and 'google_map' to Embed", () => {
+  assert.strictEqual(inferBlockTypeFromText("map"), "Embed")
+  assert.strictEqual(inferBlockTypeFromText("google_map"), "Embed")
+  assert.strictEqual(inferBlockTypeFromText("GoogleMap"), "Embed")
+})

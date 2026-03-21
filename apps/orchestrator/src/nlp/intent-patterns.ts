@@ -112,7 +112,15 @@ export const BLOCK_TYPE_KEYWORDS: Array<{ key: string; pattern: RegExp }> = [
   { key: "card", pattern: /\bcard\b/ },
   { key: "richtext", pattern: /\brich[\s-]?text\b|\btext block\b|\bparagraph\b|\bcopy\b/ },
   { key: "twocolumn", pattern: /\btwo\s*column\b|\btwocolumn\b|\b2\s*column\b/ },
-  { key: "stats", pattern: /\bstats?\b|\bstatistics\b|\bmetrics\b|\bnumbers\b/ }
+  { key: "stats", pattern: /\bstats?\b|\bstatistics\b|\bmetrics\b|\bnumbers\b/ },
+  { key: "carousel", pattern: /\bcarousel\b|\bslideshow\b|\bslider\b/ },
+  { key: "gallery", pattern: /\bgallery\b|\bimage grid\b/ },
+  { key: "tabs", pattern: /\btabs?\b|\btabbed\b/ },
+  { key: "table", pattern: /\btable\b/ },
+  { key: "quote", pattern: /\bblockquote\b/ },
+  { key: "video", pattern: /\bvideo\b/ },
+  { key: "embed", pattern: /\bembed\b|\biframe\b/ },
+  { key: "banner", pattern: /\bbanner\b|\bannouncement\b/ }
 ]
 
 export const KEYWORD_TO_BLOCK_TYPE: Record<string, BlockType> = {
@@ -125,7 +133,15 @@ export const KEYWORD_TO_BLOCK_TYPE: Record<string, BlockType> = {
   card: "Card",
   richtext: "RichText",
   twocolumn: "TwoColumn",
-  stats: "Stats"
+  stats: "Stats",
+  carousel: "Carousel",
+  gallery: "Gallery",
+  tabs: "Tabs",
+  table: "Table",
+  quote: "Quote",
+  video: "Video",
+  embed: "Embed",
+  banner: "Banner"
 }
 
 // ---------------------------------------------------------------------------

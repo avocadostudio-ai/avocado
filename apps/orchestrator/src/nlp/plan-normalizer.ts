@@ -158,14 +158,26 @@ function closeOpenBrackets(input: string): string {
   return result
 }
 
+export type JsonRepairStrategy = "basic_repair" | "bare_minus_fix" | "close_brackets" | "truncate_at_boundary" | "none"
+
+export type JsonRepairResult = {
+  parsed: unknown
+  strategy: JsonRepairStrategy
+  /** Number of character-level mutations applied (for bare_minus_fix). */
+  mutationCount?: number
+  /** Bytes discarded by truncation strategies. */
+  discardedBytes?: number
+}
+
 /**
  * Attempt multiple JSON repair strategies. Returns the first one that
- * produces parseable JSON, or throws the original error.
+ * produces parseable JSON along with metadata about what was done,
+ * or throws the original error.
  */
-export function repairAndParseJson(raw: string): unknown {
+export function repairAndParseJsonWithMeta(raw: string): JsonRepairResult {
   // Strategy 1: basic repair (includes control char escaping + markdown bullet fix)
   const basic = repairJson(raw)
-  try { return JSON.parse(basic) } catch {}
+  try { return { parsed: JSON.parse(basic), strategy: "basic_repair" } } catch {}
 
   // Strategy 2: fix "no number after minus sign" by replacing bare `-`
   // outside of string literals with `0`. Walk character by character to
@@ -174,6 +186,7 @@ export function repairAndParseJson(raw: string): unknown {
     const chars = [...basic]
     let inString = false
     let escaped = false
+    let mutations = 0
     for (let i = 0; i < chars.length; i++) {
       if (escaped) { escaped = false; continue }
       if (chars[i] === "\\") { escaped = true; continue }
@@ -183,15 +196,16 @@ export function repairAndParseJson(raw: string): unknown {
         if (next === undefined || !/\d/.test(next)) {
           // Bare minus not followed by digit — replace with 0
           chars[i] = "0"
+          mutations += 1
         }
       }
     }
-    return JSON.parse(chars.join(""))
+    return { parsed: JSON.parse(chars.join("")), strategy: "bare_minus_fix", mutationCount: mutations }
   } catch {}
 
   // Strategy 3: truncated output — close open braces/brackets in correct order
   try {
-    return JSON.parse(closeOpenBrackets(basic))
+    return { parsed: JSON.parse(closeOpenBrackets(basic)), strategy: "close_brackets" }
   } catch {}
 
   // Strategy 4: truncate at last valid key-value boundary
@@ -213,12 +227,22 @@ export function repairAndParseJson(raw: string): unknown {
     const startIdx = Math.max(0, commaPositions.length - 10)
     for (let ci = commaPositions.length - 1; ci >= startIdx; ci--) {
       const truncated = basic.slice(0, commaPositions[ci]!)
-      try { return JSON.parse(closeOpenBrackets(truncated)) } catch {}
+      try {
+        return { parsed: JSON.parse(closeOpenBrackets(truncated)), strategy: "truncate_at_boundary", discardedBytes: raw.length - commaPositions[ci]! }
+      } catch {}
     }
   } catch {}
 
   // All strategies failed — throw original parse error
-  return JSON.parse(raw)
+  return { parsed: JSON.parse(raw), strategy: "none" }
+}
+
+/**
+ * Attempt multiple JSON repair strategies. Returns the first one that
+ * produces parseable JSON, or throws the original error.
+ */
+export function repairAndParseJson(raw: string): unknown {
+  return repairAndParseJsonWithMeta(raw).parsed
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +365,7 @@ export function inferBlockTypeFromText(text: string): BlockType | undefined {
   const normalized = text.toLowerCase()
   if (normalized.includes("hero")) return "Hero"
   if (normalized.includes("featuregrid") || normalized.includes("feature grid") || normalized.includes("features") || /\bfeture/.test(normalized)) return "FeatureGrid"
-  if (normalized.includes("testimonial") || normalized.includes("testomonial") || normalized.includes("social proof") || normalized.includes("review") || normalized.includes("quote")) return "Testimonials"
+  if (normalized.includes("testimonial") || normalized.includes("testomonial") || normalized.includes("social proof") || normalized.includes("review") || (/\bquote\b/.test(normalized) && !normalized.includes("blockquote"))) return "Testimonials"
   if (normalized.includes("faq")) return "FAQAccordion"
   if (normalized.includes("twocolumn") || normalized.includes("two column") || normalized.includes("2 column")) return "TwoColumn"
   if (normalized.includes("stats") || normalized.includes("statistics") || normalized.includes("metrics") || normalized.includes("numbers")) return "Stats"
@@ -350,6 +374,14 @@ export function inferBlockTypeFromText(text: string): BlockType | undefined {
   if (normalized.includes("card")) return "Card"
   if (normalized.includes("richtext") || normalized.includes("rich text") || normalized.includes("rich-text") || normalized.includes("prose") || normalized.includes("text block") || normalized.includes("paragraph") || normalized.includes("copy")) return "RichText"
   if (normalized.includes("benefit") || normalized.includes("advantage")) return "FeatureGrid"
+  if (normalized.includes("carousel") || normalized.includes("slideshow") || normalized.includes("slider")) return "Carousel"
+  if (normalized.includes("gallery") || normalized.includes("image grid")) return "Gallery"
+  if (normalized.includes("tabs") || normalized.includes("tabbed")) return "Tabs"
+  if (normalized.includes("table")) return "Table"
+  if (normalized.includes("blockquote")) return "Quote"
+  if (normalized.includes("video")) return "Video"
+  if (normalized.includes("embed") || normalized.includes("iframe") || normalized.includes("map")) return "Embed"
+  if (normalized.includes("banner") || normalized.includes("announcement")) return "Banner"
   return undefined
 }
 
@@ -677,6 +709,34 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
           return changed ? mapped : entry
         })
       }
+
+      // Block-specific prop key remapping and type coercion (mirrors add_block path)
+      for (const k of ["autoplay", "loop", "striped"]) {
+        if (typeof patch[k] === "boolean") patch[k] = patch[k] ? "true" : "false"
+      }
+      if (blockType === "Carousel" && Array.isArray(patch.slides) && !patch.items) {
+        patch.items = patch.slides
+        delete patch.slides
+      }
+      if (blockType === "Gallery") {
+        const alt = patch.photos ?? patch.pictures
+        if (Array.isArray(alt) && !patch.images) {
+          patch.images = alt
+          delete patch.photos
+          delete patch.pictures
+        }
+        if (typeof patch.columns === "number") patch.columns = String(patch.columns)
+      }
+      if (blockType === "Table") {
+        if (Array.isArray(patch.columns) && !patch.headers) {
+          patch.headers = patch.columns
+          delete patch.columns
+        }
+        if (Array.isArray(patch.data) && !patch.rows) {
+          patch.rows = patch.data
+          delete patch.data
+        }
+      }
     }
 
     // Convert update_props with appended array items → add_item ops.
@@ -861,9 +921,21 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     }
     if (raw.op === "add_block" && raw.block && typeof raw.block === "object" && !Array.isArray(raw.block)) {
       const block = raw.block as Record<string, unknown>
-      if ((!block.type || typeof block.type !== "string") && normalizedType) block.type = normalizedType
-      if ((!block.props || typeof block.props !== "object" || Array.isArray(block.props)) && (raw.patch || raw.props || raw.changes)) {
-        block.props = patchObject(raw.patch ?? raw.props ?? raw.changes) ?? {}
+      if (typeof block.type === "string") {
+        const fixed = allowedBlockTypes.find((t) => t.toLowerCase() === (block.type as string).toLowerCase()) ?? inferBlockTypeFromText(block.type as string)
+        if (fixed) block.type = fixed
+      } else if (normalizedType) {
+        block.type = normalizedType
+      }
+      if (!block.props || typeof block.props !== "object" || Array.isArray(block.props)) {
+        if (raw.patch || raw.props || raw.changes) {
+          block.props = patchObject(raw.patch ?? raw.props ?? raw.changes) ?? {}
+        } else if (typeof block.type === "string") {
+          // LLM omitted props entirely — seed with schema defaults so validation passes
+          block.props = defaultPropsForType(block.type as BlockType)
+        } else {
+          block.props = {}
+        }
       }
       if ((!block.id || typeof block.id !== "string") && typeof block.type === "string") {
         let fallbackId = `b_${String(block.type).toLowerCase()}_${Date.now()}`
@@ -909,6 +981,44 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
             }
             return changed ? mapped : entry
           })
+        }
+      }
+
+      // Block-specific prop key remapping and type coercion
+      if (typeof block.type === "string" && block.props && typeof block.props === "object" && !Array.isArray(block.props)) {
+        const cProps = block.props as Record<string, unknown>
+        const bt = block.type
+
+        // Coerce boolean→string for "true"/"false" enum props (Carousel, Video, Table)
+        for (const k of ["autoplay", "loop", "striped"]) {
+          if (typeof cProps[k] === "boolean") cProps[k] = cProps[k] ? "true" : "false"
+        }
+
+        // Carousel: slides→items
+        if (bt === "Carousel" && Array.isArray(cProps.slides) && !cProps.items) {
+          cProps.items = cProps.slides
+          delete cProps.slides
+        }
+        // Gallery: photos/pictures→images, numeric columns→string
+        if (bt === "Gallery") {
+          const alt = cProps.photos ?? cProps.pictures
+          if (Array.isArray(alt) && !cProps.images) {
+            cProps.images = alt
+            delete cProps.photos
+            delete cProps.pictures
+          }
+          if (typeof cProps.columns === "number") cProps.columns = String(cProps.columns)
+        }
+        // Table: columns→headers, data→rows
+        if (bt === "Table") {
+          if (Array.isArray(cProps.columns) && !cProps.headers) {
+            cProps.headers = cProps.columns
+            delete cProps.columns
+          }
+          if (Array.isArray(cProps.data) && !cProps.rows) {
+            cProps.rows = cProps.data
+            delete cProps.data
+          }
         }
       }
     }

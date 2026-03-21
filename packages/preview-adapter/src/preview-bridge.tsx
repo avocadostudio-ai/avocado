@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { PreviewBridgeCore } from "./preview-bridge-core"
 
@@ -11,12 +12,14 @@ export function PreviewBridge({ slug, editorOrigin }: { slug: string; editorOrig
 function PreviewBridgeNextInner({ slug, editorOrigin }: { slug: string; editorOrigin: string }) {
   const router = useRouter()
   const pathname = usePathname()
+  const navigate = useCallback((href: string) => router.push(href), [router])
+  const refresh = useCallback(() => router.refresh(), [router])
   return (
     <PreviewBridgeCore
       slug={slug}
       editorOrigin={editorOrigin}
-      navigate={(href) => router.push(href)}
-      refresh={() => router.refresh()}
+      navigate={navigate}
+      refresh={refresh}
       pathname={pathname}
     />
   )
