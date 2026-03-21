@@ -39,7 +39,8 @@ import {
   inferBlockTypeFromText,
   normalizePlanCandidate,
   repairJson,
-  repairAndParseJson
+  repairAndParseJson,
+  repairAndParseJsonWithMeta
 } from "../nlp/plan-normalizer.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
 import { intentJsonSchema } from "./plan-json-schema.js"
@@ -916,7 +917,7 @@ export async function generatePlanWithOpenAI(args: {
     "For rewrite/rephrase requests, if contextPack.selected.block.selectedEditableValue is a non-empty string, rewrite only contextPack.selected.editablePath based on that exact selected text.",
     "If rewrite/rephrase of a specific field is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first. This does NOT apply to page-wide rewrite/refocus/rebrand requests — those should generate update_props ops across all blocks.",
     "When rewriting text, return plain text unless the user explicitly asks for markdown formatting. Do not wrap the entire rewrite in **bold** markers.",
-    "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'.",
+    "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'. When you need a placeholder image URL, use https://placehold.co/{width}x{height}.png?text={label} (e.g. https://placehold.co/768x512.png?text=Hero). Always include the .png extension — SVG format breaks Next.js image optimization. Never use via.placeholder.com — it is defunct.",
     ...(chatStrictPrimaryOpMode
       ? [
           "Return exactly one operation in ops[].",
@@ -1124,7 +1125,11 @@ export async function generatePlanWithOpenAI(args: {
   } catch (err) {
     // Attempt multiple repair strategies before giving up
     try {
-      parsedJson = repairAndParseJson(jsonText)
+      const meta = repairAndParseJsonWithMeta(jsonText)
+      parsedJson = meta.parsed
+      if (meta.strategy !== "none") {
+        console.warn(`[planner] JSON repaired via ${meta.strategy}${meta.mutationCount ? ` (${meta.mutationCount} mutations)` : ""}${meta.discardedBytes ? ` (${meta.discardedBytes}B discarded)` : ""}`)
+      }
     } catch {
       const posMatch = err instanceof SyntaxError ? /position (\d+)/i.exec(err.message) : null
       const pos = posMatch?.[1]

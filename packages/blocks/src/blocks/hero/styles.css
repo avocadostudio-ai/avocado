@@ -8,22 +8,7 @@
 
 .hero__inner {
   position: relative;
-  display: grid;
-  grid-template-columns: 1.15fr 1fr;
   gap: 24px;
-  align-items: center;
-}
-
-.hero--image-left .hero__content {
-  order: 2;
-}
-
-.hero--image-left .hero__media {
-  order: 1;
-}
-
-.hero__content {
-  min-width: 0;
 }
 
 .hero__content h1 {
@@ -43,15 +28,7 @@
   max-width: 36ch;
 }
 
-.hero__media {
-  min-width: 0;
-}
-
 .hero__media img {
-  width: 100% !important;
-  height: auto !important;
-  display: block;
-  object-fit: cover;
   background: var(--placeholder-img);
 }
 
@@ -68,10 +45,6 @@
 }
 
 @media (max-width: 900px) {
-  .hero__inner {
-    grid-template-columns: 1fr;
-  }
-
   .hero__content h1 {
     font-size: clamp(1.75rem, 8vw, 2.5rem);
     line-height: 1.12;

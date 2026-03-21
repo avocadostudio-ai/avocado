@@ -843,7 +843,13 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText((prev) => (prev ?? "") + (payload.text ?? ""))
         }
         if (payload.type === "changelog_entry") {
-          setStreamingChanges((prev) => [...prev, (payload as { entry?: string }).entry ?? ""])
+          const entry = (payload as { entry?: string }).entry ?? ""
+          // Only show action-like entries (e.g. "Add Hero", "Update heading")
+          // Filters out raw JSON keys and content values like "Key Features"
+          const actionVerb = /^(add|update|set|remove|delete|create|change|replace|move|reorder|translate|fix|adjust|insert|duplicate|rename)/i
+          if (entry.includes(" ") && entry.length > 3 && actionVerb.test(entry)) {
+            setStreamingChanges((prev) => [...prev, entry])
+          }
         }
 
         if (payload.type === "op_applied") {

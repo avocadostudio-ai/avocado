@@ -41,7 +41,8 @@ import {
   pushChatHistory,
   schedulePersistState,
   getContextCache,
-  setContextCache
+  setContextCache,
+  removePage
 } from "../state/session-state.js"
 import {
   toErrorDetail,
@@ -166,20 +167,44 @@ export const GENERATING_IMAGE_PLACEHOLDER = [
 
 /** Returns true if the URL is the shimmer placeholder used during deferred image generation. */
 export function isGeneratingPlaceholder(url: string): boolean {
-  return url.startsWith("data:image/svg+xml,") && url.includes("Generating%20image")
+  return url.startsWith("data:image/svg+xml,") && (url.includes("Generating%20image") || url.includes("Generating image"))
+}
+
+/**
+ * Recursively walk an object and clear any string values that match the
+ * generating-image placeholder.  Handles nested arrays (e.g. `cards[i].imageUrl`,
+ * `images[i].imageUrl`) and arbitrary prop depth.
+ */
+function clearPlaceholdersDeep(obj: unknown): number {
+  if (obj === null || obj === undefined || typeof obj !== "object") return 0
+  let count = 0
+  if (Array.isArray(obj)) {
+    for (const item of obj) { count += clearPlaceholdersDeep(item) }
+    return count
+  }
+  const record = obj as Record<string, unknown>
+  for (const key of Object.keys(record)) {
+    const val = record[key]
+    if (typeof val === "string" && isGeneratingPlaceholder(val)) {
+      record[key] = ""
+      count += 1
+    } else if (typeof val === "object" && val !== null) {
+      count += clearPlaceholdersDeep(val)
+    }
+  }
+  return count
 }
 
 /** Remove any "Generating image..." SVG placeholders left in session state (e.g. after cancel). */
-export function cleanupImagePlaceholders(session: string) {
+export function cleanupImagePlaceholders(session: string): number {
   const draft = getSessionDraft(session)
+  let total = 0
   for (const [, page] of draft) {
     for (const block of page.blocks) {
-      const props = block.props as Record<string, unknown>
-      if (typeof props.imageUrl === "string" && isGeneratingPlaceholder(props.imageUrl)) {
-        props.imageUrl = ""
-      }
+      total += clearPlaceholdersDeep(block.props)
     }
   }
+  return total
 }
 
 /** Metadata for a deferred create_page Hero image that still needs resolution. */
@@ -285,6 +310,18 @@ export function sseWrite(reply: { raw: NodeJS.WritableStream }, payload: unknown
 function sleepMs(durationMs: number) {
   if (!Number.isFinite(durationMs) || durationMs <= 0) return Promise.resolve()
   return new Promise<void>((resolve) => setTimeout(resolve, durationMs))
+}
+
+/**
+ * Suppress cancel errors on a promise but log any other errors at WARN.
+ * Use instead of `.catch(() => {})` to avoid hiding real failures.
+ */
+function suppressCancelOnly(promise: Promise<unknown>, log: FastifyBaseLogger, label: string) {
+  promise.catch((err) => {
+    if (!_isCancelError(err)) {
+      log.warn({ event: "suppressed_non_cancel_error", label, error: toErrorDetail(err) }, `${label}: suppressed non-cancel error`)
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -1672,6 +1709,7 @@ export async function runChatPipeline(
                 )
               }
             } catch (err) {
+              cleanupImagePlaceholders(body.session!)
               if (isCancelError(err)) throw err
               ctx.log.warn(
                 { event: "deferred_hero_image_failed", chatRequestId, pageSlug: deferred.pageSlug, blockId: deferred.blockId, error: toErrorDetail(err) },
@@ -1742,6 +1780,7 @@ export async function runChatPipeline(
             }
           }
         } catch (deferredErr) {
+          cleanupImagePlaceholders(body.session!)
           if (isCancelError(deferredErr)) throw deferredErr
           ctx.log.warn(
             { event: "deferred_image_resolution_failed", chatRequestId, error: toErrorDetail(deferredErr) },
@@ -2331,6 +2370,7 @@ export async function runChatPipeline(
         // Await the router to get its complexity verdict before choosing model
         try { await routerPromise } catch { /* router failure is non-fatal */ }
       } else if (routerHeadStartMs > 0) {
+        throwIfCanceled(combinedSignal)
         await sleepMs(routerHeadStartMs)
       }
       throwIfCanceled(combinedSignal)
@@ -2446,13 +2486,14 @@ export async function runChatPipeline(
             ])
             if (betterResult.got === "planner" && betterResult.result) {
               consumeFullPlannerResult(betterResult.result)
-              routerPromise.catch(() => {})
+              suppressCancelOnly(routerPromise, ctx.log, "router_after_quality_gate")
               // Skip to post-race handling with initialPlan set
             } else {
               // Planner didn't finish in time — fall through to use router plan below
             }
-          } catch {
-            // Planner error — use the router plan
+          } catch (qualityGateErr) {
+            if (isCancelError(qualityGateErr)) throw qualityGateErr
+            ctx.log.warn({ event: "quality_gate_planner_error", error: toErrorDetail(qualityGateErr) }, "Quality gate: full planner errored — using router plan")
           }
         }
 
@@ -2484,7 +2525,7 @@ export async function runChatPipeline(
           if (routedOutcome.done) {
             // Success — abort the full planner (fire and forget)
             fullPlannerAbort.abort("router_succeeded")
-            fullPlannerPromise.catch(() => {}) // Suppress unhandled rejection
+            suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_success")
             return routedOutcome.response
           }
         }
@@ -2504,14 +2545,14 @@ export async function runChatPipeline(
         // Full planner won the race — use its result
         consumeFullPlannerResult(routerResult.result as { plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta })
         // Let router finish in the background (no side effects)
-        routerPromise.catch(() => {})
+        suppressCancelOnly(routerPromise, ctx.log, "router_after_planner_won")
       }
     } catch (parallelError) {
       if (isCancelError(parallelError)) throw parallelError
       // Both failed — fall through to sequential full planner retry loop
       fullPlannerAbort.abort("parallel_error")
-      fullPlannerPromise.catch(() => {})
-      routerPromise.catch(() => {})
+      suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_parallel_error")
+      suppressCancelOnly(routerPromise, ctx.log, "router_after_parallel_error")
       ctx.log.warn({ err: toErrorDetail(parallelError), event: "parallel_planner_error" }, "Parallel intent router + planner failed, falling back to sequential planner")
     }
   } else if (shouldTryLlmIntentRouter) {
@@ -2693,7 +2734,8 @@ export async function runChatPipeline(
     appliedCount: 0,
     failedAtIndex: null as number | null,
     hasStructuralOps: false,
-    rollbackSnapshot: null as PageDoc | null
+    /** Snapshots per slug — `null` means the page didn't exist before streaming (needs removal on rollback). */
+    rollbackSnapshots: new Map<string, PageDoc | null>()
   }
 
   // Skip the planning loop if the parallel race already produced an initialPlan
@@ -2765,12 +2807,11 @@ export async function runChatPipeline(
               // of waiting for the entire plan.
               if (streamedPerOpApplyEnabled && options?.onOpApplied) {
                 try {
-                  // Take a snapshot before the first streamed op
-                  if (streamApplyState.appliedCount === 0) {
-                    const existingPage = getPage(body.session!, effectiveSlug)
-                    if (existingPage) {
-                      streamApplyState.rollbackSnapshot = structuredClone(existingPage)
-                    }
+                  // Snapshot the target page before we touch it (once per slug)
+                  const opSlug = ("pageSlug" in op && typeof op.pageSlug === "string") ? op.pageSlug : effectiveSlug
+                  if (!streamApplyState.rollbackSnapshots.has(opSlug)) {
+                    const existingPage = getPage(body.session!, opSlug)
+                    streamApplyState.rollbackSnapshots.set(opSlug, existingPage ? structuredClone(existingPage) : null)
                   }
                   // Skip structural ops (create_page, rename, etc.) — they need
                   // the full plan context and can't be applied incrementally.
@@ -2997,15 +3038,27 @@ export async function runChatPipeline(
     streamApplyState.failedAtIndex === null &&
     !streamApplyState.hasStructuralOps
   // If streamed apply partially failed, roll back and let respondFromPlan re-apply everything
-  if (streamedPerOpApplyEnabled && streamApplyState.failedAtIndex !== null && streamApplyState.rollbackSnapshot) {
-    setPage(body.session!, { ...streamApplyState.rollbackSnapshot, slug: effectiveSlug })
+  if (streamedPerOpApplyEnabled && streamApplyState.failedAtIndex !== null && streamApplyState.rollbackSnapshots.size > 0) {
+    const rolledBackSlugs: string[] = []
+    for (const [slug, snapshot] of streamApplyState.rollbackSnapshots) {
+      if (snapshot) {
+        setPage(body.session!, { ...snapshot, slug })
+      } else {
+        removePage(body.session!, slug)
+      }
+      rolledBackSlugs.push(slug)
+    }
+    ctx.log.warn(
+      { event: "streamed_op_rollback", chatRequestId, appliedCount: streamApplyState.appliedCount, failedAtIndex: streamApplyState.failedAtIndex, rolledBackSlugs },
+      `Rolled back ${rolledBackSlugs.length} page(s) after streamed op failure at index ${streamApplyState.failedAtIndex}`
+    )
   }
   const initialOutcome = await respondFromPlan(
     initialPlan,
     plannerSource,
     applyMode,
     streamedApplyComplete
-      ? { preApplied: true, undoSnapshot: streamApplyState.rollbackSnapshot ?? undefined }
+      ? { preApplied: true, undoSnapshot: streamApplyState.rollbackSnapshots.get(effectiveSlug) ?? undefined }
       : undefined,
     "full_llm"
   )

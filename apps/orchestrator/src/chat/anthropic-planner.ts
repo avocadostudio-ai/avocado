@@ -19,7 +19,8 @@ import {
   normalizeOpName,
   normalizePlanCandidate,
   repairJson,
-  repairAndParseJson
+  repairAndParseJson,
+  repairAndParseJsonWithMeta
 } from "../nlp/plan-normalizer.js"
 import {
   buildPlannerSchemaContext,
@@ -48,9 +49,9 @@ function tryParseOrRepair(buf: string, log?: { warn: (obj: Record<string, unknow
     return JSON.parse(buf) as Record<string, unknown>
   } catch {
     try {
-      const result = repairAndParseJson(buf) as Record<string, unknown>
-      log?.warn({ event: "anthropic_planner_json_repaired", model: model ?? "unknown" }, "Anthropic planner: repaired malformed tool JSON from stream buffer")
-      return result
+      const meta = repairAndParseJsonWithMeta(buf)
+      log?.warn({ event: "anthropic_planner_json_repaired", model: model ?? "unknown", strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed tool JSON from stream buffer")
+      return meta.parsed as Record<string, unknown>
     } catch (repairErr) {
       log?.warn({
         event: "anthropic_planner_repair_failed",
@@ -627,7 +628,9 @@ export async function generatePlanWithAnthropic(args: {
             parsed = JSON.parse(jsonText) as Record<string, unknown>
           } catch {
             try {
-              parsed = repairAndParseJson(jsonText) as Record<string, unknown>
+              const meta = repairAndParseJsonWithMeta(jsonText)
+              parsed = meta.parsed as Record<string, unknown>
+              args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model, strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed text-block JSON (non-streaming tool loop)")
             } catch { /* fall through */ }
           }
           if (parsed) break
@@ -811,7 +814,9 @@ export async function generatePlanWithAnthropic(args: {
             parsed = JSON.parse(jsonText) as Record<string, unknown>
           } catch {
             try {
-              parsed = repairAndParseJson(jsonText) as Record<string, unknown>
+              const meta = repairAndParseJsonWithMeta(jsonText)
+              parsed = meta.parsed as Record<string, unknown>
+              args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model, strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed text-block JSON (streaming)")
             } catch { /* fall through to non-parsed state */ }
           }
         }
@@ -850,7 +855,9 @@ export async function generatePlanWithAnthropic(args: {
             parsed = JSON.parse(jsonText) as Record<string, unknown>
           } catch {
             try {
-              parsed = repairAndParseJson(jsonText) as Record<string, unknown>
+              const meta = repairAndParseJsonWithMeta(jsonText)
+              parsed = meta.parsed as Record<string, unknown>
+              args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model, strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed text-block JSON (non-streaming)")
             } catch { /* fall through */ }
           }
         }
@@ -890,8 +897,9 @@ export async function generatePlanWithAnthropic(args: {
         parsed = JSON.parse(raw) as Record<string, unknown>
       } catch {
         try {
-          parsed = repairAndParseJson(raw) as Record<string, unknown>
-          args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model }, "Anthropic planner: repaired malformed output_config JSON")
+          const meta = repairAndParseJsonWithMeta(raw)
+          parsed = meta.parsed as Record<string, unknown>
+          args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model, strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed output_config JSON")
         } catch { /* fall through to !parsed check below */ }
       }
     }
