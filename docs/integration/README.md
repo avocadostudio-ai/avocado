@@ -54,9 +54,9 @@ If your team uses Claude Code, Codex, Cursor, or similar LLM-based coding agents
 All Next.js integration logic is provided by `@ai-site-editor/site-sdk`. The SDK exports:
 
 - **Route handler factories** — `createDraftEnableHandler()`, `createDraftDisableHandler()`, `createComponentsHandler()`, `createBootstrapPagesHandler()` — one-liner API route setup
-- **Draft context** — `resolveDraftContext()`, `fetchDraftPage()`, `fetchDraftSlugs()`
-- **UI components** — `EditorOverlay`, `BlockErrorBoundary`, `TileModeStyles`
-- **Utilities** — `buildSlug()`, `single()`, `isTileMode()`, `getPreviewWrapperProps()`
+- **Editor context** — `resolveEditorContext()`, `fetchEditorPage()`, `fetchEditorSlugs()`
+- **UI components** — `EditorOverlay`, `BlockErrorBoundary`
+- **Utilities** — `buildSlug()`, `single()`, `getPreviewWrapperProps()`
 - **Types** — `PageDoc`, `PageMeta`, `BlockInstance`, `DraftContext`
 
 Add the SDK as a workspace dependency:
@@ -96,7 +96,7 @@ All endpoints are created with one-liner SDK handler factories:
 
 1. Install `@ai-site-editor/site-sdk` as a dependency.
 2. Create API route files using SDK handler factories (4 one-liner files).
-3. Wire `resolveDraftContext()` and `fetchDraftPage()` into your page data loading.
+3. Wire `resolveEditorContext()` and `fetchEditorPage()` into your page data loading.
 4. Add `EditorOverlay`, `BlockErrorBoundary`, and `getPreviewWrapperProps()` to your page renderer.
 5. Set `DRAFT_MODE_SECRET` env var.
 6. Confirm editor header shows `Manifest` (not `Degraded`).

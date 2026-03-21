@@ -145,7 +145,6 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           const previewSrc = buildSiteDraftEnableUrl("/", {
             session,
             siteId: site.id,
-            __tile: "1",
             __refresh: String(sites.siteTileRefreshToken)
           }, resolveSiteOrigin(site))
           return (

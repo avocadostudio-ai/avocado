@@ -36,7 +36,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   }
 }
 
-export async function fetchDraftPage(
+export async function fetchEditorPage(
   slug: string,
   session: string,
   siteId: string,
@@ -64,7 +64,7 @@ export async function fetchDraftPage(
   return null
 }
 
-export async function fetchDraftSlugs(
+export async function fetchEditorSlugs(
   session: string,
   siteId: string,
   options?: { timeoutMs?: number; orchestratorUrl?: string }
@@ -92,7 +92,7 @@ export async function fetchDraftSlugs(
   return []
 }
 
-export async function fetchDraftSiteConfig(
+export async function fetchEditorSiteConfig(
   session: string,
   siteId: string,
   options?: { timeoutMs?: number; orchestratorUrl?: string }

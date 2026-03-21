@@ -1,4 +1,5 @@
-import { BlockErrorBoundary, SharedBlockRenderer, BlocksInitClient } from "@ai-site-editor/blocks"
+import { SharedBlockRenderer, BlocksHydrator } from "@ai-site-editor/blocks"
+import { renderBlocks } from "@ai-site-editor/site-sdk"
 import type { SiteHeaderBlock } from "../lib/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
@@ -12,15 +13,9 @@ export function SitePageContent({ page, chromeHeader }: SitePageContentProps) {
     <>
       <SharedBlockRenderer block={chromeHeader} />
       <main>
-        {page.blocks.map((block) => (
-          <div key={block.id}>
-            <BlockErrorBoundary blockId={block.id} blockType={block.type}>
-              <SharedBlockRenderer block={block} />
-            </BlockErrorBoundary>
-          </div>
-        ))}
+        {renderBlocks(page.blocks)}
       </main>
-      <BlocksInitClient />
+      <BlocksHydrator />
     </>
   )
 }
