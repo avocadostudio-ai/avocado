@@ -28,6 +28,7 @@
 
 [data-editor-selection-mode] .editor-selectable:hover {
   cursor: pointer;
+  z-index: 2147483645;
 }
 
 [data-editor-selection-mode] .editor-selectable:hover::before {
@@ -171,6 +172,12 @@
   border: var(--editor-selected-border-width) solid rgb(var(--editor-selected-rgb));
   background: none;
   mix-blend-mode: normal;
+}
+
+/* Prevent double-thick border between adjacent highlighted/hovered blocks */
+[data-editor-active] .editor-highlight + .editor-selectable:hover::before,
+[data-editor-selection-mode] .editor-highlight + .editor-selectable:hover::before {
+  top: -2px;
 }
 
 [data-editor-active] .editor-highlight.editor-child-hovering::before,
@@ -386,11 +393,12 @@
 
 .editor-list-item-controls {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 0;
+  right: 0;
+  transform: translateY(-100%);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   z-index: 24;
   opacity: 0;
   visibility: hidden;
@@ -425,7 +433,8 @@
 }
 
 .editor-list-item-controls > .editor-list-item-delete {
-  margin-left: 6px;
+  margin-left: 4px;
+  border-radius: 7px 7px 0 0;
 }
 
 .editor-highlight:hover:not(.editor-child-hovering):not(.editor-child-selected) > .editor-block-toolbar,
@@ -476,7 +485,16 @@
 }
 
 .editor-list-item-move {
-  border-radius: 7px;
+  border-radius: 0;
+}
+
+.editor-list-item-move-up {
+  border-radius: 7px 0 0 0;
+}
+
+.editor-list-item-move-down {
+  border-radius: 0 7px 0 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .editor-list-item-add {
@@ -531,9 +549,9 @@
   position: static;
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: 7px 7px 0 0;
   box-shadow: none;
-  margin-left: 6px;
+  margin-right: 4px;
   transform: none;
 }
 
@@ -602,7 +620,8 @@
 
 .editor-child-highlight,
 .editor-item-selected {
-  box-shadow: inset 0 0 0 1.5px rgba(var(--editor-selected-rgb), 0.5) !important;
+  outline: 1.5px solid rgba(var(--editor-selected-rgb), 0.5);
+  outline-offset: -1.5px;
 }
 
 .editor-child-highlight:not(a):not(.btn-primary):not(.btn-secondary),

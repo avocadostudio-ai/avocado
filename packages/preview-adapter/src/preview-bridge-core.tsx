@@ -767,8 +767,6 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
             editorOrigin
           )
         })
-        controls.append(moveUp)
-
         const moveDown = document.createElement("button")
         moveDown.type = "button"
         moveDown.className = "editor-list-item-move editor-list-item-move-down"
@@ -805,8 +803,7 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
             editorOrigin
           )
         })
-        controls.append(moveDown)
-        controls.append(del)
+        controls.append(moveUp, moveDown, del)
         root.append(controls)
       }
 
@@ -835,7 +832,7 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
           add.classList.add("editor-list-item-add--inline")
           const controls = entry.root.querySelector(".editor-list-item-controls")
           if (controls) {
-            controls.append(add)
+            controls.prepend(add)
           } else {
             entry.root.append(add)
           }
