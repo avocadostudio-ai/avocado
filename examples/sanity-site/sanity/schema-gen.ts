@@ -10,6 +10,7 @@
 import { writeFileSync, mkdirSync } from "node:fs"
 import { resolve } from "node:path"
 import { getAllBlockMeta, type FieldKind } from "@ai-site-editor/shared"
+import { toSanityName } from "../lib/sanity.utils"
 
 // Ensure blocks are registered
 import "@ai-site-editor/shared"
@@ -30,16 +31,6 @@ function fieldKindToSanityType(kind: FieldKind): string {
     case "headingLevel": return "string"
     default: return "string"
   }
-}
-
-/** Convert PascalCase to camelCase, handling acronyms (CTA → cta, FAQAccordion → faqAccordion) */
-function toSanityName(pascalCase: string): string {
-  // All uppercase (CTA, FAQ) → all lowercase
-  if (pascalCase === pascalCase.toUpperCase()) return pascalCase.toLowerCase()
-  // Leading uppercase run + rest: "FAQAccordion" → "faq" + "Accordion"
-  const match = pascalCase.match(/^([A-Z]+)([A-Z][a-z].*)$/)
-  if (match) return match[1].toLowerCase() + match[2]
-  return pascalCase.charAt(0).toLowerCase() + pascalCase.slice(1)
 }
 
 const allMeta = getAllBlockMeta()
