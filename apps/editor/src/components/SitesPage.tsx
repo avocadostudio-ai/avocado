@@ -19,6 +19,7 @@ function compactPurposeText(value: string) {
 export function SitesPage({ sites, session }: { sites: UseSiteListReturn; session: string }) {
   const [addAiTab, setAddAiTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configAiTab, setConfigAiTab] = useState<"overview" | "tone" | "constraints">("overview")
+  const [configTab, setConfigTab] = useState<"general" | "media" | "hosting">("general")
   const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
   useEffect(() => { if (!sites.configSiteId) setDriveValidation(null) }, [sites.configSiteId])
 
@@ -339,6 +340,14 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           {sites.configSite ? (
             <div className="sites-modal-body">
               <div className="sites-form-grid">
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-ai-tabs" role="tablist" aria-label="Config tabs">
+                    <button type="button" className={configTab === "general" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("general")}>General</button>
+                    <button type="button" className={configTab === "media" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("media")}>Media</button>
+                    <button type="button" className={configTab === "hosting" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("hosting")}>Hosting</button>
+                  </div>
+                </div>
+                {configTab === "general" ? (<>
                 <p className="sites-form-section-title">Core settings</p>
                 <label className="sites-form-field">
                   <span>Site name</span>
@@ -412,7 +421,9 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     </label>
                   ) : null}
                 </div>
-                <p className="sites-form-section-title">Settings</p>
+                </>) : null}
+                {configTab === "hosting" ? (<>
+                <p className="sites-form-section-title">Hosting & Deploy</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-settings-grid">
                     <label className="sites-form-field">
@@ -460,6 +471,13 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                         onChange={(event) => sites.updateConfigSite({ vercelDeployHookUrl: event.target.value })}
                       />
                     </label>
+                  </div>
+                </div>
+                </>) : null}
+                {configTab === "media" ? (<>
+                <p className="sites-form-section-title">Google Drive</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-settings-grid">
                     <label className="sites-form-field sites-form-field-wide">
                       <span>Google Drive folder ID</span>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -541,7 +559,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                         </label>
                         <label className="sites-form-field">
                           <span>Delivery Token</span>
-                          <input type="password" value={(sites.configSite.cmsMedia as { deliveryToken: string }).deliveryToken} placeholder="Content Delivery API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, deliveryToken: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                          <textarea rows={2} value={(sites.configSite.cmsMedia as { deliveryToken: string }).deliveryToken} placeholder="Content Delivery API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, deliveryToken: e.target.value } as typeof sites.configSite.cmsMedia })} />
                         </label>
                       </>
                     )}
@@ -565,12 +583,13 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                         </label>
                         <label className="sites-form-field">
                           <span>API Token</span>
-                          <input type="password" value={(sites.configSite.cmsMedia as { token?: string }).token ?? ""} placeholder="Read-only API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, token: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
+                          <textarea rows={2} value={(sites.configSite.cmsMedia as { token?: string }).token ?? ""} placeholder="Read-only API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, token: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
                         </label>
                       </>
                     )}
                   </div>
                 </div>
+                </>) : null}
               </div>
             </div>
           ) : null}

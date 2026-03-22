@@ -294,7 +294,8 @@ export function useSiteList(siteId: string, session: string) {
               ...(patch.vercelDeployHookUrl !== undefined ? { vercelDeployHookUrl: patch.vercelDeployHookUrl } : {}),
               ...(patch.tone !== undefined ? { tone: patch.tone } : {}),
               ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {}),
-              ...(patch.gdriveFolderId !== undefined ? { gdriveFolderId: patch.gdriveFolderId } : {})
+              ...(patch.gdriveFolderId !== undefined ? { gdriveFolderId: patch.gdriveFolderId } : {}),
+              ...(patch.cmsMedia !== undefined ? { cmsMedia: patch.cmsMedia } : {})
             }
           : site
       )
