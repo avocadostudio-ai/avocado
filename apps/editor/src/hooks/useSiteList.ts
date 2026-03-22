@@ -275,7 +275,7 @@ export function useSiteList(siteId: string, session: string) {
     patch: Partial<
       Pick<
         SiteConfig,
-        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "gdriveFolderId"
+        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "gdriveFolderId" | "cmsMedia"
       >
     >
   ) => {

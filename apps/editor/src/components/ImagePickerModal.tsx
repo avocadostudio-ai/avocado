@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud } from "lucide-react"
 import { orchestrator } from "../lib/editor-utils"
+import { fetchCmsMedia, getCmsMediaLabel, type CmsMediaItem } from "../lib/cms-media"
+import type { CmsMediaConfig } from "../lib/editor-types"
 
 type ImageItem = {
   id: string
@@ -11,7 +13,7 @@ type ImageItem = {
   author?: string
 }
 
-type Tab = "drive" | "unsplash" | "contentful" | "upload" | "generate"
+type Tab = "drive" | "unsplash" | "cmsMedia" | "upload" | "generate"
 
 type Features = {
   googleDrive?: boolean
@@ -25,15 +27,16 @@ type ImagePickerModalProps = {
   features: Features
   currentUrl?: string
   gdriveFolderId?: string
+  cmsMedia?: CmsMediaConfig
   onClose: () => void
   onSelect: (imageUrl: string, alt: string) => void
 }
 
-export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, onClose, onSelect }: ImagePickerModalProps) {
+export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, cmsMedia, onClose, onSelect }: ImagePickerModalProps) {
   const availableTabs: Tab[] = []
   if (features.googleDrive) availableTabs.push("drive")
   if (features.unsplash) availableTabs.push("unsplash")
-  if (features.contentful) availableTabs.push("contentful")
+  if (cmsMedia || features.contentful) availableTabs.push("cmsMedia")
   availableTabs.push("upload")
   if (features.imageGenerate) availableTabs.push("generate")
 
@@ -103,22 +106,25 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
   }, [])
 
-  const fetchContentfulAssets = useCallback(async (q?: string, page = 1) => {
+  const fetchCmsMediaAssets = useCallback(async (q?: string, page = 1) => {
+    if (!cmsMedia) return
     const id = ++requestIdRef.current
     if (page === 1) setLoading(true); else setLoadingMore(true)
     try {
-      const params = new URLSearchParams({ limit: "20", page: String(page) })
-      if (q) params.set("q", q)
-      const res = await fetch(`${orchestrator}/contentful/assets?${params}`)
+      const data = await fetchCmsMedia(cmsMedia, q ?? "", page, 20)
       if (id !== requestIdRef.current) return
-      if (!res.ok) { if (page === 1) setItems([]); setHasMore(false); return }
-      const data = (await res.json()) as { items: ImageItem[]; totalPages: number }
-      if (id !== requestIdRef.current) return
-      setItems((prev) => page === 1 ? data.items : [...prev, ...data.items])
+      const mapped: ImageItem[] = data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        imageUrl: item.imageUrl,
+        thumbUrl: item.thumbUrl,
+        alt: item.alt,
+      }))
+      setItems((prev) => page === 1 ? mapped : [...prev, ...mapped])
       setHasMore(page < data.totalPages)
     } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMore(false) } }
     finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
-  }, [])
+  }, [cmsMedia])
 
   // Reset state on open / tab switch
   useEffect(() => {
@@ -136,8 +142,8 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     setHasMore(false)
     setLoadingMore(false)
     if (activeTab === "drive" && features.googleDrive) void fetchDriveImages()
-    if (activeTab === "contentful" && features.contentful) void fetchContentfulAssets()
-  }, [open, activeTab, features.googleDrive, features.contentful, fetchDriveImages, fetchContentfulAssets])
+    if (activeTab === "cmsMedia" && cmsMedia) void fetchCmsMediaAssets()
+  }, [open, activeTab, features.googleDrive, cmsMedia, fetchDriveImages, fetchCmsMediaAssets])
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
@@ -146,7 +152,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     searchTimerRef.current = setTimeout(() => {
       if (activeTab === "drive") void fetchDriveImages(value || undefined)
       if (activeTab === "unsplash") void fetchUnsplashImages(value || undefined, 1)
-      if (activeTab === "contentful") void fetchContentfulAssets(value || undefined, 1)
+      if (activeTab === "cmsMedia") void fetchCmsMediaAssets(value || undefined, 1)
     }, 400)
   }
 
@@ -221,7 +227,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const tabConfig: Record<Tab, { label: string; icon: React.ReactNode; searchPlaceholder?: string }> = {
     drive: { label: "Drive", icon: <HardDrive size={14} />, searchPlaceholder: "Search Drive images..." },
     unsplash: { label: "Unsplash", icon: <ImageIcon size={14} />, searchPlaceholder: "Search Unsplash photos..." },
-    contentful: { label: "Contentful", icon: <Cloud size={14} />, searchPlaceholder: "Search Contentful assets..." },
+    cmsMedia: { label: cmsMedia ? getCmsMediaLabel(cmsMedia) : "CMS", icon: <Cloud size={14} />, searchPlaceholder: `Search ${cmsMedia ? getCmsMediaLabel(cmsMedia) : "CMS"} assets...` },
     upload: { label: "Upload", icon: <Upload size={14} /> },
     generate: { label: "Generate", icon: <Sparkles size={14} /> }
   }
@@ -231,7 +237,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     : activeTab === "generate" ? Boolean(generatedResult)
     : Boolean(selectedId)
 
-  const isGridTab = activeTab === "drive" || activeTab === "unsplash" || activeTab === "contentful"
+  const isGridTab = activeTab === "drive" || activeTab === "unsplash" || activeTab === "cmsMedia"
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -296,14 +302,14 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
                   </button>
                 ))}
               </div>
-              {(activeTab === "unsplash" || activeTab === "contentful") && hasMore && items.length > 0 && !loading && !loadingMore && (
+              {(activeTab === "unsplash" || activeTab === "cmsMedia") && hasMore && items.length > 0 && !loading && !loadingMore && (
                 <div style={S.loadMoreRow}>
                   <button
                     style={S.loadMoreBtn}
                     onClick={() => {
                       const next = currentPage + 1
                       setCurrentPage(next)
-                      if (activeTab === "contentful") void fetchContentfulAssets(searchQuery || undefined, next)
+                      if (activeTab === "cmsMedia") void fetchCmsMediaAssets(searchQuery || undefined, next)
                       else void fetchUnsplashImages(searchQuery || undefined, next)
                     }}
                   >

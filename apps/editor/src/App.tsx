@@ -1964,6 +1964,7 @@ function EditorPage({
         features={{ ...backendFeatures, googleDrive: backendFeatures.googleDrive || Boolean(activeSiteConfig.gdriveFolderId?.trim()) }}
         currentUrl={imagePickerTarget?.currentUrl}
         gdriveFolderId={activeSiteConfig.gdriveFolderId}
+        cmsMedia={activeSiteConfig.cmsMedia}
         onClose={() => setImagePickerTarget(null)}
         onSelect={(imageUrl, alt) => {
           if (!imagePickerTarget) return
