@@ -13,7 +13,8 @@
     "./routes/core": "./src/draft-routes-core.ts",
     "./editor-manifest": "./src/editor-manifest.ts",
     "./publish-handlers/json-file": "./src/publish-handlers/json-file.ts",
-    "./navigation": "./src/navigation.ts"
+    "./navigation": "./src/navigation.ts",
+    "./page": "./src/create-site-page.tsx"
   },
   "repository": {
     "type": "git",
@@ -61,6 +62,10 @@
       "./navigation": {
         "import": "./dist/navigation.js",
         "types": "./dist/navigation.d.ts"
+      },
+      "./page": {
+        "import": "./dist/create-site-page.js",
+        "types": "./dist/create-site-page.d.ts"
       }
     }
   },
