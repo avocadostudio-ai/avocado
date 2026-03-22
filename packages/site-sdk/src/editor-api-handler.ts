@@ -9,6 +9,8 @@ export interface EditorApiHandlerConfig {
   getPages: () => PageDoc[] | Promise<PageDoc[]>
   getManifest?: () => BlockManifest
   onPublish?: OnPublishFn
+  /** Secret token required for publish requests. Checked against x-publish-token header. */
+  publishSecret?: string
 }
 
 type NextRouteContext = { params: Promise<{ path: string[] }> }
@@ -40,7 +42,9 @@ export function createEditorApiHandler(config: EditorApiHandlerConfig): {
   const draftDisable = createDraftDisableHandler()
   const blocksHandler = createBlocksHandler(config.getManifest ? { getManifest: config.getManifest } : undefined)
   const pagesHandler = createPagesHandler(config.getPages)
-  const publishHandler = config.onPublish ? createPublishHandler(config.onPublish) : null
+  const publishHandler = config.onPublish
+    ? createPublishHandler(config.onPublish, { publishSecret: config.publishSecret })
+    : null
 
   function matchRoute(path: string[]): string {
     const key = path.join("/")

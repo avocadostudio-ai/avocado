@@ -10,8 +10,12 @@ import { revalidatePath } from "next/cache"
  *   Triggers: Entry publish, Entry unpublish (content type: page)
  */
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-revalidate-secret")
-  if (secret !== process.env.REVALIDATION_SECRET) {
+  const configuredSecret = process.env.REVALIDATION_SECRET?.trim()
+  if (!configuredSecret) {
+    return Response.json({ error: "REVALIDATION_SECRET not configured" }, { status: 500 })
+  }
+  const provided = request.headers.get("x-revalidate-secret")?.trim()
+  if (!provided || provided !== configuredSecret) {
     return Response.json({ error: "Invalid secret" }, { status: 401 })
   }
 

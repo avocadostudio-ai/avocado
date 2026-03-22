@@ -1,4 +1,5 @@
 import { createClient } from "contentful"
+import { pageDocSchemaLenient } from "@ai-site-editor/shared"
 import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
 
 let cachedClient: ReturnType<typeof createClient> | null = null
@@ -18,24 +19,18 @@ function getClient() {
   return cachedClient
 }
 
-type PageFields = {
-  slug: string
-  title: string
-  pageId: string
-  blocks: unknown
-  meta: unknown
-  updatedAt: string
-}
-
-function entryToPageDoc(fields: PageFields): PageDoc {
-  return {
+function entryToPageDoc(fields: Record<string, unknown>): PageDoc | null {
+  const raw = {
     id: fields.pageId,
     slug: fields.slug,
     title: fields.title,
-    blocks: Array.isArray(fields.blocks) ? fields.blocks : [],
-    meta: fields.meta && typeof fields.meta === "object" ? fields.meta as PageDoc["meta"] : undefined,
+    blocks: fields.blocks,
+    meta: fields.meta,
     updatedAt: fields.updatedAt,
   }
+  const parsed = pageDocSchemaLenient.safeParse(raw)
+  if (!parsed.success) return null
+  return parsed.data
 }
 
 export async function getContentfulPage(slug: string): Promise<PageDoc | null> {
@@ -46,7 +41,7 @@ export async function getContentfulPage(slug: string): Promise<PageDoc | null> {
     limit: 1,
   })
   if (entries.items.length === 0) return null
-  return entryToPageDoc(entries.items[0].fields as unknown as PageFields)
+  return entryToPageDoc(entries.items[0].fields as Record<string, unknown>)
 }
 
 export async function getContentfulSlugs(): Promise<string[]> {
@@ -57,8 +52,8 @@ export async function getContentfulSlugs(): Promise<string[]> {
     limit: 100,
   })
   return entries.items
-    .map((item) => (item.fields as unknown as { slug: string }).slug)
-    .filter(Boolean)
+    .map((item) => (item.fields as Record<string, unknown>).slug)
+    .filter((slug): slug is string => typeof slug === "string" && slug.length > 0)
 }
 
 export async function getContentfulPages(): Promise<PageDoc[]> {
@@ -67,7 +62,9 @@ export async function getContentfulPages(): Promise<PageDoc[]> {
     content_type: "page",
     limit: 100,
   })
-  return entries.items.map((item) => entryToPageDoc(item.fields as unknown as PageFields))
+  return entries.items
+    .map((item) => entryToPageDoc(item.fields as Record<string, unknown>))
+    .filter((page): page is PageDoc => page !== null)
 }
 
 export async function getContentfulSiteConfig(): Promise<SiteConfig> {

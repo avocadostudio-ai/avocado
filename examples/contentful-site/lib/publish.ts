@@ -1,4 +1,4 @@
-import type { OnPublishFn } from "../editor-routes.ts"
+import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
 
 export interface ContentfulPublishOptions {
   spaceId: string
@@ -24,7 +24,7 @@ export interface ContentfulPublishOptions {
  *
  * Usage:
  * ```ts
- * import { createContentfulPublishHandler } from "@ai-site-editor/site-sdk/publish-handlers/contentful"
+ * import { createContentfulPublishHandler } from "../lib/publish"
  *
  * createEditorApiHandler({
  *   getPages: () => [...],
@@ -55,7 +55,12 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
   }
 
   function getEnvironment() {
-    if (!cachedEnvPromise) cachedEnvPromise = loadEnvironment()
+    if (!cachedEnvPromise) {
+      cachedEnvPromise = loadEnvironment().catch((err) => {
+        cachedEnvPromise = null // Allow retry on next publish
+        throw err
+      })
+    }
     return cachedEnvPromise
   }
 
@@ -75,8 +80,8 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
 
     const publishedSlugs = new Set(pages.map((p) => p.slug))
 
-    // Upsert pages in parallel
-    await Promise.all(pages.map(async (page) => {
+    // Upsert pages in parallel — use allSettled to report partial failures
+    const upsertResults = await Promise.allSettled(pages.map(async (page) => {
       const fields = {
         slug: { [locale]: page.slug },
         title: { [locale]: page.title },
@@ -95,14 +100,19 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
         entry = await env.createEntry(pageContentType, { fields })
       }
       await entry.publish()
+      return page.slug
     }))
+
+    const failed = upsertResults
+      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+      .map((r, i) => `${pages[i]?.slug ?? "?"}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`)
 
     // Delete pages that no longer exist (in parallel)
     const deletions = allEntries.items.filter((entry) => {
       const slug = entry.fields.slug?.[locale] as string | undefined
       return slug && !publishedSlugs.has(slug)
     })
-    await Promise.all(deletions.map(async (entry) => {
+    await Promise.allSettled(deletions.map(async (entry) => {
       if (entry.isPublished()) await entry.unpublish()
       await entry.delete()
     }))
@@ -134,6 +144,9 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
       await configEntry.publish()
     }
 
+    if (failed.length > 0) {
+      return { ok: false, error: `Failed to publish: ${failed.join("; ")}` }
+    }
     return { ok: true }
   }
 }

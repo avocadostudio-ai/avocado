@@ -52,6 +52,8 @@ export default async function Page({ params, searchParams }: PageProps) {
   const session = editorCtx?.session ?? DEFAULT_SESSION
   const siteId = editorCtx?.siteId ?? DEFAULT_SITE_ID
 
+  if (editorMode) noStore()
+
   const [pageResult, navSlugs, siteConfig] = await Promise.all([
     editorMode
       ? fetchEditorPage(slug, session, siteId).then((p) => p ?? getContentfulPage(slug))
@@ -59,8 +61,6 @@ export default async function Page({ params, searchParams }: PageProps) {
     getContentfulSlugs(),
     getContentfulSiteConfig(),
   ])
-
-  if (editorMode) noStore()
 
   // Build navigation header
   const { navItems, siteName, siteLogo } = buildNavItems({
