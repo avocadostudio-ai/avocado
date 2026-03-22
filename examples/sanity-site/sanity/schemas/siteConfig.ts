@@ -18,8 +18,17 @@ export const siteConfigSchema = defineType({
     defineField({
       name: "navLabels",
       title: "Nav Labels",
-      type: "object",
-      fields: [],
+      description: "Custom navigation labels per slug (e.g., /pricing → Plans & Pricing)",
+      type: "array",
+      of: [
+        {
+          type: "object",
+          fields: [
+            { name: "slug", title: "Slug", type: "string" },
+            { name: "label", title: "Label", type: "string" },
+          ],
+        },
+      ],
     }),
   ],
   preview: {
