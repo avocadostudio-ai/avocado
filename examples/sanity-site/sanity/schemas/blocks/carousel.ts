@@ -31,7 +31,7 @@ export const carouselSchema = defineType({
         { name: "heading", title: "Heading", type: "string" },
         { name: "description", title: "Description", type: "string" },
         { name: "ctaText", title: "Button label", type: "string" },
-        { name: "ctaHref", title: "Button link", type: "url" }
+        { name: "ctaHref", title: "Button link", type: "string" }
           ],
         },
       ],

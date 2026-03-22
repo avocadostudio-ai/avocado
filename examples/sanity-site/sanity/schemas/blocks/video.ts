@@ -8,7 +8,7 @@ export const videoSchema = defineType({
     {
       name: "src",
       title: "Video URL",
-      type: "url",
+      type: "string",
     },
     {
       name: "title",

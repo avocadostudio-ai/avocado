@@ -16,7 +16,7 @@ export const embedSchema = defineType({
     {
       name: "url",
       title: "URL",
-      type: "url",
+      type: "string",
     },
     {
       name: "title",
