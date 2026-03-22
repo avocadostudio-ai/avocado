@@ -97,23 +97,13 @@ export function createStrapiPublishHandler(): OnPublishFn {
             }
           }
 
-          // Try to find existing block by documentId convention
-          const blockDocId = `block-${block.id}`.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 128)
-
-          try {
-            // Try update first
-            await strapiFetch(`/${apiName}/${blockDocId}`, {
-              method: "PUT",
-              body: JSON.stringify({ data }),
-            })
-          } catch {
-            // Create new
-            const created = await strapiFetch<{ data: { id: number; documentId: string } }>(`/${apiName}`, {
-              method: "POST",
-              body: JSON.stringify({ data: { ...data, documentId: blockDocId } }),
-            })
-            blockIds.push(created.data.id)
-          }
+          // Find existing block by blockType + a marker, or create new
+          // Strapi auto-generates documentId — we can't set it
+          const created = await strapiFetch<{ data: { id: number; documentId: string } }>(`/${apiName}`, {
+            method: "POST",
+            body: JSON.stringify({ data }),
+          })
+          blockIds.push(created.data.id)
         }
 
         // Upsert the page

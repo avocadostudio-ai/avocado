@@ -82,12 +82,12 @@ function writeContentType(
   mkdirSync(serviceDir, { recursive: true })
 
   if (kind === "collectionType") {
-    writeFileSync(resolve(routeDir, `${singularName}.js`),
-      `'use strict';\nconst { createCoreRouter } = require('@strapi/strapi').factories;\nmodule.exports = createCoreRouter('api::${singularName}.${singularName}');\n`)
-    writeFileSync(resolve(controllerDir, `${singularName}.js`),
-      `'use strict';\nconst { createCoreController } = require('@strapi/strapi').factories;\nmodule.exports = createCoreController('api::${singularName}.${singularName}');\n`)
-    writeFileSync(resolve(serviceDir, `${singularName}.js`),
-      `'use strict';\nconst { createCoreService } = require('@strapi/strapi').factories;\nmodule.exports = createCoreService('api::${singularName}.${singularName}');\n`)
+    writeFileSync(resolve(routeDir, `${singularName}.ts`),
+      `import { factories } from '@strapi/strapi';\n\nexport default factories.createCoreRouter('api::${singularName}.${singularName}');\n`)
+    writeFileSync(resolve(controllerDir, `${singularName}.ts`),
+      `import { factories } from '@strapi/strapi';\n\nexport default factories.createCoreController('api::${singularName}.${singularName}');\n`)
+    writeFileSync(resolve(serviceDir, `${singularName}.ts`),
+      `import { factories } from '@strapi/strapi';\n\nexport default factories.createCoreService('api::${singularName}.${singularName}');\n`)
   }
 
   console.log(`  Created: ${singularName}`)
