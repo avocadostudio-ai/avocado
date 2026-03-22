@@ -14,23 +14,21 @@ function getImageFields(blockType: string): Set<string> {
 }
 
 /** Upload an image URL as a Sanity asset, return the asset reference */
+type SanityImageRef = { _type: "image"; asset: { _type: "reference"; _ref: string } }
+
 async function ensureImageAsset(
   imageUrl: string,
-  cache: Map<string, Promise<{ _type: "image"; asset: { _type: "reference"; _ref: string } }>>
+  cache: Map<string, Promise<SanityImageRef | null>>
 ) {
   const cached = cache.get(imageUrl)
   if (cached) return cached
 
   const promise = (async () => {
-    // Skip non-http URLs
-    if (!imageUrl.startsWith("http")) {
-      return { _type: "image" as const, asset: { _type: "reference" as const, _ref: "" } }
-    }
+    // Skip non-http URLs — can't upload relative paths as assets
+    if (!imageUrl.startsWith("http")) return null
 
     const res = await fetch(imageUrl)
-    if (!res.ok) {
-      return { _type: "image" as const, asset: { _type: "reference" as const, _ref: "" } }
-    }
+    if (!res.ok) return null
 
     const blob = await res.blob()
     const fileName = imageUrl.split("/").pop()?.split("?")[0] || "image.jpg"
@@ -55,7 +53,7 @@ async function ensureImageAsset(
  */
 export function createSanityPublishHandler(): OnPublishFn {
   return async (pages, config) => {
-    const imageCache = new Map<string, Promise<{ _type: "image"; asset: { _type: "reference"; _ref: string } }>>()
+    const imageCache = new Map<string, Promise<SanityImageRef | null>>()
     const tx = writeClient.transaction()
 
     for (const page of pages) {
@@ -78,7 +76,9 @@ export function createSanityPublishHandler(): OnPublishFn {
           if (key === "headingLevel") continue
 
           if (imageFields.has(key) && typeof value === "string" && value) {
-            doc[key] = await ensureImageAsset(value, imageCache)
+            const imageRef = await ensureImageAsset(value, imageCache)
+            if (imageRef) doc[key] = imageRef
+            // Skip field if image couldn't be uploaded (non-http URL)
           } else {
             doc[key] = value
           }
