@@ -1,236 +1,43 @@
 [
   {
-    "id": "/",
+    "id": "home-1",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-21T16:06:44.490Z",
+    "updatedAt": "2026-03-22T05:13:45.476Z",
+    "meta": {
+      "title": "Home",
+      "description": "A Contentful-powered site"
+    },
     "blocks": [
-      {
-        "id": "header-1",
-        "type": "SiteHeader",
-        "props": {
-          "siteName": "Sample Site",
-          "logoUrl": "/logo.svg",
-          "links": [
-            {
-              "label": "Home",
-              "href": "/"
-            },
-            {
-              "label": "Features",
-              "href": "#stats-1"
-            },
-            {
-              "label": "FAQ",
-              "href": "#faq-1"
-            },
-            {
-              "label": "Blog",
-              "href": "/blog/building-with-blocks"
-            }
-          ]
-        }
-      },
       {
         "id": "hero-1",
         "type": "Hero",
         "props": {
-          "heading": "Build Modern Websites with Composable Blocks",
-          "subheading": "Ship fast with pre-built, testable components. No compromises on design or flexibility.",
-          "ctaText": "Get Started",
-          "ctaHref": "#stats-1",
-          "imageUrl": "/home-hero.svg",
-          "imageAlt": "Browser mockup showing a block-based website with floating components",
-          "imagePosition": "right"
+          "heading": "Welcome to the Contentful Site",
+          "subheading": "This page is served from Contentful via the AI Site Editor block system.",
+          "ctaLabel": "Get Started",
+          "ctaUrl": "#",
+          "imageUrl": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=80",
+          "imageAlt": "Laptop on desk",
+          "ctaText": "Learn More"
         }
       },
       {
-        "id": "stats-1",
-        "type": "Stats",
-        "props": {
-          "title": "By the numbers",
-          "stats": [
-            {
-              "value": "10k+",
-              "label": "Active users"
-            },
-            {
-              "value": "99.9%",
-              "label": "Uptime"
-            },
-            {
-              "value": "50+",
-              "label": "Components"
-            },
-            {
-              "value": "24/7",
-              "label": "Support"
-            }
-          ]
-        }
-      },
-      {
-        "id": "richtext-1",
+        "id": "b_richtext_1774156395336",
         "type": "RichText",
         "props": {
-          "title": "Why Block-Based Sites?",
-          "body": "Building websites from composable blocks gives you the **flexibility** of custom code with the **speed** of a page builder. Each block is self-contained, tested, and styled — so you can mix and match without breaking anything.\n\nHere's what makes this approach stand out:\n\n- **Consistent design** — every block shares the same design tokens, so your site looks cohesive without extra effort\n- **Easy content updates** — edit a single JSON file to change text, images, or layout across any page\n- **Static by default** — pages are pre-rendered at build time for instant load times and zero server costs\n- **Fully extensible** — add new block types as simple React components with a Zod schema\n\nWhether you're launching a marketing site, a documentation hub, or a portfolio — blocks let you ship fast and iterate faster. No CMS lock-in, no drag-and-drop compromises, just clean components and structured content."
+          "title": "Powered by Contentful",
+          "body": "This site is built with Contentful, a headless CMS that separates content management from presentation. That means you can manage your content once and deliver it anywhere—web, mobile, or any channel you choose.\n\nWith Contentful's flexible content model, you define your own content structure without rigid page templates. APIs let your developers fetch and display content exactly how they need it, while content editors work in an intuitive interface.\n\nContentful's powerful capabilities extend beyond simple publishing. You gain real-time collaboration features, version control, and workflow management that ensure your team stays synchronized. Advanced scheduling tools let you plan content releases months in advance, while webhooks and real-time updates keep your digital experiences fresh and responsive to your audience's needs.\n\nThe beauty of a headless approach lies in its flexibility and scalability. Whether you're managing a single website, multiple microsites, or delivering content to IoT devices and voice assistants, Contentful adapts to your architecture. You're never locked into a particular presentation layer, giving you complete freedom to innovate and evolve your digital strategy without constraints.\n\n**Ready to experience the power of structured content?** Start exploring Contentful today and transform how you manage your digital experiences."
         }
       },
       {
-        "id": "faq-1",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Frequently Asked Questions",
-          "items": [
-            {
-              "q": "How do I add new pages?",
-              "a": "Add a new entry to content/pages.json with a slug, title, and array of blocks. The site will pick it up automatically on the next build."
-            },
-            {
-              "q": "Can I customize the design?",
-              "a": "Yes — the CSS custom properties in globals.css control colors, typography, spacing, and shapes across all blocks."
-            },
-            {
-              "q": "How do I deploy this site?",
-              "a": "Run 'next build' to generate a fully static export in the 'out' directory. Upload it to any static hosting provider like Vercel, Netlify, or S3."
-            }
-          ]
-        }
-      },
-      {
-        "id": "cta-1",
+        "id": "b_cta_1774156320864",
         "type": "CTA",
         "props": {
           "title": "Ready to get started?",
-          "description": "Start building your site with reusable block components today.",
-          "ctaText": "Read the Blog",
-          "ctaHref": "/blog/building-with-blocks"
-        }
-      },
-      {
-        "id": "footer-1",
-        "type": "Footer",
-        "props": {
-          "copyright": "© 2026 Sample Site. All rights reserved.",
-          "columns": [
-            {
-              "title": "Product",
-              "links": "Features|#stats\nFAQ|#faq"
-            },
-            {
-              "title": "Company",
-              "links": "About|/about\nContact|#cta"
-            },
-            {
-              "title": "Content",
-              "links": "Blog|/blog/building-with-blocks"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
-    "id": "/blog/building-with-blocks",
-    "slug": "/blog/building-with-blocks",
-    "title": "Building with Blocks",
-    "updatedAt": "2026-03-21T16:06:09.110Z",
-    "blocks": [
-      {
-        "id": "blog-header-1",
-        "type": "SiteHeader",
-        "props": {
-          "siteName": "Sample Site",
-          "logoUrl": "/logo.svg",
-          "links": [
-            {
-              "label": "Home",
-              "href": "/"
-            },
-            {
-              "label": "Features",
-              "href": "/#stats-1"
-            },
-            {
-              "label": "FAQ",
-              "href": "/#faq-1"
-            },
-            {
-              "label": "Blog",
-              "href": "/blog/building-with-blocks"
-            }
-          ]
-        }
-      },
-      {
-        "id": "blog-hero-1",
-        "type": "Hero",
-        "props": {
-          "heading": "Building with Blocks",
-          "subheading": "The web is moving toward composable, block-based architecture — self-contained components with typed schemas, isolated styles, and structured content. In this article, we explore why this approach is winning over teams of every size, and how you can start building with blocks today.",
-          "ctaText": "Start Reading ↓",
-          "ctaHref": "#blog-intro-1",
-          "imageUrl": "/blog-hero.svg",
-          "imageAlt": "Abstract illustration of colorful building blocks",
-          "imagePosition": "right"
-        }
-      },
-      {
-        "id": "blog-intro-1",
-        "type": "RichText",
-        "props": {
-          "body": "The web development landscape has shifted dramatically. Gone are the days of monolithic page templates and tightly-coupled CMS themes. In their place, a new paradigm has emerged: **block-based composition**.\n\nThe idea is simple but powerful — break every page into self-contained, reusable components (blocks), each with its own schema, styles, and rendering logic. A Hero block doesn't know or care what comes after it. A FAQ accordion works the same whether it's on a landing page or a support hub. This isolation is what makes the approach so robust.\n\nWhat makes this more than just \"components\" is the **content layer**. Each block declares a typed schema — a contract for the data it needs. Content lives in structured JSON, completely separate from presentation. Change the text without touching code. Swap the layout without migrating content. Deploy to any static host with zero runtime dependencies."
-        }
-      },
-      {
-        "id": "blog-quote-1",
-        "type": "Quote",
-        "props": {
-          "quote": "The best architectures are the ones that let you change your mind. Block-based sites give you that freedom — swap, reorder, and remix without fear of breaking anything.",
-          "author": "Alex Chen",
-          "role": "Frontend Architect",
-          "imageUrl": "https://placehold.co/300x300/6366f1/ffffff?text=AC",
-          "imageAlt": "Alex Chen avatar"
-        }
-      },
-      {
-        "id": "blog-body-1",
-        "type": "RichText",
-        "props": {
-          "title": "Why It Works",
-          "body": "The block-based approach succeeds because it aligns with how teams actually work. Designers think in sections. Content authors think in fields. Developers think in components. Blocks are the natural meeting point.\n\nHere are the key benefits we've seen in practice:\n\n- **Faster iteration** — add a new section by dropping a block into the page array, no template surgery required\n- **Fewer regressions** — each block is isolated and tested independently, so changes to one never ripple into another\n- **Better collaboration** — designers prototype with real blocks, content authors edit JSON directly, developers extend the system with new block types\n- **Portable content** — your pages.json works with any renderer: React, Vue, server-side templates, or even native apps\n- **Zero-config deployment** — static export means no servers, no databases, no cold starts\n\nThe composability doesn't stop at individual pages. Once you have a library of blocks, building a new page is more like curating a playlist than writing a novel. Pick the blocks you need, fill in the content, and ship."
-        }
-      },
-      {
-        "id": "blog-cta-1",
-        "type": "CTA",
-        "props": {
-          "title": "Want to see it in action?",
-          "description": "Head back to the home page to explore the full sample site built with blocks.",
-          "ctaText": "Back to Home",
-          "ctaHref": "/"
-        }
-      },
-      {
-        "id": "blog-footer-1",
-        "type": "Footer",
-        "props": {
-          "copyright": "© 2026 Sample Site. All rights reserved.",
-          "columns": [
-            {
-              "title": "Product",
-              "links": "Features|/#stats\nFAQ|/#faq"
-            },
-            {
-              "title": "Company",
-              "links": "About|/about\nContact|/#cta"
-            },
-            {
-              "title": "Content",
-              "links": "Blog|/blog/building-with-blocks"
-            }
-          ]
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Learn More",
+          "ctaHref": "/about-us"
         }
       }
     ]
