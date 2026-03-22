@@ -256,6 +256,12 @@ export function useChatEngine(config: ChatEngineConfig) {
       const bootstrapSource = (await bootstrapSourceRes.json()) as { pages?: unknown }
       if (!Array.isArray(bootstrapSource.pages) || bootstrapSource.pages.length === 0) return { slugs: [], synced: false }
 
+      // Only overwrite orchestrator state if the site returns pages with actual content.
+      // If all pages have 0 blocks, the CMS read layer may not support block relations —
+      // don't destroy richer in-memory state from previous editing sessions.
+      const sitePages = bootstrapSource.pages as Array<{ blocks?: unknown[] }>
+      const hasContent = sitePages.some((p) => Array.isArray(p.blocks) && p.blocks.length > 0)
+
       const bootstrapRes = await fetch(`${orchestrator}/draft/bootstrap`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -263,7 +269,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           session,
           siteId,
           pages: bootstrapSource.pages,
-          overwrite: true
+          overwrite: hasContent
         })
       })
       if (!bootstrapRes.ok) return { slugs: [], synced: false }
