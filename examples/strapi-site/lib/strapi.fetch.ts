@@ -85,22 +85,24 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
 export async function getStrapiPage(slug: string): Promise<PageDoc | null> {
   try {
     const res = await strapiFetch<StrapiResponse<StrapiItem[]>>(
-      `/pages?filters[slug][$eq]=${encodeURIComponent(slug)}&populate[blocks][populate]=*`
+      `/pages?filters[slug][$eq]=${encodeURIComponent(slug)}&populate=*`
     )
     if (!res.data || res.data.length === 0) return null
     return strapiEntryToPageDoc(res.data[0])
-  } catch {
+  } catch (err) {
+    console.error("getStrapiPage failed:", err instanceof Error ? err.message : err)
     return null
   }
 }
 
 export async function getStrapiSlugs(): Promise<string[]> {
   try {
-    const res = await strapiFetch<StrapiResponse<StrapiItem[]>>("/pages?fields[0]=slug")
+    const res = await strapiFetch<StrapiResponse<StrapiItem[]>>("/pages?fields[0]=slug&pagination[pageSize]=100")
     return res.data
       .map((item) => item.slug as string)
       .filter(Boolean)
-  } catch {
+  } catch (err) {
+    console.error("getStrapiSlugs failed:", err instanceof Error ? err.message : err)
     return []
   }
 }
@@ -108,12 +110,13 @@ export async function getStrapiSlugs(): Promise<string[]> {
 export async function getStrapiPages(): Promise<PageDoc[]> {
   try {
     const res = await strapiFetch<StrapiResponse<StrapiItem[]>>(
-      "/pages?populate[blocks][populate]=*&pagination[pageSize]=100"
+      "/pages?populate=*&pagination[pageSize]=100"
     )
     return res.data
       .map(strapiEntryToPageDoc)
       .filter((p): p is PageDoc => p !== null)
-  } catch {
+  } catch (err) {
+    console.error("getStrapiPages failed:", err instanceof Error ? err.message : err)
     return []
   }
 }
