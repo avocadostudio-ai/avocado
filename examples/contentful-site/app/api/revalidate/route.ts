@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache"
+import { getContentfulPages } from "../../../lib/contentful"
 
 /**
  * Contentful webhook handler for on-demand ISR revalidation.
@@ -27,6 +28,22 @@ export async function POST(request: Request) {
     const path = slug === "/" ? "/" : `/${slug.replace(/^\//, "")}`
 
     revalidatePath(path)
+
+    // Re-bootstrap orchestrator so the editor auto-refreshes
+    const orchestratorUrl = process.env.ORCHESTRATOR_URL
+    if (orchestratorUrl) {
+      const pages = await getContentfulPages()
+      await fetch(`${orchestratorUrl}/draft/bootstrap`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          session: "dev",
+          siteId: "contentful-site",
+          pages,
+          overwrite: true
+        })
+      }).catch(() => {}) // Best-effort — don't fail the webhook if orchestrator is down
+    }
 
     return Response.json({ revalidated: true, path })
   } catch {

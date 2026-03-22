@@ -23,7 +23,7 @@ export function Table(props: Record<string, unknown>): JSX.Element {
               <thead>
                 <tr>
                   {headers.map((header, idx) => (
-                    <th key={idx}>{renderInline(header)}</th>
+                    <th key={idx} data-editable-target={`headers[${idx}]`}>{renderInline(header)}</th>
                   ))}
                 </tr>
               </thead>
@@ -34,7 +34,7 @@ export function Table(props: Record<string, unknown>): JSX.Element {
                 return (
                   <tr key={rowIdx}>
                     {row.map((rawCell, cellIdx) => (
-                      <td key={cellIdx}>{renderInline(String(rawCell ?? ""))}</td>
+                      <td key={cellIdx} data-editable-target={`rows[${rowIdx}][${cellIdx}]`}>{renderInline(String(rawCell ?? ""))}</td>
                     ))}
                   </tr>
                 )

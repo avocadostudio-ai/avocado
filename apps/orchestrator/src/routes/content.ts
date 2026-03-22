@@ -13,6 +13,7 @@ import {
   getSiteConfig,
   setSiteConfig,
   schedulePersistState,
+  bumpVersion,
   ensureHeroImageProps
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
@@ -83,10 +84,14 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
       draft.set(copy.slug, copy)
     }
 
+    const previewVersion = bumpVersion(scopedSession)
+    schedulePersistState(app.log)
+
     return {
       status: "bootstrapped",
       count: sourcePages.length,
-      slugs: orderSlugsHomeFirst(Array.from(draft.keys()))
+      slugs: orderSlugsHomeFirst(Array.from(draft.keys())),
+      previewVersion
     }
   })
 
