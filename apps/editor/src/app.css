@@ -37,7 +37,8 @@
  * the property panel.  Reset those inside shadcn dialogs / portals.
  */
 [data-slot="dialog-content"] label,
-[data-slot="select-content"] label {
+[data-slot="select-content"] label,
+[data-slot="sheet-content"] label {
   color: inherit;
   font-size: inherit;
 }
