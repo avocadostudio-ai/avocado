@@ -12,7 +12,8 @@ Steps:
 5. Run `pnpm dev` in the background from the contentful site (`/Users/yury/Projects/ai-site-editor/examples/contentful-site`)
 6. Run `pnpm dev` in the background from the sanity site (`/Users/yury/Projects/ai-site-editor/examples/sanity-site`)
 7. Run `pnpm dev` in the background from the strapi site (`/Users/yury/Projects/ai-site-editor/examples/strapi-site`)
-8. Wait a few seconds, then verify each server is responding:
+8. Run Strapi backend in the background: `cd /Users/yury/Projects/strapi-backend && source ~/.nvm/nvm.sh && nvm use 22 && npm run develop` (requires Node 22)
+9. Wait a few seconds, then verify each server is responding:
    - `curl -sf http://localhost:4200/health` (orchestrator)
    - `curl -sf http://localhost:4100` (editor)
    - `curl -sf http://localhost:3000` (avocado site)
@@ -21,4 +22,5 @@ Steps:
    - `curl -sf http://localhost:3003` (contentful site)
    - `curl -sf http://localhost:3004` (sanity site)
    - `curl -sf http://localhost:3005` (strapi site)
-9. Report which servers are up
+   - `curl -sf http://localhost:1337/_health` (strapi backend)
+10. Report which servers are up
