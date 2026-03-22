@@ -27,10 +27,12 @@ export const pageSchema = defineType({
       name: "blocks",
       title: "Blocks",
       type: "array",
-      of: blockSchemas.map((schema) => ({
-        type: "reference",
-        to: [{ type: schema.name }],
-      })),
+      of: [
+        {
+          type: "reference",
+          to: blockSchemas.map((schema) => ({ type: schema.name })),
+        },
+      ],
     }),
     defineField({
       name: "meta",
