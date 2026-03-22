@@ -1,6 +1,7 @@
 import { createClient } from "@sanity/client"
 
-const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!
+const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
+if (!projectId) throw new Error("NEXT_PUBLIC_SANITY_PROJECT_ID is required")
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET ?? "production"
 const apiVersion = "2024-01-01"
 

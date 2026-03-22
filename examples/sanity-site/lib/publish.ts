@@ -1,17 +1,6 @@
 import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
 import { writeClient } from "./sanity.client"
-
-/** Fields that should be uploaded as Sanity image assets */
-function getImageFields(blockType: string): Set<string> {
-  const meta = getAllBlockMeta()[blockType]
-  if (!meta) return new Set()
-  const result = new Set<string>()
-  for (const [key, fm] of Object.entries(meta.fields)) {
-    if (fm.kind === "image") result.add(key)
-  }
-  return result
-}
+import { toSanityName, getImageFields } from "./sanity.utils"
 
 /** Upload an image URL as a Sanity asset, return the asset reference */
 type SanityImageRef = { _type: "image"; asset: { _type: "reference"; _ref: string } }
@@ -61,10 +50,7 @@ export function createSanityPublishHandler(): OnPublishFn {
 
       for (const block of page.blocks) {
         const blockId = `block-${block.id}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 128)
-        // Convert PascalCase to Sanity name: CTA → cta, FAQAccordion → faqAccordion
-        const blockType = block.type === block.type.toUpperCase()
-          ? block.type.toLowerCase()
-          : (() => { const m = block.type.match(/^([A-Z]+)([A-Z][a-z].*)$/); return m ? m[1].toLowerCase() + m[2] : block.type.charAt(0).toLowerCase() + block.type.slice(1) })()
+        const blockType = toSanityName(block.type)
         const imageFields = getImageFields(block.type)
 
         const doc: Record<string, unknown> = {

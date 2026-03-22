@@ -1,32 +1,8 @@
 import { client } from "./sanity.client"
 import { pageBySlugQuery, allSlugsQuery, allPagesQuery, siteConfigQuery } from "./sanity.queries"
 import { sanityImageUrl } from "./sanity.image"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { sanityNameToBlockType, getImageFields } from "./sanity.utils"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
-
-/** Build a reverse lookup: sanity name → block type (e.g., "cta" → "CTA", "faqAccordion" → "FAQAccordion") */
-const sanityNameMap = new Map<string, string>()
-for (const blockType of Object.keys(getAllBlockMeta())) {
-  const sanityName = blockType === blockType.toUpperCase()
-    ? blockType.toLowerCase()
-    : (() => { const m = blockType.match(/^([A-Z]+)([A-Z][a-z].*)$/); return m ? m[1].toLowerCase() + m[2] : blockType.charAt(0).toLowerCase() + blockType.slice(1) })()
-  sanityNameMap.set(sanityName, blockType)
-}
-
-function sanityNameToBlockType(sanityName: string): string {
-  return sanityNameMap.get(sanityName) ?? sanityName.charAt(0).toUpperCase() + sanityName.slice(1)
-}
-
-/** Fields that are Sanity image objects — resolve to CDN URLs */
-function getImageFields(blockType: string): Set<string> {
-  const meta = getAllBlockMeta()[blockType]
-  if (!meta) return new Set()
-  const result = new Set<string>()
-  for (const [key, fm] of Object.entries(meta.fields)) {
-    if (fm.kind === "image") result.add(key)
-  }
-  return result
-}
 
 /** Convert a Sanity block document to a BlockInstance */
 function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {
@@ -97,9 +73,15 @@ export async function getSanityPages(): Promise<PageDoc[]> {
 export async function getSanitySiteConfig(): Promise<SiteConfig> {
   const doc = await client.fetch<Record<string, unknown> | null>(siteConfigQuery)
   if (!doc) return {}
+  // Transform navLabels from Sanity array [{slug, label}] to Record<string, string>
+  const rawLabels = doc.navLabels as Array<{ slug?: string; label?: string }> | undefined
+  const navLabels = Array.isArray(rawLabels) && rawLabels.length > 0
+    ? Object.fromEntries(rawLabels.filter((l) => l.slug && l.label).map((l) => [l.slug!, l.label!]))
+    : undefined
+
   return {
     name: (doc.name as string) || undefined,
     logo: (doc.logo as string) || undefined,
-    navLabels: (doc.navLabels as Record<string, string>) || undefined,
+    navLabels,
   }
 }
