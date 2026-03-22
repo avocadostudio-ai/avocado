@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw } from "lucide-react"
+import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud } from "lucide-react"
 import { orchestrator } from "../lib/editor-utils"
 
 type ImageItem = {
@@ -11,11 +11,12 @@ type ImageItem = {
   author?: string
 }
 
-type Tab = "drive" | "unsplash" | "upload" | "generate"
+type Tab = "drive" | "unsplash" | "contentful" | "upload" | "generate"
 
 type Features = {
   googleDrive?: boolean
   unsplash?: boolean
+  contentful?: boolean
   imageGenerate?: boolean
 }
 
@@ -32,6 +33,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const availableTabs: Tab[] = []
   if (features.googleDrive) availableTabs.push("drive")
   if (features.unsplash) availableTabs.push("unsplash")
+  if (features.contentful) availableTabs.push("contentful")
   availableTabs.push("upload")
   if (features.imageGenerate) availableTabs.push("generate")
 
@@ -101,6 +103,23 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
   }, [])
 
+  const fetchContentfulAssets = useCallback(async (q?: string, page = 1) => {
+    const id = ++requestIdRef.current
+    if (page === 1) setLoading(true); else setLoadingMore(true)
+    try {
+      const params = new URLSearchParams({ limit: "20", page: String(page) })
+      if (q) params.set("q", q)
+      const res = await fetch(`${orchestrator}/contentful/assets?${params}`)
+      if (id !== requestIdRef.current) return
+      if (!res.ok) { if (page === 1) setItems([]); setHasMoreUnsplash(false); return }
+      const data = (await res.json()) as { items: ImageItem[]; totalPages: number }
+      if (id !== requestIdRef.current) return
+      setItems((prev) => page === 1 ? data.items : [...prev, ...data.items])
+      setHasMoreUnsplash(page < data.totalPages)
+    } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMoreUnsplash(false) } }
+    finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
+  }, [])
+
   // Reset state on open / tab switch
   useEffect(() => {
     if (!open) return
@@ -117,7 +136,8 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     setHasMoreUnsplash(false)
     setLoadingMore(false)
     if (activeTab === "drive" && features.googleDrive) void fetchDriveImages()
-  }, [open, activeTab, features.googleDrive, fetchDriveImages])
+    if (activeTab === "contentful" && features.contentful) void fetchContentfulAssets()
+  }, [open, activeTab, features.googleDrive, features.contentful, fetchDriveImages, fetchContentfulAssets])
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
@@ -126,6 +146,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     searchTimerRef.current = setTimeout(() => {
       if (activeTab === "drive") void fetchDriveImages(value || undefined)
       if (activeTab === "unsplash") void fetchUnsplashImages(value || undefined, 1)
+      if (activeTab === "contentful") void fetchContentfulAssets(value || undefined, 1)
     }, 400)
   }
 
@@ -181,7 +202,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
       const item = items.find((i) => i.id === selectedId)
       if (!item) return
       const url = item.imageUrl ?? ""
-      const alt = item.alt ?? item.name?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") ?? "Image"
+      const alt = item.alt || item.name?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") || "Image"
       onSelect(url, alt)
     }
     onClose()
@@ -199,6 +220,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const tabConfig: Record<Tab, { label: string; icon: React.ReactNode }> = {
     drive: { label: "Drive", icon: <HardDrive size={14} /> },
     unsplash: { label: "Unsplash", icon: <ImageIcon size={14} /> },
+    contentful: { label: "Contentful", icon: <Cloud size={14} /> },
     upload: { label: "Upload", icon: <Upload size={14} /> },
     generate: { label: "Generate", icon: <Sparkles size={14} /> }
   }
@@ -208,7 +230,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     : activeTab === "generate" ? Boolean(generatedResult)
     : Boolean(selectedId)
 
-  const isGridTab = activeTab === "drive" || activeTab === "unsplash"
+  const isGridTab = activeTab === "drive" || activeTab === "unsplash" || activeTab === "contentful"
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -239,7 +261,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
               <Search size={15} style={{ color: "#88a1c6", flexShrink: 0 }} />
               <input
                 type="text"
-                placeholder={activeTab === "unsplash" ? "Search Unsplash photos..." : "Search Drive images..."}
+                placeholder={activeTab === "unsplash" ? "Search Unsplash photos..." : activeTab === "contentful" ? "Search Contentful assets..." : "Search Drive images..."}
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 style={S.searchInput}
@@ -273,14 +295,15 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
                   </button>
                 ))}
               </div>
-              {activeTab === "unsplash" && hasMoreUnsplash && items.length > 0 && !loading && !loadingMore && (
+              {(activeTab === "unsplash" || activeTab === "contentful") && hasMoreUnsplash && items.length > 0 && !loading && !loadingMore && (
                 <div style={S.loadMoreRow}>
                   <button
                     style={S.loadMoreBtn}
                     onClick={() => {
                       const next = unsplashPage + 1
                       setUnsplashPage(next)
-                      void fetchUnsplashImages(searchQuery || undefined, next)
+                      if (activeTab === "contentful") void fetchContentfulAssets(searchQuery || undefined, next)
+                      else void fetchUnsplashImages(searchQuery || undefined, next)
                     }}
                   >
                     Load more

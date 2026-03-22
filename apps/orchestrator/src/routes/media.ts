@@ -186,6 +186,64 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
     }
   })
 
+  // Contentful assets proxy for the editor image picker
+  app.get("/contentful/assets", async (request, reply) => {
+    const spaceId = process.env.CONTENTFUL_SPACE_ID?.trim()
+    const token = process.env.CONTENTFUL_DELIVERY_TOKEN?.trim()
+    if (!spaceId || !token) {
+      return reply.code(404).send({ error: "Contentful not configured" })
+    }
+    const env = process.env.CONTENTFUL_ENVIRONMENT?.trim() || "master"
+    const query = request.query as { q?: string; limit?: string; page?: string }
+    const q = typeof query.q === "string" ? query.q.trim() : ""
+    const limit = Math.min(20, Math.max(1, Number(query.limit) || 20))
+    const page = Math.max(1, Math.trunc(Number(query.page) || 1))
+    const skip = (page - 1) * limit
+
+    try {
+      const params = new URLSearchParams({
+        access_token: token,
+        mimetype_group: "image",
+        limit: String(limit),
+        skip: String(skip),
+        order: "-sys.createdAt"
+      })
+      if (q) params.set("query", q)
+
+      const endpoint = `https://cdn.contentful.com/spaces/${spaceId}/environments/${env}/assets?${params}`
+      const res = await fetch(endpoint)
+      if (!res.ok) return { items: [], totalPages: 0 }
+      const payload = (await res.json()) as {
+        total?: number
+        items?: Array<{
+          sys?: { id?: string }
+          fields?: {
+            title?: string
+            description?: string
+            file?: { url?: string; contentType?: string }
+          }
+        }>
+      }
+      const items = (payload.items ?? [])
+        .filter((a) => a.sys?.id && a.fields?.file?.url)
+        .map((a) => {
+          const fileUrl = `https:${a.fields!.file!.url!}`
+          return {
+            id: a.sys!.id!,
+            name: a.fields?.title ?? "",
+            thumbUrl: `${fileUrl}?w=300&h=200&fit=thumb`,
+            imageUrl: `${fileUrl}?w=1600&q=80`,
+            alt: a.fields?.description ?? a.fields?.title ?? ""
+          }
+        })
+      const total = payload.total ?? 0
+      const totalPages = Math.ceil(total / limit)
+      return { items, totalPages }
+    } catch {
+      return { items: [], totalPages: 0 }
+    }
+  })
+
   // Unsplash search proxy for the editor image picker
   app.get("/unsplash/search", async (request, reply) => {
     const accessKey = process.env.UNSPLASH_ACCESS_KEY?.trim()
