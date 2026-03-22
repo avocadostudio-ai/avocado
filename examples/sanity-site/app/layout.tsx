@@ -5,6 +5,7 @@ import type { ReactNode } from "react"
 export const metadata: Metadata = {
   title: "Sanity Site",
   description: "A Next.js site powered by Sanity, with AI editor integration.",
+  icons: { icon: "/favicon.svg" },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

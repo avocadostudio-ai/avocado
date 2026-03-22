@@ -809,8 +809,13 @@ export async function runChatPipeline(
     }
   }
 
-  const current = getPage(body.session, effectiveSlug)
-  if (!current) return { code: 404, payload: { error: "page not found" } }
+  let current = getPage(body.session, effectiveSlug)
+  if (!current) {
+    // Allow page-creation requests through by providing an empty stub page
+    const looksLikeCreatePage = body.message && /\b(create|add|make|build|generate|new)\b.*\b(page|homepage|landing)\b/i.test(body.message)
+    if (!looksLikeCreatePage) return { code: 404, payload: { error: "page not found" } }
+    current = { id: effectiveSlug, slug: effectiveSlug, title: "", updatedAt: new Date().toISOString(), blocks: [] }
+  }
 
   if (body.message && isInfoQuery(body.message) && !isBatchAddRequest(body.message)) {
     const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
