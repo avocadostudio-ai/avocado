@@ -17,6 +17,8 @@ registerBlock("Table", {
     fields: {
       title: f.text("Section title"),
       headingLevel: f.headingLevel(),
+      headers: f.text("Column headers"),
+      rows: f.text("Table rows"),
       striped: { kind: "enum", label: "Striped rows", options: ["true", "false"], inlineEditable: false },
     },
   }

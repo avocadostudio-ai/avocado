@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Bot, Check, Copy, Ellipsis, ExternalLink, Settings, SlidersHorizontal } from "lucide-react"
+import { Bot, Check, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
@@ -1140,6 +1140,25 @@ function EditorPage({
                 onClick={() => sites.setConfigSiteId(siteId)}
               >
                 <Settings size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="chat-header-icon-btn"
+                aria-label="Sync from site"
+                title="Sync content from site"
+                disabled={chatEngine.isLoading}
+                onClick={async () => {
+                  const count = await chatEngine.syncFromSite()
+                  if (count > 0) {
+                    chatEngine.pushAssistantFromResult({
+                      status: "applied",
+                      summary: `Synced ${count} page${count === 1 ? "" : "s"} from site.`,
+                      changes: []
+                    })
+                  }
+                }}
+              >
+                <RefreshCw size={14} aria-hidden="true" />
               </button>
               <a href="/sites" className="chat-header-switch-site">All sites</a>
             </div>

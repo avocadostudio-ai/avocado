@@ -249,6 +249,48 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
+  async function bootstrapFromSite(): Promise<{ slugs: string[]; synced: boolean }> {
+    try {
+      const bootstrapSourceRes = await fetch(`${activeSiteOrigin}/api/editor/pages?siteId=${encodeURIComponent(siteId)}`)
+      if (!bootstrapSourceRes.ok) return { slugs: [], synced: false }
+      const bootstrapSource = (await bootstrapSourceRes.json()) as { pages?: unknown }
+      if (!Array.isArray(bootstrapSource.pages) || bootstrapSource.pages.length === 0) return { slugs: [], synced: false }
+
+      const bootstrapRes = await fetch(`${orchestrator}/draft/bootstrap`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          session,
+          siteId,
+          pages: bootstrapSource.pages,
+          overwrite: true
+        })
+      })
+      if (!bootstrapRes.ok) return { slugs: [], synced: false }
+      const bootstrapData = (await bootstrapRes.json()) as { slugs?: string[] }
+      return { slugs: bootstrapData.slugs ?? [], synced: true }
+    } catch {
+      return { slugs: [], synced: false }
+    }
+  }
+
+  async function syncFromSite(): Promise<number> {
+    setIsLoadingSlugs(true)
+    try {
+      const result = await bootstrapFromSite()
+      if (result.synced && result.slugs.length > 0) {
+        setAvailableSlugs(result.slugs)
+        postToSite("draftUpdated", { focusBlockId: null })
+      }
+      return result.slugs.length
+    } finally {
+      setIsLoadingSlugs(false)
+    }
+  }
+
+  // Track whether the initial bootstrap has happened for this session
+  const hasBootstrappedRef = useRef(false)
+
   async function refreshRouteSlugs() {
     setIsLoadingSlugs(true)
     try {
@@ -259,42 +301,20 @@ export function useChatEngine(config: ChatEngineConfig) {
       const list = Array.isArray(data.slugs)
         ? data.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
         : []
+
+      // On first load for this session, always sync from the site to pick up CMS changes
+      if (!hasBootstrappedRef.current) {
+        hasBootstrappedRef.current = true
+        const bootstrapResult = await bootstrapFromSite()
+        if (bootstrapResult.synced && bootstrapResult.slugs.length > 0) {
+          setAvailableSlugs(bootstrapResult.slugs)
+          return bootstrapResult.slugs
+        }
+      }
+
       if (list.length > 0) {
         setAvailableSlugs(list)
         return list
-      }
-
-      // Auto-bootstrap for new site namespaces with no draft pages.
-      try {
-        const bootstrapSourceRes = await fetch(`${activeSiteOrigin}/api/editor/pages?siteId=${encodeURIComponent(siteId)}`)
-        if (bootstrapSourceRes.ok) {
-          const bootstrapSource = (await bootstrapSourceRes.json()) as { pages?: unknown }
-          if (Array.isArray(bootstrapSource.pages) && bootstrapSource.pages.length > 0) {
-            await fetch(`${orchestrator}/draft/bootstrap`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                session,
-                siteId,
-                pages: bootstrapSource.pages,
-                overwrite: false
-              })
-            })
-            const second = await fetch(slugsUrl)
-            if (second.ok) {
-              const secondData = (await second.json()) as { slugs?: unknown }
-              const secondList = Array.isArray(secondData.slugs)
-                ? secondData.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
-                : []
-              if (secondList.length > 0) {
-                setAvailableSlugs(secondList)
-                return secondList
-              }
-            }
-          }
-        }
-      } catch {
-        // Keep fallback route options when bootstrap is unavailable.
       }
 
       return routeOptionsRef.current
@@ -1309,6 +1329,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     continuationChainId,
     applyUndoHistory: undoHistory.applyUndoHistory,
     refreshRouteSlugs,
+    syncFromSite,
     addBlockAfter: structuralOps.addBlockAfter,
     addListItem: structuralOps.addListItem,
     removeListItem: structuralOps.removeListItem,
