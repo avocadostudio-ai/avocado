@@ -3,7 +3,7 @@
     "id": "home-1",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-22T05:13:45.476Z",
+    "updatedAt": "2026-03-22T05:15:48.033Z",
     "meta": {
       "title": "Home",
       "description": "A Contentful-powered site"
@@ -26,7 +26,7 @@
         "id": "b_richtext_1774156395336",
         "type": "RichText",
         "props": {
-          "title": "Powered by Contentful",
+          "title": "Powered by Contentful!",
           "body": "This site is built with Contentful, a headless CMS that separates content management from presentation. That means you can manage your content once and deliver it anywhere—web, mobile, or any channel you choose.\n\nWith Contentful's flexible content model, you define your own content structure without rigid page templates. APIs let your developers fetch and display content exactly how they need it, while content editors work in an intuitive interface.\n\nContentful's powerful capabilities extend beyond simple publishing. You gain real-time collaboration features, version control, and workflow management that ensure your team stays synchronized. Advanced scheduling tools let you plan content releases months in advance, while webhooks and real-time updates keep your digital experiences fresh and responsive to your audience's needs.\n\nThe beauty of a headless approach lies in its flexibility and scalability. Whether you're managing a single website, multiple microsites, or delivering content to IoT devices and voice assistants, Contentful adapts to your architecture. You're never locked into a particular presentation layer, giving you complete freedom to innovate and evolve your digital strategy without constraints.\n\n**Ready to experience the power of structured content?** Start exploring Contentful today and transform how you manage your digital experiences."
         }
       },
