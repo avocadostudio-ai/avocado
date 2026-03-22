@@ -97,7 +97,7 @@ export function createSanityPublishHandler(): OnPublishFn {
         title: page.title,
         pageId: page.id,
         blocks: blockRefs,
-        meta: page.meta ?? null,
+        ...(page.meta ? { meta: page.meta } : {}),
       })
     }
 
