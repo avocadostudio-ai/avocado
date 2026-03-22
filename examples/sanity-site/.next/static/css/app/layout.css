@@ -1,0 +1,1925 @@
+/*!******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/_base.css ***!
+  \******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+section {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  background: var(--section-bg);
+  border: 0;
+  border-radius: 0;
+  padding: 24px 20px;
+  margin-bottom: 0;
+}
+
+.section__inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.section__inner > h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.75rem, 2.3vw, 2.15rem);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+  color: var(--heading);
+}
+
+/* ── Buttons ── */
+.btn-primary,
+.btn-secondary,
+.btn-tertiary {
+  display: inline-block;
+  padding: 10px 22px;
+  border-radius: var(--radius-btn);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+
+/* Primary — solid brand fill */
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-fg);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+.btn-primary:hover {
+  opacity: 0.88;
+}
+
+/* Secondary — outlined */
+.btn-secondary {
+  background: transparent;
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+.btn-secondary:hover {
+  background: var(--brand-subtle);
+}
+
+/* Tertiary — text-only, underline for tap affordance on mobile */
+.btn-tertiary {
+  background: transparent;
+  color: var(--brand);
+  padding: 10px 16px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.btn-tertiary:hover {
+  background: var(--brand-subtle);
+  text-decoration: none;
+}
+
+/* Dark overrides */
+.dark .btn-primary {
+  box-shadow: 0 2px 8px rgb(2 6 23 / 0.35);
+}
+
+.dark .btn-primary:hover {
+  opacity: 0.88;
+}
+
+.dark .btn-secondary {
+  color: #5eead4;
+  border-color: #14b8a6;
+}
+
+.dark .btn-secondary:hover {
+  background: rgb(20 184 166 / 0.16);
+}
+
+.dark .btn-tertiary {
+  color: #5eead4;
+}
+
+.dark .btn-tertiary:hover {
+  background: rgb(20 184 166 / 0.16);
+}
+
+@media (max-width: 900px) {
+  section {
+    padding: 20px 16px;
+  }
+}
+
+/*!********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/_layout.css ***!
+  \********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/* ── Shared two-column grid layout ────────────────────────── */
+
+.layout-grid {
+  display: grid;
+  align-items: center;
+}
+
+.layout-grid--balanced {
+  grid-template-columns: 1fr 1fr;
+}
+
+.layout-grid--content-heavy {
+  grid-template-columns: 1.15fr 1fr;
+}
+
+.layout-grid__col {
+  min-width: 0;
+}
+
+/* Image reorder: place media before content */
+.layout-grid--image-left > :first-child {
+  order: 2;
+}
+.layout-grid--image-left > :last-child {
+  order: 1;
+}
+
+/* Responsive image inside grid columns */
+.layout-grid__img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+/* Stack to single column on narrow viewports */
+@media (max-width: 900px) {
+  .layout-grid--balanced,
+  .layout-grid--content-heavy {
+    grid-template-columns: 1fr;
+  }
+
+  .layout-grid--image-left > :first-child,
+  .layout-grid--image-left > :last-child {
+    order: unset;
+  }
+}
+
+/*!************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/hero/styles.css ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.hero {
+  border-radius: 0;
+  padding: 56px 20px;
+  background: var(--hero-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero__inner {
+  position: relative;
+  gap: 24px;
+}
+
+.hero__content h1 {
+  margin: 0 0 14px;
+  font-size: clamp(2rem, 4.2vw, 3.35rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  color: var(--heading);
+}
+
+.hero__content p {
+  margin: 0;
+  font-size: clamp(1rem, 1.65vw, 1.05rem);
+  line-height: 1.55;
+  color: var(--text-200);
+  max-width: 36ch;
+}
+
+.hero__media img {
+  background: var(--placeholder-img);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Dark */
+.dark .hero__content p {
+  color: var(--body);
+}
+
+@media (max-width: 900px) {
+  .hero__content h1 {
+    font-size: clamp(1.75rem, 8vw, 2.5rem);
+    line-height: 1.12;
+  }
+
+  .hero {
+    padding: 40px 16px;
+  }
+}
+
+/*!********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/feature-grid/styles.css ***!
+  \********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-gap: 14px;
+  gap: 14px;
+  margin-top: 16px;
+  list-style: none;
+  padding: 0;
+}
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-feature);
+  padding: 20px;
+}
+
+.feature-card strong {
+  display: block;
+  font-size: 1.125rem;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--heading);
+}
+
+.feature-card p {
+  margin: 0;
+  color: var(--body-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*!********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/testimonials/styles.css ***!
+  \********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-gap: 16px;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.testimonial-card {
+  margin: 0;
+  padding: 20px 24px 20px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border-left: 3px solid var(--brand);
+  position: relative;
+}
+
+.testimonial-card__mark {
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--brand);
+  opacity: 0.25;
+  display: block;
+  margin-bottom: 6px;
+  font-family: Georgia, serif;
+}
+
+.testimonial-card__quote {
+  margin: 0 0 14px;
+  font-style: italic;
+  color: var(--body);
+  font-size: 1rem;
+  line-height: 1.62;
+}
+
+.testimonial-card__author {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: var(--caption);
+}
+
+/* Dark */
+.dark .testimonial-card__mark {
+  color: #22d3ee;
+  opacity: 0.35;
+}
+
+@media (max-width: 900px) {
+  .testimonials-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*!*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/faq-accordion/styles.css ***!
+  \*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.faq-item {
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.faq-item:first-of-type {
+  border-top: 1px solid var(--surface-border);
+}
+
+.faq-item summary {
+  padding: 14px 40px 14px 0;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--caption);
+  border-bottom: 2px solid var(--caption);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.faq-item[open] summary::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.faq-item > p {
+  padding: 4px 0 16px;
+  margin: 0;
+  color: var(--body-secondary);
+  line-height: 1.65;
+}
+
+/* Dark */
+.dark .faq-item summary {
+  color: #e2e8f0;
+}
+
+/*!***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/cta/styles.css ***!
+  \***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.cta-section {
+  text-align: center;
+  padding: 40px 20px;
+  position: relative;
+  overflow: hidden;
+  background: var(--cta-bg);
+}
+
+.cta-section .section__inner {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  max-width: 1080px;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  grid-row-gap: 18px;
+  row-gap: 18px;
+}
+
+.cta-section .section__inner > h2 {
+  margin: 0;
+  max-width: 22ch;
+  font-size: clamp(2rem, 3.7vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.cta-section .section__inner > p {
+  margin: 0;
+  max-width: 62ch;
+  font-size: clamp(1.1rem, 1.9vw, 1.15rem);
+  line-height: 1.5;
+  color: var(--body);
+  text-wrap: pretty;
+}
+
+.cta-section .section__inner > .btn-primary {
+  margin-top: 4px;
+  min-width: 255px;
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.cta-section::before {
+  content: "";
+  position: absolute;
+  inset: auto -8% -55% auto;
+  width: 340px;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle at center, rgb(20 184 166 / 0.2), transparent 68%);
+  pointer-events: none;
+}
+
+/* Dark */
+.dark .cta-section [data-editable-target="description"] {
+  color: #d6e2f5;
+}
+
+.dark main.editor-mode .cta-section [data-editable-target="description"] {
+  color: #dbe7f7;
+}
+
+.dark .editor-live-draft-active .cta-section [data-editable-target="description"]::after {
+  background: rgba(56, 189, 248, 0.025);
+  animation: none;
+}
+
+@media (max-width: 900px) {
+  .cta-section .section__inner {
+    padding: 24px 16px;
+    row-gap: 14px;
+  }
+
+  .cta-section .section__inner > h2 {
+    max-width: 16ch;
+  }
+
+  .cta-section .section__inner > p {
+    max-width: 40ch;
+    font-size: 1rem;
+  }
+
+  .cta-section .section__inner > .btn-primary {
+    min-width: 220px;
+    font-size: 1rem;
+    padding: 12px 26px;
+  }
+}
+
+/*!************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/card/styles.css ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.card {
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.card__image-wrap {
+  margin: -16px -16px 12px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.card__image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  background: var(--placeholder-img);
+}
+
+.card h3 {
+  margin: 0 0 10px;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.card p {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--body);
+}
+
+.card .btn-primary,
+.card .btn-secondary {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/card-grid/styles.css ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-gap: 14px;
+  gap: 14px;
+}
+
+.card-grid-section h2 {
+  margin-bottom: 16px;
+}
+
+.card-grid .card {
+  background-color: var(--surface);
+  background-image:
+    radial-gradient(circle at 100% 0, rgba(15, 118, 110, 0.1) 0, rgba(15, 118, 110, 0) 42%),
+    linear-gradient(145deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0) 38%);
+  border: 1px solid var(--surface-border);
+}
+
+/* Dark */
+.dark .card-grid .card {
+  background-image: none;
+}
+
+@media (max-width: 900px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/rich-text/styles.css ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.rich-text {}
+
+.rich-text__body p {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--body-secondary);
+  margin-bottom: 1em;
+}
+
+.rich-text__body p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text__body ul,
+.rich-text__body ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+  color: var(--body-secondary);
+  line-height: 1.75;
+}
+
+.rich-text__body ul {
+  list-style: disc;
+}
+
+.rich-text__body ol {
+  list-style: decimal;
+}
+
+.rich-text__body li {
+  display: list-item;
+}
+
+.rich-text__body li + li {
+  margin-top: 0.3em;
+}
+
+.rich-text__body h3 {
+  margin-top: 1.25em;
+  margin-bottom: 0.45em;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+/* Dark */
+.dark .rich-text__body,
+.dark .rich-text__body li,
+.dark .rich-text__body strong,
+.dark .rich-text__body em {
+  color: #dbe7f7;
+}
+
+.dark main.editor-mode .rich-text__body p,
+.dark main.editor-mode .rich-text__body li {
+  color: #dbe7f7;
+}
+
+.dark .editor-live-draft-active .rich-text__body[data-editable-target]::after {
+  background: rgba(56, 189, 248, 0.025);
+  animation: none;
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/stats/styles.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.stats-section {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.stats-section .section__inner > h2 {
+  margin-bottom: 24px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-gap: 24px;
+  gap: 24px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-item__value {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--brand);
+}
+
+.stat-item__label {
+  font-size: 0.9375rem;
+  color: var(--caption);
+  font-weight: 500;
+}
+
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*!******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/two-column/styles.css ***!
+  \******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.two-column {
+  padding: 40px 20px;
+}
+
+.two-column__inner {
+  gap: 32px;
+}
+
+.two-column__text h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.75rem, 2.3vw, 2.15rem);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+  color: var(--heading);
+}
+
+.two-column__body {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--body-secondary);
+  margin-bottom: 16px;
+}
+
+.two-column__body p {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--body-secondary);
+  margin-bottom: 1em;
+}
+
+.two-column__body p:last-child {
+  margin-bottom: 0;
+}
+
+.two-column__body ul,
+.two-column__body ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+  color: var(--body-secondary);
+  line-height: 1.75;
+}
+
+.two-column__body ul {
+  list-style: disc;
+}
+
+.two-column__body ol {
+  list-style: decimal;
+}
+
+.two-column__body li {
+  display: list-item;
+}
+
+.two-column__body li + li {
+  margin-top: 0.3em;
+}
+
+.two-column__body h3 {
+  margin-top: 1.25em;
+  margin-bottom: 0.45em;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.two-column__cta {
+  margin-top: 8px;
+}
+
+.two-column__media img {
+  border-radius: var(--radius-btn);
+  background: var(--placeholder-img);
+}
+
+@media (max-width: 900px) {
+  .two-column--image-left .two-column__media {
+    order: 0;
+  }
+}
+
+/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/site-header/styles.css ***!
+  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.site-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 20px;
+  background: var(--bg-100, #fff);
+  border-bottom: 1px solid var(--border, #e4e4e7);
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.site-top-nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 960px;
+}
+
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--text-100, #18181b);
+  font-weight: 600;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.site-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-logo, 8px);
+  object-fit: contain;
+}
+
+.site-brand-text {
+  white-space: nowrap;
+}
+
+/* Desktop nav */
+.site-nav-links-desktop {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.site-nav-links-desktop a {
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-btn, 6px);
+  text-decoration: none;
+  color: var(--text-300, #52525b);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+}
+
+.site-nav-links-desktop a:hover {
+  color: var(--text-100, #18181b);
+}
+
+.site-nav-links-desktop a.is-active {
+  color: var(--text-100, #18181b);
+  font-weight: 600;
+}
+
+/* Theme toggle */
+.site-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-btn, 6px);
+  background: transparent;
+  color: var(--text-300, #52525b);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.site-theme-toggle:hover {
+  color: var(--text-100, #18181b);
+  background: var(--bg-200, #f4f4f5);
+}
+
+.site-theme-toggle-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* Mobile menu */
+.site-mobile-menu {
+  display: none;
+}
+
+.site-mobile-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-btn, 6px);
+  background: transparent;
+  color: var(--text-300, #52525b);
+  cursor: pointer;
+}
+
+.site-mobile-menu-button:hover {
+  background: var(--bg-200, #f4f4f5);
+}
+
+.burger-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 18px;
+}
+
+.burger-icon i {
+  display: block;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.site-mobile-menu.is-open .burger-icon i:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.site-mobile-menu.is-open .burger-icon i:nth-child(2) {
+  opacity: 0;
+}
+
+.site-mobile-menu.is-open .burger-icon i:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.site-nav-links-mobile {
+  position: absolute;
+  top: 100%;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 0.5rem;
+  background: var(--bg-100, #fff);
+  border: 1px solid var(--border, #e4e4e7);
+  border-radius: var(--radius-dropdown, 10px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+  z-index: 200;
+}
+
+.site-nav-links-mobile a {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-btn, 6px);
+  text-decoration: none;
+  color: var(--text-200, #27272a);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.site-nav-links-mobile a:hover,
+.site-nav-links-mobile a.is-active {
+  background: var(--bg-200, #f4f4f5);
+}
+
+.site-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+/* Responsive: hide desktop nav, show mobile menu on small screens */
+@media (max-width: 768px) {
+  .site-nav-links-desktop {
+    display: none;
+  }
+  .site-mobile-menu {
+    display: block;
+    margin-left: auto;
+  }
+  .site-theme-toggle {
+    margin-left: 0;
+  }
+}
+
+/*!**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/footer/styles.css ***!
+  \**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.site-footer {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  background: var(--footer-bg);
+  color: var(--footer-text);
+  padding: 40px 20px 24px;
+}
+
+.site-footer .section__inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.site-footer__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-gap: 32px;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.site-footer__col h4 {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--footer-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.site-footer__col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.site-footer__col a {
+  color: var(--footer-link);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  transition: color 0.15s;
+}
+
+.site-footer__col a:hover {
+  color: var(--footer-link-hover);
+}
+
+.site-footer__copyright {
+  border-top: 1px solid var(--footer-border);
+  padding-top: 16px;
+  font-size: 0.875rem;
+  color: var(--caption);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .site-footer__columns {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/embed/styles.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.embed-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.embed-block .section__inner {
+  max-width: 960px;
+  display: grid;
+  grid-row-gap: 12px;
+  row-gap: 12px;
+  justify-items: center;
+}
+
+/* Responsive iframe container */
+.embed-block__frame {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card, 12px);
+  background: var(--bg-1);
+}
+
+.embed-block__frame--16-9 { aspect-ratio: 16 / 9; }
+.embed-block__frame--4-3  { aspect-ratio: 4 / 3; }
+.embed-block__frame--1-1  { aspect-ratio: 1 / 1; }
+
+.embed-block__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.embed-block__caption {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-200);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.embed-block__error {
+  margin: 0;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-200);
+  font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .embed-block {
+    padding: 24px 12px;
+  }
+
+  .embed-block__frame {
+    border-radius: var(--radius-card, 8px);
+  }
+}
+
+/*!**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/banner/styles.css ***!
+  \**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.banner {
+  padding: 16px 20px;
+}
+
+.banner__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.banner__text {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.banner__cta.btn-primary {
+  padding: 8px 20px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* Variants — light mode */
+.banner--info {
+  background: var(--brand-subtle, #e0f2fe);
+  color: var(--heading);
+}
+
+.banner--success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.banner--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Dark mode */
+.dark .banner--info {
+  background: color-mix(in srgb, var(--brand) 15%, var(--bg-1));
+  color: var(--text-100);
+}
+
+.dark .banner--success {
+  background: color-mix(in srgb, #10b981 15%, var(--bg-1));
+  color: #6ee7b7;
+}
+
+.dark .banner--warning {
+  background: color-mix(in srgb, #f59e0b 15%, var(--bg-1));
+  color: #fcd34d;
+}
+
+@media (max-width: 900px) {
+  .banner {
+    padding: 12px 12px;
+  }
+
+  .banner__inner {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .banner__text {
+    font-size: 0.95rem;
+  }
+}
+
+/*!****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/carousel/styles.css ***!
+  \****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.carousel {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.carousel__inner {
+  position: relative;
+}
+
+/* Track — scroll-snap container */
+.carousel__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  gap: 0;
+  scrollbar-width: none;
+}
+
+.carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+/* Slide */
+.carousel__slide {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  position: relative;
+  border-radius: var(--radius-card, 12px);
+  overflow: hidden;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+}
+
+.carousel__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+/* Caption area */
+.carousel__caption {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.carousel__caption h3 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.carousel__caption p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-200);
+}
+
+.carousel__cta.btn-primary {
+  margin-top: 12px;
+  display: inline-block;
+}
+
+/* Prev / Next buttons */
+.carousel__btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.carousel__btn:hover {
+  background: #fff;
+}
+
+.carousel__btn--prev { left: 12px; }
+.carousel__btn--next { right: 12px; }
+
+/* Dot indicators */
+.carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.carousel__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--text-200);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.carousel__dot--active {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+/* Dark mode */
+.dark .carousel__btn {
+  background: rgba(30, 30, 30, 0.85);
+  color: #e5e5e5;
+}
+
+.dark .carousel__btn:hover {
+  background: rgba(50, 50, 50, 0.95);
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .carousel {
+    padding: 24px 12px;
+  }
+
+  .carousel__btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .carousel__btn--prev { left: 6px; }
+  .carousel__btn--next { right: 6px; }
+
+  .carousel__caption {
+    padding: 14px 16px;
+  }
+}
+
+/*!***************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/gallery/styles.css ***!
+  \***************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.gallery {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.gallery__grid {
+  display: grid;
+  grid-gap: 16px;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.gallery__grid--2 { grid-template-columns: repeat(2, 1fr); }
+.gallery__grid--3 { grid-template-columns: repeat(3, 1fr); }
+.gallery__grid--4 { grid-template-columns: repeat(4, 1fr); }
+
+.gallery__item {
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card, 12px);
+  background: var(--bg-1);
+}
+
+.gallery__image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery__caption {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-200);
+}
+
+@media (max-width: 600px) {
+  .gallery {
+    padding: 24px 12px;
+  }
+
+  .gallery__grid--3,
+  .gallery__grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gallery__grid {
+    gap: 10px;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .gallery__grid--2,
+  .gallery__grid--3,
+  .gallery__grid--4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*!************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/tabs/styles.css ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.tabs-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+/* Tab bar wrapper — provides fade gradient overflow hints */
+.tabs-block__bar-wrap {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.tabs-block__bar-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 2px; /* above the border-bottom */
+  width: 48px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--section-bg, var(--bg-0)));
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* Show fade when bar is scrollable — JS adds this class */
+.tabs-block__bar-wrap--overflow::after {
+  opacity: 1;
+}
+
+/* Hide fade when scrolled to the end */
+.tabs-block__bar-wrap--at-end::after {
+  opacity: 0;
+}
+
+/* Tab bar */
+.tabs-block__bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-block__bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-block__tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-200);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, box-shadow 0.15s;
+}
+
+.tabs-block__tab:hover {
+  color: var(--heading);
+}
+
+.tabs-block__tab--active {
+  color: var(--brand);
+  box-shadow: inset 0 -2px 0 var(--brand);
+}
+
+/* Panel content */
+.tabs-block__content {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-100);
+}
+
+.tabs-block__content p {
+  margin: 0 0 12px;
+}
+
+.tabs-block__content p:last-child {
+  margin-bottom: 0;
+}
+
+.tabs-block__content h3 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.tabs-block__content ul {
+  margin: 0 0 12px;
+  padding-left: 24px;
+  list-style: none;
+}
+
+.tabs-block__content ol {
+  margin: 0 0 12px;
+  padding-left: 24px;
+  list-style: none;
+  counter-reset: ol-counter;
+}
+
+.tabs-block__content ul li::before {
+  content: "•";
+  color: var(--brand);
+  font-weight: 700;
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+}
+
+.tabs-block__content ol li {
+  counter-increment: ol-counter;
+}
+
+.tabs-block__content ol li::before {
+  content: counter(ol-counter) ".";
+  color: var(--brand);
+  font-weight: 600;
+  display: inline-block;
+  width: 1.5em;
+  margin-left: -1.5em;
+}
+
+.tabs-block__content li {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 600px) {
+  .tabs-block {
+    padding: 24px 12px;
+  }
+
+  .tabs-block__tab {
+    padding: 8px 14px;
+    font-size: 0.95rem;
+  }
+
+  .tabs-block__bar {
+    margin-bottom: 16px;
+  }
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/table/styles.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.table-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.table-block__scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-card, 12px);
+  border: 1px solid var(--border);
+}
+
+.table-block__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.table-block__table th,
+.table-block__table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table-block__table th {
+  font-weight: 600;
+  color: var(--heading);
+  background: var(--table-header-bg, #e8edf3);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table-block__table td {
+  color: var(--text-100);
+}
+
+.table-block__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Striped variant */
+.table-block__table--striped tbody tr:nth-child(odd) {
+  background: var(--section-bg);
+}
+
+.table-block__table--striped tbody tr:nth-child(even) {
+  background: var(--stripe-bg, #f5f5f0);
+}
+
+/* First column — sticky + emphasis */
+.table-block__table th:first-child {
+  position: -webkit-sticky;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--table-header-bg, #eceee6);
+}
+
+.table-block__table td:first-child {
+  position: -webkit-sticky;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  font-weight: 500;
+  color: var(--heading);
+  background: inherit;
+}
+
+@media (max-width: 600px) {
+  .table-block {
+    padding: 24px 12px;
+  }
+
+  .table-block__scroll {
+    margin-right: -12px;
+    border-right: none;
+    border-radius: var(--radius-card, 12px) 0 0 var(--radius-card, 12px);
+  }
+
+  .table-block__table th,
+  .table-block__table td {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/quote/styles.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.quote-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.quote-block .section__inner {
+  max-width: 720px;
+  text-align: center;
+}
+
+.quote-block__quote {
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.quote-block__mark {
+  display: block;
+  font-size: 4rem;
+  line-height: 0.8;
+  color: var(--brand);
+  font-family: Georgia, "Times New Roman", serif;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+
+.quote-block__text {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  color: var(--heading);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.quote-block__text p {
+  margin: 0 0 8px;
+}
+
+.quote-block__text p:last-child {
+  margin-bottom: 0;
+}
+
+/* Attribution row */
+.quote-block__attribution {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+.quote-block__avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  max-width: 48px;
+  max-height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.quote-block__author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quote-block__author {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--heading);
+}
+
+.quote-block__role {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-200);
+}
+
+@media (max-width: 600px) {
+  .quote-block {
+    padding: 24px 12px;
+  }
+
+  .quote-block__mark {
+    font-size: 3rem;
+  }
+
+  .quote-block__text {
+    font-size: 1.1rem;
+  }
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/video/styles.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+.video-block {
+  padding: 40px 20px;
+  background: var(--section-bg);
+}
+
+.video-block .section__inner {
+  max-width: 960px;
+  display: grid;
+  grid-row-gap: 12px;
+  row-gap: 12px;
+  justify-items: center;
+}
+
+.video-block__frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card, 12px);
+  background: #000;
+}
+
+.video-block__frame iframe,
+.video-block__frame video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.video-block__facade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-block__facade-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-block__facade-play {
+  position: relative;
+  z-index: 1;
+  width: 68px;
+  height: 48px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.video-block__facade:hover .video-block__facade-play {
+  opacity: 1;
+}
+
+.video-block__caption {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-200);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+@media (max-width: 600px) {
+  .video-block {
+    padding: 24px 12px;
+  }
+
+  .video-block__frame {
+    border-radius: var(--radius-card, 8px);
+  }
+}
+
+/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!../../packages/blocks/src/blocks/styles.css ***!
+  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+
+
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!../../node_modules/.pnpm/next@15.2.8_@babel+core@7.29.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!./app/globals.css ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --bg-0: #fafafa;
+  --bg-000: #fafafa;
+  --bg-100: #ffffff;
+  --bg-200: #f4f4f5;
+  --bg-300: #e4e4e7;
+
+  /* Text */
+  --text-100: #18181b;
+  --text-200: #27272a;
+  --text-300: #52525b;
+  --text-400: #71717a;
+  --text-500: #a1a1aa;
+
+  /* Accent */
+  --accent: #18181b;
+  --accent-hover: #3f3f46;
+
+  /* Brand */
+  --brand: #18181b;
+  --brand-hover: #3f3f46;
+  --brand-subtle: #f4f4f5;
+  --brand-fg: #ffffff;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-border: #e4e4e7;
+
+  /* Typography — semantic */
+  --heading: #09090b;
+  --body: #18181b;
+  --body-secondary: #3f3f46;
+  --caption: #71717a;
+  --link: #18181b;
+
+  /* Typography */
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Shapes */
+  --radius: 0.5rem;
+  --radius-btn: 6px;
+  --radius-card: 8px;
+  --radius-feature: 8px;
+  --radius-logo: 8px;
+  --radius-input: 8px;
+  --radius-dropdown: 10px;
+
+  /* Block surfaces */
+  --bg-1: #ffffff;
+  --border: #e4e4e7;
+  --stripe-bg: #f4f4f5;
+  --table-header-bg: #f4f4f5;
+
+  /* Compound surfaces */
+  --card-bg: #ffffff;
+  --card-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+  --hero-bg: linear-gradient(135deg, #fafafa 0%, #f4f4f5 100%);
+  --cta-bg: linear-gradient(135deg, #f4f4f5 0%, #fafafa 100%);
+  --section-bg: #f4f4f5;
+
+  /* Misc */
+  --placeholder-img: #e4e4e7;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  background: var(--bg-0);
+  color: var(--text-100);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-heading);
+}
+
+h1, h2, h3, p {
+  margin-top: 0;
+}
+
+a {
+  color: var(--link);
+}
+
+main {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
