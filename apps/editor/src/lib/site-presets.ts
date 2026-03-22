@@ -185,8 +185,12 @@ export function loadSiteListFromStorage(siteId: string) {
       const existingIds = new Set(list.map((site) => site.id))
       const merged = list.map((site) => {
         const preset = presetById.get(site.id)
-        if (!preset?.previewUrl || site.previewUrl) return site
-        return { ...site, previewUrl: preset.previewUrl }
+        if (!preset) return site
+        return {
+          ...site,
+          ...(!site.previewUrl && preset.previewUrl ? { previewUrl: preset.previewUrl } : {}),
+          ...(!site.cmsMedia && preset.cmsMedia ? { cmsMedia: preset.cmsMedia } : {}),
+        }
       })
       for (const preset of DEFAULT_SITE_PRESETS) {
         if (existingIds.has(preset.id)) continue
