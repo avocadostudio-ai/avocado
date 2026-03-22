@@ -507,6 +507,70 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     </label>
                   </div>
                 </div>
+                <p className="sites-form-section-title">CMS Media</p>
+                <div className="sites-form-field sites-form-field-wide">
+                  <div className="sites-settings-grid">
+                    <label className="sites-form-field">
+                      <span>Provider</span>
+                      <select
+                        value={sites.configSite.cmsMedia?.provider ?? ""}
+                        onChange={(event) => {
+                          const provider = event.target.value as "" | "contentful" | "sanity" | "strapi"
+                          if (!provider) {
+                            sites.updateConfigSite({ cmsMedia: undefined })
+                          } else if (provider === "contentful") {
+                            sites.updateConfigSite({ cmsMedia: { provider: "contentful", spaceId: "", deliveryToken: "" } })
+                          } else if (provider === "sanity") {
+                            sites.updateConfigSite({ cmsMedia: { provider: "sanity", projectId: "" } })
+                          } else if (provider === "strapi") {
+                            sites.updateConfigSite({ cmsMedia: { provider: "strapi", url: "" } })
+                          }
+                        }}
+                      >
+                        <option value="">None</option>
+                        <option value="contentful">Contentful</option>
+                        <option value="sanity">Sanity</option>
+                        <option value="strapi">Strapi</option>
+                      </select>
+                    </label>
+                    {sites.configSite.cmsMedia?.provider === "contentful" && (
+                      <>
+                        <label className="sites-form-field">
+                          <span>Space ID</span>
+                          <input type="text" value={(sites.configSite.cmsMedia as { spaceId: string }).spaceId} placeholder="abc123" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, spaceId: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                        </label>
+                        <label className="sites-form-field">
+                          <span>Delivery Token</span>
+                          <input type="password" value={(sites.configSite.cmsMedia as { deliveryToken: string }).deliveryToken} placeholder="Content Delivery API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, deliveryToken: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                        </label>
+                      </>
+                    )}
+                    {sites.configSite.cmsMedia?.provider === "sanity" && (
+                      <>
+                        <label className="sites-form-field">
+                          <span>Project ID</span>
+                          <input type="text" value={(sites.configSite.cmsMedia as { projectId: string }).projectId} placeholder="abc123" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, projectId: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                        </label>
+                        <label className="sites-form-field">
+                          <span>Dataset</span>
+                          <input type="text" value={(sites.configSite.cmsMedia as { dataset?: string }).dataset ?? ""} placeholder="production" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, dataset: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
+                        </label>
+                      </>
+                    )}
+                    {sites.configSite.cmsMedia?.provider === "strapi" && (
+                      <>
+                        <label className="sites-form-field">
+                          <span>Strapi URL</span>
+                          <input type="url" value={(sites.configSite.cmsMedia as { url: string }).url} placeholder="http://localhost:1337" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, url: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                        </label>
+                        <label className="sites-form-field">
+                          <span>API Token</span>
+                          <input type="password" value={(sites.configSite.cmsMedia as { token?: string }).token ?? ""} placeholder="Read-only API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, token: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
