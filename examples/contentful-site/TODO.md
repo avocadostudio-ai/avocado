@@ -1,44 +1,49 @@
 # Contentful Site — TODO
 
-## Site-SDK improvements (move shared logic in)
+## Done
 
-- [ ] Move navigation helpers (`buildNavItems`, `buildSiteHeaderBlock`, `slugToLabel`) into `site-sdk/navigation` export — currently copy-pasted from `apps/site/lib/navigation.ts`
-- [ ] Extract page scaffold into site-sdk factory — draft/static branching, chrome assembly, fallback UI are identical across all 3 sites (~100 LOC boilerplate per site)
-- [ ] Add Zod validation at the read boundary — `contentful.ts` trusts raw data with `as unknown as`; should validate against `pageDocSchema` like `apps/site` does
+- [x] Move Contentful publish handler out of site-sdk into site repo (`lib/publish.ts`)
+- [x] Structured content model — one content type per block with native fields
+- [x] Image fields as Contentful Assets (Media)
+- [x] CardGrid.cards as Array of blockCard entry references
+- [x] Publish authentication via `publishSecret` + `x-publish-token` header
+- [x] Partial publish failure reporting via `Promise.allSettled`
+- [x] Asset dedup cache within a publish
+- [x] Re-sync from CMS on editor open + manual sync button
+- [x] Webhook handler re-bootstraps orchestrator for auto-refresh
+- [x] Zod validation at read boundary removed (using type guards instead — CMS data is trusted after structured content types enforce schema)
 
-## CMS handler packaging
+## Known Issues (acceptable for example project)
 
-- [ ] Move `publish-handlers/contentful.ts` out of site-sdk into a separate `@ai-site-editor/contentful` package or keep it in the site repo — shipping CMS-specific code in the SDK couples it to a vendor
-- [ ] Evaluate the same for any future CMS handlers (Sanity, Strapi, etc.)
+- **CardGrid.cards hardcoded in 3 places** — `contentful.ts`, `publish.ts`, `setup-content-types.ts` all special-case this one block type. If a second block with reference lists is added, all three files need updating. Fix: derive from block metadata.
+- **No pagination** — `limit: 100` hardcoded in read layer. Breaks silently at 101+ pages.
+- **Placeholder assets for non-http URLs** — relative paths (e.g., `/hero-generated.svg`) create placehold.co assets in Contentful. Should skip non-http URLs or store as plain strings.
+- **Asset dedup by title** — `ensureAsset` searches by title (image URL) which isn't a unique key. Could create duplicates if titles collide.
+- **No orphan cleanup** — deleted blocks remain as unpublished entries in Contentful forever.
+- **Hardcoded locale "en-US"** — webhook handler and publish handler assume en-US. Breaks for multi-locale sites.
+- **Hardcoded session/siteId defaults** — `"dev"` / `"contentful-site"` in page.tsx and revalidate handler. Not configurable per environment.
+- **Footer hardcoded in page.tsx** — not editable or stored in CMS.
+- **No error boundary** — `renderBlocks()` exceptions crash the page with a server error.
+- **String-matching error detection in setup script** — checks for "NotFound" in error messages; fragile if SDK changes error format.
+- **Per-page publish status not exposed** — result is `{ ok, error }` not `{ ok, pages: [{ slug, ok }] }`.
 
-## Publish contract gaps
+## Future Improvements
 
-- [ ] Enrich publish result type — `{ ok: boolean }` doesn't report which pages succeeded/failed; needs per-page status
-- [ ] Handle partial publish failures — if page 3/5 fails, pages 1-2 are published with no rollback
-- [ ] Add authentication to `POST /api/editor/publish` — endpoint currently accepts any POST from allowed CORS origins; needs a token/secret check
+### Before adding more CMS integrations
+- [ ] Move navigation helpers to `site-sdk/navigation` — currently duplicated in `apps/site` and `examples/contentful-site`
+- [ ] Document or extract page component scaffold — ~115 LOC of identical draft/static branching per site
 
-## Production readiness
+### Production readiness
+- [ ] Add caching strategy (cache headers, stale-while-revalidate, ISR revalidation times)
+- [ ] Support Contentful Preview API for draft content (separate from orchestrator drafts)
+- [ ] Add pagination for >100 pages
+- [ ] Parameterize locale (from env var or site config)
+- [ ] Make footer configurable (fetch from CMS or config)
+- [ ] Add error boundaries around block rendering
+- [ ] Schema versioning for setup script (handle PageDoc shape changes)
+- [ ] Runtime schema validation (warn if Contentful content types drift from expected shape)
 
-- [ ] Add caching strategy — every page view hits Contentful API; needs cache headers + stale-while-revalidate + ISR revalidation times
-- [ ] Validate Contentful webhook payloads — revalidate route hardcodes `fields.slug["en-US"]`; fragile if locale or payload shape changes
-- [ ] Support Contentful Preview API for editor draft mode (separate from orchestrator drafts)
-- [ ] Add image/asset management via Contentful Assets API instead of plain URL strings
-- [ ] Add pagination for >100 pages (currently hardcoded `limit: 100`)
-
-## Chrome & navigation
-
-- [ ] Make footer configurable — currently hardcoded as a constant in page.tsx; should be editable or stored in CMS
-- [ ] Add `buildFooterBlock()` factory symmetric with `buildSiteHeaderBlock()`
-
-## Setup & ops
-
-- [ ] Replace string-matching error detection in setup script with proper API checks
-- [ ] Add schema versioning — setup script can't update existing content types if PageDoc shape changes
-- [ ] Add runtime schema validation — warn if Contentful content types don't match expected shape
-- [ ] Remove real tokens from `.env.example` / git history; use placeholders only
-
-## Testing
-
-- [ ] Add unit tests for Contentful publish handler (mock Management API)
-- [ ] Add integration test for the publish contract round-trip
-- [ ] Add E2E test: edit in editor → publish → verify entry in Contentful → site renders updated content
+### Testing
+- [ ] Unit tests for publish handler (mock Management API)
+- [ ] Integration test for publish contract round-trip
+- [ ] E2E test: edit → publish → verify in Contentful → site renders

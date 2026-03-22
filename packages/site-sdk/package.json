@@ -12,7 +12,8 @@
     "./routes": "./src/routes.ts",
     "./routes/core": "./src/draft-routes-core.ts",
     "./editor-manifest": "./src/editor-manifest.ts",
-    "./publish-handlers/json-file": "./src/publish-handlers/json-file.ts"
+    "./publish-handlers/json-file": "./src/publish-handlers/json-file.ts",
+    "./navigation": "./src/navigation.ts"
   },
   "repository": {
     "type": "git",
@@ -56,6 +57,10 @@
       "./publish-handlers/json-file": {
         "import": "./dist/publish-handlers/json-file.js",
         "types": "./dist/publish-handlers/json-file.d.ts"
+      },
+      "./navigation": {
+        "import": "./dist/navigation.js",
+        "types": "./dist/navigation.d.ts"
       }
     }
   },

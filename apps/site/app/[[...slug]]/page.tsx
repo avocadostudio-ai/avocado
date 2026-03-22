@@ -9,7 +9,7 @@ import { EditorPageWrapper } from "../../components/editor-wrapper"
 import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../../lib/content"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
-import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
+import { buildNavItems, buildSiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import { DEFAULT_SITE_ID, DEFAULT_SESSION } from "../../lib/defaults"
 
 type PageProps = {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { siteNameFallback, slugToLabel, buildNavItems } from "../lib/navigation.ts"
+import { siteNameFallback, slugToLabel, buildNavItems } from "@ai-site-editor/site-sdk/navigation"
 
 // --- siteNameFallback ---
 

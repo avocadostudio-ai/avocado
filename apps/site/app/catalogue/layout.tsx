@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
 import { getPublishedSlugs, getPublishedSiteConfig } from "../../lib/published-content-api"
-import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
+import { buildNavItems, buildSiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import { DEFAULT_SITE_ID } from "../../lib/defaults"
 
 const CATALOGUE_ENABLED =
