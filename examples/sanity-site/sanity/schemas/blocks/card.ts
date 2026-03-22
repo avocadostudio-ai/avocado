@@ -23,7 +23,7 @@ export const cardSchema = defineType({
     {
       name: "ctaHref",
       title: "Button link",
-      type: "url",
+      type: "string",
     },
     {
       name: "imageUrl",

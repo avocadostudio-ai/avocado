@@ -26,7 +26,7 @@ export const bannerSchema = defineType({
     {
       name: "ctaHref",
       title: "Button link",
-      type: "url",
+      type: "string",
     }
   ],
 })

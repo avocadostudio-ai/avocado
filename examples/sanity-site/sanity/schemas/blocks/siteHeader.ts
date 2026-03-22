@@ -24,7 +24,7 @@ export const siteHeaderSchema = defineType({
           type: "object",
           fields: [
         { name: "label", title: "Link label", type: "string" },
-        { name: "href", title: "Link URL", type: "url" }
+        { name: "href", title: "Link URL", type: "string" }
           ],
         },
       ],
