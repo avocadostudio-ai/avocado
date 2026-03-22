@@ -84,7 +84,7 @@ export function createSanityPublishHandler(): OnPublishFn {
           }
         }
 
-        tx.createOrReplace(doc)
+        tx.createOrReplace(doc as { _id: string; _type: string; [key: string]: unknown })
         blockRefs.push({ _type: "reference", _ref: blockId, _key: block.id })
       }
 
