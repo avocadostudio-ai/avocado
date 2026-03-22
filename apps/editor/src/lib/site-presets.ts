@@ -1,6 +1,22 @@
-import type { SiteConfig } from "./editor-types"
+import type { CmsMediaConfig, SiteConfig } from "./editor-types"
 import { parseArrayOfStrings, parseString } from "./parse-utils"
 import { sanitizeSiteId } from "./validators"
+
+function parseCmsMedia(raw: unknown): CmsMediaConfig | null {
+  if (!raw || typeof raw !== "object") return null
+  const obj = raw as Record<string, unknown>
+  const provider = obj.provider
+  if (provider === "contentful" && typeof obj.spaceId === "string" && typeof obj.deliveryToken === "string") {
+    return { provider: "contentful", spaceId: obj.spaceId, deliveryToken: obj.deliveryToken, environment: typeof obj.environment === "string" ? obj.environment : undefined }
+  }
+  if (provider === "sanity" && typeof obj.projectId === "string") {
+    return { provider: "sanity", projectId: obj.projectId, dataset: typeof obj.dataset === "string" ? obj.dataset : undefined }
+  }
+  if (provider === "strapi" && typeof obj.url === "string") {
+    return { provider: "strapi", url: obj.url, token: typeof obj.token === "string" ? obj.token : undefined }
+  }
+  return null
+}
 
 export const SITE_LIST_STORAGE_KEY = "editor-site-list-v1"
 export const DEFAULT_SITE_HOSTING = "Vercel production site (single shared project)"
@@ -50,6 +66,7 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
         const tone = parseString(site.tone, "")
         const constraints = parseArrayOfStrings(site.constraints)
         const previewUrl = parseString(site.previewUrl, "")
+        const cmsMedia = parseCmsMedia(site.cmsMedia)
         return {
           id,
           name,
@@ -61,7 +78,8 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
           vercelDeployHookUrl,
           tone,
           constraints,
-          ...(previewUrl ? { previewUrl } : {})
+          ...(previewUrl ? { previewUrl } : {}),
+          ...(cmsMedia ? { cmsMedia } : {})
         } satisfies SiteConfig
       })
       .filter((site) => site.id.length > 0 && site.name.length > 0)
@@ -156,7 +174,8 @@ export function loadSiteListFromStorage(siteId: string) {
         tone: parseString(site.tone, ""),
         constraints: parseArrayOfStrings(site.constraints),
         ...(parseString(site.previewUrl, "") ? { previewUrl: parseString(site.previewUrl, "") } : {}),
-        ...(parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") ? { gdriveFolderId: parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") } : {})
+        ...(parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") ? { gdriveFolderId: parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") } : {}),
+        ...(parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia) ? { cmsMedia: parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia)! } : {})
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
       .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))
