@@ -83,7 +83,7 @@ export function createStrapiPublishHandler(): OnPublishFn {
           const imageFields = getImageFields(block.type)
 
           const data: Record<string, unknown> = {
-            _blockType: block.type, // custom field to identify block type on read
+            blockType: block.type, // custom field to identify block type on read
           }
 
           for (const [key, value] of Object.entries(block.props)) {
@@ -121,7 +121,7 @@ export function createStrapiPublishHandler(): OnPublishFn {
           slug: page.slug,
           title: page.title,
           pageId: page.id,
-          ...(page.meta ? { meta: page.meta } : {}),
+          ...(page.meta ? { pageMeta: page.meta } : {}),
         }
 
         // Find existing page by slug
