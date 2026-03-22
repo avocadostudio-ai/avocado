@@ -65,6 +65,8 @@ export function parseCreatePageRequest(message: string) {
   // Strip [site context]...[/site context] metadata to prevent false route matches
   const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()
   const lower = stripped.toLowerCase().replace(/\s+/g, " ").trim()
+  // Don't treat "remove/delete new page" as a create request
+  if (/\b(remove|delete|drop|destroy)\b/.test(lower)) return null
   const mentionsCurrentPage = /\b(this|current|selected)\s+page\b/.test(lower)
   const hasExplicitRoute = Boolean(firstRouteMention(stripped) ?? extractRouteMentions(stripped)[0])
   const asksNewPage = /\bnew\s+page\b/.test(lower)
