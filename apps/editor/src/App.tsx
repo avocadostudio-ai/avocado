@@ -670,7 +670,7 @@ function EditorPage({
     onApplied: () => { onAppliedRef.current?.() }
   })
 
-  const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult)
+  const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin)
 
   const media = useMediaInput()
 

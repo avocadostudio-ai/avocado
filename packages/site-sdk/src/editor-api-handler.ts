@@ -1,12 +1,14 @@
 import { createDraftEnableHandler, createDraftDisableHandler } from "./draft-routes.ts"
-import { createBlocksHandler, createPagesHandler } from "./editor-routes.ts"
+import { createBlocksHandler, createPagesHandler, createPublishHandler } from "./editor-routes.ts"
+import type { OnPublishFn } from "./editor-routes.ts"
 import { applyEditorCors } from "./editor-cors.ts"
 import type { BlockManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
 
 export interface EditorApiHandlerConfig {
-  getPages: () => PageDoc[]
+  getPages: () => PageDoc[] | Promise<PageDoc[]>
   getManifest?: () => BlockManifest
+  onPublish?: OnPublishFn
 }
 
 type NextRouteContext = { params: Promise<{ path: string[] }> }
@@ -16,7 +18,10 @@ type NextRouteContext = { params: Promise<{ path: string[] }> }
  *
  * Mount at `app/api/editor/[...path]/route.ts`:
  * ```ts
- * export const { GET, OPTIONS } = createEditorApiHandler({ getPages: () => [...] })
+ * export const { GET, POST, OPTIONS } = createEditorApiHandler({
+ *   getPages: () => [...],
+ *   onPublish: async (pages, config) => { ... return { ok: true } }
+ * })
  * ```
  *
  * Routes:
@@ -24,15 +29,18 @@ type NextRouteContext = { params: Promise<{ path: string[] }> }
  * - `/api/editor/draft/disable` → disable draft mode
  * - `/api/editor/blocks` → block manifest
  * - `/api/editor/pages` → published pages
+ * - `/api/editor/publish` → publish content (POST)
  */
 export function createEditorApiHandler(config: EditorApiHandlerConfig): {
   GET: (request: Request, context: NextRouteContext) => Promise<Response>
+  POST: (request: Request, context: NextRouteContext) => Promise<Response>
   OPTIONS: (request: Request, context: NextRouteContext) => Response
 } {
   const draftEnable = createDraftEnableHandler()
   const draftDisable = createDraftDisableHandler()
   const blocksHandler = createBlocksHandler(config.getManifest ? { getManifest: config.getManifest } : undefined)
   const pagesHandler = createPagesHandler(config.getPages)
+  const publishHandler = config.onPublish ? createPublishHandler(config.onPublish) : null
 
   function matchRoute(path: string[]): string {
     const key = path.join("/")
@@ -40,7 +48,18 @@ export function createEditorApiHandler(config: EditorApiHandlerConfig): {
     if (key === "draft/disable") return "draft-disable"
     if (key === "blocks") return "blocks"
     if (key === "pages") return "pages"
+    if (key === "publish") return "publish"
     return "not-found"
+  }
+
+  function notFound(request: Request): Response {
+    return applyEditorCors(
+      new Response(JSON.stringify({ error: "Not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      }),
+      request.headers.get("origin")
+    )
   }
 
   return {
@@ -58,14 +77,19 @@ export function createEditorApiHandler(config: EditorApiHandlerConfig): {
         case "pages":
           return pagesHandler.GET(request)
         default:
-          return applyEditorCors(
-            new Response(JSON.stringify({ error: "Not found" }), {
-              status: 404,
-              headers: { "Content-Type": "application/json" },
-            }),
-            request.headers.get("origin")
-          )
+          return notFound(request)
       }
+    },
+
+    async POST(request: Request, context: NextRouteContext) {
+      const { path } = await context.params
+      const route = matchRoute(path)
+
+      if (route === "publish" && publishHandler) {
+        return publishHandler.POST(request)
+      }
+
+      return notFound(request)
     },
 
     OPTIONS(request: Request, context: NextRouteContext) {

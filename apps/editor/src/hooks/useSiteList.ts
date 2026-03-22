@@ -23,6 +23,7 @@ export interface NewSiteFormState {
   tone: string
   constraints: string
   hosting: string
+  previewUrl: string
   vercelProjectId: string
   vercelTeamId: string
   vercelProductionUrl: string
@@ -35,6 +36,7 @@ const INITIAL_NEW_SITE_FORM: NewSiteFormState = {
   tone: "",
   constraints: "",
   hosting: DEFAULT_SITE_HOSTING,
+  previewUrl: "",
   vercelProjectId: "",
   vercelTeamId: "",
   vercelProductionUrl: "",
@@ -243,6 +245,7 @@ export function useSiteList(siteId: string, session: string) {
       .split(/\n|,/g)
       .map((item) => item.trim())
       .filter(Boolean)
+    const previewUrl = newSiteForm.previewUrl.trim()
     setSiteList((prev) => [
       ...prev,
       {
@@ -250,6 +253,7 @@ export function useSiteList(siteId: string, session: string) {
         name,
         purpose: newSiteForm.purpose.trim(),
         hosting: newSiteForm.hosting.trim() || DEFAULT_SITE_HOSTING,
+        ...(previewUrl ? { previewUrl } : {}),
         vercelProjectId: newSiteForm.vercelProjectId.trim(),
         vercelTeamId: newSiteForm.vercelTeamId.trim(),
         vercelProductionUrl: newSiteForm.vercelProductionUrl.trim(),
@@ -271,7 +275,7 @@ export function useSiteList(siteId: string, session: string) {
     patch: Partial<
       Pick<
         SiteConfig,
-        "name" | "purpose" | "hosting" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "gdriveFolderId"
+        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "gdriveFolderId"
       >
     >
   ) => {
