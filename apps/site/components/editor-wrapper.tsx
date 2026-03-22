@@ -1,6 +1,6 @@
 import { renderBlocks, EditorOverlay } from "@ai-site-editor/site-sdk/editor"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
-import type { SiteHeaderBlock } from "../lib/navigation"
+import type { SiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
 export type EditorPageProps = {

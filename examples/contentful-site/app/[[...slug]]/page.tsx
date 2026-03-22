@@ -6,7 +6,7 @@ import type { BlockInstance } from "@ai-site-editor/site-sdk"
 import { resolveEditorContext, fetchEditorPage } from "@ai-site-editor/site-sdk/draft"
 import { renderBlocks, EditorOverlay } from "@ai-site-editor/site-sdk/editor"
 import { getContentfulPage, getContentfulSlugs, getContentfulSiteConfig } from "../../lib/contentful"
-import { buildNavItems, buildSiteHeaderBlock } from "../../lib/navigation"
+import { buildNavItems, buildSiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 
 const DEFAULT_SESSION = "dev"
 const DEFAULT_SITE_ID = "contentful-site"
@@ -69,6 +69,7 @@ export default async function Page({ params, searchParams }: PageProps) {
     siteConfig,
     siteId: DEFAULT_SITE_ID,
     editorQuery: "",
+    defaultLogo: "/logo.svg",
   })
   const chromeHeader = buildSiteHeaderBlock({ navItems, siteName, siteLogo, activePath: slug })
 

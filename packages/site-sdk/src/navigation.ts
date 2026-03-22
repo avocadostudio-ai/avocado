@@ -58,11 +58,12 @@ export function buildNavItems(opts: {
   siteConfig: { name?: string; logo?: string; navLabels?: Record<string, string> }
   siteId: string
   editorQuery: string
+  defaultLogo?: string
 }): { navItems: NavItem[]; siteName: string; siteLogo: string; homeHref: string } {
   const { navSlugs, currentSlug, siteConfig, siteId, editorQuery } = opts
 
   const siteName = siteConfig.name || siteNameFallback(siteId) || "Site"
-  const siteLogo = siteConfig.logo || "/logo.svg"
+  const siteLogo = siteConfig.logo || opts.defaultLogo || "/logos/default.svg"
 
   const allSlugs = Array.from(
     new Set([...(navSlugs.length > 0 ? navSlugs : ["/"]), currentSlug])

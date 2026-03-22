@@ -1,6 +1,6 @@
 import { SharedBlockRenderer, BlocksHydrator } from "@ai-site-editor/blocks"
 import { renderBlocks } from "@ai-site-editor/site-sdk"
-import type { SiteHeaderBlock } from "../lib/navigation"
+import type { SiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import type { PageDoc } from "../lib/site-contract"
 
 export type SitePageContentProps = {
