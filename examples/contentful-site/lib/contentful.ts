@@ -1,5 +1,5 @@
 import { createClient, type Entry, type Asset } from "contentful"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
 
 let cachedClient: ReturnType<typeof createClient> | null = null
@@ -17,17 +17,6 @@ function getClient() {
     environment: process.env.CONTENTFUL_ENVIRONMENT ?? "master",
   })
   return cachedClient
-}
-
-// Determine which fields are images from the block registry
-function getImageFields(blockType: string): Set<string> {
-  const meta = getAllBlockMeta()[blockType]
-  if (!meta) return new Set()
-  const result = new Set<string>()
-  for (const [key, fm] of Object.entries(meta.fields)) {
-    if (fm.kind === "image") result.add(key)
-  }
-  return result
 }
 
 // Convert a Contentful Asset to a URL string
