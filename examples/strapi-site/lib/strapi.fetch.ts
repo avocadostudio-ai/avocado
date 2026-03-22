@@ -77,7 +77,7 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
     slug,
     title: (entry.title as string) ?? "",
     blocks,
-    meta: entry.pageMeta as PageDoc["meta"],
+    meta: (entry.pageMeta as PageDoc["meta"]) ?? undefined,
     updatedAt: (entry.updatedAt as string) ?? new Date().toISOString(),
   }
 }
