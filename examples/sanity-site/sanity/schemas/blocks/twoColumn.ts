@@ -24,7 +24,7 @@ export const twoColumnSchema = defineType({
         { name: "type", title: "Component type", type: "string" },
         { name: "text", title: "Text content", type: "string" },
         { name: "label", title: "Button label", type: "string" },
-        { name: "href", title: "Link URL", type: "url" },
+        { name: "href", title: "Link URL", type: "string" },
         { name: "src", title: "Media source", type: "image" },
         { name: "alt", title: "Alt text", type: "string" },
         { name: "poster", title: "Video poster image", type: "image" }
@@ -43,7 +43,7 @@ export const twoColumnSchema = defineType({
         { name: "type", title: "Component type", type: "string" },
         { name: "text", title: "Text content", type: "string" },
         { name: "label", title: "Button label", type: "string" },
-        { name: "href", title: "Link URL", type: "url" },
+        { name: "href", title: "Link URL", type: "string" },
         { name: "src", title: "Media source", type: "image" },
         { name: "alt", title: "Alt text", type: "string" },
         { name: "poster", title: "Video poster image", type: "image" }

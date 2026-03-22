@@ -23,7 +23,7 @@ export const ctaSchema = defineType({
     {
       name: "ctaHref",
       title: "Button link",
-      type: "url",
+      type: "string",
     }
   ],
 })

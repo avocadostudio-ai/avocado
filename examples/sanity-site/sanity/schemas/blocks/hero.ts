@@ -23,7 +23,7 @@ export const heroSchema = defineType({
     {
       name: "ctaHref",
       title: "CTA link",
-      type: "url",
+      type: "string",
     },
     {
       name: "imageUrl",
@@ -51,7 +51,7 @@ export const heroSchema = defineType({
     {
       name: "secondaryCtaHref",
       title: "Secondary CTA link",
-      type: "url",
+      type: "string",
     }
   ],
 })

@@ -21,7 +21,7 @@ function fieldKindToSanityType(kind: FieldKind): string {
   switch (kind) {
     case "text": return "string"
     case "richtext": return "text"
-    case "url": return "url"
+    case "url": return "string" // relative paths like /about are valid; Sanity's url type rejects them
     case "image": return "image"
     case "imageAlt": return "string"
     case "color": return "string"
