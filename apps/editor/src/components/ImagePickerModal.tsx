@@ -50,8 +50,8 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
   const [uploadResult, setUploadResult] = useState<{ url: string } | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [unsplashPage, setUnsplashPage] = useState(1)
-  const [hasMoreUnsplash, setHasMoreUnsplash] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -88,18 +88,18 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
   }, [gdriveFolderId])
 
   const fetchUnsplashImages = useCallback(async (q?: string, page = 1) => {
-    if (!q) { setItems([]); setHasMoreUnsplash(false); return }
+    if (!q) { setItems([]); setHasMore(false); return }
     const id = ++requestIdRef.current
     if (page === 1) setLoading(true); else setLoadingMore(true)
     try {
       const res = await fetch(`${orchestrator}/unsplash/search?q=${encodeURIComponent(q)}&limit=20&page=${page}`)
       if (id !== requestIdRef.current) return
-      if (!res.ok) { if (page === 1) setItems([]); setHasMoreUnsplash(false); return }
+      if (!res.ok) { if (page === 1) setItems([]); setHasMore(false); return }
       const data = (await res.json()) as { items: ImageItem[]; totalPages: number }
       if (id !== requestIdRef.current) return
       setItems((prev) => page === 1 ? data.items : [...prev, ...data.items])
-      setHasMoreUnsplash(page < data.totalPages)
-    } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMoreUnsplash(false) } }
+      setHasMore(page < data.totalPages)
+    } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMore(false) } }
     finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
   }, [])
 
@@ -111,12 +111,12 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
       if (q) params.set("q", q)
       const res = await fetch(`${orchestrator}/contentful/assets?${params}`)
       if (id !== requestIdRef.current) return
-      if (!res.ok) { if (page === 1) setItems([]); setHasMoreUnsplash(false); return }
+      if (!res.ok) { if (page === 1) setItems([]); setHasMore(false); return }
       const data = (await res.json()) as { items: ImageItem[]; totalPages: number }
       if (id !== requestIdRef.current) return
       setItems((prev) => page === 1 ? data.items : [...prev, ...data.items])
-      setHasMoreUnsplash(page < data.totalPages)
-    } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMoreUnsplash(false) } }
+      setHasMore(page < data.totalPages)
+    } catch { if (id === requestIdRef.current) { if (page === 1) setItems([]); setHasMore(false) } }
     finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
   }, [])
 
@@ -132,8 +132,8 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
     setGeneratedResult(null)
     setUploadResult(null)
     setUploadPreview(null)
-    setUnsplashPage(1)
-    setHasMoreUnsplash(false)
+    setCurrentPage(1)
+    setHasMore(false)
     setLoadingMore(false)
     if (activeTab === "drive" && features.googleDrive) void fetchDriveImages()
     if (activeTab === "contentful" && features.contentful) void fetchContentfulAssets()
@@ -141,7 +141,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
-    setUnsplashPage(1)
+    setCurrentPage(1)
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     searchTimerRef.current = setTimeout(() => {
       if (activeTab === "drive") void fetchDriveImages(value || undefined)
@@ -202,6 +202,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
       const item = items.find((i) => i.id === selectedId)
       if (!item) return
       const url = item.imageUrl ?? ""
+      // Use || (not ??) so empty-string alt falls back — empty alt causes schema validation failure
       const alt = item.alt || item.name?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") || "Image"
       onSelect(url, alt)
     }
@@ -217,10 +218,10 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
 
   if (!open) return null
 
-  const tabConfig: Record<Tab, { label: string; icon: React.ReactNode }> = {
-    drive: { label: "Drive", icon: <HardDrive size={14} /> },
-    unsplash: { label: "Unsplash", icon: <ImageIcon size={14} /> },
-    contentful: { label: "Contentful", icon: <Cloud size={14} /> },
+  const tabConfig: Record<Tab, { label: string; icon: React.ReactNode; searchPlaceholder?: string }> = {
+    drive: { label: "Drive", icon: <HardDrive size={14} />, searchPlaceholder: "Search Drive images..." },
+    unsplash: { label: "Unsplash", icon: <ImageIcon size={14} />, searchPlaceholder: "Search Unsplash photos..." },
+    contentful: { label: "Contentful", icon: <Cloud size={14} />, searchPlaceholder: "Search Contentful assets..." },
     upload: { label: "Upload", icon: <Upload size={14} /> },
     generate: { label: "Generate", icon: <Sparkles size={14} /> }
   }
@@ -261,7 +262,7 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
               <Search size={15} style={{ color: "#88a1c6", flexShrink: 0 }} />
               <input
                 type="text"
-                placeholder={activeTab === "unsplash" ? "Search Unsplash photos..." : activeTab === "contentful" ? "Search Contentful assets..." : "Search Drive images..."}
+                placeholder={tabConfig[activeTab].searchPlaceholder ?? "Search..."}
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 style={S.searchInput}
@@ -295,13 +296,13 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, o
                   </button>
                 ))}
               </div>
-              {(activeTab === "unsplash" || activeTab === "contentful") && hasMoreUnsplash && items.length > 0 && !loading && !loadingMore && (
+              {(activeTab === "unsplash" || activeTab === "contentful") && hasMore && items.length > 0 && !loading && !loadingMore && (
                 <div style={S.loadMoreRow}>
                   <button
                     style={S.loadMoreBtn}
                     onClick={() => {
-                      const next = unsplashPage + 1
-                      setUnsplashPage(next)
+                      const next = currentPage + 1
+                      setCurrentPage(next)
                       if (activeTab === "contentful") void fetchContentfulAssets(searchQuery || undefined, next)
                       else void fetchUnsplashImages(searchQuery || undefined, next)
                     }}
