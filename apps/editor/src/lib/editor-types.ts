@@ -216,6 +216,11 @@ export type VariationModalState = {
 
 export type PreviewWidthPreset = "desktop" | "tablet" | "mobile"
 
+export type CmsMediaConfig =
+  | { provider: "contentful"; spaceId: string; deliveryToken: string; environment?: string }
+  | { provider: "sanity"; projectId: string; dataset?: string }
+  | { provider: "strapi"; url: string; token?: string }
+
 export type SiteConfig = {
   id: string
   name: string
@@ -229,6 +234,7 @@ export type SiteConfig = {
   constraints?: string[]
   previewUrl?: string
   gdriveFolderId?: string
+  cmsMedia?: CmsMediaConfig
 }
 
 export type RestoreSnapshot = {

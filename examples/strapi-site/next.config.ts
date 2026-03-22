@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "plus.unsplash.com" },
       { protocol: "https", hostname: "placehold.co" },
+      { protocol: "https", hostname: "via.placeholder.com" },
+      { protocol: "https", hostname: "**.blob.core.windows.net" },
     ],
   },
 }
