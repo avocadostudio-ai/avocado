@@ -212,6 +212,15 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     onChange={(event) => sites.updateNewSiteForm({ name: event.target.value })}
                   />
                 </label>
+                <label className="sites-form-field">
+                  <span>Preview URL</span>
+                  <input
+                    type="url"
+                    value={sites.newSiteForm.previewUrl}
+                    placeholder="http://localhost:3000"
+                    onChange={(event) => sites.updateNewSiteForm({ previewUrl: event.target.value })}
+                  />
+                </label>
                 <p className="sites-form-section-title">Editorial brief</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
@@ -338,6 +347,15 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     value={sites.configSite.name}
                     placeholder="Site name"
                     onChange={(event) => sites.updateConfigSite({ name: event.target.value })}
+                  />
+                </label>
+                <label className="sites-form-field">
+                  <span>Preview URL</span>
+                  <input
+                    type="url"
+                    value={sites.configSite.previewUrl ?? ""}
+                    placeholder="http://localhost:3000"
+                    onChange={(event) => sites.updateConfigSite({ previewUrl: event.target.value })}
                   />
                 </label>
                 <p className="sites-form-section-title">Editorial brief</p>

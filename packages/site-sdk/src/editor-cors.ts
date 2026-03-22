@@ -21,7 +21,7 @@ export function applyEditorCors(response: Response, requestOrigin: string | null
   if (!getEditorCorsOrigins().has(requestOrigin)) return response
 
   response.headers.set("Access-Control-Allow-Origin", requestOrigin)
-  response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS")
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
   response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
   return response
 }

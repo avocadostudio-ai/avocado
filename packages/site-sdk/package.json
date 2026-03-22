@@ -11,7 +11,9 @@
     "./editor": "./src/editor.ts",
     "./routes": "./src/routes.ts",
     "./routes/core": "./src/draft-routes-core.ts",
-    "./editor-manifest": "./src/editor-manifest.ts"
+    "./editor-manifest": "./src/editor-manifest.ts",
+    "./publish-handlers/json-file": "./src/publish-handlers/json-file.ts",
+    "./publish-handlers/contentful": "./src/publish-handlers/contentful.ts"
   },
   "repository": {
     "type": "git",
@@ -51,10 +53,20 @@
       "./routes/core": {
         "import": "./dist/draft-routes-core.js",
         "types": "./dist/draft-routes-core.d.ts"
+      },
+      "./publish-handlers/json-file": {
+        "import": "./dist/publish-handlers/json-file.js",
+        "types": "./dist/publish-handlers/json-file.d.ts"
+      },
+      "./publish-handlers/contentful": {
+        "import": "./dist/publish-handlers/contentful.js",
+        "types": "./dist/publish-handlers/contentful.d.ts"
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
@@ -65,14 +77,21 @@
     "@ai-site-editor/shared": "workspace:*"
   },
   "peerDependencies": {
+    "contentful-management": ">=11.0.0",
     "next": ">=15.0.0",
     "react": ">=19.0.0"
   },
   "peerDependenciesMeta": {
-    "next": { "optional": true }
+    "next": {
+      "optional": true
+    },
+    "contentful-management": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
+    "contentful-management": "^11.74.0",
     "typescript": "^5.7.3"
   }
 }

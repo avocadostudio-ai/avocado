@@ -65,54 +65,56 @@ export function SiteHeader(props: Record<string, unknown>) {
   return (
     <>
       <header className="site-top-nav" data-block-chrome="true">
-        <a className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
-          <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" />
-          <span className="site-brand-text">{siteName}</span>
-        </a>
-        <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
-          {links.map((link, i) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className={isActive(link.href) ? "is-active" : undefined}
-              data-editable-target={`links[${i}].label`}
-              data-editable-target-label={`links[${i}].label`}
+        <div className="site-top-nav-inner">
+          <a className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
+            <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" />
+            <span className="site-brand-text">{siteName}</span>
+          </a>
+          <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
+            {links.map((link, i) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className={isActive(link.href) ? "is-active" : undefined}
+                data-editable-target={`links[${i}].label`}
+                data-editable-target-label={`links[${i}].label`}
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+          <div ref={menuRef} className={`site-mobile-menu${isOpen ? " is-open" : ""}`}>
+            <button
+              ref={toggleRef}
+              type="button"
+              className="site-mobile-menu-button"
+              aria-expanded={isOpen}
+              aria-controls={menuId}
+              aria-label="Toggle navigation menu"
+              onClick={toggle}
             >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-        <div ref={menuRef} className={`site-mobile-menu${isOpen ? " is-open" : ""}`}>
-          <button
-            ref={toggleRef}
-            type="button"
-            className="site-mobile-menu-button"
-            aria-expanded={isOpen}
-            aria-controls={menuId}
-            aria-label="Toggle navigation menu"
-            onClick={toggle}
-          >
-            <span className="burger-icon" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-          </button>
-          {isOpen ? (
-            <nav id={menuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
-              {links.map((link, i) => (
-                <a
-                  key={`mobile-${link.href}`}
-                  href={link.href}
-                  className={isActive(link.href) ? "is-active" : undefined}
-                  data-editable-target={`links[${i}].label`}
-                  onClick={close}
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
-          ) : null}
+              <span className="burger-icon" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+            </button>
+            {isOpen ? (
+              <nav id={menuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
+                {links.map((link, i) => (
+                  <a
+                    key={`mobile-${link.href}`}
+                    href={link.href}
+                    className={isActive(link.href) ? "is-active" : undefined}
+                    data-editable-target={`links[${i}].label`}
+                    onClick={close}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </nav>
+            ) : null}
+          </div>
         </div>
       </header>
       {isOpen ? (

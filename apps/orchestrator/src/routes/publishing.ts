@@ -5,6 +5,7 @@ import {
   scopedSessionKey,
   publishStatusBySession,
   getSessionPages,
+  getSiteConfig,
   getSessionDraft,
   ensureHeroImageProps,
   bumpVersion,
@@ -50,9 +51,84 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
       return reply.code(401).send({ error: "invalid publish token" })
     }
 
-    const body = (request.body ?? {}) as { session?: string; siteId?: string }
+    const body = (request.body ?? {}) as { session?: string; siteId?: string; siteOrigin?: string }
     const session = normalizeSession(body.session)
     const scopedSession = scopedSessionKey(session, body.siteId)
+    const siteOrigin = typeof body.siteOrigin === "string" ? body.siteOrigin.trim().replace(/\/+$/, "") : ""
+
+    const pages = getSessionPages(scopedSession)
+    const slugs = pages.map((page) => page.slug)
+
+    // Publish via the site's contract endpoint
+    if (siteOrigin) {
+      const siteConfig = getSiteConfig(scopedSession)
+      let siteRes: Response
+      try {
+        siteRes = await fetch(`${siteOrigin}/api/editor/publish`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            pages,
+            siteConfig,
+            session: scopedSession,
+            publishedAt: new Date().toISOString()
+          })
+        })
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "fetch failed"
+        return reply.code(502).send({
+          status: "failed",
+          session,
+          slugs,
+          reason: `Site unreachable at ${siteOrigin}/api/editor/publish: ${detail}`
+        })
+      }
+
+      if (siteRes.status === 404) {
+        return reply.code(400).send({
+          status: "failed",
+          session,
+          slugs,
+          reason: `Site does not implement the publish contract. POST ${siteOrigin}/api/editor/publish returned 404.`
+        })
+      }
+
+      const siteResult = (await siteRes.json()) as { ok?: boolean; slugs?: string[]; error?: string }
+      const ok = siteRes.ok && siteResult.ok !== false
+      const now = new Date().toISOString()
+
+      const tracker: PublishTracker = {
+        session,
+        status: ok ? "triggered" : "failed",
+        startedAt: now,
+        updatedAt: now,
+        slugs,
+        vercelState: ok ? "READY" : "ERROR",
+        deployResponse: "site_contract",
+        deployStatus: siteRes.status
+      }
+      publishStatusBySession.set(scopedSession, tracker)
+      if (ok) setLastPublishedScopedSession(scopedSession)
+
+      if (!ok) {
+        return reply.code(400).send({
+          status: "failed",
+          session,
+          slugs,
+          reason: siteResult.error ?? "site publish failed"
+        })
+      }
+
+      return {
+        status: "ready" as const,
+        session,
+        slugs: siteResult.slugs ?? slugs,
+        vercelState: "READY",
+        message: `Published ${slugs.length} page${slugs.length === 1 ? "" : "s"} to site.`
+      }
+    }
+
+    // No siteOrigin provided — use legacy publish modes
     const publishMode = (process.env.PUBLISH_MODE?.trim().toLowerCase() || "git") as "deploy_hook" | "git"
 
     if (publishMode === "git") {
@@ -95,9 +171,6 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
     if (!deployHookUrl) {
       return reply.code(400).send({ error: "VERCEL_DEPLOY_HOOK_URL is not configured" })
     }
-
-    const pages = getSessionPages(scopedSession)
-    const slugs = pages.map((page) => page.slug)
 
     try {
       const hookResponse = await fetch(deployHookUrl, {

@@ -6,7 +6,8 @@ export function usePublish(
   session: string,
   siteId: string,
   isLoading: boolean,
-  pushMessage: (data: AssistantResponse) => void
+  pushMessage: (data: AssistantResponse) => void,
+  siteOrigin?: string
 ) {
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null)
@@ -32,7 +33,7 @@ export function usePublish(
           "content-type": "application/json",
           ...(publishToken ? { "x-publish-token": publishToken } : {})
         },
-        body: JSON.stringify({ session, siteId })
+        body: JSON.stringify({ session, siteId, siteOrigin })
       })
       const data = (await res.json()) as PublishResponse
       if (!res.ok || (data.status !== "triggered" && data.status !== "ready")) {
