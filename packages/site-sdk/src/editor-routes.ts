@@ -48,7 +48,8 @@ export function createPagesHandler(
 }
 
 export function createPublishHandler(
-  onPublish: OnPublishFn
+  onPublish: OnPublishFn,
+  options?: { publishSecret?: string }
 ): {
   POST: (request: Request) => Promise<Response>
   OPTIONS: (request: Request) => Response
@@ -56,6 +57,19 @@ export function createPublishHandler(
   return {
     OPTIONS: createEditorCorsOptionsHandler(),
     async POST(request: Request) {
+      // Verify publish token if configured
+      const secret = options?.publishSecret
+      if (secret) {
+        const provided = request.headers.get("x-publish-token")?.trim()
+        if (!provided || provided !== secret) {
+          const res = new Response(
+            JSON.stringify({ ok: false, error: "Invalid or missing publish token" }),
+            { status: 401, headers: { "Content-Type": "application/json" } }
+          )
+          return applyEditorCors(res, request.headers.get("origin"))
+        }
+      }
+
       try {
         const body = (await request.json()) as {
           pages?: unknown

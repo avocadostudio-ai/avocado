@@ -64,9 +64,13 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
       const siteConfig = getSiteConfig(scopedSession)
       let siteRes: Response
       try {
+        const publishTokenValue = process.env.PUBLISH_TOKEN?.trim()
         siteRes = await fetch(`${siteOrigin}/api/editor/publish`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(publishTokenValue ? { "x-publish-token": publishTokenValue } : {})
+          },
           body: JSON.stringify({
             pages,
             siteConfig,
