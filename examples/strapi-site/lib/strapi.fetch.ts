@@ -34,15 +34,15 @@ function resolveMediaUrl(field: unknown): string {
 function strapiEntryToBlock(entry: StrapiItem): BlockInstance | null {
   // Strapi content type API names are plural (e.g., "heroes"), but the
   // __component field in dynamic zones uses singular (e.g., "hero")
-  // For relation-based blocks, we use a custom _blockType field
-  const blockType = (entry._blockType as string) ?? ""
+  // For relation-based blocks, we use a custom blockType field
+  const blockType = (entry.blockType as string) ?? ""
   if (!blockType) return null
 
   const imageFields = getImageFields(blockType)
   const props: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(entry)) {
-    if (key === "id" || key === "documentId" || key === "createdAt" || key === "updatedAt" || key === "publishedAt" || key === "locale" || key === "_blockType") continue
+    if (key === "id" || key === "documentId" || key === "createdAt" || key === "updatedAt" || key === "publishedAt" || key === "locale" || key === "blockType") continue
 
     if (imageFields.has(key)) {
       props[key] = resolveMediaUrl(value)
@@ -77,7 +77,7 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
     slug,
     title: (entry.title as string) ?? "",
     blocks,
-    meta: entry.meta as PageDoc["meta"],
+    meta: entry.pageMeta as PageDoc["meta"],
     updatedAt: (entry.updatedAt as string) ?? new Date().toISOString(),
   }
 }
