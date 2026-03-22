@@ -1,4 +1,4 @@
-import { groq } from "next-sanity"
+import groq from "groq"
 
 /** Fetch a single page by slug with all block references resolved */
 export const pageBySlugQuery = groq`
