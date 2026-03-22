@@ -938,7 +938,7 @@ export function compileDeterministicPlan(args: {
     if (targetSlug === "/") {
       return {
         intent: "needs_clarification",
-        summary_for_user: "Home page (/) cannot be deleted. Choose another page path.",
+        summary_for_user: "The home page cannot be deleted. Navigate to a different page first, or specify which page to delete (e.g. \"delete /about\").",
         change_log: assumptions,
         ops: []
       }
