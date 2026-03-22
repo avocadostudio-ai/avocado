@@ -96,14 +96,13 @@ async function fetchSanityMedia(
   const offset = (page - 1) * limit
   const end = offset + limit - 1
 
-  // GROQ query for image assets
-  let groq = `*[_type == "sanity.imageAsset"]`
-  if (query) groq = `*[_type == "sanity.imageAsset" && originalFilename match "*${query}*"]`
-  groq += ` | order(_createdAt desc) [${offset}..${end}] { _id, url, originalFilename, metadata { dimensions } }`
-
-  // Also get total count
-  let countGroq = `count(*[_type == "sanity.imageAsset"])`
-  if (query) countGroq = `count(*[_type == "sanity.imageAsset" && originalFilename match "*${query}*"])`
+  // GROQ query for image assets — sanitize query to prevent injection
+  const safeQuery = query.replace(/["\\]/g, "")
+  const filter = safeQuery
+    ? `_type == "sanity.imageAsset" && originalFilename match "*${safeQuery}*"`
+    : `_type == "sanity.imageAsset"`
+  const groq = `*[${filter}] | order(_createdAt desc) [${offset}..${end}] { _id, url, originalFilename, metadata { dimensions } }`
+  const countGroq = `count(*[${filter}])`
 
   const [assetsRes, countRes] = await Promise.all([
     fetch(`https://${config.projectId}.api.sanity.io/v2024-01-01/data/query/${dataset}?query=${encodeURIComponent(groq)}`),
