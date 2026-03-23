@@ -124,6 +124,7 @@ writeContentType(apiDir, "page", "Page", "collectionType", {
   slug: { type: "string", unique: true, required: true },
   title: { type: "string", required: true },
   pageId: { type: "string" },
+  blocks: { type: "json" },
   pageMeta: { type: "json" },
 })
 

@@ -1,5 +1,5 @@
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { getImageFields } from "@ai-site-editor/shared"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
 
 /** Strapi v4/v5 REST response shape */
@@ -8,17 +8,6 @@ type StrapiItem = {
   id: number
   documentId: string
   [key: string]: unknown
-}
-
-/** Get image fields for a block type */
-function getImageFields(blockType: string): Set<string> {
-  const meta = getAllBlockMeta()[blockType]
-  if (!meta) return new Set()
-  const result = new Set<string>()
-  for (const [key, fm] of Object.entries(meta.fields)) {
-    if (fm.kind === "image") result.add(key)
-  }
-  return result
 }
 
 /** Resolve a Strapi media field to an absolute URL */
@@ -63,12 +52,18 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
   const slug = entry.slug as string | undefined
   if (!slug) return null
 
-  const rawBlocks = entry.blocks as StrapiItem[] | undefined
+  const rawBlocks = entry.blocks as Array<Record<string, unknown>> | undefined
   const blocks: BlockInstance[] = []
   if (Array.isArray(rawBlocks)) {
     for (const raw of rawBlocks) {
-      const block = strapiEntryToBlock(raw)
-      if (block) blocks.push(block)
+      // JSON-stored blocks have { id, type, props } directly
+      if (typeof raw.type === "string" && typeof raw.id === "string" && raw.props) {
+        blocks.push({ id: raw.id, type: raw.type, props: raw.props as Record<string, unknown> })
+      } else {
+        // Legacy: Strapi entry with blockType field
+        const block = strapiEntryToBlock(raw as StrapiItem)
+        if (block) blocks.push(block)
+      }
     }
   }
 
