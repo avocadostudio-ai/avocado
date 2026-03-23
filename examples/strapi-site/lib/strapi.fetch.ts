@@ -2,7 +2,7 @@ import { strapiFetch, STRAPI_URL } from "./strapi.client"
 import { getImageFields } from "@ai-site-editor/shared"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
 
-/** Strapi v4/v5 REST response shape */
+/** Strapi v5 REST response shape */
 type StrapiResponse<T> = { data: T; meta?: unknown }
 type StrapiItem = {
   id: number
@@ -19,20 +19,25 @@ function resolveMediaUrl(field: unknown): string {
   return url.startsWith("http") ? url : `${STRAPI_URL}${url}`
 }
 
-/** Convert a Strapi block entry to a BlockInstance */
-function strapiEntryToBlock(entry: StrapiItem): BlockInstance | null {
-  // Strapi content type API names are plural (e.g., "heroes"), but the
-  // __component field in dynamic zones uses singular (e.g., "hero")
-  // For relation-based blocks, we use a custom blockType field
-  const blockType = (entry.blockType as string) ?? ""
-  if (!blockType) return null
+/**
+ * Convert a Strapi Dynamic Zone component to a BlockInstance.
+ *
+ * Dynamic Zone entries have __component: "blocks.hero" and all
+ * component fields inline.
+ */
+function dzComponentToBlock(entry: Record<string, unknown>): BlockInstance | null {
+  const component = entry.__component as string | undefined
+  if (!component?.startsWith("blocks.")) return null
+
+  // "blocks.hero" → "Hero", "blocks.featuregrid" → "Featuregrid"
+  const rawName = component.replace("blocks.", "")
+  const blockType = rawName.charAt(0).toUpperCase() + rawName.slice(1)
 
   const imageFields = getImageFields(blockType)
   const props: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(entry)) {
-    if (key === "id" || key === "documentId" || key === "createdAt" || key === "updatedAt" || key === "publishedAt" || key === "locale" || key === "blockType") continue
-
+    if (key === "id" || key === "__component") continue
     if (imageFields.has(key)) {
       props[key] = resolveMediaUrl(value)
     } else {
@@ -41,7 +46,7 @@ function strapiEntryToBlock(entry: StrapiItem): BlockInstance | null {
   }
 
   return {
-    id: entry.documentId ?? String(entry.id),
+    id: String(entry.id ?? ""),
     type: blockType,
     props,
   }
@@ -56,14 +61,8 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
   const blocks: BlockInstance[] = []
   if (Array.isArray(rawBlocks)) {
     for (const raw of rawBlocks) {
-      // JSON-stored blocks have { id, type, props } directly
-      if (typeof raw.type === "string" && typeof raw.id === "string" && raw.props) {
-        blocks.push({ id: raw.id, type: raw.type, props: raw.props as Record<string, unknown> })
-      } else {
-        // Legacy: Strapi entry with blockType field
-        const block = strapiEntryToBlock(raw as StrapiItem)
-        if (block) blocks.push(block)
-      }
+      const block = dzComponentToBlock(raw)
+      if (block) blocks.push(block)
     }
   }
 
@@ -93,9 +92,7 @@ export async function getStrapiPage(slug: string): Promise<PageDoc | null> {
 export async function getStrapiSlugs(): Promise<string[]> {
   try {
     const res = await strapiFetch<StrapiResponse<StrapiItem[]>>("/pages?fields[0]=slug&pagination[pageSize]=100")
-    return res.data
-      .map((item) => item.slug as string)
-      .filter(Boolean)
+    return res.data.map((item) => item.slug as string).filter(Boolean)
   } catch (err) {
     console.error("getStrapiSlugs failed:", err instanceof Error ? err.message : err)
     return []
@@ -107,9 +104,7 @@ export async function getStrapiPages(): Promise<PageDoc[]> {
     const res = await strapiFetch<StrapiResponse<StrapiItem[]>>(
       "/pages?populate=*&pagination[pageSize]=100"
     )
-    return res.data
-      .map(strapiEntryToPageDoc)
-      .filter((p): p is PageDoc => p !== null)
+    return res.data.map(strapiEntryToPageDoc).filter((p): p is PageDoc => p !== null)
   } catch (err) {
     console.error("getStrapiPages failed:", err instanceof Error ? err.message : err)
     return []

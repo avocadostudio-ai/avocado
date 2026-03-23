@@ -1,26 +1,6 @@
 import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
-
-/** Strapi plural API name: Hero → heroes, CTA → ctas, FAQ → faqs */
-function toStrapiPlural(blockType: string): string {
-  const lower = blockType.toLowerCase()
-  if (lower.endsWith("s")) return lower + "es"
-  if (lower.endsWith("y") && !/[aeiou]y$/i.test(lower)) return lower.slice(0, -1) + "ies"
-  return lower + "s"
-}
-
-/** Reject URLs pointing at private/loopback addresses. */
-function isSafeImageUrl(raw: string): boolean {
-  let parsed: URL
-  try { parsed = new URL(raw) } catch { return false }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
-  const h = parsed.hostname
-  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
-  if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
-  return true
-}
+import { getImageFields } from "@ai-site-editor/shared"
 
 /** Upload an image URL to Strapi media library, return the media ID */
 async function ensureMediaAsset(
@@ -32,32 +12,22 @@ async function ensureMediaAsset(
 
   const promise = (async () => {
     if (!imageUrl.startsWith("http")) return null
-    if (!isSafeImageUrl(imageUrl)) return null
-
     try {
       const imageRes = await fetch(imageUrl)
       if (!imageRes.ok) return null
-
       const blob = await imageRes.blob()
       const fileName = imageUrl.split("/").pop()?.split("?")[0] || "image.jpg"
-
       const form = new FormData()
       form.append("files", blob, fileName)
-
       const uploadRes = await fetch(`${STRAPI_URL}/api/upload`, {
         method: "POST",
-        headers: {
-          ...(process.env.STRAPI_API_TOKEN ? { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}` } : {}),
-        },
+        headers: { ...(process.env.STRAPI_API_TOKEN ? { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}` } : {}) },
         body: form,
       })
       if (!uploadRes.ok) return null
-
       const uploaded = (await uploadRes.json()) as Array<{ id: number }>
       return uploaded[0]?.id ?? null
-    } catch {
-      return null
-    }
+    } catch { return null }
   })()
 
   cache.set(imageUrl, promise)
@@ -65,10 +35,11 @@ async function ensureMediaAsset(
 }
 
 /**
- * Publish handler for Strapi REST API.
+ * Publish handler for Strapi using Dynamic Zones.
  *
- * Creates/updates block entries, then creates/updates page entries
- * with relations to the blocks.
+ * Each block is stored as a Strapi Component within the page's
+ * Dynamic Zone — the native Strapi way to model page builders.
+ * No separate block entries — components are embedded in the page.
  */
 export function createStrapiPublishHandler(): OnPublishFn {
   return async (pages, config) => {
@@ -77,20 +48,16 @@ export function createStrapiPublishHandler(): OnPublishFn {
 
     for (const page of pages) {
       try {
-        const blockIds: number[] = []
-
-        // Upsert each block
-        for (const block of page.blocks) {
-          const apiName = toStrapiPlural(block.type)
+        // Build Dynamic Zone array — each block becomes a component
+        const dzBlocks = await Promise.all(page.blocks.map(async (block) => {
+          const componentName = `blocks.${block.type.toLowerCase()}`
           const imageFields = getImageFields(block.type)
-
           const data: Record<string, unknown> = {
-            blockType: block.type, // custom field to identify block type on read
+            __component: componentName,
           }
 
           for (const [key, value] of Object.entries(block.props)) {
             if (key === "headingLevel") continue
-
             if (imageFields.has(key) && typeof value === "string" && value) {
               const mediaId = await ensureMediaAsset(value, mediaCache)
               if (mediaId) data[key] = mediaId
@@ -99,21 +66,15 @@ export function createStrapiPublishHandler(): OnPublishFn {
             }
           }
 
-          // Find existing block by blockType + a marker, or create new
-          // Strapi auto-generates documentId — we can't set it
-          const created = await strapiFetch<{ data: { id: number; documentId: string } }>(`/${apiName}`, {
-            method: "POST",
-            body: JSON.stringify({ data }),
-          })
-          blockIds.push(created.data.id)
-        }
+          return data
+        }))
 
-        // Upsert the page with blocks stored as JSON
-        const pageData: Record<string, unknown> = {
+        // Upsert the page with Dynamic Zone blocks
+        const pageData = {
           slug: page.slug,
           title: page.title,
           pageId: page.id,
-          blocks: page.blocks.map((b) => ({ id: b.id, type: b.type, props: b.props })),
+          blocks: dzBlocks,
           ...(page.meta ? { pageMeta: page.meta } : {}),
         }
 
@@ -138,41 +99,24 @@ export function createStrapiPublishHandler(): OnPublishFn {
       }
     }
 
-    // Upsert site config (singleton)
+    // Upsert site config
     if (config.name || config.logo || config.navLabels) {
       try {
         await strapiFetch("/site-config", {
           method: "PUT",
-          body: JSON.stringify({
-            data: {
-              name: config.name ?? "",
-              logo: config.logo ?? "",
-              navLabels: config.navLabels ?? {},
-            },
-          }),
+          body: JSON.stringify({ data: { name: config.name ?? "", logo: config.logo ?? "", navLabels: config.navLabels ?? {} } }),
         })
       } catch {
-        // Site config might not exist yet
         try {
           await strapiFetch("/site-config", {
             method: "POST",
-            body: JSON.stringify({
-              data: {
-                name: config.name ?? "",
-                logo: config.logo ?? "",
-                navLabels: config.navLabels ?? {},
-              },
-            }),
+            body: JSON.stringify({ data: { name: config.name ?? "", logo: config.logo ?? "", navLabels: config.navLabels ?? {} } }),
           })
-        } catch {
-          // Ignore — site config is optional
-        }
+        } catch { /* optional */ }
       }
     }
 
-    if (errors.length > 0) {
-      return { ok: false, error: `Failed: ${errors.join("; ")}` }
-    }
+    if (errors.length > 0) return { ok: false, error: `Failed: ${errors.join("; ")}` }
     return { ok: true }
   }
 }
