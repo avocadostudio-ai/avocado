@@ -186,7 +186,7 @@ export function useSiteList(siteId: string, session: string) {
       commit: ""
     })
     try {
-      const res = await fetch(`${orchestrator}/restore/snapshots?limit=30`)
+      const res = await fetch(`${orchestrator}/restore/snapshots?limit=30&siteId=${encodeURIComponent(targetSiteId)}`)
       const data = (await res.json()) as { snapshots?: RestoreSnapshot[]; error?: string }
       if (!res.ok) {
         setRestoreState((prev) => ({ ...prev, error: data.error ?? "Failed to load snapshots.", isLoading: false }))
@@ -224,6 +224,7 @@ export function useSiteList(siteId: string, session: string) {
         return
       }
       setSiteTileRefreshToken((prev) => prev + 1)
+      openEditorForSite(restoreState.siteId)
       setRestoreState(INITIAL_RESTORE_STATE)
     } catch {
       setRestoreState((prev) => ({ ...prev, error: "Failed to restore snapshot.", isRestoring: false }))
