@@ -145,6 +145,25 @@ export function createStrapiPublishHandler(): OnPublishFn {
       }
     }
 
+    // Delete pages that exist in Strapi but not in the published set
+    const publishedSlugs = new Set(pages.map((p) => p.slug))
+    try {
+      const allCmsPages = await strapiFetch<{ data: Array<{ documentId: string; slug: string }> }>(
+        "/pages?fields[0]=slug&fields[1]=documentId&pagination[pageSize]=100"
+      )
+      for (const cmsPage of allCmsPages.data) {
+        if (!publishedSlugs.has(cmsPage.slug)) {
+          try {
+            await strapiFetch(`/pages/${cmsPage.documentId}`, { method: "DELETE" })
+          } catch (err) {
+            errors.push(`delete ${cmsPage.slug}: ${err instanceof Error ? err.message : String(err)}`)
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — stale pages remain but published pages are correct
+    }
+
     // Upsert site config
     if (config.name || config.logo || config.navLabels) {
       try {

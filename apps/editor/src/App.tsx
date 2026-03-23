@@ -670,7 +670,9 @@ function EditorPage({
     onApplied: () => { onAppliedRef.current?.() }
   })
 
-  const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin)
+  const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin, () => {
+    preview.postToSite("draftUpdated", { focusBlockId: null })
+  })
 
   const media = useMediaInput()
 
@@ -1090,6 +1092,13 @@ function EditorPage({
         lines.push(`timeline: ${compact}`)
       }
       if (entry.debug.promptExcerpt) lines.push(`prompt: ${entry.debug.promptExcerpt}`)
+      // Context fields
+      const contextParts: string[] = []
+      if (entry.debug.currentPage) contextParts.push(`page: ${entry.debug.currentPage}`)
+      if (entry.debug.siteId) contextParts.push(`site: ${entry.debug.siteId}`)
+      if (entry.debug.activeBlockId) contextParts.push(`block: ${entry.debug.activeBlockId}`)
+      if (entry.debug.activeEditablePath) contextParts.push(`path: ${entry.debug.activeEditablePath}`)
+      if (contextParts.length > 0) lines.push(`context: ${contextParts.join(", ")}`)
     }
     return lines.join("\n")
   }, [])
@@ -1386,6 +1395,14 @@ function EditorPage({
                           <li>timeline: {entry.debug.timeline.map((item) => `${item.stage}:${item.atMs}ms`).join(" -> ")}</li>
                         ) : null}
                         {entry.debug.promptExcerpt ? <li>prompt: {entry.debug.promptExcerpt}</li> : null}
+                        {(entry.debug.currentPage || entry.debug.siteId || entry.debug.activeBlockId || entry.debug.activeEditablePath) ? (
+                          <li>context: {[
+                            entry.debug.currentPage ? `page: ${entry.debug.currentPage}` : null,
+                            entry.debug.siteId ? `site: ${entry.debug.siteId}` : null,
+                            entry.debug.activeBlockId ? `block: ${entry.debug.activeBlockId}` : null,
+                            entry.debug.activeEditablePath ? `path: ${entry.debug.activeEditablePath}` : null
+                          ].filter(Boolean).join(", ")}</li>
+                        ) : null}
                       </ul>
                     </div>
                   </details>

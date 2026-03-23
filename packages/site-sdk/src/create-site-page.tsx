@@ -4,7 +4,7 @@ import { SharedBlockRenderer, BlocksHydrator } from "@ai-site-editor/blocks"
 import { buildSlug } from "./index.ts"
 import type { BlockInstance } from "./types.ts"
 import type { SiteConfig } from "@ai-site-editor/shared"
-import { resolveEditorContext, fetchEditorPage } from "./draft.ts"
+import { resolveEditorContext, fetchEditorPage, fetchEditorSlugs } from "./draft.ts"
 import { renderBlocks, EditorOverlay } from "./editor.ts"
 import { buildNavItems, buildSiteHeaderBlock } from "./navigation.ts"
 import type { PageDoc } from "@ai-site-editor/shared"
@@ -104,7 +104,9 @@ export function createSitePage(config: SitePageConfig) {
       editorMode
         ? fetchEditorPage(slug, session, currentSiteId).then((p) => p ?? cmsGetPage(slug))
         : cmsGetPage(slug),
-      cmsGetSlugs(),
+      editorMode
+        ? fetchEditorSlugs(session, currentSiteId).then((s) => s.length > 0 ? s : cmsGetSlugs())
+        : cmsGetSlugs(),
       cmsGetSiteConfig ? cmsGetSiteConfig() : Promise.resolve({}),
     ])
 
