@@ -221,7 +221,7 @@ function inferActionFromMessage(message: string): ParsedIntent["action"] | null 
     { action: "remove", pattern: /\b(remove|delete)\b/ },
     { action: "move", pattern: /\b(move|reorder|re-arrange|rearrange)\b/ },
     { action: "add", pattern: /\b(add|insert|create|include|put)\b/ },
-    { action: "update", pattern: /\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*)\b/ },
+    { action: "update", pattern: /\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*|rename)\b/ },
   ]
   let earliest: { action: ParsedIntent["action"]; index: number } | null = null
   for (const { action, pattern } of verbPatterns) {
@@ -424,6 +424,37 @@ export function inferDeterministicIntent(args: {
 }
 
 /**
+ * Detects "move (this) page before/after X" — page nav move requests.
+ * Matches both route-based ("move page after /pricing") and natural language
+ * ("move this page before About us") anchor references.
+ * Requires "this/the/current page" to distinguish from block moves like "move page hero to bottom".
+ */
+function isNavMoveRequest(message: string) {
+  const lower = message.toLowerCase()
+  const movesThisPage = /\bmove\b.*\b(this|the|current)\s+page\b/.test(lower)
+  const hasPlacement = /\b(before|after|above|below|first|last|top|bottom|start|end|beginning)\b/.test(lower)
+  return movesThisPage && hasPlacement
+}
+
+/**
+ * Resolves a natural language page name (e.g. "About us") to a slug by matching
+ * against page titles in the session draft. Returns undefined if no match.
+ */
+function resolvePageSlugByTitle(sessionDraft: Map<string, PageDoc>, name: string): string | undefined {
+  const lower = name.toLowerCase().trim()
+  if (!lower) return undefined
+  for (const [slug, page] of sessionDraft) {
+    if (page.title.toLowerCase() === lower) return slug
+  }
+  // Fuzzy: check if name is contained in title or vice versa
+  for (const [slug, page] of sessionDraft) {
+    const titleLower = page.title.toLowerCase()
+    if (titleLower.includes(lower) || lower.includes(titleLower)) return slug
+  }
+  return undefined
+}
+
+/**
  * Returns true only when UI context makes the intent completely unambiguous,
  * so the deterministic planner can handle it without an LLM call.
  */
@@ -475,6 +506,10 @@ export function isHighConfidenceDeterministicCase(args: {
   if (action === "add" && /\b(each|every)\b/i.test(raw)) return false
   // Counted multi-block add without enough named types → needs LLM for content generation
   if (action === "add" && isBatchAddRequest(raw) && extractMentionedBlockTypes(raw).length < 2) return false
+  // Case: page rename — "rename page to Our community", "rename this page to /plans"
+  if (action === "update" && isPageRouteRenameRequest(raw)) return true
+  // Case: page nav move — "move this page before About us", "move page after /pricing"
+  if (action === "move" && isNavMoveRequest(raw)) return true
   // Case: page-level delete — "delete this page", "remove the page"
   if (action === "remove" && /\b(delete|remove)\b.*\bpage\b/i.test(raw) && !inferBlockTypeFromText(raw)) return true
   const removeType = inferBlockTypeFromText(raw)
@@ -921,9 +956,12 @@ export function compileDeterministicPlan(args: {
   const routeMentions = extractRouteMentions(cleanMessage)
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
+  const hasStructuralVerb = /\b(move|reorder|re-arrange|rearrange|add|remove|delete|create|duplicate|rename)\b/.test(lowerMessage)
 
   if (
     process.env.OPENAI_API_KEY &&
+    (intent.action === "update" || intent.action === "clarify") &&
+    !hasStructuralVerb &&
     isRewriteRequest(message) &&
     (!hasQuotedReplacementDirective(message) || hasQuotedConstraintOnlyText(message))
   ) return null
@@ -957,6 +995,25 @@ export function compileDeterministicPlan(args: {
       toSlug = routeMentions[0]
       fromSlug = slug
     }
+    // Extract natural language name after "to" when no route mentions resolve
+    let newTitle: string | undefined
+    if (!toSlug || toSlug === fromSlug) {
+      // Strip clarification history and site context before extracting the target name
+      const msgForRename = message.replace(/\nClarification from user:[\s\S]*/i, "").replace(/\s*\[site context\][\s\S]*$/i, "").trim()
+      const nameMatch = msgForRename.match(/\brename\b.*\bpage\b.*?\bto\s+(.+)$/i)
+        ?? msgForRename.match(/\brename\b.*?\bto\s+(.+)$/i)
+      if (nameMatch) {
+        const rawName = nameMatch[1].replace(/[.!?]+$/, "").trim()
+        if (rawName) {
+          const seed = toSeedSlug(rawName)
+          if (seed) {
+            toSlug = `/${seed}`
+            fromSlug = slug
+            newTitle = rawName.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
+          }
+        }
+      }
+    }
     if (!toSlug || toSlug === fromSlug) {
       return {
         intent: "needs_clarification",
@@ -965,11 +1022,12 @@ export function compileDeterministicPlan(args: {
         ops: []
       }
     }
+    const renameOp: Operation = { op: "rename_page", pageSlug: fromSlug, newPageSlug: toSlug, ...(newTitle ? { newTitle } : {}) }
     return {
       intent: "edit_plan",
       summary_for_user: `Renamed page path from ${fromSlug} to ${toSlug}.`,
       change_log: [...assumptions, `Renamed page ${fromSlug} -> ${toSlug}.`],
-      ops: [{ op: "rename_page", pageSlug: fromSlug, newPageSlug: toSlug }]
+      ops: [renameOp]
     }
   }
 
@@ -1003,7 +1061,8 @@ export function compileDeterministicPlan(args: {
     /\b(nav|navigation|menu|tabs?|tab order|page order)\b/.test(lowerMessage) ||
     /\bmove\b.*\btab\b/.test(lowerMessage) ||
     (/\bmove\b.*\bpage\b/.test(lowerMessage) && hasNavContext) ||
-    /\breorder\b.*\b(page|nav|menu|tabs?)\b/.test(lowerMessage)
+    /\breorder\b.*\b(page|nav|menu|tabs?)\b/.test(lowerMessage) ||
+    isNavMoveRequest(cleanMessage)
   if ((intent.action === "move" || intent.action === "clarify") && asksNavMove) {
     const sessionDraft = getSessionDraft(session)
     const slugsRaw = Array.from(sessionDraft.keys())
@@ -1026,16 +1085,45 @@ export function compileDeterministicPlan(args: {
       }
     }
 
+    // Extract anchor page name from natural language when no route mentions available
+    const resolveAnchorSlug = (): string | undefined => {
+      if (routeMentions.length >= 2) return routeMentions[1]
+      // "move page before About us" → extract "About us"
+      const anchorMatch = cleanMessage.match(/\b(?:before|after|above|below|under)\s+(.+)$/i)
+      if (anchorMatch) {
+        const name = anchorMatch[1].replace(/\s*\[site context\][\s\S]*$/i, "").replace(/[.!?]+$/, "").trim()
+        return resolvePageSlugByTitle(sessionDraft, name)
+      }
+      return undefined
+    }
+
     let afterPageSlug: string | undefined
     if (/\b(top|first|start|beginning)\b/.test(lowerMessage)) {
       afterPageSlug = undefined
     } else if (/\b(bottom|last|end)\b/.test(lowerMessage)) {
       const tail = [...ordered].reverse().find((route) => route !== movedSlug)
       afterPageSlug = tail === "/" ? "/" : tail
-    } else if (/\b(after|below|under)\b/.test(lowerMessage) && routeMentions.length >= 2) {
-      afterPageSlug = routeMentions[1]
-    } else if (/\b(before|above)\b/.test(lowerMessage) && routeMentions.length >= 2) {
-      const anchor = routeMentions[1]
+    } else if (/\b(after|below|under)\b/.test(lowerMessage)) {
+      const anchor = resolveAnchorSlug()
+      if (!anchor) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: "Specify where to place the page (first/last/before/after).",
+          change_log: assumptions,
+          ops: []
+        }
+      }
+      afterPageSlug = anchor
+    } else if (/\b(before|above)\b/.test(lowerMessage)) {
+      const anchor = resolveAnchorSlug()
+      if (!anchor) {
+        return {
+          intent: "needs_clarification",
+          summary_for_user: "Specify where to place the page (first/last/before/after).",
+          change_log: assumptions,
+          ops: []
+        }
+      }
       if (anchor === "/") afterPageSlug = undefined
       else {
         const index = ordered.findIndex((route) => route === anchor)
@@ -1177,10 +1265,10 @@ export function compileDeterministicPlan(args: {
     !asksAudienceCreatePage &&
     (/\bfor\b/.test(lowerMessage) || /\baudience\b/.test(lowerMessage) || /\btarget\b/.test(lowerMessage))
   if (asksAudienceRetarget && audience) {
-    if (process.env.OPENAI_API_KEY) return null
     const targets = selectedBlock
       ? [selectedBlock]
       : currentPage.blocks.filter((block) => block.type === "Hero" || block.type === "CTA" || block.type === "RichText").slice(0, 3)
+    if (process.env.OPENAI_API_KEY && !selectedBlock) return null
     const ops: Operation[] = []
     for (const block of targets) {
       const patch = audiencePatchForBlock(block, audience)

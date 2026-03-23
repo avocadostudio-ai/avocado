@@ -48,17 +48,22 @@ export function isLikelyClarificationFollowUp(message: string) {
   const hasConfirmationOpener =
     /^(yes\b|yeah\b|yep\b|sure\b|ok\b|okay\b|go ahead\b|do it\b|let'?s (?:see|go|do)\b|show me\b|sounds good\b|please\b)/.test(normalized)
   if (hasConfirmationOpener) return true
+  if (isStandalonePageOperation(normalized)) return false
   const hasReferenceCue =
     /\b(selected|this|that|it|them|those|these|one|ones|same)\b/.test(normalized) ||
     /\bfirst|second|third|last\b/.test(normalized) ||
     /\b(?:all|the|both)\s+\d+\b/.test(normalized)
   const hasActionVerb = /\b(add|update|change|edit|remove|delete|move|rename|create|duplicate|set|rewrite|replace|translate|redesign|refocus|overhaul|rebuild)\b/.test(normalized)
+  if (hasActionVerb && /\b(this|current|selected|the)\s+page\b/.test(normalized)) return false
   return (words.length <= 8 && hasReferenceCue) || (!hasActionVerb && words.length <= 5)
 }
 
 export function isStandalonePageOperation(message: string) {
   const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
-  return /\b(create|generate|add|make|build|remove|delete|rename|move|translate|redesign|refocus|overhaul|rebuild)\b.*\bpage\b/.test(normalized)
+  if (/\b(create|generate|add|make|build|remove|delete|rename|move|translate|redesign|refocus|overhaul|rebuild)\b.*\bpage\b/.test(normalized)) return true
+  // "rename to Olive oil" — implicit page rename even without "page" keyword
+  if (/\brename\b.*\bto\s+[a-z]/i.test(normalized) && !/\bto\s+(first|last|top|bottom|start|end|beginning)\b/i.test(normalized)) return true
+  return false
 }
 
 export function parseCreatePageRequest(message: string) {
@@ -70,7 +75,11 @@ export function parseCreatePageRequest(message: string) {
   const mentionsCurrentPage = /\b(this|current|selected)\s+page\b/.test(lower)
   const hasExplicitRoute = Boolean(firstRouteMention(stripped) ?? extractRouteMentions(stripped)[0])
   const asksNewPage = /\bnew\s+page\b/.test(lower)
+  const isCurrentPagePlacementPhrase =
+    /\b(?:on|at|in|within|inside)\s+(?:this|the|current|selected)\s+page\b/.test(lower) ||
+    /\b(?:end|top|bottom|start|beginning)\s+of\s+(?:this|the|current|selected)\s+page\b/.test(lower)
   if (mentionsCurrentPage && !asksNewPage && !hasExplicitRoute) return null
+  if (isCurrentPagePlacementPhrase && !asksNewPage && !hasExplicitRoute) return null
 
   const hasPageWord = /\bpages?\b/.test(lower)
   if (!hasPageWord) return null
