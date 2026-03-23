@@ -216,9 +216,12 @@ export function isRewriteRequest(message: string) {
   )
 }
 
+const TRANSLATION_KEYWORD_RE = /\btranslat\w*\b|\blocali[zs]\w*\b/
+const LANGUAGE_NAME_RE = /\bin\s+(?:spanish|french|german|italian|portuguese|chinese|japanese|korean|arabic|russian|hindi|dutch|swedish|norwegian|danish|finnish|polish|turkish|greek|hebrew|thai|vietnamese|indonesian|malay|czech|hungarian|romanian|ukrainian|bulgarian|croatian|serbian|slovak|slovenian|latvian|lithuanian|estonian|bengali|tamil|telugu|urdu|persian|swahili|catalan|basque|galician|tagalog)\b/
+
 export function isTranslationRequest(message: string) {
   const lower = message.toLowerCase()
-  return /\btranslate|translation|localiz|in\s+[a-z]+\b/.test(lower)
+  return TRANSLATION_KEYWORD_RE.test(lower) || LANGUAGE_NAME_RE.test(lower)
 }
 
 export function shouldKeepRichTextTitleOnTranslate(args: {
@@ -250,7 +253,7 @@ export function inferFieldHintFromMessage(message: string, allowedKeys: string[]
   for (const entry of keyMap) {
     if (entry.test.test(lower) && allowedKeys.includes(entry.key)) return entry.key
   }
-  return allowedKeys[0]
+  return null
 }
 
 export function rewriteFromExisting(existing: string, message: string) {
@@ -360,8 +363,11 @@ export function coercePatchForEditablePath(block: PageDoc["blocks"][number], edi
 }
 
 export function quotedText(message: string) {
-  return /"([^"]+)"/.exec(message)?.[1]?.trim()
-    ?? /'([^']+)'/.exec(message)?.[1]?.trim()
+  const normalized = message
+    .replace(/\u201c|\u201d/g, '"')
+    .replace(/\u2018|\u2019/g, "'")
+  return /"([^"]+)"/.exec(normalized)?.[1]?.trim()
+    ?? /'([^']+)'/.exec(normalized)?.[1]?.trim()
 }
 
 export function buildListAppendPatch(block: PageDoc["blocks"][number], message: string) {

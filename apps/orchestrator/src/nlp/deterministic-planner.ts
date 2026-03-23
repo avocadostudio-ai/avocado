@@ -215,11 +215,24 @@ function inferActionFromMessage(message: string): ParsedIntent["action"] | null 
   const hasPageCreateCue = Boolean(parseCreatePageRequest(message))
   if (isHeroLayoutRequest(lower)) return "update"
   if (hasPageCreateCue) return "add"
-  if (/\b(remove|delete)\b/.test(lower)) return "remove"
-  if (/\b(move|reorder|re-arrange|rearrange)\b/.test(lower)) return "move"
-  if (/\b(add|insert|create|include|put)\b/.test(lower)) return "add"
+
+  // Use earliest-verb-position to resolve ambiguity (e.g., "add a delete button" → "add")
+  const verbPatterns: Array<{ action: ParsedIntent["action"]; pattern: RegExp }> = [
+    { action: "remove", pattern: /\b(remove|delete)\b/ },
+    { action: "move", pattern: /\b(move|reorder|re-arrange|rearrange)\b/ },
+    { action: "add", pattern: /\b(add|insert|create|include|put)\b/ },
+    { action: "update", pattern: /\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*)\b/ },
+  ]
+  let earliest: { action: ParsedIntent["action"]; index: number } | null = null
+  for (const { action, pattern } of verbPatterns) {
+    const match = pattern.exec(lower)
+    if (match && (earliest === null || match.index < earliest.index)) {
+      earliest = { action, index: match.index }
+    }
+  }
+  if (earliest) return earliest.action
+
   if (/\bad\b/.test(lower) && inferBlockTypeFromText(lower)) return "add"
-  if (/\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*)\b/.test(lower)) return "update"
   return null
 }
 
@@ -464,7 +477,11 @@ export function isHighConfidenceDeterministicCase(args: {
   if (action === "add" && isBatchAddRequest(raw) && extractMentionedBlockTypes(raw).length < 2) return false
   // Case: page-level delete — "delete this page", "remove the page"
   if (action === "remove" && /\b(delete|remove)\b.*\bpage\b/i.test(raw) && !inferBlockTypeFromText(raw)) return true
-  if (action === "remove" && inferBlockTypeFromText(raw)) return true
+  const removeType = inferBlockTypeFromText(raw)
+  if (action === "remove" && removeType) {
+    if (args.currentPage.blocks.filter((b) => b.type === removeType).length > 1) return false
+    return true
+  }
   if (action === "remove" && args.activeBlockId && /\b(this|selected|it)\b/i.test(raw)) return true
   // "add CTA directing to recipes" = needs LLM for content-aware props
   if (action === "add" && inferBlockTypeFromText(raw) && hasContentDirective(raw)) return false
@@ -489,6 +506,17 @@ export function isHighConfidenceDeterministicCase(args: {
  * Returns null when the message is not a decomposable compound request.
  */
 function splitCompoundMessage(raw: string): [string, string] | null {
+  // Bail when 3+ distinct action verbs are present — too complex for 2-way split
+  const lower = raw.toLowerCase()
+  const verbCategories = [
+    /\b(?:add|insert|create|include)\b/,
+    /\b(?:remove|delete|clear)\b/,
+    /\b(?:move|reorder|rearrange)\b/,
+    /\b(?:update|change|edit|set|replace)\b/,
+  ]
+  const matchedCategories = verbCategories.filter((p) => p.test(lower)).length
+  if (matchedCategories >= 3) return null
+
   // Only split when two different action-category verbs are connected by a conjunction.
   // Pattern: <verb-group-A> ... <and|then|,> ... <verb-group-B>
   const addVerbs = String.raw`(?:add|insert|create|include)`
@@ -586,10 +614,21 @@ export function tryCompoundDeterministicPlan(args: {
   })
   if (!firstPlan || firstPlan.intent !== "edit_plan" || firstPlan.ops.length === 0) return null
 
+  // Apply first plan's ops to a cloned page so second plan sees updated state
+  // (e.g., removed blocks are no longer visible, added blocks can be referenced)
+  let updatedPage = args.currentPage
+  for (const op of firstPlan.ops) {
+    if (op.op === "remove_block") {
+      updatedPage = { ...updatedPage, blocks: updatedPage.blocks.filter((b) => b.id !== op.blockId) }
+    } else if (op.op === "add_block") {
+      updatedPage = { ...updatedPage, blocks: [...updatedPage.blocks, op.block] }
+    }
+  }
+
   // Build intent + plan for second part
   const secondIntent = inferDeterministicIntent({
     message: secondMsg,
-    currentPage: args.currentPage,
+    currentPage: updatedPage,
     activeBlockId: args.activeBlockId,
     activeEditablePath: args.activeEditablePath
   })
@@ -600,7 +639,7 @@ export function tryCompoundDeterministicPlan(args: {
     intent: secondIntent,
     message: secondMsg,
     slug: args.slug,
-    currentPage: args.currentPage,
+    currentPage: updatedPage,
     activeBlockId: args.activeBlockId,
     activeEditablePath: args.activeEditablePath
   })
@@ -663,6 +702,8 @@ export function resolveBlockRef(args: {
     }
     const contains = blocks.find((b) => b.id.toLowerCase().includes(key))
     if (contains) return contains
+    // User named something specific that doesn't exist — don't fall back to selected block
+    return null
   }
 
   if (activeBlockId) {
@@ -1300,10 +1341,26 @@ export function compileDeterministicPlan(args: {
       if (bProps) {
         for (const [key, val] of Object.entries(bProps)) {
           if (!Array.isArray(val) || val.length === 0) continue
-          let idx = 0
-          if (/\blast\b/i.test(lowerMessage)) idx = val.length - 1
-          else if (/\bsecond\b/i.test(lowerMessage)) idx = 1
-          else if (/\bthird\b/i.test(lowerMessage)) idx = 2
+          // Use ordinalToIndex for consistent ordinal parsing
+          const ordMatch = lowerMessage.match(/\b(first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th)\b/i)
+          const parsedIdx = ordMatch ? ordinalToIndex(ordMatch[1]) : 0
+          if (parsedIdx === null) {
+            return {
+              intent: "needs_clarification",
+              summary_for_user: `Please specify which item to remove (e.g., "the first question", "the last item").`,
+              change_log: assumptions,
+              ops: []
+            }
+          }
+          const idx = parsedIdx === -1 ? val.length - 1 : parsedIdx
+          if (idx >= val.length) {
+            return {
+              intent: "needs_clarification",
+              summary_for_user: `There are only ${val.length} items in ${target.type} — cannot remove item ${idx + 1}.`,
+              change_log: assumptions,
+              ops: []
+            }
+          }
           return {
             intent: "edit_plan",
             summary_for_user: intent.summary ?? `Removed an item from ${target.type}.`,
