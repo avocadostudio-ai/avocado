@@ -163,7 +163,6 @@ async function fetchStrapiMedia(
 
   // Strapi upload endpoint returns array directly (no wrapper), pagination in headers
   const totalCount = Number(res.headers.get("x-total-count") ?? data.length)
-
   return {
     items: data.map((file) => {
       const fullUrl = file.url.startsWith("http") ? file.url : `${baseUrl}${file.url}`

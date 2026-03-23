@@ -2,6 +2,18 @@ import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
 import { writeClient } from "./sanity.client"
 import { toSanityName, getImageFields } from "./sanity.utils"
 
+/** Reject URLs pointing at private/loopback addresses. */
+function isSafeImageUrl(raw: string): boolean {
+  let parsed: URL
+  try { parsed = new URL(raw) } catch { return false }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
+  const h = parsed.hostname
+  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
+  if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
+  return true
+}
+
 /** Upload an image URL as a Sanity asset, return the asset reference */
 type SanityImageRef = { _type: "image"; asset: { _type: "reference"; _ref: string } }
 
@@ -15,6 +27,7 @@ async function ensureImageAsset(
   const promise = (async () => {
     // Skip non-http URLs — can't upload relative paths as assets
     if (!imageUrl.startsWith("http")) return null
+    if (!isSafeImageUrl(imageUrl)) return null
 
     const res = await fetch(imageUrl)
     if (!res.ok) return null
