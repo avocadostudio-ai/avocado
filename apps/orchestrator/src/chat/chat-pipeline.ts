@@ -137,51 +137,42 @@ export type ChatPipelineContext = {
 // Deferred image placeholder
 // ---------------------------------------------------------------------------
 
-/**
- * Data URI SVG with SMIL shimmer animation and "Generating image..." text.
- * Used as a Hero's `imageUrl` while the real image is being generated.
- */
-export const GENERATING_IMAGE_PLACEHOLDER = [
-  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E`,
-  `%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E`,
-  `%3Cstop offset='0%25' stop-color='%23e2e8f0'/%3E`,
-  `%3Cstop offset='50%25' stop-color='%23f1f5f9'%3E%3Canimate attributeName='offset' values='0;1;0' dur='2s' repeatCount='indefinite'/%3E%3C/stop%3E`,
-  `%3Cstop offset='100%25' stop-color='%23e2e8f0'/%3E`,
-  `%3C/linearGradient%3E%3C/defs%3E`,
-  `%3Crect width='1200' height='600' fill='url(%23g)'/%3E`,
-  // AI sparkle — classic 4-point diamond star, positioned just left of the text
+/** Build a shimmer SVG data URI placeholder with a custom icon and label. */
+function buildShimmerPlaceholder(icon: string, label: string): string {
+  return [
+    `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E`,
+    `%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E`,
+    `%3Cstop offset='0%25' stop-color='%23e2e8f0'/%3E`,
+    `%3Cstop offset='50%25' stop-color='%23f1f5f9'%3E%3Canimate attributeName='offset' values='0;1;0' dur='2s' repeatCount='indefinite'/%3E%3C/stop%3E`,
+    `%3Cstop offset='100%25' stop-color='%23e2e8f0'/%3E`,
+    `%3C/linearGradient%3E%3C/defs%3E`,
+    `%3Crect width='1200' height='600' fill='url(%23g)'/%3E`,
+    icon,
+    `%3Ctext x='616' y='310' text-anchor='middle' fill='%2394a3b8' font-family='system-ui' font-size='36' font-weight='500'%3E${label}%3C/text%3E`,
+    `%3C/svg%3E`
+  ].join("")
+}
+
+// AI sparkle icon — 4-point diamond star with companion sparkle
+const SPARKLE_ICON = [
   `%3Cg transform='translate(448,296)' fill='%2394a3b8'%3E`,
-  // Main sparkle: thin 4-point star (tall + narrow = classic AI look)
   `%3Cpath d='M0-12C1 -4 4-1 12 0 4 1 1 4 0 12-1 4-4 1-12 0-4-1-1-4 0-12Z'%3E`,
-  `%3Canimate attributeName='opacity' values='0.5;1;0.5' dur='2s' repeatCount='indefinite'/%3E`,
-  `%3C/path%3E`,
-  // Small companion sparkle — offset top-right
+  `%3Canimate attributeName='opacity' values='0.5;1;0.5' dur='2s' repeatCount='indefinite'/%3E%3C/path%3E`,
   `%3Cpath d='M11-9C11.4-7 12.6-5.8 15-5.5 12.6-5.2 11.4-4 11-2 10.6-4 9.4-5.2 7-5.5 9.4-5.8 10.6-7 11-9Z' opacity='0.6'%3E`,
-  `%3Canimate attributeName='opacity' values='0.3;0.8;0.3' dur='1.6s' repeatCount='indefinite'/%3E`,
-  `%3C/path%3E`,
-  `%3C/g%3E`,
-  // "Generating image..." — large centered text (nudged right to balance sparkle)
-  `%3Ctext x='616' y='310' text-anchor='middle' fill='%2394a3b8' font-family='system-ui' font-size='36' font-weight='500'%3EGenerating image%E2%80%A6%3C/text%3E`,
-  `%3C/svg%3E`
+  `%3Canimate attributeName='opacity' values='0.3;0.8;0.3' dur='1.6s' repeatCount='indefinite'/%3E%3C/path%3E`,
+  `%3C/g%3E`
 ].join("")
 
-/** Shimmer SVG placeholder shown while searching for stock images. */
-export const SEARCHING_IMAGE_PLACEHOLDER = [
-  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E`,
-  `%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E`,
-  `%3Cstop offset='0%25' stop-color='%23e2e8f0'/%3E`,
-  `%3Cstop offset='50%25' stop-color='%23f1f5f9'%3E%3Canimate attributeName='offset' values='0;1;0' dur='2s' repeatCount='indefinite'/%3E%3C/stop%3E`,
-  `%3Cstop offset='100%25' stop-color='%23e2e8f0'/%3E`,
-  `%3C/linearGradient%3E%3C/defs%3E`,
-  `%3Crect width='1200' height='600' fill='url(%23g)'/%3E`,
-  // Magnifying glass icon
+// Magnifying glass icon
+const SEARCH_ICON = [
   `%3Cg transform='translate(460,280)' fill='none' stroke='%2394a3b8' stroke-width='3'%3E`,
   `%3Ccircle cx='0' cy='0' r='10'%3E%3Canimate attributeName='opacity' values='0.4;1;0.4' dur='1.8s' repeatCount='indefinite'/%3E%3C/circle%3E`,
   `%3Cline x1='7' y1='7' x2='14' y2='14'%3E%3Canimate attributeName='opacity' values='0.4;1;0.4' dur='1.8s' repeatCount='indefinite'/%3E%3C/line%3E`,
-  `%3C/g%3E`,
-  `%3Ctext x='616' y='310' text-anchor='middle' fill='%2394a3b8' font-family='system-ui' font-size='36' font-weight='500'%3ESearching%E2%80%A6%3C/text%3E`,
-  `%3C/svg%3E`
+  `%3C/g%3E`
 ].join("")
+
+export const GENERATING_IMAGE_PLACEHOLDER = buildShimmerPlaceholder(SPARKLE_ICON, "Generating image%E2%80%A6")
+export const SEARCHING_IMAGE_PLACEHOLDER = buildShimmerPlaceholder(SEARCH_ICON, "Searching%E2%80%A6")
 
 /** Returns true if the URL is a shimmer placeholder used during deferred image generation/search. */
 export function isGeneratingPlaceholder(url: string): boolean {
@@ -2105,9 +2096,8 @@ export async function runChatPipeline(
         const imageMessage = pending.originalMessage ?? (typeof body.message === "string" ? body.message : "")
         const planClone = structuredClone(approvalPlan)
 
-        // Show shimmer placeholder in the live preview while images are being generated.
-        // This gives immediate visual feedback instead of leaving the old image in place.
-        for (const imgOp of pending.pendingImageOps) {
+        // Show shimmer placeholders in the live preview while images are being generated.
+        const placeholderOps: Operation[] = pending.pendingImageOps.map((imgOp) => {
           const placeholder = imgOp.provider === "unsplash" ? SEARCHING_IMAGE_PLACEHOLDER : GENERATING_IMAGE_PLACEHOLDER
           const patchProps: Record<string, unknown> = {}
           if (typeof imgOp.path === "string" && imgOp.path.length > 0) {
@@ -2115,17 +2105,14 @@ export async function runChatPipeline(
           } else {
             patchProps.imageUrl = placeholder
           }
-          const placeholderOp: Operation = {
-            op: "update_props",
-            pageSlug: imgOp.pageSlug,
-            blockId: imgOp.blockId,
-            patch: { props: patchProps }
-          }
-          try {
-            await applyOpsAtomically(body.session!, [placeholderOp], { componentsManifest })
-            const ver = versions.get(body.session) ?? 0
-            options?.onOpApplied?.({ index: 0, total: 1, op: placeholderOp, previewVersion: ver, focusBlockId: imgOp.blockId })
-          } catch { /* best-effort — don't block image generation if placeholder fails */ }
+          return { op: "update_props" as const, pageSlug: imgOp.pageSlug, blockId: imgOp.blockId, patch: { props: patchProps } }
+        })
+        try {
+          await applyOpsAtomically(body.session!, placeholderOps, { componentsManifest })
+          const ver = versions.get(body.session) ?? 0
+          options?.onOpApplied?.({ index: 0, total: placeholderOps.length, op: placeholderOps[0], previewVersion: ver })
+        } catch (e) {
+          ctx.log.debug({ error: e instanceof Error ? e.message : String(e) }, "Shimmer placeholder injection failed, continuing")
         }
 
         // Restore placeholder imageUrl in ops that had it stripped during detection.
