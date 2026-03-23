@@ -1,6 +1,12 @@
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { getImageFields } from "@ai-site-editor/shared"
+import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
+
+/** Reverse map: strapi component name → PascalCase block type */
+const componentToBlockType = new Map<string, string>()
+for (const blockType of Object.keys(getAllBlockMeta())) {
+  componentToBlockType.set(blockType.toLowerCase(), blockType)
+}
 
 /** Strapi v5 REST response shape */
 type StrapiResponse<T> = { data: T; meta?: unknown }
@@ -29,9 +35,9 @@ function dzComponentToBlock(entry: Record<string, unknown>): BlockInstance | nul
   const component = entry.__component as string | undefined
   if (!component?.startsWith("blocks.")) return null
 
-  // "blocks.hero" → "Hero", "blocks.featuregrid" → "Featuregrid"
+  // "blocks.hero" → "Hero", "blocks.featuregrid" → "FeatureGrid", "blocks.cta" → "CTA"
   const rawName = component.replace("blocks.", "")
-  const blockType = rawName.charAt(0).toUpperCase() + rawName.slice(1)
+  const blockType = componentToBlockType.get(rawName) ?? rawName.charAt(0).toUpperCase() + rawName.slice(1)
 
   const imageFields = getImageFields(blockType)
   const props: Record<string, unknown> = {}

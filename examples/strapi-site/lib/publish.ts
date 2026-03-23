@@ -2,6 +2,18 @@ import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
 import { getImageFields } from "@ai-site-editor/shared"
 
+/** Reject URLs pointing at private/loopback addresses (SSRF protection) */
+function isSafeImageUrl(raw: string): boolean {
+  let parsed: URL
+  try { parsed = new URL(raw) } catch { return false }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
+  const h = parsed.hostname
+  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
+  if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
+  return true
+}
+
 /** Upload an image URL to Strapi media library, return the media ID */
 async function ensureMediaAsset(
   imageUrl: string,
@@ -11,7 +23,7 @@ async function ensureMediaAsset(
   if (cached) return cached
 
   const promise = (async () => {
-    if (!imageUrl.startsWith("http")) return null
+    if (!imageUrl.startsWith("http") || !isSafeImageUrl(imageUrl)) return null
     try {
       const imageRes = await fetch(imageUrl)
       if (!imageRes.ok) return null
