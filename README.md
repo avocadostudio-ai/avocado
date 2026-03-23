@@ -33,20 +33,14 @@ pnpm monorepo with three apps and shared packages:
 
 ## Quick start
 
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-2. Copy and configure environment:
-   ```bash
-   cp .env.example .env
-   # Edit .env — at minimum set OPENAI_API_KEY or ANTHROPIC_API_KEY for AI planning
-   ```
-3. Start all apps:
-   ```bash
-   pnpm dev
-   ```
-4. Open the editor at `http://localhost:4100`
+```bash
+git clone <repo> && cd ai-site-editor
+pnpm install && pnpm dev
+```
+
+Open `http://localhost:4100` — you'll see the Sites page with **Avocado Stories**, a built-in demo site. Click **Open editor** to enter the split-pane view: live preview on the left, chat on the right. Type a message (e.g. "change the hero heading to Welcome") to start editing.
+
+No API key needed for basic edits — the deterministic planner handles them locally. To enable AI-powered planning, copy `.env.example` to `.env` and add your `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
 
 ### Managed dev stack (recommended for repeated restarts)
 
