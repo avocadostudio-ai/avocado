@@ -20,7 +20,8 @@
     "benchmark:compact-context": "tsx src/scripts/benchmark-compact-context.ts",
     "benchmark:ops": "tsx src/scripts/benchmark-models.ts --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
     "benchmark:ops:multi": "tsx src/scripts/benchmark-models.ts --eval-mode ops-json --ops-cardinality multi --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
-    "benchmark:ops:sonnet": "tsx src/scripts/benchmark-models.ts --provider anthropic --model claude-sonnet-4-20250514 --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5"
+    "benchmark:ops:sonnet": "tsx src/scripts/benchmark-models.ts --provider anthropic --model claude-sonnet-4-20250514 --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
+    "benchmark:ops:stability:anthropic": "tsx src/scripts/benchmark-models.ts --provider anthropic --eval-mode ops-json --ops-cardinality single --prompts src/scripts/test-sets/prompt-examples.json --runs 20 --variants 3 --min-pass-rate 0.9 --fail-on-threshold true --group-variants-by-base-id true --out ../../.data/evals/ops-stability-anthropic.json"
   },
   "dependencies": {
     "@ai-site-editor/shared": "workspace:*",
