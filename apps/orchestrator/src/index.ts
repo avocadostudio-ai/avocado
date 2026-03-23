@@ -130,7 +130,8 @@ app.get("/status/planner", async () => ({
   features: {
     googleDrive: Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON?.trim() || process.env.GOOGLE_API_KEY?.trim()),
     unsplash: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
-    imageGenerate: Boolean(process.env.OPENAI_API_KEY?.trim()),
+    imageGenerate: Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim()),
+    imageGenerateChat: Boolean(process.env.GOOGLE_GENAI_API_KEY?.trim()),
     contentful: Boolean(process.env.CONTENTFUL_SPACE_ID?.trim() && process.env.CONTENTFUL_DELIVERY_TOKEN?.trim())
   }
 }))

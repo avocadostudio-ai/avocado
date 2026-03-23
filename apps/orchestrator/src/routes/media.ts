@@ -6,6 +6,7 @@ import OpenAI from "openai"
 import { toFile } from "openai/uploads"
 import { toErrorDetail } from "../ops/ops-engine.js"
 import { openAIChatOptionsForModel } from "../chat/planner.js"
+import { generateVariationImageWithGemini, getGeminiClient, getGeminiImageModel, GEMINI_ASPECT_RATIOS, saveGeminiInlineImage } from "../image/image-helpers.js"
 import type { RouteContext } from "./route-context.js"
 
 const allowedTranscriptionMimeTypes = new Set([
@@ -282,19 +283,28 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
 
   // Image generation proxy for the editor image picker
   app.post("/image/generate", async (request, reply) => {
-    if (!process.env.OPENAI_API_KEY) {
-      return reply.code(503).send({ error: "OPENAI_API_KEY is not configured" })
+    const provider = (process.env.IMAGE_GEN_PROVIDER?.trim().toLowerCase()) || "openai"
+    const hasOpenAI = !!process.env.OPENAI_API_KEY
+    const hasGemini = !!process.env.GOOGLE_GENAI_API_KEY
+    if (!hasOpenAI && !hasGemini) {
+      return reply.code(503).send({ error: "No image generation API key configured (OPENAI_API_KEY or GOOGLE_GENAI_API_KEY)" })
     }
     const body = (request.body ?? {}) as { prompt?: string; aspectRatio?: string }
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
     if (!prompt) return reply.code(400).send({ error: "prompt is required" })
 
-    const aspectSizes: Record<string, string> = { landscape: "1536x1024", square: "1024x1024", portrait: "1024x1536" }
-    const size = aspectSizes[body.aspectRatio ?? "landscape"] ?? "1536x1024"
-    const model = process.env.OPENAI_IMAGE_MODEL_DRAFT?.trim() || "gpt-image-1-mini"
-
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     try {
+      if (provider === "gemini" && hasGemini) {
+        const result = await generateVariationImageWithGemini({ prompt, altText: prompt.slice(0, 200), aspectRatio: body.aspectRatio })
+        if (!result) return reply.code(502).send({ error: "Gemini image generation returned no data" })
+        return { url: result.url, alt: result.alt }
+      }
+      // Default: OpenAI
+      if (!hasOpenAI) return reply.code(503).send({ error: "OPENAI_API_KEY not configured and IMAGE_GEN_PROVIDER is not gemini" })
+      const aspectSizes: Record<string, string> = { landscape: "1536x1024", square: "1024x1024", portrait: "1024x1536" }
+      const size = aspectSizes[body.aspectRatio ?? "landscape"] ?? "1536x1024"
+      const model = process.env.OPENAI_IMAGE_MODEL_DRAFT?.trim() || "gpt-image-1-mini"
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
       const result = await client.images.generate({ model, prompt, size: size as "1536x1024" })
       const image = result.data?.[0]
       let bytes: Buffer | null = null
@@ -307,17 +317,146 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
       if (!bytes || bytes.byteLength === 0) {
         return reply.code(502).send({ error: "Image generation returned no data" })
       }
-
       const fileName = `gen_${Date.now()}_${randomUUID().slice(0, 8)}.png`
       await mkdir(ctx.generatedImageDir, { recursive: true })
       await writeFile(resolve(ctx.generatedImageDir, fileName), bytes)
-
-      return {
-        url: `${ctx.orchestratorPublicOrigin}/generated-images/${fileName}`,
-        alt: prompt.slice(0, 200)
-      }
+      return { url: `${ctx.orchestratorPublicOrigin}/generated-images/${fileName}`, alt: prompt.slice(0, 200) }
     } catch (error) {
       return reply.code(502).send({ error: "Image generation failed", detail: toErrorDetail(error) })
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // Multi-turn Gemini image generation chat sessions
+  // ---------------------------------------------------------------------------
+  const geminiChatSessions = new Map<string, { chat: unknown; lastUsed: number }>()
+  const MAX_CHAT_SESSIONS = 200
+
+  if (process.env.GOOGLE_GENAI_API_KEY) {
+    setInterval(() => {
+      const cutoff = Date.now() - 30 * 60 * 1000
+      for (const [id, session] of geminiChatSessions) {
+        if (session.lastUsed < cutoff) geminiChatSessions.delete(id)
+      }
+    }, 10 * 60 * 1000).unref()
+  }
+
+  app.post("/image/generate/chat", async (request, reply) => {
+    if (!process.env.GOOGLE_GENAI_API_KEY) {
+      return reply.code(503).send({ error: "GOOGLE_GENAI_API_KEY is not configured" })
+    }
+    const body = (request.body ?? {}) as { prompt?: string; chatId?: string; aspectRatio?: string; stream?: boolean; referenceImageUrl?: string }
+    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
+    if (!prompt) return reply.code(400).send({ error: "prompt is required" })
+
+    try {
+      const ai = await getGeminiClient()
+      const model = getGeminiImageModel()
+      const geminiAspectRatio = GEMINI_ASPECT_RATIOS[body.aspectRatio ?? "landscape"] ?? "3:2"
+
+      let chatId = body.chatId ?? ""
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let chat: any
+
+      if (chatId && geminiChatSessions.has(chatId)) {
+        const session = geminiChatSessions.get(chatId)!
+        chat = session.chat
+        session.lastUsed = Date.now()
+      } else {
+        chatId = randomUUID()
+        chat = ai.chats.create({
+          model,
+          config: {
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: { aspectRatio: geminiAspectRatio }
+          }
+        })
+        // Evict oldest session if at capacity
+        if (geminiChatSessions.size >= MAX_CHAT_SESSIONS) {
+          let oldestId = ""; let oldestTime = Infinity
+          for (const [id, s] of geminiChatSessions) { if (s.lastUsed < oldestTime) { oldestTime = s.lastUsed; oldestId = id } }
+          if (oldestId) geminiChatSessions.delete(oldestId)
+        }
+        geminiChatSessions.set(chatId, { chat, lastUsed: Date.now() })
+      }
+
+      // Build message — include reference image for editing on first message
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let messageContent: any = prompt
+      if (body.referenceImageUrl && !body.chatId) {
+        try {
+          const imgRes = await fetch(body.referenceImageUrl, { signal: AbortSignal.timeout(8000) })
+          if (imgRes.ok) {
+            const imgBuf = Buffer.from(await imgRes.arrayBuffer())
+            const mimeType = imgRes.headers.get("content-type") ?? "image/png"
+            messageContent = [
+              { text: prompt },
+              { inlineData: { mimeType, data: imgBuf.toString("base64") } }
+            ]
+          }
+        } catch (imgErr) {
+          app.log.warn({ event: "gemini_ref_image_fetch_failed", url: body.referenceImageUrl, error: imgErr instanceof Error ? imgErr.message : String(imgErr) }, "Failed to fetch reference image — falling back to text-only")
+        }
+      }
+
+      if (body.stream) {
+        const reqOrigin = (request.headers.origin as string) ?? "*"
+        reply.raw.setHeader("Content-Type", "text/event-stream")
+        reply.raw.setHeader("Cache-Control", "no-cache, no-transform")
+        reply.raw.setHeader("Connection", "keep-alive")
+        reply.raw.setHeader("X-Accel-Buffering", "no")
+        reply.raw.setHeader("Access-Control-Allow-Origin", reqOrigin)
+        reply.raw.setHeader("Vary", "Origin")
+        reply.raw.writeHead(200)
+        const send = (event: string, data: unknown) => {
+          if (reply.raw.writable && !reply.raw.writableEnded) {
+            reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          }
+        }
+        send("chatId", { chatId })
+        send("status", { stage: "Generating image\u2026" })
+
+        try {
+          const stream = await chat.sendMessageStream({ message: messageContent })
+          for await (const chunk of stream) {
+            const parts = chunk.candidates?.[0]?.content?.parts
+            if (!parts) continue
+            for (const part of parts) {
+              if (part.text) {
+                send("text", { text: part.text })
+              } else if (part.inlineData?.data) {
+                const saved = await saveGeminiInlineImage([part], "gen")
+                if (saved) send("image", { url: saved.url, alt: prompt.slice(0, 200) })
+              }
+            }
+          }
+        } catch (streamErr) {
+          send("error", { error: streamErr instanceof Error ? streamErr.message : String(streamErr) })
+        }
+        send("done", {})
+        reply.raw.end()
+        return
+      }
+
+      // Non-streaming fallback
+      const response = await chat.sendMessage({ message: messageContent })
+      const parts = response.candidates?.[0]?.content?.parts
+      if (!parts) return reply.code(502).send({ error: "Gemini returned no content" })
+
+      let imageUrl: string | null = null
+      let textResponse = ""
+      for (const part of parts) {
+        if (part.text) {
+          textResponse += part.text
+        } else if (part.inlineData?.data) {
+          const saved = await saveGeminiInlineImage([part], "gen")
+          if (saved) imageUrl = saved.url
+        }
+      }
+
+      return { chatId, url: imageUrl, alt: prompt.slice(0, 200), text: textResponse || undefined }
+    } catch (error) {
+      return reply.code(502).send({ error: "Gemini image generation failed", detail: toErrorDetail(error) })
     }
   })
 

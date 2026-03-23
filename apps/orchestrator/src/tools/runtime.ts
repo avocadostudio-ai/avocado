@@ -27,7 +27,7 @@ type CreateToolRuntimeArgs = {
 export async function createToolRuntime(args: CreateToolRuntimeArgs): Promise<ToolRuntime> {
   const registry = new ToolRegistry()
   registry.registerBuiltin(unsplashSearchManifest, unsplashSearchHandler)
-  if (process.env.OPENAI_API_KEY) {
+  if (process.env.OPENAI_API_KEY || process.env.GOOGLE_GENAI_API_KEY) {
     registry.registerBuiltin(imageGenerateManifest, imageGenerateHandler)
   }
   if (process.env.GOOGLE_DRIVE_FOLDER_ID) {

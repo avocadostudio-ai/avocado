@@ -7,6 +7,7 @@ import {
   type PageDoc
 } from "@ai-site-editor/shared"
 import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./prompts.js"
+import { GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER } from "./chat-pipeline.js"
 import {
   type ParsedIntent,
   extractAudienceTarget,
@@ -37,6 +38,21 @@ import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js
 import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthropic-cache.js"
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
+
+/**
+ * A native image tool call that was deferred during planning so text ops
+ * stream immediately. The real tool is executed post-apply and the result
+ * is patched into the preview via follow-up SSE events.
+ */
+export type DeferredNativeImageCall = {
+  toolName: "image.generate" | "unsplash.search"
+  input: Record<string, unknown>
+  /** The placeholder URL returned to the LLM so it can finish the plan */
+  placeholderUrl: string
+}
+
+/** Set of tool names whose execution is deferred to avoid blocking text streaming */
+const DEFERRABLE_IMAGE_TOOLS = new Set(["image.generate", "unsplash.search"])
 
 // Minimum text length to treat a text-only model response as meaningful
 // content (rather than discarding it in favor of the hardcoded fallback).
@@ -228,7 +244,7 @@ export async function generatePlanWithAnthropic(args: {
   manifestBlockTypes?: string[]
   lightweight?: boolean
   signal?: AbortSignal
-}): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
+}): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
   const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
@@ -345,6 +361,7 @@ export async function generatePlanWithAnthropic(args: {
 
   let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
+  const deferredNativeImageCalls: DeferredNativeImageCall[] = []
   let streamedOpsCount = 0
   let lastSummaryLen = 0
   let emittedChangeLogCount = 0
@@ -582,6 +599,40 @@ export async function generatePlanWithAnthropic(args: {
       for (const toolCall of runtimeToolCalls) {
         const input = "input" in toolCall ? toolCall.input : {}
         const runtimeToolName = runtimeToolNameByAlias.get(toolCall.name) ?? toolCall.name
+
+        // Defer slow image tools — return a placeholder so text ops stream immediately
+        if (DEFERRABLE_IMAGE_TOOLS.has(runtimeToolName)) {
+          const placeholderUrl = runtimeToolName === "image.generate"
+            ? GENERATING_IMAGE_PLACEHOLDER
+            : SEARCHING_IMAGE_PLACEHOLDER
+          const placeholderData = runtimeToolName === "image.generate"
+            ? { imageUrl: placeholderUrl, alt: String((input as Record<string, unknown>).prompt ?? "Generating image…"), width: 768, height: 512 }
+            : { items: [{ id: "placeholder", imageUrl: placeholderUrl, thumbUrl: placeholderUrl, alt: String((input as Record<string, unknown>).query ?? "Searching…"), author: "Placeholder", sourceUrl: "" }] }
+
+          deferredNativeImageCalls.push({
+            toolName: runtimeToolName as "image.generate" | "unsplash.search",
+            input: input as Record<string, unknown>,
+            placeholderUrl
+          })
+          args.onToolExecution?.({
+            toolName: runtimeToolName,
+            ok: true,
+            latencyMs: 0,
+            attempts: 0,
+            traceId: args.toolCallContext?.traceId ?? "tool-call",
+            sessionId: args.toolCallContext?.sessionId ?? "dev",
+            siteId: args.toolCallContext?.siteId ?? "default",
+            plannerProvider: "anthropic",
+            deferred: true
+          })
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolCall.id,
+            content: JSON.stringify(placeholderData)
+          })
+          continue
+        }
+
         const result = await executeToolCall({
           runtime: args.toolRuntime!,
           toolName: runtimeToolName,
@@ -831,6 +882,7 @@ export async function generatePlanWithAnthropic(args: {
     throw new Error(`${message}${path}. Parsed sample: ${sample}`)
   }
 
+  const deferredImageMeta = deferredNativeImageCalls.length > 0 ? { deferredNativeImageCalls } : {}
   if (chatStrictPrimaryOpMode && planResult.data.intent === "edit_plan" && planResult.data.ops.length > 1) {
     return {
       plan: {
@@ -838,8 +890,9 @@ export async function generatePlanWithAnthropic(args: {
         ops: [planResult.data.ops[0]]
       },
       usage,
-      schemaContext: schemaContext.meta
+      schemaContext: schemaContext.meta,
+      ...deferredImageMeta
     }
   }
-  return { plan: planResult.data, usage, schemaContext: schemaContext.meta }
+  return { plan: planResult.data, usage, schemaContext: schemaContext.meta, ...deferredImageMeta }
 }
