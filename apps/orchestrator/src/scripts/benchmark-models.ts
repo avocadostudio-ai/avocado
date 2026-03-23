@@ -66,6 +66,47 @@ type ScoredAggregate = {
   score: number
 }
 
+type StabilitySeverity = "critical" | "high" | "flaky"
+type StabilityFailureKind = "error" | "missing_ops" | "unexpected_ops" | "exact_mismatch" | "low_f1"
+
+type PromptStabilitySummary = {
+  basePromptId: string
+  promptIds: string[]
+  models: string[]
+  expectedOps: string[]
+  runs: number
+  exactMatchRate: number
+  avgF1: number
+  passRate: number
+  disagreementRate: number
+  mostCommonPredictionRate: number
+  topWrongOps: Array<{ op: string; count: number }>
+  failureKinds: Array<{ kind: StabilityFailureKind; count: number }>
+  representativeFailure: {
+    promptId: string
+    model: string
+    run: number
+    outputTextPreview: string
+    error?: string
+    predictedOps: string[]
+    missingOps: string[]
+    unexpectedOps: string[]
+  } | null
+  severity: StabilitySeverity | null
+  belowThreshold: boolean
+}
+
+type StabilityReport = {
+  perBasePrompt: PromptStabilitySummary[]
+  triageRows: PromptStabilitySummary[]
+  failures: PromptStabilitySummary[]
+  severityCounts: Record<StabilitySeverity, number>
+}
+
+const VARIANT_SUFFIX_REGEX = /__v\d+$/i
+const CRITICAL_PASS_RATE_THRESHOLD = 0.7
+const FLAKY_DISAGREEMENT_RATE_THRESHOLD = 0.3
+
 const envCandidates = [resolve(process.cwd(), ".env"), resolve(process.cwd(), "../../.env")]
 for (const path of envCandidates) {
   if (existsSync(path)) {
@@ -222,9 +263,32 @@ function toInt(value: string | undefined, fallback: number) {
   return parsed
 }
 
+function toRate(value: string | undefined, fallback: number) {
+  if (!value) return fallback
+  const parsed = Number.parseFloat(value)
+  if (!Number.isFinite(parsed)) return fallback
+  if (parsed >= 0 && parsed <= 1) return parsed
+  if (parsed > 1 && parsed <= 100) return parsed / 100
+  if (parsed < 0) return 0
+  return 1
+}
+
+function toBool(value: string | undefined, fallback: boolean) {
+  if (value === undefined) return fallback
+  const normalized = value.trim().toLowerCase()
+  if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") return true
+  if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") return false
+  return fallback
+}
+
 function toEvalMode(value: string | undefined): EvalMode {
   const raw = (value ?? "text").trim().toLowerCase()
   return raw === "ops-json" ? "ops-json" : "text"
+}
+
+function toBasePromptId(promptId: string, groupVariantsByBaseId: boolean) {
+  if (!groupVariantsByBaseId) return promptId
+  return promptId.replace(VARIANT_SUFFIX_REGEX, "")
 }
 
 function normalizeOp(value: unknown): CanonicalOp | null {
@@ -661,6 +725,223 @@ function printCommandAccuracy(prompts: PromptCase[], models: string[], rows: Run
   }
 }
 
+function compactPreview(text: string, maxChars = 180) {
+  return text.replace(/\s+/g, " ").trim().slice(0, maxChars)
+}
+
+function rankedCounts(values: string[], limit = 3) {
+  const counts = new Map<string, number>()
+  for (const value of values) {
+    if (!value) continue
+    counts.set(value, (counts.get(value) ?? 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+}
+
+function buildStabilityReport(args: {
+  prompts: PromptCase[]
+  results: RunResult[]
+  groupVariantsByBaseId: boolean
+  minPassRate: number
+  flakyDisagreementRateThreshold: number
+}): StabilityReport {
+  const promptById = new Map(args.prompts.map((prompt) => [prompt.id, prompt]))
+  const grouped = new Map<
+    string,
+    {
+      promptIds: Set<string>
+      models: Set<string>
+      expectedOps: Set<string>
+      rows: RunResult[]
+    }
+  >()
+
+  for (const row of args.results) {
+    const basePromptId = toBasePromptId(row.promptId, args.groupVariantsByBaseId)
+    const existing = grouped.get(basePromptId) ?? {
+      promptIds: new Set<string>(),
+      models: new Set<string>(),
+      expectedOps: new Set<string>(),
+      rows: []
+    }
+    existing.promptIds.add(row.promptId)
+    existing.models.add(row.model)
+    existing.rows.push(row)
+    const prompt = promptById.get(row.promptId)
+    for (const op of prompt?.expectedOps ?? []) {
+      const normalized = normalizeOp(op) ?? op
+      existing.expectedOps.add(normalized)
+    }
+    grouped.set(basePromptId, existing)
+  }
+
+  const perBasePrompt: PromptStabilitySummary[] = []
+  for (const [basePromptId, bucket] of grouped) {
+    const evaluatedRows = bucket.rows.filter((row) => !!row.commandEval)
+    const runs = evaluatedRows.length
+    const exactMatchRate = runs > 0 ? mean(evaluatedRows.map((row) => (row.commandEval?.exactMatch ? 1 : 0))) : 0
+    const avgF1 = runs > 0 ? mean(evaluatedRows.map((row) => row.commandEval?.f1 ?? 0)) : 0
+    const passRate = exactMatchRate
+
+    const predictionSignatures = evaluatedRows.map((row) => {
+      const predicted = row.commandEval?.predictedOps ?? []
+      if (predicted.length === 0) return "(none)"
+      return [...predicted].sort().join(",")
+    })
+    const signatureCounts = rankedCounts(predictionSignatures, 1)
+    const mostCommonPredictionRate = runs > 0 ? (signatureCounts[0]?.[1] ?? 0) / runs : 0
+    const disagreementRate = runs > 0 ? 1 - mostCommonPredictionRate : 0
+
+    const wrongOpLabels: string[] = []
+    const failureKindCounts = new Map<StabilityFailureKind, number>()
+    let representativeFailure: PromptStabilitySummary["representativeFailure"] = null
+
+    const bumpFailureKind = (kind: StabilityFailureKind) => {
+      failureKindCounts.set(kind, (failureKindCounts.get(kind) ?? 0) + 1)
+    }
+
+    for (const row of evaluatedRows) {
+      const commandEval = row.commandEval
+      if (!commandEval) continue
+      if (row.error) bumpFailureKind("error")
+      if (!commandEval.exactMatch) bumpFailureKind("exact_mismatch")
+      if (commandEval.missingOps.length > 0) {
+        bumpFailureKind("missing_ops")
+        for (const op of commandEval.missingOps) wrongOpLabels.push(`missing:${op}`)
+      }
+      if (commandEval.unexpectedOps.length > 0) {
+        bumpFailureKind("unexpected_ops")
+        for (const op of commandEval.unexpectedOps) wrongOpLabels.push(`unexpected:${op}`)
+      }
+      if (commandEval.f1 < 0.999) bumpFailureKind("low_f1")
+
+      if (!representativeFailure && (row.error || !commandEval.exactMatch)) {
+        representativeFailure = {
+          promptId: row.promptId,
+          model: row.model,
+          run: row.run,
+          outputTextPreview: compactPreview(row.outputTextPreview ?? row.error ?? ""),
+          ...(row.error ? { error: row.error } : {}),
+          predictedOps: commandEval.predictedOps,
+          missingOps: commandEval.missingOps,
+          unexpectedOps: commandEval.unexpectedOps
+        }
+      }
+    }
+
+    const topWrongOps = rankedCounts(wrongOpLabels, 3).map(([op, count]) => ({ op, count }))
+    const failureKinds = Array.from(failureKindCounts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([kind, count]) => ({ kind, count }))
+
+    let severity: StabilitySeverity | null = null
+    if (runs > 0) {
+      if (passRate < CRITICAL_PASS_RATE_THRESHOLD) severity = "critical"
+      else if (passRate < args.minPassRate) severity = "high"
+      else if (disagreementRate >= args.flakyDisagreementRateThreshold) severity = "flaky"
+    }
+
+    perBasePrompt.push({
+      basePromptId,
+      promptIds: Array.from(bucket.promptIds).sort(),
+      models: Array.from(bucket.models).sort(),
+      expectedOps: Array.from(bucket.expectedOps).sort(),
+      runs,
+      exactMatchRate,
+      avgF1,
+      passRate,
+      disagreementRate,
+      mostCommonPredictionRate,
+      topWrongOps,
+      failureKinds,
+      representativeFailure,
+      severity,
+      belowThreshold: runs > 0 && passRate < args.minPassRate
+    })
+  }
+
+  const severityOrder: Record<StabilitySeverity, number> = {
+    critical: 0,
+    high: 1,
+    flaky: 2
+  }
+  const triageRows = perBasePrompt
+    .filter((row) => !!row.severity)
+    .sort((a, b) => {
+      const rankDiff = severityOrder[a.severity as StabilitySeverity] - severityOrder[b.severity as StabilitySeverity]
+      if (rankDiff !== 0) return rankDiff
+      if (a.passRate !== b.passRate) return a.passRate - b.passRate
+      return a.basePromptId.localeCompare(b.basePromptId)
+    })
+  const failures = perBasePrompt
+    .filter((row) => row.belowThreshold)
+    .sort((a, b) => a.passRate - b.passRate || a.basePromptId.localeCompare(b.basePromptId))
+  const severityCounts: Record<StabilitySeverity, number> = {
+    critical: 0,
+    high: 0,
+    flaky: 0
+  }
+  for (const row of triageRows) {
+    if (!row.severity) continue
+    severityCounts[row.severity] += 1
+  }
+
+  return {
+    perBasePrompt: perBasePrompt.sort((a, b) => a.basePromptId.localeCompare(b.basePromptId)),
+    triageRows,
+    failures,
+    severityCounts
+  }
+}
+
+function printStabilityTriage(args: {
+  report: StabilityReport
+  minPassRate: number
+  flakyDisagreementRateThreshold: number
+  groupVariantsByBaseId: boolean
+}) {
+  console.log("\nPrompt Stability Triage")
+  console.log(
+    `grouping=${args.groupVariantsByBaseId ? "base prompt id (variants merged)" : "variant id"} | ` +
+      `critical < ${(CRITICAL_PASS_RATE_THRESHOLD * 100).toFixed(1)}% | ` +
+      `high < ${(args.minPassRate * 100).toFixed(1)}% | ` +
+      `flaky disagreement >= ${(args.flakyDisagreementRateThreshold * 100).toFixed(1)}%`
+  )
+
+  if (args.report.triageRows.length === 0) {
+    console.log("No critical/high/flaky prompt groups detected.")
+    return
+  }
+
+  console.log("severity | base prompt | pass | exact | avg f1 | runs | disagreement | expected ops | top wrong ops")
+  for (const row of args.report.triageRows) {
+    const expectedLabel = row.expectedOps.length > 0 ? row.expectedOps.join(",") : "-"
+    const wrongOpsLabel = row.topWrongOps.length > 0 ? row.topWrongOps.map((item) => `${item.op}(${item.count})`).join(", ") : "-"
+    console.log(
+      `${row.severity} | ${row.basePromptId} | ${(row.passRate * 100).toFixed(1)}% | ${(row.exactMatchRate * 100).toFixed(1)}% | ` +
+        `${row.avgF1.toFixed(3)} | ${row.runs} | ${(row.disagreementRate * 100).toFixed(1)}% | ${expectedLabel} | ${wrongOpsLabel}`
+    )
+  }
+
+  const failingRows = args.report.failures.filter((row) => row.severity === "critical" || row.severity === "high")
+  if (failingRows.length === 0) return
+
+  console.log("\nFailure Details (critical/high)")
+  for (const row of failingRows) {
+    const expectedLabel = row.expectedOps.length > 0 ? row.expectedOps.join(", ") : "-"
+    const wrongOpsLabel = row.topWrongOps.length > 0 ? row.topWrongOps.map((item) => `${item.op} (${item.count})`).join(", ") : "-"
+    const preview = row.representativeFailure?.outputTextPreview || row.representativeFailure?.error || "-"
+    const prediction = row.representativeFailure?.predictedOps.join(", ") || "(none)"
+    console.log(`- ${row.basePromptId} [${row.severity}] pass=${(row.passRate * 100).toFixed(1)}% runs=${row.runs}`)
+    console.log(`  expected ops: ${expectedLabel}`)
+    console.log(`  top wrong ops: ${wrongOpsLabel}`)
+    console.log(`  representative predicted ops: ${prediction}`)
+    console.log(`  representative bad output: ${preview}`)
+  }
+}
+
 async function run() {
   const args = parseArgs(process.argv.slice(2))
   if (args.has("help")) {
@@ -676,6 +957,9 @@ Options:
   --eval-mode text|ops-json
   --ops-cardinality single|multi
   --variants 1
+  --min-pass-rate 0.9
+  --fail-on-threshold true|false
+  --group-variants-by-base-id true|false
   --max-output-tokens 400
   --weight-reliability 0.4
   --weight-latency 0.35
@@ -689,9 +973,20 @@ Prompts file format:
     return
   }
 
+  const providerModeRaw = (args.get("provider") ?? "auto").trim().toLowerCase()
+  const providerMode: ProviderMode =
+    providerModeRaw === "openai" || providerModeRaw === "anthropic" || providerModeRaw === "auto"
+      ? providerModeRaw
+      : "auto"
+  const anthropicDefaultModel =
+    process.env.ANTHROPIC_MODEL_BALANCED?.trim() ||
+    process.env.ANTHROPIC_MODEL_FAST?.trim() ||
+    "claude-sonnet-4-5-20250514"
+  const defaultModels =
+    providerMode === "anthropic" ? [anthropicDefaultModel] : DEFAULT_MODELS
   const modelArg = args.get("model")?.trim()
   const modelsArg = args.get("models")
-  const rawModels = modelArg && modelArg.length > 0 ? modelArg : (modelsArg ?? DEFAULT_MODELS.join(","))
+  const rawModels = modelArg && modelArg.length > 0 ? modelArg : (modelsArg ?? defaultModels.join(","))
   const models = rawModels
     .split(",")
     .map((item) => item.trim())
@@ -700,15 +995,13 @@ Prompts file format:
 
   const runs = toInt(args.get("runs"), 3)
   const variants = toInt(args.get("variants"), 1)
+  const minPassRate = toRate(args.get("min-pass-rate"), 0.9)
+  const failOnThreshold = toBool(args.get("fail-on-threshold"), true)
+  const groupVariantsByBaseId = toBool(args.get("group-variants-by-base-id"), true)
   const maxOutputTokens = toInt(args.get("max-output-tokens"), 400)
   const evalMode = toEvalMode(args.get("eval-mode"))
   const opsCardinalityRaw = (args.get("ops-cardinality") ?? "single").trim().toLowerCase()
   const opsCardinality: OpsCardinality = opsCardinalityRaw === "multi" ? "multi" : "single"
-  const providerModeRaw = (args.get("provider") ?? "auto").trim().toLowerCase()
-  const providerMode: ProviderMode =
-    providerModeRaw === "openai" || providerModeRaw === "anthropic" || providerModeRaw === "auto"
-      ? providerModeRaw
-      : "auto"
   const endpointModeRaw = (args.get("endpoint") ?? "auto").trim()
   const endpointMode: EndpointMode =
     endpointModeRaw === "chat" || endpointModeRaw === "responses" || endpointModeRaw === "messages" || endpointModeRaw === "auto"
@@ -981,6 +1274,19 @@ Prompts file format:
     weightedByPrompt
   )
   printCommandAccuracy(prompts, models, results)
+  const stability = buildStabilityReport({
+    prompts,
+    results,
+    groupVariantsByBaseId,
+    minPassRate,
+    flakyDisagreementRateThreshold: FLAKY_DISAGREEMENT_RATE_THRESHOLD
+  })
+  printStabilityTriage({
+    report: stability,
+    minPassRate,
+    flakyDisagreementRateThreshold: FLAKY_DISAGREEMENT_RATE_THRESHOLD,
+    groupVariantsByBaseId
+  })
 
   console.log("\nWeighted Overall Ranking")
   console.log(
@@ -1003,6 +1309,9 @@ Prompts file format:
       endpointMode,
       evalMode,
       opsCardinality,
+      minPassRate,
+      failOnThreshold,
+      groupVariantsByBaseId,
       maxOutputTokens,
       scoringWeights: weights,
       prompts: prompts.map((item) => ({ id: item.id, prompt: item.prompt, expectedOps: item.expectedOps ?? [] }))
@@ -1037,6 +1346,30 @@ Prompts file format:
       ])
     ),
     overallRanking: overallScored.map((item) => ({ model: item.model, score: item.score, aggregate: item.aggregate })),
+    stabilityReport: {
+      mode: evalMode === "ops-json" ? "ops-intent" : "mixed",
+      thresholds: {
+        minPassRate,
+        criticalPassRateUpperBound: CRITICAL_PASS_RATE_THRESHOLD,
+        flakyDisagreementRateThreshold: FLAKY_DISAGREEMENT_RATE_THRESHOLD
+      },
+      controls: {
+        failOnThreshold,
+        groupVariantsByBaseId
+      },
+      summary: {
+        totalPromptGroups: stability.perBasePrompt.length,
+        belowThresholdPromptGroups: stability.failures.length,
+        severityCounts: stability.severityCounts
+      },
+      perBasePrompt: stability.perBasePrompt,
+      fixLoop: [
+        "For each critical/high prompt, patch planner prompt instructions or deterministic routing/normalization.",
+        "Add or refine the corresponding prompt case in src/scripts/test-sets/prompt-examples.json.",
+        "Re-run benchmark until all base prompt groups meet min-pass-rate.",
+        "When failures map to deterministic parsers, add direct unit tests in parser test files."
+      ]
+    },
     results
   }
 
@@ -1044,6 +1377,14 @@ Prompts file format:
     await mkdir(dirname(outPath), { recursive: true })
     await writeFile(outPath, `${JSON.stringify(report, null, 2)}\n`, "utf8")
     console.log(`\nReport written to ${outPath}`)
+  }
+
+  if (failOnThreshold && stability.failures.length > 0) {
+    console.error(
+      `\nStability gate failed: ${stability.failures.length} prompt group(s) are below ${(minPassRate * 100).toFixed(1)}% pass rate.`
+    )
+    console.error(`Failing prompt groups: ${stability.failures.map((item) => item.basePromptId).join(", ")}`)
+    process.exit(1)
   }
 }
 
