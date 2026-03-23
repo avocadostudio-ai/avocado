@@ -84,8 +84,12 @@ pnpm test:unit
 # E2E tests (requires API keys, ~30s)
 pnpm test:e2e
 
+# Local Anthropic prompt stability sweep (ops intent, no CI)
+pnpm -C apps/orchestrator benchmark:ops:stability:anthropic
+
 # Build all workspaces
 pnpm build
 ```
 
 See [CLAUDE.md](CLAUDE.md) for the full command reference and environment variable documentation.
+Detailed runbook: [docs/testing/local-prompt-stability.md](docs/testing/local-prompt-stability.md).
