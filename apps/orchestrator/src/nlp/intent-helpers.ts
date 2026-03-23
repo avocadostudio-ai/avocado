@@ -89,6 +89,13 @@ export function parseCreatePageRequest(message: string) {
     if (normalized && normalized !== "/") return normalized
   }
 
+  // Quoted page name: 'create a new page "Test"' → /test, "page called 'About Us'" → /about-us
+  const quotedName = stripped.match(/["'\u201C\u201D\u2018\u2019]([^"'\u201C\u201D\u2018\u2019]{1,60})["'\u201C\u201D\u2018\u2019]/)
+  if (quotedName) {
+    const seed = toSeedSlug(quotedName[1].trim())
+    if (seed) return `/${seed}`
+  }
+
   const forAudience = lower.match(/\bpage\s+for\s+([a-z0-9 -]{2,60})$/)?.[1]
   if (forAudience) {
     const seed = toSeedSlug(forAudience)
@@ -100,6 +107,20 @@ export function parseCreatePageRequest(message: string) {
     // Trim at structural words that introduce block layout ("with a Hero section...")
     const trimmed = aboutTopic.replace(/\s+(?:with|including|containing|featuring|that\s+has|having)\s+.*$/, "").trim()
     const seed = toSeedSlug(trimmed || aboutTopic)
+    if (seed) return `/${seed}`
+  }
+
+  // "create/add/make [a] [new] <PageName> page" — extract name before "page"
+  const namedPage = lower.match(/\b(?:create|add|make|build|generate)\b\s+(?:a\s+)?(?:new\s+)?([a-z][a-z0-9 ]{1,40}?)\s+pages?\b/)
+  if (namedPage) {
+    const seed = toSeedSlug(namedPage[1].trim())
+    if (seed && seed !== "new") return `/${seed}`
+  }
+
+  // "page called/named/titled <PageName>"
+  const calledPage = lower.match(/\bpages?\s+(?:called|named|titled)\s+['"]?([a-z][a-z0-9 ]{1,40}?)['"]?(?:\s|$)/)
+  if (calledPage) {
+    const seed = toSeedSlug(calledPage[1].trim())
     if (seed) return `/${seed}`
   }
 

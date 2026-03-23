@@ -1401,7 +1401,15 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
         selectedEditablePathRef.current = null
         pendingListItemMovePathRef.current = null
         setChildSelectionLock(null)
-        smoothRefresh()
+        // Navigate if the editor signals a slug change (e.g. create_page, remove_page, rename_page).
+        // navigate() already triggers a full page load, so skip smoothRefresh to avoid a redundant reload.
+        const navigateTo = typeof msg.payload.navigateTo === "string" ? msg.payload.navigateTo.trim() : ""
+        if (navigateTo) {
+          const href = navigateTo.startsWith("/") ? navigateTo : `/${navigateTo}`
+          navigate(`${href}${window.location.search}`)
+        } else {
+          smoothRefresh()
+        }
       }
 
       if (msg.type === "highlightBlock") {
