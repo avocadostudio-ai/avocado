@@ -7,7 +7,8 @@ export function usePublish(
   siteId: string,
   isLoading: boolean,
   pushMessage: (data: AssistantResponse) => void,
-  siteOrigin?: string
+  siteOrigin?: string,
+  onPublished?: () => void
 ) {
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null)
@@ -45,24 +46,27 @@ export function usePublish(
         return
       }
 
-      const slugText = Array.isArray(data.slugs) && data.slugs.length > 0 ? data.slugs.join(", ") : "none"
+      const slugs = Array.isArray(data.slugs) ? data.slugs : []
       setPublishStatus({
         session: data.session ?? session,
         status: data.status,
-        slugs: data.slugs ?? [],
+        slugs,
         deployStatus: data.deployStatus,
         inspectUrl: data.inspectUrl,
         deploymentId: data.deploymentId,
         vercelState: data.vercelState
       })
       void fetchPublishStatus()
+      const pageChanges = slugs.map((s) => {
+        const label = s === "/" ? "Home" : s.replace(/^\//, "")
+        return `Updated ${label}`
+      })
       if (data.status === "ready") {
         pushMessage({
           status: "applied",
           summary: data.message ?? "Nothing new to publish.",
           changes: [
-            `Session: ${data.session ?? session}`,
-            `Slugs: ${slugText}`,
+            ...pageChanges,
             ...(data.branch ? [`Branch: ${data.branch}`] : [])
           ]
         })
@@ -71,8 +75,7 @@ export function usePublish(
           status: "applied",
           summary: "Publish triggered. Vercel deployment started.",
           changes: [
-            `Session: ${data.session ?? session}`,
-            `Slugs: ${slugText}`,
+            ...pageChanges,
             `Deploy status: ${data.deployStatus ?? "unknown"}`,
             `Vercel state: ${data.vercelState ?? "TRIGGERED"}`,
             ...(data.commitSha ? [`Commit: ${data.commitSha.slice(0, 12)}`] : []),
@@ -81,6 +84,7 @@ export function usePublish(
           ]
         })
       }
+      onPublished?.()
     } catch {
       pushMessage({
         status: "error",

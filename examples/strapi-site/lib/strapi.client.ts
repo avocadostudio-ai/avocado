@@ -23,5 +23,8 @@ export async function strapiFetch<T = unknown>(
     const body = await res.text().catch(() => "")
     throw new Error(`Strapi ${res.status} ${res.statusText}: ${body.slice(0, 200)}`)
   }
-  return res.json() as Promise<T>
+  // Strapi DELETE returns 204/empty body — avoid JSON parse error
+  const text = await res.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
