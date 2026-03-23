@@ -1,5 +1,5 @@
 import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
 
 export interface ContentfulPublishOptions {
   spaceId: string
@@ -41,17 +41,6 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     return cachedEnvPromise
   }
 
-  // Determine which fields are images from the block registry
-  function getImageFields(blockType: string): Set<string> {
-    const meta = getAllBlockMeta()[blockType]
-    if (!meta) return new Set()
-    const imageFields = new Set<string>()
-    for (const [key, fm] of Object.entries(meta.fields)) {
-      if (fm.kind === "image") imageFields.add(key)
-    }
-    return imageFields
-  }
-
   // Check if a list field should be references (CardGrid.cards → blockCard)
   function isReferenceList(blockType: string, listKey: string): string | null {
     if (blockType === "CardGrid" && listKey === "cards") return "blockCard"
@@ -61,10 +50,22 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
   type CfEnv = Awaited<ReturnType<typeof loadEnvironment>>
   type CfEntry = Awaited<ReturnType<CfEnv["getEntries"]>>["items"][0]
 
+  /** Reject URLs pointing at private/loopback addresses. */
+  function isSafeImageUrl(raw: string): boolean {
+    let parsed: URL
+    try { parsed = new URL(raw) } catch { return false }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
+    const h = parsed.hostname
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
+    if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
+    return true
+  }
+
   // Upload an image URL as a Contentful Asset, return the asset ID
   async function ensureAsset(env: CfEnv, imageUrl: string, alt: string): Promise<string> {
-    // Skip non-http URLs (relative paths, data URIs)
-    if (!imageUrl.startsWith("http")) {
+    // Skip non-http URLs (relative paths, data URIs) or private IPs
+    if (!imageUrl.startsWith("http") || !isSafeImageUrl(imageUrl)) {
       // Create a placeholder asset with the URL as title
       const asset = await env.createAsset({
         fields: {

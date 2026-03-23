@@ -129,6 +129,24 @@ export function getAllBlockMeta(): Readonly<Record<string, BlockMeta>> {
   return _blockMeta
 }
 
+/** Cache for getImageFields results. */
+const _imageFieldsCache = new Map<string, Set<string>>()
+
+/** Get the set of prop keys that are image fields for a block type. */
+export function getImageFields(blockType: string): Set<string> {
+  const cached = _imageFieldsCache.get(blockType)
+  if (cached) return cached
+  const meta = _blockMeta[blockType]
+  const result = new Set<string>()
+  if (meta) {
+    for (const [key, fm] of Object.entries(meta.fields)) {
+      if (fm.kind === "image") result.add(key)
+    }
+  }
+  _imageFieldsCache.set(blockType, result)
+  return result
+}
+
 /** Check if a block type is a chrome block (structurally pinned). */
 export function isChrome(type: string): boolean {
   return _blockMeta[type]?.chrome === true

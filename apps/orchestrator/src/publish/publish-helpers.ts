@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto"
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
@@ -76,7 +77,8 @@ export function requirePublishToken(request: { headers: Record<string, unknown> 
   const configured = process.env.PUBLISH_TOKEN?.trim()
   if (!configured) return true
   const provided = String(request.headers["x-publish-token"] ?? "").trim()
-  return provided.length > 0 && provided === configured
+  if (provided.length === 0 || provided.length !== configured.length) return false
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(configured))
 }
 
 // ---------------------------------------------------------------------------
