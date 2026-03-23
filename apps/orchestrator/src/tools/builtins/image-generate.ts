@@ -1,4 +1,4 @@
-import { generateVariationImageWithOpenAI, recordImageGenDuration, estimatedImageGenMs } from "../../image/image-helpers.js"
+import { generateVariationImageWithOpenAI, generateVariationImageWithGemini, recordImageGenDuration, estimatedImageGenMs } from "../../image/image-helpers.js"
 import type { ToolManifest, ToolHandler } from "../types.js"
 
 type ImageGenerateInput = {
@@ -107,13 +107,22 @@ export const imageGenerateHandler: ToolHandler = async ({ input, context }) => {
     onProgress({ percent: pct, stage: cur.label })
   }, 500) : null
 
+  const provider = (process.env.IMAGE_GEN_PROVIDER?.trim().toLowerCase()) || "openai"
+
   const genStart = Date.now()
-  const result = await generateVariationImageWithOpenAI({
-    prompt: fullPrompt,
-    altText: prompt,
-    size,
-    model
-  })
+  const result = provider === "gemini"
+    ? await generateVariationImageWithGemini({
+        prompt: fullPrompt,
+        altText: prompt,
+        aspectRatio,
+        quality
+      })
+    : await generateVariationImageWithOpenAI({
+        prompt: fullPrompt,
+        altText: prompt,
+        size,
+        model
+      })
   recordImageGenDuration(Date.now() - genStart)
   if (progressTimer) clearInterval(progressTimer)
   onProgress?.({ percent: 100, stage: "Done" })

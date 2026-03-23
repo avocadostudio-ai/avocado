@@ -68,6 +68,8 @@ export type ToolExecutionEvent = {
   sessionId: string
   siteId: string
   plannerProvider: string
+  /** True when the tool was deferred (placeholder returned) to avoid blocking text streaming */
+  deferred?: boolean
 }
 
 export type ToolHandler = (args: {
