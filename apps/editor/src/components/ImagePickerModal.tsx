@@ -350,6 +350,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+        <style>{`@keyframes imgPickerDotBounce { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }`}</style>
         {/* Header row: title + current image + close */}
         <div style={S.header}>
           <div style={S.headerLeft}>
@@ -496,7 +497,6 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             {/* Multi-turn chat history */}
             {features.imageGenerateChat && chatMessages.length > 0 && (
               <div ref={chatScrollRef} style={S.chatScroll}>
-                <style>{`@keyframes imgPickerDotBounce { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }`}</style>
                 {chatMessages.map((msg, i) => {
                   const isLastAssistant = generating && msg.role === "assistant" && i === chatMessages.length - 1
                   return (
