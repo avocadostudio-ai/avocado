@@ -45,6 +45,32 @@ function findStringByKeys(root: unknown, wanted: Set<string>): string | undefine
   return undefined
 }
 
+/** Reject origins that point at private/loopback IPs or non-http protocols. */
+function isSafeOrigin(raw: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
+  const host = parsed.hostname
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]" ||
+    host === "0.0.0.0" ||
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("169.254.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  ) {
+    // Allow in development
+    if (process.env.NODE_ENV === "production") return false
+  }
+  return true
+}
+
 export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext) {
   app.post("/publish", async (request, reply) => {
     if (!requirePublishToken(request as { headers: Record<string, unknown> })) {
@@ -55,6 +81,10 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
     const session = normalizeSession(body.session)
     const scopedSession = scopedSessionKey(session, body.siteId)
     const siteOrigin = typeof body.siteOrigin === "string" ? body.siteOrigin.trim().replace(/\/+$/, "") : ""
+
+    if (siteOrigin && !isSafeOrigin(siteOrigin)) {
+      return reply.code(400).send({ error: "siteOrigin is not an allowed URL" })
+    }
 
     const pages = getSessionPages(scopedSession)
     const slugs = pages.map((page) => page.slug)

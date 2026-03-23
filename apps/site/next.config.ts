@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "plus.unsplash.com" },
       { protocol: "https", hostname: "oaidalleapiprodscus.blob.core.windows.net" },
-      { protocol: "https", hostname: "**.blob.core.windows.net" },
+      { protocol: "https", hostname: "placehold.co" },
       { protocol: "http", hostname: "localhost" },
     ],
   },
