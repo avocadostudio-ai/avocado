@@ -347,6 +347,117 @@ export async function generateVariationImageWithOpenAI(args: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Shared image save utility
+// ---------------------------------------------------------------------------
+
+export async function saveGeneratedImage(bytes: Buffer, prefix = "gen", ext = "png"): Promise<{ fileName: string; url: string }> {
+  const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
+  const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
+  const fileName = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+  await mkdir(generatedImageDir, { recursive: true })
+  await writeFile(resolve(generatedImageDir, fileName), bytes)
+  return { fileName, url: `${orchestratorPublicOrigin}/generated-images/${fileName}` }
+}
+
+/** Extract the first inline image from a Gemini response, save to disk, return URL. */
+export async function saveGeminiInlineImage(
+  parts: Array<{ inlineData?: { data?: string; mimeType?: string } }>,
+  prefix = "gen"
+): Promise<{ url: string; mimeType: string } | null> {
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      const mimeType = part.inlineData.mimeType ?? "image/png"
+      const bytes = Buffer.from(part.inlineData.data, "base64")
+      if (bytes.byteLength === 0) continue
+      const ext = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png"
+      const { url } = await saveGeneratedImage(bytes, prefix, ext)
+      return { url, mimeType }
+    }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Gemini client singleton + aspect ratios
+// ---------------------------------------------------------------------------
+
+export const GEMINI_ASPECT_RATIOS: Record<string, string> = {
+  landscape: "3:2",
+  square: "1:1",
+  portrait: "2:3"
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _geminiClient: any = null
+export async function getGeminiClient() {
+  if (_geminiClient) return _geminiClient
+  const { GoogleGenAI } = await import("@google/genai")
+  _geminiClient = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY! })
+  return _geminiClient
+}
+
+export function getGeminiImageModel(): string {
+  return process.env.GOOGLE_GENAI_IMAGE_MODEL?.trim() || "gemini-2.5-flash-image"
+}
+
+// ---------------------------------------------------------------------------
+// Gemini native image generation
+// ---------------------------------------------------------------------------
+
+export async function generateVariationImageWithGemini(args: {
+  prompt: string
+  altText: string
+  aspectRatio?: string
+  quality?: "draft" | "final"
+  model?: string
+  log?: ImageLogger
+}): Promise<UnsplashImage | null> {
+  if (!process.env.GOOGLE_GENAI_API_KEY?.trim()) {
+    args.log?.warn({ event: "gemini_image_skip", reason: "no_api_key" }, "Skipping Gemini image generation: GOOGLE_GENAI_API_KEY not set")
+    return null
+  }
+
+  const ai = await getGeminiClient()
+  const model = args.model ?? getGeminiImageModel()
+  const geminiAspectRatio = GEMINI_ASPECT_RATIOS[args.aspectRatio ?? "landscape"] ?? "3:2"
+  const imageSize = args.quality === "final" ? "2K" : "1K"
+
+  args.log?.info({ event: "gemini_image_start", model, aspectRatio: geminiAspectRatio, imageSize, promptLength: args.prompt.length }, "Starting Gemini image generation")
+
+  const genStartMs = Date.now()
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: args.prompt,
+      config: {
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: { aspectRatio: geminiAspectRatio, imageSize }
+      }
+    })
+    const durationMs = Date.now() - genStartMs
+    const parts = response.candidates?.[0]?.content?.parts
+    if (!parts) return null
+
+    const saved = await saveGeminiInlineImage(parts, "var")
+    if (!saved) return null
+
+    args.log?.info(
+      { event: "gemini_image_done", model, aspectRatio: geminiAspectRatio, durationMs },
+      `Gemini image generated in ${durationMs}ms (model=${model})`
+    )
+
+    return { url: saved.url, alt: args.altText, query: args.prompt }
+  } catch (err) {
+    const failDurationMs = Date.now() - genStartMs
+    args.log?.warn(
+      { event: "gemini_image_error", model, durationMs: failDurationMs, error: err instanceof Error ? err.message : String(err) },
+      "Gemini image generation failed"
+    )
+    return null
+  }
+}
+
 export async function resolveUnsplashImage(
   query: string,
   options?: UnsplashResolveOptions,

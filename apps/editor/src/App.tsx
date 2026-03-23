@@ -414,7 +414,7 @@ function EditorPage({
   const [selectedVariationId, setSelectedVariationId] = useState<string | null>(null)
   const [imagePickerTarget, setImagePickerTarget] = useState<{ slug: string; blockId: string; editablePath: string; currentUrl?: string } | null>(null)
   const imagePickerOpen = imagePickerTarget !== null
-  const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean }>({})
+  const [backendFeatures, setBackendFeatures] = useState<{ googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean; imageGenerateChat?: boolean }>({})
   const [selectionModeEnabled, setSelectionModeEnabled] = useState(false)
   const [anchorRect, setAnchorRect] = useState<AnchorRect>(null)
   const [anchoredExpanded, setAnchoredExpanded] = useState(false)
@@ -759,13 +759,14 @@ function EditorPage({
         for (const url of urls) {
           const res = await fetch(url)
           if (!res.ok) continue
-          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[]; features?: { googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean } }
+          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[]; features?: { googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean; imageGenerateChat?: boolean } }
           if (!active) return
           if (data.features) {
             setBackendFeatures((prev) => {
               if (prev.googleDrive === data.features!.googleDrive &&
                   prev.unsplash === data.features!.unsplash &&
-                  prev.imageGenerate === data.features!.imageGenerate) return prev
+                  prev.imageGenerate === data.features!.imageGenerate &&
+                  prev.imageGenerateChat === data.features!.imageGenerateChat) return prev
               return data.features!
             })
           }

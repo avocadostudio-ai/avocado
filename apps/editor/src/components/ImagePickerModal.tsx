@@ -20,6 +20,13 @@ type Features = {
   unsplash?: boolean
   contentful?: boolean
   imageGenerate?: boolean
+  imageGenerateChat?: boolean
+}
+
+type ChatMessage = {
+  role: "user" | "assistant"
+  text: string
+  imageUrl?: string
 }
 
 type ImagePickerModalProps = {
@@ -32,7 +39,21 @@ type ImagePickerModalProps = {
   onSelect: (imageUrl: string, alt: string) => void
 }
 
-export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, cmsMedia, onClose, onSelect }: ImagePickerModalProps) {
+/** Unwrap Next.js /_next/image?url=...&w=...&q=... proxy URLs to the raw image URL */
+function unwrapNextImageUrl(url: string | undefined): string | undefined {
+  if (!url) return url
+  try {
+    const parsed = new URL(url, "http://localhost")
+    if (parsed.pathname === "/_next/image") {
+      const raw = parsed.searchParams.get("url")
+      if (raw) return raw
+    }
+  } catch { /* not a valid URL */ }
+  return url
+}
+
+export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gdriveFolderId, cmsMedia, onClose, onSelect }: ImagePickerModalProps) {
+  const currentUrl = unwrapNextImageUrl(rawCurrentUrl)
   const availableTabs: Tab[] = []
   if (features.googleDrive) availableTabs.push("drive")
   if (features.unsplash) availableTabs.push("unsplash")
@@ -51,7 +72,13 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, c
   const [urlAltInput, setUrlAltInput] = useState("")
   const [generatePrompt, setGeneratePrompt] = useState("")
   const [generating, setGenerating] = useState(false)
+  const [generateStatus, setGenerateStatus] = useState("")
   const [generatedResult, setGeneratedResult] = useState<{ url: string; alt: string } | null>(null)
+  const [chatId, setChatId] = useState<string | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [editMode, setEditMode] = useState<"choose" | "edit" | "new">("choose")
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const scrollRafRef = useRef(0)
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
   const [uploadResult, setUploadResult] = useState<{ url: string } | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -138,6 +165,9 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, c
     setUrlAltInput("")
     setGeneratePrompt("")
     setGeneratedResult(null)
+    setChatId(null)
+    setChatMessages([])
+    setEditMode("choose")
     setUploadResult(null)
     setUploadPreview(null)
     setCurrentPage(1)
@@ -160,19 +190,92 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, c
 
   const handleGenerate = async () => {
     if (!generatePrompt.trim() || generating) return
+    const userPrompt = generatePrompt.trim()
     setGenerating(true)
-    setGeneratedResult(null)
-    try {
-      const res = await fetch(`${orchestrator}/image/generate`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: generatePrompt.trim() })
-      })
-      if (!res.ok) return
-      const data = (await res.json()) as { url: string; alt: string }
-      setGeneratedResult(data)
-    } catch { /* ignore */ }
-    finally { setGenerating(false) }
+    setGenerateStatus("Generating image\u2026")
+
+    // Use multi-turn chat endpoint with SSE streaming when available
+    if (features.imageGenerateChat) {
+      setChatMessages((prev) => [...prev, { role: "user", text: userPrompt }, { role: "assistant", text: "" }])
+      setGeneratePrompt("")
+
+      const scheduleScroll = () => {
+        cancelAnimationFrame(scrollRafRef.current)
+        scrollRafRef.current = requestAnimationFrame(() => {
+          chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" })
+        })
+      }
+
+      const updateLastAssistant = (updater: (msg: ChatMessage) => ChatMessage) => {
+        setChatMessages((prev) => {
+          let idx = -1
+          for (let i = prev.length - 1; i >= 0; i--) { if (prev[i].role === "assistant") { idx = i; break } }
+          if (idx < 0) return prev
+          const updated = [...prev]
+          updated[idx] = updater(updated[idx])
+          return updated
+        })
+      }
+
+      try {
+        const res = await fetch(`${orchestrator}/image/generate/chat`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ prompt: userPrompt, chatId: chatId ?? undefined, stream: true, ...(editMode === "edit" && currentUrl && !chatId ? { referenceImageUrl: currentUrl } : {}) })
+        })
+        if (!res.ok || !res.body) return
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const lines = buffer.split("\n")
+          buffer = lines.pop() ?? ""
+          let eventType = ""
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim()
+            } else if (line.startsWith("data: ") && eventType) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                if (eventType === "chatId") {
+                  setChatId(data.chatId)
+                } else if (eventType === "status") {
+                  setGenerateStatus(data.stage ?? "Generating image\u2026")
+                } else if (eventType === "text") {
+                  updateLastAssistant((msg) => ({ ...msg, text: msg.text + data.text }))
+                } else if (eventType === "image") {
+                  updateLastAssistant((msg) => ({ ...msg, imageUrl: data.url }))
+                  setGeneratedResult({ url: data.url, alt: data.alt })
+                }
+              } catch { /* ignore parse errors */ }
+              eventType = ""
+            }
+          }
+          scheduleScroll()
+        }
+      } catch { /* ignore */ }
+      finally { setGenerating(false); setGenerateStatus("") }
+    } else {
+      // Single-shot fallback (OpenAI / no chat)
+      setGeneratedResult(null)
+      try {
+        const res = await fetch(`${orchestrator}/image/generate`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ prompt: userPrompt })
+        })
+        if (!res.ok) return
+        const data = (await res.json()) as { url: string; alt: string }
+        setGeneratedResult(data)
+      } catch { /* ignore */ }
+      finally { setGenerating(false); setGenerateStatus("") }
+    }
   }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -365,37 +468,106 @@ export function ImagePickerModal({ open, features, currentUrl, gdriveFolderId, c
 
         {/* ---- Generate tab ---- */}
         {activeTab === "generate" && (
-          <div style={S.formArea}>
-            <textarea
-              placeholder="Describe the image you want, e.g. 'A professional photo of a modern office with natural light'"
-              value={generatePrompt}
-              onChange={(e) => setGeneratePrompt(e.target.value)}
-              style={S.textarea}
-              rows={3}
-              autoFocus
-            />
-            <button
-              onClick={handleGenerate}
-              disabled={!generatePrompt.trim() || generating}
-              style={{ ...S.generateBtn, ...(!generatePrompt.trim() || generating ? S.disabled : {}) }}>
-              <Sparkles size={15} />
-              {generating ? "Generating..." : "Generate image"}
-            </button>
-            {generatedResult && (
+          <div style={{ ...S.formArea, display: "flex", flexDirection: "column", flex: features.imageGenerateChat ? "1 1 0" : undefined, minHeight: 0 }}>
+            {/* Choice: edit existing or generate new */}
+            {features.imageGenerateChat && currentUrl && editMode === "choose" && chatMessages.length === 0 && (
+              <div style={S.editChoiceContainer}>
+                <button style={S.editChoiceCard} onClick={() => setEditMode("edit")}>
+                  <img src={currentUrl} alt="" style={S.editChoiceImg} />
+                  <span style={S.editChoiceTitle}>Edit this image</span>
+                  <span style={S.editChoiceDesc}>Describe changes to the current image</span>
+                </button>
+                <button style={S.editChoiceCard} onClick={() => setEditMode("new")}>
+                  <div style={S.editChoiceNewIcon}><Sparkles size={24} /></div>
+                  <span style={S.editChoiceTitle}>Generate new</span>
+                  <span style={S.editChoiceDesc}>Create a completely new image from scratch</span>
+                </button>
+              </div>
+            )}
+
+            {/* Edit mode: show current image as reference */}
+            {features.imageGenerateChat && currentUrl && editMode === "edit" && chatMessages.length === 0 && (
+              <div style={S.editContext}>
+                <img src={currentUrl} alt="" style={S.editContextImg} />
+                <span style={S.editContextLabel}>Describe how you'd like to change this image</span>
+              </div>
+            )}
+
+            {/* Multi-turn chat history */}
+            {features.imageGenerateChat && chatMessages.length > 0 && (
+              <div ref={chatScrollRef} style={S.chatScroll}>
+                <style>{`@keyframes imgPickerDotBounce { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }`}</style>
+                {chatMessages.map((msg, i) => {
+                  const isLastAssistant = generating && msg.role === "assistant" && i === chatMessages.length - 1
+                  return (
+                    <div key={i} style={msg.role === "user" ? S.chatBubbleUser : S.chatBubbleAssistant}>
+                      {msg.text && <span style={S.chatText}>{msg.text}</span>}
+                      {msg.imageUrl && <img src={msg.imageUrl} alt="" style={S.chatImage} />}
+                      {isLastAssistant && (
+                        <div style={S.generatingRow}>
+                          <span style={S.typingDots}>
+                            <span style={{ ...S.dot, animationDelay: "0s" }} />
+                            <span style={{ ...S.dot, animationDelay: "0.2s" }} />
+                            <span style={{ ...S.dot, animationDelay: "0.4s" }} />
+                          </span>
+                          <span style={S.generatingLabel}>{generateStatus}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Single-shot: show preview below textarea */}
+            {!features.imageGenerateChat && generatedResult && (
               <div style={S.previewRow}>
                 <img src={generatedResult.url} alt={generatedResult.alt} style={S.previewImg} />
               </div>
             )}
+
+            {/* Prompt input — hidden during choice screen */}
+            {!(currentUrl && editMode === "choose" && features.imageGenerateChat && chatMessages.length === 0) && (
+            <div style={S.chatInputArea}>
+              <div style={S.chatInputRow}>
+                <textarea
+                  placeholder={chatMessages.length > 0
+                    ? "Refine: e.g. 'Make it warmer' or 'Add more contrast'"
+                    : editMode === "edit"
+                      ? "Describe changes: e.g. 'Make the background brighter' or 'Add a sunset'"
+                      : "Describe the image you want, e.g. 'A professional photo of a modern office with natural light'"}
+                  value={generatePrompt}
+                  onChange={(e) => setGeneratePrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleGenerate() } }}
+                  style={S.textarea}
+                  rows={2}
+                  autoFocus
+                />
+                <button
+                  onClick={handleGenerate}
+                  disabled={!generatePrompt.trim() || generating}
+                  style={{ ...S.generateBtn, ...(!generatePrompt.trim() || generating ? S.disabled : {}) }}>
+                  <Sparkles size={15} />
+                  {generating ? "..." : chatMessages.length > 0 ? "Refine" : editMode === "edit" ? "Edit" : "Generate"}
+                </button>
+              </div>
+              {features.imageGenerateChat && generatedResult && (
+                <button onClick={handleSelect} style={S.useImageInline}>Use image</button>
+              )}
+            </div>
+            )}
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer — hidden on generate+chat tab (Use image is inline there) */}
+        {!(activeTab === "generate" && features.imageGenerateChat) && (
         <div style={S.footer}>
           <button onClick={handleSelect} disabled={!canSubmit}
             style={{ ...S.submitBtn, ...(canSubmit ? {} : S.disabled) }}>
             {activeTab === "upload" && urlInput.trim() && !uploadResult ? "Apply URL" : "Use image"}
           </button>
         </div>
+        )}
       </div>
     </div>
   )
@@ -436,7 +608,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: "8px 16px", color: "#9db1cc", fontSize: 13, cursor: "pointer",
     fontWeight: 500, transition: "all .15s"
   },
-  tabActive: { background: "#304a71", color: "#f4f8ff", borderColor: "#8daede", boxShadow: "inset 0 0 0 1px rgba(173, 201, 239, 0.2)" },
+  tabActive: { background: "#304a71", color: "#f4f8ff", border: "1px solid #8daede", boxShadow: "inset 0 0 0 1px rgba(173, 201, 239, 0.2)" },
 
   // Search
   searchBar: {
@@ -464,7 +636,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: 0, cursor: "pointer", display: "flex", flexDirection: "column",
     overflow: "hidden", textAlign: "left"
   },
-  cardSelected: { borderColor: "#63a4ff", boxShadow: "0 0 0 1px #63a4ff, 0 8px 20px rgba(38, 116, 230, 0.35)" },
+  cardSelected: { border: "2px solid #63a4ff", boxShadow: "0 0 0 1px #63a4ff, 0 8px 20px rgba(38, 116, 230, 0.35)" },
   cardImg: { width: "100%", aspectRatio: "4/3", objectFit: "cover" },
   cardLabel: {
     fontSize: 11, color: "#afc2de", padding: "5px 6px", lineHeight: 1.35,
@@ -517,8 +689,86 @@ const S: Record<string, React.CSSProperties> = {
   },
   previewLabel: { fontSize: 13, color: "#afc2de" },
 
+  editChoiceContainer: {
+    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12
+  },
+  editChoiceCard: {
+    display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 8,
+    padding: "20px 16px", background: "#0d182d", border: "1px solid #304a6b",
+    borderRadius: 12, cursor: "pointer", color: "#e0ecff", textAlign: "center" as const,
+    transition: "border-color .15s, background .15s"
+  },
+  editChoiceImg: {
+    width: 80, height: 56, objectFit: "cover" as const, borderRadius: 8
+  },
+  editChoiceNewIcon: {
+    width: 80, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
+    background: "#1a2d4a", borderRadius: 8, color: "#6fa8f2"
+  },
+  editChoiceTitle: {
+    fontSize: 14, fontWeight: 600, color: "#f2f7ff"
+  },
+  editChoiceDesc: {
+    fontSize: 12, color: "#8fa6c9", lineHeight: 1.35
+  },
+  editContext: {
+    display: "flex", alignItems: "center", gap: 12, padding: 10,
+    background: "#0d182d", borderRadius: 10, border: "1px solid #304a6b",
+    marginBottom: 10
+  },
+  editContextImg: {
+    width: 80, height: 56, objectFit: "cover" as const, borderRadius: 8, flexShrink: 0
+  },
+  editContextLabel: {
+    fontSize: 13, color: "#8fa6c9", lineHeight: 1.4
+  },
+  chatInputArea: {
+    flexShrink: 0, display: "flex", flexDirection: "column" as const, gap: 8,
+    paddingTop: 8, borderTop: "1px solid #253652"
+  },
+  chatInputRow: {
+    display: "flex", gap: 8, alignItems: "flex-end"
+  },
+  useImageInline: {
+    alignSelf: "flex-end", background: "#346ec2", color: "white",
+    border: "1px solid #5f90da", borderRadius: 10,
+    padding: "9px 24px", fontSize: 13, fontWeight: 500, cursor: "pointer"
+  },
+  chatScroll: {
+    flex: "1 1 0", minHeight: 0, overflowY: "auto" as const,
+    display: "flex", flexDirection: "column" as const, gap: 8,
+    padding: "4px 0"
+  },
+  chatBubbleUser: {
+    alignSelf: "flex-end", maxWidth: "80%",
+    background: "#2a4a75", borderRadius: "12px 12px 4px 12px",
+    padding: "8px 12px", fontSize: 13, color: "#e0ecff"
+  },
+  chatBubbleAssistant: {
+    alignSelf: "flex-start", maxWidth: "85%",
+    background: "#0d182d", borderRadius: "12px 12px 12px 4px",
+    padding: "8px 12px", fontSize: 13, color: "#c8d9f0",
+    display: "flex", flexDirection: "column" as const, gap: 8
+  },
+  chatText: { lineHeight: 1.45 },
+  generatingRow: {
+    display: "flex", alignItems: "center", gap: 8
+  },
+  generatingLabel: {
+    fontSize: 13, color: "#9cb2d0", fontStyle: "italic" as const
+  },
+  typingDots: {
+    display: "inline-flex", gap: 4, alignItems: "center", padding: "4px 0"
+  },
+  dot: {
+    width: 8, height: 8, borderRadius: "50%", background: "#6fa8f2",
+    animation: "imgPickerDotBounce 1.2s ease-in-out infinite"
+  },
+  chatImage: {
+    width: "100%", maxWidth: 320, borderRadius: 8, marginTop: 4
+  },
   generateBtn: {
-    display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10,
+    display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0,
     padding: "9px 18px", background: "#2f79dc", color: "white",
     border: "1px solid #6fa8f2", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer"
   },
