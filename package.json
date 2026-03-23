@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.1",
   "packageManager": "pnpm@10.10.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm -r --parallel --filter @ai-site-editor/site --filter @ai-site-editor/editor --filter @ai-site-editor/orchestrator dev",
     "dev:ctl": "./scripts/devctl.sh",
@@ -12,6 +15,7 @@
     "dev:status": "./scripts/devctl.sh status",
     "dev:logs": "./scripts/devctl.sh logs",
     "dev:doctor": "./scripts/devctl.sh doctor",
+    "dev:setup": "./scripts/dev-setup.sh",
     "demo:avocado:check": "./scripts/demo-avocado-check.sh",
     "demo:60s:human": "./scripts/demo-60s-humanized-playwright.sh",
     "docs:c4:render": "./scripts/render-c4.sh",
