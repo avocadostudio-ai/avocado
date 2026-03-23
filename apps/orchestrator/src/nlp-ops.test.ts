@@ -8,6 +8,251 @@ import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromM
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage, isRewriteLikeMessage } from "./chat/chat-pipeline.js"
 
+function demoPageBySlug(slug: string) {
+  const page = demoPublishedPages().find((item) => item.slug === slug)
+  assert.ok(page, `demo page ${slug} should exist`)
+  return page!
+}
+
+function buildPageWithTwoColumnImage() {
+  const page = demoPublishedPages()[0]
+  return {
+    ...page,
+    blocks: [
+      ...page.blocks,
+      {
+        id: "b_two_col_test",
+        type: "TwoColumn" as const,
+        props: {
+          variant: "default",
+          left: [
+            { type: "heading", text: "Trail" },
+            { type: "paragraph", text: "Body" }
+          ],
+          right: [
+            { type: "image", src: "/hero-generated.svg", alt: "A climber" }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Prompt intent understanding matrix (table-driven)
+// ---------------------------------------------------------------------------
+
+type IntentMatrixCase = {
+  name: string
+  message: string
+  currentPage: ReturnType<typeof demoPublishedPages>[number]
+  activeBlockId?: string
+  activeEditablePath?: string
+  expectedNull?: boolean
+  expectedAction?: "add" | "move" | "update" | "remove" | "info" | "clarify"
+  expectedTargetBlockRef?: string
+  expectedTargetBlockType?: string
+  expectedPatch?: Record<string, unknown>
+}
+
+test("inferDeterministicIntent understanding matrix", () => {
+  const home = demoPageBySlug("/")
+  const heroId = home.blocks.find((item) => item.type === "Hero")?.id
+  assert.ok(heroId, "home should include hero block")
+  const pageWithTwoColumn = buildPageWithTwoColumnImage()
+
+  const cases: IntentMatrixCase[] = [
+    {
+      name: "selected remove maps to target block",
+      message: "remove this section",
+      currentPage: home,
+      activeBlockId: heroId,
+      expectedAction: "remove",
+      expectedTargetBlockRef: heroId
+    },
+    {
+      name: "quoted field rewrite maps to update patch",
+      message: "change heading to \"Build your dream site\"",
+      currentPage: home,
+      activeBlockId: heroId,
+      activeEditablePath: "heading",
+      expectedAction: "update",
+      expectedTargetBlockRef: heroId,
+      expectedPatch: { heading: "Build your dream site" }
+    },
+    {
+      name: "remove-all-except infers kept block type",
+      message: "remove all blocks except hero",
+      currentPage: home,
+      expectedAction: "remove",
+      expectedTargetBlockType: "Hero"
+    },
+    {
+      name: "hero layout phrase maps to imagePosition patch",
+      message: "set hero image on the left",
+      currentPage: home,
+      expectedAction: "update",
+      expectedTargetBlockRef: heroId,
+      expectedPatch: { imagePosition: "left" }
+    },
+    {
+      name: "focused image command maps to update action",
+      message: "add unsplash image matching image alt text",
+      currentPage: pageWithTwoColumn,
+      activeBlockId: "b_two_col_test",
+      activeEditablePath: "imageUrl",
+      expectedAction: "update",
+      expectedTargetBlockRef: "b_two_col_test"
+    },
+    {
+      name: "container-scoped remove-except is rejected deterministically",
+      message: "remove CTAs from all slides except last one in Carousel",
+      currentPage: home,
+      activeBlockId: home.blocks[0]?.id,
+      expectedNull: true
+    }
+  ]
+
+  for (const entry of cases) {
+    const parsed = inferDeterministicIntent({
+      message: entry.message,
+      currentPage: entry.currentPage,
+      activeBlockId: entry.activeBlockId,
+      activeEditablePath: entry.activeEditablePath
+    })
+
+    if (entry.expectedNull) {
+      assert.equal(parsed, null, entry.name)
+      continue
+    }
+
+    assert.ok(parsed, `${entry.name}: expected deterministic intent`)
+    assert.equal(parsed?.action, entry.expectedAction, entry.name)
+    if (entry.expectedTargetBlockRef !== undefined) {
+      assert.equal(parsed?.target_block_ref, entry.expectedTargetBlockRef, entry.name)
+    }
+    if (entry.expectedTargetBlockType !== undefined) {
+      assert.equal(parsed?.target_block_type, entry.expectedTargetBlockType, entry.name)
+    }
+    if (entry.expectedPatch !== undefined) {
+      assert.deepEqual(parsed?.patch, entry.expectedPatch, entry.name)
+    }
+  }
+})
+
+type PromptIntentPlanMatrixCase = {
+  name: string
+  message: string
+  slug: string
+  currentPage: ReturnType<typeof demoPublishedPages>[number]
+  activeBlockId?: string
+  activeEditablePath?: string
+  expectedAction: "add" | "move" | "update" | "remove" | "info" | "clarify"
+  expectedPlanIntent: "edit_plan" | "needs_clarification"
+  expectedFirstOp?: string
+}
+
+test("prompt intent understanding matrix (infer -> deterministic compile)", () => {
+  const home = demoPageBySlug("/")
+  const pricing = demoPageBySlug("/pricing")
+  const heroId = home.blocks.find((item) => item.type === "Hero")?.id
+  assert.ok(heroId, "home should include hero block")
+
+  const cases: PromptIntentPlanMatrixCase[] = [
+    {
+      name: "create page prompt becomes create_page op",
+      message: "create new page /intent-matrix",
+      slug: "/",
+      currentPage: home,
+      expectedAction: "add",
+      expectedPlanIntent: "edit_plan",
+      expectedFirstOp: "create_page"
+    },
+    {
+      name: "this-page add richtext stays block-level",
+      message: "on this page add a richtext describing benefits of grapefruits",
+      slug: "/",
+      currentPage: home,
+      expectedAction: "add",
+      expectedPlanIntent: "edit_plan",
+      expectedFirstOp: "add_block"
+    },
+    {
+      name: "remove this page maps to remove_page",
+      message: "remove this page",
+      slug: "/pricing",
+      currentPage: pricing,
+      expectedAction: "remove",
+      expectedPlanIntent: "edit_plan",
+      expectedFirstOp: "remove_page"
+    },
+    {
+      name: "rename page route maps to rename_page",
+      message: "rename page /pricing to /plans",
+      slug: "/pricing",
+      currentPage: pricing,
+      expectedAction: "update",
+      expectedPlanIntent: "edit_plan",
+      expectedFirstOp: "rename_page"
+    },
+    {
+      name: "nav move phrase maps to move_page",
+      message: "move this page before Home",
+      slug: "/pricing",
+      currentPage: pricing,
+      expectedAction: "move",
+      expectedPlanIntent: "edit_plan",
+      expectedFirstOp: "move_page"
+    },
+    {
+      name: "selected-field rewrite maps to update_props",
+      message: "change heading to \"Build your dream site\"",
+      slug: "/",
+      currentPage: home,
+      activeBlockId: heroId,
+      activeEditablePath: "heading",
+      expectedAction: "update",
+      expectedPlanIntent: "edit_plan",
+      expectedFirstOp: "update_props"
+    },
+    {
+      name: "home-page delete is blocked with clarification",
+      message: "delete page /",
+      slug: "/",
+      currentPage: home,
+      expectedAction: "remove",
+      expectedPlanIntent: "needs_clarification"
+    }
+  ]
+
+  for (const [index, entry] of cases.entries()) {
+    const parsed = inferDeterministicIntent({
+      message: entry.message,
+      currentPage: entry.currentPage,
+      activeBlockId: entry.activeBlockId,
+      activeEditablePath: entry.activeEditablePath
+    })
+    assert.ok(parsed, `${entry.name}: expected deterministic intent`)
+    assert.equal(parsed?.action, entry.expectedAction, entry.name)
+
+    const plan = compileDeterministicPlan({
+      session: `intent-matrix-${index}`,
+      intent: parsed!,
+      message: entry.message,
+      slug: entry.slug,
+      currentPage: entry.currentPage,
+      activeBlockId: entry.activeBlockId,
+      activeEditablePath: entry.activeEditablePath
+    })
+
+    assert.ok(plan, `${entry.name}: expected deterministic plan`)
+    assert.equal(plan?.intent, entry.expectedPlanIntent, entry.name)
+    if (entry.expectedFirstOp !== undefined) {
+      assert.equal(plan?.ops[0]?.op, entry.expectedFirstOp, entry.name)
+    }
+  }
+})
+
 test("blockSupportsImageAtPath checks schema support", () => {
   // Hero has top-level imageUrl
   assert.equal(blockSupportsImageAtPath("Hero", "imageUrl"), true)
@@ -1398,6 +1643,66 @@ test("compileDeterministicPlan renames page route when source and target paths a
   }
 })
 
+test("compileDeterministicPlan renames page from natural language name", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-rename-natural",
+    intent: { action: "update" },
+    message: "rename page to Our community",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "rename_page")
+  if (plan?.ops[0]?.op === "rename_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+    assert.equal(plan.ops[0].newPageSlug, "/our-community")
+    assert.equal(plan.ops[0].newTitle, "Our Community")
+  }
+})
+
+test("isHighConfidenceDeterministicCase matches rename page with natural language name", () => {
+  const currentPage = demoPublishedPages()[0]
+  const result = isHighConfidenceDeterministicCase({
+    message: "rename page to Our community",
+    currentPage
+  })
+  assert.equal(result, true)
+})
+
+test("isHighConfidenceDeterministicCase matches bare 'rename to X' without 'page' keyword", () => {
+  const currentPage = demoPublishedPages()[0]
+  const result = isHighConfidenceDeterministicCase({
+    message: "rename to Olive oil",
+    currentPage
+  })
+  assert.equal(result, true)
+})
+
+test("compileDeterministicPlan renames current page from bare 'rename to X'", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-rename-bare",
+    intent: { action: "update" },
+    message: "rename to Olive oil",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "rename_page")
+  if (plan?.ops[0]?.op === "rename_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+    assert.equal(plan.ops[0].newPageSlug, "/olive-oil")
+    assert.equal(plan.ops[0].newTitle, "Olive Oil")
+  }
+})
+
 test("compileDeterministicPlan asks clarification when page rename target path is missing", () => {
   const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
   assert.ok(currentPage)
@@ -1427,6 +1732,51 @@ test("compileDeterministicPlan blocks deleting home page", () => {
   assert.ok(plan)
   assert.equal(plan?.intent, "needs_clarification")
   assert.equal(plan?.ops.length, 0)
+})
+
+test("compileDeterministicPlan moves page before natural language anchor name", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-nav-move-natural",
+    intent: { action: "move" },
+    message: "move this page before Home",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_page")
+  if (plan?.ops[0]?.op === "move_page") {
+    assert.equal(plan.ops[0].pageSlug, "/pricing")
+    // Before Home (/) means afterPageSlug is undefined (top position)
+    assert.equal(plan.ops[0].afterPageSlug, undefined)
+  }
+})
+
+test("isHighConfidenceDeterministicCase matches 'move this page before Pricing'", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "move this page before Pricing", currentPage }),
+    true
+  )
+})
+
+test("compileDeterministicPlan moves page to last position via natural language", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-nav-move-last",
+    intent: { action: "move" },
+    message: "move this page to last position",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_page")
 })
 
 test("compileDeterministicPlan returns nav move clarification when anchor page is missing", () => {
