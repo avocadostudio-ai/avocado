@@ -237,7 +237,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         setActiveBlockType(undefined)
         setActiveEditablePath(undefined)
       }
-      postToSite("draftUpdated", { focusBlockId: data.focusBlockId ?? null })
+      const navigateTo = nextSlug !== currentSlug ? nextSlug : undefined
+      postToSite("draftUpdated", { focusBlockId: data.focusBlockId ?? null, navigateTo })
       if (data.focusBlockId) {
         activeBlockIdRef.current = data.focusBlockId
         setActiveBlockId(data.focusBlockId)
@@ -920,7 +921,8 @@ export function useChatEngine(config: ChatEngineConfig) {
           // Navigate to a newly created page when the server signals updatedSlug
           if (typeof payload.updatedSlug === "string" && payload.updatedSlug.length > 0) {
             const nextSlug = payload.updatedSlug as string
-            if (nextSlug !== slugRef.current) {
+            const slugChanged = nextSlug !== slugRef.current
+            if (slugChanged) {
               setSlug(nextSlug)
               activeBlockIdRef.current = undefined
               activeBlockTypeRef.current = undefined
@@ -929,7 +931,7 @@ export function useChatEngine(config: ChatEngineConfig) {
               setActiveBlockType(undefined)
               setActiveEditablePath(undefined)
             }
-            postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId })
+            postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId, navigateTo: slugChanged ? nextSlug : undefined })
             void refreshRouteSlugs()
           }
         }
