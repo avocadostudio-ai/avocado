@@ -315,6 +315,7 @@ test("parseCreatePageRequest prompt matrix", () => {
     { prompt: 'create a new page "Test"', expected: "/test" },
     { prompt: "create a new page \"About Us\"", expected: "/about-us" },
     { prompt: "add page 'Our Services'", expected: "/our-services" },
+    { prompt: "generate and add a CTA at the end of the page", expected: null },
     { prompt: "add a CTA corresponding to intent of this page", expected: null },
     { prompt: "improve this page", expected: null },
     { prompt: "delete this page", expected: null },
@@ -471,6 +472,7 @@ test("findFullPageTranslationCoverageGap passes when list child text coverage is
       summary_for_user: "Translate page",
       change_log: [],
       ops: [
+        { op: "update_props", pageSlug: "/test", blockId: "b_features", patch: { title: "Functies" } },
         { op: "update_item", pageSlug: "/test", blockId: "b_features", listKey: "features", index: 0, patch: { title: "Snelheid", description: "Snelle opzet" } },
         { op: "update_item", pageSlug: "/test", blockId: "b_features", listKey: "features", index: 1, patch: { title: "Veiligheid", description: "Veilige wijzigingen" } }
       ]
@@ -857,8 +859,26 @@ test("normalizePlanCandidate remaps question/answer to q/a in add_block FAQ item
 })
 
 test("normalizePlanCandidate infers listKey from block props when LLM omits it", () => {
-  const currentPage = demoPublishedPages()[0]
-  const cardGrid = currentPage.blocks.find((b) => b.type === "CardGrid")!
+  const currentPage = {
+    id: "p_cards",
+    slug: "/cards",
+    title: "Cards",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_cards",
+        type: "CardGrid" as const,
+        props: {
+          title: "Benefits",
+          cards: [
+            { title: "One", description: "Desc 1", ctaText: "Read", ctaHref: "/" },
+            { title: "Two", description: "Desc 2", ctaText: "Read", ctaHref: "/" }
+          ]
+        }
+      }
+    ]
+  }
+  const cardGrid = currentPage.blocks[0]
   const parsed = normalizePlanCandidate(
     {
       intent: "edit_plan",
@@ -874,7 +894,7 @@ test("normalizePlanCandidate infers listKey from block props when LLM omits it",
       ]
     },
     {
-      defaultSlug: "/",
+      defaultSlug: "/cards",
       currentPage,
       userMessage: "add images to each card"
     }
@@ -2752,23 +2772,20 @@ test("compileDeterministicPlan creates one page per audience in multi-page promp
 })
 
 // ---------------------------------------------------------------------------
-// Step 9: audience retarget defers to AI when OPENAI_API_KEY is set
+// Step 9: audience retarget defers to AI when OPENAI_API_KEY is set (without a selected block)
 // ---------------------------------------------------------------------------
 
-test("compileDeterministicPlan defers audience retarget to AI when OPENAI_API_KEY is set", () => {
+test("compileDeterministicPlan defers audience retarget to AI when OPENAI_API_KEY is set and no block is selected", () => {
   const currentPage = demoPublishedPages()[0]
-  const hero = currentPage.blocks.find((b) => b.type === "Hero")
-  assert.ok(hero)
   const original = process.env.OPENAI_API_KEY
   try {
     process.env.OPENAI_API_KEY = "sk-test-fake"
     const plan = compileDeterministicPlan({
       session: "test-retarget-defer-ai",
       intent: { action: "update" },
-      message: "retarget this for developer teams audience",
+      message: "retarget this page for developer teams audience",
       slug: "/",
-      currentPage,
-      activeBlockId: hero!.id
+      currentPage
     })
     assert.equal(plan, null, "should return null to defer to AI planner")
   } finally {
@@ -3076,9 +3093,26 @@ test("parseDuplicatePageRequest: 'clone this page with url /about-us'", () => {
 })
 
 test("normalizePlanCandidate converts update_props with appended array items to add_item ops", () => {
-  const currentPage = demoPublishedPages()[0]
-  const faqBlock = currentPage.blocks.find((b) => b.type === "FAQAccordion")
-  assert.ok(faqBlock, "demo page should have FAQAccordion")
+  const currentPage = {
+    id: "p_faq",
+    slug: "/faq",
+    title: "FAQ",
+    updatedAt: new Date().toISOString(),
+    blocks: [
+      {
+        id: "b_faq_test",
+        type: "FAQAccordion" as const,
+        props: {
+          title: "FAQ",
+          items: [
+            { q: "Do you ship internationally?", a: "Yes, we ship to most countries." },
+            { q: "How long is delivery?", a: "Delivery usually takes 3-5 days." }
+          ]
+        }
+      }
+    ]
+  }
+  const faqBlock = currentPage.blocks[0]
   const existingItems = (faqBlock.props as Record<string, unknown>).items as unknown[]
   assert.ok(Array.isArray(existingItems) && existingItems.length > 0, "FAQAccordion should have existing items")
 
@@ -3096,13 +3130,13 @@ test("normalizePlanCandidate converts update_props with appended array items to 
       ops: [
         {
           op: "update_props",
-          pageSlug: "/",
+          pageSlug: "/faq",
           blockId: faqBlock.id,
           patch: { items: [...existingItems, ...newItems] }
         }
       ]
     },
-    { defaultSlug: "/", currentPage, userMessage: "add 3 questions about storage" }
+    { defaultSlug: "/faq", currentPage, userMessage: "add 3 questions about storage" }
   ) as { ops: Array<Record<string, unknown>> }
 
   // Should be converted to 3 add_item ops (not 1 update_props)

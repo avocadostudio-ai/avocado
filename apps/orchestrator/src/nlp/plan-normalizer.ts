@@ -471,7 +471,8 @@ function remapListItemPatchKeys(args: { patchRaw: unknown; allowedKeys: string[]
 export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: string; currentPage?: PageDoc; userMessage?: string }) {
   if (!input || typeof input !== "object") return input
   const root = input as Record<string, unknown>
-  const ops = Array.isArray(root.ops) ? root.ops : Array.isArray(root.operations) ? root.operations : []
+  const hasInlineOp = !Array.isArray(root.ops) && !Array.isArray(root.operations) && Boolean(root.op ?? root.operation ?? root.action ?? root.kind)
+  const ops = Array.isArray(root.ops) ? root.ops : Array.isArray(root.operations) ? root.operations : hasInlineOp ? [root] : []
   const userMessage = (args?.userMessage ?? "").toLowerCase()
   const requestedRoute = firstRouteMention(args?.userMessage)
   const routeMentions = extractRouteMentions(args?.userMessage)
@@ -1362,5 +1363,9 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     })
   }
 
+  if (hasInlineOp) {
+    if (reorderedOps.length === 1) return reorderedOps[0]
+    return { ...root, ops: reorderedOps }
+  }
   return { ...root, ops: reorderedOps }
 }
