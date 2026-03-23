@@ -31,7 +31,7 @@ function resolveMediaUrl(field: unknown): string {
  * Dynamic Zone entries have __component: "blocks.hero" and all
  * component fields inline.
  */
-function dzComponentToBlock(entry: Record<string, unknown>): BlockInstance | null {
+function dzComponentToBlock(entry: Record<string, unknown>, index: number): BlockInstance | null {
   const component = entry.__component as string | undefined
   if (!component?.startsWith("blocks.")) return null
 
@@ -44,6 +44,8 @@ function dzComponentToBlock(entry: Record<string, unknown>): BlockInstance | nul
 
   for (const [key, value] of Object.entries(entry)) {
     if (key === "id" || key === "__component") continue
+    // Strapi returns null for empty fields — skip them so Zod treats them as absent (optional)
+    if (value === null || value === undefined) continue
     if (imageFields.has(key)) {
       props[key] = resolveMediaUrl(value)
     } else {
@@ -52,7 +54,7 @@ function dzComponentToBlock(entry: Record<string, unknown>): BlockInstance | nul
   }
 
   return {
-    id: String(entry.id ?? ""),
+    id: entry.id ? `${entry.id}-${index}` : String(index),
     type: blockType,
     props,
   }
@@ -66,8 +68,8 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
   const rawBlocks = entry.blocks as Array<Record<string, unknown>> | undefined
   const blocks: BlockInstance[] = []
   if (Array.isArray(rawBlocks)) {
-    for (const raw of rawBlocks) {
-      const block = dzComponentToBlock(raw)
+    for (let i = 0; i < rawBlocks.length; i++) {
+      const block = dzComponentToBlock(rawBlocks[i], i)
       if (block) blocks.push(block)
     }
   }
@@ -85,7 +87,7 @@ function strapiEntryToPageDoc(entry: StrapiItem): PageDoc | null {
 export async function getStrapiPage(slug: string): Promise<PageDoc | null> {
   try {
     const res = await strapiFetch<StrapiResponse<StrapiItem[]>>(
-      `/pages?filters[slug][$eq]=${encodeURIComponent(slug)}&populate=*`
+      `/pages?filters[slug][$eq]=${encodeURIComponent(slug)}&populate[blocks][populate]=*`
     )
     if (!res.data || res.data.length === 0) return null
     return strapiEntryToPageDoc(res.data[0])
@@ -108,7 +110,7 @@ export async function getStrapiSlugs(): Promise<string[]> {
 export async function getStrapiPages(): Promise<PageDoc[]> {
   try {
     const res = await strapiFetch<StrapiResponse<StrapiItem[]>>(
-      "/pages?populate=*&pagination[pageSize]=100"
+      "/pages?populate[blocks][populate]=*&pagination[pageSize]=100"
     )
     return res.data.map(strapiEntryToPageDoc).filter((p): p is PageDoc => p !== null)
   } catch (err) {
