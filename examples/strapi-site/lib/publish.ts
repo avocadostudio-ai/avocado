@@ -1,17 +1,6 @@
 import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
-
-/** Get image fields for a block type */
-function getImageFields(blockType: string): Set<string> {
-  const meta = getAllBlockMeta()[blockType]
-  if (!meta) return new Set()
-  const result = new Set<string>()
-  for (const [key, fm] of Object.entries(meta.fields)) {
-    if (fm.kind === "image") result.add(key)
-  }
-  return result
-}
+import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
 
 /** Strapi plural API name: Hero → heroes, CTA → ctas, FAQ → faqs */
 function toStrapiPlural(blockType: string): string {
@@ -19,6 +8,18 @@ function toStrapiPlural(blockType: string): string {
   if (lower.endsWith("s")) return lower + "es"
   if (lower.endsWith("y") && !/[aeiou]y$/i.test(lower)) return lower.slice(0, -1) + "ies"
   return lower + "s"
+}
+
+/** Reject URLs pointing at private/loopback addresses. */
+function isSafeImageUrl(raw: string): boolean {
+  let parsed: URL
+  try { parsed = new URL(raw) } catch { return false }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
+  const h = parsed.hostname
+  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
+  if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
+  return true
 }
 
 /** Upload an image URL to Strapi media library, return the media ID */
@@ -31,6 +32,7 @@ async function ensureMediaAsset(
 
   const promise = (async () => {
     if (!imageUrl.startsWith("http")) return null
+    if (!isSafeImageUrl(imageUrl)) return null
 
     try {
       const imageRes = await fetch(imageUrl)
@@ -106,11 +108,12 @@ export function createStrapiPublishHandler(): OnPublishFn {
           blockIds.push(created.data.id)
         }
 
-        // Upsert the page
+        // Upsert the page with blocks stored as JSON
         const pageData: Record<string, unknown> = {
           slug: page.slug,
           title: page.title,
           pageId: page.id,
+          blocks: page.blocks.map((b) => ({ id: b.id, type: b.type, props: b.props })),
           ...(page.meta ? { pageMeta: page.meta } : {}),
         }
 
