@@ -221,8 +221,10 @@ export function getSessionDraft(session: string) {
   let sessionMap = draftPages.get(session)
   if (!sessionMap) {
     sessionMap = new Map<string, PageDoc>()
-    // Keep legacy/default sessions seeded from published pages for demo compatibility.
-    // Site-scoped sessions (<siteId>::<session>) start empty and are expected to be bootstrapped explicitly.
+    // Legacy/default sessions are seeded from published pages so the orchestrator can
+    // serve content immediately. The editor's bootstrapFromSite() will overwrite this
+    // with the site's actual published-content.json on first load.
+    // Site-scoped sessions (<siteId>::<session>) start empty and are bootstrapped explicitly.
     if (!session.includes("::")) {
       for (const [slug, page] of publishedPages) {
         const copy = structuredClone(page)
