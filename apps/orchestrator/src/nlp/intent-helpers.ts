@@ -118,7 +118,7 @@ export function parseCreatePageRequest(message: string) {
   }
 
   // "page called/named/titled <PageName>"
-  const calledPage = lower.match(/\bpages?\s+(?:called|named|titled)\s+['"]?([a-z][a-z0-9 ]{1,40}?)['"]?(?:\s|$)/)
+  const calledPage = lower.match(/\bpages?\s+(?:called|named|titled)\s+['"]?([a-z][a-z0-9 ]{1,40})['"]?$/)
   if (calledPage) {
     const seed = toSeedSlug(calledPage[1].trim())
     if (seed) return `/${seed}`

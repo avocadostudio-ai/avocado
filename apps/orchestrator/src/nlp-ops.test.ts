@@ -66,7 +66,7 @@ test("parseCreatePageRequest prompt matrix", () => {
     { prompt: "create new About Us page", expected: "/about-us" },
     { prompt: "create a Services page", expected: "/services" },
     { prompt: "add page called Our Team", expected: "/our-team" },
-    { prompt: "create page named Pricing", expected: "/pricing" },
+    { prompt: "create page named Reviews", expected: "/reviews" },
     { prompt: 'create a new page "Test"', expected: "/test" },
     { prompt: "create a new page \"About Us\"", expected: "/about-us" },
     { prompt: "add page 'Our Services'", expected: "/our-services" },
@@ -934,6 +934,81 @@ test("compileDeterministicPlan creates page on create-page prompts", () => {
   if (plan?.ops[0] && "page" in plan.ops[0]) {
     const op = plan.ops[0] as { page: { slug: string } }
     assert.equal(op.page.slug, "/test-suite-page")
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Prompt-to-page integration: verifies the full chain from natural-language
+// prompt → parseCreatePageRequest → compileDeterministicPlan → page slug + title.
+// These catch regressions where slug extraction fails and the user sees
+// "/new-page" or "New Page" instead of the intended page name.
+// ---------------------------------------------------------------------------
+test("compileDeterministicPlan: create page with quoted name produces correct slug and title", () => {
+  const currentPage = demoPublishedPages()[0]
+  const cases = [
+    { message: 'create a new page "Test"', expectedSlug: "/test", expectedTitle: "Test" },
+    { message: 'create a new page "About Us"', expectedSlug: "/about-us", expectedTitle: "About Us" },
+    { message: "add page 'Our Services'", expectedSlug: "/our-services", expectedTitle: "Our Services" },
+  ]
+  for (const { message, expectedSlug, expectedTitle } of cases) {
+    const plan = compileDeterministicPlan({
+      session: "test-suite",
+      intent: { action: "add" },
+      message,
+      slug: "/",
+      currentPage
+    })
+    assert.ok(plan, `no plan for: ${message}`)
+    assert.equal(plan?.intent, "edit_plan", message)
+    assert.equal(plan?.ops[0]?.op, "create_page", message)
+    if (plan?.ops[0]?.op === "create_page") {
+      assert.equal(plan.ops[0].page.slug, expectedSlug, `slug mismatch for: ${message}`)
+      assert.equal(plan.ops[0].page.title, expectedTitle, `title mismatch for: ${message}`)
+    }
+  }
+})
+
+test("compileDeterministicPlan: create page with natural-language name (no route, no quotes)", () => {
+  const currentPage = demoPublishedPages()[0]
+  const cases = [
+    { message: "Create a new About Us page", expectedSlug: "/about-us", expectedTitle: "About Us" },
+    { message: "Add a Contact page", expectedSlug: "/contact", expectedTitle: "Contact" },
+    { message: "create a Services page", expectedSlug: "/services", expectedTitle: "Services" },
+    { message: "add page called Our Team", expectedSlug: "/our-team", expectedTitle: "Our Team" },
+    { message: "create page named Reviews", expectedSlug: "/reviews", expectedTitle: "Reviews" },
+  ]
+  for (const { message, expectedSlug, expectedTitle } of cases) {
+    const plan = compileDeterministicPlan({
+      session: "test-suite",
+      intent: { action: "add" },
+      message,
+      slug: "/",
+      currentPage
+    })
+    assert.ok(plan, `no plan for: ${message}`)
+    assert.equal(plan?.intent, "edit_plan", message)
+    assert.equal(plan?.ops[0]?.op, "create_page", message)
+    if (plan?.ops[0]?.op === "create_page") {
+      assert.equal(plan.ops[0].page.slug, expectedSlug, `slug mismatch for: ${message}`)
+      assert.equal(plan.ops[0].page.title, expectedTitle, `title mismatch for: ${message}`)
+    }
+  }
+})
+
+test("compileDeterministicPlan: create page never produces /new-page for named pages", () => {
+  const currentPage = demoPublishedPages()[0]
+  // All of these have a clear page name — none should fall back to /new-page
+  const prompts = [
+    'create a new page "FAQ"',
+    "Create a new About Us page",
+    "add page called Pricing",
+    "create a Blog page",
+    "add page 'Team'",
+  ]
+  for (const message of prompts) {
+    const slug = parseCreatePageRequest(message)
+    assert.ok(slug, `no slug for: ${message}`)
+    assert.notEqual(slug, "/new-page", `fell back to /new-page for: ${message}`)
   }
 })
 
