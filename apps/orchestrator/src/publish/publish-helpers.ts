@@ -134,11 +134,23 @@ export async function loadPublishedSnapshotFromCommit(commit: string): Promise<P
   return pages
 }
 
-export async function listRestoreSnapshots(limit = 30): Promise<SnapshotDescriptor[]> {
+export async function listRestoreSnapshots(limit = 30, siteId?: string): Promise<SnapshotDescriptor[]> {
   const repoRoot = resolve(process.cwd(), "../..")
   const targetPath = "apps/site/lib/published-content.json"
   const cappedLimit = Math.max(1, Math.min(80, Math.floor(limit)))
-  const rawLog = (await runGit(["log", "--max-count", String(cappedLimit * 4), "--date=iso-strict", "--pretty=format:%H|%ad|%s", "--", targetPath], repoRoot)).stdout
+  const gitArgs = ["log", "--max-count", String(cappedLimit * 4), "--date=iso-strict", "--pretty=format:%H|%ad|%s"]
+  if (siteId) {
+    const normalised = siteId.trim().toLowerCase()
+    if (normalised === "avocado-stories" || normalised === "default") {
+      // Legacy commits use bare session key: "publish: session dev ..."
+      // The trailing space ensures we don't match scoped keys like "siteId::dev"
+      gitArgs.push("--grep=publish: session dev ")
+    } else {
+      gitArgs.push(`--grep=publish: session ${normalised}::`)
+    }
+  }
+  gitArgs.push("--", targetPath)
+  const rawLog = (await runGit(gitArgs, repoRoot)).stdout
   const lines = rawLog
     .split("\n")
     .map((line) => line.trim())

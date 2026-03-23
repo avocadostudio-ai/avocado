@@ -153,12 +153,14 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
         })
       }
 
+      const publishedSlugs = siteResult.slugs ?? slugs
+      const pageNames = publishedSlugs.map((s) => s === "/" ? "Home" : s.replace(/^\//, ""))
       return {
         status: "ready" as const,
         session,
-        slugs: siteResult.slugs ?? slugs,
+        slugs: publishedSlugs,
         vercelState: "READY",
-        message: `Published ${slugs.length} page${slugs.length === 1 ? "" : "s"} to site.`
+        message: `Published ${pageNames.join(", ")} to site.`
       }
     }
 
@@ -273,10 +275,11 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
   })
 
   app.get("/restore/snapshots", async (request, reply) => {
-    const query = request.query as { limit?: string }
+    const query = request.query as { limit?: string; siteId?: string }
     const limit = query.limit ? Number(query.limit) : 30
+    const siteId = typeof query.siteId === "string" ? query.siteId.trim() : undefined
     try {
-      const snapshots = await listRestoreSnapshots(Number.isFinite(limit) ? limit : 30)
+      const snapshots = await listRestoreSnapshots(Number.isFinite(limit) ? limit : 30, siteId || undefined)
       return { snapshots }
     } catch (error) {
       return reply.code(500).send({ error: toErrorDetail(error) })

@@ -199,20 +199,7 @@ export function loadSiteListFromStorage(siteId: string) {
       return merged
     }
 
-    if (cleaned.length > 0) {
-      if (cleaned.length > 1) {
-        const migrated = cleaned.filter((site) => {
-          const isLegacyAvocado =
-            site.id === LEGACY_AVOCADO_SITE_ID &&
-            site.name === LEGACY_AVOCADO_SITE_NAME &&
-            (site.purpose === "" || site.purpose === LEGACY_AVOCADO_SITE_PURPOSE) &&
-            site.hosting === DEFAULT_SITE_HOSTING
-          return !isLegacyAvocado
-        })
-        if (migrated.length > 0) return mergePresets(migrated)
-      }
-      return mergePresets(cleaned)
-    }
+    if (cleaned.length > 0) return mergePresets(cleaned)
     return mergePresets(defaultSiteList(siteId))
   } catch {
     return defaultSiteList(siteId)
