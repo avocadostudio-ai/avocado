@@ -22,7 +22,7 @@ import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
 import { fieldAiSuggestions, fieldAiQuickActions } from "./lib/field-ai-suggestions"
-import { manifestUnavailableChanges } from "./lib/integration-context"
+import { manifestUnavailableChanges, withIntegrationContext } from "./lib/integration-context"
 import {
   DEBUG_MODE_STORAGE_KEY,
   MODEL_KEY_STORAGE_KEY,
@@ -1989,7 +1989,7 @@ function EditorPage({
               const res = await fetch(`${orchestrator}/ops`, {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ session, siteId, ops })
+                body: JSON.stringify(withIntegrationContext({ session, siteId, ops }, componentManifest.manifest))
               })
               const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string }
               if (res.ok && data.status === "applied") {

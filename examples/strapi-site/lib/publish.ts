@@ -14,6 +14,33 @@ function isSafeImageUrl(raw: string): boolean {
   return true
 }
 
+/** Check if a URL points to the same Strapi server */
+function isStrapiUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    const strapiParsed = new URL(STRAPI_URL)
+    return parsed.origin === strapiParsed.origin
+  } catch { return false }
+}
+
+/** Look up an existing Strapi media asset by its URL path, return its ID */
+async function findStrapiMediaByUrl(imageUrl: string): Promise<number | null> {
+  try {
+    const parsed = new URL(imageUrl)
+    // Strapi stores relative paths like /uploads/image.jpg
+    const urlPath = parsed.pathname
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (process.env.STRAPI_API_TOKEN) headers.Authorization = `Bearer ${process.env.STRAPI_API_TOKEN}`
+    const res = await fetch(
+      `${STRAPI_URL}/api/upload/files?filters[url][$eq]=${encodeURIComponent(urlPath)}`,
+      { headers }
+    )
+    if (!res.ok) return null
+    const data = (await res.json()) as Array<{ id: number }>
+    return data[0]?.id ?? null
+  } catch { return null }
+}
+
 /** Upload an image URL to Strapi media library, return the media ID */
 async function ensureMediaAsset(
   imageUrl: string,
@@ -23,7 +50,14 @@ async function ensureMediaAsset(
   if (cached) return cached
 
   const promise = (async () => {
-    if (!imageUrl.startsWith("http") || !isSafeImageUrl(imageUrl)) return null
+    if (!imageUrl.startsWith("http")) return null
+
+    // Image already in Strapi — look up by URL instead of re-uploading
+    if (isStrapiUrl(imageUrl)) {
+      return findStrapiMediaByUrl(imageUrl)
+    }
+
+    if (!isSafeImageUrl(imageUrl)) return null
     try {
       const imageRes = await fetch(imageUrl)
       if (!imageRes.ok) return null
