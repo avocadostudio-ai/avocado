@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T12:15:03.274Z",
+    "updatedAt": "2026-03-24T12:15:43.170Z",
     "blocks": [
       {
         "id": "166-0",
@@ -13,8 +13,8 @@
           "subheading": "Build amazing things",
           "ctaText": "Get Started",
           "ctaHref": "/about",
-          "imageUrl": "http://localhost:1337/uploads/photo_1476966502122_c26b7830def9_fdf36fcab9.jpeg",
-          "imageAlt": "photo-1476966502122-c26b7830def9",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774354540774_l9fo70.jpg",
+          "imageAlt": "make clock larger",
           "imagePosition": "right"
         }
       },
