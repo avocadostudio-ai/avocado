@@ -233,7 +233,7 @@ const LOCALHOST_GENERATED_RE =
 const LOCALHOST_GDRIVE_RE =
   /https?:\/\/localhost:\d+\/gdrive\/images\/([a-zA-Z0-9_-]+)/gi
 
-function findLocalhostImageUrls(pages: PageDoc[]): Map<string, string> {
+export function findLocalhostImageUrls(pages: PageDoc[]): Map<string, string> {
   const json = JSON.stringify(pages)
   const urlMap = new Map<string, string>()
   for (const match of json.matchAll(LOCALHOST_GENERATED_RE)) {
@@ -251,6 +251,86 @@ function rewriteImageUrlsInPages(pages: PageDoc[], urlMap: Map<string, string>):
     json = json.replaceAll(originalUrl, `/generated-images/${fileName}`)
   }
   return JSON.parse(json) as PageDoc[]
+}
+
+// ---------------------------------------------------------------------------
+// Inline assets for site-contract publish (base64-encoded generated images)
+// ---------------------------------------------------------------------------
+
+export type InlineAsset = {
+  /** base64-encoded image bytes */
+  data: string
+  /** MIME type, e.g. "image/png" */
+  mimeType: string
+  /** Original filename */
+  fileName: string
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+}
+
+/**
+ * Collect generated/gdrive images referenced by localhost URLs in pages,
+ * read them from disk, and return a map of originalUrl → base64 InlineAsset.
+ * Missing files are silently skipped.
+ */
+export async function collectInlineAssets(
+  pages: PageDoc[],
+  generatedImageDir: string
+): Promise<Record<string, InlineAsset>> {
+  const urlMap = findLocalhostImageUrls(pages)
+  if (urlMap.size === 0) return {}
+
+  const assets: Record<string, InlineAsset> = {}
+  for (const [originalUrl, fileName] of urlMap) {
+    const filePath = resolve(generatedImageDir, fileName)
+    try {
+      const bytes = await readFile(filePath)
+      const ext = fileName.split(".").pop()?.toLowerCase() ?? "png"
+      assets[originalUrl] = {
+        data: bytes.toString("base64"),
+        mimeType: MIME_BY_EXT[ext] ?? "image/png",
+        fileName,
+      }
+    } catch {
+      // File missing on disk — skip gracefully (same as git publish)
+    }
+  }
+  return assets
+}
+
+/**
+ * Record a publish snapshot in git history (commit only, no push).
+ * Used after site-contract publishes so version history can find them.
+ * Best-effort: failures are silently ignored.
+ */
+export async function recordPublishSnapshot(session: string, pages: PageDoc[]): Promise<string | undefined> {
+  const repoRoot = resolve(process.cwd(), "../..")
+  const targetPath = "apps/site/lib/published-content.json"
+  const absoluteTargetPath = resolve(repoRoot, targetPath)
+  try {
+    const payload = `${JSON.stringify(pages, null, 2)}\n`
+    await writeFile(absoluteTargetPath, payload, "utf8")
+    await runGit(["add", targetPath], repoRoot)
+    // Check if there are staged changes
+    try {
+      await runGit(["diff", "--cached", "--quiet", "--", targetPath], repoRoot)
+      return undefined // no changes
+    } catch {
+      // Has staged changes — commit them
+    }
+    const commitMessage = `publish: session ${session} ${new Date().toISOString()}`
+    await runGit(["commit", "-m", commitMessage, "--", targetPath], repoRoot)
+    const rev = await runGit(["rev-parse", "HEAD"], repoRoot)
+    return rev.stdout.trim()
+  } catch {
+    return undefined
+  }
 }
 
 function sanitizeBranch(input: string) {
