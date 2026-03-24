@@ -345,7 +345,7 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
     if (!process.env.GOOGLE_GENAI_API_KEY) {
       return reply.code(503).send({ error: "GOOGLE_GENAI_API_KEY is not configured" })
     }
-    const body = (request.body ?? {}) as { prompt?: string; chatId?: string; aspectRatio?: string; stream?: boolean; referenceImageUrl?: string }
+    const body = (request.body ?? {}) as { prompt?: string; chatId?: string; aspectRatio?: string; stream?: boolean; referenceImageUrl?: string; referenceImageUrls?: string[] }
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
     if (!prompt) return reply.code(400).send({ error: "prompt is required" })
 
@@ -380,22 +380,34 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
         geminiChatSessions.set(chatId, { chat, lastUsed: Date.now() })
       }
 
-      // Build message — include reference image for editing on first message
+      // Build message — include reference images on first message (Gemini supports up to 14)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let messageContent: any = prompt
-      if (body.referenceImageUrl && !body.chatId) {
-        try {
-          const imgRes = await fetch(body.referenceImageUrl, { signal: AbortSignal.timeout(8000) })
-          if (imgRes.ok) {
-            const imgBuf = Buffer.from(await imgRes.arrayBuffer())
-            const mimeType = imgRes.headers.get("content-type") ?? "image/png"
-            messageContent = [
-              { text: prompt },
-              { inlineData: { mimeType, data: imgBuf.toString("base64") } }
-            ]
+      if (!body.chatId) {
+        const allUrls = [body.referenceImageUrl, ...(Array.isArray(body.referenceImageUrls) ? body.referenceImageUrls : [])]
+          .filter((u): u is string => typeof u === "string" && u.trim().length > 0)
+          .slice(0, 14)
+
+        if (allUrls.length > 0) {
+          const results = await Promise.allSettled(
+            allUrls.map(async (url) => {
+              const imgRes = await fetch(url, { signal: AbortSignal.timeout(8000) })
+              if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`)
+              const imgBuf = Buffer.from(await imgRes.arrayBuffer())
+              if (imgBuf.byteLength > 5 * 1024 * 1024) throw new Error("Image too large (>5MB)")
+              const mimeType = imgRes.headers.get("content-type") ?? "image/png"
+              return { inlineData: { mimeType, data: imgBuf.toString("base64") } }
+            })
+          )
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const inlineParts: any[] = []
+          for (const r of results) {
+            if (r.status === "fulfilled") inlineParts.push(r.value)
+            else app.log.warn({ event: "gemini_ref_image_fetch_failed", error: r.reason instanceof Error ? r.reason.message : String(r.reason) }, "Failed to fetch reference image — skipping")
           }
-        } catch (imgErr) {
-          app.log.warn({ event: "gemini_ref_image_fetch_failed", url: body.referenceImageUrl, error: imgErr instanceof Error ? imgErr.message : String(imgErr) }, "Failed to fetch reference image — falling back to text-only")
+          if (inlineParts.length > 0) {
+            messageContent = [{ text: prompt }, ...inlineParts]
+          }
         }
       }
 
