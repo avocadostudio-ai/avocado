@@ -84,8 +84,8 @@ export type PreviewBridgeCoreProps = {
 }
 
 export function PreviewBridgeCore(props: PreviewBridgeCoreProps) {
-  // When running standalone (no editor origin), render nothing — there's no parent to talk to.
-  if (!props.editorOrigin) return null
+  // When running standalone (no editor origin) or not embedded in an iframe, render nothing.
+  if (!props.editorOrigin || typeof window !== "undefined" && window.parent === window) return null
 
   return <PreviewBridgeCoreInner {...props} />
 }
