@@ -3,10 +3,10 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T20:56:12.596Z",
+    "updatedAt": "2026-03-24T21:30:20.139Z",
     "blocks": [
       {
-        "id": "276-0",
+        "id": "280-0",
         "type": "Hero",
         "props": {
           "heading": "Build with Strapi",
@@ -19,7 +19,7 @@
         }
       },
       {
-        "id": "8-1",
+        "id": "10-1",
         "type": "RichText",
         "props": {
           "title": "Why Choose Our Platform",
@@ -27,7 +27,7 @@
         }
       },
       {
-        "id": "8-2",
+        "id": "10-2",
         "type": "FAQAccordion",
         "props": {
           "title": "Common Questions",
@@ -48,7 +48,7 @@
         }
       },
       {
-        "id": "168-3",
+        "id": "170-3",
         "type": "CTA",
         "props": {
           "title": "Ready to Transform Your Content Strategy?",
@@ -63,23 +63,23 @@
     "id": "p_news",
     "slug": "/news",
     "title": "News",
-    "updatedAt": "2026-03-24T21:30:18.448Z",
+    "updatedAt": "2026-03-24T21:30:20.175Z",
     "blocks": [
       {
-        "id": "278-0",
+        "id": "282-0",
         "type": "Hero",
         "props": {
           "heading": "Transform Your Vision into Reality",
           "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
           "ctaText": "Explore Now",
           "ctaHref": "/",
-          "imageUrl": "http://localhost:1337/uploads/photo_1476966502122_c26b7830def9_fdf36fcab9.jpeg",
           "imageAlt": "photo-1476966502122-c26b7830def9",
-          "imagePosition": "right"
+          "imagePosition": "right",
+          "imageUrl": "http://localhost:1337/uploads/large_photo_1476966502122_c26b7830def9_fdf36fcab9.jpeg"
         }
       },
       {
-        "id": "2-1",
+        "id": "4-1",
         "type": "CardGrid",
         "props": {
           "title": "Explore more",
