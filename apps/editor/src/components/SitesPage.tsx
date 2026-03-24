@@ -153,6 +153,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc} />
               <div className="site-tile-meta">
                 <h2>{site.name}</h2>
+                <p className="site-local-url">{resolveSiteOrigin(site)}</p>
                 {site.purpose ? <p className="site-purpose">{compactPurposeText(site.purpose)}</p> : null}
                 {capability ? (
                   <p
