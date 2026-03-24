@@ -9,6 +9,7 @@ export const siteConfigSchema = z.object({
   name: z.string().optional(),
   logo: z.string().optional(),
   navLabels: z.record(z.string(), z.string()).optional(), // slug → custom label, e.g. { "/pricing": "Plans & Pricing" }
+  navGroups: z.record(z.string(), z.array(z.string())).optional(), // parent label → child slugs, e.g. { "Products": ["/bananas", "/cherries"] }
 })
 export type SiteConfig = z.infer<typeof siteConfigSchema>
 
@@ -163,7 +164,8 @@ const updateSiteConfigSchema = z.object({
   patch: z.object({
     name: z.string().optional(),
     logo: z.string().optional(),
-    navLabels: z.record(z.string(), z.string()).optional()
+    navLabels: z.record(z.string(), z.string()).optional(),
+    navGroups: z.record(z.string(), z.array(z.string())).optional(),
   })
 })
 

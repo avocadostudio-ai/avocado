@@ -3,22 +3,33 @@
 import { useState, useRef, useEffect, useCallback, useId } from "react"
 import { BlockImage } from "../_shared"
 
-type NavLink = { label: string; href: string }
+type NavLink = { label: string; href?: string; children?: NavLink[] }
+
+function ChevronDown({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export function SiteHeader(props: Record<string, unknown>) {
   const siteName = String(props.siteName ?? "Site")
   const logoUrl = String(props.logoUrl ?? "/logos/default.svg")
   const activePath = typeof props.activePath === "string" ? props.activePath : undefined
   const links: NavLink[] = Array.isArray(props.links)
-    ? (props.links as NavLink[]).filter((l) => l && typeof l.label === "string" && typeof l.href === "string")
+    ? (props.links as NavLink[]).filter(
+        (l) => l && typeof l.label === "string" && (typeof l.href === "string" || Array.isArray(l.children))
+      )
     : []
 
   const [isOpen, setIsOpen] = useState(false)
+  const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<HTMLButtonElement | null>(null)
   const menuId = useId()
 
-  const close = useCallback(() => setIsOpen(false), [])
+  const close = useCallback(() => { setIsOpen(false); setExpandedGroup(null) }, [])
   const toggle = useCallback(() => setIsOpen((v) => !v), [])
 
   // Close on popstate (SPA navigation)
@@ -56,11 +67,14 @@ export function SiteHeader(props: Record<string, unknown>) {
     }
   }, [isOpen])
 
-  const isActive = (href: string) => {
-    if (!activePath) return false
+  const isActive = (href: string | undefined) => {
+    if (!activePath || !href) return false
     const clean = href.split("?")[0]
     return clean === activePath
   }
+
+  const hasActiveChild = (link: NavLink) =>
+    link.children?.some((c) => isActive(c.href)) ?? false
 
   return (
     <>
@@ -70,19 +84,50 @@ export function SiteHeader(props: Record<string, unknown>) {
             <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" />
             <span className="site-brand-text">{siteName}</span>
           </a>
+
+          {/* Desktop nav */}
           <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
-            {links.map((link, i) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={isActive(link.href) ? "is-active" : undefined}
-                data-editable-target={`links[${i}].label`}
-                data-editable-target-label={`links[${i}].label`}
-              >
-                {link.label}
-              </a>
-            ))}
+            {links.map((link, i) =>
+              link.children?.length ? (
+                <div key={`group-${i}`} className="site-nav-dropdown">
+                  <button
+                    type="button"
+                    className={`site-nav-dropdown-trigger${hasActiveChild(link) ? " is-active" : ""}`}
+                    data-editable-target={`links[${i}].label`}
+                    data-editable-target-label={`links[${i}].label`}
+                  >
+                    {link.label}
+                    <ChevronDown className="site-nav-chevron" />
+                  </button>
+                  <div className="site-nav-dropdown-menu">
+                    {link.children.map((child, j) => (
+                      <a
+                        key={child.href}
+                        href={child.href}
+                        className={isActive(child.href) ? "is-active" : undefined}
+                        data-editable-target={`links[${i}].children[${j}].label`}
+                        data-editable-target-label={`links[${i}].children[${j}].label`}
+                      >
+                        {child.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className={isActive(link.href) ? "is-active" : undefined}
+                  data-editable-target={`links[${i}].label`}
+                  data-editable-target-label={`links[${i}].label`}
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </nav>
+
+          {/* Mobile menu */}
           <div ref={menuRef} className={`site-mobile-menu${isOpen ? " is-open" : ""}`}>
             <button
               ref={toggleRef}
@@ -101,17 +146,47 @@ export function SiteHeader(props: Record<string, unknown>) {
             </button>
             {isOpen ? (
               <nav id={menuId} className="site-nav-links site-nav-links-mobile" aria-label="Mobile primary">
-                {links.map((link, i) => (
-                  <a
-                    key={`mobile-${link.href}`}
-                    href={link.href}
-                    className={isActive(link.href) ? "is-active" : undefined}
-                    data-editable-target={`links[${i}].label`}
-                    onClick={close}
-                  >
-                    {link.label}
-                  </a>
-                ))}
+                {links.map((link, i) =>
+                  link.children?.length ? (
+                    <div key={`mobile-group-${i}`} className="site-nav-mobile-group">
+                      <button
+                        type="button"
+                        className={`site-nav-mobile-group-trigger${hasActiveChild(link) ? " is-active" : ""}`}
+                        aria-expanded={expandedGroup === i}
+                        onClick={() => setExpandedGroup(expandedGroup === i ? null : i)}
+                        data-editable-target={`links[${i}].label`}
+                      >
+                        {link.label}
+                        <ChevronDown className={`site-nav-chevron${expandedGroup === i ? " is-expanded" : ""}`} />
+                      </button>
+                      {expandedGroup === i ? (
+                        <div className="site-nav-mobile-group-children">
+                          {link.children.map((child, j) => (
+                            <a
+                              key={`mobile-${child.href}`}
+                              href={child.href}
+                              className={isActive(child.href) ? "is-active" : undefined}
+                              data-editable-target={`links[${i}].children[${j}].label`}
+                              onClick={close}
+                            >
+                              {child.label}
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <a
+                      key={`mobile-${link.href}`}
+                      href={link.href}
+                      className={isActive(link.href) ? "is-active" : undefined}
+                      data-editable-target={`links[${i}].label`}
+                      onClick={close}
+                    >
+                      {link.label}
+                    </a>
+                  )
+                )}
               </nav>
             ) : null}
           </div>
