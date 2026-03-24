@@ -2872,6 +2872,18 @@ export async function runChatPipeline(
     }
   }
 
+  // Guard: if the planner returned content_answer for a message that clearly
+  // requests an edit, discard the plan so the retry loop runs with the
+  // original (non-downgraded) model.  This prevents the fast model from
+  // hallucinating "already set" when the user explicitly asks to update text.
+  if (
+    (initialPlan as EditPlan | null)?.intent === "content_answer" &&
+    /\b(update|change|set|replace|make|rewrite|edit|rename|translate|fix)\b/i.test(plannerMessage)
+  ) {
+    ctx.log.info({ event: "content_answer_rejected_for_edit", model: modelUsed }, "Rejected content_answer for an edit request — retrying with full model")
+    ;(initialPlan as unknown) = null
+  }
+
   markPlanningStart()
 
   // Streamed per-op apply: apply ops as they stream from the LLM, so the user

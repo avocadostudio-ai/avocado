@@ -137,6 +137,11 @@ siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
+// Track sessions that were just restored so bootstrap doesn't overwrite them
+const recentlyRestoredSessions = new Set<string>()
+export function markRecentlyRestored(session: string) { recentlyRestoredSessions.add(session) }
+export function consumeRecentlyRestored(session: string): boolean { return recentlyRestoredSessions.delete(session) }
+
 // ---------------------------------------------------------------------------
 // Persistence config constants
 // ---------------------------------------------------------------------------
