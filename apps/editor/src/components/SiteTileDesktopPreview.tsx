@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
-export function SiteTileDesktopPreview(args: { title: string; src: string }) {
+export function SiteTileDesktopPreview(args: { title: string; src: string; onClick?: () => void }) {
   const shellRef = useRef<HTMLDivElement>(null)
   const [shellWidth, setShellWidth] = useState(0)
   const virtualWidth = 1200
@@ -20,7 +20,7 @@ export function SiteTileDesktopPreview(args: { title: string; src: string }) {
   const scaledHeight = Math.max(170, Math.ceil(virtualHeight * scale))
 
   return (
-    <div ref={shellRef} className="site-tile-preview" style={{ height: scaledHeight }}>
+    <div ref={shellRef} className="site-tile-preview" style={{ height: scaledHeight, cursor: args.onClick ? "pointer" : undefined }} onClick={args.onClick}>
       <iframe
         title={args.title}
         src={args.src}

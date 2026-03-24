@@ -130,12 +130,17 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           <button
             type="button"
             className="primary-btn"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => {
               sites.resetNewSiteForm()
               setAddAiTab("overview")
               sites.setShowSiteModal(true)
             }}
           >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style={{ stroke: "currentColor", fill: "none", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }}>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             Add site
           </button>
         </div>
@@ -150,25 +155,25 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           }, resolveSiteOrigin(site))
           return (
             <article key={site.id} className="site-tile">
-              <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc} />
+              <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc} onClick={() => sites.openEditorForSite(site.id)} />
               <div className="site-tile-meta">
-                <h2>{site.name}</h2>
+                <h2>
+                  {site.name}
+                  {capability ? (
+                    <span
+                      className={
+                        capability.status === "ready"
+                          ? "site-status-dot site-status-dot-ready"
+                          : capability.status === "degraded"
+                            ? "site-status-dot site-status-dot-degraded"
+                            : "site-status-dot"
+                      }
+                      title={capability.status === "ready" ? "Editing ready" : capability.status === "degraded" ? `Limited editing: ${capability.reason}` : "Checking..."}
+                    />
+                  ) : null}
+                </h2>
                 <p className="site-local-url">{resolveSiteOrigin(site)}</p>
                 {site.purpose ? <p className="site-purpose">{compactPurposeText(site.purpose)}</p> : null}
-                {capability ? (
-                  <p
-                    className={
-                      capability.status === "ready"
-                        ? "site-capability site-capability-ready"
-                        : capability.status === "degraded"
-                          ? "site-capability site-capability-degraded"
-                          : "site-capability"
-                    }
-                    title={capability.reason}
-                  >
-                    {capability.summary}
-                  </p>
-                ) : null}
                 <div className="site-tile-actions">
                   <button type="button" className="secondary-btn site-config-btn" onClick={() => sites.setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`}>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
