@@ -203,12 +203,12 @@ test("minimalPlannerContextPack: trims recentSuccessfulEdits to 1", () => {
   assert.equal(result.recentSuccessfulEdits.length, 1)
 })
 
-test("minimalPlannerContextPack: nulls out resolvedReferences", () => {
+test("minimalPlannerContextPack: preserves resolvedReferences", () => {
   const pack = makeContextPack("b_hero")
   pack.resolvedReferences = { target: { id: "b1" } as any, anchor: null, mentionedBlocks: [{ id: "b2" } as any] }
   const result = minimalPlannerContextPack({ contextPack: pack })
-  assert.equal(result.resolvedReferences.target, null)
-  assert.deepEqual(result.resolvedReferences.mentionedBlocks, [])
+  assert.deepEqual(result.resolvedReferences.target, { id: "b1" })
+  assert.deepEqual(result.resolvedReferences.mentionedBlocks, [{ id: "b2" }])
 })
 
 test("minimalPlannerContextPack: returns full pack when no block selected", () => {
