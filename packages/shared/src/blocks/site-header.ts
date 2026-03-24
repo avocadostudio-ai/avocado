@@ -2,13 +2,18 @@ import { z } from "zod"
 import { registerBlock } from "./_registry.ts"
 import { f } from "./_helpers.ts"
 
+const navLinkLeaf = z.object({
+  label: z.string().min(1),
+  href: z.string().min(1),
+})
+
 registerBlock("SiteHeader", {
   schema: z.object({
     siteName: z.string().min(1),
     logoUrl: z.string().min(1),
-    links: z.array(z.object({
-      label: z.string().min(1),
-      href: z.string().min(1),
+    links: z.array(navLinkLeaf.extend({
+      href: z.string().optional(),         // parent dropdown items have no href
+      children: z.array(navLinkLeaf).optional(), // 2nd-level dropdown items
     })).min(1),
   }),
   meta: {

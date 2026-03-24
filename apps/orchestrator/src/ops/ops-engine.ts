@@ -19,6 +19,7 @@ import {
   toErrorDetail as _unifiedToErrorDetail
 } from "../errors.js"
 import type { ContentSource } from "../state/content-source.js"
+import { acquireSessionLock } from "../state/session-lock.js"
 import {
   getSessionDraft,
   orderSlugsHomeFirst,
@@ -174,6 +175,13 @@ export type SkippedOperation = {
   blockId?: string
 }
 
+export type FuzzyMatch = {
+  requestedId: string
+  resolvedId: string
+  resolvedIndex: number
+  strategy: "strip_copy_suffix" | "type_prefix"
+}
+
 export type ApplyOpsOptions = {
   componentsManifest?: BlockManifest
   contentSource?: ContentSource
@@ -202,6 +210,48 @@ function _nextUniqueBlockId(blocks: Array<{ id: string }>, preferred: string) {
   let i = 1
   while (blocks.some((b) => b.id === `${root}_${i}`)) i += 1
   return `${root}_${i}`
+}
+
+/**
+ * Resolve a blockId to its index in the blocks array.
+ * Exact match first, then fuzzy fallback:
+ *  1. Strip trailing `_copy`, `_copy_N` suffix and retry exact match
+ *  2. Match by block-type prefix — only when a single block matches (rejects ambiguous)
+ *
+ * Pushes a FuzzyMatch entry when a fallback strategy succeeds.
+ */
+function _resolveBlockIndex(blocks: Array<{ id: string; type?: string }>, blockId: string, fuzzyMatches?: FuzzyMatch[]): number {
+  // Exact match
+  const exact = blocks.findIndex((b) => b.id === blockId)
+  if (exact !== -1) return exact
+
+  // Fuzzy 1: strip _copy / _copy_N suffix and retry
+  const stripped = blockId.replace(/_copy(?:_\d+)?$/, "")
+  if (stripped !== blockId) {
+    const idx = blocks.findIndex((b) => b.id === stripped)
+    if (idx !== -1) {
+      fuzzyMatches?.push({ requestedId: blockId, resolvedId: blocks[idx].id, resolvedIndex: idx, strategy: "strip_copy_suffix" })
+      return idx
+    }
+  }
+
+  // Fuzzy 2: match by block-type prefix — reject if ambiguous (>1 match)
+  const typeMatch = blockId.match(/^b_([a-z]+)/i)
+  if (typeMatch) {
+    const typePrefix = `b_${typeMatch[1].toLowerCase()}_`
+    const matches: number[] = []
+    for (let i = 0; i < blocks.length; i += 1) {
+      if (blocks[i].id.startsWith(typePrefix)) matches.push(i)
+    }
+    if (matches.length === 1) {
+      const idx = matches[0]
+      fuzzyMatches?.push({ requestedId: blockId, resolvedId: blocks[idx].id, resolvedIndex: idx, strategy: "type_prefix" })
+      return idx
+    }
+    // Ambiguous: >1 block of same type — don't guess
+  }
+
+  return -1
 }
 
 function _nextDuplicateSlug(candidateMap: Map<string, PageDoc>, sourceSlug: string) {
@@ -323,6 +373,15 @@ export function validateOperations(ops: unknown[]): Operation[] {
 // ---------------------------------------------------------------------------
 
 export async function applyOpsAtomically(session: string, ops: Operation[], options?: ApplyOpsOptions) {
+  const release = await acquireSessionLock(session)
+  try {
+    return await _applyOpsAtomicallyUnsafe(session, ops, options)
+  } finally {
+    release()
+  }
+}
+
+async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], options?: ApplyOpsOptions) {
   const manifestByType = new Map<string, BlockDefinition>()
   if (options?.componentsManifest) {
     for (const component of options.componentsManifest.blocks) {
@@ -342,10 +401,22 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
   const touchedSlugs = new Set<string>()
   const deletedSlugs = new Set<string>()
   const skippedOps: SkippedOperation[] = []
+  const fuzzyMatches: FuzzyMatch[] = []
   let orderChanged = false
   let configChanged = false
   const originalSiteConfig = cs ? await cs.getSiteConfig(session) : getSiteConfig(session)
   let stagedSiteConfig = originalSiteConfig
+
+  // Pre-check: reject plans with duplicate add_block IDs
+  const addBlockIds = new Set<string>()
+  for (const op of ops) {
+    if (op.op === "add_block") {
+      if (addBlockIds.has(op.block.id)) {
+        throw new OperationError(`Duplicate block id "${op.block.id}" in plan — each add_block must use a unique id`, { category: "schema_violation" })
+      }
+      addBlockIds.add(op.block.id)
+    }
+  }
 
   for (let opIndex = 0; opIndex < ops.length; opIndex += 1) {
     const op = ops[opIndex]
@@ -355,6 +426,9 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
       if (op.patch.logo !== undefined) merged.logo = op.patch.logo
       if (op.patch.navLabels !== undefined) {
         merged.navLabels = { ...(stagedSiteConfig.navLabels ?? {}), ...op.patch.navLabels }
+      }
+      if (op.patch.navGroups !== undefined) {
+        merged.navGroups = op.patch.navGroups // full replacement — groups are atomic
       }
       stagedSiteConfig = merged
       configChanged = true
@@ -550,7 +624,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "duplicate_block") {
-      const idx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const idx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const source = page.blocks[idx]
       if (isChrome(source.type)) throw new OperationError(`Cannot duplicate chrome block "${op.blockId}"`, { category: "schema_violation" })
@@ -577,7 +651,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "add_item") {
-      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const blockIdx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (blockIdx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const block = page.blocks[blockIdx]
       _requireManifestComponent(manifestByType, block.type, "add list items")
@@ -596,7 +670,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "update_item") {
-      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const blockIdx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (blockIdx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const block = page.blocks[blockIdx]
       _requireManifestComponent(manifestByType, block.type, "update list items")
@@ -618,7 +692,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "remove_item") {
-      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const blockIdx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (blockIdx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const block = page.blocks[blockIdx]
       _requireManifestComponent(manifestByType, block.type, "remove list items")
@@ -634,7 +708,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "move_item") {
-      const blockIdx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const blockIdx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (blockIdx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const block = page.blocks[blockIdx]
       _requireManifestComponent(manifestByType, block.type, "reorder list items")
@@ -658,7 +732,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "update_props") {
-      const idx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const idx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       const block = page.blocks[idx]
       _requireManifestComponent(manifestByType, block.type, "update props")
@@ -736,7 +810,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "remove_block") {
-      const idx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const idx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       if (isChrome(page.blocks[idx].type)) throw new OperationError(`Cannot remove chrome block "${op.blockId}"`, { category: "schema_violation" })
       _requireManifestComponent(manifestByType, page.blocks[idx].type, "remove block")
@@ -747,7 +821,7 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
     }
 
     if (op.op === "move_block") {
-      const idx = page.blocks.findIndex((b) => b.id === op.blockId)
+      const idx = _resolveBlockIndex(page.blocks, op.blockId, fuzzyMatches)
       if (idx === -1) throw new OperationError(`blockId ${op.blockId} not found`, { category: "not_found" })
       if (isChrome(page.blocks[idx].type)) throw new OperationError(`Cannot move chrome block "${op.blockId}"`, { category: "schema_violation" })
       _requireManifestComponent(manifestByType, page.blocks[idx].type, "move block")
@@ -789,7 +863,8 @@ export async function applyOpsAtomically(session: string, ops: Operation[], opti
   }
   return {
     appliedCount: Math.max(0, ops.length - skippedOps.length),
-    skippedOps
+    skippedOps,
+    fuzzyMatches
   }
 }
 
