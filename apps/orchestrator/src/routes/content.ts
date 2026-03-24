@@ -14,7 +14,8 @@ import {
   setSiteConfig,
   schedulePersistState,
   bumpVersion,
-  ensureHeroImageProps
+  ensureHeroImageProps,
+  consumeRecentlyRestored
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
 
@@ -57,6 +58,10 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     const scopedSession = scopedSessionKey(body.session, body.siteId)
     const overwrite = body.overwrite === true
     const draft = getSessionDraft(scopedSession)
+
+    if (overwrite && consumeRecentlyRestored(scopedSession)) {
+      return { status: "skipped", reason: "recently_restored", slugs: orderSlugsHomeFirst(Array.from(draft.keys())) }
+    }
 
     if (!overwrite && draft.size > 0) {
       return { status: "skipped", reason: "already_initialized", slugs: orderSlugsHomeFirst(Array.from(draft.keys())) }
