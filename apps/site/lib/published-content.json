@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T12:27:06.273Z",
+    "updatedAt": "2026-03-24T12:31:33.245Z",
     "blocks": [
       {
         "id": "226-0",
@@ -13,8 +13,8 @@
           "subheading": "Build amazing things",
           "ctaText": "Get Started",
           "ctaHref": "/about",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774355198009_apgxxd.jpg",
-          "imageAlt": "move clock to midnight and malke it larger",
+          "imageUrl": "https://images.unsplash.com/photo-1544507888-56d73eb6046e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8aGFwcHklMjB3b21hbnxlbnwxfDB8fHwxNzc0MzU1NDcwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+          "imageAlt": "woman smiling near tree outdoor during daytime",
           "imagePosition": "right"
         }
       },
