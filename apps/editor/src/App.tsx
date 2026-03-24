@@ -436,6 +436,8 @@ function EditorPage({
   const slugSyncedFromPreviewRef = useRef(false)
   const lastStructuralNoticeAtRef = useRef(0)
   const resizeStartRef = useRef<{ y: number; composerHeight: number } | null>(null)
+  const panelResizeRef = useRef<{ x: number; width: number } | null>(null)
+  const [chatWidth, setChatWidth] = useState<number | null>(null)
   const anchoredComposerRef = useRef<HTMLDivElement>(null)
   const shimmerTargetRef = useRef<{ blockId: string; editablePath: string } | null>(null)
   const shimmerActiveRef = useRef(false)
@@ -994,16 +996,26 @@ function EditorPage({
   }, [])
 
   useEffect(() => {
+    const clampChatWidth = (w: number) => Math.max(340, Math.min(w, window.innerWidth * 0.5))
     const onPointerMove = (event: PointerEvent) => {
-      const started = resizeStartRef.current
-      if (!started) return
-      const deltaY = event.clientY - started.y
-      const next = clampComposerHeight(started.composerHeight - deltaY)
-      setComposerHeight(next)
+      const composerStarted = resizeStartRef.current
+      if (composerStarted) {
+        const deltaY = event.clientY - composerStarted.y
+        const next = clampComposerHeight(composerStarted.composerHeight - deltaY)
+        setComposerHeight(next)
+      }
+      const panelStarted = panelResizeRef.current
+      if (panelStarted) {
+        const deltaX = event.clientX - panelStarted.x
+        setChatWidth(clampChatWidth(panelStarted.width - deltaX))
+      }
     }
     const onPointerUp = () => {
+      const wasPanelDrag = !!panelResizeRef.current
       resizeStartRef.current = null
+      panelResizeRef.current = null
       document.body.style.userSelect = ""
+      if (wasPanelDrag) document.body.classList.remove("panel-resizing")
     }
     window.addEventListener("pointermove", onPointerMove)
     window.addEventListener("pointerup", onPointerUp)
@@ -1014,7 +1026,10 @@ function EditorPage({
   }, [])
 
   useEffect(() => {
-    const onWindowResize = () => { setComposerHeight((prev) => clampComposerHeight(prev)) }
+    const onWindowResize = () => {
+      setComposerHeight((prev) => clampComposerHeight(prev))
+      setChatWidth((prev) => prev ? Math.max(340, Math.min(prev, window.innerWidth * 0.5)) : prev)
+    }
     window.addEventListener("resize", onWindowResize)
     return () => window.removeEventListener("resize", onWindowResize)
   }, [])
@@ -1136,7 +1151,7 @@ function EditorPage({
   }, [])
 
   return (
-    <div className="layout">
+    <div className="layout" style={chatWidth ? { "--chat-width": `${chatWidth}px` } as React.CSSProperties : undefined}>
       <aside className={chatPanelClassName} ref={chatPanelRef} style={chatPanelStyle}>
         <header className="chat-header">
           <div className="chat-header-top">
@@ -1621,6 +1636,20 @@ function EditorPage({
           />
         </footer>
       </aside>
+
+      <div
+        className="panel-splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize chat panel"
+        onPointerDown={(event) => {
+          const panel = chatPanelRef.current
+          if (!panel) return
+          panelResizeRef.current = { x: event.clientX, width: panel.offsetWidth }
+          document.body.style.userSelect = "none"
+          document.body.classList.add("panel-resizing")
+        }}
+      />
 
       <section className="preview">
         <iframe

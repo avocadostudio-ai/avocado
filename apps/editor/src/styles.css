@@ -34,8 +34,8 @@ body {
 .layout {
   height: 100vh;
   display: grid;
-  grid-template-columns: 1fr minmax(390px, clamp(450px, 20vw, 600px));
-  column-gap: 10px;
+  grid-template-columns: 1fr 0px var(--chat-width, clamp(450px, 20vw, 600px));
+  column-gap: 0;
   row-gap: 14px;
   padding: 0;
   overflow: hidden;
@@ -52,8 +52,37 @@ body {
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.panel-splitter {
   grid-column: 2;
   grid-row: 1;
+  position: relative;
+  width: 16px;
+  margin-left: -8px;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+body.panel-resizing iframe {
+  pointer-events: none;
+}
+
+.panel-splitter::before {
+  content: "";
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--line);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.panel-splitter:hover::before {
+  opacity: 0.7;
 }
 
 .chat-panel--chat {
@@ -3307,6 +3336,10 @@ textarea {
     height: 100vh;
     padding: 0;
     overflow: auto;
+  }
+
+  .panel-splitter {
+    display: none;
   }
 
   .chat-panel,
