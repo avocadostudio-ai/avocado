@@ -1047,12 +1047,11 @@ export function compileDeterministicPlan(args: {
   }
 
   const requestedCreateSlug = parseCreatePageRequest(message)
-  // When the user mentions "template" and page templates are available in site context,
-  // skip deterministic page creation and let the LLM planner use the template definitions.
+  // When the user mentions "template", skip deterministic page creation
+  // and let the LLM planner use the template definitions from site context.
   const mentionsTemplate = /\btemplate\b/i.test(cleanMessage)
-  const hasPageTemplates = /Page templates:\n/i.test(message)
   if ((intent.action === "add" || intent.action === "clarify" || intent.action === "update") && requestedCreateSlug) {
-    if (mentionsTemplate && hasPageTemplates) return null // defer to LLM planner
+    if (mentionsTemplate) return null // defer to LLM planner
     const createPlan = buildCreatePagePlan({ session, requestedSlug: requestedCreateSlug, assumptions, userMessage: message })
     if (createPlan) return createPlan
   }

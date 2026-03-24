@@ -129,7 +129,7 @@ function buildLightweightPlannerPrompt(opts: PlannerPromptOptions): string {
 // ---------------------------------------------------------------------------
 
 const HERO_IMAGE_URL_BASE =
-  "For Hero imageUrl, use any placeholder value (the system will resolve the actual image separately). If the user provides an explicit URL, use that URL. Never invent local image paths. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'."
+  "For imageUrl fields (Hero, CardGrid cards, or any block with images), use \"/hero-generated.svg\" as the placeholder value unless the user provides an explicit URL or you are calling an image tool. Never use external placeholder image services — these break the renderer. The system will resolve actual images separately. Do NOT mention a specific image source (e.g. Unsplash) in summary_for_user — just say 'image'."
 
 const HERO_IMAGE_URL_OPENAI_EXT =
   " When you need a placeholder image URL, use https://placehold.co/{width}x{height}.png?text={label} (e.g. https://placehold.co/768x512.png?text=Hero). Always include the .png extension — SVG format breaks Next.js image optimization. Never use via.placeholder.com — it is defunct."

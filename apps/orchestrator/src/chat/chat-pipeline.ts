@@ -2248,7 +2248,7 @@ export async function runChatPipeline(
 
   // Deterministic selected-text rewrite disabled — let AI planner handle creative rewrites.
 
-  const forcedCreatePlan = deterministicCreatePagePlan({ session: body.session, message: plannerMessage })
+  const forcedCreatePlan = deterministicCreatePagePlan({ session: body.session, message: plannerMessage, hasPageTemplates: !!siteContextBlock?.includes("Page templates:\n") })
   if (forcedCreatePlan) {
     markPlanningFinish()
     ctx.chatTelemetry.push({
