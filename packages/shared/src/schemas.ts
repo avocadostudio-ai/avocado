@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { blockInstanceSchema, blockInstanceSchemaLenient, type BlockInstance } from "./blocks/_registry.ts"
+import { blockInstanceSchema, blockInstanceSchemaLenient, IMAGE_PLACEHOLDER, type BlockInstance } from "./blocks/_registry.ts"
 
 // ---------------------------------------------------------------------------
 // Site config
@@ -247,7 +247,7 @@ export function demoPublishedPages(): PageDoc[] {
             subheading: "Edit content instantly with chat and live preview.",
             ctaText: "Start Editing",
             ctaHref: "/pricing",
-            imageUrl: "/hero-generated.svg",
+            imageUrl: IMAGE_PLACEHOLDER,
             imageAlt: "Abstract generated illustration for the hero section",
             imagePosition: "right"
           }
@@ -290,7 +290,7 @@ export function demoPublishedPages(): PageDoc[] {
             subheading: "Start free, upgrade when you're ready.",
             ctaText: "Choose Plan",
             ctaHref: "/",
-            imageUrl: "/hero-generated.svg",
+            imageUrl: IMAGE_PLACEHOLDER,
             imageAlt: "Abstract generated illustration for the pricing hero",
             imagePosition: "right"
           }
