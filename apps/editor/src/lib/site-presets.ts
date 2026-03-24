@@ -1,4 +1,4 @@
-import type { CmsMediaConfig, SiteConfig } from "./editor-types"
+import type { CmsMediaConfig, PageTemplate, SiteConfig } from "./editor-types"
 import { parseArrayOfStrings, parseString } from "./parse-utils"
 import { sanitizeSiteId } from "./validators"
 
@@ -45,6 +45,14 @@ export const AUTO_SITE_PRESETS: SiteConfig[] = ENABLE_AUTO_SITE_PRESETS ? [
   }
 ] : []
 
+function parsePageTemplates(raw: unknown): PageTemplate[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((t): t is Record<string, unknown> => Boolean(t && typeof t === "object"))
+    .map((t) => ({ name: parseString(t.name, ""), description: parseString(t.description, "") }))
+    .filter((t) => t.name.length > 0 && t.description.length > 0)
+}
+
 function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
   const trimmed = raw?.trim()
   if (!trimmed) return []
@@ -65,6 +73,7 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
         const vercelDeployHookUrl = parseString(site.vercelDeployHookUrl, "")
         const tone = parseString(site.tone, "")
         const constraints = parseArrayOfStrings(site.constraints)
+        const pageTemplates = parsePageTemplates(site.pageTemplates)
         const previewUrl = parseString(site.previewUrl, "")
         const cmsMedia = parseCmsMedia(site.cmsMedia)
         return {
@@ -78,6 +87,7 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
           vercelDeployHookUrl,
           tone,
           constraints,
+          ...(pageTemplates.length > 0 ? { pageTemplates } : {}),
           ...(previewUrl ? { previewUrl } : {}),
           ...(cmsMedia ? { cmsMedia } : {})
         } satisfies SiteConfig
@@ -153,6 +163,7 @@ export function loadSiteListFromStorage(siteId: string) {
         vercelDeployHookUrl?: string
         tone?: string
         constraints?: unknown
+        pageTemplates?: unknown
         previewUrl?: string
       } => {
         return Boolean(
@@ -173,6 +184,7 @@ export function loadSiteListFromStorage(siteId: string) {
         vercelDeployHookUrl: parseString(site.vercelDeployHookUrl, ""),
         tone: parseString(site.tone, ""),
         constraints: parseArrayOfStrings(site.constraints),
+        ...((pts) => pts.length > 0 ? { pageTemplates: pts } : {})(parsePageTemplates(site.pageTemplates)),
         ...(parseString(site.previewUrl, "") ? { previewUrl: parseString(site.previewUrl, "") } : {}),
         ...(parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") ? { gdriveFolderId: parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") } : {}),
         ...(parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia) ? { cmsMedia: parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia)! } : {})

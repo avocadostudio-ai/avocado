@@ -419,7 +419,7 @@ function EditorPage({
   const [anchorRect, setAnchorRect] = useState<AnchorRect>(null)
   const [anchoredExpanded, setAnchoredExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "properties">("chat")
-  const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints">("overview")
+  const [siteConfigTab, setSiteConfigTab] = useState<"overview" | "tone" | "constraints" | "templates">("overview")
   const [configModalTab, setConfigModalTab] = useState<"general" | "brief" | "deploy">("general")
   const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
   useEffect(() => { if (!sites.configSiteId) { setDriveValidation(null); setSiteConfigTab("overview") } }, [sites.configSiteId])
@@ -1876,6 +1876,7 @@ function EditorPage({
                         <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
                         <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
                         <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
+                        <button type="button" className={siteConfigTab === "templates" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("templates")}>Templates</button>
                       </div>
                       {siteConfigTab === "overview" ? (
                         <label className="sites-form-field">
@@ -1899,6 +1900,49 @@ function EditorPage({
                             rows={8}
                           />
                         </label>
+                      ) : null}
+                      {siteConfigTab === "templates" ? (
+                        <div className="sites-form-field">
+                          <span>Page templates</span>
+                          <p className="sites-form-hint">Define reusable page structures. The AI will match templates by name or intent when creating pages.</p>
+                          {(sites.configSite?.pageTemplates ?? []).map((tpl, idx) => (
+                            <div key={idx} className="sites-template-entry">
+                              <input
+                                type="text"
+                                value={tpl.name}
+                                placeholder="Template name (e.g. Campaign Landing Page)"
+                                onChange={(e) => {
+                                  const updated = [...(sites.configSite?.pageTemplates ?? [])]
+                                  updated[idx] = { ...updated[idx], name: e.target.value }
+                                  sites.updateConfigSite({ pageTemplates: updated })
+                                }}
+                              />
+                              <textarea
+                                value={tpl.description}
+                                placeholder="Describe the page structure: which sections, in what order, with what content focus."
+                                rows={3}
+                                onChange={(e) => {
+                                  const updated = [...(sites.configSite?.pageTemplates ?? [])]
+                                  updated[idx] = { ...updated[idx], description: e.target.value }
+                                  sites.updateConfigSite({ pageTemplates: updated })
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="sites-template-remove"
+                                onClick={() => {
+                                  const updated = (sites.configSite?.pageTemplates ?? []).filter((_, i) => i !== idx)
+                                  sites.updateConfigSite({ pageTemplates: updated.length > 0 ? updated : undefined })
+                                }}
+                              >Remove</button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            className="sites-template-add"
+                            onClick={() => sites.updateConfigSite({ pageTemplates: [...(sites.configSite?.pageTemplates ?? []), { name: "", description: "" }] })}
+                          >+ Add template</button>
+                        </div>
                       ) : null}
                     </div>
                   </div>
