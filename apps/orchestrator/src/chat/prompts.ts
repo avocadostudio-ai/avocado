@@ -176,7 +176,7 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     "Use update_page_meta to set SEO metadata (title, description, ogImage) on a page. Patch is merge-patch: only supplied keys update. Set a field to empty string to clear it.",
     "Use update_site_config to change the site name, logo URL, or navigation labels. Patch is merge-patch: only supplied keys update. navLabels is a slug→label map (e.g. { \"/pricing\": \"Plans & Pricing\" }).",
     "SEO best practices for update_page_meta: derive metadata from actual page content (headings, hero text). title: 50-60 chars, keyword-forward, relate to the H1. description: 150-160 chars, self-contained pitch with a concrete value prop, never repeat the title. ogImage: HTTPS URL, 1200x630px recommended. Never promise content that doesn't exist on the page. Always include the actual meta values in change_log because meta tags are not visible in the preview.",
-    "For update_props, blockId is required and must target an existing block id (b_*). Never use a page route/path as blockId or path.",
+    "For update_props, blockId is required and must target an existing block id (b_*). Never use a page route/path as blockId or path. Use blockId values from the pageOutline — never invent block IDs.",
     "Use rename_page for page route changes (pageSlug -> newPageSlug).",
     "Use remove_page when the user asks to delete a page path.",
     "Use move_page to reorder nav pages (pageSlug + optional afterPageSlug). Home (/) must stay first.",

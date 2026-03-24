@@ -180,5 +180,14 @@ export function isPageRouteRenameRequest(message?: string) {
     lower.includes("move") ||
     lower.includes("switch")
   const mentionsPage = lower.includes("page") || lower.includes("this page")
-  return mentionsRoute && asksRename && mentionsPage
+  if (mentionsRoute && asksRename && mentionsPage) return true
+  // "rename page to Our community" — natural language name after "to"
+  // Exclude position words (first/last/top/bottom) which indicate nav move, not rename
+  const hasRenameVerb = lower.includes("rename") || lower.includes("change") || lower.includes("switch")
+  const hasTarget = /\bto\s+[A-Za-z]/.test(message) &&
+    !/\bto\s+(first|last|top|bottom|start|end|beginning)\b/i.test(message)
+  if (hasRenameVerb && mentionsPage && hasTarget) return true
+  // "rename to Olive oil" — implicit current page (no "page" keyword needed when verb is "rename")
+  if (lower.includes("rename") && hasTarget) return true
+  return false
 }

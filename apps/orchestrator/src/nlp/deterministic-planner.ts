@@ -1,6 +1,7 @@
 import { z } from "zod"
 import {
   allowedBlockTypes,
+  IMAGE_PLACEHOLDER,
   type BlockType,
   type EditPlan,
   type Operation,
@@ -183,7 +184,7 @@ export type ParsedIntent = z.infer<typeof intentSchema>
 function hasContentDirective(message: string): boolean {
   const lower = message.toLowerCase()
   // Phrases that signal the user wants specific content, not just a default block
-  return /\b(about|featuring|directing|promoting|highlighting|linking to|that\s+(links?|points?|directs?|promotes?|describes?|shows?|explains?))\b/i.test(lower)
+  return /\b(about|featuring|directing|promoting|highlighting|explaining|describing|marketing|showcasing|illustrating|linking to|that\s+(links?|points?|directs?|promotes?|describes?|shows?|explains?))\b/i.test(lower)
     || /\bfor\b.*\b(audience|users?|visitors?|customers?|readers?)\b/i.test(lower)
     || /\bwith\b.*\b(content|text|copy|images?|questions?|items?|cards?|testimonials?|features?)\b/i.test(lower)
     || /\b(proper|real|good|relevant|meaningful|appropriate|custom|tailored|compelling|engaging)\b/i.test(lower)
@@ -924,14 +925,9 @@ export function plannerContextPack(args: {
       if (b.id === activeBlockId || args.includeFullProps) {
         return { id: b.id, type: b.type, props: structuredClone(bProps), arrayProps: arrProps }
       }
-      // Other blocks: scalar props only — keeps token count low
-      const scalarProps: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(bProps)) {
-        if (!Array.isArray(value) && (typeof value !== "object" || value === null)) {
-          scalarProps[key] = value
-        }
-      }
-      return { id: b.id, type: b.type, props: scalarProps, arrayProps: arrProps }
+      // Other blocks: type + array metadata only — keeps token count low.
+      // Full scalar props are available via includeFullProps for content queries/translations.
+      return { id: b.id, type: b.type, props: {}, arrayProps: arrProps }
     }),
     pageMeta: currentPage.meta ?? null,
     pageIntent: pageIntentSummary({ slug, currentPage }),
@@ -1202,7 +1198,7 @@ export function compileDeterministicPlan(args: {
               subheading: `Everything on this page is tailored for ${aud}.`,
               ctaText: "Get Started",
               ctaHref: "/",
-              imageUrl: "/hero-generated.svg",
+              imageUrl: IMAGE_PLACEHOLDER,
               imageAlt: `Audience-focused hero image for ${label}`
             }
           },
