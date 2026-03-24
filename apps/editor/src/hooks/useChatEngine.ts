@@ -103,16 +103,51 @@ export function useChatEngine(config: ChatEngineConfig) {
     return null
   }
 
+  function buildWelcomeSuggestions(
+    cfg: SiteConfig,
+    slugs: string[],
+    manifest?: BlockManifest | null,
+    pageBlocks?: Array<{ type: string }>
+  ): string[] {
+    const suggestions: string[] = []
+    const supported = new Set(manifest?.blocks?.map(b => b.type) ?? [])
+
+    if (pageBlocks && pageBlocks.length > 0) {
+      const onPage = new Set(pageBlocks.map(b => b.type))
+      if (onPage.has("Hero")) suggestions.push("Rewrite the hero headline")
+      if (!onPage.has("Testimonials") && supported.has("Testimonials")) suggestions.push("Add a testimonials section")
+      if (!onPage.has("FAQAccordion") && supported.has("FAQAccordion")) suggestions.push("Add an FAQ section")
+      if (!onPage.has("CTA") && supported.has("CTA")) suggestions.push("Add a call-to-action")
+    } else {
+      suggestions.push("Change the headline and subheading")
+      if (supported.has("Testimonials")) suggestions.push("Add a testimonials section")
+      if (supported.has("FAQAccordion")) suggestions.push("Add an FAQ section")
+      if (supported.has("CTA")) suggestions.push("Add a call-to-action")
+      if (suggestions.length < 2) suggestions.push("Add a new section")
+    }
+
+    if (cfg.tone) {
+      suggestions.push(`Rewrite the copy to sound more ${cfg.tone}`)
+    }
+
+    if (cfg.pageTemplates?.length) {
+      suggestions.push(`Create a new ${cfg.pageTemplates[0].name} page`)
+    } else if (!slugs.includes("/about")) {
+      suggestions.push("Create a new /about page")
+    }
+
+    return suggestions.slice(0, 4)
+  }
+
+  const welcomeText = activeSiteConfig.name
+    ? `Welcome to ${activeSiteConfig.name}! Tell me what you'd like to change \u2014 I can add sections, rewrite copy, create new pages, and more.`
+    : "Let\u2019s shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want."
+
   const welcomeEntry: ChatEntry = {
     id: "welcome",
     role: "assistant",
-    text: "Let's shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want.",
-    suggestions: [
-      "Add testimonials below hero",
-      "Change the hero headline",
-      "Create a new /about page",
-      "Add a FAQ section"
-    ]
+    text: welcomeText,
+    suggestions: buildWelcomeSuggestions(activeSiteConfig, routeOptions, componentManifest)
   }
 
   const [chatLog, setChatLog] = useState<ChatEntry[]>(() => {
@@ -298,6 +333,20 @@ export function useChatEngine(config: ChatEngineConfig) {
   // Track whether the initial bootstrap has happened for this session
   const hasBootstrappedRef = useRef(false)
 
+  async function updateWelcomeSuggestions(slugs: string[]) {
+    try {
+      const pageUrl = `${orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slugRef.current)}`
+      const pageRes = await fetch(pageUrl)
+      if (!pageRes.ok) return
+      const pageDoc = (await pageRes.json()) as { blocks?: Array<{ type: string }> }
+      const blocks = Array.isArray(pageDoc.blocks) ? pageDoc.blocks : undefined
+      const updated = buildWelcomeSuggestions(activeSiteConfig, slugs, componentManifest, blocks)
+      setChatLog(prev => prev.map(entry =>
+        entry.id === "welcome" ? { ...entry, suggestions: updated } : entry
+      ))
+    } catch { /* non-critical — keep initial suggestions */ }
+  }
+
   async function refreshRouteSlugs() {
     setIsLoadingSlugs(true)
     try {
@@ -315,12 +364,14 @@ export function useChatEngine(config: ChatEngineConfig) {
         const bootstrapResult = await bootstrapFromSite()
         if (bootstrapResult.synced && bootstrapResult.slugs.length > 0) {
           setAvailableSlugs(bootstrapResult.slugs)
+          void updateWelcomeSuggestions(bootstrapResult.slugs)
           return bootstrapResult.slugs
         }
       }
 
       if (list.length > 0) {
         setAvailableSlugs(list)
+        void updateWelcomeSuggestions(list)
         return list
       }
 
@@ -1307,6 +1358,21 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
+  async function submitFeedback(entryId: string, rating: "up" | "down", note?: string) {
+    const entry = chatLog.find((e) => e.id === entryId)
+    if (!entry?.debug?.traceId) return
+    try {
+      await fetch(`${orchestrator}/telemetry/chat/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ traceId: entry.debug.traceId, session, rating, note })
+      })
+    } catch { /* best-effort */ }
+    setChatLog((prev) =>
+      prev.map((e) => e.id === entryId ? { ...e, feedback: { rating, note, at: new Date().toISOString() } } : e)
+    )
+  }
+
   return {
     chatLog,
     isLoading,
@@ -1347,6 +1413,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     inlineEditCommit: structuralOps.inlineEditCommit,
     clearFieldAiContext: () => setChatLog((prev) => prev.filter((e) => !e.fieldAiContext)),
     setFieldAiContext: (entry: ChatEntry) => setChatLog((prev) => [...prev.filter((e) => !e.fieldAiContext), entry]),
-    clearChat: () => setChatLog([welcomeEntry])
+    clearChat: () => setChatLog([welcomeEntry]),
+    submitFeedback
   }
 }
