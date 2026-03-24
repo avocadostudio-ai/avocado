@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud } from "lucide-react"
+import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud, ZoomIn } from "lucide-react"
 import { isImagePlaceholder } from "@ai-site-editor/shared"
 import { orchestrator } from "../lib/editor-utils"
 import { fetchCmsMedia, getCmsMediaLabel, type CmsMediaItem } from "../lib/cms-media"
@@ -36,6 +36,8 @@ type ImagePickerModalProps = {
   currentUrl?: string
   gdriveFolderId?: string
   cmsMedia?: CmsMediaConfig
+  /** Origin of the active site — used to resolve relative image URLs (e.g. /media/villa/img.webp → http://localhost:3001/media/villa/img.webp) */
+  siteOrigin?: string
   onClose: () => void
   onSelect: (imageUrl: string, alt: string) => void
 }
@@ -53,8 +55,18 @@ function unwrapNextImageUrl(url: string | undefined): string | undefined {
   return url
 }
 
-export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gdriveFolderId, cmsMedia, onClose, onSelect }: ImagePickerModalProps) {
-  const currentUrl = unwrapNextImageUrl(rawCurrentUrl)
+/** Resolve a potentially-relative image URL against the site origin so the editor can display it */
+function resolveImageUrl(url: string | undefined, siteOrigin: string | undefined): string | undefined {
+  if (!url) return url
+  // Already absolute
+  if (/^https?:\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) return url
+  // Relative path like /media/villa/img.webp — prefix with site origin
+  if (siteOrigin && url.startsWith("/")) return `${siteOrigin}${url}`
+  return url
+}
+
+export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gdriveFolderId, cmsMedia, siteOrigin, onClose, onSelect }: ImagePickerModalProps) {
+  const currentUrl = resolveImageUrl(unwrapNextImageUrl(rawCurrentUrl), siteOrigin)
   const hasEditableImage = !isImagePlaceholder(currentUrl)
   const availableTabs: Tab[] = []
   if (features.googleDrive) availableTabs.push("drive")
@@ -87,6 +99,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
@@ -324,10 +337,15 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (lightboxUrl) { setLightboxUrl(null); e.stopPropagation() }
+        else onClose()
+      }
+    }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose])
+  }, [open, onClose, lightboxUrl])
 
   if (!open) return null
 
@@ -352,7 +370,10 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={(e) => e.stopPropagation()}>
-        <style>{`@keyframes imgPickerDotBounce { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }`}</style>
+        <style>{`@keyframes imgPickerDotBounce { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }
+.imgpicker-zoom-wrap .imgpicker-zoom-icon { opacity: 0; transition: opacity 0.15s; }
+.imgpicker-zoom-wrap:hover .imgpicker-zoom-icon { opacity: 1; }
+.imgpicker-zoom-wrap:hover img { filter: brightness(0.7); }`}</style>
         {/* Header row: title + current image + close */}
         <div style={S.header}>
           <div style={S.headerLeft}>
@@ -491,8 +512,10 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             {/* Edit mode: show current image as reference */}
             {features.imageGenerateChat && hasEditableImage && editMode === "edit" && chatMessages.length === 0 && (
               <div style={S.editContext}>
-                <img src={currentUrl} alt="" style={S.editContextImg} />
-                <span style={S.editContextLabel}>Describe how you'd like to change this image</span>
+                <div className="imgpicker-zoom-wrap" style={S.zoomWrap} onClick={() => setLightboxUrl(currentUrl!)}>
+                  <img src={currentUrl} alt="" style={S.editContextImg} />
+                  <div className="imgpicker-zoom-icon" style={S.zoomIcon}><ZoomIn size={20} /></div>
+                </div>
               </div>
             )}
 
@@ -504,7 +527,17 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                   return (
                     <div key={i} style={msg.role === "user" ? S.chatBubbleUser : S.chatBubbleAssistant}>
                       {msg.text && <span style={S.chatText}>{msg.text}</span>}
-                      {msg.imageUrl && <img src={msg.imageUrl} alt="" style={S.chatImage} />}
+                      {msg.imageUrl && (
+                        <div style={S.chatImageRow}>
+                          <div className="imgpicker-zoom-wrap" style={S.zoomWrap} onClick={() => setLightboxUrl(msg.imageUrl!)}>
+                            <img src={msg.imageUrl} alt="" style={S.chatImage} />
+                            <div className="imgpicker-zoom-icon" style={S.zoomIcon}><ZoomIn size={20} /></div>
+                          </div>
+                          {generatedResult && msg.imageUrl === generatedResult.url && !generating && (
+                            <button onClick={handleSelect} style={S.useImageBeside}>Use image</button>
+                          )}
+                        </div>
+                      )}
                       {isLastAssistant && (
                         <div style={S.generatingRow}>
                           <span style={S.typingDots}>
@@ -539,10 +572,14 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                       ? "Describe changes: e.g. 'Make the background brighter' or 'Add a sunset'"
                       : "Describe the image you want, e.g. 'A professional photo of a modern office with natural light'"}
                   value={generatePrompt}
-                  onChange={(e) => setGeneratePrompt(e.target.value)}
+                  onChange={(e) => {
+                    setGeneratePrompt(e.target.value)
+                    e.target.style.height = "auto"
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
+                  }}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleGenerate() } }}
                   style={S.textarea}
-                  rows={2}
+                  rows={1}
                   autoFocus
                 />
                 <button
@@ -553,9 +590,6 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                   {generating ? "..." : chatMessages.length > 0 ? "Refine" : editMode === "edit" ? "Edit" : "Generate"}
                 </button>
               </div>
-              {features.imageGenerateChat && generatedResult && (
-                <button onClick={handleSelect} style={S.useImageInline}>Use image</button>
-              )}
             </div>
             )}
           </div>
@@ -569,6 +603,14 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             {activeTab === "upload" && urlInput.trim() && !uploadResult ? "Apply URL" : "Use image"}
           </button>
         </div>
+        )}
+
+        {/* Lightbox */}
+        {lightboxUrl && (
+          <div style={S.lightboxOverlay} onClick={() => setLightboxUrl(null)}>
+            <button onClick={() => setLightboxUrl(null)} style={S.lightboxClose} aria-label="Close preview"><X size={20} /></button>
+            <img src={lightboxUrl} alt="" style={S.lightboxImg} onClick={(e) => e.stopPropagation()} />
+          </div>
         )}
       </div>
     </div>
@@ -663,8 +705,8 @@ const S: Record<string, React.CSSProperties> = {
   textarea: {
     width: "100%", padding: "10px 12px", background: "#0b1425",
     border: "1px solid #355073", borderRadius: 10, color: "#edf4ff",
-    fontSize: 14, outline: "none", boxSizing: "border-box",
-    resize: "vertical", fontFamily: "inherit"
+    fontSize: 14, outline: "none", boxSizing: "border-box", resize: "none" as const, overflow: "hidden",
+    fontFamily: "inherit"
   },
 
   uploadBtn: {
@@ -714,27 +756,46 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 12, color: "#8fa6c9", lineHeight: 1.35
   },
   editContext: {
-    display: "flex", alignItems: "center", gap: 12, padding: 10,
+    display: "flex", alignItems: "center", gap: 14, padding: 12,
     background: "#0d182d", borderRadius: 10, border: "1px solid #304a6b",
-    marginBottom: 10
+    marginBottom: 16
   },
   editContextImg: {
-    width: 80, height: 56, objectFit: "cover" as const, borderRadius: 8, flexShrink: 0
+    width: 240, height: 160, objectFit: "cover" as const, borderRadius: 8, flexShrink: 0,
+    transition: "filter 0.15s"
+  },
+  zoomWrap: {
+    position: "relative" as const, display: "inline-block", cursor: "pointer", borderRadius: 8,
+    overflow: "hidden"
+  },
+  zoomIcon: {
+    position: "absolute" as const, inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+    color: "white", pointerEvents: "none" as const
+  },
+  lightboxOverlay: {
+    position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.8)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    zIndex: 10000, cursor: "zoom-out"
+  },
+  lightboxImg: {
+    maxWidth: "90%", maxHeight: "90%", borderRadius: 8, objectFit: "contain" as const,
+    cursor: "default"
+  },
+  lightboxClose: {
+    position: "absolute" as const, top: 16, right: 16,
+    background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%",
+    width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+    color: "white", cursor: "pointer"
   },
   editContextLabel: {
     fontSize: 13, color: "#8fa6c9", lineHeight: 1.4
   },
   chatInputArea: {
     flexShrink: 0, display: "flex", flexDirection: "column" as const, gap: 8,
-    paddingTop: 8, borderTop: "1px solid #253652"
+    paddingTop: 14, borderTop: "1px solid #253652"
   },
   chatInputRow: {
-    display: "flex", gap: 8, alignItems: "flex-end"
-  },
-  useImageInline: {
-    alignSelf: "flex-end", background: "#346ec2", color: "white",
-    border: "1px solid #5f90da", borderRadius: 10,
-    padding: "9px 24px", fontSize: 13, fontWeight: 500, cursor: "pointer"
+    display: "flex", gap: 8, alignItems: "center"
   },
   chatScroll: {
     flex: "1 1 0", minHeight: 0, overflowY: "auto" as const,
@@ -768,6 +829,15 @@ const S: Record<string, React.CSSProperties> = {
   },
   chatImage: {
     width: "100%", maxWidth: 320, borderRadius: 8, marginTop: 4
+  },
+  chatImageRow: {
+    display: "flex", alignItems: "flex-end", gap: 10, marginTop: 4
+  },
+  useImageBeside: {
+    background: "#346ec2", color: "white",
+    border: "1px solid #5f90da", borderRadius: 10,
+    padding: "9px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer",
+    whiteSpace: "nowrap" as const, flexShrink: 0
   },
   generateBtn: {
     display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0,
