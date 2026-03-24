@@ -120,12 +120,12 @@ export function buildAiInsightChanges(args: { plan: EditPlan; message: string })
 // Deterministic create page shortcut
 // ---------------------------------------------------------------------------
 
-export function deterministicCreatePagePlan(args: { session: string; message: string }) {
+export function deterministicCreatePagePlan(args: { session: string; message: string; hasPageTemplates?: boolean }) {
   const requestedSlug = parseCreatePageRequest(args.message)
   if (!requestedSlug) return null
 
   // When the user mentions a template and templates are available, defer to AI planner
-  if (/\btemplate\b/i.test(args.message) && /Page templates:\n/i.test(args.message)) return null
+  if (/\btemplate\b/i.test(args.message) && args.hasPageTemplates) return null
 
   // When the user specifies block content (quoted titles, descriptions), defer to AI planner
   if (quotedText(args.message) || /'[^']{2,}'/.test(args.message)) return null
