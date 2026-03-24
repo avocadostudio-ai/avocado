@@ -18,10 +18,13 @@ export function slugToLabel(route: string) {
 }
 
 export type NavItem = {
-  href: string
+  href?: string
   label: string
   isActive: boolean
+  children?: NavItem[]
 }
+
+type NavLinkProp = { label: string; href?: string; children?: NavLinkProp[] }
 
 export type SiteHeaderBlock = {
   id: string
@@ -29,9 +32,16 @@ export type SiteHeaderBlock = {
   props: {
     siteName: string
     logoUrl: string
-    links: { label: string; href: string }[]
+    links: NavLinkProp[]
     activePath?: string
   }
+}
+
+function mapNavItemToLink(item: NavItem): NavLinkProp {
+  const link: NavLinkProp = { label: item.label }
+  if (item.href) link.href = item.href
+  if (item.children?.length) link.children = item.children.map(mapNavItemToLink)
+  return link
 }
 
 export function buildSiteHeaderBlock(opts: {
@@ -46,7 +56,7 @@ export function buildSiteHeaderBlock(opts: {
     props: {
       siteName: opts.siteName,
       logoUrl: opts.siteLogo,
-      links: opts.navItems.map((item) => ({ label: item.label, href: item.href })),
+      links: opts.navItems.map(mapNavItemToLink),
       activePath: opts.activePath,
     },
   }
@@ -55,7 +65,7 @@ export function buildSiteHeaderBlock(opts: {
 export function buildNavItems(opts: {
   navSlugs: string[]
   currentSlug: string
-  siteConfig: { name?: string; logo?: string; navLabels?: Record<string, string> }
+  siteConfig: { name?: string; logo?: string; navLabels?: Record<string, string>; navGroups?: Record<string, string[]> }
   siteId: string
   editorQuery: string
   defaultLogo?: string
@@ -72,11 +82,54 @@ export function buildNavItems(opts: {
     ? ["/", ...allSlugs.filter((r) => r !== "/")]
     : allSlugs
 
-  const navItems = orderedSlugs.map((route) => ({
+  // Build flat items first
+  const flatItems = orderedSlugs.map((route) => ({
     href: `${route}${editorQuery}`,
     label: siteConfig.navLabels?.[route] ?? slugToLabel(route),
     isActive: route === currentSlug,
+    _slug: route, // internal, stripped before return
   }))
+
+  // Apply navGroups to collapse slugs into parent dropdown items
+  const navGroups = siteConfig.navGroups
+  let navItems: NavItem[]
+
+  if (navGroups && Object.keys(navGroups).length > 0) {
+    // Build reverse lookup: slug → group label
+    const slugToGroup = new Map<string, string>()
+    for (const [groupLabel, slugs] of Object.entries(navGroups)) {
+      for (const slug of slugs) slugToGroup.set(slug, groupLabel)
+    }
+
+    const emittedGroups = new Set<string>()
+    navItems = []
+
+    for (const item of flatItems) {
+      const groupLabel = slugToGroup.get(item._slug)
+      if (groupLabel) {
+        if (emittedGroups.has(groupLabel)) continue // already emitted as part of parent
+        emittedGroups.add(groupLabel)
+
+        // Collect all children in this group (preserving order from navGroups definition)
+        const groupSlugs = navGroups[groupLabel]
+        const children: NavItem[] = groupSlugs
+          .map((slug) => flatItems.find((fi) => fi._slug === slug))
+          .filter((fi): fi is typeof flatItems[number] => !!fi)
+          .map(({ _slug: _, ...rest }) => rest)
+
+        navItems.push({
+          label: groupLabel,
+          isActive: children.some((c) => c.isActive),
+          children,
+        })
+      } else {
+        const { _slug: _, ...rest } = item
+        navItems.push(rest)
+      }
+    }
+  } else {
+    navItems = flatItems.map(({ _slug: _, ...rest }) => rest)
+  }
 
   const homeHref = `/${editorQuery}`
 
