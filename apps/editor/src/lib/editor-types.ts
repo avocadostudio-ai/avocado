@@ -221,6 +221,11 @@ export type CmsMediaConfig =
   | { provider: "sanity"; projectId: string; dataset?: string }
   | { provider: "strapi"; url: string; token?: string }
 
+export type PageTemplate = {
+  name: string
+  description: string
+}
+
 export type SiteConfig = {
   id: string
   name: string
@@ -232,6 +237,7 @@ export type SiteConfig = {
   vercelDeployHookUrl?: string
   tone?: string
   constraints?: string[]
+  pageTemplates?: PageTemplate[]
   previewUrl?: string
   gdriveFolderId?: string
   cmsMedia?: CmsMediaConfig

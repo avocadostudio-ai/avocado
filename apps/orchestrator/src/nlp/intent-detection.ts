@@ -403,11 +403,17 @@ export function buildSiteContextBlock(args?: {
     ...normalizeConstraintList(businessContext?.constraints)
   ]
   const siteName = typeof siteContext?.siteName === "string" ? siteContext.siteName.trim() : ""
+  const pageTemplates = Array.isArray(siteContext?.pageTemplates)
+    ? (siteContext.pageTemplates as Array<{ name?: unknown; description?: unknown }>)
+        .filter((t) => typeof t?.name === "string" && typeof t?.description === "string" && (t.name as string).trim() && (t.description as string).trim())
+        .map((t) => `- ${(t.name as string).trim()}: ${(t.description as string).trim()}`)
+    : []
   const lines = [
     purpose ? `Site purpose: ${purpose}` : null,
     tone ? `Preferred tone: ${tone}` : null,
     constraints.length > 0 ? `Constraints: ${constraints.join("; ")}` : null,
     siteName ? `Site name: ${siteName}` : null,
+    pageTemplates.length > 0 ? `Page templates:\n${pageTemplates.join("\n")}` : null,
     args?.pageDirectory ? `Pages:\n${args.pageDirectory}` : null
   ].filter((line): line is string => Boolean(line))
 
