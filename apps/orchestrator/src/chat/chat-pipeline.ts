@@ -14,6 +14,8 @@ import {
   isBatchAddRequest,
   isBlockCatalogQuery,
   isInfoQuery,
+  isAdviceQuery,
+  adviceResponse,
   isContentQuery,
   isPageListQuery,
   plannerMessageWithPendingContext,
@@ -256,7 +258,7 @@ function buildPageDirectory(session: string): string {
 function isVariationRequestMessage(message: string) {
   const normalized = normalizeVariationTypos(message.toLowerCase())
   return (
-    /\bvariations?\b/.test(normalized) &&
+    /\b(variations?|alternatives?|variants?|options)\b/.test(normalized) &&
     /\b(generate|create|make|show|give|produce|draft)\b/.test(normalized)
   )
 }
@@ -832,9 +834,44 @@ export async function runChatPipeline(
     current = { id: effectiveSlug, slug: effectiveSlug, title: "", updatedAt: new Date().toISOString(), blocks: [] }
   }
 
+  // "describe this image" on an image field — return the current image URL and suggest alt text
+  if (body.message && /\bdescribe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration)\b/i.test(body.message) && body.activeEditablePath) {
+    const isImageField = /(?:imageUrl|image\.?src|\.url)$/i.test(body.activeEditablePath)
+    if (isImageField && body.activeBlockId) {
+      const block = current.blocks.find((b) => b.id === body.activeBlockId)
+      if (block) {
+        const imageUrl = getValueAtPath(block.props, body.activeEditablePath)
+        const summary = typeof imageUrl === "string" && imageUrl.startsWith("http")
+          ? `This image is: ${imageUrl}`
+          : "No image URL is currently set for this field."
+        return {
+          code: 200,
+          payload: withDebugPayload({
+            status: "info",
+            summary,
+            changes: [],
+            suggestions: [
+              "Write alt text for this image",
+              "Replace this image",
+              "Search for a new image"
+            ],
+            previewVersion: versions.get(body.session) ?? 0,
+            plannerSource,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult, { outcome: "info" })
+        }
+      }
+    }
+  }
+
   if (body.message && isInfoQuery(body.message) && !isBatchAddRequest(body.message)) {
     const info = infoResponse({ body, current, plannerSource, modelUsed, modelKey })
     return { code: info.code, payload: withDebugPayload(info.payload, { outcome: "info" }) }
+  }
+  if (body.message && isAdviceQuery(body.message) && !isBatchAddRequest(body.message)) {
+    const advice = adviceResponse({ body, current, plannerSource, modelUsed, modelKey })
+    return { code: advice.code, payload: withDebugPayload(advice.payload, { outcome: "advice" }) }
   }
   if (body.message && isPageListQuery(body.message)) {
     const directory = buildPageDirectory(body.session)
@@ -1334,7 +1371,15 @@ export async function runChatPipeline(
     }
 
     if (resolvedPlan.intent === "needs_clarification") {
-      pendingClarificationBySession.set(body.session!, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
+      // If the message already had a clarification suffix and still failed, clear the
+      // pending context — the clarification chain is not converging and further stacking
+      // will only produce incoherent prompts.
+      const alreadyHadClarification = plannerMessage.includes("\nClarification from user:")
+      if (alreadyHadClarification) {
+        pendingClarificationBySession.delete(body.session!)
+      } else {
+        pendingClarificationBySession.set(body.session!, { baseRequest: plannerMessage, updatedAt: new Date().toISOString() })
+      }
       ctx.chatTelemetry.push({
         id: chatRequestId,
         at: new Date().toISOString(),
@@ -1542,49 +1587,21 @@ export async function runChatPipeline(
         (op) => op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
       )
       if (incrementalApplyEnabled && options?.onOpApplied && !hasPageStructuralOps) {
-        const rollbackBySlug = new Map<string, PageDoc>()
-        for (const op of resolvedPlan.ops) {
-          const slugsToSnapshot: string[] = []
-          if (op.op === "create_page") slugsToSnapshot.push(op.page.slug)
-          else if (op.op === "update_site_config") { /* no page slug */ }
-          else slugsToSnapshot.push(op.pageSlug)
-          if (op.op === "duplicate_block" && typeof op.toPageSlug === "string" && op.toPageSlug.length > 0) {
-            slugsToSnapshot.push(op.toPageSlug)
-          }
-
-          for (const slug of slugsToSnapshot) {
-            if (rollbackBySlug.has(slug)) continue
-            const existing = getPage(body.session!, slug)
-            if (existing) rollbackBySlug.set(slug, structuredClone(existing))
-          }
+        // Snapshot the entire session draft so we can restore it wholesale after preflight.
+        const sessionDraft = getSessionDraft(body.session!)
+        const preFlightSnapshot = new Map<string, PageDoc>()
+        for (const [slug, page] of sessionDraft) {
+          preFlightSnapshot.set(slug, structuredClone(page))
         }
 
         // Validate the whole plan from the current state before progressive apply.
         const preflight = await applyOpsAtomically(body.session!, resolvedPlan.ops, { componentsManifest })
         skippedOps = preflight.skippedOps
 
-        // Roll back to pre-apply state so we can replay ops progressively.
-        for (const [slug, snapshot] of rollbackBySlug) {
-          setPage(body.session!, { ...snapshot, slug })
-        }
-        for (const op of resolvedPlan.ops) {
-          if (op.op === "create_page") {
-            if (rollbackBySlug.has(op.page.slug)) {
-              setPage(body.session!, structuredClone(rollbackBySlug.get(op.page.slug)!))
-              continue
-            }
-            const sessionDraft = getSessionDraft(body.session!)
-            sessionDraft.delete(op.page.slug)
-            continue
-          }
-          if (op.op === "rename_page") {
-            const sessionDraft = getSessionDraft(body.session!)
-            if (rollbackBySlug.has(op.newPageSlug)) {
-              setPage(body.session!, structuredClone(rollbackBySlug.get(op.newPageSlug)!))
-            } else {
-              sessionDraft.delete(op.newPageSlug)
-            }
-          }
+        // Restore pre-apply state wholesale so we can replay ops progressively.
+        sessionDraft.clear()
+        for (const [slug, page] of preFlightSnapshot) {
+          setPage(body.session!, structuredClone(page))
         }
 
         const total = resolvedPlan.ops.length
@@ -1643,8 +1660,9 @@ export async function runChatPipeline(
           if (isCancelError(progressiveError)) throw progressiveError
           options?.onRollbackStarted?.({ appliedCount: total, reason: toErrorDetail(progressiveError) })
           // Roll back to pre-plan state so we don't leave a partially-applied plan.
-          for (const [slug, snapshot] of rollbackBySlug) {
-            setPage(body.session!, { ...snapshot, slug })
+          sessionDraft.clear()
+          for (const [slug, page] of preFlightSnapshot) {
+            setPage(body.session!, structuredClone(page))
           }
           options?.onRollbackDone?.({ restoredVersion: versions.get(body.session!) ?? 0 })
           throw progressiveError
@@ -1736,6 +1754,7 @@ export async function runChatPipeline(
                 { event: "deferred_hero_image_failed", chatRequestId, pageSlug: deferred.pageSlug, blockId: deferred.blockId, error: toErrorDetail(err) },
                 "Deferred hero image resolution failed — page remains with placeholder"
               )
+              options?.onStatusUpdate?.("Image generation failed — you can try again or set an image manually.")
             }
           }
         }
@@ -1807,6 +1826,7 @@ export async function runChatPipeline(
             { event: "deferred_image_resolution_failed", chatRequestId, error: toErrorDetail(deferredErr) },
             "Deferred image resolution failed — preview remains without images"
           )
+          options?.onStatusUpdate?.("Image resolution failed — you can try again or set images manually.")
         }
       }
 
@@ -1894,6 +1914,7 @@ export async function runChatPipeline(
             { event: "deferred_native_image_resolution_failed", chatRequestId, error: toErrorDetail(deferredErr) },
             "Deferred native image resolution failed"
           )
+          options?.onStatusUpdate?.("Image generation failed — you can try again or set images manually.")
         }
       }
 

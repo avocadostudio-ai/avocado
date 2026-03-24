@@ -107,11 +107,9 @@ export function minimalPlannerContextPack(args: {
     pageRoutes: Array.from(routeSet),
     pageOutline: compactOutline,
     recentSuccessfulEdits: args.contextPack.recentSuccessfulEdits.slice(-1),
-    resolvedReferences: {
-      target: null,
-      anchor: null,
-      mentionedBlocks: []
-    }
+    // Keep resolvedReferences from full context — small (~50 tokens) but helps LLM
+    // target the right block even in minimal mode
+    resolvedReferences: args.contextPack.resolvedReferences
   }
 }
 
