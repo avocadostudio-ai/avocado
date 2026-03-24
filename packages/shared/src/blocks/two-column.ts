@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { registerBlock, type FieldMeta } from "./_registry.ts"
+import { registerBlock, IMAGE_PLACEHOLDER, type FieldMeta } from "./_registry.ts"
 import { f } from "./_helpers.ts"
 
 const twoColumnChild = z.object({
@@ -55,7 +55,7 @@ export function twoColumnDefaultProps(): Record<string, unknown> {
       { type: "cta", label: "Learn more", href: "/" }
     ],
     right: [
-      { type: "image", src: "/hero-generated.svg", alt: "Team collaborating on a website update" }
+      { type: "image", src: IMAGE_PLACEHOLDER, alt: "Team collaborating on a website update" }
     ]
   }
 }

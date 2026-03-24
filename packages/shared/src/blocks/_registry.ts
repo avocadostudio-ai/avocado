@@ -1,6 +1,18 @@
 import { z } from "zod"
 
 // ---------------------------------------------------------------------------
+// Placeholder image — used as default value for all image slots.
+// Treat this as "no image set" throughout the UI.
+// ---------------------------------------------------------------------------
+export const IMAGE_PLACEHOLDER = "/hero-generated.svg"
+
+export function isImagePlaceholder(url: string | undefined | null): boolean {
+  if (!url) return true
+  const cleaned = url.split("?")[0].replace(/^\/+/, "")
+  return cleaned === IMAGE_PLACEHOLDER.replace(/^\/+/, "")
+}
+
+// ---------------------------------------------------------------------------
 // Field & block metadata types
 // ---------------------------------------------------------------------------
 
@@ -232,7 +244,7 @@ function defaultScalarForField(field: FieldMeta, fieldKey: string): unknown {
   const label = field.label?.trim() || fieldKey
   if (field.kind === "text" || field.kind === "richtext" || field.kind === "imageAlt") return `New ${label}`
   if (field.kind === "url") return "/"
-  if (field.kind === "image") return "/hero-generated.svg"
+  if (field.kind === "image") return IMAGE_PLACEHOLDER
   if (field.kind === "color") return "#0f766e"
   if (field.kind === "number") return 0
   if (field.kind === "enum") return Array.isArray(field.options) && field.options.length > 0 ? field.options[0] : ""

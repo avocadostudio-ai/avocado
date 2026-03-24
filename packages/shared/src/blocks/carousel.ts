@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { registerBlock } from "./_registry.ts"
+import { registerBlock, IMAGE_PLACEHOLDER } from "./_registry.ts"
 import { f } from "./_helpers.ts"
 
 registerBlock("Carousel", {
@@ -42,9 +42,9 @@ registerBlock("Carousel", {
 export function carouselDefaultProps(): Record<string, unknown> {
   return {
     items: [
-      { imageUrl: "/hero-generated.svg", imageAlt: "First slide", heading: "Welcome", description: "Get started with our platform.", ctaText: "Get started", ctaHref: "/" },
-      { imageUrl: "/hero-generated.svg", imageAlt: "Second slide", heading: "Features", description: "Discover what makes us different." },
-      { imageUrl: "/hero-generated.svg", imageAlt: "Third slide", heading: "Get Started", description: "Sign up today and start building.", ctaText: "Sign up", ctaHref: "/pricing" },
+      { imageUrl: IMAGE_PLACEHOLDER, imageAlt: "First slide", heading: "Welcome", description: "Get started with our platform.", ctaText: "Get started", ctaHref: "/" },
+      { imageUrl: IMAGE_PLACEHOLDER, imageAlt: "Second slide", heading: "Features", description: "Discover what makes us different." },
+      { imageUrl: IMAGE_PLACEHOLDER, imageAlt: "Third slide", heading: "Get Started", description: "Sign up today and start building.", ctaText: "Sign up", ctaHref: "/pricing" },
     ],
     autoplay: "false",
     interval: 5000,

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { registerBlock } from "./_registry.ts"
+import { registerBlock, IMAGE_PLACEHOLDER } from "./_registry.ts"
 import { f } from "./_helpers.ts"
 
 registerBlock("Gallery", {
@@ -40,9 +40,9 @@ export function galleryDefaultProps(): Record<string, unknown> {
     title: "",
     columns: "3",
     images: [
-      { imageUrl: "/hero-generated.svg", alt: "Gallery image 1", caption: "" },
-      { imageUrl: "/hero-generated.svg", alt: "Gallery image 2", caption: "" },
-      { imageUrl: "/hero-generated.svg", alt: "Gallery image 3", caption: "" },
+      { imageUrl: IMAGE_PLACEHOLDER, alt: "Gallery image 1", caption: "" },
+      { imageUrl: IMAGE_PLACEHOLDER, alt: "Gallery image 2", caption: "" },
+      { imageUrl: IMAGE_PLACEHOLDER, alt: "Gallery image 3", caption: "" },
     ],
   }
 }

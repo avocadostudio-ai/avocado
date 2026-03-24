@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { registerBlock } from "./_registry.ts"
+import { registerBlock, IMAGE_PLACEHOLDER } from "./_registry.ts"
 import { f } from "./_helpers.ts"
 
 registerBlock("Hero", {
@@ -39,7 +39,7 @@ export function heroDefaultProps(): Record<string, unknown> {
     subheading: "Make changes safely with instant preview.",
     ctaText: "Get Started",
     ctaHref: "/",
-    imageUrl: "/hero-generated.svg",
+    imageUrl: IMAGE_PLACEHOLDER,
     imageAlt: "Abstract generated illustration",
     imagePosition: "right"
   }

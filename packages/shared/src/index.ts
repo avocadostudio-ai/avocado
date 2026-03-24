@@ -21,6 +21,9 @@ export {
   type BlockType,
   type BlockInstance,
   type BlockRegistration,
+  // Constants & helpers
+  IMAGE_PLACEHOLDER,
+  isImagePlaceholder,
   // Registry functions
   registerBlock,
   getBlockMeta,

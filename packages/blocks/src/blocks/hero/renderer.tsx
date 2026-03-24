@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag, IMAGE_PLACEHOLDER } from "@ai-site-editor/shared"
 import { PrimaryButton, SecondaryButton, BlockImage } from "../_shared"
 
 export function Hero(props: Record<string, unknown>) {
@@ -41,7 +41,7 @@ export function Hero(props: Record<string, unknown>) {
         <div className="hero__media layout-grid__col" data-editable-target="imageUrl" data-editable-target-label="Hero block image">
           <BlockImage
             className="layout-grid__img"
-            src={String(props.imageUrl ?? "/hero-generated.svg")}
+            src={String(props.imageUrl ?? IMAGE_PLACEHOLDER)}
             alt={String(props.imageAlt ?? "Hero image")}
             width={1536}
             height={1024}
