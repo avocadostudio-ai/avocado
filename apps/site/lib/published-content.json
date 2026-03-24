@@ -34,7 +34,7 @@
     "id": "p_new_page",
     "slug": "/new-page",
     "title": "New Page",
-    "updatedAt": "2026-03-24T12:27:56.529Z",
+    "updatedAt": "2026-03-24T12:30:00.344Z",
     "blocks": [
       {
         "id": "228-0",
@@ -44,8 +44,8 @@
           "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
           "ctaText": "Explore Now",
           "ctaHref": "/",
-          "imageUrl": "http://localhost:4200/generated-images/upload_1774355274804_b93ce3db.webp",
-          "imageAlt": "Uploaded image",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774355380461_m1tsl8.jpg",
+          "imageAlt": "remove tears",
           "imagePosition": "right"
         }
       }
