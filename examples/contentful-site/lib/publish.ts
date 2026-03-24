@@ -1,4 +1,4 @@
-import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
+import type { OnPublishFn, InlineAsset } from "@ai-site-editor/site-sdk/routes"
 import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
 
 export interface ContentfulPublishOptions {
@@ -62,20 +62,81 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     return true
   }
 
-  // Upload an image URL as a Contentful Asset, return the asset ID
-  async function ensureAsset(env: CfEnv, imageUrl: string, alt: string): Promise<string> {
+  // Upload an image URL as a Contentful Asset, return the asset ID (or null on failure)
+  async function ensureAsset(
+    env: CfEnv,
+    imageUrl: string,
+    alt: string,
+    assets?: Record<string, InlineAsset>
+  ): Promise<string | null> {
+    // Check for inline asset (generated/modified images with localhost URLs)
+    const inlineAsset = assets?.[imageUrl]
+    if (inlineAsset) {
+      try {
+        const bytes = Buffer.from(inlineAsset.data, "base64")
+        const upload = await env.createUpload({ file: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer })
+        const asset = await env.createAsset({
+          fields: {
+            title: { [locale]: alt || inlineAsset.fileName },
+            description: { [locale]: imageUrl },
+            file: {
+              [locale]: {
+                contentType: inlineAsset.mimeType,
+                fileName: inlineAsset.fileName,
+                uploadFrom: { sys: { type: "Link", linkType: "Upload", id: upload.sys.id } },
+              },
+            },
+          },
+        })
+        const processed = await asset.processForAllLocales()
+        const published = await processed.publish()
+        return published.sys.id
+      } catch (err) {
+        console.warn(`[contentful-publish] inline asset upload failed for ${imageUrl}: ${err instanceof Error ? err.message : err}`)
+        return null
+      }
+    }
+
     // Skip non-http URLs (relative paths, data URIs) or private IPs
     if (!imageUrl.startsWith("http") || !isSafeImageUrl(imageUrl)) {
-      // Create a placeholder asset with the URL as title
+      try {
+        const asset = await env.createAsset({
+          fields: {
+            title: { [locale]: alt || imageUrl },
+            description: { [locale]: imageUrl },
+            file: {
+              [locale]: {
+                contentType: "image/png",
+                fileName: imageUrl.split("/").pop() || "image.png",
+                upload: `https://placehold.co/800x600/e4e4e7/52525b?text=${encodeURIComponent(alt || "Image")}`,
+              },
+            },
+          },
+        })
+        const processed = await asset.processForAllLocales()
+        const published = await processed.publish()
+        return published.sys.id
+      } catch {
+        return null
+      }
+    }
+
+    // Check if asset already exists by source URL stored in description
+    try {
+      const existing = await env.getAssets({ "fields.description": imageUrl, limit: 1 })
+      if (existing.items.length > 0) return existing.items[0].sys.id
+    } catch { /* continue to upload */ }
+
+    try {
       const asset = await env.createAsset({
         fields: {
           title: { [locale]: alt || imageUrl },
-          description: { [locale]: "" },
+          description: { [locale]: imageUrl },
           file: {
             [locale]: {
-              contentType: "image/png",
-              fileName: imageUrl.split("/").pop() || "image.png",
-              upload: `https://placehold.co/800x600/e4e4e7/52525b?text=${encodeURIComponent(alt || "Image")}`,
+              contentType: guessContentType(imageUrl),
+              fileName: imageUrl.split("/").pop()?.split("?")[0] || "image.jpg",
+              upload: imageUrl,
             },
           },
         },
@@ -83,28 +144,10 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
       const processed = await asset.processForAllLocales()
       const published = await processed.publish()
       return published.sys.id
+    } catch (err) {
+      console.warn(`[contentful-publish] asset upload failed for ${imageUrl}: ${err instanceof Error ? err.message : err}`)
+      return null
     }
-
-    // Check if asset already exists by URL (search by title as a proxy)
-    const existing = await env.getAssets({ "fields.title": imageUrl, limit: 1 })
-    if (existing.items.length > 0) return existing.items[0].sys.id
-
-    const asset = await env.createAsset({
-      fields: {
-        title: { [locale]: alt || imageUrl },
-        description: { [locale]: "" },
-        file: {
-          [locale]: {
-            contentType: guessContentType(imageUrl),
-            fileName: imageUrl.split("/").pop()?.split("?")[0] || "image.jpg",
-            upload: imageUrl,
-          },
-        },
-      },
-    })
-    const processed = await asset.processForAllLocales()
-    const published = await processed.publish()
-    return published.sys.id
   }
 
   function guessContentType(url: string): string {
@@ -116,12 +159,33 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     return "image/jpeg"
   }
 
-  // Build Contentful fields for a block entry, converting images to Asset links
+  /** Helper: create an asset link field value */
+  function assetLink(assetId: string) {
+    return { [locale]: { sys: { type: "Link", linkType: "Asset", id: assetId } } }
+  }
+
+  /** Helper: create an entry link */
+  function entryLink(entryId: string) {
+    return { sys: { type: "Link" as const, linkType: "Entry" as const, id: entryId } }
+  }
+
+  /** Extract existing asset ID from a Contentful field value (locale-wrapped asset link) */
+  function existingAssetId(fieldValue: unknown): string | null {
+    if (!fieldValue || typeof fieldValue !== "object") return null
+    const localeVal = (fieldValue as Record<string, unknown>)[locale]
+    if (!localeVal || typeof localeVal !== "object") return null
+    const sys = (localeVal as Record<string, unknown>).sys as { id?: string; linkType?: string } | undefined
+    return sys?.linkType === "Asset" && sys.id ? sys.id : null
+  }
+
+  // Build Contentful fields for a block entry, converting images to Asset links.
+  // existingFields is the previous entry's fields (for fallback when image upload fails).
   async function buildBlockFields(
     env: CfEnv,
     blockType: string,
     props: Record<string, unknown>,
-    resolveAsset: (url: string, alt: string) => Promise<string> = (url, alt) => ensureAsset(env, url, alt)
+    resolveAsset: (url: string, alt: string) => Promise<string | null>,
+    existingFields?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const meta = getAllBlockMeta()[blockType]
     const imageFields = getImageFields(blockType)
@@ -137,24 +201,22 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
         const altKey = key.replace(/Url$/, "Alt").replace(/^image$/, "imageAlt")
         const alt = typeof props[altKey] === "string" ? (props[altKey] as string) : ""
         const assetId = await resolveAsset(value, alt)
-        fields[key] = { [locale]: { sys: { type: "Link", linkType: "Asset", id: assetId } } }
-      } else if (meta?.listFields?.[key]) {
-        const refTarget = isReferenceList(blockType, key)
-        if (refTarget && Array.isArray(value)) {
-          // Create child entries for reference lists (e.g., CardGrid.cards → blockCard entries)
-          const refs = await Promise.all(
-            (value as Record<string, unknown>[]).map(async (item, i) => {
-              const childFields = await buildBlockFields(env, "Card", item)
-              const childEntry = await env.createEntry(refTarget, { fields: childFields })
-              const published = await childEntry.publish()
-              return { sys: { type: "Link" as const, linkType: "Entry" as const, id: published.sys.id } }
-            })
-          )
-          fields[key] = { [locale]: refs }
+        if (assetId) {
+          fields[key] = assetLink(assetId)
         } else {
-          // JSON field for other lists
+          // Fallback: preserve existing asset from previous publish
+          const prevAssetId = existingAssetId(existingFields?.[key])
+          if (prevAssetId) {
+            fields[key] = assetLink(prevAssetId)
+          }
+        }
+      } else if (meta?.listFields?.[key]) {
+        // Handled separately for reference lists (card entries use deterministic IDs)
+        if (!isReferenceList(blockType, key)) {
+          // JSON field for non-reference lists
           fields[key] = { [locale]: value }
         }
+        // Reference lists are built in the main handler with deterministic IDs
       } else {
         fields[key] = { [locale]: value }
       }
@@ -163,44 +225,90 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     return fields
   }
 
-  return async (pages, config) => {
+  return async (pages, config, context) => {
     const env = await getEnvironment()
 
     // Cache asset lookups within a single publish to avoid duplicate uploads
-    const assetCache = new Map<string, Promise<string>>()
+    const assetCache = new Map<string, Promise<string | null>>()
     const cachedEnsureAsset = (imageUrl: string, alt: string) => {
       const cached = assetCache.get(imageUrl)
       if (cached) return cached
-      const promise = ensureAsset(env, imageUrl, alt)
+      const promise = ensureAsset(env, imageUrl, alt, context?.assets)
       assetCache.set(imageUrl, promise)
       return promise
     }
 
-    // Track all block entry IDs we create/update (for cleanup)
-    const allBlockEntryIds = new Set<string>()
-
     // Upsert each page and its blocks
     const upsertResults = await Promise.allSettled(pages.map(async (page) => {
-      // Create/update block entries in parallel
       const blockEntries = await Promise.all(page.blocks.map(async (block) => {
         const contentTypeId = `block${block.type}`
-        const blockFields = await buildBlockFields(env, block.type, block.props, cachedEnsureAsset)
-
         const entryId = `block_${block.id}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
-        let entry: CfEntry
 
+        // Fetch existing entry for fallback (image fields) and later upsert
+        let existingEntry: CfEntry | null = null
         try {
-          entry = await env.getEntry(entryId)
-          entry.fields = blockFields
-          entry = await entry.update()
-          await entry.publish()
-        } catch {
-          entry = await env.createEntryWithId(contentTypeId, entryId, { fields: blockFields })
-          await entry.publish()
+          existingEntry = await env.getEntry(entryId)
+        } catch { /* first publish */ }
+        const existingFields = existingEntry?.fields as Record<string, unknown> | undefined
+
+        const blockFields = await buildBlockFields(env, block.type, block.props, cachedEnsureAsset, existingFields)
+
+        // Handle reference lists (CardGrid.cards → blockCard entries with deterministic IDs)
+        const meta = getAllBlockMeta()[block.type]
+        for (const [key, value] of Object.entries(block.props)) {
+          const refTarget = isReferenceList(block.type, key)
+          if (refTarget && Array.isArray(value) && meta?.listFields?.[key]) {
+            const items = value as Record<string, unknown>[]
+            const cardRefs = await Promise.all(
+              items.map(async (item, i) => {
+                const cardEntryId = `card_${entryId}_${i}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
+
+                // Fetch existing card entry for image fallback + upsert
+                let existingCard: CfEntry | null = null
+                try { existingCard = await env.getEntry(cardEntryId) } catch { /* first publish */ }
+
+                const childFields = await buildBlockFields(env, "Card", item, cachedEnsureAsset,
+                  existingCard?.fields as Record<string, unknown> | undefined)
+
+                if (existingCard) {
+                  existingCard.fields = childFields
+                  const updated = await existingCard.update()
+                  await updated.publish()
+                } else {
+                  const created = await env.createEntryWithId(refTarget, cardEntryId, { fields: childFields })
+                  await created.publish()
+                }
+                return entryLink(cardEntryId)
+              })
+            )
+            blockFields[key] = { [locale]: cardRefs }
+
+            // Clean up excess card entries from previous publishes
+            // (e.g., CardGrid went from 5 cards to 3 — delete cards at index 3, 4)
+            for (let i = items.length; i < items.length + 20; i++) {
+              const staleCardId = `card_${entryId}_${i}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
+              try {
+                const staleCard = await env.getEntry(staleCardId)
+                try { await staleCard.unpublish() } catch { /* may already be unpublished */ }
+                await staleCard.delete()
+              } catch {
+                break // no more stale cards
+              }
+            }
+          }
         }
 
-        allBlockEntryIds.add(entry.sys.id)
-        return { sys: { type: "Link" as const, linkType: "Entry" as const, id: entry.sys.id } }
+        // Upsert the block entry (reuse fetched entry to avoid double-fetch)
+        if (existingEntry) {
+          existingEntry.fields = blockFields
+          const updated = await existingEntry.update()
+          await updated.publish()
+          return entryLink(updated.sys.id)
+        } else {
+          const entry = await env.createEntryWithId(contentTypeId, entryId, { fields: blockFields })
+          await entry.publish()
+          return entryLink(entry.sys.id)
+        }
       }))
 
       // Upsert the page entry
