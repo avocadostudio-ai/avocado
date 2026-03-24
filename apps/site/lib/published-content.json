@@ -1,91 +1,81 @@
 [
   {
-    "id": "home-1",
+    "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T20:27:53.129Z",
-    "meta": {
-      "title": "Home",
-      "description": "A Contentful-powered site"
-    },
+    "updatedAt": "2026-03-24T20:29:17.577Z",
     "blocks": [
       {
-        "id": "block_block_block_hero-1",
+        "id": "268-0",
         "type": "Hero",
         "props": {
-          "heading": "Welcome to the Contentful Site",
-          "subheading": "This page is served from Contentful via the AI Site Editor block system.",
-          "ctaText": "Check our plans",
-          "ctaHref": "/pricing-plans",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774384070824_rx2ul0.jpg",
-          "imageAlt": "generate an image of a person building a website sitting in front if monitor",
+          "heading": "Build with Strapi",
+          "subheading": "Powerful tools to manage, publish, and optimize your content across all channels",
+          "ctaText": "Start Free Trial",
+          "ctaHref": "/signup",
+          "imageUrl": "http://localhost:1337/uploads/large_gen_1774381906261_47d8jz_65d54ca645.jpg",
+          "imageAlt": "make the clock larger, add proper numbers",
           "imagePosition": "right"
         }
       },
       {
-        "id": "block_block_block_b_richtext_1774156395336",
+        "id": "4-1",
         "type": "RichText",
         "props": {
-          "title": "Powered by Contentful!",
-          "body": "This site is built with Contentful, a headless CMS that separates content management from presentation. That means you can manage your content once and deliver it anywhere—web, mobile, or any channel you choose.\n\nWith Contentful's flexible content model, you define your own content structure without rigid page templates. APIs let your developers fetch and display content exactly how they need it, while content editors work in an intuitive interface.\n\nContentful's powerful capabilities extend beyond simple publishing. You gain real-time collaboration features, version control, and workflow management that ensure your team stays synchronized. Advanced scheduling tools let you plan content releases months in advance, while webhooks and real-time updates keep your digital experiences fresh and responsive to your audience's needs.\n\nThe beauty of a headless approach lies in its flexibility and scalability. Whether you're managing a single website, multiple microsites, or delivering content to IoT devices and voice assistants, Contentful adapts to your architecture. You're never locked into a particular presentation layer, giving you complete freedom to innovate and evolve your digital strategy without constraints.\n\n**Ready to experience the power of structured content?** Start exploring Contentful today and transform how you manage your digital experiences."
+          "title": "Why Choose Our Platform",
+          "body": "Streamline your workflow with enterprise-grade campaign tools. Collaborate seamlessly, publish instantly, and measure impact in real time."
         }
       },
       {
-        "id": "block_block_block_b_cardgrid_1774161229066_910",
-        "type": "CardGrid",
+        "id": "4-2",
+        "type": "FAQAccordion",
         "props": {
-          "title": "Explore more",
-          "cards": [
+          "title": "Common Questions",
+          "items": [
             {
-              "title": "Fast setup",
-              "description": "Create and ship updates quickly.",
-              "ctaText": "Get started",
-              "ctaHref": "/"
+              "q": "How do I set up my first campaign?",
+              "a": "Simply connect your content sources, define your audience, and set your launch date. Our onboarding wizard guides you through every step."
             },
             {
-              "title": "Safe updates",
-              "description": "Schema-validated edits reduce breakage.",
-              "ctaText": "See how",
-              "ctaHref": "/pricing"
+              "q": "Can I collaborate with my team?",
+              "a": "Yes. Invite team members, assign roles, and manage permissions. Real-time collaboration keeps everyone in sync."
             },
             {
-              "title": "Team workflow",
-              "description": "Collaborate with clear, reviewable changes.",
-              "ctaText": "Read guide",
-              "ctaHref": "/"
+              "q": "What analytics do you provide?",
+              "a": "Track engagement, reach, conversions, and ROI across channels. Detailed reports and dashboards give you actionable insights."
             }
           ]
         }
       },
       {
-        "id": "block_block_block_b_cta_1774156320864",
+        "id": "164-3",
         "type": "CTA",
         "props": {
-          "title": "Ready to get started?",
-          "description": "Apply your next change in seconds.",
-          "ctaText": "Learn More",
-          "ctaHref": "/about-us"
+          "title": "Ready to Transform Your Content Strategy?",
+          "description": "Join hundreds of companies using Strapi to power their campaigns.",
+          "ctaText": "Get Started Today",
+          "ctaHref": "/signup"
         }
       }
     ]
   },
   {
-    "id": "p_solutions",
-    "slug": "/solutions",
-    "title": "Solutions",
-    "updatedAt": "2026-03-24T20:26:58.361Z",
+    "id": "p_new_page",
+    "slug": "/new-page",
+    "title": "New Page",
+    "updatedAt": "2026-03-24T19:51:50.728Z",
     "blocks": [
       {
-        "id": "b_hero_solutions",
+        "id": "270-0",
         "type": "Hero",
         "props": {
-          "heading": "Powerful Solutions for Your Business",
-          "subheading": "Transform the way you work. Discover cutting-edge tools and strategies designed to solve your toughest challenges and drive real results.",
+          "heading": "Transform Your Vision into Reality",
+          "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
           "ctaText": "Explore Now",
           "ctaHref": "/",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774383972945_q7mfg6.jpg",
-          "imageAlt": "use neon glow for text",
-          "imagePosition": "right"
+          "imageAlt": "open eyes",
+          "imagePosition": "right",
+          "imageUrl": "http://localhost:1337/uploads/large_gen_1774361409463_blajwy_e17050736f.jpg"
         }
       }
     ]
