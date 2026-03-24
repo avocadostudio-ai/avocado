@@ -73,15 +73,15 @@
     "id": "p_solutions",
     "slug": "/solutions",
     "title": "Solutions",
-    "updatedAt": "2026-03-24T20:26:37.285Z",
+    "updatedAt": "2026-03-24T20:26:58.361Z",
     "blocks": [
       {
         "id": "b_hero_solutions",
         "type": "Hero",
         "props": {
-          "heading": "Solutions",
-          "subheading": "Use this page to introduce Solutions.",
-          "ctaText": "Get started",
+          "heading": "Powerful Solutions for Your Business",
+          "subheading": "Transform the way you work. Discover cutting-edge tools and strategies designed to solve your toughest challenges and drive real results.",
+          "ctaText": "Explore Now",
           "ctaHref": "/",
           "imageUrl": "http://localhost:4200/generated-images/gen_1774383972945_q7mfg6.jpg",
           "imageAlt": "use neon glow for text",
