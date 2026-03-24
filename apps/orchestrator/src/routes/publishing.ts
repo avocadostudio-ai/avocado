@@ -10,7 +10,8 @@ import {
   ensureHeroImageProps,
   bumpVersion,
   schedulePersistState,
-  setLastPublishedScopedSession
+  setLastPublishedScopedSession,
+  markRecentlyRestored
 } from "../state/session-state.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
 import {
@@ -313,6 +314,7 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
         draft.set(clone.slug, clone)
       }
       const previewVersion = bumpVersion(scopedSession)
+      markRecentlyRestored(scopedSession)
       schedulePersistState(app.log)
       return {
         status: "restored",
