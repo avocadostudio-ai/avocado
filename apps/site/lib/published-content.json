@@ -604,10 +604,10 @@
     ]
   },
   {
-    "id": "p_blueberriy_lovers",
-    "slug": "/blueberriy-lovers",
-    "title": "Blueberriy Lovers",
-    "updatedAt": "2026-03-17T21:53:00.075Z",
+    "id": "p_blueberries",
+    "slug": "/blueberries",
+    "title": "Blueberries",
+    "updatedAt": "2026-03-24T20:09:49.199Z",
     "meta": {
       "title": "Blueberry Varieties, Growing Tips & Community Guide",
       "description": "Learn about blueberry varieties, growing guides, and health benefits. Join our community of growers and enthusiasts. Discover highbush, lowbush, and rabbiteye blueberries."
@@ -706,10 +706,10 @@
     ]
   },
   {
-    "id": "p_for_recipes",
-    "slug": "/for-recipes",
-    "title": "For Recipes",
-    "updatedAt": "2026-03-19T19:15:06.829Z",
+    "id": "p_recipes",
+    "slug": "/recipes",
+    "title": "Recipes",
+    "updatedAt": "2026-03-24T20:10:35.338Z",
     "blocks": [
       {
         "id": "b_hero_for-recipes",
