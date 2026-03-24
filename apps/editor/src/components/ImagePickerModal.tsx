@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud } from "lucide-react"
+import { isImagePlaceholder } from "@ai-site-editor/shared"
 import { orchestrator } from "../lib/editor-utils"
 import { fetchCmsMedia, getCmsMediaLabel, type CmsMediaItem } from "../lib/cms-media"
 import type { CmsMediaConfig } from "../lib/editor-types"
@@ -54,6 +55,7 @@ function unwrapNextImageUrl(url: string | undefined): string | undefined {
 
 export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gdriveFolderId, cmsMedia, onClose, onSelect }: ImagePickerModalProps) {
   const currentUrl = unwrapNextImageUrl(rawCurrentUrl)
+  const hasEditableImage = !isImagePlaceholder(currentUrl)
   const availableTabs: Tab[] = []
   if (features.googleDrive) availableTabs.push("drive")
   if (features.unsplash) availableTabs.push("unsplash")
@@ -76,7 +78,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   const [generatedResult, setGeneratedResult] = useState<{ url: string; alt: string } | null>(null)
   const [chatId, setChatId] = useState<string | null>(null)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [editMode, setEditMode] = useState<"choose" | "edit" | "new">("choose")
+  const [editMode, setEditMode] = useState<"choose" | "edit" | "new">(hasEditableImage ? "choose" : "new")
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const scrollRafRef = useRef(0)
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
@@ -167,7 +169,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     setGeneratedResult(null)
     setChatId(null)
     setChatMessages([])
-    setEditMode("choose")
+    setEditMode(hasEditableImage ? "choose" : "new")
     setUploadResult(null)
     setUploadPreview(null)
     setCurrentPage(1)
@@ -221,7 +223,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
         const res = await fetch(`${orchestrator}/image/generate/chat`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ prompt: userPrompt, chatId: chatId ?? undefined, stream: true, ...(editMode === "edit" && currentUrl && !chatId ? { referenceImageUrl: currentUrl } : {}) })
+          body: JSON.stringify({ prompt: userPrompt, chatId: chatId ?? undefined, stream: true, ...(editMode === "edit" && hasEditableImage && currentUrl && !chatId ? { referenceImageUrl: currentUrl } : {}) })
         })
         if (!res.ok || !res.body) return
 
@@ -471,7 +473,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
         {activeTab === "generate" && (
           <div style={{ ...S.formArea, display: "flex", flexDirection: "column", flex: features.imageGenerateChat ? "1 1 0" : undefined, minHeight: 0 }}>
             {/* Choice: edit existing or generate new */}
-            {features.imageGenerateChat && currentUrl && editMode === "choose" && chatMessages.length === 0 && (
+            {features.imageGenerateChat && hasEditableImage && editMode === "choose" && chatMessages.length === 0 && (
               <div style={S.editChoiceContainer}>
                 <button style={S.editChoiceCard} onClick={() => setEditMode("edit")}>
                   <img src={currentUrl} alt="" style={S.editChoiceImg} />
@@ -487,7 +489,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             )}
 
             {/* Edit mode: show current image as reference */}
-            {features.imageGenerateChat && currentUrl && editMode === "edit" && chatMessages.length === 0 && (
+            {features.imageGenerateChat && hasEditableImage && editMode === "edit" && chatMessages.length === 0 && (
               <div style={S.editContext}>
                 <img src={currentUrl} alt="" style={S.editContextImg} />
                 <span style={S.editContextLabel}>Describe how you'd like to change this image</span>
@@ -527,7 +529,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             )}
 
             {/* Prompt input — hidden during choice screen */}
-            {!(currentUrl && editMode === "choose" && features.imageGenerateChat && chatMessages.length === 0) && (
+            {!(hasEditableImage && editMode === "choose" && features.imageGenerateChat && chatMessages.length === 0) && (
             <div style={S.chatInputArea}>
               <div style={S.chatInputRow}>
                 <textarea

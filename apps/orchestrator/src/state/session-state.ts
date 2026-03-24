@@ -4,6 +4,7 @@ import { basename, resolve } from "node:path"
 import type { FastifyBaseLogger } from "fastify"
 import {
   demoPublishedPages,
+  IMAGE_PLACEHOLDER,
   type EditPlan,
   type Operation,
   type PageDoc,
@@ -171,7 +172,7 @@ export function ensureHeroImageProps(page: PageDoc) {
       // Skip imageUrl fallback if the block uses carouselImages instead
       if (typeof props.imageUrl !== "string" || props.imageUrl.length === 0) {
         if (!Array.isArray(props.carouselImages) || props.carouselImages.length === 0) {
-          props.imageUrl = "/hero-generated.svg"
+          props.imageUrl = IMAGE_PLACEHOLDER
         }
       }
       if (typeof props.imageAlt !== "string" || props.imageAlt.length === 0) {
@@ -196,7 +197,7 @@ export function ensureHeroImageProps(page: PageDoc) {
         ]
       }
       if (!Array.isArray(props.right) || props.right.length === 0) {
-        const src = typeof props.imageUrl === "string" ? props.imageUrl : "/hero-generated.svg"
+        const src = typeof props.imageUrl === "string" ? props.imageUrl : IMAGE_PLACEHOLDER
         const alt = typeof props.imageAlt === "string" ? props.imageAlt : "Section image"
         props.right = [{ type: "image", src, alt }]
       }
