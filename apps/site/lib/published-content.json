@@ -3,7 +3,7 @@
     "id": "home-1",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-22T17:43:54.119Z",
+    "updatedAt": "2026-03-24T20:27:53.129Z",
     "meta": {
       "title": "Home",
       "description": "A Contentful-powered site"
@@ -17,8 +17,8 @@
           "subheading": "This page is served from Contentful via the AI Site Editor block system.",
           "ctaText": "Check our plans",
           "ctaHref": "/pricing-plans",
-          "imageUrl": "https://images.ctfassets.net/eu3fr0x9v8qq/73SuNhjuUsTb2wCAjHmijP/df052694ff0e1c823a0bfa8a08382c8c/photo-1667053310801-d83094493eb5",
-          "imageAlt": "Enterprise software dashboard interface",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774384070824_rx2ul0.jpg",
+          "imageAlt": "generate an image of a person building a website sitting in front if monitor",
           "imagePosition": "right"
         }
       },
