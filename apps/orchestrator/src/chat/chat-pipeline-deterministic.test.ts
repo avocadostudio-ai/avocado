@@ -282,34 +282,22 @@ test("shouldReturnDeterministicClarification: rejects non-page ops", () => {
 // deterministicCreatePagePlan — template deferral
 // ---------------------------------------------------------------------------
 
-test("deterministicCreatePagePlan: defers to LLM when message mentions template and templates exist in context", () => {
-  const messageWithTemplates = [
-    "add a new page /campaign using a Campaign Landing Page template",
-    "[site context]",
-    "Page templates:",
-    "- Campaign Landing Page: Hero with bold CTA, FeatureGrid, Testimonials, CTA",
-    "[/site context]"
-  ].join("\n")
-  const result = deterministicCreatePagePlan({ session: "test-template-defer", message: messageWithTemplates })
+test("deterministicCreatePagePlan: defers to LLM when message mentions template and templates are available", () => {
+  const message = "add a new page /campaign using a Campaign Landing Page template"
+  const result = deterministicCreatePagePlan({ session: "test-template-defer", message, hasPageTemplates: true })
   assert.equal(result, null, "should return null to defer to LLM planner")
 })
 
-test("deterministicCreatePagePlan: does NOT defer when no templates in context", () => {
-  const messageWithoutTemplates = "add a new page /campaign using a Campaign Landing Page template"
-  const result = deterministicCreatePagePlan({ session: "test-template-no-defer", message: messageWithoutTemplates })
+test("deterministicCreatePagePlan: does NOT defer when no templates available", () => {
+  const message = "add a new page /campaign using a Campaign Landing Page template"
+  const result = deterministicCreatePagePlan({ session: "test-template-no-defer", message, hasPageTemplates: false })
   assert.ok(result !== null, "should create page deterministically when no templates available")
   assert.equal(result!.ops[0].op, "create_page")
 })
 
 test("deterministicCreatePagePlan: does NOT defer when templates exist but message does not mention template", () => {
-  const messageNoTemplateMention = [
-    "add a new page /about",
-    "[site context]",
-    "Page templates:",
-    "- Campaign Landing Page: Hero with bold CTA, FeatureGrid, Testimonials, CTA",
-    "[/site context]"
-  ].join("\n")
-  const result = deterministicCreatePagePlan({ session: "test-template-no-mention", message: messageNoTemplateMention })
+  const message = "add a new page /about"
+  const result = deterministicCreatePagePlan({ session: "test-template-no-mention", message, hasPageTemplates: true })
   assert.ok(result !== null, "should create page deterministically when user doesn't mention template")
   assert.equal(result!.ops[0].op, "create_page")
 })
