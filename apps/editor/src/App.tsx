@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Bot, Check, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal } from "lucide-react"
+import { Bot, Check, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
@@ -411,6 +411,8 @@ function EditorPage({
   const [addBlockSearch, setAddBlockSearch] = useState("")
   const [isAddingBlock, setIsAddingBlock] = useState(false)
   const [copiedDebugEntryId, setCopiedDebugEntryId] = useState<string | null>(null)
+  const [feedbackNoteEntryId, setFeedbackNoteEntryId] = useState<string | null>(null)
+  const [feedbackNoteText, setFeedbackNoteText] = useState("")
   const [selectedVariationId, setSelectedVariationId] = useState<string | null>(null)
   const [imagePickerTarget, setImagePickerTarget] = useState<{ slug: string; blockId: string; editablePath: string; currentUrl?: string } | null>(null)
   const imagePickerOpen = imagePickerTarget !== null
@@ -719,11 +721,15 @@ function EditorPage({
     }
 
     const params = { session, siteId, editorOrigin }
+
+    // When the site navigated on its own (user clicked a link inside the iframe),
+    // don't reload the iframe — the site already handled the navigation.
+    if (slugSyncedFromPreviewRef.current) {
+      slugSyncedFromPreviewRef.current = false
+      return
+    }
+
     if (siteDraftSecret && draftPrimedRef.current) {
-      if (slugSyncedFromPreviewRef.current) {
-        slugSyncedFromPreviewRef.current = false
-        return
-      }
       preview.postToSite("navigate", { href: buildSitePathWithQuery(slug, params) })
       return
     }
@@ -1453,6 +1459,61 @@ function EditorPage({
                   </button>
                 </div>
               ) : null}
+              {entry.role === "assistant" && entry.debug?.traceId && entry.id !== "welcome" ? (
+                <div className="msg-feedback-row">
+                  <button
+                    type="button"
+                    className={`msg-feedback-btn ${entry.feedback?.rating === "up" ? "msg-feedback-btn--active" : ""}`}
+                    onClick={() => {
+                      if (!entry.feedback) void chatEngine.submitFeedback(entry.id, "up")
+                    }}
+                    disabled={!!entry.feedback}
+                    title="Good response"
+                  >
+                    <ThumbsUp aria-hidden="true" size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`msg-feedback-btn ${entry.feedback?.rating === "down" ? "msg-feedback-btn--active" : ""}`}
+                    onClick={() => {
+                      if (!entry.feedback) {
+                        setFeedbackNoteEntryId(feedbackNoteEntryId === entry.id ? null : entry.id)
+                        setFeedbackNoteText("")
+                      }
+                    }}
+                    disabled={!!entry.feedback}
+                    title="Bad response"
+                  >
+                    <ThumbsDown aria-hidden="true" size={13} />
+                  </button>
+                  {entry.feedback ? (
+                    <span className="msg-feedback-label">
+                      {entry.feedback.rating === "up" ? "Thanks!" : "Noted"}
+                      {entry.feedback.note ? ` — "${entry.feedback.note}"` : ""}
+                    </span>
+                  ) : null}
+                  {feedbackNoteEntryId === entry.id && !entry.feedback ? (
+                    <form
+                      className="msg-feedback-note-form"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void chatEngine.submitFeedback(entry.id, "down", feedbackNoteText || undefined)
+                        setFeedbackNoteEntryId(null)
+                        setFeedbackNoteText("")
+                      }}
+                    >
+                      <input
+                        className="msg-feedback-note-input"
+                        placeholder="What went wrong? (optional)"
+                        value={feedbackNoteText}
+                        onChange={(e) => setFeedbackNoteText(e.target.value)}
+                        autoFocus
+                      />
+                      <button type="submit" className="msg-feedback-note-submit">Send</button>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           ))}
           {chatEngine.streamingText ? (
@@ -2056,6 +2117,7 @@ function EditorPage({
         currentUrl={imagePickerTarget?.currentUrl}
         gdriveFolderId={activeSiteConfig.gdriveFolderId}
         cmsMedia={activeSiteConfig.cmsMedia}
+        siteOrigin={activeSiteOrigin}
         onClose={() => setImagePickerTarget(null)}
         onSelect={(imageUrl, alt) => {
           if (!imagePickerTarget) return

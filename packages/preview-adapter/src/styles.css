@@ -117,7 +117,7 @@
   position: relative;
 }
 
-.editor-live-draft-active [data-editable-target] {
+.editor-live-draft-active [data-editable-target]:not([class*="absolute"]):not([class*="fixed"]) {
   position: relative;
   overflow: hidden;
 }
@@ -560,7 +560,7 @@
   transform: none;
 }
 
-[data-editor-active] .editor-selectable [data-editable-label] {
+[data-editor-active] .editor-selectable [data-editable-label]:not([class*="absolute"]):not([class*="fixed"]) {
   position: relative;
 }
 
@@ -569,7 +569,7 @@
   display: none;
 }
 
-.editor-highlight [data-editable-target] {
+.editor-highlight [data-editable-target]:not([class*="absolute"]):not([class*="fixed"]) {
   position: relative;
 }
 
