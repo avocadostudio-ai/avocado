@@ -55,19 +55,19 @@
     "id": "p_new_page",
     "slug": "/new-page",
     "title": "New Page",
-    "updatedAt": "2026-03-22T08:32:24Z",
+    "updatedAt": "2026-03-24T21:26:33.941Z",
     "blocks": [
       {
         "id": "block-b_hero_new-page",
         "type": "Hero",
         "props": {
-          "ctaHref": "/",
-          "ctaText": "Get started",
           "heading": "New Page",
-          "imageAlt": "Abstract generated illustration",
-          "imagePosition": "right",
           "subheading": "Use this page to introduce New Page.",
-          "imageUrl": "/hero-generated.svg"
+          "ctaText": "Get started",
+          "ctaHref": "/",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/97133d6ef7cbbcb4d3cf1d2ba07d6553a0c8ec29-1080x720.jpg",
+          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
+          "imagePosition": "right"
         }
       },
       {
@@ -112,27 +112,6 @@
           "imagePosition": "right",
           "subheading": "Make changes safely with instant preview.",
           "imageUrl": "/hero-generated.svg"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_test",
-    "slug": "/test",
-    "title": "Test",
-    "updatedAt": "2026-03-24T21:26:12.932Z",
-    "blocks": [
-      {
-        "id": "block-b_hero_test",
-        "type": "Hero",
-        "props": {
-          "heading": "Test",
-          "subheading": "Use this page to introduce Test.",
-          "ctaText": "Get started",
-          "ctaHref": "/",
-          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/97133d6ef7cbbcb4d3cf1d2ba07d6553a0c8ec29-1080x720.jpg",
-          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
-          "imagePosition": "right"
         }
       }
     ]
