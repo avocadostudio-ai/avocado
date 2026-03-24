@@ -3,23 +3,23 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T12:15:43.170Z",
+    "updatedAt": "2026-03-24T12:20:36.688Z",
     "blocks": [
       {
-        "id": "166-0",
+        "id": "218-0",
         "type": "Hero",
         "props": {
           "heading": "Enterprise Content Management Platform",
           "subheading": "Build amazing things",
           "ctaText": "Get Started",
           "ctaHref": "/about",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774354540774_l9fo70.jpg",
           "imageAlt": "make clock larger",
-          "imagePosition": "right"
+          "imagePosition": "right",
+          "imageUrl": "/hero-generated.svg"
         }
       },
       {
-        "id": "110-1",
+        "id": "140-1",
         "type": "CTA",
         "props": {
           "title": "Ready to start?",
@@ -34,19 +34,19 @@
     "id": "p_new_page",
     "slug": "/new-page",
     "title": "New Page",
-    "updatedAt": "2026-03-24T12:01:36.896Z",
+    "updatedAt": "2026-03-24T12:21:07.370Z",
     "blocks": [
       {
-        "id": "168-0",
+        "id": "220-0",
         "type": "Hero",
         "props": {
-          "heading": "New Page",
-          "subheading": "Use this page to introduce New Page.",
-          "ctaText": "Get started",
+          "heading": "Transform Your Vision into Reality",
+          "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
+          "ctaText": "Explore Now",
           "ctaHref": "/",
+          "imageUrl": "http://localhost:1337/uploads/photo_1476966502122_c26b7830def9_fdf36fcab9.jpeg",
           "imageAlt": "photo-1476966502122-c26b7830def9",
-          "imagePosition": "right",
-          "imageUrl": "/hero-generated.svg"
+          "imagePosition": "right"
         }
       }
     ]
