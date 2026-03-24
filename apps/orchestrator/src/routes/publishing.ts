@@ -19,7 +19,9 @@ import {
   requirePublishToken,
   listRestoreSnapshots,
   loadPublishedSnapshotFromCommit,
-  publishViaGit
+  publishViaGit,
+  collectInlineAssets,
+  recordPublishSnapshot
 } from "../publish/publish-helpers.js"
 import { firstUrlFromText } from "../chat/chat-pipeline.js"
 import { parseJsonMaybe } from "../chat/variation-pipeline.js"
@@ -71,7 +73,7 @@ function isSafeOrigin(raw: string): boolean {
   return true
 }
 
-export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext) {
+export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) {
   app.post("/publish", async (request, reply) => {
     if (!requirePublishToken(request as { headers: Record<string, unknown> })) {
       return reply.code(401).send({ error: "invalid publish token" })
@@ -92,6 +94,7 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
     // Publish via the site's contract endpoint
     if (siteOrigin) {
       const siteConfig = getSiteConfig(scopedSession)
+      const assets = await collectInlineAssets(pages, ctx.generatedImageDir)
       let siteRes: Response
       try {
         const publishTokenValue = process.env.PUBLISH_TOKEN?.trim()
@@ -105,7 +108,8 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
             pages,
             siteConfig,
             session: scopedSession,
-            publishedAt: new Date().toISOString()
+            publishedAt: new Date().toISOString(),
+            ...(Object.keys(assets).length > 0 ? { assets } : {})
           })
         })
       } catch (err) {
@@ -152,6 +156,9 @@ export async function publishingRoutes(app: FastifyInstance, _ctx: RouteContext)
           reason: siteResult.error ?? "site publish failed"
         })
       }
+
+      // Record snapshot in git so version history can find it
+      void recordPublishSnapshot(scopedSession, pages).catch(() => {})
 
       const publishedSlugs = siteResult.slugs ?? slugs
       const pageNames = publishedSlugs.map((s) => s === "/" ? "Home" : s.replace(/^\//, ""))
