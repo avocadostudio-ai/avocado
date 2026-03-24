@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T12:33:27.927Z",
+    "updatedAt": "2026-03-24T12:27:06.273Z",
     "blocks": [
       {
         "id": "226-0",
@@ -13,8 +13,8 @@
           "subheading": "Build amazing things",
           "ctaText": "Get Started",
           "ctaHref": "/about",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774355556070_jow2l3.jpg",
-          "imageAlt": "use avocado hero in the face, keep facial expression",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774355198009_apgxxd.jpg",
+          "imageAlt": "move clock to midnight and malke it larger",
           "imagePosition": "right"
         }
       },
@@ -34,7 +34,7 @@
     "id": "p_new_page",
     "slug": "/new-page",
     "title": "New Page",
-    "updatedAt": "2026-03-24T12:30:00.344Z",
+    "updatedAt": "2026-03-24T12:22:04.088Z",
     "blocks": [
       {
         "id": "228-0",
@@ -44,9 +44,9 @@
           "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
           "ctaText": "Explore Now",
           "ctaHref": "/",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774355380461_m1tsl8.jpg",
-          "imageAlt": "remove tears",
-          "imagePosition": "right"
+          "imageAlt": "photo-1476966502122-c26b7830def9",
+          "imagePosition": "right",
+          "imageUrl": "http://localhost:1337/uploads/large_photo_1476966502122_c26b7830def9_fdf36fcab9.jpeg"
         }
       }
     ]
