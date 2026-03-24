@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud, ZoomIn } from "lucide-react"
+import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud, ZoomIn, Paperclip, Eye } from "lucide-react"
 import { isImagePlaceholder } from "@ai-site-editor/shared"
 import { orchestrator } from "../lib/editor-utils"
 import { fetchCmsMedia, getCmsMediaLabel, type CmsMediaItem } from "../lib/cms-media"
@@ -100,7 +100,10 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [lightboxShowOriginal, setLightboxShowOriginal] = useState(false)
+  const [referenceImages, setReferenceImages] = useState<Array<{ url: string; thumbUrl: string; uploading?: boolean }>>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const refImageInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
 
@@ -185,6 +188,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     setEditMode(hasEditableImage ? "choose" : "new")
     setUploadResult(null)
     setUploadPreview(null)
+    setReferenceImages([])
     setCurrentPage(1)
     setHasMore(false)
     setLoadingMore(false)
@@ -236,7 +240,11 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
         const res = await fetch(`${orchestrator}/image/generate/chat`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ prompt: userPrompt, chatId: chatId ?? undefined, stream: true, ...(editMode === "edit" && hasEditableImage && currentUrl && !chatId ? { referenceImageUrl: currentUrl } : {}) })
+          body: JSON.stringify({
+            prompt: userPrompt, chatId: chatId ?? undefined, stream: true,
+            ...(editMode === "edit" && hasEditableImage && currentUrl && !chatId ? { referenceImageUrl: currentUrl } : {}),
+            ...(referenceImages.length > 0 && !chatId ? { referenceImageUrls: referenceImages.filter(r => r.url).map(r => r.url) } : {})
+          })
         })
         if (!res.ok || !res.body) return
 
@@ -293,6 +301,42 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     }
   }
 
+  const MAX_REFERENCES = 14
+  const effectiveMaxReferences = (editMode === "edit" && hasEditableImage) ? MAX_REFERENCES - 1 : MAX_REFERENCES
+
+  const handleReferenceImageAdd = async (files: File[]) => {
+    const remaining = effectiveMaxReferences - referenceImages.length
+    const toProcess = files.filter(f => f.type.startsWith("image/") && f.size <= 5 * 1024 * 1024).slice(0, remaining)
+    if (toProcess.length === 0) return
+
+    // Add with local previews immediately
+    const newEntries = toProcess.map(f => ({ url: "", thumbUrl: URL.createObjectURL(f), uploading: true, _file: f }))
+    const startIdx = referenceImages.length
+    setReferenceImages(prev => [...prev, ...newEntries.map(({ _file: _, ...e }) => e)])
+
+    // Upload each in parallel
+    await Promise.allSettled(newEntries.map(async (entry, i) => {
+      const form = new FormData()
+      form.append("image", entry._file)
+      const res = await fetch(`${orchestrator}/image/upload`, { method: "POST", body: form })
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+      const data = (await res.json()) as { url: string }
+      setReferenceImages(prev => prev.map((r, ri) => ri === startIdx + i ? { ...r, url: data.url, uploading: false } : r))
+    }))
+  }
+
+  const handleRefImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length > 0) void handleReferenceImageAdd(files)
+    e.target.value = ""
+  }
+
+  const handleRefDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"))
+    if (files.length > 0) void handleReferenceImageAdd(files)
+  }
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -339,7 +383,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (lightboxUrl) { setLightboxUrl(null); e.stopPropagation() }
+        if (lightboxUrl) { setLightboxUrl(null); setLightboxShowOriginal(false); e.stopPropagation() }
         else onClose()
       }
     }
@@ -492,7 +536,11 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
 
         {/* ---- Generate tab ---- */}
         {activeTab === "generate" && (
-          <div style={{ ...S.formArea, display: "flex", flexDirection: "column", flex: features.imageGenerateChat ? "1 1 0" : undefined, minHeight: 0 }}>
+          <div
+            style={{ ...S.formArea, display: "flex", flexDirection: "column", flex: features.imageGenerateChat ? "1 1 0" : undefined, minHeight: 0 }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy" }}
+            onDrop={handleRefDrop}
+          >
             {/* Choice: edit existing or generate new */}
             {features.imageGenerateChat && hasEditableImage && editMode === "choose" && chatMessages.length === 0 && (
               <div style={S.editChoiceContainer}>
@@ -564,13 +612,36 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             {/* Prompt input — hidden during choice screen */}
             {!(hasEditableImage && editMode === "choose" && features.imageGenerateChat && chatMessages.length === 0) && (
             <div style={S.chatInputArea}>
+              {/* Reference images strip */}
+              {referenceImages.length > 0 && (
+                <div style={S.refStrip}>
+                  {referenceImages.map((ref, i) => (
+                    <div key={i} style={S.refThumb}>
+                      <img src={ref.thumbUrl} alt="" style={S.refThumbImg} />
+                      {ref.uploading && <div style={S.refUploading} />}
+                      {!chatId && (
+                        <button
+                          style={S.refRemoveBtn}
+                          onClick={() => setReferenceImages(prev => prev.filter((_, ri) => ri !== i))}
+                          aria-label="Remove reference"
+                        ><X size={10} /></button>
+                      )}
+                    </div>
+                  ))}
+                  {!chatId && referenceImages.length < effectiveMaxReferences && (
+                    <button style={S.refAddBtn} onClick={() => refImageInputRef.current?.click()}>+</button>
+                  )}
+                  <span style={S.refCount}>{referenceImages.length}/{effectiveMaxReferences}</span>
+                </div>
+              )}
+              <input ref={refImageInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleRefImageInput} />
               <div style={S.chatInputRow}>
                 <textarea
                   placeholder={chatMessages.length > 0
-                    ? "Refine: e.g. 'Make it warmer' or 'Add more contrast'"
+                    ? "Refine: 'Make it warmer'…"
                     : editMode === "edit"
-                      ? "Describe changes: e.g. 'Make the background brighter' or 'Add a sunset'"
-                      : "Describe the image you want, e.g. 'A professional photo of a modern office with natural light'"}
+                      ? "Describe changes…"
+                      : "Describe the image you want…"}
                   value={generatePrompt}
                   onChange={(e) => {
                     setGeneratePrompt(e.target.value)
@@ -582,6 +653,14 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                   rows={1}
                   autoFocus
                 />
+                {!chatId && (
+                  <button
+                    style={{ ...S.attachBtn, ...(referenceImages.length >= effectiveMaxReferences ? S.disabled : {}) }}
+                    onClick={() => refImageInputRef.current?.click()}
+                    disabled={referenceImages.length >= effectiveMaxReferences}
+                    title="Attach example images for AI to reference (up to 14)"
+                  ><Paperclip size={15} /></button>
+                )}
                 <button
                   onClick={handleGenerate}
                   disabled={!generatePrompt.trim() || generating}
@@ -607,9 +686,18 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
 
         {/* Lightbox */}
         {lightboxUrl && (
-          <div style={S.lightboxOverlay} onClick={() => setLightboxUrl(null)}>
-            <button onClick={() => setLightboxUrl(null)} style={S.lightboxClose} aria-label="Close preview"><X size={20} /></button>
-            <img src={lightboxUrl} alt="" style={S.lightboxImg} onClick={(e) => e.stopPropagation()} />
+          <div style={S.lightboxOverlay} onClick={() => { setLightboxUrl(null); setLightboxShowOriginal(false) }}>
+            <button onClick={() => { setLightboxUrl(null); setLightboxShowOriginal(false) }} style={S.lightboxClose} aria-label="Close preview"><X size={20} /></button>
+            <img src={lightboxShowOriginal && currentUrl ? currentUrl : lightboxUrl} alt="" style={S.lightboxImg} onClick={(e) => e.stopPropagation()} />
+            {editMode === "edit" && hasEditableImage && currentUrl && lightboxUrl !== currentUrl && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightboxShowOriginal(prev => !prev) }}
+                style={S.lightboxToggleOriginal}
+              >
+                <Eye size={15} />
+                {lightboxShowOriginal ? "Show edited" : "Show original"}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -703,7 +791,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 14, outline: "none", boxSizing: "border-box"
   },
   textarea: {
-    width: "100%", padding: "10px 12px", background: "#0b1425",
+    width: "100%", padding: "8px 12px", background: "#0b1425",
     border: "1px solid #355073", borderRadius: 10, color: "#edf4ff",
     fontSize: 14, outline: "none", boxSizing: "border-box", resize: "none" as const, overflow: "hidden",
     fontFamily: "inherit"
@@ -787,12 +875,19 @@ const S: Record<string, React.CSSProperties> = {
     width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
     color: "white", cursor: "pointer"
   },
+  lightboxToggleOriginal: {
+    position: "absolute" as const, bottom: 24, left: "50%", transform: "translateX(-50%)",
+    background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 20,
+    padding: "8px 18px", display: "flex", alignItems: "center", gap: 7,
+    color: "white", fontSize: 13, fontWeight: 500, cursor: "pointer",
+    whiteSpace: "nowrap" as const, backdropFilter: "blur(8px)"
+  },
   editContextLabel: {
     fontSize: 13, color: "#8fa6c9", lineHeight: 1.4
   },
   chatInputArea: {
     flexShrink: 0, display: "flex", flexDirection: "column" as const, gap: 8,
-    paddingTop: 14, borderTop: "1px solid #253652"
+    paddingTop: 10, paddingBottom: 14
   },
   chatInputRow: {
     display: "flex", gap: 8, alignItems: "center"
@@ -840,9 +935,45 @@ const S: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const, flexShrink: 0
   },
   generateBtn: {
-    display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0,
-    padding: "9px 18px", background: "#2f79dc", color: "white",
+    display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0,
+    height: 36, padding: "0 14px", background: "#2f79dc", color: "white",
     border: "1px solid #6fa8f2", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer"
+  },
+  attachBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    width: 36, height: 36, background: "none", border: "1px solid #3f5f88",
+    borderRadius: 8, color: "#8fa6c9", cursor: "pointer", padding: 0
+  },
+  refStrip: {
+    display: "flex", alignItems: "center", gap: 6, overflowX: "auto" as const,
+    paddingBottom: 6
+  },
+  refThumb: {
+    position: "relative" as const, width: 44, height: 44, flexShrink: 0, borderRadius: 6,
+    overflow: "hidden"
+  },
+  refThumbImg: {
+    width: "100%", height: "100%", objectFit: "cover" as const, display: "block"
+  },
+  refRemoveBtn: {
+    position: "absolute" as const, top: 2, right: 2,
+    width: 16, height: 16, padding: 0, border: "none",
+    borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "white",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", fontSize: 10, lineHeight: 1
+  },
+  refUploading: {
+    position: "absolute" as const, inset: 0, background: "rgba(0,0,0,0.4)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 6
+  },
+  refAddBtn: {
+    width: 44, height: 44, flexShrink: 0, borderRadius: 6,
+    border: "1px dashed #3f5f88", background: "none", color: "#8fa6c9",
+    cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center"
+  },
+  refCount: {
+    fontSize: 11, color: "#7389aa", whiteSpace: "nowrap" as const, marginLeft: 4, flexShrink: 0
   },
 
   // Footer
