@@ -276,7 +276,7 @@ export function useSiteList(siteId: string, session: string) {
     patch: Partial<
       Pick<
         SiteConfig,
-        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "gdriveFolderId" | "cmsMedia"
+        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "pageTemplates" | "gdriveFolderId" | "cmsMedia"
       >
     >
   ) => {
@@ -295,6 +295,7 @@ export function useSiteList(siteId: string, session: string) {
               ...(patch.vercelDeployHookUrl !== undefined ? { vercelDeployHookUrl: patch.vercelDeployHookUrl } : {}),
               ...(patch.tone !== undefined ? { tone: patch.tone } : {}),
               ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {}),
+              ...(patch.pageTemplates !== undefined ? { pageTemplates: patch.pageTemplates } : {}),
               ...(patch.gdriveFolderId !== undefined ? { gdriveFolderId: patch.gdriveFolderId } : {}),
               ...(patch.cmsMedia !== undefined ? { cmsMedia: patch.cmsMedia } : {})
             }

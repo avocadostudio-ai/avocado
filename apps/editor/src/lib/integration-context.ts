@@ -1,5 +1,5 @@
 import type { BlockManifest } from "@ai-site-editor/shared"
-import type { SiteCapabilities, SiteConfig } from "./editor-types"
+import type { PageTemplate, SiteCapabilities, SiteConfig } from "./editor-types"
 import { parseArrayOfStrings, parseString } from "./parse-utils"
 
 type SiteContextPayload = {
@@ -15,6 +15,7 @@ type SiteContextPayload = {
     purpose?: string
     tone?: string
     constraints?: string[]
+    pageTemplates?: PageTemplate[]
     gdriveFolderId?: string
   }
 }
@@ -45,6 +46,7 @@ export function buildSiteContextPayload(siteId: string, activeSiteConfig: SiteCo
       purpose,
       tone: tone || undefined,
       constraints: constraints.length > 0 ? constraints : undefined,
+      pageTemplates: activeSiteConfig.pageTemplates?.filter(t => t.name && t.description),
       gdriveFolderId: activeSiteConfig.gdriveFolderId?.trim() || undefined
     }
   }
