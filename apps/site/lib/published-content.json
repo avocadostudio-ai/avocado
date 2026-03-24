@@ -1,37 +1,85 @@
 [
   {
-    "id": "home-1",
+    "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-24T20:54:14.171Z",
-    "meta": {
-      "title": "Home",
-      "description": "A Contentful-powered site"
-    },
+    "updatedAt": "2026-03-24T20:29:21.848Z",
     "blocks": [
       {
-        "id": "block_block_block_hero-1",
+        "id": "272-0",
         "type": "Hero",
         "props": {
-          "heading": "Welcome to the Contentful Site",
-          "subheading": "This page is served from Contentful via the AI Site Editor block system.",
-          "ctaText": "Check our plans",
-          "ctaHref": "/pricing-plans",
-          "imageUrl": "https://images.ctfassets.net/eu3fr0x9v8qq/pXKHvCDGNPtoWss0qoy1e/f5feed9213b0a083cbb30ccc7fcd2929/photo-1504805572947-34fad45aed93",
-          "imageAlt": "Do Something Great neon sign",
-          "imagePosition": "right"
+          "heading": "Build with Strapi",
+          "subheading": "Powerful tools to manage, publish, and optimize your content across all channels",
+          "ctaText": "Start Free Trial",
+          "ctaHref": "/signup",
+          "imageAlt": "make the clock larger, add proper numbers",
+          "imagePosition": "right",
+          "imageUrl": "http://localhost:1337/uploads/large_gen_1774381906261_47d8jz_65d54ca645.jpg"
         }
       },
       {
-        "id": "block_block_block_b_richtext_1774156395336",
+        "id": "6-1",
         "type": "RichText",
         "props": {
-          "title": "Powered by Contentful!",
-          "body": "This site is built with Contentful, a headless CMS that separates content management from presentation. That means you can manage your content once and deliver it anywhere—web, mobile, or any channel you choose.\n\nWith Contentful's flexible content model, you define your own content structure without rigid page templates. APIs let your developers fetch and display content exactly how they need it, while content editors work in an intuitive interface.\n\nContentful's powerful capabilities extend beyond simple publishing. You gain real-time collaboration features, version control, and workflow management that ensure your team stays synchronized. Advanced scheduling tools let you plan content releases months in advance, while webhooks and real-time updates keep your digital experiences fresh and responsive to your audience's needs.\n\nThe beauty of a headless approach lies in its flexibility and scalability. Whether you're managing a single website, multiple microsites, or delivering content to IoT devices and voice assistants, Contentful adapts to your architecture. You're never locked into a particular presentation layer, giving you complete freedom to innovate and evolve your digital strategy without constraints.\n\n**Ready to experience the power of structured content?** Start exploring Contentful today and transform how you manage your digital experiences."
+          "title": "Why Choose Our Platform",
+          "body": "Streamline your workflow with enterprise-grade campaign tools. Collaborate seamlessly, publish instantly, and measure impact in real time."
         }
       },
       {
-        "id": "block_block_block_b_cardgrid_1774161229066_910",
+        "id": "6-2",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Common Questions",
+          "items": [
+            {
+              "q": "How do I set up my first campaign?",
+              "a": "Simply connect your content sources, define your audience, and set your launch date. Our onboarding wizard guides you through every step."
+            },
+            {
+              "q": "Can I collaborate with my team?",
+              "a": "Yes. Invite team members, assign roles, and manage permissions. Real-time collaboration keeps everyone in sync."
+            },
+            {
+              "q": "What analytics do you provide?",
+              "a": "Track engagement, reach, conversions, and ROI across channels. Detailed reports and dashboards give you actionable insights."
+            }
+          ]
+        }
+      },
+      {
+        "id": "166-3",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to Transform Your Content Strategy?",
+          "description": "Join hundreds of companies using Strapi to power their campaigns.",
+          "ctaText": "Get Started Today",
+          "ctaHref": "/signup"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_news",
+    "slug": "/news",
+    "title": "News",
+    "updatedAt": "2026-03-24T20:56:09.648Z",
+    "blocks": [
+      {
+        "id": "274-0",
+        "type": "Hero",
+        "props": {
+          "heading": "Transform Your Vision into Reality",
+          "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
+          "ctaText": "Explore Now",
+          "ctaHref": "/",
+          "imageAlt": "open eyes",
+          "imagePosition": "right",
+          "imageUrl": "http://localhost:1337/uploads/large_gen_1774361409463_blajwy_e17050736f.jpg"
+        }
+      },
+      {
+        "id": "b_cardgrid_1774385706244_233",
         "type": "CardGrid",
         "props": {
           "title": "Explore more",
@@ -46,7 +94,9 @@
               "title": "Safe updates",
               "description": "Schema-validated edits reduce breakage.",
               "ctaText": "See how",
-              "ctaHref": "/pricing"
+              "ctaHref": "/pricing",
+              "imageUrl": "http://localhost:4200/generated-images/gen_1774385766300_p8f2jc.jpg",
+              "imageAlt": "replace by a boy"
             },
             {
               "title": "Team workflow",
@@ -55,16 +105,6 @@
               "ctaHref": "/"
             }
           ]
-        }
-      },
-      {
-        "id": "block_block_block_b_cta_1774156320864",
-        "type": "CTA",
-        "props": {
-          "title": "Ready to get started?",
-          "description": "Apply your next change in seconds.",
-          "ctaText": "Learn More",
-          "ctaHref": "/about-us"
         }
       }
     ]
