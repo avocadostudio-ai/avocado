@@ -159,6 +159,28 @@ export function getImageFields(blockType: string): Set<string> {
   return result
 }
 
+/** Cache for getListImageFields results. */
+const _listImageFieldsCache = new Map<string, Map<string, Set<string>>>()
+
+/** Get list props that contain image fields: Map<listKey, Set<imageFieldKey>>. */
+export function getListImageFields(blockType: string): Map<string, Set<string>> {
+  const cached = _listImageFieldsCache.get(blockType)
+  if (cached) return cached
+  const meta = _blockMeta[blockType]
+  const result = new Map<string, Set<string>>()
+  if (meta?.listFields) {
+    for (const [listKey, listMeta] of Object.entries(meta.listFields)) {
+      const imageKeys = new Set<string>()
+      for (const [fieldKey, fieldMeta] of Object.entries(listMeta.itemFields)) {
+        if (fieldMeta.kind === "image") imageKeys.add(fieldKey)
+      }
+      if (imageKeys.size > 0) result.set(listKey, imageKeys)
+    }
+  }
+  _listImageFieldsCache.set(blockType, result)
+  return result
+}
+
 /** Check if a block type is a chrome block (structurally pinned). */
 export function isChrome(type: string): boolean {
   return _blockMeta[type]?.chrome === true

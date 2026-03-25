@@ -1,4 +1,4 @@
-import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
+import { getAllBlockMeta } from "@ai-site-editor/shared"
 
 /** Convert PascalCase block type to Sanity camelCase: CTA → cta, FAQAccordion → faqAccordion */
 export function toSanityName(pascalCase: string): string {
@@ -18,5 +18,10 @@ export function sanityNameToBlockType(sanityName: string): string {
   return _sanityNameMap.get(sanityName) ?? sanityName.charAt(0).toUpperCase() + sanityName.slice(1)
 }
 
-// getImageFields is re-exported from @ai-site-editor/shared
-export { getImageFields }
+// Re-exported from @ai-site-editor/shared
+export { getImageFields, getListImageFields } from "@ai-site-editor/shared"
+
+/** List props stored as Sanity document references (vs inline array objects). */
+export const REFERENCE_LISTS: Record<string, Set<string>> = {
+  CardGrid: new Set(["cards"]),
+}

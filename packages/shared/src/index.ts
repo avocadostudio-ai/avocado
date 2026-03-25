@@ -29,6 +29,7 @@ export {
   getBlockMeta,
   getAllBlockMeta,
   getImageFields,
+  getListImageFields,
   isFieldInlineEditable,
   getImageSpec,
   isChrome,
