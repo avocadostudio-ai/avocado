@@ -1,5 +1,9 @@
 /**
- * Generate Sanity schema files from the shared block registry.
+ * OPTIONAL STARTER KIT: Generate Sanity schema files from the default block set.
+ *
+ * Skip this if you have an existing Sanity schema — instead, write your own
+ * fetch adapter (lib/sanity.fetch.ts) and block manifest (getManifest in the
+ * editor API route). See villa-puravida-web for a custom-blocks example.
  *
  * Usage: pnpm sanity:schema-gen
  *
