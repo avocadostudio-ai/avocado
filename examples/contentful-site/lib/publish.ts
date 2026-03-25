@@ -242,7 +242,8 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     const upsertResults = await Promise.allSettled(pages.map(async (page) => {
       const blockEntries = await Promise.all(page.blocks.map(async (block) => {
         const contentTypeId = `block${block.type}`
-        const entryId = `block_${block.id}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
+        const rawId = block.id.startsWith("block_") ? block.id : `block_${block.id}`
+        const entryId = rawId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
 
         // Fetch existing entry for fallback (image fields) and later upsert
         let existingEntry: CfEntry | null = null

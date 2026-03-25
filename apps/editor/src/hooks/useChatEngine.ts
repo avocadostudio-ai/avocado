@@ -1289,10 +1289,10 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   async function continueChain(chainId: string) {
     if (!chainId || isLoading) return
-    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Continue to next step." }])
+    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: t("ops.continueNext") }])
     setIsLoading(true)
     try {
-      await submitChatHttp(t("ops.continueNext"), {
+      await submitChatHttp("Continue to next step", {
         executionMode: "continue_chain",
         continuationChainId: chainId
       })

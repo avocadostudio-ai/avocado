@@ -10,8 +10,7 @@ function resolveLocale(locale?: string): ServerLocale {
   return "en"
 }
 
-const strings: Record<ServerLocale, Record<string, string>> = {
-  en: {
+const en = {
     "rename.needsPath": "Please provide the target page path, for example: rename page from /old to /new.",
     "rename.done": "Renamed page path from {{from}} to {{to}}.",
     "delete.homeBlocked": "The home page cannot be deleted. Navigate to a different page first, or specify which page to delete (e.g. \"delete /about\").",
@@ -49,7 +48,11 @@ const strings: Record<ServerLocale, Record<string, string>> = {
     "add.done": "Added {{type}}.",
     "duplicate.done": "Duplicated {{type}}.",
     "duplicate.pageDone": "Duplicated page {{from}} as {{to}}.",
-  },
+} as const
+
+type ServerStringKey = keyof typeof en
+const strings: Record<ServerLocale, Record<ServerStringKey, string>> = {
+  en,
   de: {
     "rename.needsPath": "Bitte gib den Zielpfad an, zum Beispiel: Seite umbenennen von /alt nach /neu.",
     "rename.done": "Seitenpfad von {{from}} nach {{to}} umbenannt.",
@@ -91,7 +94,7 @@ const strings: Record<ServerLocale, Record<string, string>> = {
   },
 }
 
-export function st(locale: string | undefined, key: string, vars?: Record<string, string | number>): string {
+export function st(locale: string | undefined, key: ServerStringKey, vars?: Record<string, string | number>): string {
   const l = resolveLocale(locale)
   let str = strings[l][key] ?? strings.en[key] ?? key
   if (vars) {

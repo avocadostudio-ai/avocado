@@ -286,20 +286,17 @@ export async function collectInlineAssets(
   const urlMap = findLocalhostImageUrls(pages)
   if (urlMap.size === 0) return {}
 
-  const assets: Record<string, InlineAsset> = {}
-  for (const [originalUrl, fileName] of urlMap) {
-    const filePath = resolve(generatedImageDir, fileName)
-    try {
-      const bytes = await readFile(filePath)
+  const entries = Array.from(urlMap.entries())
+  const results = await Promise.allSettled(
+    entries.map(async ([originalUrl, fileName]) => {
+      const bytes = await readFile(resolve(generatedImageDir, fileName))
       const ext = fileName.split(".").pop()?.toLowerCase() ?? "png"
-      assets[originalUrl] = {
-        data: bytes.toString("base64"),
-        mimeType: MIME_BY_EXT[ext] ?? "image/png",
-        fileName,
-      }
-    } catch {
-      // File missing on disk — skip gracefully (same as git publish)
-    }
+      return [originalUrl, { data: bytes.toString("base64"), mimeType: MIME_BY_EXT[ext] ?? "image/png", fileName }] as const
+    })
+  )
+  const assets: Record<string, InlineAsset> = {}
+  for (const r of results) {
+    if (r.status === "fulfilled") assets[r.value[0]] = r.value[1]
   }
   return assets
 }

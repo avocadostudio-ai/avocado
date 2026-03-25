@@ -88,6 +88,10 @@ let publish: (pages: PageDoc[], config: Record<string, unknown>) => Promise<{ ok
 const TEST_SLUG_HOME = "/"
 const TEST_SLUG_ABOUT = "/e2e-about"
 const TEST_SLUG_CONTACT = "/e2e-contact"
+const TEST_SLUG_IMAGE = "/e2e-image"
+
+// 1×1 red PNG for inline asset tests
+const TEST_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg=="
 
 function makePage(slug: string, title: string, blocks: PageDoc["blocks"] = []): PageDoc {
   return {
@@ -148,14 +152,14 @@ describe("strapi-e2e: publish round-trip", { timeout: 30_000 }, () => {
     existingPages = await fetchMod.getStrapiPages()
 
     // Clean up test pages from previous runs
-    for (const slug of [TEST_SLUG_ABOUT, TEST_SLUG_CONTACT]) {
+    for (const slug of [TEST_SLUG_ABOUT, TEST_SLUG_CONTACT, TEST_SLUG_IMAGE]) {
       await deleteStrapiPage(slug).catch(() => {})
     }
   })
 
   after(async () => {
     if (skip) return
-    for (const slug of [TEST_SLUG_ABOUT, TEST_SLUG_CONTACT]) {
+    for (const slug of [TEST_SLUG_ABOUT, TEST_SLUG_CONTACT, TEST_SLUG_IMAGE]) {
       await deleteStrapiPage(slug).catch(() => {})
     }
   })
@@ -259,5 +263,108 @@ describe("strapi-e2e: publish round-trip", { timeout: 30_000 }, () => {
     assert.equal(fetched.blocks[0].props.heading, "Round-trip Hero")
     assert.equal(fetched.blocks[1].type, "CTA")
     assert.equal(fetched.blocks[1].props.title, "Round-trip CTA")
+  })
+
+  // -----------------------------------------------------------------------
+  // 5. Inline asset: generated image uploaded to Strapi media
+  // -----------------------------------------------------------------------
+  test("publish uploads inline asset (generated image) to Strapi media", async (t) => {
+    if (skip) return t.skip("Strapi not reachable")
+
+    const localhostUrl = "http://localhost:4200/generated-images/e2e_test_image.png"
+    const page = makePage(TEST_SLUG_IMAGE, "E2E Image Test", [{
+      id: "b_hero_img",
+      type: "Hero",
+      props: {
+        heading: "Image Upload Test",
+        subheading: "Testing inline asset",
+        ctaText: "Go",
+        ctaHref: "/",
+        imageUrl: localhostUrl,
+        imageAlt: "E2E test image",
+      },
+    }])
+
+    const result = await publish([...existingPages, page], {}, {
+      assets: {
+        [localhostUrl]: {
+          data: TEST_PNG_BASE64,
+          mimeType: "image/png",
+          fileName: "e2e_test_image.png",
+        },
+      },
+    })
+    assert.ok(result.ok, `publish failed: ${result.error}`)
+
+    // Verify the image was uploaded to Strapi media and linked to the block
+    const cms = await findStrapiPage(TEST_SLUG_IMAGE)
+    assert.ok(cms, "page not found in Strapi after publish")
+    const hero = cms.blocks?.[0] as Record<string, unknown> | undefined
+    assert.ok(hero, "hero block missing")
+    assert.equal(hero.__component, "blocks.hero")
+
+    // imageUrl should be a populated media object (not null, not a number)
+    const media = hero.imageUrl as { id?: number; url?: string; name?: string } | null
+    assert.ok(media && typeof media === "object", `imageUrl should be a media object, got: ${JSON.stringify(media)}`)
+    assert.ok(media.url, "media should have a url")
+    assert.ok(media.url!.includes("e2e_test_image"), `uploaded media name should contain 'e2e_test_image', got: ${media.url}`)
+  })
+
+  // -----------------------------------------------------------------------
+  // 6. Existing media preserved when image can't be resolved
+  // -----------------------------------------------------------------------
+  test("publish preserves existing Strapi media when image URL is unresolvable", async (t) => {
+    if (skip) return t.skip("Strapi not reachable")
+
+    // First publish WITH inline asset so the page has a real media reference
+    const localhostUrl = "http://localhost:4200/generated-images/e2e_preserve_test.png"
+    const page1 = makePage(TEST_SLUG_IMAGE, "E2E Preserve Test", [{
+      id: "b_hero_preserve",
+      type: "Hero",
+      props: {
+        heading: "Preserve Test",
+        subheading: "Sub",
+        ctaText: "Go",
+        ctaHref: "/",
+        imageUrl: localhostUrl,
+        imageAlt: "preserve test",
+      },
+    }])
+    const r1 = await publish([...existingPages, page1], {}, {
+      assets: {
+        [localhostUrl]: {
+          data: TEST_PNG_BASE64,
+          mimeType: "image/png",
+          fileName: "e2e_preserve_test.png",
+        },
+      },
+    })
+    assert.ok(r1.ok, `initial publish failed: ${r1.error}`)
+
+    // Capture the media URL
+    const cms1 = await findStrapiPage(TEST_SLUG_IMAGE)
+    const media1 = cms1?.blocks?.[0]?.imageUrl as { url?: string } | null
+    assert.ok(media1?.url, "initial publish should have created media")
+
+    // Re-publish with an unresolvable image (placeholder SVG) — media should be preserved
+    const page2 = makePage(TEST_SLUG_IMAGE, "E2E Preserve Test Updated", [{
+      id: "b_hero_preserve",
+      type: "Hero",
+      props: {
+        heading: "Preserve Test Updated",
+        subheading: "Sub",
+        ctaText: "Go",
+        ctaHref: "/",
+        imageUrl: "/hero-generated.svg",
+        imageAlt: "preserve test",
+      },
+    }])
+    const r2 = await publish([...existingPages, page2], {})
+    assert.ok(r2.ok, `re-publish failed: ${r2.error}`)
+
+    const cms2 = await findStrapiPage(TEST_SLUG_IMAGE)
+    const media2 = cms2?.blocks?.[0]?.imageUrl as { url?: string } | null
+    assert.ok(media2?.url, "existing media should be preserved, not voided")
+    assert.equal(media2!.url, media1!.url, "media URL should be unchanged after re-publish")
   })
 })
