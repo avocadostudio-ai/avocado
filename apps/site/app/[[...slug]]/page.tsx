@@ -6,6 +6,7 @@ import { buildSlug, single } from "@ai-site-editor/site-sdk"
 import { resolveEditorContext } from "@ai-site-editor/site-sdk/draft"
 import { SitePageContent } from "../../components/site-page-content"
 import { EditorPageWrapper } from "../../components/editor-wrapper"
+import { ImmersivePageWrapper } from "../../components/immersive-wrapper"
 import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../../lib/content"
 import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content-api"
 import { derivePageDescription } from "../../lib/seo"
@@ -170,7 +171,29 @@ export default async function SitePage({ params, searchParams }: PageProps) {
     return <SitePageContent page={page} chromeHeader={chromeHeader} />
   }
 
-  // Editor mode: wrapper with overlays and block selection
+  // Immersive mode: widget rendered directly on page, no iframe needed
+  const isImmersive = single(resolvedSearch.immersive) === "1"
+  if (isImmersive) {
+    const orchestratorUrl = process.env.ORCHESTRATOR_URL?.replace(/\/+$/, "") ?? "http://localhost:4200"
+    // Rebuild nav with immersive query params so links preserve the mode
+    const immersiveQuery = (() => {
+      const p = new URLSearchParams({ session, siteId, __editor: "1", immersive: "1" })
+      return `?${p.toString()}`
+    })()
+    const immersiveNav = buildNavItems({ navSlugs, currentSlug: slug, siteConfig, siteId, editorQuery: immersiveQuery })
+    const immersiveHeader = buildSiteHeaderBlock({ navItems: immersiveNav.navItems, siteName: immersiveNav.siteName, siteLogo: immersiveNav.siteLogo, activePath: slug })
+    return (
+      <ImmersivePageWrapper
+        page={page}
+        chromeHeader={immersiveHeader}
+        slug={slug}
+        config={{ orchestratorUrl, session, siteId }}
+        siteContext={{ siteName: siteConfig.name }}
+      />
+    )
+  }
+
+  // Editor mode: wrapper with overlays and block selection (iframe)
   return (
     <EditorPageWrapper
       page={page}

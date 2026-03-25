@@ -1,7 +1,7 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@ai-site-editor/preview-adapter", "@ai-site-editor/site-sdk", "@ai-site-editor/blocks"],
+  transpilePackages: ["@ai-site-editor/preview-adapter", "@ai-site-editor/site-sdk", "@ai-site-editor/blocks", "@ai-site-editor/immersive-widget"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
       config.resolve = {
         ...config.resolve,
         symlinks: false,
+      }
+      // Bust persistent cache for workspace packages so HMR picks up changes
+      // without needing to manually delete .next/cache.
+      // Uses BUILD_ID env (set by dev script) or timestamp as cache version.
+      config.cache = {
+        ...config.cache,
+        version: `${process.env.WORKSPACE_CACHE_BUST ?? Date.now()}`,
       }
     }
     return config
