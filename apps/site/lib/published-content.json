@@ -3,108 +3,188 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-25T10:57:22.902Z",
+    "updatedAt": "2026-03-25T11:02:40.635Z",
     "blocks": [
       {
-        "id": "328-0",
+        "id": "block-block-block-b_hero_home",
         "type": "Hero",
         "props": {
-          "heading": "Build with Strapi",
-          "subheading": "Powerful tools to manage, publish, and optimize your content across all channels",
-          "ctaText": "Start Free Trial",
-          "ctaHref": "/signup",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774436240637_9ttkkh.jpg",
-          "imageAlt": "insert strapi logo top left corner",
+          "heading": "Welcome to Sanity Site",
+          "subheading": "Build and manage your content with ease.",
+          "ctaText": "Get started",
+          "ctaHref": "/explore",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774436558581_yolj3f.jpg",
+          "imageAlt": "give logo more contrast use #f50 color",
           "imagePosition": "right"
         }
       },
       {
-        "id": "28-1",
-        "type": "RichText",
+        "id": "block-block-block-b_features_home",
+        "type": "FeatureGrid",
         "props": {
-          "title": "Why Choose Our Platform",
-          "body": "Streamline your workflow with enterprise-grade campaign tools. Collaborate seamlessly, publish instantly, and measure impact in real time."
-        }
-      },
-      {
-        "id": "28-2",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Common Questions",
-          "items": [
+          "features": [
             {
-              "q": "How do I set up my first campaign?",
-              "a": "Simply connect your content sources, define your audience, and set your launch date. Our onboarding wizard guides you through every step."
+              "description": "Launch quickly with guided defaults.",
+              "title": "Fast setup"
             },
             {
-              "q": "Can I collaborate with my team?",
-              "a": "Yes. Invite team members, assign roles, and manage permissions. Real-time collaboration keeps everyone in sync."
+              "description": "Structured operations keep content valid.",
+              "title": "Safe edits"
             },
             {
-              "q": "What analytics do you provide?",
-              "a": "Track engagement, reach, conversions, and ROI across channels. Detailed reports and dashboards give you actionable insights."
+              "description": "Preview changes immediately.",
+              "title": "Live updates"
             }
-          ]
+          ],
+          "title": "Key features"
         }
       },
       {
-        "id": "198-3",
+        "id": "block-block-block-b_cta_home",
         "type": "CTA",
         "props": {
-          "title": "Ready to Transform Your Content Strategy?",
-          "description": "Join hundreds of companies using Strapi to power their campaigns.",
-          "ctaText": "Get Started Today",
-          "ctaHref": "/signup"
+          "ctaHref": "/explore",
+          "ctaText": "Get started",
+          "description": "Explore our platform today and transform your content workflow.",
+          "title": "Ready to get started?"
         }
       }
     ]
   },
   {
-    "id": "p_news",
-    "slug": "/news",
-    "title": "News",
-    "updatedAt": "2026-03-24T21:37:07.017Z",
+    "id": "p_explore",
+    "slug": "/explore",
+    "title": "Explore",
+    "updatedAt": "2026-03-25T10:56:07Z",
     "blocks": [
       {
-        "id": "330-0",
+        "id": "block-block-block-b_hero_new-page",
         "type": "Hero",
         "props": {
-          "heading": "Transform Your Vision into Reality",
-          "subheading": "Unlock powerful insights and accelerate your workflow with intuitive tools designed for modern teams.",
-          "ctaText": "Explore Now",
           "ctaHref": "/",
-          "imageAlt": "photo-1476966502122-c26b7830def9",
+          "ctaText": "Start Exploring",
+          "heading": "Explore What's Possible",
+          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
           "imagePosition": "right",
-          "imageUrl": "http://localhost:1337/uploads/large_photo_1476966502122_c26b7830def9_fdf36fcab9.jpeg"
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/5f79dfa56ab3777a80be60d83d9f9bcd1775171a-1080x720.jpg?auto=format",
+          "subheading": "Discover features, tools, and resources to help you succeed."
         }
       },
       {
-        "id": "22-1",
-        "type": "CardGrid",
+        "id": "block-block-block-b_features_new-page",
+        "type": "FeatureGrid",
         "props": {
-          "title": "Explore more",
-          "cards": [
+          "features": [
             {
-              "title": "Fast setup",
-              "description": "Create and ship updates quickly.",
-              "ctaText": "Get started",
-              "ctaHref": "/"
+              "description": "Launch quickly with guided defaults.",
+              "title": "Fast setup"
             },
             {
-              "title": "Safe updates",
-              "description": "Schema-validated edits reduce breakage.",
-              "ctaText": "See how",
-              "ctaHref": "/pricing",
-              "imageUrl": "http://localhost:4200/generated-images/gen_1774385766300_p8f2jc.jpg",
-              "imageAlt": "replace by a boy"
+              "description": "Structured operations keep content valid.",
+              "title": "Safe edits"
             },
             {
-              "title": "Team workflow",
-              "description": "Collaborate with clear, reviewable changes.",
-              "ctaText": "Read guide",
-              "ctaHref": "/"
+              "description": "Preview changes immediately.",
+              "title": "Live updates"
             }
-          ]
+          ],
+          "title": "Key features"
+        }
+      },
+      {
+        "id": "block-block-block-b_cta_new-page",
+        "type": "CTA",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "description": "Take the next step and explore the possibilities available to you.",
+          "title": "Ready to discover what's next?"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_new_page",
+    "slug": "/new-page",
+    "title": "New Page",
+    "updatedAt": "2026-03-25T10:54:37Z",
+    "blocks": [
+      {
+        "id": "block-block-b_hero_new-page",
+        "type": "Hero",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "heading": "New Page",
+          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
+          "imagePosition": "right",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/251cbabf83ef22e9f7bffc7e8efbfb4f76db4745-1080x720.jpg?auto=format",
+          "subheading": "Use this page to introduce New Page."
+        }
+      },
+      {
+        "id": "block-block-b_features_new-page",
+        "type": "FeatureGrid",
+        "props": {
+          "features": [
+            {
+              "description": "Launch quickly with guided defaults.",
+              "title": "Fast setup"
+            },
+            {
+              "description": "Structured operations keep content valid.",
+              "title": "Safe edits"
+            },
+            {
+              "description": "Preview changes immediately.",
+              "title": "Live updates"
+            }
+          ],
+          "title": "Key features"
+        }
+      },
+      {
+        "id": "block-block-b_cta_new-page",
+        "type": "CTA",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "description": "Continue to the next step.",
+          "title": "Ready to explore New Page?"
+        }
+      },
+      {
+        "id": "block-block-b_hero_1774167607904",
+        "type": "Hero",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get Started",
+          "heading": "Build with confidence",
+          "imageAlt": "Abstract generated illustration",
+          "imagePosition": "right",
+          "subheading": "Make changes safely with instant preview.",
+          "imageUrl": "/hero-generated.svg"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_test",
+    "slug": "/test",
+    "title": "Test",
+    "updatedAt": "2026-03-25T10:54:37Z",
+    "blocks": [
+      {
+        "id": "block-block-b_hero_test",
+        "type": "Hero",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "heading": "Test",
+          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
+          "imagePosition": "right",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/251cbabf83ef22e9f7bffc7e8efbfb4f76db4745-1080x720.jpg?auto=format",
+          "subheading": "Use this page to introduce Test."
         }
       }
     ]
