@@ -2,6 +2,7 @@ import { createDraftEnableHandler, createDraftDisableHandler } from "./draft-rou
 import { createBlocksHandler, createPagesHandler, createPublishHandler } from "./editor-routes.ts"
 import type { OnPublishFn } from "./editor-routes.ts"
 import { applyEditorCors } from "./editor-cors.ts"
+import { checkIntegrationOnce } from "./integration-check.ts"
 import type { BlockManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
 
@@ -68,6 +69,7 @@ export function createEditorApiHandler(config: EditorApiHandlerConfig): {
 
   return {
     async GET(request: Request, context: NextRouteContext) {
+      checkIntegrationOnce()
       const { path } = await context.params
       const route = matchRoute(path)
 
