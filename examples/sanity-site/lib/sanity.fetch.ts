@@ -1,7 +1,8 @@
 import { client } from "./sanity.client"
 import { pageBySlugQuery, allSlugsQuery, allPagesQuery, siteConfigQuery } from "./sanity.queries"
 import { sanityImageUrl } from "./sanity.image"
-import { sanityNameToBlockType, getImageFields, getListImageFields } from "./sanity.utils"
+import { sanityNameToBlockType } from "./sanity.utils"
+import { imageFields, listImageFields } from "./manifest"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
 
 /** Convert a Sanity block document to a BlockInstance */
@@ -11,8 +12,8 @@ function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {
 
   // Convert Sanity name back to PascalCase: cta → CTA, faqAccordion → FAQAccordion
   const blockType = sanityNameToBlockType(type)
-  const imageFields = getImageFields(blockType)
-  const listImageFields = getListImageFields(blockType)
+  const imageFields = imageFields.get(blockType) ?? new Set<string>()
+  const listImageFields = listImageFields.get(blockType) ?? new Map<string, Set<string>>()
 
   const props: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(doc)) {

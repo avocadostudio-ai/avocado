@@ -54,6 +54,13 @@ export {
 } from "./blocks/index.ts"
 
 export {
+  blockTypeToCamel,
+  camelToBlockType,
+  blockTypeToLower,
+  lowerToBlockType,
+} from "./block-names.ts"
+
+export {
   // Types
   type PageMeta,
   type PageDoc,

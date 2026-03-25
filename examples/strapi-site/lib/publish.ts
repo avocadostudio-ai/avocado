@@ -1,18 +1,7 @@
-import type { OnPublishFn, PublishContext, InlineAsset } from "@ai-site-editor/site-sdk/routes"
+import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
+import { createImageResolver } from "@ai-site-editor/site-sdk/routes"
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { getImageFields } from "@ai-site-editor/shared"
-
-/** Reject URLs pointing at private/loopback addresses (SSRF protection) */
-function isSafeImageUrl(raw: string): boolean {
-  let parsed: URL
-  try { parsed = new URL(raw) } catch { return false }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
-  const h = parsed.hostname
-  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
-  if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
-  return true
-}
+import { imageFields } from "./manifest"
 
 /** Check if a URL points to the same Strapi server */
 function isStrapiUrl(url: string): boolean {
@@ -27,7 +16,6 @@ function isStrapiUrl(url: string): boolean {
 async function findStrapiMediaByUrl(imageUrl: string): Promise<number | null> {
   try {
     const parsed = new URL(imageUrl)
-    // Strapi stores relative paths like /uploads/image.jpg
     const urlPath = parsed.pathname
     const headers: Record<string, string> = { "Content-Type": "application/json" }
     if (process.env.STRAPI_API_TOKEN) headers.Authorization = `Bearer ${process.env.STRAPI_API_TOKEN}`
@@ -55,51 +43,6 @@ async function uploadToStrapiMedia(blob: Blob, fileName: string): Promise<number
   return uploaded[0]?.id ?? null
 }
 
-/** Resolve an image URL to a Strapi media ID, uploading if needed */
-async function ensureMediaAsset(
-  imageUrl: string,
-  cache: Map<string, Promise<number | null>>,
-  assets?: Record<string, InlineAsset>
-): Promise<number | null> {
-  const cached = cache.get(imageUrl)
-  if (cached) return cached
-
-  const promise = (async () => {
-    // Resolve relative Strapi paths (e.g., /uploads/image.png)
-    if (!imageUrl.startsWith("http") && imageUrl.startsWith("/")) {
-      return findStrapiMediaByUrl(`${STRAPI_URL}${imageUrl}`)
-    }
-
-    if (!imageUrl.startsWith("http")) return null
-
-    // Image already in Strapi — look up by URL instead of re-uploading
-    if (isStrapiUrl(imageUrl)) {
-      return findStrapiMediaByUrl(imageUrl)
-    }
-
-    // Inline asset from orchestrator (generated/modified images with localhost URLs)
-    const inlineAsset = assets?.[imageUrl]
-    if (inlineAsset) {
-      try {
-        const bytes = Buffer.from(inlineAsset.data, "base64")
-        return await uploadToStrapiMedia(new Blob([bytes], { type: inlineAsset.mimeType }), inlineAsset.fileName)
-      } catch { return null }
-    }
-
-    if (!isSafeImageUrl(imageUrl)) return null
-    try {
-      const imageRes = await fetch(imageUrl)
-      if (!imageRes.ok) return null
-      const blob = await imageRes.blob()
-      const fileName = imageUrl.split("/").pop()?.split("?")[0] || "image.jpg"
-      return await uploadToStrapiMedia(blob, fileName)
-    } catch { return null }
-  })()
-
-  cache.set(imageUrl, promise)
-  return promise
-}
-
 /**
  * Publish handler for Strapi using Dynamic Zones.
  *
@@ -109,8 +52,24 @@ async function ensureMediaAsset(
  */
 export function createStrapiPublishHandler(): OnPublishFn {
   return async (pages, config, context) => {
-    const mediaCache = new Map<string, Promise<number | null>>()
+    // Shared image resolver: handles inline assets, SSRF, fetch, and caching.
+    // Strapi-specific: also resolves existing Strapi media URLs by lookup.
+    const imageResolver = createImageResolver<number>(
+      async (bytes, fileName) => uploadToStrapiMedia(new Blob([bytes]), fileName),
+      context?.assets,
+    )
     const errors: string[] = []
+
+    // Wrap resolver to also handle Strapi-local URLs (already in media library)
+    async function resolveMediaId(imageUrl: string): Promise<number | null> {
+      if (!imageUrl.startsWith("http") && imageUrl.startsWith("/")) {
+        return findStrapiMediaByUrl(`${STRAPI_URL}${imageUrl}`)
+      }
+      if (isStrapiUrl(imageUrl)) {
+        return findStrapiMediaByUrl(imageUrl)
+      }
+      return imageResolver.resolve(imageUrl)
+    }
 
     for (const page of pages) {
       try {
@@ -123,7 +82,7 @@ export function createStrapiPublishHandler(): OnPublishFn {
         // Build Dynamic Zone array — each block becomes a component
         const dzBlocks = await Promise.all(page.blocks.map(async (block, blockIndex) => {
           const componentName = `blocks.${block.type.toLowerCase()}`
-          const imageFields = getImageFields(block.type)
+          const imageFields = imageFields.get(block.type) ?? new Set<string>()
           const data: Record<string, unknown> = {
             __component: componentName,
           }
@@ -131,7 +90,7 @@ export function createStrapiPublishHandler(): OnPublishFn {
           for (const [key, value] of Object.entries(block.props)) {
             if (key === "headingLevel") continue
             if (imageFields.has(key) && typeof value === "string" && value) {
-              const mediaId = await ensureMediaAsset(value, mediaCache, context?.assets)
+              const mediaId = await resolveMediaId(value)
               if (mediaId) {
                 data[key] = mediaId
               } else {
