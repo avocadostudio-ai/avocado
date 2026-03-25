@@ -8,6 +8,7 @@ const en = {
   "header.syncFromSite": "Sync from site",
   "header.syncFromSiteTitle": "Sync content from site",
   "header.allSites": "All sites",
+  "header.viewAllSites": "View all sites",
   "header.limited": "Limited",
   "header.demoMode": "Demo mode",
   "header.moreOptions": "More options",
@@ -15,7 +16,8 @@ const en = {
   "header.publishing": "Publishing",
   "header.viewDeploy": "View deploy",
   "header.openLiveSite": "Open live site",
-  "header.syncedPages": "Synced {{count}} page(s) from site.",
+  "header.syncedPage": "Synced 1 page from site.",
+  "header.syncedPages": "Synced {{count}} pages from site.",
 
   // -- Tabs --
   "tabs.chat": "Chat",
@@ -121,7 +123,6 @@ const en = {
   "sites.addTemplate": "+ Add template",
   "sites.preferredTone": "Preferred tone",
   "sites.writingConstraints": "Writing constraints",
-  "sites.siteNameLabel": "Site name",
   "sites.hostingPlaceholder": "Vercel production site",
   "sites.vercelProjectId": "Vercel project ID",
   "sites.vercelProjectIdPlaceholder": "prj_...",

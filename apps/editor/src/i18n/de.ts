@@ -10,6 +10,7 @@ const de: LocaleDict = {
   "header.syncFromSite": "Von Seite synchronisieren",
   "header.syncFromSiteTitle": "Inhalte von Seite synchronisieren",
   "header.allSites": "Alle Seiten",
+  "header.viewAllSites": "Alle Websites anzeigen",
   "header.limited": "Eingeschränkt",
   "header.demoMode": "Demomodus",
   "header.moreOptions": "Weitere Optionen",
@@ -17,7 +18,8 @@ const de: LocaleDict = {
   "header.publishing": "Wird veröffentlicht",
   "header.viewDeploy": "Deployment ansehen",
   "header.openLiveSite": "Live-Seite öffnen",
-  "header.syncedPages": "{{count}} Seite(n) von der Website synchronisiert.",
+  "header.syncedPage": "1 Seite von der Website synchronisiert.",
+  "header.syncedPages": "{{count}} Seiten von der Website synchronisiert.",
 
   // -- Tabs --
   "tabs.chat": "Chat",
@@ -123,7 +125,6 @@ const de: LocaleDict = {
   "sites.addTemplate": "+ Vorlage hinzufügen",
   "sites.preferredTone": "Bevorzugte Tonalität",
   "sites.writingConstraints": "Schreibregeln",
-  "sites.siteNameLabel": "Seitenname",
   "sites.hostingPlaceholder": "Vercel-Produktionsseite",
   "sites.vercelProjectId": "Vercel-Projekt-ID",
   "sites.vercelProjectIdPlaceholder": "prj_...",
@@ -166,7 +167,7 @@ const de: LocaleDict = {
   "sites.checking": "Wird geprüft\u2026",
 
   // -- Chat input --
-  "chatInput.placeholder": "Stelle eine Frage",
+  "chatInput.placeholder": "Frag mich etwas",
   "chatInput.listening": "Hört zu\u2026 Klicke \u2713 zum Senden oder X zum Abbrechen.",
   "chatInput.transcribing": "Wird transkribiert\u2026",
   "chatInput.uploadingImage": "Eingefügtes Bild wird hochgeladen\u2026",
@@ -253,7 +254,7 @@ const de: LocaleDict = {
 
   // -- Welcome & suggestions --
   "welcome.greeting": "Willkommen bei {{name}}! Sag mir, was du ändern möchtest \u2014 ich kann Bereiche hinzufügen, Texte umschreiben, neue Seiten erstellen und mehr.",
-  "welcome.greetingFallback": "Lass uns deine Seite in etwas Besonderes verwandeln. Sag mir, was du ändern möchtest.",
+  "welcome.greetingFallback": "Lass uns deine Seite in etwas Besonderes verwandeln. Ich kann Bereiche hinzuf\u00FCgen, Texte umschreiben, Bl\u00F6cke umordnen, neue Seiten erstellen und mehr. Klicke auf etwas in der Vorschau oder sag mir, was du \u00E4ndern m\u00F6chtest.",
   "suggestion.rewriteHero": "Hero-Überschrift umschreiben",
   "suggestion.addTestimonials": "Einen Testimonial-Bereich hinzufügen",
   "suggestion.addFaq": "Einen FAQ-Bereich hinzufügen",
