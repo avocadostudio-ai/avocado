@@ -20,11 +20,12 @@ Use this page as the entry point for connecting the AI Site Editor to your websi
 | Tier | Audience | Effort | Doc |
 |---|---|---|---|
 | **Next.js Embedded** | Startups, product teams on Next.js 15+ (App Router) | ~30 min | [nextjs-mvp-embedded.md](nextjs-mvp-embedded.md) |
+| **Custom blocks** | Sites with their own component library | ~15 min | [custom-blocks.md](custom-blocks.md) |
 | **Custom tools** | Teams needing PIM, DAM, or other tool integrations | Variable | [tools-mvp.md](tools-mvp.md) |
 
 **MVP requirements:** Next.js 15+ with App Router. The `@ai-site-editor/site-sdk` package handles all integration plumbing. Pages Router is not supported.
 
-**Available block types (12):** Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, Stats, ContactForm, TwoColumn, Footer.
+**Default block types (12):** Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, Stats, ContactForm, TwoColumn, Footer. You can also [register custom blocks](custom-blocks.md) from your own component library.
 
 ## Planned (not yet implemented)
 
@@ -47,7 +48,8 @@ If your team uses Claude Code, Codex, Cursor, or similar LLM-based coding agents
 
 1. `docs/integration/nextjs-mvp-embedded.md`
 2. `docs/integration/editor-quickstart.md`
-3. `docs/integration/nextjs-mvp-adoption-example.md`
+3. `docs/integration/custom-blocks.md` (if using your own block types)
+4. `docs/integration/nextjs-mvp-adoption-example.md`
 
 ## The `@ai-site-editor/site-sdk` package
 
@@ -87,10 +89,14 @@ All endpoints are created with one-liner SDK handler factories:
 
 | Variable | App | Required | Description |
 |---|---|---|---|
-| `DRAFT_MODE_SECRET` | Site | Yes | Shared secret for draft mode activation |
+| `DRAFT_MODE_SECRET` | Site + Editor | Yes | Shared secret for draft mode activation. Site also accepts `VITE_SITE_DRAFT_SECRET` — set one in a shared `.env`. |
 | `ORCHESTRATOR_URL` | Site | No | Orchestrator API base URL (defaults to `http://localhost:4200`) |
+| `PUBLISH_TOKEN` | Site | No | Required if publish protection is enabled; must match orchestrator `PUBLISH_TOKEN` |
 | `VITE_SITE_ORIGIN` | Editor | Yes | Site origin for iframe target (e.g. `http://localhost:3000`) |
-| `VITE_SITE_DRAFT_SECRET` | Editor | Yes | Must match the site's `DRAFT_MODE_SECRET` |
+| `VITE_SITE_DRAFT_SECRET` | Editor | Yes | Same value as `DRAFT_MODE_SECRET` (either name works on the site) |
+| `VITE_PUBLISH_TOKEN` | Editor | No | Required if publish protection is enabled; must match orchestrator `PUBLISH_TOKEN` |
+| `ACCESS_PASSWORD_HASH` | Orchestrator | No | Enables access gate for protected chat/ops endpoints |
+| `PUBLISH_TOKEN` | Orchestrator | No | Validates publish requests; should match Site `PUBLISH_TOKEN` and Editor `VITE_PUBLISH_TOKEN` |
 
 ## Adoption checklist
 
