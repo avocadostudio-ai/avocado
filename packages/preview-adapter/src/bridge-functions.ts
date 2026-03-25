@@ -458,6 +458,15 @@ export function createBridgeFunctions(
     state.liveDraftOriginals.clear()
   }
 
+  /** Discard stored originals without restoring them (use after content is committed). */
+  const discardLiveDraftOriginals = () => {
+    for (const [node] of state.liveDraftOriginals) {
+      node.classList.remove("editor-live-typing")
+    }
+    state.liveDraftOriginals.clear()
+    state.liveDraftActiveBlockId = null
+  }
+
   const renderLiveDraft = (blockId: string, text: string, active: boolean, fields?: Record<string, string>) => {
     if (!active) {
       restoreLiveDraftOriginals()
@@ -1378,6 +1387,7 @@ export function createBridgeFunctions(
     // Live draft
     clearLiveDraft,
     restoreLiveDraftOriginals,
+    discardLiveDraftOriginals,
     renderLiveDraft,
     // Selection
     applyBlockFocus,
