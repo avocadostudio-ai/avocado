@@ -2,7 +2,10 @@ export type DraftSecretValidationResult =
   | { ok: true; reason: null }
   | { ok: false; reason: "missing_config" | "invalid_secret" }
 
-const DEFAULT_DRAFT_SECRET_KEYS = ["DRAFT_MODE_SECRET", "NEXT_DRAFT_MODE_SECRET"] as const
+// Accept multiple env var names so the same secret works across site and editor.
+// VITE_SITE_DRAFT_SECRET is the editor's name; accepting it here means you can
+// set one var in a shared .env and it works for both site and editor.
+const DEFAULT_DRAFT_SECRET_KEYS = ["DRAFT_MODE_SECRET", "VITE_SITE_DRAFT_SECRET", "NEXT_DRAFT_MODE_SECRET"] as const
 
 export function getConfiguredDraftSecret(
   env: Record<string, string | undefined>,
