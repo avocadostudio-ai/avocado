@@ -3,23 +3,23 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-25T10:54:20.887Z",
+    "updatedAt": "2026-03-25T10:55:26.263Z",
     "blocks": [
       {
-        "id": "block-block-b_hero_home",
+        "id": "block-block-block-b_hero_home",
         "type": "Hero",
         "props": {
-          "heading": "Welcome to Sanity Site",
-          "subheading": "Build and manage your content with ease.",
+          "ctaHref": "/explore",
           "ctaText": "Get started",
-          "ctaHref": "/new-page",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774436058515_x27z9a.jpg",
+          "heading": "Welcome to Sanity Site",
           "imageAlt": "add sanity logo into the image top left corner",
-          "imagePosition": "right"
+          "imagePosition": "right",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/714be3a8c965169da59cf4383cfa7ad1435aedac-1264x848.jpg?auto=format",
+          "subheading": "Build and manage your content with ease."
         }
       },
       {
-        "id": "block-block-b_features_home",
+        "id": "block-block-block-b_features_home",
         "type": "FeatureGrid",
         "props": {
           "features": [
@@ -40,10 +40,10 @@
         }
       },
       {
-        "id": "block-block-b_cta_home",
+        "id": "block-block-block-b_cta_home",
         "type": "CTA",
         "props": {
-          "ctaHref": "/new-page",
+          "ctaHref": "/explore",
           "ctaText": "Get started",
           "description": "Explore our platform today and transform your content workflow.",
           "title": "Ready to get started?"
@@ -52,26 +52,26 @@
     ]
   },
   {
-    "id": "p_new_page",
-    "slug": "/new-page",
-    "title": "New Page",
-    "updatedAt": "2026-03-24T21:26:49Z",
+    "id": "p_explore",
+    "slug": "/explore",
+    "title": "Explore",
+    "updatedAt": "2026-03-25T10:55:59.037Z",
     "blocks": [
       {
-        "id": "block-block-b_hero_new-page",
+        "id": "block-block-block-b_hero_new-page",
         "type": "Hero",
         "props": {
+          "heading": "Explore What's Possible",
+          "subheading": "Discover features, tools, and resources to help you succeed.",
+          "ctaText": "Start Exploring",
           "ctaHref": "/",
-          "ctaText": "Get started",
-          "heading": "New Page",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/251cbabf83ef22e9f7bffc7e8efbfb4f76db4745-1080x720.jpg?auto=format",
           "imageAlt": "photo-1724754608848-cdd8d5cd8538",
-          "imagePosition": "right",
-          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/868eb03cbb52e22dbdcbb177dc8be3a8dff76fcf-1080x720.jpg?auto=format",
-          "subheading": "Use this page to introduce New Page."
+          "imagePosition": "right"
         }
       },
       {
-        "id": "block-block-b_features_new-page",
+        "id": "block-block-block-b_features_new-page",
         "type": "FeatureGrid",
         "props": {
           "features": [
@@ -92,47 +92,13 @@
         }
       },
       {
-        "id": "block-block-b_cta_new-page",
+        "id": "block-block-block-b_cta_new-page",
         "type": "CTA",
         "props": {
-          "ctaHref": "/",
+          "title": "Ready to discover what's next?",
+          "description": "Take the next step and explore the possibilities available to you.",
           "ctaText": "Get started",
-          "description": "Continue to the next step.",
-          "title": "Ready to explore New Page?"
-        }
-      },
-      {
-        "id": "block-block-b_hero_1774167607904",
-        "type": "Hero",
-        "props": {
-          "ctaHref": "/",
-          "ctaText": "Get Started",
-          "heading": "Build with confidence",
-          "imageAlt": "Abstract generated illustration",
-          "imagePosition": "right",
-          "subheading": "Make changes safely with instant preview.",
-          "imageUrl": "/hero-generated.svg"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_test",
-    "slug": "/test",
-    "title": "Test",
-    "updatedAt": "2026-03-24T21:26:19Z",
-    "blocks": [
-      {
-        "id": "block-block-b_hero_test",
-        "type": "Hero",
-        "props": {
-          "ctaHref": "/",
-          "ctaText": "Get started",
-          "heading": "Test",
-          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
-          "imagePosition": "right",
-          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/868eb03cbb52e22dbdcbb177dc8be3a8dff76fcf-1080x720.jpg?auto=format",
-          "subheading": "Use this page to introduce Test."
+          "ctaHref": "/"
         }
       }
     ]
