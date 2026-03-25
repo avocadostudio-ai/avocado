@@ -1,7 +1,7 @@
 import { client } from "./sanity.client"
 import { pageBySlugQuery, allSlugsQuery, allPagesQuery, siteConfigQuery } from "./sanity.queries"
 import { sanityImageUrl } from "./sanity.image"
-import { sanityNameToBlockType, getImageFields } from "./sanity.utils"
+import { sanityNameToBlockType, getImageFields, getListImageFields } from "./sanity.utils"
 import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
 
 /** Convert a Sanity block document to a BlockInstance */
@@ -12,19 +12,36 @@ function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {
   // Convert Sanity name back to PascalCase: cta → CTA, faqAccordion → FAQAccordion
   const blockType = sanityNameToBlockType(type)
   const imageFields = getImageFields(blockType)
+  const listImageFields = getListImageFields(blockType)
 
   const props: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(doc)) {
     if (key.startsWith("_")) continue // skip Sanity internal fields (_id, _type, _rev, etc.)
+    if (value === null || value === undefined) continue // skip nulls (Sanity returns null for absent fields)
     if (imageFields.has(key)) {
       props[key] = sanityImageUrl(value)
+    } else if (listImageFields.has(key) && Array.isArray(value)) {
+      // Resolve image refs within list items (Gallery.images, Carousel.items, etc.)
+      const itemImageKeys = listImageFields.get(key)!
+      props[key] = value.map((item: Record<string, unknown>) => {
+        const resolved: Record<string, unknown> = {}
+        for (const [ik, iv] of Object.entries(item)) {
+          if (ik.startsWith("_")) continue // strip _key, _type from Sanity
+          if (itemImageKeys.has(ik)) {
+            resolved[ik] = sanityImageUrl(iv)
+          } else {
+            resolved[ik] = iv
+          }
+        }
+        return resolved
+      })
     } else {
       props[key] = value
     }
   }
 
   return {
-    id: (doc._id as string) ?? "",
+    id: ((doc._id as string) ?? "").replace(/^block-/, ""),
     type: blockType,
     props,
   }
@@ -49,7 +66,7 @@ function sanityDocToPageDoc(doc: Record<string, unknown>): PageDoc | null {
     slug,
     title: (doc.title as string) ?? "",
     blocks,
-    meta: doc.meta as PageDoc["meta"],
+    meta: (doc.meta ?? undefined) as PageDoc["meta"],
     updatedAt: (doc._updatedAt as string) ?? new Date().toISOString(),
   }
 }
