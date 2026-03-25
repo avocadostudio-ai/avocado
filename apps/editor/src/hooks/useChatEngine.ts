@@ -130,11 +130,11 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
 
     if (cfg.tone) {
-      suggestions.push(`Rewrite the copy to sound more ${cfg.tone}`)
+      suggestions.push(t("suggestion.rewriteTone", { tone: cfg.tone }))
     }
 
     if (cfg.pageTemplates?.length) {
-      suggestions.push(`Create a new ${cfg.pageTemplates[0].name} page`)
+      suggestions.push(t("suggestion.createFromTemplate", { name: cfg.pageTemplates[0].name }))
     } else if (!slugs.includes("/about")) {
       suggestions.push(t("suggestion.createAbout"))
     }
@@ -335,6 +335,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   // Track whether the initial bootstrap has happened for this session
   const hasBootstrappedRef = useRef(false)
+  const [hasBootstrapped, setHasBootstrapped] = useState(false)
 
   async function updateWelcomeSuggestions(slugs: string[]) {
     try {
@@ -365,6 +366,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       if (!hasBootstrappedRef.current) {
         hasBootstrappedRef.current = true
         const bootstrapResult = await bootstrapFromSite()
+        setHasBootstrapped(true)
         if (bootstrapResult.synced && bootstrapResult.slugs.length > 0) {
           setAvailableSlugs(bootstrapResult.slugs)
           void updateWelcomeSuggestions(bootstrapResult.slugs)
@@ -373,6 +375,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
 
       if (list.length > 0) {
+        if (!hasBootstrapped) setHasBootstrapped(true)
         setAvailableSlugs(list)
         void updateWelcomeSuggestions(list)
         return list
@@ -1419,6 +1422,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     clearFieldAiContext: () => setChatLog((prev) => prev.filter((e) => !e.fieldAiContext)),
     setFieldAiContext: (entry: ChatEntry) => setChatLog((prev) => [...prev.filter((e) => !e.fieldAiContext), entry]),
     clearChat: () => setChatLog([welcomeEntry]),
-    submitFeedback
+    submitFeedback,
+    hasBootstrapped
   }
 }

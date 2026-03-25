@@ -8,6 +8,9 @@ export type BlockPropsResult = {
   refetch: () => void
 }
 
+const RETRY_DELAY_MS = 1200
+const MAX_RETRIES = 2
+
 export function useBlockProps(
   session: string,
   siteId: string,
@@ -19,12 +22,15 @@ export function useBlockProps(
   const [props, setProps] = useState<Record<string, unknown> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const propsJsonRef = useRef<string>("")
+  const retryCountRef = useRef(0)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const doFetch = useCallback(async () => {
+  const doFetch = useCallback(async (retry = false) => {
     if (!activeBlockId) {
       setStatus("idle")
       setProps(null)
       propsJsonRef.current = ""
+      retryCountRef.current = 0
       return
     }
 
@@ -32,11 +38,18 @@ export function useBlockProps(
     const controller = new AbortController()
     abortRef.current = controller
 
+    if (!retry) retryCountRef.current = 0
     setStatus("loading")
     try {
       const url = `${orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slug)}`
       const res = await fetch(url, { signal: controller.signal, cache: "no-store" })
       if (!res.ok) {
+        // Draft not found — bootstrap may still be in progress, retry
+        if (retryCountRef.current < MAX_RETRIES) {
+          retryCountRef.current++
+          retryTimerRef.current = setTimeout(() => { void doFetch(true) }, RETRY_DELAY_MS)
+          return
+        }
         setStatus("error")
         return
       }
@@ -50,13 +63,25 @@ export function useBlockProps(
           setProps(block.props)
         }
         setStatus("ready")
+        retryCountRef.current = 0
       } else {
+        // Block ID not found in page — bootstrap may not have synced yet, retry
+        if (retryCountRef.current < MAX_RETRIES) {
+          retryCountRef.current++
+          retryTimerRef.current = setTimeout(() => { void doFetch(true) }, RETRY_DELAY_MS)
+          return
+        }
         propsJsonRef.current = ""
         setProps(null)
-        setStatus("idle")
+        setStatus("error")
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return
+      if (retryCountRef.current < MAX_RETRIES) {
+        retryCountRef.current++
+        retryTimerRef.current = setTimeout(() => { void doFetch(true) }, RETRY_DELAY_MS)
+        return
+      }
       setStatus("error")
     }
   }, [session, siteId, slug, activeBlockId])
@@ -64,7 +89,10 @@ export function useBlockProps(
   // Auto-fetch when deps change, gated on `enabled`
   useEffect(() => {
     if (enabled) void doFetch()
-    return () => { abortRef.current?.abort() }
+    return () => {
+      abortRef.current?.abort()
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    }
   }, [doFetch, enabled])
 
   // refetch is always callable — not gated on `enabled`

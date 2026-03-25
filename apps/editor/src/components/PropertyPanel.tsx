@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect, type ChangeE
 import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, type BlockDefinition, type BlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
-import { WandSparkles, Sparkles, Pencil } from "lucide-react"
+import { WandSparkles, Sparkles, Pencil, Replace, Trash2, ImagePlus } from "lucide-react"
 import { useT } from "@/i18n"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
@@ -169,7 +169,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
           </span>
         </div>
       </div>
-      {status === "loading" && !props ? (
+      {(status === "loading" || (status === "idle" && !props)) && !props ? (
         <div className="property-panel-empty">{t("propertyPanel.loading")}</div>
       ) : status === "error" ? (
         <div className="property-panel-empty">{t("propertyPanel.loadFailed")}</div>
@@ -468,6 +468,7 @@ function ImageFieldWidget({
   fieldShimmer?: boolean
   siteOrigin?: string
 }) {
+  const { t } = useT()
   const [altLocal, setAltLocal] = useState(altText ?? "")
   const [altFocused, setAltFocused] = useState(false)
   const [imgBroken, setImgBroken] = useState(false)
@@ -497,23 +498,23 @@ function ImageFieldWidget({
           )}
           <div className="property-field-image-actions">
             <button type="button" className="property-field-image-change" onClick={onChangeClick}>
-              {imageUrl ? "Change" : "Choose image"}
+              {imageUrl ? <><Replace size={13} /> {t("propertyPanel.change")}</> : <><ImagePlus size={13} /> {t("propertyPanel.chooseImage")}</>}
             </button>
             {imageUrl && onRemove ? (
-              <button type="button" className="property-field-image-remove" onClick={onRemove}>Remove</button>
+              <button type="button" className="property-field-image-remove" onClick={onRemove}><Trash2 size={13} /> {t("propertyPanel.remove")}</button>
             ) : null}
           </div>
         </div>
         {onAltCommit !== undefined && (
           <div className="property-field-image-alt-group">
             <div className="property-field-image-alt-label">
-              <span>Alt text</span>
+              <span>{t("propertyPanel.altText")}</span>
             </div>
             <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
               <input
                 type="text"
                 className="property-field-image-alt"
-                placeholder="Describe what's in this image"
+                placeholder={t("propertyPanel.altPlaceholder")}
                 value={displayAlt}
                 onFocus={() => { setAltLocal(altText ?? ""); setAltFocused(true) }}
                 onChange={(e) => { setAltLocal(e.target.value); debouncedAltCommit(e.target.value) }}
@@ -522,7 +523,7 @@ function ImageFieldWidget({
                   flushAltCommit()
                 }}
               />
-              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} fieldKind="imageAlt" fieldLabel="Alt text" blockType={blockType ?? ""} currentValue={altText ?? ""} onQuickAction={onAltAiQuickAction} onCustomPrompt={onAltAiAssist} aiLoading={aiLoading} /> : null}
+              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} fieldKind="imageAlt" fieldLabel={t("propertyPanel.altText")} blockType={blockType ?? ""} currentValue={altText ?? ""} onQuickAction={onAltAiQuickAction} onCustomPrompt={onAltAiAssist} aiLoading={aiLoading} /> : null}
             </div>
           </div>
         )}
@@ -797,7 +798,7 @@ function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist, onAiQuick
           <input
             type="text"
             className="property-field-input"
-            placeholder="Page"
+            placeholder={t("propertyPanel.navPlaceholder")}
             value={display}
             onFocus={() => { setLocal(navLabel); setFocused(true) }}
             onChange={(e) => { setLocal(e.target.value); debouncedCommit(e.target.value) }}
@@ -825,15 +826,16 @@ function PageMetaFields({
   aiLoading?: boolean
   aiLoadingPath?: string
 }) {
+  const { t } = useT()
   return (
     <div className="property-panel-page-section">
-      <div className="property-panel-block-name">SEO</div>
+      <div className="property-panel-block-name">{t("propertyPanel.seo")}</div>
       <PageMetaField
-        label="SEO title"
+        label={t("propertyPanel.seoTitle")}
         fieldKind="text"
         blockType="Page"
         value={pageMeta.title ?? ""}
-        placeholder="Defaults to page title"
+        placeholder={t("propertyPanel.seoTitlePlaceholder")}
         multiline
         autosizeRows={{ min: 2, max: 2 }}
         recommendedMax={60}
@@ -844,11 +846,11 @@ function PageMetaFields({
         fieldShimmer={aiLoading === true && aiLoadingPath === "SEO title"}
       />
       <PageMetaField
-        label="Meta description"
+        label={t("propertyPanel.metaDescription")}
         fieldKind="richtext"
         blockType="Page"
         value={pageMeta.description ?? ""}
-        placeholder="Defaults to generated description"
+        placeholder={t("propertyPanel.metaDescPlaceholder")}
         multiline
         autosizeRows={{ min: 3, max: 6 }}
         recommendedMax={160}
@@ -859,7 +861,7 @@ function PageMetaFields({
         fieldShimmer={aiLoading === true && aiLoadingPath === "Meta description"}
       />
       <PageMetaField
-        label="Open Graph image URL"
+        label={t("propertyPanel.ogImage")}
         fieldKind="url"
         blockType="Page"
         value={pageMeta.ogImage ?? ""}

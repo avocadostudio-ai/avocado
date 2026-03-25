@@ -682,8 +682,9 @@ function EditorPage({
 
   const media = useMediaInput()
 
-  const blockProps = useBlockProps(session, siteId, slug, activeBlockId, activeTab === "properties")
-  const pageMeta = usePageMeta(session, siteId, slug, activeTab === "properties")
+  const propsEnabled = activeTab === "properties" && chatEngine.hasBootstrapped
+  const blockProps = useBlockProps(session, siteId, slug, activeBlockId, propsEnabled)
+  const pageMeta = usePageMeta(session, siteId, slug, propsEnabled)
   onAppliedRef.current = () => {
     void blockProps.refetch()
     void pageMeta.refetch()

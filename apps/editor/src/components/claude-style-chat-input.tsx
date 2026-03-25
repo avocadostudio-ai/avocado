@@ -217,7 +217,7 @@ export default function ClaudeStyleChatInput(props: Props) {
             appendTranscript(transcriptText)
           }
         } catch (error) {
-          const detail = error instanceof Error ? error.message : "Failed to transcribe audio."
+          const detail = error instanceof Error ? error.message : t("chatInput.transcribeFailed")
           setTranscriptionError(detail)
         } finally {
           setIsTranscribing(false)
