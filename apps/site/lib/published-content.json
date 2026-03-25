@@ -1,90 +1,70 @@
 [
   {
-    "id": "p_home",
+    "id": "home-1",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-25T07:21:22.148Z",
+    "updatedAt": "2026-03-25T10:36:08.535Z",
+    "meta": {
+      "title": "Home",
+      "description": "A Contentful-powered site"
+    },
     "blocks": [
       {
-        "id": "b_hero_home",
+        "id": "block_hero-1",
         "type": "Hero",
         "props": {
-          "heading": "Build websites with plain language",
-          "subheading": "Edit content instantly with chat and live preview.",
-          "ctaText": "Start Editing",
-          "ctaHref": "/pricing",
-          "imageUrl": "/hero-generated.svg",
-          "imageAlt": "Abstract generated illustration for the hero section",
+          "heading": "Welcome to the Contentful Site",
+          "subheading": "This page is served from Contentful via the AI Site Editor block system.",
+          "ctaText": "Check our plans",
+          "ctaHref": "/pricing-plans",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774434964053_xj5du4.jpg",
+          "imageAlt": "change text to \"do something amazing\", use nice neon colors",
           "imagePosition": "right"
         }
       },
       {
-        "id": "b_features_home",
-        "type": "FeatureGrid",
+        "id": "block_b_richtext_1774156395336",
+        "type": "RichText",
         "props": {
-          "title": "Why teams use it",
-          "features": [
+          "title": "Powered by Contentful!",
+          "body": "This site is built with Contentful, a headless CMS that separates content management from presentation. That means you can manage your content once and deliver it anywhere—web, mobile, or any channel you choose.\n\nWith Contentful's flexible content model, you define your own content structure without rigid page templates. APIs let your developers fetch and display content exactly how they need it, while content editors work in an intuitive interface.\n\nContentful's powerful capabilities extend beyond simple publishing. You gain real-time collaboration features, version control, and workflow management that ensure your team stays synchronized. Advanced scheduling tools let you plan content releases months in advance, while webhooks and real-time updates keep your digital experiences fresh and responsive to your audience's needs.\n\nThe beauty of a headless approach lies in its flexibility and scalability. Whether you're managing a single website, multiple microsites, or delivering content to IoT devices and voice assistants, Contentful adapts to your architecture. You're never locked into a particular presentation layer, giving you complete freedom to innovate and evolve your digital strategy without constraints.\n\n**Ready to experience the power of structured content?** Start exploring Contentful today and transform how you manage your digital experiences."
+        }
+      },
+      {
+        "id": "block_b_cardgrid_1774161229066_910",
+        "type": "CardGrid",
+        "props": {
+          "title": "Explore more",
+          "cards": [
             {
-              "title": "Fast edits",
-              "description": "See updates without rebuilding."
+              "title": "Fast setup",
+              "description": "Create and ship updates quickly.",
+              "ctaText": "Get started",
+              "ctaHref": "/"
             },
             {
-              "title": "Safe changes",
-              "description": "Schema-validated structured operations."
+              "title": "Safe updates",
+              "description": "Schema-validated edits reduce breakage.",
+              "ctaText": "See how",
+              "ctaHref": "/pricing"
             },
             {
-              "title": "Simple workflow",
-              "description": "Chat to edit, preview to verify."
+              "title": "Team workflow",
+              "description": "Collaborate with clear, reviewable changes.",
+              "ctaText": "Read guide",
+              "ctaHref": "/"
             }
           ]
         }
       },
       {
-        "id": "b_cta_home",
+        "id": "block_b_cta_1774156320864",
         "type": "CTA",
         "props": {
-          "title": "Ready for your first change?",
-          "description": "Use the editor to modify this page now.",
-          "ctaText": "Open Pricing",
-          "ctaHref": "/pricing"
-        }
-      }
-    ]
-  },
-  {
-    "id": "p_pricing",
-    "slug": "/pricing",
-    "title": "Pricing",
-    "updatedAt": "2026-03-25T07:21:22.148Z",
-    "blocks": [
-      {
-        "id": "b_hero_pricing",
-        "type": "Hero",
-        "props": {
-          "heading": "Pricing that grows with you",
-          "subheading": "Start free, upgrade when you're ready.",
-          "ctaText": "Choose Plan",
-          "ctaHref": "/",
-          "imageUrl": "/hero-generated.svg",
-          "imageAlt": "Abstract generated illustration for the pricing hero",
-          "imagePosition": "right"
-        }
-      },
-      {
-        "id": "b_faq_pricing",
-        "type": "FAQAccordion",
-        "props": {
-          "title": "Pricing FAQ",
-          "items": [
-            {
-              "q": "Can I cancel anytime?",
-              "a": "Yes, there are no long-term contracts."
-            },
-            {
-              "q": "Do you offer support?",
-              "a": "Yes, email support is included."
-            }
-          ]
+          "title": "Ready to get started?",
+          "description": "Apply your next change in seconds.",
+          "ctaText": "Learn More",
+          "ctaHref": "/about-us"
         }
       }
     ]
