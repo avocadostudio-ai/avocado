@@ -10,7 +10,8 @@ export const pageBySlugQuery = groq`
     blocks[]-> {
       _id,
       _type,
-      ...
+      ...,
+      "cards": cards[]-> { ... }
     },
     meta,
     _updatedAt
@@ -32,7 +33,8 @@ export const allPagesQuery = groq`
     blocks[]-> {
       _id,
       _type,
-      ...
+      ...,
+      "cards": cards[]-> { ... }
     },
     meta,
     _updatedAt
