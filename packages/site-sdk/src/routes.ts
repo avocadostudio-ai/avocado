@@ -8,3 +8,14 @@ export type { OnPublishFn, InlineAsset, PublishContext } from "./editor-routes.t
 // Catch-all editor API handler
 export { createEditorApiHandler } from "./editor-api-handler.ts"
 export type { EditorApiHandlerConfig } from "./editor-api-handler.ts"
+
+// Publish utilities (SSRF check, image resolution)
+export { isSafeImageUrl, createImageResolver } from "./publish-utils.ts"
+export type { ImageUploader } from "./publish-utils.ts"
+
+// Revalidation handler factory
+export { createRevalidateHandler } from "./revalidate-handler.ts"
+export type { RevalidateHandlerConfig } from "./revalidate-handler.ts"
+
+// Manifest utilities (derive image fields from block manifest)
+export { getManifestImageFields } from "./manifest-utils.ts"

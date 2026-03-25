@@ -1,83 +1,23 @@
-import type { OnPublishFn, PublishContext, InlineAsset } from "@ai-site-editor/site-sdk/routes"
+import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
+import { createImageResolver } from "@ai-site-editor/site-sdk/routes"
 import { writeClient } from "./sanity.client"
-import { toSanityName, getImageFields, getListImageFields, REFERENCE_LISTS } from "./sanity.utils"
+import { toSanityName, REFERENCE_LISTS } from "./sanity.utils"
+import { imageFields, listImageFields } from "./manifest"
 
-/** Reject URLs pointing at private/loopback addresses. */
-function isSafeImageUrl(raw: string): boolean {
-  let parsed: URL
-  try { parsed = new URL(raw) } catch { return false }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
-  const h = parsed.hostname
-  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
-  if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
-  if (/^172\/(1[6-9]|2\d|3[01])\./.test(h)) return false
-  return true
-}
-
-/** Upload an image URL as a Sanity asset, return the asset reference */
+/** Sanity image asset reference shape */
 type SanityImageRef = { _type: "image"; asset: { _type: "reference"; _ref: string } }
-
-async function ensureImageAsset(
-  imageUrl: string,
-  cache: Map<string, Promise<SanityImageRef | null>>,
-  assets?: Record<string, InlineAsset>
-) {
-  const cached = cache.get(imageUrl)
-  if (cached) return cached
-
-  const promise = (async () => {
-    if (!imageUrl.startsWith("http")) return null
-
-    const inlineAsset = assets?.[imageUrl]
-    if (inlineAsset) {
-      try {
-        const buf = Buffer.from(inlineAsset.data, "base64")
-        const asset = await writeClient.assets.upload("image", buf, {
-          filename: inlineAsset.fileName,
-          contentType: inlineAsset.mimeType,
-        })
-        return {
-          _type: "image" as const,
-          asset: { _type: "reference" as const, _ref: asset._id },
-        }
-      } catch { return null }
-    }
-
-    if (!isSafeImageUrl(imageUrl)) return null
-
-    const res = await fetch(imageUrl)
-    if (!res.ok) return null
-
-    const blob = await res.blob()
-    const fileName = imageUrl.split("/").pop()?.split("?")[0] || "image.jpg"
-    const asset = await writeClient.assets.upload("image", blob, { filename: fileName })
-
-    return {
-      _type: "image" as const,
-      asset: { _type: "reference" as const, _ref: asset._id },
-    }
-  })()
-
-  cache.set(imageUrl, promise)
-  return promise
-}
-
-type ImageProcessCtx = {
-  imageCache: Map<string, Promise<SanityImageRef | null>>
-  assets?: Record<string, InlineAsset>
-}
 
 /** Resolve image fields in a record, falling back to existing values on failure. */
 async function resolveImageFields(
   item: Record<string, unknown>,
   imageKeys: Set<string>,
   existing: Record<string, unknown> | undefined,
-  ctx: ImageProcessCtx,
+  resolver: { resolve: (url: string) => Promise<SanityImageRef | null> },
 ): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(item)) {
     if (imageKeys.has(k) && typeof v === "string" && v) {
-      const ref = await ensureImageAsset(v, ctx.imageCache, ctx.assets)
+      const ref = await resolver.resolve(v)
       out[k] = ref ?? existing?.[k] ?? undefined
     } else {
       out[k] = v
@@ -108,7 +48,13 @@ async function fetchExistingDocs(ids: string[]): Promise<Map<string, Record<stri
  */
 export function createSanityPublishHandler(): OnPublishFn {
   return async (pages, config, context) => {
-    const ctx: ImageProcessCtx = { imageCache: new Map(), assets: context?.assets }
+    const imageResolver = createImageResolver<SanityImageRef>(
+      async (bytes, fileName, mimeType) => {
+        const asset = await writeClient.assets.upload("image", bytes, { filename: fileName, contentType: mimeType })
+        return { _type: "image" as const, asset: { _type: "reference" as const, _ref: asset._id } }
+      },
+      context?.assets,
+    )
     const tx = writeClient.transaction()
 
     for (const page of pages) {
@@ -133,8 +79,8 @@ export function createSanityPublishHandler(): OnPublishFn {
       const blockRefs = await Promise.all(page.blocks.map(async (block) => {
         const blockId = `block-${block.id}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 128)
         const blockType = toSanityName(block.type)
-        const imageFields = getImageFields(block.type)
-        const listImageFields = getListImageFields(block.type)
+        const imageFields = imageFields.get(block.type) ?? new Set<string>()
+        const listImageFields = listImageFields.get(block.type) ?? new Map<string, Set<string>>()
         const refLists = REFERENCE_LISTS[block.type]
         const existingDoc = existingDocs.get(blockId)
 
@@ -144,7 +90,7 @@ export function createSanityPublishHandler(): OnPublishFn {
           if (key === "headingLevel") continue
 
           if (imageFields.has(key) && typeof value === "string" && value) {
-            const imageRef = await ensureImageAsset(value, ctx.imageCache, ctx.assets)
+            const imageRef = await imageResolver.resolve(value)
             doc[key] = imageRef ?? existingDoc?.[key] ?? undefined
 
           } else if (refLists?.has(key) && Array.isArray(value)) {
@@ -152,7 +98,7 @@ export function createSanityPublishHandler(): OnPublishFn {
             const cardRefs = await Promise.all(
               (value as Record<string, unknown>[]).map(async (item, idx) => {
                 const cardId = `card-${blockId}-${idx}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 128)
-                const fields = await resolveImageFields(item, itemImageKeys, existingDocs.get(cardId), ctx)
+                const fields = await resolveImageFields(item, itemImageKeys, existingDocs.get(cardId), imageResolver)
                 tx.createOrReplace({ _id: cardId, _type: "card", ...fields } as { _id: string; _type: string; [key: string]: unknown })
                 return { _type: "reference" as const, _ref: cardId, _key: `card-${idx}` }
               })
@@ -165,7 +111,7 @@ export function createSanityPublishHandler(): OnPublishFn {
             doc[key] = await Promise.all(
               (value as Record<string, unknown>[]).map(async (item, idx) => ({
                 _key: `item-${idx}`,
-                ...await resolveImageFields(item, itemImageKeys, existingItems?.[idx], ctx),
+                ...await resolveImageFields(item, itemImageKeys, existingItems?.[idx], imageResolver),
               }))
             )
 
