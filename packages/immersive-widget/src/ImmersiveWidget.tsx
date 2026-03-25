@@ -17,6 +17,7 @@ import { ChatFab } from "./components/ChatFab"
 import { ChatPanel } from "./components/ChatPanel"
 import { PasswordGate } from "./components/PasswordGate"
 import { InlineFieldPrompt, type FieldContext } from "./components/InlineFieldPrompt"
+import { InlineBlockPicker, type AddBlockContext } from "./components/InlineBlockPicker"
 import { TextSelectionToolbar } from "./components/TextSelectionToolbar"
 import { useBlockSelection, type BlockSelectionState } from "./hooks/useBlockSelection"
 import { useTextSelection, type TextSelectionContext } from "./hooks/useTextSelection"
@@ -25,6 +26,7 @@ import { submitChatStream, submitChatHttp, applyOps, type ChatResult, type ChatR
 import { getAccessToken } from "./lib/access-auth"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
 import type { BlockManifest } from "@ai-site-editor/shared"
+import { defaultPropsForType } from "@ai-site-editor/shared"
 
 export type SiteContext = {
   siteName?: string
@@ -67,7 +69,7 @@ export function ImmersiveWidget({
   provider = "anthropic",
 }: ImmersiveWidgetProps) {
   const [panelOpen, setPanelOpen] = useState(false)
-  const [panelQuickActions, setPanelQuickActions] = useState<string[] | undefined>(undefined)
+  const [blockPickerContext, setBlockPickerContext] = useState<AddBlockContext | null>(null)
   const [activeField, setActiveField] = useState<FieldContext | null>(null)
   const [fieldLoading, setFieldLoading] = useState(false)
   // Key: "iw-authed" is only set in THIS tab after successful password verify or confirmed valid token
@@ -141,7 +143,7 @@ export function ImmersiveWidget({
     })
   }, [config, refresh])
 
-  const { focusBlock, renderLiveDraft, triggerRefresh } = useBlockSelection({
+  const { focusBlock, renderLiveDraft, discardLiveDraftOriginals, triggerRefresh } = useBlockSelection({
     slug,
     pathname,
     refresh,
@@ -154,17 +156,11 @@ export function ImmersiveWidget({
     onBlockDeleteRequested: useCallback((p: { slug: string; blockId: string; blockType: string }) => {
       applyOp({ op: "remove_block", pageSlug: p.slug, blockId: p.blockId })
     }, [applyOp]),
-    onBlockAddRequested: useCallback((_p: { slug: string; afterBlockId?: string; beforeBlockId?: string }) => {
+    onBlockAddRequested: useCallback((p: { slug: string; afterBlockId?: string; beforeBlockId?: string }) => {
       setActiveField(null)
-      setPanelQuickActions([
-        "Add a Hero section",
-        "Add a Features grid",
-        "Add a Testimonials section",
-        "Add an FAQ section",
-        "Add a CTA section",
-        "Add a Card grid",
-      ])
-      setPanelOpen(true)
+      const addBtn = document.querySelector<HTMLElement>(".editor-selected-add-bottom, .editor-selected-add-top")
+      if (!addBtn) return
+      setBlockPickerContext({ slug: p.slug, afterBlockId: p.afterBlockId, beforeBlockId: p.beforeBlockId, anchorElement: addBtn })
     }, []),
     onListItemMoveRequested: useCallback((p: { slug: string; blockId: string; blockType: string; listKey: string; index: number; afterIndex?: number }) => {
       applyOp({ op: "move_item", pageSlug: p.slug, blockId: p.blockId, listKey: p.listKey, itemIndex: p.index, afterIndex: p.afterIndex })
@@ -186,7 +182,7 @@ export function ImmersiveWidget({
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
         setActiveField(null)
-        setPanelQuickActions(undefined)
+        setBlockPickerContext(null)
         setPanelOpen(true)
       }
     }
@@ -269,7 +265,7 @@ export function ImmersiveWidget({
           renderLiveDraft(event.blockId, event.value, true, { [event.editablePath]: event.value })
         },
         onFinal: (result) => {
-          // Don't clear live draft — let refresh replace DOM naturally to avoid blink
+          discardLiveDraftOriginals()
           handleChatResult(result)
         },
         onError: (result) => {
@@ -338,9 +334,7 @@ export function ImmersiveWidget({
           setFieldLoading(false)
           setActiveField(null)
           applyAiFieldLoading("", "", false)
-          // Don't clear live draft here — let the refresh replace the DOM
-          // so the streamed text stays visible until the server content loads.
-          // The refresh will naturally overwrite the live-draft nodes.
+          discardLiveDraftOriginals()
           if (result.focusBlockId) focusBlock(result.focusBlockId)
           triggerRefresh(result.focusBlockId)
         },
@@ -378,6 +372,27 @@ export function ImmersiveWidget({
 
   const ui = (
     <div data-editor-widget-ignore="">
+      {/* Inline block picker — shown when + button is clicked */}
+      {blockPickerContext && (
+        <InlineBlockPicker
+          context={blockPickerContext}
+          onAdd={(blockType) => {
+            const ctx = blockPickerContext
+            setBlockPickerContext(null)
+            const safeType = blockType.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+            const blockId = `b_${safeType}_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+            const op: Record<string, unknown> = {
+              op: "add_block",
+              pageSlug: ctx.slug,
+              block: { id: blockId, type: blockType, props: defaultPropsForType(blockType as any) },
+            }
+            if (ctx.afterBlockId) op.afterBlockId = ctx.afterBlockId
+            applyOp(op)
+          }}
+          onClose={() => setBlockPickerContext(null)}
+        />
+      )}
+
       {/* Inline field prompt — shown when a text element is clicked */}
       {activeField && !panelOpen && (
         <InlineFieldPrompt
@@ -415,8 +430,7 @@ export function ImmersiveWidget({
           isLoading={isLoading}
           streamStatus={streamStatus}
           onSubmit={handleSubmit}
-          onClose={() => { setPanelOpen(false); setPanelQuickActions(undefined) }}
-          quickActions={panelQuickActions}
+          onClose={() => setPanelOpen(false)}
           selectedBlockLabel={selectedBlockLabel}
         />
       )}
@@ -424,10 +438,7 @@ export function ImmersiveWidget({
       {/* FAB */}
       <ChatFab
         open={panelOpen}
-        onClick={() => {
-          setPanelOpen((prev) => !prev)
-          if (panelOpen) setPanelQuickActions(undefined)
-        }}
+        onClick={() => setPanelOpen((prev) => !prev)}
       />
     </div>
   )

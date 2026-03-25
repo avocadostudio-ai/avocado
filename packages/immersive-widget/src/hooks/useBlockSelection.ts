@@ -144,6 +144,10 @@ export function useBlockSelection(args: UseBlockSelectionArgs) {
     bridgeRef.current?.renderLiveDraft(blockId, text, active, fields)
   }, [])
 
+  const discardLiveDraftOriginals = useCallback(() => {
+    bridgeRef.current?.discardLiveDraftOriginals()
+  }, [])
+
   const triggerRefresh = useCallback((focusBlockId?: string) => {
     const state = stateRef.current
     if (state && focusBlockId) {
@@ -153,5 +157,5 @@ export function useBlockSelection(args: UseBlockSelectionArgs) {
     bridgeRef.current?.smoothRefresh()
   }, [])
 
-  return { focusBlock, renderLiveDraft, triggerRefresh, stateRef, bridgeRef }
+  return { focusBlock, renderLiveDraft, discardLiveDraftOriginals, triggerRefresh, stateRef, bridgeRef }
 }
