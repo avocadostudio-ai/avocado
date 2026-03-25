@@ -34,14 +34,14 @@ function dzComponentToBlock(entry: Record<string, unknown>, index: number): Bloc
   const rawName = component.replace("blocks.", "")
   const blockType = lowerToBlockType(rawName)
 
-  const imageFields = imageFields.get(blockType) ?? new Set<string>()
+  const imgFields = imageFields.get(blockType) ?? new Set<string>()
   const props: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(entry)) {
     if (key === "id" || key === "__component") continue
     // Strapi returns null for empty fields — skip them so Zod treats them as absent (optional)
     if (value === null || value === undefined) continue
-    if (imageFields.has(key)) {
+    if (imgFields.has(key)) {
       props[key] = resolveMediaUrl(value)
     } else {
       props[key] = value

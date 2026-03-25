@@ -12,14 +12,14 @@ function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {
 
   // Convert Sanity name back to PascalCase: cta → CTA, faqAccordion → FAQAccordion
   const blockType = sanityNameToBlockType(type)
-  const imageFields = imageFields.get(blockType) ?? new Set<string>()
-  const listImageFields = listImageFields.get(blockType) ?? new Map<string, Set<string>>()
+  const imgFields = imageFields.get(blockType) ?? new Set<string>()
+  const listImgFields = listImageFields.get(blockType) ?? new Map<string, Set<string>>()
 
   const props: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(doc)) {
     if (key.startsWith("_")) continue // skip Sanity internal fields (_id, _type, _rev, etc.)
     if (value === null || value === undefined) continue // skip nulls (Sanity returns null for absent fields)
-    if (imageFields.has(key)) {
+    if (imgFields.has(key)) {
       props[key] = sanityImageUrl(value)
     } else if (listImageFields.has(key) && Array.isArray(value)) {
       // Resolve image refs within list items (Gallery.images, Carousel.items, etc.)
