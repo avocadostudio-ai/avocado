@@ -391,15 +391,19 @@
 
 .iw-field-prompt {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: #111827;
   border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow:
-    0 12px 32px -4px rgba(0, 0, 0, 0.15),
-    0 4px 12px -2px rgba(0, 0, 0, 0.08),
-    0 0 0 1px rgba(0, 0, 0, 0.03);
+    0 12px 32px -4px rgba(0, 0, 0, 0.2),
+    0 4px 12px -2px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.4);
   padding: 10px 12px;
   animation: iw-field-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
 }
 
 @keyframes iw-field-in {
@@ -462,13 +466,13 @@
 
 .iw-field-prompt-input {
   flex: 1;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 10px;
   padding: 7px 12px;
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.7);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -516,8 +520,8 @@
 }
 
 .iw-field-prompt-pill {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 100px;
   padding: 4px 11px;
   font-size: 12px;
@@ -539,46 +543,7 @@
   cursor: default;
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .iw-field-prompt {
-    background: #1a1a2e;
-    border-color: rgba(255, 255, 255, 0.06);
-    box-shadow:
-      0 12px 32px -4px rgba(0, 0, 0, 0.4),
-      0 4px 12px -2px rgba(0, 0, 0, 0.25);
-  }
-
-  .iw-field-prompt-label { color: #e5e7eb; }
-
-  .iw-field-prompt-block {
-    background: rgba(99, 102, 241, 0.15);
-    color: #a5b4fc;
-  }
-
-  .iw-field-prompt-input {
-    background: #252540;
-    border-color: #374151;
-    color: #e5e7eb;
-  }
-
-  .iw-field-prompt-input:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-  }
-
-  .iw-field-prompt-pill {
-    background: #252540;
-    border-color: #374151;
-    color: #d1d5db;
-  }
-
-  .iw-field-prompt-pill:hover:not(:disabled) {
-    background: rgba(99, 102, 241, 0.15);
-    border-color: #6366f1;
-    color: #a5b4fc;
-  }
-}
+/* No dark mode for field prompt — always light to contrast with any site background */
 
 /* ------------------------------------------------------------------ */
 /* Text Selection Toolbar                                             */

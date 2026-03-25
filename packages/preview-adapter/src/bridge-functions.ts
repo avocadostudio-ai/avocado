@@ -1172,6 +1172,10 @@ export function createBridgeFunctions(
       return
     }
     const target = event.target as HTMLElement | null
+
+    // Ignore clicks inside editor widget overlays (immersive prompt, FAB, panel)
+    if (target?.closest("[data-editor-widget-ignore]")) return
+
     const editing = state.inlineEditing
     if (editing && target && !editing.node.contains(target)) {
       commitInlineEdit()

@@ -107,6 +107,7 @@ export function InlineFieldPrompt({ field, isLoading, onSubmit, onClose }: Inlin
     <div
       ref={containerRef}
       className="iw-field-prompt"
+      data-editor-widget-ignore=""
       style={{
         position: "absolute",
         top: `${position.top}px`,
