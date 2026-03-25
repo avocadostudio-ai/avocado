@@ -184,6 +184,7 @@ const en = {
   "chatInput.imageOnly": "Only image files are supported here.",
   "chatInput.analyzeFailed": "Failed to analyze pasted image.",
   "chatInput.uploadFailed": "Image uploaded failed. Try again or use drag-and-drop upload.",
+  "chatInput.transcribeFailed": "Failed to transcribe audio.",
 
   // -- Image picker --
   "imagePicker.title": "Asset Picker",
@@ -217,6 +218,17 @@ const en = {
   "imagePicker.refine": "Refine",
   "imagePicker.edit": "Edit",
   "imagePicker.closePreview": "Close preview",
+  "imagePicker.ready": "Ready",
+  "imagePicker.editThisImage": "Edit this image",
+  "imagePicker.editThisImageDesc": "Describe changes to the current image",
+  "imagePicker.generateNew": "Generate new",
+  "imagePicker.generateNewDesc": "Create a completely new image from scratch",
+  "imagePicker.useImage": "Use image",
+  "imagePicker.applyUrl": "Apply URL",
+  "imagePicker.removeReference": "Remove reference",
+  "imagePicker.attachReference": "Attach example images for AI to reference (up to {{max}})",
+  "imagePicker.showOriginal": "Show original",
+  "imagePicker.showEdited": "Show edited",
 
   // -- Property panel --
   "propertyPanel.loading": "Loading...",
@@ -224,6 +236,18 @@ const en = {
   "propertyPanel.unknownBlock": "Unknown block type:",
   "propertyPanel.page": "Page",
   "propertyPanel.navLabel": "Nav label",
+  "propertyPanel.change": "Change",
+  "propertyPanel.chooseImage": "Choose image",
+  "propertyPanel.remove": "Remove",
+  "propertyPanel.altText": "Alt text",
+  "propertyPanel.altPlaceholder": "Describe what's in this image",
+  "propertyPanel.navPlaceholder": "Page",
+  "propertyPanel.seo": "SEO",
+  "propertyPanel.seoTitle": "SEO title",
+  "propertyPanel.seoTitlePlaceholder": "Defaults to page title",
+  "propertyPanel.metaDescription": "Meta description",
+  "propertyPanel.metaDescPlaceholder": "Defaults to generated description",
+  "propertyPanel.ogImage": "Open Graph image URL",
 
   // -- Welcome & suggestions --
   "welcome.greeting": "Welcome to {{name}}! Tell me what you'd like to change \u2014 I can add sections, rewrite copy, create new pages, and more.",
@@ -234,6 +258,8 @@ const en = {
   "suggestion.addCta": "Add a call-to-action",
   "suggestion.changeHeadline": "Change the headline and subheading",
   "suggestion.addSection": "Add a new section",
+  "suggestion.rewriteTone": "Rewrite the copy to sound more {{tone}}",
+  "suggestion.createFromTemplate": "Create a new {{name}} page",
   "suggestion.createAbout": "Create a new /about page",
 
   // -- Streaming errors --

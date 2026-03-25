@@ -186,6 +186,7 @@ const de: LocaleDict = {
   "chatInput.imageOnly": "Hier werden nur Bilddateien unterstützt.",
   "chatInput.analyzeFailed": "Analyse des eingefügten Bildes fehlgeschlagen.",
   "chatInput.uploadFailed": "Bildupload fehlgeschlagen. Erneut versuchen oder Drag-and-Drop verwenden.",
+  "chatInput.transcribeFailed": "Audiotranskription fehlgeschlagen.",
 
   // -- Image picker --
   "imagePicker.title": "Medienbibliothek",
@@ -219,6 +220,17 @@ const de: LocaleDict = {
   "imagePicker.refine": "Verfeinern",
   "imagePicker.edit": "Bearbeiten",
   "imagePicker.closePreview": "Vorschau schließen",
+  "imagePicker.ready": "Fertig",
+  "imagePicker.editThisImage": "Dieses Bild bearbeiten",
+  "imagePicker.editThisImageDesc": "Änderungen am aktuellen Bild beschreiben",
+  "imagePicker.generateNew": "Neu generieren",
+  "imagePicker.generateNewDesc": "Ein komplett neues Bild von Grund auf erstellen",
+  "imagePicker.useImage": "Bild verwenden",
+  "imagePicker.applyUrl": "URL anwenden",
+  "imagePicker.removeReference": "Referenz entfernen",
+  "imagePicker.attachReference": "Beispielbilder als Referenz anhängen (bis zu {{max}})",
+  "imagePicker.showOriginal": "Original anzeigen",
+  "imagePicker.showEdited": "Bearbeitet anzeigen",
 
   // -- Property panel --
   "propertyPanel.loading": "Wird geladen\u2026",
@@ -226,6 +238,18 @@ const de: LocaleDict = {
   "propertyPanel.unknownBlock": "Unbekannter Blocktyp:",
   "propertyPanel.page": "Seite",
   "propertyPanel.navLabel": "Nav-Label",
+  "propertyPanel.change": "Ändern",
+  "propertyPanel.chooseImage": "Bild wählen",
+  "propertyPanel.remove": "Entfernen",
+  "propertyPanel.altText": "Alt-Text",
+  "propertyPanel.altPlaceholder": "Beschreibe, was auf dem Bild zu sehen ist",
+  "propertyPanel.navPlaceholder": "Seite",
+  "propertyPanel.seo": "SEO",
+  "propertyPanel.seoTitle": "SEO-Titel",
+  "propertyPanel.seoTitlePlaceholder": "Standardmäßig der Seitentitel",
+  "propertyPanel.metaDescription": "Meta-Beschreibung",
+  "propertyPanel.metaDescPlaceholder": "Standardmäßig generierte Beschreibung",
+  "propertyPanel.ogImage": "Open-Graph-Bild-URL",
 
   // -- Welcome & suggestions --
   "welcome.greeting": "Willkommen bei {{name}}! Sag mir, was du ändern möchtest \u2014 ich kann Bereiche hinzufügen, Texte umschreiben, neue Seiten erstellen und mehr.",
@@ -236,6 +260,8 @@ const de: LocaleDict = {
   "suggestion.addCta": "Einen Call-to-Action hinzufügen",
   "suggestion.changeHeadline": "Überschrift und Untertitel ändern",
   "suggestion.addSection": "Neuen Bereich hinzufügen",
+  "suggestion.rewriteTone": "Text umschreiben: mehr {{tone}}",
+  "suggestion.createFromTemplate": "Neue {{name}}-Seite erstellen",
   "suggestion.createAbout": "Eine neue /about-Seite erstellen",
 
   // -- Streaming errors --
