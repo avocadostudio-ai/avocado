@@ -518,7 +518,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
               <div style={S.previewRow}>
                 <img src={uploadResult?.url ?? uploadPreview} alt="" style={S.previewImg} />
                 {uploading && <span style={S.previewLabel}>{t("imagePicker.uploading")}</span>}
-                {uploadResult && <span style={{ ...S.previewLabel, color: "#4ade80" }}>Ready</span>}
+                {uploadResult && <span style={{ ...S.previewLabel, color: "#4ade80" }}>{t("imagePicker.ready")}</span>}
               </div>
             )}
 
@@ -548,13 +548,13 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
               <div style={S.editChoiceContainer}>
                 <button style={S.editChoiceCard} onClick={() => setEditMode("edit")}>
                   <img src={currentUrl} alt="" style={S.editChoiceImg} />
-                  <span style={S.editChoiceTitle}>Edit this image</span>
-                  <span style={S.editChoiceDesc}>Describe changes to the current image</span>
+                  <span style={S.editChoiceTitle}>{t("imagePicker.editThisImage")}</span>
+                  <span style={S.editChoiceDesc}>{t("imagePicker.editThisImageDesc")}</span>
                 </button>
                 <button style={S.editChoiceCard} onClick={() => setEditMode("new")}>
                   <div style={S.editChoiceNewIcon}><Sparkles size={24} /></div>
-                  <span style={S.editChoiceTitle}>Generate new</span>
-                  <span style={S.editChoiceDesc}>Create a completely new image from scratch</span>
+                  <span style={S.editChoiceTitle}>{t("imagePicker.generateNew")}</span>
+                  <span style={S.editChoiceDesc}>{t("imagePicker.generateNewDesc")}</span>
                 </button>
               </div>
             )}
@@ -584,7 +584,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                             <div className="imgpicker-zoom-icon" style={S.zoomIcon}><ZoomIn size={20} /></div>
                           </div>
                           {generatedResult && msg.imageUrl === generatedResult.url && !generating && (
-                            <button onClick={handleSelect} style={S.useImageBeside}>Use image</button>
+                            <button onClick={handleSelect} style={S.useImageBeside}>{t("imagePicker.useImage")}</button>
                           )}
                         </div>
                       )}
@@ -625,7 +625,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                         <button
                           style={S.refRemoveBtn}
                           onClick={() => setReferenceImages(prev => prev.filter((_, ri) => ri !== i))}
-                          aria-label="Remove reference"
+                          aria-label={t("imagePicker.removeReference")}
                         ><X size={10} /></button>
                       )}
                     </div>
@@ -660,7 +660,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                     style={{ ...S.attachBtn, ...(referenceImages.length >= effectiveMaxReferences ? S.disabled : {}) }}
                     onClick={() => refImageInputRef.current?.click()}
                     disabled={referenceImages.length >= effectiveMaxReferences}
-                    title="Attach example images for AI to reference (up to 14)"
+                    title={t("imagePicker.attachReference", { max: String(effectiveMaxReferences) })}
                   ><Paperclip size={15} /></button>
                 )}
                 <button
@@ -681,7 +681,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
         <div style={S.footer}>
           <button onClick={handleSelect} disabled={!canSubmit}
             style={{ ...S.submitBtn, ...(canSubmit ? {} : S.disabled) }}>
-            {activeTab === "upload" && urlInput.trim() && !uploadResult ? "Apply URL" : "Use image"}
+            {activeTab === "upload" && urlInput.trim() && !uploadResult ? t("imagePicker.applyUrl") : t("imagePicker.useImage")}
           </button>
         </div>
         )}
@@ -697,7 +697,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                 style={S.lightboxToggleOriginal}
               >
                 <Eye size={15} />
-                {lightboxShowOriginal ? "Show edited" : "Show original"}
+                {lightboxShowOriginal ? t("imagePicker.showEdited") : t("imagePicker.showOriginal")}
               </button>
             )}
           </div>
