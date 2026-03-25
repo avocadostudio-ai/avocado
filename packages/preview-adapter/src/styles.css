@@ -33,7 +33,7 @@
 
 [data-editor-selection-mode] .editor-selectable:hover {
   cursor: pointer;
-  z-index: 2147483645;
+  z-index: 9999;
 }
 
 [data-editor-selection-mode] .editor-selectable:hover::before {
@@ -110,7 +110,7 @@
 [data-editor-active] .editor-highlight {
   overflow: visible !important;
   position: relative;
-  z-index: 2147483645;
+  z-index: 9999;
 }
 
 .editor-live-draft-active {
@@ -332,7 +332,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  z-index: 2147483646;
+  z-index: 10000;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
   opacity: 0;
   visibility: hidden;
@@ -434,7 +434,7 @@
 }
 
 .editor-list-item-add {
-  z-index: 2147483646;
+  z-index: 10000;
 }
 
 .editor-list-item-controls > .editor-list-item-delete {
