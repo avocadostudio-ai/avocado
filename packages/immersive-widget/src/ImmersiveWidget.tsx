@@ -21,7 +21,7 @@ import { TextSelectionToolbar } from "./components/TextSelectionToolbar"
 import { useBlockSelection, type BlockSelectionState } from "./hooks/useBlockSelection"
 import { useTextSelection, type TextSelectionContext } from "./hooks/useTextSelection"
 import { findBlockNode, findEditableNode, supportsInlineEditablePath, applyAiFieldLoading } from "@ai-site-editor/preview-adapter"
-import { submitChatStream, submitChatHttp, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
+import { submitChatStream, submitChatHttp, applyOps, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
 import { getAccessToken } from "./lib/access-auth"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
 import type { BlockManifest } from "@ai-site-editor/shared"
@@ -67,6 +67,7 @@ export function ImmersiveWidget({
   provider = "anthropic",
 }: ImmersiveWidgetProps) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const [panelQuickActions, setPanelQuickActions] = useState<string[] | undefined>(undefined)
   const [activeField, setActiveField] = useState<FieldContext | null>(null)
   const [fieldLoading, setFieldLoading] = useState(false)
   // Key: "iw-authed" is only set in THIS tab after successful password verify or confirmed valid token
@@ -129,13 +130,51 @@ export function ImmersiveWidget({
     setActiveField(null)
   }, [])
 
+  // Helper: apply an operation via /ops and refresh
+  const applyOp = useCallback((op: Record<string, unknown>) => {
+    applyOps(config.orchestratorUrl, {
+      session: config.session,
+      siteId: config.siteId,
+      ops: [op],
+    }).then(() => {
+      setTimeout(() => refresh(), 100)
+    })
+  }, [config, refresh])
+
   const { focusBlock, renderLiveDraft, triggerRefresh } = useBlockSelection({
     slug,
     pathname,
     refresh,
     navigate,
-    selectionMode: true, // Always on in immersive mode
+    selectionMode: true,
     onBlockSelected: handleBlockSelected,
+    onBlockReordered: useCallback((p: { slug: string; blockId: string; afterBlockId: string | null }) => {
+      applyOp({ op: "move_block", pageSlug: p.slug, blockId: p.blockId, afterBlockId: p.afterBlockId })
+    }, [applyOp]),
+    onBlockDeleteRequested: useCallback((p: { slug: string; blockId: string; blockType: string }) => {
+      applyOp({ op: "remove_block", pageSlug: p.slug, blockId: p.blockId })
+    }, [applyOp]),
+    onBlockAddRequested: useCallback((_p: { slug: string; afterBlockId?: string; beforeBlockId?: string }) => {
+      setActiveField(null)
+      setPanelQuickActions([
+        "Add a Hero section",
+        "Add a Features grid",
+        "Add a Testimonials section",
+        "Add an FAQ section",
+        "Add a CTA section",
+        "Add a Card grid",
+      ])
+      setPanelOpen(true)
+    }, []),
+    onListItemMoveRequested: useCallback((p: { slug: string; blockId: string; blockType: string; listKey: string; index: number; afterIndex?: number }) => {
+      applyOp({ op: "move_item", pageSlug: p.slug, blockId: p.blockId, listKey: p.listKey, itemIndex: p.index, afterIndex: p.afterIndex })
+    }, [applyOp]),
+    onListItemRemoveRequested: useCallback((p: { slug: string; blockId: string; blockType: string; listKey: string; index: number }) => {
+      applyOp({ op: "remove_item", pageSlug: p.slug, blockId: p.blockId, listKey: p.listKey, itemIndex: p.index })
+    }, [applyOp]),
+    onListItemAddRequested: useCallback((p: { slug: string; blockId: string; blockType: string; listKey: string; afterIndex: number }) => {
+      applyOp({ op: "add_item", pageSlug: p.slug, blockId: p.blockId, listKey: p.listKey, afterIndex: p.afterIndex })
+    }, [applyOp]),
   })
 
   // Text selection
@@ -147,6 +186,7 @@ export function ImmersiveWidget({
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
         setActiveField(null)
+        setPanelQuickActions(undefined)
         setPanelOpen(true)
       }
     }
@@ -229,8 +269,8 @@ export function ImmersiveWidget({
           renderLiveDraft(event.blockId, event.value, true, { [event.editablePath]: event.value })
         },
         onFinal: (result) => {
-          renderLiveDraft("", "", false)
-          setTimeout(() => handleChatResult(result), 100)
+          // Don't clear live draft — let refresh replace DOM naturally to avoid blink
+          handleChatResult(result)
         },
         onError: (result) => {
           setIsLoading(false)
@@ -297,13 +337,12 @@ export function ImmersiveWidget({
         onFinal: (result) => {
           setFieldLoading(false)
           setActiveField(null)
-          // Clear shimmer + live draft, then refresh to show committed content
           applyAiFieldLoading("", "", false)
-          renderLiveDraft("", "", false)
-          setTimeout(() => {
-            if (result.focusBlockId) focusBlock(result.focusBlockId)
-            triggerRefresh(result.focusBlockId)
-          }, 100)
+          // Don't clear live draft here — let the refresh replace the DOM
+          // so the streamed text stays visible until the server content loads.
+          // The refresh will naturally overwrite the live-draft nodes.
+          if (result.focusBlockId) focusBlock(result.focusBlockId)
+          triggerRefresh(result.focusBlockId)
         },
         onError: (result) => {
           setFieldLoading(false)
@@ -376,7 +415,8 @@ export function ImmersiveWidget({
           isLoading={isLoading}
           streamStatus={streamStatus}
           onSubmit={handleSubmit}
-          onClose={() => setPanelOpen(false)}
+          onClose={() => { setPanelOpen(false); setPanelQuickActions(undefined) }}
+          quickActions={panelQuickActions}
           selectedBlockLabel={selectedBlockLabel}
         />
       )}
@@ -384,7 +424,10 @@ export function ImmersiveWidget({
       {/* FAB */}
       <ChatFab
         open={panelOpen}
-        onClick={() => setPanelOpen((prev) => !prev)}
+        onClick={() => {
+          setPanelOpen((prev) => !prev)
+          if (panelOpen) setPanelQuickActions(undefined)
+        }}
       />
     </div>
   )

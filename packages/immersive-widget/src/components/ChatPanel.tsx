@@ -13,11 +13,15 @@ type ChatPanelProps = {
   streamStatus: string | null
   onSubmit: (message: string) => void
   onClose: () => void
+  /** Pre-filled input text (e.g. from + button) */
+  initialInput?: string
+  /** Quick action suggestions shown at the top */
+  quickActions?: string[]
   selectedBlockLabel?: string | null
 }
 
-export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose, selectedBlockLabel }: ChatPanelProps) {
-  const [input, setInput] = useState("")
+export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose, initialInput, quickActions, selectedBlockLabel }: ChatPanelProps) {
+  const [input, setInput] = useState(initialInput ?? "")
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -62,7 +66,25 @@ export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose,
       </div>
 
       <div className="iw-panel-messages" ref={scrollRef}>
-        {chatLog.length === 0 && !streamStatus && (
+        {chatLog.length === 0 && !streamStatus && quickActions && quickActions.length > 0 && (
+          <div className="iw-panel-quick-actions">
+            <p className="iw-panel-quick-actions-label">Choose a block to add:</p>
+            <div className="iw-message-suggestions">
+              {quickActions.map((action, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="iw-suggestion-pill"
+                  onClick={() => { onSubmit(action); }}
+                  disabled={isLoading}
+                >
+                  {action}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {chatLog.length === 0 && !streamStatus && !quickActions && (
           <div className="iw-panel-empty">
             Select a block or type a message to get started.
           </div>
@@ -110,7 +132,7 @@ export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose,
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={selectedBlockLabel ? `Edit ${selectedBlockLabel}...` : "Ask AI to edit this page..."}
+          placeholder="Ask AI anything..."
           rows={1}
           disabled={isLoading}
         />

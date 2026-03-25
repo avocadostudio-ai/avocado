@@ -25,6 +25,31 @@ export type ChatRequestPayload = {
   siteContext?: { siteId: string; siteName?: string; purpose?: string; tone?: string; constraints?: string[] }
 }
 
+/**
+ * Apply operations directly via /ops endpoint (for block reorder, delete, add, etc.)
+ */
+export async function applyOps(
+  orchestratorUrl: string,
+  payload: { session: string; siteId: string; ops: Record<string, unknown>[] },
+): Promise<{ ok: boolean; previewVersion?: number; error?: string }> {
+  const token = getAccessToken()
+  const headers: Record<string, string> = { "content-type": "application/json" }
+  if (token) headers["x-access-token"] = token
+
+  try {
+    const res = await fetch(`${orchestratorUrl}/ops`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data.error ?? `Status ${res.status}` }
+    return { ok: true, previewVersion: data.previewVersion }
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+}
+
 export type ChatResult = {
   status: string
   summary: string
