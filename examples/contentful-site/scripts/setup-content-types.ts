@@ -1,4 +1,11 @@
 /**
+ * OPTIONAL STARTER KIT: Create Contentful content types from the default block set.
+ *
+ * Skip this if you have an existing Contentful schema — instead, write your own
+ * fetch adapter (lib/contentful.ts) and block manifest (getManifest in the
+ * editor API route). See villa-puravida-web for a custom-blocks example.
+ *
+ * Original description:
  * Setup script to create Contentful content types from the block registry.
  *
  * Creates one content type per block (20 blocks) + Page + SiteConfig = 22 total.
