@@ -16,9 +16,11 @@ import { createPortal } from "react-dom"
 import { ChatFab } from "./components/ChatFab"
 import { ChatPanel } from "./components/ChatPanel"
 import { PasswordGate } from "./components/PasswordGate"
+import { InlineFieldPrompt, type FieldContext } from "./components/InlineFieldPrompt"
 import { TextSelectionToolbar } from "./components/TextSelectionToolbar"
 import { useBlockSelection, type BlockSelectionState } from "./hooks/useBlockSelection"
 import { useTextSelection, type TextSelectionContext } from "./hooks/useTextSelection"
+import { findBlockNode, findEditableNode, supportsInlineEditablePath } from "@ai-site-editor/preview-adapter"
 import { submitChatStream, submitChatHttp, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
 import { getAccessToken } from "./lib/access-auth"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
@@ -65,6 +67,8 @@ export function ImmersiveWidget({
   provider = "anthropic",
 }: ImmersiveWidgetProps) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const [activeField, setActiveField] = useState<FieldContext | null>(null)
+  const [fieldLoading, setFieldLoading] = useState(false)
   // Key: "iw-authed" is only set in THIS tab after successful password verify or confirmed valid token
   const [authenticated, setAuthenticated] = useState(() =>
     typeof sessionStorage !== "undefined" && sessionStorage.getItem("iw-authed") === "1"
@@ -100,9 +104,29 @@ export function ImmersiveWidget({
     saveChatHistory(config.session, config.siteId, chatLog)
   }, [chatLog, config.session, config.siteId])
 
-  // Block selection — callbacks use refs to avoid circular deps with triggerRefresh
+  // Block selection — when a text field is clicked, show inline prompt
   const handleBlockSelected = useCallback((state: BlockSelectionState) => {
     setSelectedBlock(state)
+
+    // If a text field was clicked (not an image), show inline field prompt
+    if (state.blockId && state.editablePath && supportsInlineEditablePath(state.editablePath)) {
+      const blockNode = findBlockNode(state.blockId)
+      if (blockNode) {
+        const fieldNode = findEditableNode(blockNode, state.editablePath)
+        if (fieldNode) {
+          setActiveField({
+            blockId: state.blockId,
+            blockType: state.blockType ?? "Block",
+            editablePath: state.editablePath,
+            element: fieldNode,
+          })
+          setPanelOpen(false) // Close chat panel when field prompt is active
+          return
+        }
+      }
+    }
+    // Clear field prompt if clicking a block without a text field
+    setActiveField(null)
   }, [])
 
   const { focusBlock, renderLiveDraft, triggerRefresh } = useBlockSelection({
@@ -122,6 +146,7 @@ export function ImmersiveWidget({
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
+        setActiveField(null)
         setPanelOpen(true)
       }
     }
@@ -229,11 +254,65 @@ export function ImmersiveWidget({
     cancelRef.current = cancel
   }, [config, slug, modelKey, provider, selectedBlock, manifest, accessToken, focusBlock, renderLiveDraft, triggerRefresh, handleChatResult])
 
+  // Field-level submit — targets a specific editable field
+  const handleFieldSubmit = useCallback((message: string) => {
+    if (!activeField) return
+    setFieldLoading(true)
+
+    const payload: ChatRequestPayload = {
+      session: config.session,
+      siteId: config.siteId,
+      slug,
+      message,
+      modelKey,
+      provider,
+      activeBlockId: activeField.blockId,
+      activeBlockType: activeField.blockType,
+      activeEditablePath: activeField.editablePath,
+      componentsManifest: manifest,
+      ...(siteContext ? {
+        sitePurpose: siteContext.purpose,
+        businessContext: { purpose: siteContext.purpose, tone: siteContext.tone, constraints: siteContext.constraints },
+        siteContext: { siteId: config.siteId, siteName: siteContext.siteName, purpose: siteContext.purpose, tone: siteContext.tone, constraints: siteContext.constraints },
+      } : {}),
+    }
+
+    const { cancel } = submitChatStream(
+      config.orchestratorUrl,
+      payload,
+      {
+        onStatus: () => {},
+        onOpApplied: (event) => {
+          if (event.focusBlockId) focusBlock(event.focusBlockId)
+          triggerRefresh(event.focusBlockId)
+        },
+        onFieldDraft: (event) => {
+          renderLiveDraft(event.blockId, event.value, true, { [event.editablePath]: event.value })
+        },
+        onFinal: (result) => {
+          setFieldLoading(false)
+          setActiveField(null)
+          if (result.focusBlockId) focusBlock(result.focusBlockId)
+          triggerRefresh(result.focusBlockId)
+        },
+        onError: (result) => {
+          setFieldLoading(false)
+          if (result.summary?.toLowerCase().includes("unauthorized") || result.error?.toLowerCase().includes("unauthorized")) {
+            sessionStorage.removeItem("iw-authed")
+            setAuthenticated(false)
+          }
+        },
+      },
+      accessToken,
+    )
+
+    cancelRef.current = cancel
+  }, [activeField, config, slug, modelKey, provider, manifest, siteContext, accessToken, focusBlock, renderLiveDraft, triggerRefresh])
+
   const handleTextSelectionAskAI = useCallback((ctx: TextSelectionContext) => {
     clearSelection()
     setSelectedBlock({ blockId: ctx.blockId, blockType: ctx.blockType, editablePath: ctx.editablePath })
     setPanelOpen(true)
-    // Pre-fill context — user can type their instruction
   }, [clearSelection])
 
   const selectedBlockLabel = selectedBlock.blockType
@@ -248,8 +327,18 @@ export function ImmersiveWidget({
 
   const ui = (
     <>
+      {/* Inline field prompt — shown when a text element is clicked */}
+      {activeField && !panelOpen && (
+        <InlineFieldPrompt
+          field={activeField}
+          isLoading={fieldLoading}
+          onSubmit={handleFieldSubmit}
+          onClose={() => setActiveField(null)}
+        />
+      )}
+
       {/* Text selection toolbar */}
-      {textSelection && !panelOpen && (
+      {textSelection && !panelOpen && !activeField && (
         <TextSelectionToolbar
           selection={textSelection}
           onAskAI={handleTextSelectionAskAI}
