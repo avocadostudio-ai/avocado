@@ -20,7 +20,7 @@ import { InlineFieldPrompt, type FieldContext } from "./components/InlineFieldPr
 import { TextSelectionToolbar } from "./components/TextSelectionToolbar"
 import { useBlockSelection, type BlockSelectionState } from "./hooks/useBlockSelection"
 import { useTextSelection, type TextSelectionContext } from "./hooks/useTextSelection"
-import { findBlockNode, findEditableNode, supportsInlineEditablePath } from "@ai-site-editor/preview-adapter"
+import { findBlockNode, findEditableNode, supportsInlineEditablePath, applyAiFieldLoading } from "@ai-site-editor/preview-adapter"
 import { submitChatStream, submitChatHttp, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
 import { getAccessToken } from "./lib/access-auth"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
@@ -224,13 +224,14 @@ export function ImmersiveWidget({
         onStatus: (msg) => setStreamStatus(msg),
         onOpApplied: (event) => {
           setStreamStatus(`Applying changes (${event.index + 1}/${event.total})...`)
-          if (event.focusBlockId) focusBlock(event.focusBlockId)
-          triggerRefresh(event.focusBlockId)
         },
         onFieldDraft: (event) => {
           renderLiveDraft(event.blockId, event.value, true, { [event.editablePath]: event.value })
         },
-        onFinal: handleChatResult,
+        onFinal: (result) => {
+          renderLiveDraft("", "", false)
+          setTimeout(() => handleChatResult(result), 100)
+        },
         onError: (result) => {
           setIsLoading(false)
           setStreamStatus(null)
@@ -259,6 +260,9 @@ export function ImmersiveWidget({
     if (!activeField) return
     setFieldLoading(true)
 
+    // Show shimmer effect on the field being edited
+    applyAiFieldLoading(activeField.blockId, activeField.editablePath, true)
+
     const payload: ChatRequestPayload = {
       session: config.session,
       siteId: config.siteId,
@@ -282,21 +286,29 @@ export function ImmersiveWidget({
       payload,
       {
         onStatus: () => {},
-        onOpApplied: (event) => {
-          if (event.focusBlockId) focusBlock(event.focusBlockId)
-          triggerRefresh(event.focusBlockId)
+        onOpApplied: () => {
+          // Don't refresh on each op — wait for final to avoid flickering
         },
         onFieldDraft: (event) => {
+          // Transition from shimmer → live text as AI streams
+          applyAiFieldLoading("", "", false)
           renderLiveDraft(event.blockId, event.value, true, { [event.editablePath]: event.value })
         },
         onFinal: (result) => {
           setFieldLoading(false)
           setActiveField(null)
-          if (result.focusBlockId) focusBlock(result.focusBlockId)
-          triggerRefresh(result.focusBlockId)
+          // Clear shimmer + live draft, then refresh to show committed content
+          applyAiFieldLoading("", "", false)
+          renderLiveDraft("", "", false)
+          setTimeout(() => {
+            if (result.focusBlockId) focusBlock(result.focusBlockId)
+            triggerRefresh(result.focusBlockId)
+          }, 100)
         },
         onError: (result) => {
           setFieldLoading(false)
+          applyAiFieldLoading("", "", false)
+          renderLiveDraft("", "", false)
           if (result.summary?.toLowerCase().includes("unauthorized") || result.error?.toLowerCase().includes("unauthorized")) {
             sessionStorage.removeItem("iw-authed")
             setAuthenticated(false)
@@ -326,7 +338,7 @@ export function ImmersiveWidget({
   if (!mounted) return null
 
   const ui = (
-    <>
+    <div data-editor-widget-ignore="">
       {/* Inline field prompt — shown when a text element is clicked */}
       {activeField && !panelOpen && (
         <InlineFieldPrompt
@@ -374,7 +386,7 @@ export function ImmersiveWidget({
         open={panelOpen}
         onClick={() => setPanelOpen((prev) => !prev)}
       />
-    </>
+    </div>
   )
 
   // Portal to document.body to escape stacking contexts
