@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Eraser } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AIProvider, ModelKey } from "@/lib/editor-types"
+import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
 
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
@@ -73,6 +74,7 @@ export function SettingsModal({
   onModelChange,
   onClearChat,
 }: SettingsModalProps) {
+  const { t, locale, setLocale } = useT()
   const currentValue = selectionValue(provider, modelKey)
 
   const handleModelChange = (value: string) => {
@@ -103,20 +105,34 @@ export function SettingsModal({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className={cn("w-full max-w-none gap-0 p-0 font-sans text-foreground text-sm", chatDarkMode && "editor-dark")} showCloseButton={true}>
         <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
-          <SheetTitle className="text-base font-bold tracking-tight">Developer mode</SheetTitle>
+          <SheetTitle className="text-base font-bold tracking-tight">{t("settings.title")}</SheetTitle>
         </SheetHeader>
 
         <div className="grid gap-5 px-5 py-5">
+          <div className="grid gap-1.5 text-left">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{t("settings.language")}</span>
+            <Select value={locale} onValueChange={(v) => setLocale(v as Locale)}>
+              <SelectTrigger className="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={cn("font-sans text-sm", chatDarkMode && "editor-dark")}>
+                {(Object.entries(LOCALE_LABELS) as [Locale, string][]).map(([code, label]) => (
+                  <SelectItem key={code} value={code}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid gap-0" role="group" aria-label="Developer toggles">
-            <ToggleRow label="Streaming" checked={useStreaming} onCheckedChange={onStreamingChange} />
-            <ToggleRow label="Nested labels" checked={showNestedLabels} onCheckedChange={onNestedLabelsChange} />
-            <ToggleRow label="Field draft telemetry" checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
-            <ToggleRow label="Dark mode" checked={chatDarkMode} onCheckedChange={onDarkModeChange} />
-            <ToggleRow label="Debug mode" checked={showDebugDetails} onCheckedChange={onDebugDetailsChange} />
+            <ToggleRow label={t("settings.streaming")} checked={useStreaming} onCheckedChange={onStreamingChange} />
+            <ToggleRow label={t("settings.nestedLabels")} checked={showNestedLabels} onCheckedChange={onNestedLabelsChange} />
+            <ToggleRow label={t("settings.fieldDraftTelemetry")} checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
+            <ToggleRow label={t("settings.darkMode")} checked={chatDarkMode} onCheckedChange={onDarkModeChange} />
+            <ToggleRow label={t("settings.debugMode")} checked={showDebugDetails} onCheckedChange={onDebugDetailsChange} />
           </div>
 
           <div className="grid gap-1.5 text-left">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Model</span>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{t("settings.model")}</span>
             <Select value={currentValue} onValueChange={handleModelChange}>
               <SelectTrigger className="w-full h-9 text-sm">
                 <SelectValue />
@@ -126,7 +142,7 @@ export function SettingsModal({
                   <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                 ))}
                 <SelectGroup>
-                  <SelectLabel>Advanced</SelectLabel>
+                  <SelectLabel>{t("settings.advanced")}</SelectLabel>
                   {advancedItems.map((item) => (
                     <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                   ))}
@@ -137,7 +153,7 @@ export function SettingsModal({
 
           <Button variant="destructive" size="sm" className="w-full" onClick={handleClearChat}>
             <Eraser className="size-4" />
-            Clear chat
+            {t("settings.clearChat")}
           </Button>
         </div>
       </SheetContent>

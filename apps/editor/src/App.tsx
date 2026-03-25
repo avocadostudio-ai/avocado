@@ -21,6 +21,7 @@ import { useBlockManifest } from "./hooks/useBlockManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
+import { useT } from "./i18n"
 import { fieldAiSuggestions, fieldAiQuickActions } from "./lib/field-ai-suggestions"
 import { manifestUnavailableChanges, withIntegrationContext } from "./lib/integration-context"
 import {
@@ -387,6 +388,7 @@ function EditorPage({
   chatDarkMode: boolean
   onSetChatDarkMode: (value: boolean) => void
 }) {
+  const { t } = useT()
   const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
   const { activeSiteConfig } = sites
   const activeSiteOrigin = useMemo(() => resolveSiteOrigin(activeSiteConfig), [activeSiteConfig])
@@ -506,7 +508,7 @@ function EditorPage({
     lastStructuralNoticeAtRef.current = now
     chatEngine.pushAssistantFromResult({
       status: "needs_clarification",
-      summary: "Structural edits are disabled for this site context.",
+      summary: t("streamError.structuralDisabled"),
       changes: manifestUnavailableChanges(componentManifest.reason)
     })
   }
@@ -1072,8 +1074,8 @@ function EditorPage({
   }, [addBlockPicker, isAddingBlock])
 
   const streamIsError = chatEngine.streamStatus ? /failed|error/i.test(chatEngine.streamStatus) : false
-  const streamLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Shaping your update..." : "Getting things ready..."))
-  const streamTextLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? "Updating..." : "Thinking"))
+  const streamLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? t("stream.shapingUpdate") : t("stream.gettingReady")))
+  const streamTextLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? t("stream.updating") : t("stream.thinking")))
   const fieldDraftDebugLabel = `field_draft ${chatEngine.fieldDraftDebug.eventsPerSecond}/s · chars ${chatEngine.fieldDraftDebug.charsPerSecond}/s · lag ${chatEngine.fieldDraftDebug.typingLagChars}`
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const chatPanelClassName = `chat-panel ${activeTab === "properties" ? "chat-panel--properties" : "chat-panel--chat"}`
@@ -1140,7 +1142,7 @@ function EditorPage({
   }, [buildCopyPayload])
 
   const buildDebugSummary = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
-    if (!entry.debug) return "Expand details"
+    if (!entry.debug) return t("chat.expandDetails")
     const parts: string[] = []
     if (entry.debug.outcome) parts.push(entry.debug.outcome.replace(/_/g, " "))
     if (typeof entry.debug.opCount === "number") {
@@ -1153,8 +1155,8 @@ function EditorPage({
       const totalMs = entry.debug.timeline[entry.debug.timeline.length - 1]?.atMs
       if (typeof totalMs === "number") parts.push(`${totalMs}ms`)
     }
-    return parts.join(" · ") || "Expand details"
-  }, [])
+    return parts.join(" · ") || t("chat.expandDetails")
+  }, [t])
 
   return (
     <div className="layout" style={chatWidth ? { "--chat-width": `${chatWidth}px` } as React.CSSProperties : undefined}>
@@ -1166,8 +1168,8 @@ function EditorPage({
               <button
                 type="button"
                 className="chat-header-icon-btn"
-                aria-label="Site settings"
-                title="Site settings"
+                aria-label={t("header.siteSettings")}
+                title={t("header.siteSettings")}
                 onClick={() => sites.setConfigSiteId(siteId)}
               >
                 <Settings size={14} aria-hidden="true" />
@@ -1175,15 +1177,15 @@ function EditorPage({
               <button
                 type="button"
                 className="chat-header-icon-btn"
-                aria-label="Sync from site"
-                title="Sync content from site"
+                aria-label={t("header.syncFromSite")}
+                title={t("header.syncFromSiteTitle")}
                 disabled={chatEngine.isLoading}
                 onClick={async () => {
                   const count = await chatEngine.syncFromSite()
                   if (count > 0) {
                     chatEngine.pushAssistantFromResult({
                       status: "applied",
-                      summary: `Synced ${count} page${count === 1 ? "" : "s"} from site.`,
+                      summary: t("header.syncedPages", { count }),
                       changes: []
                     })
                   }
@@ -1191,34 +1193,34 @@ function EditorPage({
               >
                 <RefreshCw size={14} aria-hidden="true" />
               </button>
-              <a href="/sites" className="chat-header-switch-site">All sites</a>
+              <a href="/sites" className="chat-header-switch-site">{t("header.allSites")}</a>
             </div>
             <div className="chat-header-right">
               {componentManifest.status === "degraded" ? (
                 <span className="planner-badge" title={componentManifest.reason ?? "Components unavailable"}>
-                  Limited
+                  {t("header.limited")}
                 </span>
               ) : null}
               {chatEngine.plannerBadgeState === "demo" ? (
-                <span className="planner-badge planner-badge-demo">Demo mode</span>
+                <span className="planner-badge planner-badge-demo">{t("header.demoMode")}</span>
               ) : null}
               <button
                 type="button"
                 className="chat-header-icon-btn"
-                aria-label="More options"
+                aria-label={t("header.moreOptions")}
                 onClick={() => setShowSettingsModal(true)}
               >
                 <Ellipsis size={14} aria-hidden="true" />
               </button>
               <button type="button" className="publish-preview-btn" onClick={() => void publish.publishSite()} disabled={chatEngine.isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
-                {publish.publishInProgress ? "Publishing" : "Publish"}
+                {publish.publishInProgress ? t("header.publishing") : t("header.publish")}
               </button>
               {publish.publishStatus ? (
                 <>
                   {publish.publishStatus.inspectUrl ? (
                     <a className="publish-view-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
-                      View deploy
+                      {t("header.viewDeploy")}
                     </a>
                   ) : null}
                   {liveSiteUrl ? (
@@ -1227,8 +1229,8 @@ function EditorPage({
                       href={liveSiteUrl}
                       target="_blank"
                       rel="noreferrer"
-                      aria-label="Open live site"
-                      title="Open live site"
+                      aria-label={t("header.openLiveSite")}
+                      title={t("header.openLiveSite")}
                     >
                       <ExternalLink size={16} aria-hidden="true" />
                     </a>
@@ -1253,21 +1255,21 @@ function EditorPage({
             type="button"
             className={`panel-tab panel-tab-main ${activeTab === "chat" ? "is-active" : ""}`}
             onClick={() => setActiveTab("chat")}
-            aria-label="Chat"
-            title="Chat"
+            aria-label={t("tabs.chat")}
+            title={t("tabs.chat")}
           >
             <Bot size={14} />
-            <span className="panel-tab-label">Chat</span>
+            <span className="panel-tab-label">{t("tabs.chat")}</span>
           </button>
           <button
             type="button"
             className={`panel-tab panel-tab-main ${activeTab === "properties" ? "is-active" : ""}`}
             onClick={() => setActiveTab("properties")}
-            aria-label="Properties"
-            title="Properties"
+            aria-label={t("tabs.properties")}
+            title={t("tabs.properties")}
           >
             <SlidersHorizontal size={14} />
-            <span className="panel-tab-label">Properties</span>
+            <span className="panel-tab-label">{t("tabs.properties")}</span>
             {activeBlockId ? <span className="panel-tab-dot" /> : null}
           </button>
         </nav>
@@ -1432,8 +1434,8 @@ function EditorPage({
                     type="button"
                     className="msg-debug-copy-btn"
                     onClick={() => void copyAssistantBubble(entry)}
-                    aria-label={copiedDebugEntryId === entry.id ? "Copied" : "Copy debug bubble"}
-                    title={copiedDebugEntryId === entry.id ? "Copied" : "Copy"}
+                    aria-label={copiedDebugEntryId === entry.id ? t("chat.copied") : t("chat.copyDebug")}
+                    title={copiedDebugEntryId === entry.id ? t("chat.copied") : t("chat.copy")}
                   >
                     {copiedDebugEntryId === entry.id ? (
                       <Check aria-hidden="true" size={14} />
@@ -1451,7 +1453,7 @@ function EditorPage({
                     onClick={() => void chatEngine.applyUndoHistory(entry.id)}
                     disabled={!entry.canUndo || chatEngine.isLoading || chatEngine.undoInFlightEntryId !== null}
                   >
-                    <span>{entry.wasUndone ? "Undone" : "Undo"}</span>
+                    <span>{entry.wasUndone ? t("chat.undone") : t("chat.undo")}</span>
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M9 7 4 12l5 5" />
                       <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
@@ -1468,7 +1470,7 @@ function EditorPage({
                       if (!entry.feedback) void chatEngine.submitFeedback(entry.id, "up")
                     }}
                     disabled={!!entry.feedback}
-                    title="Good response"
+                    title={t("chat.goodResponse")}
                   >
                     <ThumbsUp aria-hidden="true" size={13} />
                   </button>
@@ -1482,13 +1484,13 @@ function EditorPage({
                       }
                     }}
                     disabled={!!entry.feedback}
-                    title="Bad response"
+                    title={t("chat.badResponse")}
                   >
                     <ThumbsDown aria-hidden="true" size={13} />
                   </button>
                   {entry.feedback ? (
                     <span className="msg-feedback-label">
-                      {entry.feedback.rating === "up" ? "Thanks!" : "Noted"}
+                      {entry.feedback.rating === "up" ? t("chat.feedbackThanks") : t("chat.feedbackNoted")}
                       {entry.feedback.note ? ` — "${entry.feedback.note}"` : ""}
                     </span>
                   ) : null}
@@ -1504,12 +1506,12 @@ function EditorPage({
                     >
                       <input
                         className="msg-feedback-note-input"
-                        placeholder="What went wrong? (optional)"
+                        placeholder={t("chat.feedbackPlaceholder")}
                         value={feedbackNoteText}
                         onChange={(e) => setFeedbackNoteText(e.target.value)}
                         autoFocus
                       />
-                      <button type="submit" className="msg-feedback-note-submit">Send</button>
+                      <button type="submit" className="msg-feedback-note-submit">{t("chat.feedbackSend")}</button>
                     </form>
                   ) : null}
                 </div>
@@ -1670,7 +1672,7 @@ function EditorPage({
           style={{ display: activeTab === "chat" ? "" : "none" }}
           role="separator"
           aria-orientation="horizontal"
-          aria-label="Resize input panel"
+          aria-label={t("resize.inputPanel")}
           onPointerDown={(event) => {
             resizeStartRef.current = { y: event.clientY, composerHeight }
             document.body.style.userSelect = "none"
@@ -1702,7 +1704,7 @@ function EditorPage({
         className="panel-splitter"
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize chat panel"
+        aria-label={t("resize.chatPanel")}
         onPointerDown={(event) => {
           const panel = chatPanelRef.current
           if (!panel) return
@@ -1715,7 +1717,7 @@ function EditorPage({
       <section className="preview">
         <iframe
           ref={preview.iframeRef}
-          title="Live preview"
+          title={t("preview.title")}
           src={previewSrc}
           onLoad={() => {
             if (siteDraftSecret && !draftPrimedRef.current) {
@@ -1762,13 +1764,13 @@ function EditorPage({
             if (!chatEngine.isApplyingVariation) chatEngine.setVariationModal(null)
           }}
         >
-          <div className="variation-modal" role="dialog" aria-modal="true" aria-label="Choose a variation" onClick={(e) => e.stopPropagation()}>
+          <div className="variation-modal" role="dialog" aria-modal="true" aria-label={t("variation.title")} onClick={(e) => e.stopPropagation()}>
             <div className="variation-modal-header">
               <h2>Choose a Variation</h2>
               <button
                 type="button"
                 className="settings-close-btn"
-                aria-label="Close variation picker"
+                aria-label={t("variation.close")}
                 onClick={() => chatEngine.setVariationModal(null)}
                 disabled={chatEngine.isApplyingVariation}
               >
@@ -1805,7 +1807,7 @@ function EditorPage({
                 onClick={() => { if (selectedOption) void chatEngine.applyVariation(selectedOption) }}
                 disabled={chatEngine.isApplyingVariation || !selectedOption}
               >
-                {chatEngine.isApplyingVariation ? "Applying..." : `Apply "${selectedOption?.title ?? ""}"`}
+                {chatEngine.isApplyingVariation ? t("variation.applying") : t("variation.apply", { title: selectedOption?.title ?? "" })}
               </button>
             </div>
           </div>
@@ -1820,18 +1822,18 @@ function EditorPage({
             if (!isAddingBlock) setAddBlockPicker(null)
           }}
         >
-          <div className="add-block-modal" role="dialog" aria-modal="true" aria-label="Add block" onClick={(e) => e.stopPropagation()}>
+          <div className="add-block-modal" role="dialog" aria-modal="true" aria-label={t("addBlock.title")} onClick={(e) => e.stopPropagation()}>
             <div className="add-block-modal-header">
               <h2>Add block</h2>
               <p>
                 {addBlockPicker.beforeBlockId && !addBlockPicker.afterBlockId
-                  ? "Select block type to insert above the selected section."
-                  : "Select block type to insert below the selected section."}
+                  ? t("addBlock.insertAbove")
+                  : t("addBlock.insertBelow")}
               </p>
               <button
                 type="button"
                 className="settings-close-btn"
-                aria-label="Close add block picker"
+                aria-label={t("addBlock.close")}
                 onClick={() => setAddBlockPicker(null)}
                 disabled={isAddingBlock}
               >
@@ -1844,7 +1846,7 @@ function EditorPage({
                   type="search"
                   value={addBlockSearch}
                   onChange={(e) => setAddBlockSearch(e.target.value)}
-                  placeholder="Search block types"
+                  placeholder={t("addBlock.searchPlaceholder")}
                   disabled={isAddingBlock}
                 />
               </label>
@@ -1914,29 +1916,29 @@ function EditorPage({
           {sites.configSite ? (
             <>
               <nav className="panel-tabs">
-                <button type="button" className={`panel-tab ${configModalTab === "general" ? "is-active" : ""}`} onClick={() => setConfigModalTab("general")}>General</button>
-                <button type="button" className={`panel-tab ${configModalTab === "brief" ? "is-active" : ""}`} onClick={() => setConfigModalTab("brief")}>Brief</button>
-                <button type="button" className={`panel-tab ${configModalTab === "deploy" ? "is-active" : ""}`} onClick={() => setConfigModalTab("deploy")}>Deploy</button>
+                <button type="button" className={`panel-tab ${configModalTab === "general" ? "is-active" : ""}`} onClick={() => setConfigModalTab("general")}>{t("sites.general")}</button>
+                <button type="button" className={`panel-tab ${configModalTab === "brief" ? "is-active" : ""}`} onClick={() => setConfigModalTab("brief")}>{t("sites.brief")}</button>
+                <button type="button" className={`panel-tab ${configModalTab === "deploy" ? "is-active" : ""}`} onClick={() => setConfigModalTab("deploy")}>{t("sites.deploy")}</button>
               </nav>
               <div className="sites-modal-body">
                 {configModalTab === "general" ? (
                   <div className="sites-form-grid">
                     <label className="sites-form-field">
-                      <span>Site name</span>
+                      <span>{t("sites.siteNameLabel")}</span>
                       <input
                         type="text"
                         value={sites.configSite.name}
-                        placeholder="Site name"
+                        placeholder={t("sites.siteNamePlaceholder")}
                         onChange={(e) => sites.updateConfigSite({ name: e.target.value })}
                       />
                     </label>
-                    <p className="sites-form-section-title">Header</p>
+                    <p className="sites-form-section-title">{t("sites.header")}</p>
                     <label className="sites-form-field">
-                      <span>Header name</span>
+                      <span>{t("sites.siteHeaderName")}</span>
                       <input
                         type="text"
                         value={sites.headerConfig.name ?? ""}
-                        placeholder="Site header name"
+                        placeholder={t("sites.siteHeaderName")}
                         onBlur={(e) => {
                           void sites.updateHeaderConfig({ name: e.target.value })
                           preview.postToSite("draftUpdated", {})
@@ -1945,7 +1947,7 @@ function EditorPage({
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Logo URL</span>
+                      <span>{t("sites.logoUrl")}</span>
                       <input
                         type="text"
                         value={sites.headerConfig.logo ?? ""}
@@ -1962,30 +1964,30 @@ function EditorPage({
                 {configModalTab === "brief" ? (
                   <div className="sites-form-grid">
                     <div className="sites-form-field sites-form-field-wide">
-                      <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
-                        <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>Overview</button>
-                        <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>Tone</button>
-                        <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>Constraints</button>
-                        <button type="button" className={siteConfigTab === "templates" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("templates")}>Templates</button>
+                      <div className="sites-ai-tabs" role="tablist" aria-label={t("sites.editorialBrief")}>
+                        <button type="button" className={siteConfigTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("overview")}>{t("sites.overview")}</button>
+                        <button type="button" className={siteConfigTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("tone")}>{t("sites.tone")}</button>
+                        <button type="button" className={siteConfigTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("constraints")}>{t("sites.constraints")}</button>
+                        <button type="button" className={siteConfigTab === "templates" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setSiteConfigTab("templates")}>{t("sites.templates")}</button>
                       </div>
                       {siteConfigTab === "overview" ? (
                         <label className="sites-form-field">
-                          <span>Overview</span>
-                          <textarea value={sites.configSite.purpose} placeholder="What this site is for." onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
+                          <span>{t("sites.overview")}</span>
+                          <textarea value={sites.configSite.purpose} placeholder={t("sites.overviewPlaceholder")} onChange={(e) => sites.updateConfigSite({ purpose: e.target.value })} rows={8} />
                         </label>
                       ) : null}
                       {siteConfigTab === "tone" ? (
                         <label className="sites-form-field">
-                          <span>Preferred tone</span>
-                          <textarea value={sites.configSite.tone ?? ""} placeholder="How the writing should sound." onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
+                          <span>{t("sites.tone")}</span>
+                          <textarea value={sites.configSite.tone ?? ""} placeholder={t("sites.tonePlaceholder")} onChange={(e) => sites.updateConfigSite({ tone: e.target.value })} rows={8} />
                         </label>
                       ) : null}
                       {siteConfigTab === "constraints" ? (
                         <label className="sites-form-field">
-                          <span>Writing constraints</span>
+                          <span>{t("sites.constraints")}</span>
                           <textarea
                             value={(sites.configSite.constraints ?? []).join("\n")}
-                            placeholder={"Rules for content output.\nOne per line."}
+                            placeholder={t("sites.constraintsPlaceholder")}
                             onChange={(e) => sites.updateConfigSite({ constraints: e.target.value.split(/\n|,/g).map((s) => s.trim()).filter(Boolean) })}
                             rows={8}
                           />
@@ -1993,14 +1995,14 @@ function EditorPage({
                       ) : null}
                       {siteConfigTab === "templates" ? (
                         <div className="sites-form-field">
-                          <span>Page templates</span>
-                          <p className="sites-form-hint">Define reusable page structures. The AI will match templates by name or intent when creating pages.</p>
+                          <span>{t("sites.pageTemplates")}</span>
+                          <p className="sites-form-hint">{t("sites.pageTemplatesHint")}</p>
                           {(sites.configSite?.pageTemplates ?? []).map((tpl, idx) => (
                             <div key={idx} className="sites-template-entry">
                               <input
                                 type="text"
                                 value={tpl.name}
-                                placeholder="Template name (e.g. Campaign Landing Page)"
+                                placeholder={t("sites.templateName")}
                                 onChange={(e) => {
                                   const updated = [...(sites.configSite?.pageTemplates ?? [])]
                                   updated[idx] = { ...updated[idx], name: e.target.value }
@@ -2009,7 +2011,7 @@ function EditorPage({
                               />
                               <textarea
                                 value={tpl.description}
-                                placeholder="Describe the page structure: which sections, in what order, with what content focus."
+                                placeholder={t("sites.templateDescription")}
                                 rows={3}
                                 onChange={(e) => {
                                   const updated = [...(sites.configSite?.pageTemplates ?? [])]
@@ -2024,14 +2026,14 @@ function EditorPage({
                                   const updated = (sites.configSite?.pageTemplates ?? []).filter((_, i) => i !== idx)
                                   sites.updateConfigSite({ pageTemplates: updated.length > 0 ? updated : undefined })
                                 }}
-                              >Remove</button>
+                              >{t("sites.removeTemplate")}</button>
                             </div>
                           ))}
                           <button
                             type="button"
                             className="sites-template-add"
                             onClick={() => sites.updateConfigSite({ pageTemplates: [...(sites.configSite?.pageTemplates ?? []), { name: "", description: "" }] })}
-                          >+ Add template</button>
+                          >{t("sites.addTemplate")}</button>
                         </div>
                       ) : null}
                     </div>
@@ -2041,32 +2043,32 @@ function EditorPage({
                   <div className="sites-form-grid">
                     <div className="sites-settings-grid">
                       <label className="sites-form-field">
-                        <span>Hosting</span>
-                        <input type="text" value={sites.configSite.hosting} placeholder="Vercel production site" onChange={(e) => sites.updateConfigSite({ hosting: e.target.value })} />
+                        <span>{t("sites.hosting")}</span>
+                        <input type="text" value={sites.configSite.hosting} placeholder={t("sites.hostingPlaceholder")} onChange={(e) => sites.updateConfigSite({ hosting: e.target.value })} />
                       </label>
                       <label className="sites-form-field">
-                        <span>Vercel project ID</span>
-                        <input type="text" value={sites.configSite.vercelProjectId ?? ""} placeholder="prj_..." onChange={(e) => sites.updateConfigSite({ vercelProjectId: e.target.value })} />
+                        <span>{t("sites.vercelProjectId")}</span>
+                        <input type="text" value={sites.configSite.vercelProjectId ?? ""} placeholder={t("sites.vercelProjectIdPlaceholder")} onChange={(e) => sites.updateConfigSite({ vercelProjectId: e.target.value })} />
                       </label>
                       <label className="sites-form-field">
-                        <span>Vercel team ID</span>
-                        <input type="text" value={sites.configSite.vercelTeamId ?? ""} placeholder="team_..." onChange={(e) => sites.updateConfigSite({ vercelTeamId: e.target.value })} />
+                        <span>{t("sites.vercelTeamId")}</span>
+                        <input type="text" value={sites.configSite.vercelTeamId ?? ""} placeholder={t("sites.vercelTeamIdPlaceholder")} onChange={(e) => sites.updateConfigSite({ vercelTeamId: e.target.value })} />
                       </label>
                       <label className="sites-form-field">
-                        <span>Vercel production URL</span>
-                        <input type="url" value={sites.configSite.vercelProductionUrl ?? ""} placeholder="https://example.vercel.app" onChange={(e) => sites.updateConfigSite({ vercelProductionUrl: e.target.value })} />
+                        <span>{t("sites.vercelProductionUrl")}</span>
+                        <input type="url" value={sites.configSite.vercelProductionUrl ?? ""} placeholder={t("sites.vercelProductionUrlPlaceholder")} onChange={(e) => sites.updateConfigSite({ vercelProductionUrl: e.target.value })} />
                       </label>
                       <label className="sites-form-field sites-form-field-wide">
-                        <span>Vercel deploy hook URL</span>
-                        <input type="url" value={sites.configSite.vercelDeployHookUrl ?? ""} placeholder="https://api.vercel.com/v1/integrations/deploy/..." onChange={(e) => sites.updateConfigSite({ vercelDeployHookUrl: e.target.value })} />
+                        <span>{t("sites.vercelDeployHook")}</span>
+                        <input type="url" value={sites.configSite.vercelDeployHookUrl ?? ""} placeholder={t("sites.vercelDeployHookPlaceholder")} onChange={(e) => sites.updateConfigSite({ vercelDeployHookUrl: e.target.value })} />
                       </label>
                       <label className="sites-form-field sites-form-field-wide">
-                        <span>Google Drive folder ID</span>
+                        <span>{t("sites.googleDriveFolderId")}</span>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <input
                             type="text"
                             value={sites.configSite.gdriveFolderId ?? ""}
-                            placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+                            placeholder={t("sites.googleDrivePlaceholder")}
                             onChange={(e) => { sites.updateConfigSite({ gdriveFolderId: e.target.value }); setDriveValidation(null) }}
                             style={{ flex: 1 }}
                           />
@@ -2083,17 +2085,17 @@ function EditorPage({
                                 const res = await fetch(`${orchestrator}/gdrive/images?folderId=${encodeURIComponent(folderId)}&limit=1`)
                                 if (res.ok) {
                                   const data = (await res.json()) as { items: unknown[] }
-                                  setDriveValidation({ status: "ok", message: `Connected (${data.items.length > 0 ? "images found" : "folder empty"})` })
+                                  setDriveValidation({ status: "ok", message: data.items.length > 0 ? t("sites.driveConnectedImages") : t("sites.driveConnectedEmpty") })
                                 } else {
                                   const data = (await res.json().catch(() => ({}))) as { error?: string }
                                   setDriveValidation({ status: "error", message: data.error ?? `HTTP ${res.status}` })
                                 }
                               } catch {
-                                setDriveValidation({ status: "error", message: "Could not reach orchestrator" })
+                                setDriveValidation({ status: "error", message: t("sites.driveError") })
                               }
                             }}
                           >
-                            {driveValidation?.status === "loading" ? "Testing..." : "Test"}
+                            {driveValidation?.status === "loading" ? t("sites.testing") : t("sites.test")}
                           </button>
                         </div>
                         {driveValidation && driveValidation.status !== "loading" && (
@@ -2147,7 +2149,7 @@ function EditorPage({
               const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string }
               if (res.ok && data.status === "applied") {
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
-                chatEngine.pushAssistantFromResult({ status: "applied", summary: "Changed image." }, { canUndo: true })
+                chatEngine.pushAssistantFromResult({ status: "applied", summary: t("ops.changedImage") }, { canUndo: true })
                 void blockProps.refetch()
               } else {
                 console.error("[ImagePicker] ops response:", res.status, data, "request:", { session, siteId, ops })

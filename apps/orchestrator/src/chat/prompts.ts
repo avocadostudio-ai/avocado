@@ -32,6 +32,7 @@ export function buildVariationSystemPrompt(opts: {
   keepTitle: boolean
   cardsOnly: boolean
   blockType: string
+  locale?: string
 }): string {
   return [
     "You generate alternative content variations for one selected website block.",
@@ -43,7 +44,8 @@ export function buildVariationSystemPrompt(opts: {
     "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     ...(opts.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
     ...(opts.cardsOnly && opts.blockType === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
-    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant."
+    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant.",
+    ...localeInstruction(opts.locale)
   ].join("\n")
 }
 
@@ -56,6 +58,7 @@ export function buildDecomposerSystemPrompt(opts: {
   pageTitle: string
   blocksSummary: string
   siteContextBlock?: string | null | undefined
+  locale?: string
 }): string {
   return `You break complex website editing requests into sequential steps.
 
@@ -73,7 +76,8 @@ Current page: ${opts.slug}
 Page title: "${opts.pageTitle}"
 Blocks:
 ${opts.blocksSummary}
-${opts.siteContextBlock ? `\nSite context:\n${opts.siteContextBlock}` : ""}`
+${opts.siteContextBlock ? `\nSite context:\n${opts.siteContextBlock}` : ""}
+${localeInstruction(opts.locale).join("\n")}`
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +97,27 @@ export interface PlannerPromptOptions {
   imageUrlForVision?: string | null | undefined
   editablePath?: string | null | undefined
   blockId?: string | null | undefined
+  locale?: string
+}
+
+const LOCALE_NAMES: Record<string, string> = {
+  de: "German",
+  fr: "French",
+  es: "Spanish",
+  it: "Italian",
+  pt: "Portuguese",
+  nl: "Dutch",
+  ja: "Japanese",
+  ko: "Korean",
+  zh: "Chinese",
+}
+
+function localeInstruction(locale?: string): string[] {
+  if (!locale || locale === "en") return []
+  const lang = LOCALE_NAMES[locale] ?? locale
+  return [
+    `The user's interface is in ${lang}. Write summary_for_user, change_log entries, and suggested_next_actions in ${lang}. Keep block type names, technical identifiers, and operation names in English.`
+  ]
 }
 
 export function buildPlannerSystemPrompt(opts: PlannerPromptOptions): string {
@@ -120,7 +145,8 @@ function buildLightweightPlannerPrompt(opts: PlannerPromptOptions): string {
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases.",
     opts.selectedBlockId.length > 0
       ? `Selected block is ${opts.selectedBlockId}. Target only this block in ops.`
-      : "Respect explicit user target references when present."
+      : "Respect explicit user target references when present.",
+    ...localeInstruction(opts.locale)
   ].join("\n")
 }
 
@@ -160,7 +186,7 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     "If request is ambiguous, return intent=needs_clarification and no ops.",
     "Requests for structured data (schema.org), JSON-LD, microdata, or rich snippets are outside the editor's capabilities — they require code changes. Return intent=needs_clarification explaining this, and suggest using update_page_meta to improve SEO metadata (title, description) instead.",
     "If the user asks a read-only question about page content (e.g. 'list all CTA buttons', 'what images are on this page', 'show me all links and their URLs', 'how many sections are there'), return intent=content_answer with empty ops[]. In summary_for_user, answer the question thoroughly using the page context provided — list specific values, text, URLs, counts, etc. Use markdown tables or bullet lists for clarity. In change_log, include one entry per item found. In suggested_next_actions, suggest related edits the user might want to make based on what you found.",
-    "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=needs_clarification with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. In suggested_next_actions, provide 2-4 concrete actions.",
+    "If the user asks for page improvement suggestions, feedback, or what to add next, return intent=content_answer with empty ops[]. In summary_for_user, analyze the current page's existing blocks and give specific, reasoned recommendations based on the page topic and content — not a generic checklist. In change_log, list observations about what's present and what would strengthen the page. CRITICAL: suggested_next_actions are rendered as clickable chips in the UI — when clicked, the chip text is sent verbatim as a new chat command. Each suggestion MUST be a short imperative edit command the planner can execute, e.g. 'Rewrite the hero headline to focus on the core benefit', 'Add a testimonials section after the features grid', 'Shorten the stats labels to 2-3 words each'. NEVER phrase suggestions as questions ('Would you like me to…?', 'Should I…?') or offers ('I can…').",
     "IMPORTANT: 'review copy for [quality]', 'review text for [trait]', 'improve readability', 'tighten the copy', 'optimize this', 'optimize the copy' are edit requests — generate update_props ops that rewrite the copy to achieve the stated quality goal. Do NOT return needs_clarification for these.",
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
@@ -249,6 +275,8 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
           "An image is attached for the field being edited. Describe its visual content accurately for the alt text. Be specific about what's depicted (objects, people, actions, setting) in 1-2 concise sentences. Do not mention 'AI-generated' or image metadata.",
           `Return an update_props operation setting the "${opts.editablePath}" field on block "${opts.blockId}" to your generated alt text description. This is an edit_plan, not needs_clarification.`
         ]
-      : [])
+      : []),
+    // Locale-aware output
+    ...localeInstruction(opts.locale)
   ].join("\n")
 }

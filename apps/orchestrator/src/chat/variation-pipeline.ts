@@ -50,6 +50,7 @@ export type VariationRequestBody = {
   activeBlockId?: string
   activeBlockType?: string
   activeEditablePath?: string
+  locale?: string
 }
 
 export type VariationOption = {
@@ -433,6 +434,7 @@ async function generateVariationsWithOpenAI(args: {
   model: string
   modelKey: ModelKey
   count: number
+  locale?: string
 }): Promise<{ variations: VariationOption[]; usage: TokenUsage }> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const props = args.block.props as Record<string, unknown>
@@ -443,6 +445,7 @@ async function generateVariationsWithOpenAI(args: {
     keepTitle: constraints.keepTitle,
     cardsOnly: constraints.cardsOnly,
     blockType: args.block.type,
+    locale: args.locale,
   })
 
   const user = {
@@ -503,6 +506,7 @@ async function generateVariationsWithAnthropic(args: {
   model: string
   modelKey: ModelKey
   count: number
+  locale?: string
 }): Promise<{ variations: VariationOption[]; usage: TokenUsage }> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const props = args.block.props as Record<string, unknown>
@@ -513,6 +517,7 @@ async function generateVariationsWithAnthropic(args: {
     keepTitle: constraints.keepTitle,
     cardsOnly: constraints.cardsOnly,
     blockType: args.block.type,
+    locale: args.locale,
   })
 
   const user = {
@@ -624,7 +629,8 @@ export async function runVariationPipeline(
         message: contextualMessage,
         model: modelUsed,
         modelKey,
-        count
+        count,
+        locale: body.locale
       })
       variations = result.variations
       generatorUsage = result.usage
@@ -638,7 +644,8 @@ export async function runVariationPipeline(
         message: contextualMessage,
         model: modelUsed,
         modelKey,
-        count
+        count,
+        locale: body.locale
       })
       variations = result.variations
       generatorUsage = result.usage

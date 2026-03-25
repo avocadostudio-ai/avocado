@@ -39,9 +39,10 @@ export async function decomposeRequest(args: {
   slug: string
   model: string
   siteContextBlock?: string | null
+  locale?: string
   client?: { chat: { completions: { create: (a: unknown) => any } } }
 }): Promise<DecomposeResult> {
-  const { message, currentPage, slug, model, siteContextBlock } = args
+  const { message, currentPage, slug, model, siteContextBlock, locale } = args
 
   const blocksSummary = currentPage.blocks
     .map((b) => {
@@ -57,6 +58,7 @@ export async function decomposeRequest(args: {
     pageTitle: currentPage.title,
     blocksSummary,
     siteContextBlock,
+    locale,
   })
 
   const client = args.client ?? (new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as { chat: { completions: { create: (a: unknown) => any } } })

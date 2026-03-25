@@ -1261,7 +1261,8 @@ export async function runChatPipeline(
           slug: effectiveSlug ?? "/",
           currentPage: current,
           activeBlockId: planningActiveBlockId,
-          activeEditablePath: planningActiveEditablePath
+          activeEditablePath: planningActiveEditablePath,
+          locale: body.locale
         })
         if (focusedFallback?.intent === "edit_plan" && focusedFallback.ops.length > 0) {
           resolvedPlan = focusedFallback
@@ -2346,7 +2347,8 @@ export async function runChatPipeline(
         slug: effectiveSlug,
         currentPage: current,
         activeBlockId: planningActiveBlockId,
-        activeEditablePath: planningActiveEditablePath
+        activeEditablePath: planningActiveEditablePath,
+        locale: body.locale
       })
 
       if (deterministicPlan?.intent === "edit_plan" && deterministicPlan.ops.length > 0) {
@@ -2490,7 +2492,8 @@ export async function runChatPipeline(
         slug: effectiveSlug,
         currentPage: current,
         activeBlockId: planningActiveBlockId,
-        activeEditablePath: planningActiveEditablePath
+        activeEditablePath: planningActiveEditablePath,
+        locale: body.locale
       })
 
       routerComplexity = routedIntent.complexity ?? null
@@ -2538,6 +2541,7 @@ export async function runChatPipeline(
         currentPage: current,
         contextPack: plannerContext,
         model: plannerModel,
+        locale: body.locale,
         history: isLightweightEdit ? [] : sessionChatHistory,
         siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
         toolRuntime: plannerSource === "anthropic" && !isLightweightEdit ? ctx.toolRuntime : undefined,
@@ -2745,7 +2749,8 @@ export async function runChatPipeline(
         slug: effectiveSlug,
         currentPage: current,
         activeBlockId: planningActiveBlockId,
-        activeEditablePath: planningActiveEditablePath
+        activeEditablePath: planningActiveEditablePath,
+        locale: body.locale
       })
 
       if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
@@ -2828,7 +2833,8 @@ export async function runChatPipeline(
         currentPage: current,
         slug: effectiveSlug,
         model: decomposerModel,
-        siteContextBlock
+        siteContextBlock,
+        locale: body.locale
       })
       if (decomposition.steps.length > 1) {
         const chain: ContinuationChain = {
@@ -2914,6 +2920,7 @@ export async function runChatPipeline(
         currentPage: current,
         contextPack: plannerContext,
         model: modelUsed,
+        locale: body.locale,
         history: isLightweightEdit ? [] : sessionChatHistory,
         siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
         toolRuntime: plannerSource === "anthropic" && !isLightweightEdit ? ctx.toolRuntime : undefined,
@@ -3266,6 +3273,7 @@ export async function runChatPipeline(
       currentPage: current,
       contextPack: plannerContext,
       model: modelUsed,
+      locale: body.locale,
       history: sessionChatHistory,
       feedback: repairFeedback,
       forceFullSchemaContracts: true,
