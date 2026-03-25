@@ -897,7 +897,7 @@ const S: Record<string, React.CSSProperties> = {
   chatScroll: {
     flex: "1 1 0", minHeight: 0, overflowY: "auto" as const,
     display: "flex", flexDirection: "column" as const, gap: 8,
-    padding: "4px 0"
+    padding: "4px 0", justifyContent: "flex-end" as const
   },
   chatBubbleUser: {
     alignSelf: "flex-end", maxWidth: "80%",
@@ -912,7 +912,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   chatText: { lineHeight: 1.45 },
   generatingRow: {
-    display: "flex", alignItems: "center", gap: 8
+    display: "flex", alignItems: "center", gap: 8, padding: "16px 0"
   },
   generatingLabel: {
     fontSize: 13, color: "#9cb2d0", fontStyle: "italic" as const
@@ -925,7 +925,7 @@ const S: Record<string, React.CSSProperties> = {
     animation: "imgPickerDotBounce 1.2s ease-in-out infinite"
   },
   chatImage: {
-    width: "100%", maxWidth: 320, borderRadius: 8, marginTop: 4
+    width: "100%", maxWidth: 420, borderRadius: 8, marginTop: 4
   },
   chatImageRow: {
     display: "flex", alignItems: "flex-end", gap: 10, marginTop: 4

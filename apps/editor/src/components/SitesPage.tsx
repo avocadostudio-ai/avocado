@@ -373,7 +373,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   <input
                     type="text"
                     value={sites.configSite.name}
-                    placeholder={t("sites.siteNameLabel")}
+                    placeholder={t("sites.siteName")}
                     onChange={(event) => sites.updateConfigSite({ name: event.target.value })}
                   />
                 </label>

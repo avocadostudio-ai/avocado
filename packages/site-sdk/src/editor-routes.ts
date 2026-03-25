@@ -3,9 +3,24 @@ import { buildBlockManifest, type BlockManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
 import type { SiteConfig } from "@ai-site-editor/shared"
 
+export type InlineAsset = {
+  /** base64-encoded image bytes */
+  data: string
+  /** MIME type, e.g. "image/png" */
+  mimeType: string
+  /** Original filename */
+  fileName: string
+}
+
+export type PublishContext = {
+  /** Base64-encoded images for localhost/generated URLs that can't be fetched remotely */
+  assets?: Record<string, InlineAsset>
+}
+
 export type OnPublishFn = (
   pages: PageDoc[],
-  config: SiteConfig
+  config: SiteConfig,
+  context?: PublishContext
 ) => Promise<{ ok: boolean; error?: string }>
 
 export function createBlocksHandler(options?: {
@@ -74,6 +89,7 @@ export function createPublishHandler(
         const body = (await request.json()) as {
           pages?: unknown
           siteConfig?: unknown
+          assets?: Record<string, InlineAsset>
         }
 
         if (!Array.isArray(body.pages)) {
@@ -86,7 +102,8 @@ export function createPublishHandler(
 
         const pages = body.pages as PageDoc[]
         const config = (body.siteConfig ?? {}) as SiteConfig
-        const result = await onPublish(pages, config)
+        const context: PublishContext = { assets: body.assets }
+        const result = await onPublish(pages, config, context)
 
         const status = result.ok ? 200 : 500
         const res = new Response(
