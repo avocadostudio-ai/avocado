@@ -3,7 +3,7 @@ export { createDraftEnableHandler, createDraftDisableHandler } from "./draft-rou
 
 // Editor route handler factories
 export { createBlocksHandler, createPagesHandler, createPublishHandler } from "./editor-routes.ts"
-export type { OnPublishFn } from "./editor-routes.ts"
+export type { OnPublishFn, InlineAsset, PublishContext } from "./editor-routes.ts"
 
 // Catch-all editor API handler
 export { createEditorApiHandler } from "./editor-api-handler.ts"

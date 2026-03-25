@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react"
 import en, { type LocaleKeys, type LocaleDict } from "./en"
 import de from "./de"
 
@@ -56,18 +56,12 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     setLocaleState(l)
   }, [])
 
-  const t = useCallback<TFunction>((key, vars) => {
-    let str = LOCALES[locale][key] ?? LOCALES.en[key] ?? key
-    if (vars) {
-      for (const [k, v] of Object.entries(vars)) {
-        str = str.replaceAll(`{{${k}}}`, String(v))
-      }
-    }
-    return str
-  }, [locale])
+  const t = useMemo(() => makeT(locale), [locale])
+
+  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
 
   return (
-    <LocaleContext value={{ locale, setLocale, t }}>
+    <LocaleContext value={value}>
       {children}
     </LocaleContext>
   )

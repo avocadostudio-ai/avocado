@@ -1,4 +1,4 @@
-import type { OnPublishFn } from "@ai-site-editor/site-sdk/routes"
+import type { OnPublishFn, PublishContext, InlineAsset } from "@ai-site-editor/site-sdk/routes"
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
 import { getImageFields } from "@ai-site-editor/shared"
 
@@ -41,20 +41,49 @@ async function findStrapiMediaByUrl(imageUrl: string): Promise<number | null> {
   } catch { return null }
 }
 
-/** Upload an image URL to Strapi media library, return the media ID */
+/** Upload a blob to Strapi media library, return the media ID */
+async function uploadToStrapiMedia(blob: Blob, fileName: string): Promise<number | null> {
+  const form = new FormData()
+  form.append("files", blob, fileName)
+  const res = await fetch(`${STRAPI_URL}/api/upload`, {
+    method: "POST",
+    headers: { ...(process.env.STRAPI_API_TOKEN ? { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}` } : {}) },
+    body: form,
+  })
+  if (!res.ok) return null
+  const uploaded = (await res.json()) as Array<{ id: number }>
+  return uploaded[0]?.id ?? null
+}
+
+/** Resolve an image URL to a Strapi media ID, uploading if needed */
 async function ensureMediaAsset(
   imageUrl: string,
-  cache: Map<string, Promise<number | null>>
+  cache: Map<string, Promise<number | null>>,
+  assets?: Record<string, InlineAsset>
 ): Promise<number | null> {
   const cached = cache.get(imageUrl)
   if (cached) return cached
 
   const promise = (async () => {
+    // Resolve relative Strapi paths (e.g., /uploads/image.png)
+    if (!imageUrl.startsWith("http") && imageUrl.startsWith("/")) {
+      return findStrapiMediaByUrl(`${STRAPI_URL}${imageUrl}`)
+    }
+
     if (!imageUrl.startsWith("http")) return null
 
     // Image already in Strapi — look up by URL instead of re-uploading
     if (isStrapiUrl(imageUrl)) {
       return findStrapiMediaByUrl(imageUrl)
+    }
+
+    // Inline asset from orchestrator (generated/modified images with localhost URLs)
+    const inlineAsset = assets?.[imageUrl]
+    if (inlineAsset) {
+      try {
+        const bytes = Buffer.from(inlineAsset.data, "base64")
+        return await uploadToStrapiMedia(new Blob([bytes], { type: inlineAsset.mimeType }), inlineAsset.fileName)
+      } catch { return null }
     }
 
     if (!isSafeImageUrl(imageUrl)) return null
@@ -63,16 +92,7 @@ async function ensureMediaAsset(
       if (!imageRes.ok) return null
       const blob = await imageRes.blob()
       const fileName = imageUrl.split("/").pop()?.split("?")[0] || "image.jpg"
-      const form = new FormData()
-      form.append("files", blob, fileName)
-      const uploadRes = await fetch(`${STRAPI_URL}/api/upload`, {
-        method: "POST",
-        headers: { ...(process.env.STRAPI_API_TOKEN ? { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}` } : {}) },
-        body: form,
-      })
-      if (!uploadRes.ok) return null
-      const uploaded = (await uploadRes.json()) as Array<{ id: number }>
-      return uploaded[0]?.id ?? null
+      return await uploadToStrapiMedia(blob, fileName)
     } catch { return null }
   })()
 
@@ -88,14 +108,20 @@ async function ensureMediaAsset(
  * No separate block entries — components are embedded in the page.
  */
 export function createStrapiPublishHandler(): OnPublishFn {
-  return async (pages, config) => {
+  return async (pages, config, context) => {
     const mediaCache = new Map<string, Promise<number | null>>()
     const errors: string[] = []
 
     for (const page of pages) {
       try {
+        // Find existing page by slug (with populated blocks so we can preserve media)
+        const existing = await strapiFetch<{ data: Array<{ documentId: string; blocks?: Array<Record<string, unknown>> }> }>(
+          `/pages?filters[slug][$eq]=${encodeURIComponent(page.slug)}&populate[blocks][populate]=*`
+        )
+        const existingBlocks = existing.data[0]?.blocks as Array<Record<string, unknown>> | undefined
+
         // Build Dynamic Zone array — each block becomes a component
-        const dzBlocks = await Promise.all(page.blocks.map(async (block) => {
+        const dzBlocks = await Promise.all(page.blocks.map(async (block, blockIndex) => {
           const componentName = `blocks.${block.type.toLowerCase()}`
           const imageFields = getImageFields(block.type)
           const data: Record<string, unknown> = {
@@ -105,8 +131,19 @@ export function createStrapiPublishHandler(): OnPublishFn {
           for (const [key, value] of Object.entries(block.props)) {
             if (key === "headingLevel") continue
             if (imageFields.has(key) && typeof value === "string" && value) {
-              const mediaId = await ensureMediaAsset(value, mediaCache)
-              if (mediaId) data[key] = mediaId
+              const mediaId = await ensureMediaAsset(value, mediaCache, context?.assets)
+              if (mediaId) {
+                data[key] = mediaId
+              } else {
+                // Preserve existing Strapi media if we couldn't resolve the new image
+                const existingMedia = existingBlocks?.[blockIndex]?.[key]
+                const existingMediaId = existingMedia && typeof existingMedia === "object" && !Array.isArray(existingMedia)
+                  ? (existingMedia as Record<string, unknown>).id as number | undefined
+                  : undefined
+                if (existingMediaId) {
+                  data[key] = existingMediaId
+                }
+              }
             } else {
               data[key] = value
             }
@@ -123,11 +160,6 @@ export function createStrapiPublishHandler(): OnPublishFn {
           blocks: dzBlocks,
           ...(page.meta ? { pageMeta: page.meta } : {}),
         }
-
-        // Find existing page by slug
-        const existing = await strapiFetch<{ data: Array<{ documentId: string }> }>(
-          `/pages?filters[slug][$eq]=${encodeURIComponent(page.slug)}`
-        )
 
         if (existing.data.length > 0) {
           await strapiFetch(`/pages/${existing.data[0].documentId}`, {
