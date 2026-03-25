@@ -3,6 +3,7 @@ import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, typ
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
 import { WandSparkles, Sparkles, Pencil } from "lucide-react"
+import { useT } from "@/i18n"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
 const noop = () => {}
@@ -76,6 +77,7 @@ type Props = {
 }
 
 export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading, aiLoadingPath, onAddListItem, highlightPath, manifestByType, siteOrigin }: Props) {
+  const { t } = useT()
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
@@ -111,24 +113,32 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
           listFields: Object.keys(derived.listFields).length > 0 ? derived.listFields : undefined,
         }
       } else {
-        // Block exists in shared registry — merge in any extra fields from
-        // the manifest that the registry doesn't know about (e.g. villa Hero
-        // has carouselImages/logoUrl not in the shared Hero definition).
-        const extraFields: Record<string, FieldMeta> = {}
+        // Block exists in shared registry — manifest defines WHICH fields to
+        // show (the site's source of truth), shared registry provides richer
+        // metadata (kind, label, imageSpec) for fields that appear in both.
+        const mergedFields: Record<string, FieldMeta> = {}
         for (const [key, fm] of Object.entries(derived.fields)) {
-          if (!(key in meta.fields)) extraFields[key] = fm
+          mergedFields[key] = key in meta.fields ? meta.fields[key] : fm
         }
-        const extraListFields: Record<string, ListFieldMeta> = {}
+        const mergedListFields: Record<string, ListFieldMeta> = {}
         for (const [key, lf] of Object.entries(derived.listFields)) {
-          if (!meta.listFields || !(key in meta.listFields)) extraListFields[key] = lf
-        }
-        if (Object.keys(extraFields).length > 0 || Object.keys(extraListFields).length > 0) {
-          meta = {
-            ...meta,
-            fields: { ...meta.fields, ...extraFields },
-            listFields: { ...(meta.listFields ?? {}), ...extraListFields },
+          if (meta.listFields && key in meta.listFields) {
+            // Merge item fields: manifest keys win for set, registry provides metadata
+            const registryItems = meta.listFields[key].itemFields
+            const mergedItems: Record<string, FieldMeta> = {}
+            for (const [ik, ifm] of Object.entries(lf.itemFields)) {
+              mergedItems[ik] = ik in registryItems ? registryItems[ik] : ifm
+            }
+            mergedListFields[key] = { label: meta.listFields[key].label ?? lf.label, itemFields: mergedItems }
+          } else {
+            mergedListFields[key] = lf
           }
-          if (meta.listFields && Object.keys(meta.listFields).length === 0) meta.listFields = undefined
+        }
+        meta = {
+          ...meta,
+          displayName: def.displayName ?? meta.displayName,
+          fields: mergedFields,
+          listFields: Object.keys(mergedListFields).length > 0 ? mergedListFields : undefined,
         }
       }
     }
@@ -137,7 +147,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
   if (!meta) {
     return (
       <div className="property-panel" style={style}>
-        <div className="property-panel-empty">Unknown block type: {blockType}</div>
+        <div className="property-panel-empty">{t("propertyPanel.unknownBlock")}: {blockType}</div>
       </div>
     )
   }
@@ -153,16 +163,16 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
         </svg>
         <div className="property-panel-context-text">
           <span className="property-panel-context-breadcrumb">
-            <button type="button" className="property-panel-context-breadcrumb-link" onClick={onDeselectBlock}>Page</button>
+            <button type="button" className="property-panel-context-breadcrumb-link" onClick={onDeselectBlock}>{t("propertyPanel.page")}</button>
             <span className="property-panel-context-breadcrumb-sep" aria-hidden="true">&rsaquo;</span>
             <span className="property-panel-context-breadcrumb-current">{meta.displayName}</span>
           </span>
         </div>
       </div>
       {status === "loading" && !props ? (
-        <div className="property-panel-empty">Loading...</div>
+        <div className="property-panel-empty">{t("propertyPanel.loading")}</div>
       ) : status === "error" ? (
-        <div className="property-panel-empty">Failed to load block properties</div>
+        <div className="property-panel-empty">{t("propertyPanel.loadFailed")}</div>
       ) : props ? (
         <div className="property-panel-fields">
           {renderFieldEntries(Object.entries(meta.fields), props, "", blockType, onFieldChange, onImageClick, onAiAssist, onAiQuickAction, aiLoading, aiLoadingPath, highlightPath, siteOrigin)}
@@ -266,6 +276,10 @@ function renderFieldEntries(
           imageUrl={data[key] == null ? "" : String(data[key])}
           altText={altValue}
           onChangeClick={() => onImageClick?.(pathPrefix + key, data[key] == null ? "" : String(data[key]))}
+          onRemove={() => {
+            onFieldChange(pathPrefix + key, "")
+            if (altKey) onFieldChange(pathPrefix + altKey, "")
+          }}
           onAltCommit={altKey ? (v) => onFieldChange(pathPrefix + altKey, v) : undefined}
           onAltAiAssist={altKey && onAiAssist ? () => onAiAssist(pathPrefix + altKey, "Alt text", "imageAlt", altValue ?? "") : undefined}
           onAltAiQuickAction={altKey && onAiQuickAction ? (actionText: string) => onAiQuickAction(pathPrefix + altKey, "Alt text", "imageAlt", altValue ?? "", actionText) : undefined}
@@ -433,6 +447,7 @@ function ImageFieldWidget({
   imageUrl,
   altText,
   onChangeClick,
+  onRemove,
   onAltCommit,
   onAltAiAssist,
   onAltAiQuickAction,
@@ -445,6 +460,7 @@ function ImageFieldWidget({
   imageUrl: string
   altText?: string
   onChangeClick: () => void
+  onRemove?: () => void
   onAltCommit?: (value: string) => void
   onAltAiAssist?: () => void
   onAltAiQuickAction?: (actionText: string) => void
@@ -479,9 +495,14 @@ function ImageFieldWidget({
               </svg>
             </div>
           )}
-          <button type="button" className="property-field-image-change" onClick={onChangeClick}>
-            {imageUrl ? "Change" : "Choose image"}
-          </button>
+          <div className="property-field-image-actions">
+            <button type="button" className="property-field-image-change" onClick={onChangeClick}>
+              {imageUrl ? "Change" : "Choose image"}
+            </button>
+            {imageUrl && onRemove ? (
+              <button type="button" className="property-field-image-remove" onClick={onRemove}>Remove</button>
+            ) : null}
+          </div>
         </div>
         {onAltCommit !== undefined && (
           <div className="property-field-image-alt-group">
@@ -760,6 +781,7 @@ function FieldEditor({
 }
 
 function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist, onAiQuickAction, aiLoading, fieldShimmer }: { slug: string; navLabel: string; onNavLabelChange: (slug: string, label: string) => void; onAiAssist?: (fieldLabel: string, fieldKind: string, currentValue: string) => void; onAiQuickAction?: (fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => void; aiLoading?: boolean; fieldShimmer?: boolean }) {
+  const { t } = useT()
   const [local, setLocal] = useState(navLabel)
   const [focused, setFocused] = useState(false)
   const display = focused ? local : navLabel
@@ -769,7 +791,7 @@ function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist, onAiQuick
     <div className="property-panel-page-section">
       <div className="property-field">
         <div className="property-field-label">
-          <span>Menu label</span>
+          <span>{t("propertyPanel.navLabel")}</span>
         </div>
         <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
           <input
