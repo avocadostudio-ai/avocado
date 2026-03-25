@@ -176,7 +176,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     resolveAsset: (url: string, alt: string) => Promise<string | null>,
     existingFields?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const imageFields = imageFields.get(blockType) ?? new Set<string>()
+    const imgFields = imageFields.get(blockType) ?? new Set<string>()
     const listFieldsForType = listFieldNames.get(blockType) ?? new Set<string>()
     const fields: Record<string, unknown> = {}
 
@@ -184,7 +184,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     for (const [key, value] of Object.entries(props)) {
       if (key === "headingLevel") continue
 
-      if (imageFields.has(key) && typeof value === "string" && value) {
+      if (imgFields.has(key) && typeof value === "string" && value) {
         // Convert image URL to Asset reference
         const altKey = key.replace(/Url$/, "Alt").replace(/^image$/, "imageAlt")
         const alt = typeof props[altKey] === "string" ? (props[altKey] as string) : ""
