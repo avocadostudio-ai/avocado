@@ -55,6 +55,7 @@ export type ChatRequestBody = {
     constraints?: string[]
     gdriveFolderId?: string
   } | string
+  locale?: string
   slug?: string
   message?: string
   modelKey?: ModelKey
@@ -121,6 +122,10 @@ export type ChatResult = {
       stage: "request_received" | "first_token" | "first_structured_progress" | "plan_ready" | "first_op_applied" | "done"
       atMs: number
     }>
+    currentPage?: string
+    siteId?: string
+    activeBlockId?: string
+    activeEditablePath?: string
   }
 }
 
@@ -236,6 +241,8 @@ export function isAdviceQuery(message: string) {
   const m = normalizeForIntent(message)
   // Exclude structural action requests that happen to contain "should we/I"
   if (/\b(reorder|reorganize|restructure|rearrange|sort|move)\b/.test(m) && /\bpages?\b/.test(m)) return false
+  // Exclude explicit edit verbs — "review copy for clarity" is an edit, not advice
+  if (/\b(?:add|create|remove|delete|update|change|replace|move|rewrite|translate|rename)\b/.test(m)) return false
   return (
     /\b(is it good|is this good|should (we|i)|do you recommend|would you recommend)\b/.test(m) ||
     /\bwhat do you think\b/.test(m) ||
@@ -245,7 +252,8 @@ export function isAdviceQuery(message: string) {
     /\bimprovements?\b/.test(m) ||
     /\bis faq\b/.test(m) ||
     /\bshould .*faq\b/.test(m) ||
-    /\bgood idea\b/.test(m)
+    /\bgood idea\b/.test(m) ||
+    /\b(?:audit|review|check|inspect|analyze)\s+(?:the\s+)?(?:this\s+)?(?:page|site|content|copy|text)\b/.test(m)
   )
 }
 
@@ -321,11 +329,43 @@ export function adviceResponse(args: {
   for (const item of suggestionPriority) {
     if (!existingTypes.has(item.type) && suggestions.length < 4) suggestions.push(item.label)
   }
-  // If page has all common blocks, suggest content improvements instead
+  // If page has all common blocks, suggest content improvements based on actual props
   if (suggestions.length === 0) {
-    if (hasHero) suggestions.push("Rewrite the hero headline")
-    if (hasCta) suggestions.push("Strengthen the CTA copy")
-    suggestions.push("Update section content for this audience")
+    for (const block of current.blocks) {
+      if (suggestions.length >= 4) break
+      const p = block.props as Record<string, unknown> | undefined
+      if (!p) continue
+      if (block.type === "Hero") {
+        const heading = (p.heading ?? p.title ?? "") as string
+        if (!p.imageUrl && !p.backgroundImage) {
+          suggestions.push("Add a hero image")
+        } else if (heading && heading.length > 60) {
+          suggestions.push("Shorten the hero headline to under 60 characters")
+        } else if (heading) {
+          suggestions.push("Rewrite the hero headline to be more action-oriented")
+        }
+      }
+      if (block.type === "Stats") {
+        const items = (p.items ?? p.stats) as Array<Record<string, unknown>> | undefined
+        if (items?.some((it) => ((it.label ?? it.description ?? "") as string).length > 30)) {
+          suggestions.push("Rewrite the stats labels to be shorter and number-driven")
+        }
+      }
+      if (block.type === "CTA") {
+        const btn = (p.buttonText ?? p.ctaText ?? "") as string
+        if (btn.length > 20) {
+          suggestions.push("Shorten the CTA button text")
+        } else {
+          suggestions.push("Strengthen the CTA copy to create urgency")
+        }
+      }
+    }
+    // Fallback if no content-specific suggestions were derived
+    if (suggestions.length === 0) {
+      if (hasHero) suggestions.push("Rewrite the hero headline")
+      if (hasCta) suggestions.push("Strengthen the CTA copy")
+      suggestions.push("Tighten the copy across all sections")
+    }
   }
 
   const summary = `For ${pageLabel} with ${current.blocks.length} block${current.blocks.length === 1 ? "" : "s"}: ${missingTypes.length > 0 ? `consider adding ${missingTypes.slice(0, 3).join(", ")}` : "all major sections are covered — focus on refining content"}.`

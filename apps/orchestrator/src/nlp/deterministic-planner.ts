@@ -46,6 +46,7 @@ import {
 import {
   userFacingPropNames
 } from "./deterministic-planner-suggestions.js"
+import { st } from "../chat/locale-strings.js"
 import {
   buildCreatePagePlan,
   isPageRouteRenameRequest
@@ -222,7 +223,7 @@ function inferActionFromMessage(message: string): ParsedIntent["action"] | null 
     { action: "remove", pattern: /\b(remove|delete)\b/ },
     { action: "move", pattern: /\b(move|reorder|re-arrange|rearrange)\b/ },
     { action: "add", pattern: /\b(add|insert|create|include|put)\b/ },
-    { action: "update", pattern: /\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*|rename)\b/ },
+    { action: "update", pattern: /\b(update|change|edit|set|rewrit\w*|reword\w*|rephras\w*|replace|improve|shorten|reduc\w*|trim|cut|polish\w*|refin\w*|refresh\w*|tighten\w*|clarif\w*|rename)\b/ },
   ]
   let earliest: { action: ParsedIntent["action"]; index: number } | null = null
   for (const { action, pattern } of verbPatterns) {
@@ -945,6 +946,7 @@ export function compileDeterministicPlan(args: {
   currentPage: PageDoc
   activeBlockId?: string
   activeEditablePath?: string
+  locale?: string
 }): EditPlan | null {
   const { session, intent, message, slug, currentPage, activeBlockId, activeEditablePath } = args
   const cleanMessage = stripSiteContextEnvelope(message)
@@ -1013,7 +1015,7 @@ export function compileDeterministicPlan(args: {
     if (!toSlug || toSlug === fromSlug) {
       return {
         intent: "needs_clarification",
-        summary_for_user: "Please provide the target page path, for example: rename page from /old to /new.",
+        summary_for_user: st(args.locale, "rename.needsPath"),
         change_log: assumptions,
         ops: []
       }
@@ -1021,7 +1023,7 @@ export function compileDeterministicPlan(args: {
     const renameOp: Operation = { op: "rename_page", pageSlug: fromSlug, newPageSlug: toSlug, ...(newTitle ? { newTitle } : {}) }
     return {
       intent: "edit_plan",
-      summary_for_user: `Renamed page path from ${fromSlug} to ${toSlug}.`,
+      summary_for_user: st(args.locale, "rename.done", { from: fromSlug, to: toSlug }),
       change_log: [...assumptions, `Renamed page ${fromSlug} -> ${toSlug}.`],
       ops: [renameOp]
     }
@@ -1033,14 +1035,14 @@ export function compileDeterministicPlan(args: {
     if (targetSlug === "/") {
       return {
         intent: "needs_clarification",
-        summary_for_user: "The home page cannot be deleted. Navigate to a different page first, or specify which page to delete (e.g. \"delete /about\").",
+        summary_for_user: st(args.locale, "delete.homeBlocked"),
         change_log: assumptions,
         ops: []
       }
     }
     return {
       intent: "edit_plan",
-      summary_for_user: `Deleted page ${targetSlug}.`,
+      summary_for_user: st(args.locale, "delete.done", { slug: targetSlug }),
       change_log: [...assumptions, `Removed page ${targetSlug}.`],
       ops: [{ op: "remove_page", pageSlug: targetSlug }]
     }
@@ -1071,7 +1073,7 @@ export function compileDeterministicPlan(args: {
     if (!ordered.includes(movedSlug)) {
       return {
         intent: "needs_clarification",
-        summary_for_user: `I could not find page ${movedSlug}.`,
+        summary_for_user: st(args.locale, "move.notFound", { slug: movedSlug }),
         change_log: assumptions,
         ops: []
       }
@@ -1079,7 +1081,7 @@ export function compileDeterministicPlan(args: {
     if (movedSlug === "/") {
       return {
         intent: "needs_clarification",
-        summary_for_user: "Home page (/) is fixed at the first position in navigation.",
+        summary_for_user: st(args.locale, "move.homeFixed"),
         change_log: assumptions,
         ops: []
       }
@@ -1108,7 +1110,7 @@ export function compileDeterministicPlan(args: {
       if (!anchor) {
         return {
           intent: "needs_clarification",
-          summary_for_user: "Specify where to place the page (first/last/before/after).",
+          summary_for_user: st(args.locale, "move.specifyWhere"),
           change_log: assumptions,
           ops: []
         }
@@ -1119,7 +1121,7 @@ export function compileDeterministicPlan(args: {
       if (!anchor) {
         return {
           intent: "needs_clarification",
-          summary_for_user: "Specify where to place the page (first/last/before/after).",
+          summary_for_user: st(args.locale, "move.specifyWhere"),
           change_log: assumptions,
           ops: []
         }
@@ -1130,7 +1132,7 @@ export function compileDeterministicPlan(args: {
         if (index === -1) {
           return {
             intent: "needs_clarification",
-            summary_for_user: `I could not find anchor page ${anchor}.`,
+            summary_for_user: st(args.locale, "move.anchorNotFound", { slug: anchor }),
             change_log: assumptions,
             ops: []
           }
@@ -1143,7 +1145,7 @@ export function compileDeterministicPlan(args: {
     } else {
       return {
         intent: "needs_clarification",
-        summary_for_user: "Specify where to place the page (first/last/before/after).",
+        summary_for_user: st(args.locale, "move.specifyWhere"),
         change_log: assumptions,
         ops: []
       }
@@ -1278,7 +1280,7 @@ export function compileDeterministicPlan(args: {
     if (ops.length > 0) {
       return {
         intent: "edit_plan",
-        summary_for_user: `Tailored this page for ${audience}.`,
+        summary_for_user: st(args.locale, "audience.done", { audience }),
         change_log: [...assumptions, `Retargeted copy for audience: ${audience}.`],
         ops
       }
@@ -1288,7 +1290,7 @@ export function compileDeterministicPlan(args: {
   if (intent.action === "move" && hasConditionalQualifier && asksSectionReorder && !hasExplicitPlacementCue && !hasExplicitBlockMentionInMessage) {
     return {
       intent: "needs_clarification",
-      summary_for_user: "I can reorder sections if needed, but please specify what should move (for example: move FAQ below Testimonials).",
+      summary_for_user: st(args.locale, "reorder.specify"),
       change_log: [...assumptions, "Skipped ambiguous conditional reorder request without explicit section or placement."],
       ops: []
     }
@@ -1310,7 +1312,7 @@ export function compileDeterministicPlan(args: {
 
     return {
       intent: "edit_plan",
-      summary_for_user: "Added a secondary CTA button to the selected Hero.",
+      summary_for_user: st(args.locale, "hero.secondaryCta"),
       change_log: [...assumptions, `Updated ${selectedBlock.id}: secondaryCtaText, secondaryCtaHref`],
       ops: [{ op: "update_props", pageSlug: slug, blockId: selectedBlock.id, patch }]
     }
@@ -1350,7 +1352,7 @@ export function compileDeterministicPlan(args: {
       if (patch) {
         return {
           intent: "edit_plan",
-          summary_for_user: `Updated ${inlineTarget.type}.`,
+          summary_for_user: st(args.locale, "update.done", { type: inlineTarget.type }),
           change_log: [...assumptions, `Added one entry to ${inlineTarget.id}.`],
           ops: [{ op: "update_props", pageSlug: slug, blockId: inlineTarget.id, patch }]
         }
@@ -1367,7 +1369,7 @@ export function compileDeterministicPlan(args: {
   if (intent.action === "clarify" && !activeEditablePath) {
     return {
       intent: "needs_clarification",
-      summary_for_user: intent.summary ?? "Please specify the section and exact change you want.",
+      summary_for_user: intent.summary ?? st(args.locale, "update.specify"),
       change_log: assumptions,
       ops: []
     }
@@ -1381,7 +1383,7 @@ export function compileDeterministicPlan(args: {
       if (toRemove.length === 0) {
         return {
           intent: "edit_plan",
-          summary_for_user: `All blocks are already ${keepType} — nothing to remove.`,
+          summary_for_user: st(args.locale, "remove.allAlready", { type: keepType }),
           change_log: assumptions,
           ops: []
         }
@@ -1415,7 +1417,7 @@ export function compileDeterministicPlan(args: {
     if (!target) {
       return {
         intent: "needs_clarification",
-        summary_for_user: "I need to know which block to remove.",
+        summary_for_user: st(args.locale, "remove.needsBlock"),
         change_log: assumptions,
         ops: []
       }
@@ -1435,7 +1437,7 @@ export function compileDeterministicPlan(args: {
           if (parsedIdx === null) {
             return {
               intent: "needs_clarification",
-              summary_for_user: `Please specify which item to remove (e.g., "the first question", "the last item").`,
+              summary_for_user: st(args.locale, "remove.specifyItem"),
               change_log: assumptions,
               ops: []
             }
@@ -1444,14 +1446,14 @@ export function compileDeterministicPlan(args: {
           if (idx >= val.length) {
             return {
               intent: "needs_clarification",
-              summary_for_user: `There are only ${val.length} items in ${target.type} — cannot remove item ${idx + 1}.`,
+              summary_for_user: st(args.locale, "remove.outOfRange", { count: String(val.length), type: target.type, index: String(idx + 1) }),
               change_log: assumptions,
               ops: []
             }
           }
           return {
             intent: "edit_plan",
-            summary_for_user: intent.summary ?? `Removed an item from ${target.type}.`,
+            summary_for_user: intent.summary ?? st(args.locale, "remove.itemDone", { type: target.type }),
             change_log: [...assumptions, `Removed item at index ${idx} from ${target.id}.${key}.`],
             ops: [{ op: "remove_item", pageSlug: slug, blockId: target.id, listKey: key, index: idx }]
           }
@@ -1460,7 +1462,7 @@ export function compileDeterministicPlan(args: {
     }
     return {
       intent: "edit_plan",
-      summary_for_user: intent.summary ?? `Removed ${target.type}.`,
+      summary_for_user: intent.summary ?? st(args.locale, "remove.done", { type: target.type }),
       change_log: [...assumptions, `Removed block ${target.id}.`],
       ops: [{ op: "remove_block", pageSlug: slug, blockId: target.id }]
     }
@@ -1476,7 +1478,7 @@ export function compileDeterministicPlan(args: {
     if (!target) {
       return {
         intent: "needs_clarification",
-        summary_for_user: "I need to know which block to update.",
+        summary_for_user: st(args.locale, "update.needsBlock"),
         change_log: assumptions,
         ops: []
       }
@@ -1496,7 +1498,7 @@ export function compileDeterministicPlan(args: {
       const editableFields = userFacingPropNames(target.type, Object.keys(target.props))
       return {
         intent: "needs_clarification",
-        summary_for_user: `Please specify at least one valid field for ${target.type}.`,
+        summary_for_user: st(args.locale, "update.invalidFields", { type: target.type }),
         change_log: [...assumptions, `Editable fields: ${editableFields.join(", ")}`],
         ops: []
       }
@@ -1504,7 +1506,7 @@ export function compileDeterministicPlan(args: {
     const changedKeys = userFacingPropNames(target.type, Object.keys(patch))
     return {
       intent: "edit_plan",
-      summary_for_user: intent.summary ?? `Updated ${target.type}.`,
+      summary_for_user: intent.summary ?? st(args.locale, "update.done", { type: target.type }),
       change_log: [
         ...assumptions,
         childPatch
@@ -1525,7 +1527,7 @@ export function compileDeterministicPlan(args: {
     if (!target) {
       return {
         intent: "needs_clarification",
-        summary_for_user: "I need to know which block to move.",
+        summary_for_user: st(args.locale, "move.needsBlock"),
         change_log: assumptions,
         ops: []
       }
@@ -1542,7 +1544,7 @@ export function compileDeterministicPlan(args: {
       if (!anchor) {
         return {
           intent: "needs_clarification",
-          summary_for_user: "I could not find the anchor block to move after.",
+          summary_for_user: st(args.locale, "move.anchorBlockNotFound"),
           change_log: assumptions,
           ops: []
         }
@@ -1553,7 +1555,7 @@ export function compileDeterministicPlan(args: {
       if (!anchor) {
         return {
           intent: "needs_clarification",
-          summary_for_user: "I could not find the anchor block to move before.",
+          summary_for_user: st(args.locale, "move.anchorBlockBeforeNotFound"),
           change_log: assumptions,
           ops: []
         }
@@ -1567,7 +1569,7 @@ export function compileDeterministicPlan(args: {
     } else {
       return {
         intent: "needs_clarification",
-        summary_for_user: "Please specify where to move the block (top, bottom, before, after).",
+        summary_for_user: st(args.locale, "move.specifyDirection"),
         change_log: assumptions,
         ops: []
       }
@@ -1575,7 +1577,7 @@ export function compileDeterministicPlan(args: {
 
     return {
       intent: "edit_plan",
-      summary_for_user: intent.summary ?? `Moved ${target.type}.`,
+      summary_for_user: intent.summary ?? st(args.locale, "move.blockDone", { type: target.type }),
       change_log: [...assumptions, `Moved block ${target.id}.`],
       ops: [{ op: "move_block", pageSlug: slug, blockId: target.id, afterBlockId }]
     }
@@ -1600,7 +1602,7 @@ export function compileDeterministicPlan(args: {
         }
         return {
           intent: "edit_plan",
-          summary_for_user: `Added ${blockTypes.join(", ")}.`,
+          summary_for_user: st(args.locale, "add.multiple", { types: blockTypes.join(", ") }),
           change_log: changeLog,
           ops
         }
@@ -1625,7 +1627,7 @@ export function compileDeterministicPlan(args: {
         if (hero) {
           return {
             intent: "edit_plan",
-            summary_for_user: "Updated the hero image.",
+            summary_for_user: st(args.locale, "add.heroImage"),
             change_log: [...assumptions, `Updated ${hero.id}: imageUrl`],
             ops: [{ op: "update_props", pageSlug: slug, blockId: hero.id, patch: { imageUrl: "pending" } }]
           }
@@ -1633,7 +1635,7 @@ export function compileDeterministicPlan(args: {
       }
       return {
         intent: "needs_clarification",
-        summary_for_user: `Please specify which block type to add (${allowedBlockTypes.join(", ")}).`,
+        summary_for_user: st(args.locale, "add.specifyType", { types: allowedBlockTypes.join(", ") }),
         change_log: assumptions,
         ops: []
       }
@@ -1647,7 +1649,7 @@ export function compileDeterministicPlan(args: {
       if (listPatch) {
         return {
           intent: "edit_plan",
-          summary_for_user: intent.summary ?? `Added an item to ${existing.type}.`,
+          summary_for_user: intent.summary ?? st(args.locale, "add.itemDone", { type: existing.type }),
           change_log: [...assumptions, `Appended item to ${existing.id}.`],
           ops: [{ op: "update_props", pageSlug: slug, blockId: existing.id, patch: listPatch }]
         }
@@ -1671,7 +1673,7 @@ export function compileDeterministicPlan(args: {
       if (!anchor) {
         return {
           intent: "needs_clarification",
-          summary_for_user: "I could not find the anchor block to place this after.",
+          summary_for_user: st(args.locale, "add.anchorAfterNotFound"),
           change_log: assumptions,
           ops: []
         }
@@ -1682,7 +1684,7 @@ export function compileDeterministicPlan(args: {
       if (!anchor) {
         return {
           intent: "needs_clarification",
-          summary_for_user: "I could not find the anchor block to place this before.",
+          summary_for_user: st(args.locale, "add.anchorBeforeNotFound"),
           change_log: assumptions,
           ops: []
         }
@@ -1699,7 +1701,7 @@ export function compileDeterministicPlan(args: {
     const ops: Operation[] = extraMoveTop ? [addOp, extraMoveTop] : [addOp]
     return {
       intent: "edit_plan",
-      summary_for_user: intent.summary ?? `Added ${blockType}.`,
+      summary_for_user: intent.summary ?? st(args.locale, "add.done", { type: blockType }),
       change_log: [...assumptions, `Added ${blockType} block ${blockId}.`],
       ops
     }

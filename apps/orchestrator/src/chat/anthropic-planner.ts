@@ -244,6 +244,7 @@ export async function generatePlanWithAnthropic(args: {
   manifestBlockTypes?: string[]
   lightweight?: boolean
   signal?: AbortSignal
+  locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
   const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
@@ -273,6 +274,7 @@ export async function generatePlanWithAnthropic(args: {
     imageUrlForVision: args.contextPack.selected?.imageUrlForVision,
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
+    locale: args.locale,
   })
 
   const includeContracts =
@@ -817,43 +819,105 @@ export async function generatePlanWithAnthropic(args: {
       }
     }
   } else {
-    // No runtime tools — use output_config.format for constrained decoding
-    // instead of forcing a tool_use call. This guarantees schema-valid JSON.
-    const response = await client.messages.create({
-      model: args.model,
-      max_tokens: 8192,
-      system: anthropicSystemPromptWithCache(system),
-      output_config: {
-        format: { type: "json_schema", schema: editPlanJsonSchema }
-      },
-      messages: [
-        ...historyMessages,
-        { role: "user", content: userContent }
-      ],
-    })
-    usage = extractUsage(response)
-
-    if (response.stop_reason === "max_tokens") {
-      args.log?.warn({
-        event: "anthropic_planner_truncated",
+    // No runtime tools — try output_config.format for constrained decoding first,
+    // then fall back to tool_choice if the model doesn't return parseable JSON
+    // (some models like Haiku 4.5 may not reliably support output_config).
+    try {
+      const response = await client.messages.create({
         model: args.model,
-        stopReason: response.stop_reason,
-        contentBlockTypes: response.content.map((b) => b.type)
-      }, "Anthropic planner: response truncated (max_tokens)")
-      throw new Error("Model response was truncated (max_tokens reached)")
+        max_tokens: 8192,
+        system: anthropicSystemPromptWithCache(system),
+        output_config: {
+          format: { type: "json_schema", schema: editPlanJsonSchema }
+        },
+        messages: [
+          ...historyMessages,
+          { role: "user", content: userContent }
+        ],
+      })
+      usage = extractUsage(response)
+
+      if (response.stop_reason === "max_tokens") {
+        args.log?.warn({
+          event: "anthropic_planner_truncated",
+          model: args.model,
+          stopReason: response.stop_reason,
+          contentBlockTypes: response.content.map((b) => b.type)
+        }, "Anthropic planner: response truncated (max_tokens)")
+        throw new Error("Model response was truncated (max_tokens reached)")
+      }
+
+      const textBlock = response.content.find((b) => b.type === "text")
+      const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+      if (raw.trim()) {
+        try {
+          parsed = JSON.parse(raw) as Record<string, unknown>
+        } catch {
+          try {
+            const meta = repairAndParseJsonWithMeta(raw)
+            parsed = meta.parsed as Record<string, unknown>
+            args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model, strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed output_config JSON")
+          } catch { /* fall through to tool_choice fallback below */ }
+        }
+      }
+    } catch (outputConfigErr) {
+      // output_config may not be supported by this model — log and fall through
+      // to the tool_choice fallback below (don't re-throw truncation errors).
+      if (outputConfigErr instanceof Error && outputConfigErr.message.includes("truncated")) throw outputConfigErr
+      args.log?.warn({
+        event: "anthropic_planner_output_config_failed",
+        model: args.model,
+        error: outputConfigErr instanceof Error ? outputConfigErr.message : String(outputConfigErr)
+      }, "Anthropic planner: output_config call failed, falling back to tool_choice")
     }
 
-    const textBlock = response.content.find((b) => b.type === "text")
-    const raw = textBlock && "text" in textBlock ? textBlock.text : ""
-    if (raw.trim()) {
-      try {
-        parsed = JSON.parse(raw) as Record<string, unknown>
-      } catch {
-        try {
-          const meta = repairAndParseJsonWithMeta(raw)
-          parsed = meta.parsed as Record<string, unknown>
-          args.log?.warn({ event: "anthropic_planner_json_repaired", model: args.model, strategy: meta.strategy, mutationCount: meta.mutationCount, discardedBytes: meta.discardedBytes }, "Anthropic planner: repaired malformed output_config JSON")
-        } catch { /* fall through to !parsed check below */ }
+    // Fallback: if output_config didn't produce JSON, retry with tool_choice
+    if (!parsed) {
+      args.log?.warn({
+        event: "anthropic_planner_output_config_fallback",
+        model: args.model
+      }, "Anthropic planner: output_config returned no JSON, retrying with tool_choice")
+      const fallbackResponse = await client.messages.create({
+        model: args.model,
+        max_tokens: 8192,
+        system: anthropicSystemPromptWithCache(system),
+        tools: [anthropicToolWithCache(submitPlanToolDef)],
+        tool_choice: { type: "tool", name: "submit_edit_plan" },
+        messages: [
+          ...historyMessages,
+          { role: "user", content: userContent }
+        ],
+      })
+      const fallbackUsage = extractUsage(fallbackResponse)
+      usage = {
+        inputTokens: usage.inputTokens + fallbackUsage.inputTokens,
+        outputTokens: usage.outputTokens + fallbackUsage.outputTokens,
+        totalTokens: usage.totalTokens + fallbackUsage.totalTokens,
+        cacheCreationInputTokens: (usage.cacheCreationInputTokens ?? 0) + (fallbackUsage.cacheCreationInputTokens ?? 0),
+        cacheReadInputTokens: (usage.cacheReadInputTokens ?? 0) + (fallbackUsage.cacheReadInputTokens ?? 0)
+      }
+
+      if (fallbackResponse.stop_reason === "max_tokens") {
+        throw new Error("Model response was truncated (max_tokens reached)")
+      }
+
+      const toolBlock = fallbackResponse.content.find((b) => b.type === "tool_use")
+      if (toolBlock && "input" in toolBlock && toolBlock.input && typeof toolBlock.input === "object") {
+        parsed = toolBlock.input as Record<string, unknown>
+      } else {
+        const textBlock = fallbackResponse.content.find((b) => b.type === "text")
+        const raw = textBlock && "text" in textBlock ? textBlock.text : ""
+        const jsonText = extractJsonObject(raw)
+        if (jsonText) {
+          try {
+            parsed = JSON.parse(jsonText) as Record<string, unknown>
+          } catch {
+            try {
+              const meta = repairAndParseJsonWithMeta(jsonText)
+              parsed = meta.parsed as Record<string, unknown>
+            } catch { /* fall through */ }
+          }
+        }
       }
     }
   }

@@ -1,26 +1,32 @@
 import { useState, useEffect, type ReactNode } from "react"
+import { useT } from "@/i18n"
+import {
+  ACCESS_GRANTED_STORAGE_KEY,
+  clearStoredAccessToken,
+  getStoredAccessToken,
+  setStoredAccessToken
+} from "@/lib/access-auth"
 
 const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL as string
-const SESSION_KEY = "editor-access-granted"
 
 export function PasswordGate({ children }: { children: ReactNode }) {
+  const { t } = useT()
   const [authorized, setAuthorized] = useState<boolean | null>(null)
   const [password, setPassword] = useState("")
   const [error, setError] = useState(false)
   const [checking, setChecking] = useState(false)
 
   useEffect(() => {
-    if (sessionStorage.getItem(SESSION_KEY)) {
-      setAuthorized(true)
-      return
-    }
     fetch(`${ORCHESTRATOR_URL}/auth/status`)
       .then((r) => r.json())
       .then((data) => {
         if (!data.gateEnabled) {
+          clearStoredAccessToken()
           setAuthorized(true)
         } else {
-          setAuthorized(false)
+          const hasGrant = Boolean(sessionStorage.getItem(ACCESS_GRANTED_STORAGE_KEY))
+          const hasToken = getStoredAccessToken().length > 0
+          setAuthorized(hasGrant && hasToken)
         }
       })
       .catch(() => {
@@ -39,13 +45,17 @@ export function PasswordGate({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: password.trim() }),
       })
+      const data = (await res.json().catch(() => ({}))) as { accessToken?: string }
       if (res.ok) {
-        sessionStorage.setItem(SESSION_KEY, "1")
+        sessionStorage.setItem(ACCESS_GRANTED_STORAGE_KEY, "1")
+        setStoredAccessToken(data.accessToken ?? "")
         setAuthorized(true)
       } else {
+        clearStoredAccessToken()
         setError(true)
       }
     } catch {
+      clearStoredAccessToken()
       setError(true)
     }
     setChecking(false)
@@ -81,13 +91,13 @@ export function PasswordGate({ children }: { children: ReactNode }) {
         }}
       >
         <h2 style={{ margin: 0, color: "#fafafa", fontSize: 18 }}>
-          Editor Access
+          {t("password.title")}
         </h2>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
+          placeholder={t("password.placeholder")}
           autoFocus
           style={{
             padding: "10px 12px",
@@ -101,7 +111,7 @@ export function PasswordGate({ children }: { children: ReactNode }) {
         />
         {error && (
           <span style={{ color: "#ef4444", fontSize: 13 }}>
-            Incorrect password
+            {t("password.incorrect")}
           </span>
         )}
         <button
@@ -119,7 +129,7 @@ export function PasswordGate({ children }: { children: ReactNode }) {
             opacity: checking || !password.trim() ? 0.5 : 1,
           }}
         >
-          {checking ? "Checking…" : "Continue"}
+          {checking ? t("password.checking") : t("password.continue")}
         </button>
       </form>
     </div>
