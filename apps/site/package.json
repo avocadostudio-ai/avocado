@@ -15,6 +15,7 @@
     "@ai-site-editor/blocks": "workspace:*",
     "@ai-site-editor/shared": "workspace:*",
     "@ai-site-editor/site-sdk": "workspace:*",
+    "@ai-site-editor/immersive-widget": "workspace:*",
     "@tailwindcss/postcss": "^4.2.1",
     "lucide-react": "^0.575.0",
     "next": "15.2.8",

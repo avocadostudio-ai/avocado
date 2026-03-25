@@ -1,0 +1,6 @@
+export { ImmersiveWidget } from "./ImmersiveWidget"
+export type { ImmersiveWidgetProps, SiteContext } from "./ImmersiveWidget"
+export type { WidgetConfig, WidgetChatEntry } from "./lib/widget-state"
+export type { ChatResult, ChatRequestPayload } from "./lib/widget-transport"
+export type { BlockSelectionState } from "./hooks/useBlockSelection"
+export type { TextSelectionContext } from "./hooks/useTextSelection"
