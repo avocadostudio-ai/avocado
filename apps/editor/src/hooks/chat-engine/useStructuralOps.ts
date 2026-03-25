@@ -1,4 +1,5 @@
 import { useRef } from "react"
+import { useT } from "../../i18n"
 import {
   defaultListItemForBlock,
   defaultPropsForType,
@@ -33,6 +34,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
     pushAssistantFromResult
   } = config
 
+  const { t } = useT()
   const lastStructuralNoticeRef = useRef<number>(0)
 
   const pushStructuralDisabledNotice = (action: string) => {
@@ -213,7 +215,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      pushAssistantFromResult({ status: "applied", summary: "Added list item." }, { canUndo: true })
+      pushAssistantFromResult({ status: "applied", summary: t("ops.addedItem") }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",
@@ -367,7 +369,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId: null })
       }
-      pushAssistantFromResult({ status: "applied", summary: "Deleted block." }, { canUndo: true })
+      pushAssistantFromResult({ status: "applied", summary: t("ops.deletedBlock") }, { canUndo: true })
     } catch {
       pushAssistantFromResult({
         status: "error",

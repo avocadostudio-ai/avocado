@@ -3,6 +3,7 @@ import { blockManifestSchema, validateManifestDefaultProps } from "@ai-site-edit
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, orchestrator, resolveSiteOrigin } from "../lib/editor-utils"
+import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 function compactPurposeText(value: string) {
@@ -17,6 +18,8 @@ function compactPurposeText(value: string) {
 }
 
 export function SitesPage({ sites, session }: { sites: UseSiteListReturn; session: string }) {
+  const { t, locale, setLocale } = useT()
+  const localeEntries = Object.entries(LOCALE_LABELS) as [Locale, string][]
   const [addAiTab, setAddAiTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configAiTab, setConfigAiTab] = useState<"overview" | "tone" | "constraints">("overview")
   const [configTab, setConfigTab] = useState<"general" | "media" | "hosting">("general")
@@ -42,7 +45,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
     const run = async () => {
       const loadingMap: Record<string, { status: "loading"; summary: string }> = {}
       for (const site of dedupedSites) {
-        loadingMap[site.id] = { status: "loading", summary: "Checking manifest..." }
+        loadingMap[site.id] = { status: "loading", summary: t("sites.checkingManifest") }
       }
       if (active) setCapabilityBySiteId(loadingMap)
 
@@ -58,7 +61,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 ...prev,
                 [site.id]: {
                   status: "degraded",
-                  summary: "Limited editing",
+                  summary: t("sites.limitedEditing"),
                   reason: `Manifest endpoint returned ${res.status}`
                 }
               }))
@@ -72,7 +75,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 ...prev,
                 [site.id]: {
                   status: "degraded",
-                  summary: "Limited editing",
+                  summary: t("sites.limitedEditing"),
                   reason: "Manifest response shape is invalid"
                 }
               }))
@@ -85,7 +88,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 ...prev,
                 [site.id]: {
                   status: "degraded",
-                  summary: "Limited editing",
+                  summary: t("sites.limitedEditing"),
                   reason: defaultsError
                 }
               }))
@@ -105,7 +108,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               ...prev,
               [site.id]: {
                 status: "degraded",
-                summary: "Limited editing",
+                summary: t("sites.limitedEditing"),
                 reason: error instanceof Error ? error.message : "Manifest fetch failed"
               }
             }))
@@ -123,10 +126,20 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
     <main className="sites-page">
       <header className="sites-header">
         <div>
-          <h1>Sites</h1>
-          <p>Choose a site to edit.</p>
+          <h1>{t("sites.title")}</h1>
+          <p>{t("sites.subtitle")}</p>
         </div>
         <div className="sites-header-actions">
+          <select
+            className="sites-locale-select"
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+            aria-label={t("settings.language")}
+          >
+            {localeEntries.map(([code, label]) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
           <button
             type="button"
             className="primary-btn"
@@ -141,7 +154,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Add site
+            {t("sites.addSite")}
           </button>
         </div>
       </header>
@@ -168,7 +181,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                             ? "site-status-dot site-status-dot-degraded"
                             : "site-status-dot"
                       }
-                      title={capability.status === "ready" ? "Editing ready" : capability.status === "degraded" ? `Limited editing: ${capability.reason}` : "Checking..."}
+                      title={capability.status === "ready" ? t("sites.editingReady") : capability.status === "degraded" ? `${t("sites.limitedEditing")}: ${capability.reason}` : t("sites.checking")}
                     />
                   ) : null}
                 </h2>
@@ -180,13 +193,13 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                       <path d="M8.8 2h2.4l.5 2.1a6.7 6.7 0 0 1 1.5.6l1.9-1.1 1.7 1.7-1.1 1.9c.2.5.4 1 .5 1.5l2.1.5v2.4l-2.1.5a6.7 6.7 0 0 1-.6 1.5l1.1 1.9-1.7 1.7-1.9-1.1a6.7 6.7 0 0 1-1.5.6L11.2 18H8.8l-.5-2.1a6.7 6.7 0 0 1-1.5-.6l-1.9 1.1-1.7-1.7 1.1-1.9a6.7 6.7 0 0 1-.6-1.5L2 11.2V8.8l2.1-.5c.1-.5.3-1 .6-1.5L3.6 4.9l1.7-1.7 1.9 1.1c.5-.2 1-.4 1.5-.5L8.8 2z" />
                       <circle cx="10" cy="10" r="2.4" />
                     </svg>
-                    <span>Settings</span>
+                    <span>{t("sites.settings")}</span>
                   </button>
                   <button type="button" className="secondary-btn site-config-btn" onClick={() => void sites.openRestoreModal(site.id)} aria-label={`Version history for ${site.name}`}>
-                    <span>Version history</span>
+                    <span>{t("sites.versionHistory")}</span>
                   </button>
                   <button type="button" className="primary-btn" onClick={() => sites.openEditorForSite(site.id)}>
-                    <span>Open editor</span>
+                    <span>{t("sites.openEditor")}</span>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path d="M7 5h8v8" />
                       <path d="m7 13 8-8" />
@@ -200,53 +213,53 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       </section>
       {sites.showSiteModal ? (
         <div className="sites-modal-backdrop" onClick={() => sites.setShowSiteModal(false)}>
-          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Add site" onClick={(event) => event.stopPropagation()}>
+          <section className="sites-modal" role="dialog" aria-modal="true" aria-label={t("sites.addSite")} onClick={(event) => event.stopPropagation()}>
             <header className="sites-modal-header">
-              <h2>Add Site</h2>
-              <button type="button" className="settings-close-btn" onClick={() => sites.setShowSiteModal(false)} aria-label="Close">
+              <h2>{t("sites.addSiteTitle")}</h2>
+              <button type="button" className="settings-close-btn" onClick={() => sites.setShowSiteModal(false)} aria-label={t("sites.close")}>
                 ×
               </button>
             </header>
             <div className="sites-modal-body">
               <div className="sites-form-grid">
-                <p className="sites-form-section-title">Core settings</p>
+                <p className="sites-form-section-title">{t("sites.coreSettings")}</p>
                 <label className="sites-form-field">
-                  <span>Site name</span>
+                  <span>{t("sites.siteName")}</span>
                   <input
                     type="text"
                     value={sites.newSiteForm.name}
-                    placeholder="Adventure Arena"
+                    placeholder={t("sites.siteNamePlaceholder")}
                     onChange={(event) => sites.updateNewSiteForm({ name: event.target.value })}
                   />
                 </label>
                 <label className="sites-form-field">
-                  <span>Preview URL</span>
+                  <span>{t("sites.previewUrl")}</span>
                   <input
                     type="url"
                     value={sites.newSiteForm.previewUrl}
-                    placeholder="http://localhost:3000"
+                    placeholder={t("sites.previewUrlPlaceholder")}
                     onChange={(event) => sites.updateNewSiteForm({ previewUrl: event.target.value })}
                   />
                 </label>
-                <p className="sites-form-section-title">Editorial brief</p>
+                <p className="sites-form-section-title">{t("sites.editorialBrief")}</p>
                 <div className="sites-form-field sites-form-field-wide">
-                  <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                  <div className="sites-ai-tabs" role="tablist" aria-label={t("sites.editorialBrief")}>
                     <button type="button" className={addAiTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setAddAiTab("overview")}>
-                      Overview
+                      {t("sites.overview")}
                     </button>
                     <button type="button" className={addAiTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setAddAiTab("tone")}>
-                      Tone
+                      {t("sites.tone")}
                     </button>
                     <button type="button" className={addAiTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setAddAiTab("constraints")}>
-                      Constraints
+                      {t("sites.constraints")}
                     </button>
                   </div>
                   {addAiTab === "overview" ? (
                     <label className="sites-form-field">
-                      <span>Overview</span>
+                      <span>{t("sites.overview")}</span>
                       <textarea
                         value={sites.newSiteForm.purpose}
-                        placeholder="What this site is for."
+                        placeholder={t("sites.overviewPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ purpose: event.target.value })}
                         rows={8}
                       />
@@ -254,10 +267,10 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   ) : null}
                   {addAiTab === "tone" ? (
                     <label className="sites-form-field">
-                      <span>Preferred tone</span>
+                      <span>{t("sites.tone")}</span>
                       <textarea
                         value={sites.newSiteForm.tone}
-                        placeholder="How the writing should sound."
+                        placeholder={t("sites.tonePlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ tone: event.target.value })}
                         rows={8}
                       />
@@ -265,61 +278,61 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   ) : null}
                   {addAiTab === "constraints" ? (
                     <label className="sites-form-field">
-                      <span>Writing constraints</span>
+                      <span>{t("sites.constraints")}</span>
                       <textarea
                         value={sites.newSiteForm.constraints}
-                        placeholder={"Rules for content output.\nOne per line."}
+                        placeholder={t("sites.constraintsPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ constraints: event.target.value })}
                         rows={8}
                       />
                     </label>
                   ) : null}
                 </div>
-                <p className="sites-form-section-title">Settings</p>
+                <p className="sites-form-section-title">{t("sites.hosting")}</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-settings-grid">
                     <label className="sites-form-field">
-                      <span>Hosting</span>
+                      <span>{t("sites.hosting")}</span>
                       <input
                         type="text"
                         value={sites.newSiteForm.hosting}
-                        placeholder="Vercel production site (single shared project)"
+                        placeholder={t("sites.hostingPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ hosting: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Vercel project ID</span>
+                      <span>{t("sites.vercelProjectId")}</span>
                       <input
                         type="text"
                         value={sites.newSiteForm.vercelProjectId}
-                        placeholder="prj_..."
+                        placeholder={t("sites.vercelProjectIdPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ vercelProjectId: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Vercel team ID</span>
+                      <span>{t("sites.vercelTeamId")}</span>
                       <input
                         type="text"
                         value={sites.newSiteForm.vercelTeamId}
-                        placeholder="team_..."
+                        placeholder={t("sites.vercelTeamIdPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ vercelTeamId: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Vercel production URL</span>
+                      <span>{t("sites.vercelProductionUrl")}</span>
                       <input
                         type="url"
                         value={sites.newSiteForm.vercelProductionUrl}
-                        placeholder="https://example.vercel.app"
+                        placeholder={t("sites.vercelProductionUrlPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ vercelProductionUrl: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field sites-form-field-wide">
-                      <span>Vercel deploy hook URL</span>
+                      <span>{t("sites.vercelDeployHook")}</span>
                       <input
                         type="url"
                         value={sites.newSiteForm.vercelDeployHookUrl}
-                        placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                        placeholder={t("sites.vercelDeployHookPlaceholder")}
                         onChange={(event) => sites.updateNewSiteForm({ vercelDeployHookUrl: event.target.value })}
                       />
                     </label>
@@ -329,10 +342,10 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             </div>
             <footer className="sites-modal-footer">
               <button type="button" className="secondary-btn" onClick={() => sites.setShowSiteModal(false)}>
-                Cancel
+                {t("sites.cancel")}
               </button>
               <button type="button" className="primary-btn" onClick={sites.addSiteFromName}>
-                Create
+                {t("sites.create")}
               </button>
             </footer>
           </section>
@@ -341,57 +354,57 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       <Sheet open={!!sites.configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>
         <SheetContent side="right" className="w-full sm:max-w-lg gap-0 p-0 font-sans text-foreground text-sm">
           <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
-            <SheetTitle className="text-base font-bold tracking-tight">Site Config</SheetTitle>
+            <SheetTitle className="text-base font-bold tracking-tight">{t("sites.siteConfig")}</SheetTitle>
           </SheetHeader>
           {sites.configSite ? (
             <div className="sites-modal-body">
               <div className="sites-form-grid">
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-ai-tabs" role="tablist" aria-label="Config tabs">
-                    <button type="button" className={configTab === "general" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("general")}>General</button>
-                    <button type="button" className={configTab === "media" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("media")}>Media</button>
-                    <button type="button" className={configTab === "hosting" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("hosting")}>Hosting</button>
+                    <button type="button" className={configTab === "general" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("general")}>{t("sites.general")}</button>
+                    <button type="button" className={configTab === "media" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("media")}>{t("sites.media")}</button>
+                    <button type="button" className={configTab === "hosting" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigTab("hosting")}>{t("sites.hosting")}</button>
                   </div>
                 </div>
                 {configTab === "general" ? (<>
-                <p className="sites-form-section-title">Core settings</p>
+                <p className="sites-form-section-title">{t("sites.coreSettings")}</p>
                 <label className="sites-form-field">
-                  <span>Site name</span>
+                  <span>{t("sites.siteName")}</span>
                   <input
                     type="text"
                     value={sites.configSite.name}
-                    placeholder="Site name"
+                    placeholder={t("sites.siteNameLabel")}
                     onChange={(event) => sites.updateConfigSite({ name: event.target.value })}
                   />
                 </label>
                 <label className="sites-form-field">
-                  <span>Preview URL</span>
+                  <span>{t("sites.previewUrl")}</span>
                   <input
                     type="url"
                     value={sites.configSite.previewUrl ?? ""}
-                    placeholder="http://localhost:3000"
+                    placeholder={t("sites.previewUrlPlaceholder")}
                     onChange={(event) => sites.updateConfigSite({ previewUrl: event.target.value })}
                   />
                 </label>
-                <p className="sites-form-section-title">Editorial brief</p>
+                <p className="sites-form-section-title">{t("sites.editorialBrief")}</p>
                 <div className="sites-form-field sites-form-field-wide">
-                  <div className="sites-ai-tabs" role="tablist" aria-label="Editorial brief tabs">
+                  <div className="sites-ai-tabs" role="tablist" aria-label={t("sites.editorialBrief")}>
                     <button type="button" className={configAiTab === "overview" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigAiTab("overview")}>
-                      Overview
+                      {t("sites.overview")}
                     </button>
                     <button type="button" className={configAiTab === "tone" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigAiTab("tone")}>
-                      Tone
+                      {t("sites.tone")}
                     </button>
                     <button type="button" className={configAiTab === "constraints" ? "sites-ai-tab active" : "sites-ai-tab"} onClick={() => setConfigAiTab("constraints")}>
-                      Constraints
+                      {t("sites.constraints")}
                     </button>
                   </div>
                   {configAiTab === "overview" ? (
                     <label className="sites-form-field">
-                      <span>Overview</span>
+                      <span>{t("sites.overview")}</span>
                       <textarea
                         value={sites.configSite.purpose}
-                        placeholder="What this site is for."
+                        placeholder={t("sites.overviewPlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ purpose: event.target.value })}
                         rows={8}
                       />
@@ -399,10 +412,10 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   ) : null}
                   {configAiTab === "tone" ? (
                     <label className="sites-form-field">
-                      <span>Preferred tone</span>
+                      <span>{t("sites.tone")}</span>
                       <textarea
                         value={sites.configSite.tone ?? ""}
-                        placeholder="How the writing should sound."
+                        placeholder={t("sites.tonePlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ tone: event.target.value })}
                         rows={8}
                       />
@@ -410,10 +423,10 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                   ) : null}
                   {configAiTab === "constraints" ? (
                     <label className="sites-form-field">
-                      <span>Writing constraints</span>
+                      <span>{t("sites.constraints")}</span>
                       <textarea
                         value={(sites.configSite.constraints ?? []).join("\n")}
-                        placeholder={"Rules for content output.\nOne per line."}
+                        placeholder={t("sites.constraintsPlaceholder")}
                         onChange={(event) =>
                           sites.updateConfigSite({
                             constraints: event.target.value
@@ -429,51 +442,51 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 </div>
                 </>) : null}
                 {configTab === "hosting" ? (<>
-                <p className="sites-form-section-title">Hosting & Deploy</p>
+                <p className="sites-form-section-title">{t("sites.hosting")}</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-settings-grid">
                     <label className="sites-form-field">
-                      <span>Hosting</span>
+                      <span>{t("sites.hosting")}</span>
                       <input
                         type="text"
                         value={sites.configSite.hosting}
-                        placeholder="Vercel production site (single shared project)"
+                        placeholder={t("sites.hostingPlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ hosting: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Vercel project ID</span>
+                      <span>{t("sites.vercelProjectId")}</span>
                       <input
                         type="text"
                         value={sites.configSite.vercelProjectId ?? ""}
-                        placeholder="prj_..."
+                        placeholder={t("sites.vercelProjectIdPlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ vercelProjectId: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Vercel team ID</span>
+                      <span>{t("sites.vercelTeamId")}</span>
                       <input
                         type="text"
                         value={sites.configSite.vercelTeamId ?? ""}
-                        placeholder="team_..."
+                        placeholder={t("sites.vercelTeamIdPlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ vercelTeamId: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field">
-                      <span>Vercel production URL</span>
+                      <span>{t("sites.vercelProductionUrl")}</span>
                       <input
                         type="url"
                         value={sites.configSite.vercelProductionUrl ?? ""}
-                        placeholder="https://example.vercel.app"
+                        placeholder={t("sites.vercelProductionUrlPlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ vercelProductionUrl: event.target.value })}
                       />
                     </label>
                     <label className="sites-form-field sites-form-field-wide">
-                      <span>Vercel deploy hook URL</span>
+                      <span>{t("sites.vercelDeployHook")}</span>
                       <input
                         type="url"
                         value={sites.configSite.vercelDeployHookUrl ?? ""}
-                        placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                        placeholder={t("sites.vercelDeployHookPlaceholder")}
                         onChange={(event) => sites.updateConfigSite({ vercelDeployHookUrl: event.target.value })}
                       />
                     </label>
@@ -481,16 +494,16 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 </div>
                 </>) : null}
                 {configTab === "media" ? (<>
-                <p className="sites-form-section-title">Google Drive</p>
+                <p className="sites-form-section-title">{t("sites.googleDrive")}</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-settings-grid">
                     <label className="sites-form-field sites-form-field-wide">
-                      <span>Google Drive folder ID</span>
+                      <span>{t("sites.googleDriveFolderId")}</span>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <input
                           type="text"
                           value={sites.configSite.gdriveFolderId ?? ""}
-                          placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+                          placeholder={t("sites.googleDrivePlaceholder")}
                           onChange={(event) => {
                             sites.updateConfigSite({ gdriveFolderId: event.target.value })
                             setDriveValidation(null)
@@ -510,17 +523,17 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                               const res = await fetch(`${orchestrator}/gdrive/images?folderId=${encodeURIComponent(folderId)}&limit=1`)
                               if (res.ok) {
                                 const data = (await res.json()) as { items: unknown[] }
-                                setDriveValidation({ status: "ok", message: `Connected (${data.items.length > 0 ? "images found" : "folder empty"})` })
+                                setDriveValidation({ status: "ok", message: data.items.length > 0 ? t("sites.driveConnectedImages") : t("sites.driveConnectedEmpty") })
                               } else {
                                 const data = (await res.json().catch(() => ({}))) as { error?: string }
                                 setDriveValidation({ status: "error", message: data.error ?? `HTTP ${res.status}` })
                               }
                             } catch {
-                              setDriveValidation({ status: "error", message: "Could not reach orchestrator" })
+                              setDriveValidation({ status: "error", message: t("sites.driveError") })
                             }
                           }}
                         >
-                          {driveValidation?.status === "loading" ? "Testing..." : "Test"}
+                          {driveValidation?.status === "loading" ? t("sites.testing") : t("sites.test")}
                         </button>
                       </div>
                       {driveValidation && driveValidation.status !== "loading" && (
@@ -531,11 +544,11 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     </label>
                   </div>
                 </div>
-                <p className="sites-form-section-title">CMS Media</p>
+                <p className="sites-form-section-title">{t("sites.cmsMedia")}</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-settings-grid">
                     <label className="sites-form-field">
-                      <span>Provider</span>
+                      <span>{t("sites.provider")}</span>
                       <select
                         value={sites.configSite.cmsMedia?.provider ?? ""}
                         onChange={(event) => {
@@ -551,7 +564,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                           }
                         }}
                       >
-                        <option value="">None</option>
+                        <option value="">{t("sites.none")}</option>
                         <option value="contentful">Contentful</option>
                         <option value="sanity">Sanity</option>
                         <option value="strapi">Strapi</option>
@@ -560,36 +573,36 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     {sites.configSite.cmsMedia?.provider === "contentful" && (
                       <>
                         <label className="sites-form-field">
-                          <span>Space ID</span>
-                          <input type="text" value={(sites.configSite.cmsMedia as { spaceId: string }).spaceId} placeholder="abc123" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, spaceId: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                          <span>{t("sites.spaceId")}</span>
+                          <input type="text" value={(sites.configSite.cmsMedia as { spaceId: string }).spaceId} placeholder={t("sites.spaceIdPlaceholder")} onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, spaceId: e.target.value } as typeof sites.configSite.cmsMedia })} />
                         </label>
                         <label className="sites-form-field">
-                          <span>Delivery Token</span>
-                          <textarea rows={2} value={(sites.configSite.cmsMedia as { deliveryToken: string }).deliveryToken} placeholder="Content Delivery API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, deliveryToken: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                          <span>{t("sites.deliveryToken")}</span>
+                          <textarea rows={2} value={(sites.configSite.cmsMedia as { deliveryToken: string }).deliveryToken} placeholder={t("sites.deliveryTokenPlaceholder")} onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, deliveryToken: e.target.value } as typeof sites.configSite.cmsMedia })} />
                         </label>
                       </>
                     )}
                     {sites.configSite.cmsMedia?.provider === "sanity" && (
                       <>
                         <label className="sites-form-field">
-                          <span>Project ID</span>
-                          <input type="text" value={(sites.configSite.cmsMedia as { projectId: string }).projectId} placeholder="abc123" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, projectId: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                          <span>{t("sites.projectId")}</span>
+                          <input type="text" value={(sites.configSite.cmsMedia as { projectId: string }).projectId} placeholder={t("sites.spaceIdPlaceholder")} onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, projectId: e.target.value } as typeof sites.configSite.cmsMedia })} />
                         </label>
                         <label className="sites-form-field">
-                          <span>Dataset</span>
-                          <input type="text" value={(sites.configSite.cmsMedia as { dataset?: string }).dataset ?? ""} placeholder="production" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, dataset: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
+                          <span>{t("sites.dataset")}</span>
+                          <input type="text" value={(sites.configSite.cmsMedia as { dataset?: string }).dataset ?? ""} placeholder={t("sites.datasetPlaceholder")} onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, dataset: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
                         </label>
                       </>
                     )}
                     {sites.configSite.cmsMedia?.provider === "strapi" && (
                       <>
                         <label className="sites-form-field">
-                          <span>Strapi URL</span>
-                          <input type="url" value={(sites.configSite.cmsMedia as { url: string }).url} placeholder="http://localhost:1337" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, url: e.target.value } as typeof sites.configSite.cmsMedia })} />
+                          <span>{t("sites.strapiUrl")}</span>
+                          <input type="url" value={(sites.configSite.cmsMedia as { url: string }).url} placeholder={t("sites.strapiUrlPlaceholder")} onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, url: e.target.value } as typeof sites.configSite.cmsMedia })} />
                         </label>
                         <label className="sites-form-field">
-                          <span>API Token</span>
-                          <textarea rows={2} value={(sites.configSite.cmsMedia as { token?: string }).token ?? ""} placeholder="Read-only API token" onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, token: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
+                          <span>{t("sites.apiToken")}</span>
+                          <textarea rows={2} value={(sites.configSite.cmsMedia as { token?: string }).token ?? ""} placeholder={t("sites.apiTokenPlaceholder")} onChange={(e) => sites.updateConfigSite({ cmsMedia: { ...sites.configSite!.cmsMedia!, token: e.target.value || undefined } as typeof sites.configSite.cmsMedia })} />
                         </label>
                       </>
                     )}
@@ -603,17 +616,17 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       </Sheet>
       {sites.restoreState.siteId ? (
         <div className="sites-modal-backdrop" onClick={() => sites.updateRestoreState({ siteId: null })}>
-          <section className="sites-modal" role="dialog" aria-modal="true" aria-label="Version history" onClick={(event) => event.stopPropagation()}>
+          <section className="sites-modal" role="dialog" aria-modal="true" aria-label={t("sites.versionHistory")} onClick={(event) => event.stopPropagation()}>
             <header className="sites-modal-header">
-              <h2>Version History</h2>
-              <button type="button" className="settings-close-btn" onClick={() => sites.updateRestoreState({ siteId: null })} aria-label="Close">
+              <h2>{t("sites.versionHistory")}</h2>
+              <button type="button" className="settings-close-btn" onClick={() => sites.updateRestoreState({ siteId: null })} aria-label={t("sites.close")}>
                 ×
               </button>
             </header>
             <div className="sites-modal-body">
-              <p className="site-purpose">Restore a previous published snapshot into <strong>{sites.restoreState.siteId}</strong>.</p>
+              <p className="site-purpose">{t("sites.restoreDescription")} <strong>{sites.restoreState.siteId}</strong>.</p>
               <label className="sites-form-field">
-                <span>Snapshot version</span>
+                <span>{t("sites.snapshotVersion")}</span>
                 <select
                   value={sites.restoreState.commit}
                   onChange={(event) => sites.updateRestoreState({ commit: event.target.value })}
@@ -634,7 +647,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             </div>
             <footer className="sites-modal-footer">
               <button type="button" className="secondary-btn" onClick={() => sites.updateRestoreState({ siteId: null })} disabled={sites.restoreState.isRestoring}>
-                Cancel
+                {t("sites.cancel")}
               </button>
               <button
                 type="button"
@@ -642,7 +655,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 onClick={() => void sites.restoreSnapshotForSite()}
                 disabled={sites.restoreState.isLoading || sites.restoreState.isRestoring || !sites.restoreState.commit}
               >
-                {sites.restoreState.isRestoring ? "Restoring..." : "Restore"}
+                {sites.restoreState.isRestoring ? t("sites.restoring") : t("sites.restore")}
               </button>
             </footer>
           </section>

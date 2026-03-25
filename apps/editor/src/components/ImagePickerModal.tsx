@@ -4,6 +4,7 @@ import { isImagePlaceholder } from "@ai-site-editor/shared"
 import { orchestrator } from "../lib/editor-utils"
 import { fetchCmsMedia, getCmsMediaLabel, type CmsMediaItem } from "../lib/cms-media"
 import type { CmsMediaConfig } from "../lib/editor-types"
+import { useT } from "@/i18n"
 
 type ImageItem = {
   id: string
@@ -66,6 +67,7 @@ function resolveImageUrl(url: string | undefined, siteOrigin: string | undefined
 }
 
 export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gdriveFolderId, cmsMedia, siteOrigin, onClose, onSelect }: ImagePickerModalProps) {
+  const { t } = useT()
   const currentUrl = resolveImageUrl(unwrapNextImageUrl(rawCurrentUrl), siteOrigin)
   const hasEditableImage = !isImagePlaceholder(currentUrl)
   const availableTabs: Tab[] = []
@@ -360,7 +362,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     if (activeTab === "upload") {
       // URL input or file upload
       if (uploadResult) {
-        onSelect(uploadResult.url, "Uploaded image")
+        onSelect(uploadResult.url, t("imagePicker.uploadedImage"))
       } else if (urlInput.trim()) {
         onSelect(urlInput.trim(), urlAltInput.trim() || "Image")
       } else {
@@ -394,13 +396,13 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   if (!open) return null
 
   const tabConfig: Record<Tab, { label: string; icon: React.ReactNode; searchPlaceholder?: string }> = {
-    drive: { label: "Drive", icon: <HardDrive size={14} />, searchPlaceholder: "Search Drive images..." },
-    unsplash: { label: "Unsplash", icon: <ImageIcon size={14} />, searchPlaceholder: "Search Unsplash photos..." },
-    contentful: { label: "Contentful", icon: <Cloud size={14} />, searchPlaceholder: "Search Contentful assets..." },
-    sanity: { label: "Sanity", icon: <Cloud size={14} />, searchPlaceholder: "Search Sanity assets..." },
-    strapi: { label: "Strapi", icon: <Cloud size={14} />, searchPlaceholder: "Search Strapi media..." },
-    upload: { label: "Upload", icon: <Upload size={14} /> },
-    generate: { label: "Generate", icon: <Sparkles size={14} /> }
+    drive: { label: t("imagePicker.drive"), icon: <HardDrive size={14} />, searchPlaceholder: t("imagePicker.searchDrive") },
+    unsplash: { label: t("imagePicker.unsplash"), icon: <ImageIcon size={14} />, searchPlaceholder: t("imagePicker.searchUnsplash") },
+    contentful: { label: t("imagePicker.contentful"), icon: <Cloud size={14} />, searchPlaceholder: t("imagePicker.searchContentful") },
+    sanity: { label: t("imagePicker.sanity"), icon: <Cloud size={14} />, searchPlaceholder: t("imagePicker.searchSanity") },
+    strapi: { label: t("imagePicker.strapi"), icon: <Cloud size={14} />, searchPlaceholder: t("imagePicker.searchStrapi") },
+    upload: { label: t("imagePicker.upload"), icon: <Upload size={14} /> },
+    generate: { label: t("imagePicker.generate"), icon: <Sparkles size={14} /> }
   }
 
   const canSubmit =
@@ -421,18 +423,18 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
         {/* Header row: title + current image + close */}
         <div style={S.header}>
           <div style={S.headerLeft}>
-            <span style={S.title}>Asset Picker</span>
+            <span style={S.title}>{t("imagePicker.title")}</span>
           </div>
-          <button onClick={onClose} style={S.closeBtn} aria-label="Close"><X size={18} /></button>
+          <button onClick={onClose} style={S.closeBtn} aria-label={t("imagePicker.close")}><X size={18} /></button>
         </div>
 
         {/* Tabs */}
         <div style={S.tabs}>
-          {availableTabs.map((t) => (
-            <button key={t} onClick={() => setActiveTab(t)}
-              style={{ ...S.tab, ...(activeTab === t ? S.tabActive : {}) }}>
-              {tabConfig[t].icon}
-              {tabConfig[t].label}
+          {availableTabs.map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{ ...S.tab, ...(activeTab === tab ? S.tabActive : {}) }}>
+              {tabConfig[tab].icon}
+              {tabConfig[tab].label}
             </button>
           ))}
         </div>
@@ -444,7 +446,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
               <Search size={15} style={{ color: "#88a1c6", flexShrink: 0 }} />
               <input
                 type="text"
-                placeholder={tabConfig[activeTab].searchPlaceholder ?? "Search..."}
+                placeholder={tabConfig[activeTab].searchPlaceholder ?? t("imagePicker.search")}
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 style={S.searchInput}
@@ -455,18 +457,18 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                   onClick={() => void fetchDriveImages(searchQuery || undefined, true)}
                   disabled={loading}
                   style={S.refreshBtn}
-                  aria-label="Refresh"
-                  title="Refresh from Drive"
+                  aria-label={t("imagePicker.refreshDrive")}
+                  title={t("imagePicker.refreshDrive")}
                 >
                   <RefreshCw size={14} />
                 </button>
               )}
             </div>
             <div style={S.gridScroll}>
-              {loading && <div style={S.status}>Searching...</div>}
+              {loading && <div style={S.status}>{t("imagePicker.searching")}</div>}
               {!loading && items.length === 0 && (
                 <div style={S.status}>
-                  {activeTab === "unsplash" && !searchQuery ? "Type to search Unsplash" : "No images found"}
+                  {activeTab === "unsplash" && !searchQuery ? t("imagePicker.typeToSearch") : t("imagePicker.noImages")}
                 </div>
               )}
               <div style={S.grid}>
@@ -489,13 +491,13 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                       else void fetchUnsplashImages(searchQuery || undefined, next)
                     }}
                   >
-                    Load more
+                    {t("imagePicker.loadMore")}
                   </button>
                 </div>
               )}
               {loadingMore && (
                 <div style={S.loadMoreRow}>
-                  <span style={{ fontSize: 13, color: "#9cb2d0" }}>Loading...</span>
+                  <span style={{ fontSize: 13, color: "#9cb2d0" }}>{t("imagePicker.loading")}</span>
                 </div>
               )}
             </div>
@@ -509,24 +511,24 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
             <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleFileSelect} style={{ display: "none" }} />
             <button onClick={() => fileInputRef.current?.click()} style={S.uploadBtn} disabled={uploading}>
               <Upload size={18} />
-              {uploading ? "Uploading..." : uploadPreview ? "Choose different file" : "Upload from computer"}
+              {uploading ? t("imagePicker.uploading") : uploadPreview ? t("imagePicker.chooseDifferent") : t("imagePicker.uploadFromComputer")}
             </button>
 
             {uploadPreview && (
               <div style={S.previewRow}>
                 <img src={uploadResult?.url ?? uploadPreview} alt="" style={S.previewImg} />
-                {uploading && <span style={S.previewLabel}>Uploading...</span>}
+                {uploading && <span style={S.previewLabel}>{t("imagePicker.uploading")}</span>}
                 {uploadResult && <span style={{ ...S.previewLabel, color: "#4ade80" }}>Ready</span>}
               </div>
             )}
 
             {/* Divider */}
-            <div style={S.divider}><span style={S.dividerText}>or paste a URL</span></div>
+            <div style={S.divider}><span style={S.dividerText}>{t("imagePicker.orPasteUrl")}</span></div>
 
             {/* URL input */}
             <input
               type="text"
-              placeholder="https://example.com/image.jpg"
+              placeholder={t("imagePicker.urlPlaceholder")}
               value={urlInput}
               onChange={(e) => { setUrlInput(e.target.value); setUploadResult(null); setUploadPreview(null) }}
               style={S.input}
@@ -638,10 +640,10 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
               <div style={S.chatInputRow}>
                 <textarea
                   placeholder={chatMessages.length > 0
-                    ? "Refine: 'Make it warmer'…"
+                    ? t("imagePicker.examplePrompt")
                     : editMode === "edit"
-                      ? "Describe changes…"
-                      : "Describe the image you want…"}
+                      ? t("imagePicker.edit")
+                      : t("imagePicker.examplePrompt")}
                   value={generatePrompt}
                   onChange={(e) => {
                     setGeneratePrompt(e.target.value)
@@ -666,7 +668,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                   disabled={!generatePrompt.trim() || generating}
                   style={{ ...S.generateBtn, ...(!generatePrompt.trim() || generating ? S.disabled : {}) }}>
                   <Sparkles size={15} />
-                  {generating ? "..." : chatMessages.length > 0 ? "Refine" : editMode === "edit" ? "Edit" : "Generate"}
+                  {generating ? "..." : chatMessages.length > 0 ? t("imagePicker.refine") : editMode === "edit" ? t("imagePicker.edit") : t("imagePicker.generate")}
                 </button>
               </div>
             </div>
@@ -687,7 +689,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
         {/* Lightbox */}
         {lightboxUrl && (
           <div style={S.lightboxOverlay} onClick={() => { setLightboxUrl(null); setLightboxShowOriginal(false) }}>
-            <button onClick={() => { setLightboxUrl(null); setLightboxShowOriginal(false) }} style={S.lightboxClose} aria-label="Close preview"><X size={20} /></button>
+            <button onClick={() => { setLightboxUrl(null); setLightboxShowOriginal(false) }} style={S.lightboxClose} aria-label={t("imagePicker.closePreview")}><X size={20} /></button>
             <img src={lightboxShowOriginal && currentUrl ? currentUrl : lightboxUrl} alt="" style={S.lightboxImg} onClick={(e) => e.stopPropagation()} />
             {editMode === "edit" && hasEditableImage && currentUrl && lightboxUrl !== currentUrl && (
               <button

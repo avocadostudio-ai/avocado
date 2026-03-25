@@ -838,6 +838,7 @@ export async function generatePlanWithOpenAI(args: {
   manifestBlockTypes?: string[]
   lightweight?: boolean
   signal?: AbortSignal
+  locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
   const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
@@ -867,6 +868,7 @@ export async function generatePlanWithOpenAI(args: {
     imageUrlForVision: args.contextPack.selected?.imageUrlForVision,
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
+    locale: args.locale,
   })
 
   const includeContracts =

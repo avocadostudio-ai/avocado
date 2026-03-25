@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { ArrowUp, Check, Mic, MousePointerClick, Plus, Square, X } from "lucide-react"
+import { useT } from "@/i18n"
 
 type Props = {
   message: string
@@ -19,6 +20,7 @@ type Props = {
 
 export default function ClaudeStyleChatInput(props: Props) {
   const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange, selectionModeEnabled, onToggleSelectionMode, compact } = props
+  const { t } = useT()
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -143,16 +145,16 @@ export default function ClaudeStyleChatInput(props: Props) {
       onMessageChange(nextLines.filter(Boolean).join("\n"))
 
       if (!uploadedUrl && interpretedResult.status === "rejected") {
-        const detail = interpretedResult.reason instanceof Error ? interpretedResult.reason.message : "Failed to analyze pasted image."
+        const detail = interpretedResult.reason instanceof Error ? interpretedResult.reason.message : t("chatInput.analyzeFailed")
         setImagePasteError(detail)
       } else if (!uploadedUrl && interpretedResult.status === "fulfilled") {
-        setImagePasteError("Image uploaded failed. Try again or use drag-and-drop upload.")
+        setImagePasteError(t("chatInput.uploadFailed"))
       } else if (uploadedUrl && interpretedResult.status === "rejected") {
         // URL is the critical part for image replacement; keep this non-fatal.
         setImagePasteError(null)
       }
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "Failed to analyze pasted image."
+      const detail = error instanceof Error ? error.message : t("chatInput.analyzeFailed")
       setImagePasteError(detail)
     } finally {
       setIsUploadingImage(false)
@@ -163,7 +165,7 @@ export default function ClaudeStyleChatInput(props: Props) {
   async function handleMicClick() {
     setTranscriptionError(null)
     if (!supportsRecording()) {
-      setTranscriptionError("Speech input is not supported in this browser.")
+      setTranscriptionError(t("chatInput.speechUnsupported"))
       return
     }
     if (isLoading || isTranscribing) return
@@ -204,7 +206,7 @@ export default function ClaudeStyleChatInput(props: Props) {
           const transcript = await onTranscribeAudio(blob, mimeType)
           const transcriptText = transcript.trim()
           if (!transcriptText) {
-            setTranscriptionError("No speech detected. Try recording again.")
+            setTranscriptionError(t("chatInput.noSpeechDetected"))
             return
           }
 
@@ -225,7 +227,7 @@ export default function ClaudeStyleChatInput(props: Props) {
       recorder.start()
       setIsRecording(true)
     } catch {
-      setTranscriptionError("Microphone access is blocked. Please allow mic permissions and try again.")
+      setTranscriptionError(t("chatInput.micBlocked"))
     }
   }
 
@@ -257,7 +259,7 @@ export default function ClaudeStyleChatInput(props: Props) {
           e.target.value = ""
           if (!file) return
           if (!file.type.startsWith("image/")) {
-            setImagePasteError("Only image files are supported here.")
+            setImagePasteError(t("chatInput.imageOnly"))
             return
           }
           void handleImagePaste(file, file.type || "image/png")
@@ -266,7 +268,7 @@ export default function ClaudeStyleChatInput(props: Props) {
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}
-          placeholder="Ask anything"
+          placeholder={t("chatInput.placeholder")}
           value={message}
           onChange={(e) => {
             onMessageChange(e.target.value)
@@ -293,10 +295,10 @@ export default function ClaudeStyleChatInput(props: Props) {
           }}
           rows={1}
         />
-        {isRecording ? <div className="composer-input-note">Listening... click ✓ to send or X to cancel.</div> : null}
-        {isTranscribing ? <div className="composer-input-note">Transcribing...</div> : null}
-        {isUploadingImage ? <div className="composer-input-note">Uploading pasted image...</div> : null}
-        {isAnalyzingImage ? <div className="composer-input-note">Analyzing pasted image...</div> : null}
+        {isRecording ? <div className="composer-input-note">{t("chatInput.listening")}</div> : null}
+        {isTranscribing ? <div className="composer-input-note">{t("chatInput.transcribing")}</div> : null}
+        {isUploadingImage ? <div className="composer-input-note">{t("chatInput.uploadingImage")}</div> : null}
+        {isAnalyzingImage ? <div className="composer-input-note">{t("chatInput.analyzingImage")}</div> : null}
         {transcriptionError ? <div className="composer-input-note composer-input-note-error">{transcriptionError}</div> : null}
         {imagePasteError ? <div className="composer-input-note composer-input-note-error">{imagePasteError}</div> : null}
       </div>
@@ -308,7 +310,7 @@ export default function ClaudeStyleChatInput(props: Props) {
               className="composer-ghost-btn composer-plus-btn"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || isUploadingImage || isAnalyzingImage}
-              aria-label="Add image"
+              aria-label={t("chatInput.addImage")}
             >
               <Plus size={16} />
             </button>
@@ -318,7 +320,7 @@ export default function ClaudeStyleChatInput(props: Props) {
                 className={`composer-ghost-btn composer-selector-btn${selectionModeEnabled ? " is-active" : ""}`}
                 onClick={onToggleSelectionMode}
                 disabled={isLoading}
-                aria-label={selectionModeEnabled ? "Exit selector mode" : "Select an element"}
+                aria-label={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
                 aria-pressed={selectionModeEnabled}
               >
                 <MousePointerClick size={16} />
@@ -327,13 +329,13 @@ export default function ClaudeStyleChatInput(props: Props) {
           </>
         )}
         <div className="composer-actions-spacer" />
-        <div className="composer-actions-right" role="group" aria-label="Voice and send actions">
+        <div className="composer-actions-right" role="group" aria-label={t("chatInput.voiceActions")}>
           {!compact && isRecording ? (
             <>
-              <button type="button" className="composer-ghost-btn" onClick={cancelRecording} disabled={isLoading || isTranscribing} aria-label="Cancel voice input">
+              <button type="button" className="composer-ghost-btn" onClick={cancelRecording} disabled={isLoading || isTranscribing} aria-label={t("chatInput.cancelVoice")}>
                 <X size={16} />
               </button>
-              <button type="button" className="composer-send-btn" onClick={confirmRecording} disabled={isLoading || isTranscribing} aria-label="Send recorded message">
+              <button type="button" className="composer-send-btn" onClick={confirmRecording} disabled={isLoading || isTranscribing} aria-label={t("chatInput.sendRecorded")}>
                 <Check size={16} />
               </button>
             </>
@@ -345,7 +347,7 @@ export default function ClaudeStyleChatInput(props: Props) {
                   className="composer-ghost-btn"
                   onClick={() => void handleMicClick()}
                   disabled={isLoading || isTranscribing}
-                  aria-label="Start voice input"
+                  aria-label={t("chatInput.startVoice")}
                 >
                   <Mic size={16} />
                 </button>
@@ -355,7 +357,7 @@ export default function ClaudeStyleChatInput(props: Props) {
                 className={`composer-send-btn${isLoading && onCancel ? " is-stop" : ""}`}
                 onClick={isLoading && onCancel ? onCancel : () => onSubmit()}
                 disabled={!(isLoading && onCancel) && !canSubmit}
-                aria-label={isLoading && onCancel ? "Stop generation" : "Send message"}
+                aria-label={isLoading && onCancel ? t("chatInput.stopGeneration") : t("chatInput.sendMessage")}
               >
                 <span className="icon-send">
                   <ArrowUp size={16} strokeWidth={2.8} />

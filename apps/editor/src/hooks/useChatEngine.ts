@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useT } from "../i18n"
 import {
   type BlockManifest,
   type Operation
@@ -23,6 +24,7 @@ import {
   splitAiInsightChanges
 } from "../lib/editor-utils"
 import { buildSiteContextPayload, manifestUnavailableChanges, withIntegrationContext } from "../lib/integration-context"
+import { withAccessTokenQuery } from "../lib/access-auth"
 import { parseString } from "../lib/parse-utils"
 import { usePlanApproval } from "./chat-engine/usePlanApproval"
 import { useStructuralOps } from "./chat-engine/useStructuralOps"
@@ -92,6 +94,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     onApplied
   } = config
 
+  const { t, locale } = useT()
   const activeSiteOrigin = resolveSiteOrigin(activeSiteConfig)
   const chatLogStorageKey = `editor-chat-log-v1:${session}:${siteId}`
 
@@ -114,16 +117,16 @@ export function useChatEngine(config: ChatEngineConfig) {
 
     if (pageBlocks && pageBlocks.length > 0) {
       const onPage = new Set(pageBlocks.map(b => b.type))
-      if (onPage.has("Hero")) suggestions.push("Rewrite the hero headline")
-      if (!onPage.has("Testimonials") && supported.has("Testimonials")) suggestions.push("Add a testimonials section")
-      if (!onPage.has("FAQAccordion") && supported.has("FAQAccordion")) suggestions.push("Add an FAQ section")
-      if (!onPage.has("CTA") && supported.has("CTA")) suggestions.push("Add a call-to-action")
+      if (onPage.has("Hero")) suggestions.push(t("suggestion.rewriteHero"))
+      if (!onPage.has("Testimonials") && supported.has("Testimonials")) suggestions.push(t("suggestion.addTestimonials"))
+      if (!onPage.has("FAQAccordion") && supported.has("FAQAccordion")) suggestions.push(t("suggestion.addFaq"))
+      if (!onPage.has("CTA") && supported.has("CTA")) suggestions.push(t("suggestion.addCta"))
     } else {
-      suggestions.push("Change the headline and subheading")
-      if (supported.has("Testimonials")) suggestions.push("Add a testimonials section")
-      if (supported.has("FAQAccordion")) suggestions.push("Add an FAQ section")
-      if (supported.has("CTA")) suggestions.push("Add a call-to-action")
-      if (suggestions.length < 2) suggestions.push("Add a new section")
+      suggestions.push(t("suggestion.changeHeadline"))
+      if (supported.has("Testimonials")) suggestions.push(t("suggestion.addTestimonials"))
+      if (supported.has("FAQAccordion")) suggestions.push(t("suggestion.addFaq"))
+      if (supported.has("CTA")) suggestions.push(t("suggestion.addCta"))
+      if (suggestions.length < 2) suggestions.push(t("suggestion.addSection"))
     }
 
     if (cfg.tone) {
@@ -133,15 +136,15 @@ export function useChatEngine(config: ChatEngineConfig) {
     if (cfg.pageTemplates?.length) {
       suggestions.push(`Create a new ${cfg.pageTemplates[0].name} page`)
     } else if (!slugs.includes("/about")) {
-      suggestions.push("Create a new /about page")
+      suggestions.push(t("suggestion.createAbout"))
     }
 
     return suggestions.slice(0, 4)
   }
 
   const welcomeText = activeSiteConfig.name
-    ? `Welcome to ${activeSiteConfig.name}! Tell me what you'd like to change \u2014 I can add sections, rewrite copy, create new pages, and more.`
-    : "Let\u2019s shape your site into something people remember. I can add sections, rewrite copy, rearrange blocks, create new pages, and more. Click anything in the preview or tell me the result you want."
+    ? t("welcome.greeting", { name: activeSiteConfig.name })
+    : t("welcome.greetingFallback")
 
   const welcomeEntry: ChatEntry = {
     id: "welcome",
@@ -392,6 +395,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         session,
         siteId,
         ...contextPayload,
+        locale,
         slug: slugRef.current,
         message: finalMessage,
         modelKey,
@@ -415,6 +419,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       session,
       siteId,
       ...contextPayload,
+      locale,
       slug: slugRef.current,
       message: finalMessage,
       modelKey,
@@ -426,7 +431,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     }, componentManifest, siteCapabilities)
 
     // Show immediate feedback before any SSE events arrive
-    setStreamStatus("Thinking...")
+    setStreamStatus(t("stream.thinking"))
 
     let streamId: string
     try {
@@ -461,7 +466,7 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       persistStreamContext()
 
-      const source = new EventSource(`${orchestrator}/chat/stream?streamId=${streamId}`)
+      const source = new EventSource(withAccessTokenQuery(`${orchestrator}/chat/stream?streamId=${streamId}`))
       let settled = false
       let gotAnyEvent = false
       let pendingFocusBlockId: string | null = null
@@ -1105,7 +1110,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           if (payload.result) {
             applyChatResult(payload.result)
           } else {
-            pushAssistantFromResult({ status: "error", summary: "Streaming request failed.", changes: [] })
+            pushAssistantFromResult({ status: "error", summary: t("streamError.failed"), changes: [] })
           }
           source.close()
           resolve(true)
@@ -1123,7 +1128,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           source.close()
           setStreamStatus("Reconnecting...")
           const reconnectSource = new EventSource(
-            `${orchestrator}/chat/stream?streamId=${streamId}&afterSeq=${lastSeq}`
+            withAccessTokenQuery(`${orchestrator}/chat/stream?streamId=${streamId}&afterSeq=${lastSeq}`)
           )
           reconnectSource.onmessage = source.onmessage
           reconnectSource.onerror = () => {
@@ -1165,7 +1170,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           return
         }
         clearStreamContext()
-        setStreamStatus("Streaming failed, retrying with standard request...")
+        setStreamStatus(t("streamError.retrying"))
         setStreamTokenCount(0)
         setStreamingText(null)
         setStreamingChanges([])
@@ -1184,7 +1189,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   async function cancelChat() {
     const currentStreamId = activeStreamIdRef.current
     if (!currentStreamId) return
-    setStreamStatus("Canceling...")
+    setStreamStatus(t("streamError.canceling"))
     try {
       const res = await fetch(`${orchestrator}/chat/cancel`, {
         method: "POST",
@@ -1284,7 +1289,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     setChatLog((prev) => [...prev, { id: createId(), role: "user", text: "Continue to next step." }])
     setIsLoading(true)
     try {
-      await submitChatHttp("Continue to next step", {
+      await submitChatHttp(t("ops.continueNext"), {
         executionMode: "continue_chain",
         continuationChainId: chainId
       })
