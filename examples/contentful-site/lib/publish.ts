@@ -1,5 +1,6 @@
 import type { OnPublishFn, InlineAsset } from "@ai-site-editor/site-sdk/routes"
-import { getAllBlockMeta, getImageFields } from "@ai-site-editor/shared"
+import { isSafeImageUrl } from "@ai-site-editor/site-sdk/routes"
+import { imageFields, listFieldNames } from "./manifest"
 
 export interface ContentfulPublishOptions {
   spaceId: string
@@ -49,18 +50,6 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
 
   type CfEnv = Awaited<ReturnType<typeof loadEnvironment>>
   type CfEntry = Awaited<ReturnType<CfEnv["getEntries"]>>["items"][0]
-
-  /** Reject URLs pointing at private/loopback addresses. */
-  function isSafeImageUrl(raw: string): boolean {
-    let parsed: URL
-    try { parsed = new URL(raw) } catch { return false }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
-    const h = parsed.hostname
-    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "0.0.0.0") return false
-    if (h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.")) return false
-    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
-    return true
-  }
 
   // Upload an image URL as a Contentful Asset, return the asset ID (or null on failure)
   async function ensureAsset(
@@ -187,14 +176,13 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     resolveAsset: (url: string, alt: string) => Promise<string | null>,
     existingFields?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const meta = getAllBlockMeta()[blockType]
-    const imageFields = getImageFields(blockType)
+    const imageFields = imageFields.get(blockType) ?? new Set<string>()
+    const listFieldsForType = listFieldNames.get(blockType) ?? new Set<string>()
     const fields: Record<string, unknown> = {}
 
     // Scalar fields
     for (const [key, value] of Object.entries(props)) {
       if (key === "headingLevel") continue
-      if (!meta?.fields[key] && !meta?.listFields?.[key]) continue
 
       if (imageFields.has(key) && typeof value === "string" && value) {
         // Convert image URL to Asset reference
@@ -210,7 +198,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
             fields[key] = assetLink(prevAssetId)
           }
         }
-      } else if (meta?.listFields?.[key]) {
+      } else if (listFieldsForType.has(key)) {
         // Handled separately for reference lists (card entries use deterministic IDs)
         if (!isReferenceList(blockType, key)) {
           // JSON field for non-reference lists
@@ -255,10 +243,10 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
         const blockFields = await buildBlockFields(env, block.type, block.props, cachedEnsureAsset, existingFields)
 
         // Handle reference lists (CardGrid.cards → blockCard entries with deterministic IDs)
-        const meta = getAllBlockMeta()[block.type]
+        const blockListFields = listFieldNames.get(block.type) ?? new Set<string>()
         for (const [key, value] of Object.entries(block.props)) {
           const refTarget = isReferenceList(block.type, key)
-          if (refTarget && Array.isArray(value) && meta?.listFields?.[key]) {
+          if (refTarget && Array.isArray(value) && blockListFields.has(key)) {
             const items = value as Record<string, unknown>[]
             const cardRefs = await Promise.all(
               items.map(async (item, i) => {

@@ -1,4 +1,11 @@
 /**
+ * OPTIONAL STARTER KIT: Generate Strapi schema files from the default block set.
+ *
+ * Skip this if you have an existing Strapi schema — instead, write your own
+ * fetch adapter (lib/strapi.fetch.ts) and block manifest (getManifest in the
+ * editor API route). See villa-puravida-web for a custom-blocks example.
+ *
+ * Original description:
  * Setup script that generates Strapi Components + Dynamic Zone schema files.
  *
  * Follows Strapi best practices:
