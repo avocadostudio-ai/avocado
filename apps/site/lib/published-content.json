@@ -1,70 +1,138 @@
 [
   {
-    "id": "home-1",
+    "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-25T10:36:08.535Z",
-    "meta": {
-      "title": "Home",
-      "description": "A Contentful-powered site"
-    },
+    "updatedAt": "2026-03-25T10:54:20.887Z",
     "blocks": [
       {
-        "id": "block_hero-1",
+        "id": "block-block-b_hero_home",
         "type": "Hero",
         "props": {
-          "heading": "Welcome to the Contentful Site",
-          "subheading": "This page is served from Contentful via the AI Site Editor block system.",
-          "ctaText": "Check our plans",
-          "ctaHref": "/pricing-plans",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774434964053_xj5du4.jpg",
-          "imageAlt": "change text to \"do something amazing\", use nice neon colors",
+          "heading": "Welcome to Sanity Site",
+          "subheading": "Build and manage your content with ease.",
+          "ctaText": "Get started",
+          "ctaHref": "/new-page",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774436058515_x27z9a.jpg",
+          "imageAlt": "add sanity logo into the image top left corner",
           "imagePosition": "right"
         }
       },
       {
-        "id": "block_b_richtext_1774156395336",
-        "type": "RichText",
+        "id": "block-block-b_features_home",
+        "type": "FeatureGrid",
         "props": {
-          "title": "Powered by Contentful!",
-          "body": "This site is built with Contentful, a headless CMS that separates content management from presentation. That means you can manage your content once and deliver it anywhere—web, mobile, or any channel you choose.\n\nWith Contentful's flexible content model, you define your own content structure without rigid page templates. APIs let your developers fetch and display content exactly how they need it, while content editors work in an intuitive interface.\n\nContentful's powerful capabilities extend beyond simple publishing. You gain real-time collaboration features, version control, and workflow management that ensure your team stays synchronized. Advanced scheduling tools let you plan content releases months in advance, while webhooks and real-time updates keep your digital experiences fresh and responsive to your audience's needs.\n\nThe beauty of a headless approach lies in its flexibility and scalability. Whether you're managing a single website, multiple microsites, or delivering content to IoT devices and voice assistants, Contentful adapts to your architecture. You're never locked into a particular presentation layer, giving you complete freedom to innovate and evolve your digital strategy without constraints.\n\n**Ready to experience the power of structured content?** Start exploring Contentful today and transform how you manage your digital experiences."
-        }
-      },
-      {
-        "id": "block_b_cardgrid_1774161229066_910",
-        "type": "CardGrid",
-        "props": {
-          "title": "Explore more",
-          "cards": [
+          "features": [
             {
-              "title": "Fast setup",
-              "description": "Create and ship updates quickly.",
-              "ctaText": "Get started",
-              "ctaHref": "/"
+              "description": "Launch quickly with guided defaults.",
+              "title": "Fast setup"
             },
             {
-              "title": "Safe updates",
-              "description": "Schema-validated edits reduce breakage.",
-              "ctaText": "See how",
-              "ctaHref": "/pricing"
+              "description": "Structured operations keep content valid.",
+              "title": "Safe edits"
             },
             {
-              "title": "Team workflow",
-              "description": "Collaborate with clear, reviewable changes.",
-              "ctaText": "Read guide",
-              "ctaHref": "/"
+              "description": "Preview changes immediately.",
+              "title": "Live updates"
             }
-          ]
+          ],
+          "title": "Key features"
         }
       },
       {
-        "id": "block_b_cta_1774156320864",
+        "id": "block-block-b_cta_home",
         "type": "CTA",
         "props": {
-          "title": "Ready to get started?",
-          "description": "Apply your next change in seconds.",
-          "ctaText": "Learn More",
-          "ctaHref": "/about-us"
+          "ctaHref": "/new-page",
+          "ctaText": "Get started",
+          "description": "Explore our platform today and transform your content workflow.",
+          "title": "Ready to get started?"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_new_page",
+    "slug": "/new-page",
+    "title": "New Page",
+    "updatedAt": "2026-03-24T21:26:49Z",
+    "blocks": [
+      {
+        "id": "block-block-b_hero_new-page",
+        "type": "Hero",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "heading": "New Page",
+          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
+          "imagePosition": "right",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/868eb03cbb52e22dbdcbb177dc8be3a8dff76fcf-1080x720.jpg?auto=format",
+          "subheading": "Use this page to introduce New Page."
+        }
+      },
+      {
+        "id": "block-block-b_features_new-page",
+        "type": "FeatureGrid",
+        "props": {
+          "features": [
+            {
+              "description": "Launch quickly with guided defaults.",
+              "title": "Fast setup"
+            },
+            {
+              "description": "Structured operations keep content valid.",
+              "title": "Safe edits"
+            },
+            {
+              "description": "Preview changes immediately.",
+              "title": "Live updates"
+            }
+          ],
+          "title": "Key features"
+        }
+      },
+      {
+        "id": "block-block-b_cta_new-page",
+        "type": "CTA",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "description": "Continue to the next step.",
+          "title": "Ready to explore New Page?"
+        }
+      },
+      {
+        "id": "block-block-b_hero_1774167607904",
+        "type": "Hero",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get Started",
+          "heading": "Build with confidence",
+          "imageAlt": "Abstract generated illustration",
+          "imagePosition": "right",
+          "subheading": "Make changes safely with instant preview.",
+          "imageUrl": "/hero-generated.svg"
+        }
+      }
+    ]
+  },
+  {
+    "id": "p_test",
+    "slug": "/test",
+    "title": "Test",
+    "updatedAt": "2026-03-24T21:26:19Z",
+    "blocks": [
+      {
+        "id": "block-block-b_hero_test",
+        "type": "Hero",
+        "props": {
+          "ctaHref": "/",
+          "ctaText": "Get started",
+          "heading": "Test",
+          "imageAlt": "photo-1724754608848-cdd8d5cd8538",
+          "imagePosition": "right",
+          "imageUrl": "https://cdn.sanity.io/images/mfbrij78/production/868eb03cbb52e22dbdcbb177dc8be3a8dff76fcf-1080x720.jpg?auto=format",
+          "subheading": "Use this page to introduce Test."
         }
       }
     ]
