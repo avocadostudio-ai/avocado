@@ -138,7 +138,11 @@ export function ImmersiveWidget({
       session: config.session,
       siteId: config.siteId,
       ops: [op],
-    }).then(() => {
+    }).then((result) => {
+      if (!result.ok) {
+        console.error("[immersive] /ops failed:", result.error)
+        return
+      }
       setTimeout(() => refresh(), 100)
     })
   }, [config, refresh])
@@ -158,7 +162,9 @@ export function ImmersiveWidget({
     }, [applyOp]),
     onBlockAddRequested: useCallback((p: { slug: string; afterBlockId?: string; beforeBlockId?: string }) => {
       setActiveField(null)
-      const addBtn = document.querySelector<HTMLElement>(".editor-selected-add-bottom, .editor-selected-add-top")
+      // Top + has beforeBlockId set, bottom + has afterBlockId set
+      const isTop = !!p.beforeBlockId && !p.afterBlockId
+      const addBtn = document.querySelector<HTMLElement>(isTop ? ".editor-selected-add-top" : ".editor-selected-add-bottom")
       if (!addBtn) return
       setBlockPickerContext({ slug: p.slug, afterBlockId: p.afterBlockId, beforeBlockId: p.beforeBlockId, anchorElement: addBtn })
     }, []),
