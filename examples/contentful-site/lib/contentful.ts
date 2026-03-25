@@ -33,14 +33,14 @@ function entryToBlockInstance(entry: Entry, includes?: { Asset?: Asset[] }): Blo
   if (!contentTypeId?.startsWith("block")) return null
 
   const blockType = contentTypeId.replace(/^block/, "")
-  const imageFields = imageFields.get(blockType) ?? new Set<string>()
+  const imgFields = imageFields.get(blockType) ?? new Set<string>()
   const listImgFieldsForType = listImageFields.get(blockType)
   const props: Record<string, unknown> = {}
 
   const fields = entry.fields as Record<string, unknown>
 
   for (const [key, value] of Object.entries(fields)) {
-    if (imageFields.has(key)) {
+    if (imgFields.has(key)) {
       // Asset link → resolve to URL
       const linked = value as { sys?: { id?: string } } | undefined
       if (linked?.sys?.id && includes?.Asset) {

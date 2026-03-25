@@ -79,8 +79,8 @@ export function createSanityPublishHandler(): OnPublishFn {
       const blockRefs = await Promise.all(page.blocks.map(async (block) => {
         const blockId = `block-${block.id}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 128)
         const blockType = toSanityName(block.type)
-        const imageFields = imageFields.get(block.type) ?? new Set<string>()
-        const listImageFields = listImageFields.get(block.type) ?? new Map<string, Set<string>>()
+        const imgFields = imageFields.get(block.type) ?? new Set<string>()
+        const listImgFields = listImageFields.get(block.type) ?? new Map<string, Set<string>>()
         const refLists = REFERENCE_LISTS[block.type]
         const existingDoc = existingDocs.get(blockId)
 
@@ -89,12 +89,12 @@ export function createSanityPublishHandler(): OnPublishFn {
         for (const [key, value] of Object.entries(block.props)) {
           if (key === "headingLevel") continue
 
-          if (imageFields.has(key) && typeof value === "string" && value) {
+          if (imgFields.has(key) && typeof value === "string" && value) {
             const imageRef = await imageResolver.resolve(value)
             doc[key] = imageRef ?? existingDoc?.[key] ?? undefined
 
           } else if (refLists?.has(key) && Array.isArray(value)) {
-            const itemImageKeys = listImageFields.get(key) ?? new Set<string>()
+            const itemImageKeys = listImgFields.get(key) ?? new Set<string>()
             const cardRefs = await Promise.all(
               (value as Record<string, unknown>[]).map(async (item, idx) => {
                 const cardId = `card-${blockId}-${idx}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 128)

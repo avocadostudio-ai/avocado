@@ -82,14 +82,14 @@ export function createStrapiPublishHandler(): OnPublishFn {
         // Build Dynamic Zone array — each block becomes a component
         const dzBlocks = await Promise.all(page.blocks.map(async (block, blockIndex) => {
           const componentName = `blocks.${block.type.toLowerCase()}`
-          const imageFields = imageFields.get(block.type) ?? new Set<string>()
+          const imgFields = imageFields.get(block.type) ?? new Set<string>()
           const data: Record<string, unknown> = {
             __component: componentName,
           }
 
           for (const [key, value] of Object.entries(block.props)) {
             if (key === "headingLevel") continue
-            if (imageFields.has(key) && typeof value === "string" && value) {
+            if (imgFields.has(key) && typeof value === "string" && value) {
               const mediaId = await resolveMediaId(value)
               if (mediaId) {
                 data[key] = mediaId
