@@ -91,6 +91,7 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
     const siteOrigin = typeof body.siteOrigin === "string" ? body.siteOrigin.trim().replace(/\/+$/, "") : ""
 
     if (siteOrigin && !isSafeOrigin(siteOrigin)) {
+      request.log.warn({ siteOrigin, session, siteId: body.siteId }, "publish: rejected siteOrigin")
       return reply.code(400).send({ error: "siteOrigin is not an allowed URL" })
     }
 
