@@ -2416,7 +2416,6 @@ export async function runChatPipeline(
               options?.onPlannedOp?.({ op, index })
             }
           : undefined,
-        manifestBlockTypes: componentsManifest ? componentsManifest.blocks.map(c => c.type) : undefined,
         componentsManifest,
         lightweight: routerComplexity === "simple" || likelySimple,
         signal: combinedSignal
@@ -2859,7 +2858,6 @@ export async function runChatPipeline(
               }
             }
           : undefined,
-        manifestBlockTypes: componentsManifest ? componentsManifest.blocks.map(c => c.type) : undefined,
         componentsManifest,
         lightweight: shouldPreferFastModelForMessage(plannerMessage),
         signal: options?.signal

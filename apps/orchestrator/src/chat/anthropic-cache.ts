@@ -29,3 +29,7 @@ export function anthropicToolWithCache(tool: Anthropic.Messages.Tool): Anthropic
   if (!cacheControl) return tool
   return { ...tool, cache_control: cacheControl }
 }
+
+export const ANTHROPIC_FINE_GRAINED_STREAM_HEADERS = {
+  "anthropic-beta": "fine-grained-tool-streaming-2025-05-14"
+}

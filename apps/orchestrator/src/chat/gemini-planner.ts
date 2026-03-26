@@ -195,14 +195,13 @@ export async function generatePlanWithGemini(args: {
   siteContextBlock?: string | null
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
-  manifestBlockTypes?: string[]
   componentsManifest?: BlockManifest
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const ai = await getGeminiClient()
-  const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
+  const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
@@ -258,8 +257,7 @@ export async function generatePlanWithGemini(args: {
         pageWideTranslation,
         legacyIncludeContracts: includeContracts,
         forceFullContracts: args.forceFullSchemaContracts,
-        componentsManifest: args.componentsManifest,
-        effectiveBlockTypes
+        componentsManifest: args.componentsManifest
       })
 
   const userPayload = {

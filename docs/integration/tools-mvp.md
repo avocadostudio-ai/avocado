@@ -96,22 +96,7 @@ The planner loop supports:
 
 ## Adopter Onboarding
 
-### Option A: Runtime registration endpoint
-
-- `GET /tools` to view enabled tools
-- `POST /tools/register` to register a remote tool
-
-Payload:
-
-```json
-{
-  "manifest": { "name": "pim.getProduct", "description": "...", "inputSchema": {"type":"object"}, "outputSchema": {"type":"object"}, "capability": "read", "timeoutMs": 3000, "retryPolicy": {"maxAttempts": 2}, "idempotent": true },
-  "endpoint": "https://vendor.example.com/site-editor/tools/pim/getProduct",
-  "staticHeaders": { "x-api-key": "***" }
-}
-```
-
-### Option B: Bootstrap config file
+### Bootstrap config file
 
 Set `ORCHESTRATOR_TOOL_MANIFEST_PATH` to a JSON file:
 

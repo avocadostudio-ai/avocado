@@ -243,14 +243,14 @@ function buildContractsForMode(args: {
   mode: PlannerContractMode
   targetBlockTypes: string[]
   includePageMetaContract: boolean
-  componentsManifest?: BlockManifest
-  effectiveBlockTypes?: string[]
+  allContracts: ReturnType<typeof blockContractsSummary>
+  knownBlockTypes: string[]
 }): PlannerSchemaContextPayload {
-  const allContracts = blockContractsSummary(args.componentsManifest)
   const payload: PlannerSchemaContextPayload = {
-    knownBlockTypes: args.effectiveBlockTypes ?? Object.keys(blockSchemas),
+    knownBlockTypes: args.knownBlockTypes,
     editPlanShape: EDIT_PLAN_SHAPE_HINT
   }
+  const allContracts = args.allContracts
 
   if (args.mode === "full") {
     payload.blockContracts = allContracts
@@ -279,12 +279,14 @@ export function buildPlannerSchemaContext(args: {
   const strictJsonEnabled = isStrictJsonResponseEnabled()
   const targetBlockTypes = pickTargetBlockTypes({ message: args.message, contextPack: args.contextPack })
   const includePageMetaContract = /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/i.test(args.message) || /\d{2,3}\s*char/i.test(args.message)
-  const knownTypes = args.effectiveBlockTypes ?? Object.keys(blockSchemas)
+  const knownTypes = args.effectiveBlockTypes
+    ?? (args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : Object.keys(blockSchemas))
+  const allContracts = blockContractsSummary(args.componentsManifest)
 
   if (!isAdaptiveSchemaContextEnabled()) {
     const payload: PlannerSchemaContextPayload = args.legacyIncludeContracts
       ? {
-          blockContracts: blockContractsSummary(args.componentsManifest),
+          blockContracts: allContracts,
           pageMetaContract: pageMetaContractSummary(),
           knownBlockTypes: knownTypes,
           editPlanShape: EDIT_PLAN_SHAPE_HINT
@@ -328,13 +330,13 @@ export function buildPlannerSchemaContext(args: {
     mode: selectedMode,
     targetBlockTypes,
     includePageMetaContract,
-    componentsManifest: args.componentsManifest,
-    effectiveBlockTypes: args.effectiveBlockTypes
+    allContracts,
+    knownBlockTypes: knownTypes
   })
   let selectedBytes = bytesForPayload(selectedPayload)
 
   for (const mode of fallbackOrder) {
-    const payload = buildContractsForMode({ mode, targetBlockTypes, includePageMetaContract, componentsManifest: args.componentsManifest, effectiveBlockTypes: args.effectiveBlockTypes })
+    const payload = buildContractsForMode({ mode, targetBlockTypes, includePageMetaContract, allContracts, knownBlockTypes: knownTypes })
     const bytes = bytesForPayload(payload)
     selectedMode = mode
     selectedPayload = payload
@@ -843,14 +845,13 @@ export async function generatePlanWithOpenAI(args: {
   client?: PlannerOpenAIClient
   siteContextBlock?: string | null
   forceFullSchemaContracts?: boolean
-  manifestBlockTypes?: string[]
   componentsManifest?: BlockManifest
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
-  const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
+  const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
@@ -909,8 +910,7 @@ export async function generatePlanWithOpenAI(args: {
         pageWideTranslation,
         legacyIncludeContracts: includeContracts,
         forceFullContracts: args.forceFullSchemaContracts,
-        componentsManifest: args.componentsManifest,
-        effectiveBlockTypes
+        componentsManifest: args.componentsManifest
       })
 
   const user = {

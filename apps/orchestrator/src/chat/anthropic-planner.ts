@@ -36,7 +36,7 @@ import {
 } from "./planner.js"
 import { editPlanJsonSchema, intentJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
-import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthropic-cache.js"
+import { anthropicSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "./anthropic-cache.js"
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
 
@@ -231,14 +231,13 @@ export async function generatePlanWithAnthropic(args: {
   siteContextBlock?: string | null
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
-  manifestBlockTypes?: string[]
   componentsManifest?: BlockManifest
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
-  const effectiveBlockTypes = args.manifestBlockTypes ?? allowedBlockTypes
+  const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
@@ -297,8 +296,7 @@ export async function generatePlanWithAnthropic(args: {
         pageWideTranslation,
         legacyIncludeContracts: includeContracts,
         forceFullContracts: args.forceFullSchemaContracts,
-        componentsManifest: args.componentsManifest,
-        effectiveBlockTypes
+        componentsManifest: args.componentsManifest
       })
 
   const user = {
@@ -333,9 +331,6 @@ export async function generatePlanWithAnthropic(args: {
     description: "Submit the structured EditPlan JSON.",
     input_schema: editPlanJsonSchema,
     eager_input_streaming: true
-  }
-  const anthropicFineGrainedStreamHeaders = {
-    "anthropic-beta": "fine-grained-tool-streaming-2025-05-14"
   }
   const runtimeToolNameByAlias = new Map<string, string>()
   const usedAliases = new Set<string>(["submit_edit_plan"])
@@ -414,7 +409,7 @@ export async function generatePlanWithAnthropic(args: {
           tool_choice: { type: "auto" },
           messages: loopMessages
         }, {
-          headers: anthropicFineGrainedStreamHeaders
+          headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS
         })
         const toolNameByIndex = new Map<number, string>()
         const submitToolJsonByIndex = new Map<number, string>()
@@ -686,7 +681,7 @@ export async function generatePlanWithAnthropic(args: {
           { role: "user", content: userContent }
         ],
       }, {
-        headers: anthropicFineGrainedStreamHeaders
+        headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS
       })
       // Wrap stream iteration — SDK may throw on message_stop if tool JSON is malformed
       let streamLoopError: unknown
