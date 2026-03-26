@@ -40,11 +40,15 @@ export function normalizeSession(value: unknown) {
   return cleaned || DEFAULT_SESSION
 }
 
+/** Returns true for the default JSON-file site (avocado-stories). */
+export function isLegacySiteId(siteId: string) {
+  return siteId === DEFAULT_SITE_ID || siteId === "default"
+}
+
 export function scopedSessionKey(session: unknown, siteId: unknown) {
   const normalizedSession = normalizeSession(session)
   const normalizedSiteId = normalizeSiteId(siteId)
-  if (normalizedSiteId === "avocado-stories" || normalizedSiteId === "default") {
-    // Keep Avocado Stories on legacy session keys so existing content is preserved.
+  if (isLegacySiteId(normalizedSiteId)) {
     return normalizedSession
   }
   return `${normalizedSiteId}::${normalizedSession}`

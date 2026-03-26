@@ -12,7 +12,8 @@ import {
   versions,
   ensureHeroImageProps,
   persistStateNow,
-  getSessionPages
+  getSessionPages,
+  isLegacySiteId
 } from "../state/session-state.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
 
@@ -185,7 +186,7 @@ export async function listRestoreSnapshots(limit = 30, siteId?: string): Promise
   const gitArgs = ["log", "--max-count", String(cappedLimit * 4), "--date=iso-strict", "--pretty=format:%H|%ad|%s"]
   if (siteId) {
     const normalised = siteId.trim().toLowerCase()
-    if (normalised === "avocado-stories" || normalised === "default") {
+    if (isLegacySiteId(normalised)) {
       // Legacy commits use bare session key: "publish: session dev ..."
       // The trailing space ensures we don't match scoped keys like "siteId::dev"
       gitArgs.push("--grep=publish: session dev ")
