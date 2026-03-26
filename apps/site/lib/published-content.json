@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-26T07:55:43.529Z",
+    "updatedAt": "2026-03-26T10:24:23.618Z",
     "meta": {
       "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
       "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -23,14 +23,44 @@
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
         "props": {
-          "heading": "Nourish Your Body with Science-Backed Nutrition.",
+          "heading": "Eat Smarter. Feel Better. Live Greener.",
           "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
-          "ctaText": "Get Started Free",
-          "ctaHref": "/nutrition-facts",
+          "ctaText": "Explore Recipes",
+          "ctaHref": "/recipes",
           "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxBdm9jYWRvfGVufDF8MHx8fDE3NzM3NTIyMjl8MA&ixlib=rb-4.1.0&q=80&w=1080",
           "imageAlt": "sliced green and yellow fruit",
           "imagePosition": "right",
           "secondaryCtaText": "Read Research Studies"
+        }
+      },
+      {
+        "id": "b_cardgrid_1774520663617_434",
+        "type": "CardGrid",
+        "props": {
+          "title": "Featured Recipes",
+          "cards": [
+            {
+              "title": "Creamy Avocado Toast",
+              "description": "A quick, nutrient-packed breakfast with smashed avocado, lemon zest, and chili flakes on sourdough.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1616902666559-af398792d890?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwdG9hc3QlMjBicmVha2Zhc3R8ZW58MXwwfHx8MTc3NDUyMDY0OXww&ixlib=rb-4.1.0&q=80&w=1080"
+            },
+            {
+              "title": "Avocado & Mango Salsa",
+              "description": "A vibrant, tropical salsa bursting with fresh mango, cilantro, and creamy avocado — perfect for tacos or chips.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1579639482794-abf71bcd3960?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxtYW5nbyUyMGF2b2NhZG8lMjBzYWxzYXxlbnwxfDB8fHwxNzc0NTIwNjUwfDA&ixlib=rb-4.1.0&q=80&w=1080"
+            },
+            {
+              "title": "Green Goddess Smoothie",
+              "description": "Blend avocado, spinach, banana, and almond milk for a silky, energizing smoothie that keeps you full for hours.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1623002071634-54590669fe3d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmVlbiUyMHNtb290aGllJTIwaGVhbHRoeXxlbnwxfDB8fHwxNzc0NTIwNjUwfDA&ixlib=rb-4.1.0&q=80&w=1080"
+            }
+          ]
         }
       },
       {
