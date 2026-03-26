@@ -11,7 +11,7 @@ Start here if you want to add AI-powered editing to your website.
 | [Adoption Example](integration/nextjs-mvp-adoption-example.md) | Full code example for `app/[[...slug]]/page.tsx` |
 | [Editor Quickstart](integration/editor-quickstart.md) | Draft mode URLs, behavior checks, self-check commands |
 | [Framework-Agnostic SPI](integration/site-provider-spi.md) | REST API contract for non-Next.js integrations |
-| [Custom Tools](integration/tools-mvp.md) | Register PIM, DAM, or other tools with the AI planner |
+| [Custom Tools](integration/tools-mvp.md) | Configure PIM, DAM, or other tools for the AI planner |
 | [Adoption guide for AI agents](integration/ai-coding-agents-adoption.md) | Paste into your agent to integrate AI Site Editor into your site |
 | [Contributing guide for AI agents](integration/ai-coding-agents.md) | For agents working on the AI Site Editor codebase itself |
 

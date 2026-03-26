@@ -8,9 +8,9 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { AgentTool } from "./agent-tools.js"
 import type { AgentProvider } from "./agent-provider.js"
-import { AGENT_MAX_TOOL_CALLS } from "./agent-provider.js"
+import { AGENT_MAX_TOOL_CALLS, AGENT_MAX_TOKENS, AGENT_TEMPERATURE, AGENT_THINKING_BUDGET, shouldUseThinking } from "./agent-provider.js"
 import { runOpenAIAgentLoop } from "./agent-loop-openai.js"
-import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "../chat/anthropic-cache.js"
+import { anthropicSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "../chat/anthropic-cache.js"
 
 export type AgentEvent =
   | { type: "text_delta"; text: string }
@@ -78,64 +78,62 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
     const toolUseBlocks: Array<{ id: string; name: string; input: Record<string, unknown> }> = []
 
     try {
+      // Enable thinking on first turn only for complex requests
+      const useThinking = toolCallCount === 0 && shouldUseThinking(userMessage)
+      if (useThinking) {
+        console.log("[agent-loop] Extended thinking enabled (budget:", AGENT_THINKING_BUDGET, ")")
+      }
       console.log("[agent-loop] Calling Anthropic API (streaming), turn", toolCallCount + 1)
 
       const stream = client.messages.stream({
         model,
-        max_tokens: 4096,
+        max_tokens: AGENT_MAX_TOKENS,
+        temperature: useThinking ? 1 : AGENT_TEMPERATURE,
         system: cachedSystem,
         tools: toolDefs,
         messages,
-      })
+        ...(useThinking ? { thinking: { type: "enabled", budget_tokens: AGENT_THINKING_BUDGET } } : {}),
+      }, { headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS })
 
-      // Event-driven queue: callbacks push events, notify wakes the generator
-      const pendingEvents: AgentEvent[] = []
-      let notify: () => void
-      let dataReady = new Promise<void>(r => { notify = r })
+      const emittedToolStarts = new Set<string>()
 
-      stream.on("text", (text) => {
-        pendingEvents.push({ type: "text_delta", text })
-        notify()
-      })
+      for await (const event of stream) {
+        // Skip thinking blocks (internal reasoning — not shown to user)
+        if (event.type === "content_block_start" && event.content_block?.type === "thinking") continue
+        if (event.type === "content_block_delta" && event.delta?.type === "thinking_delta") continue
 
-      stream.on("contentBlock", (block) => {
-        if (block.type === "text") {
+        if (event.type === "content_block_start" && event.content_block?.type === "tool_use") {
+          const { id, name } = event.content_block
+          if (!emittedToolStarts.has(id)) {
+            emittedToolStarts.add(id)
+            yield { type: "tool_start", toolName: name, toolUseId: id }
+          }
+        }
+
+        if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+          const { text } = event.delta
+          textParts.push(text)
+          yield { type: "text_delta", text }
+        }
+      }
+
+      response = await stream.finalMessage()
+
+      for (const block of response.content) {
+        if (block.type === "tool_use") {
+          toolUseBlocks.push({ id: block.id, name: block.name, input: block.input as Record<string, unknown> })
+          // Fallback for non-fine-grained: emit tool_start if not already emitted
+          if (!emittedToolStarts.has(block.id)) {
+            yield { type: "tool_start", toolName: block.name, toolUseId: block.id }
+          }
+        } else if (block.type === "text" && !textParts.length) {
           textParts.push(block.text)
-        } else if (block.type === "tool_use") {
-          toolUseBlocks.push({
-            id: block.id,
-            name: block.name,
-            input: block.input as Record<string, unknown>,
-          })
-          pendingEvents.push({ type: "tool_start", toolName: block.name, toolUseId: block.id })
-          notify()
         }
-      })
-
-      const streamDone = stream.finalMessage()
-      let done = false
-      streamDone.then(() => { done = true; notify() })
-
-      // Drain events as they arrive — no polling, wake only on data or completion
-      while (!done) {
-        await Promise.race([dataReady, streamDone])
-        while (pendingEvents.length > 0) {
-          yield pendingEvents.shift()!
-        }
-        // Reset the notify promise for next wakeup
-        dataReady = new Promise<void>(r => { notify = r })
       }
-
-      // Final drain after stream completes
-      while (pendingEvents.length > 0) {
-        yield pendingEvents.shift()!
-      }
-
-      response = await streamDone
 
       console.log("[agent-loop] Stream complete, stop_reason:", response.stop_reason,
         "content blocks:", response.content.length,
-        "tools:", response.content.filter(b => b.type === "tool_use").map(b => (b as { name: string }).name))
+        "tools:", toolUseBlocks.map(b => b.name))
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
