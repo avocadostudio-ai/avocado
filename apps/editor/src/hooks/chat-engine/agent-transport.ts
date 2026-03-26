@@ -27,13 +27,29 @@ type AgentTransportArgs = {
   setActiveBlockId: (id: string | undefined) => void
 }
 
-export async function submitAgentStream(args: AgentTransportArgs): Promise<boolean> {
+export type AgentStreamHandle = {
+  promise: Promise<boolean>
+  cancel: () => void
+}
+
+export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   const {
     orchestrator, agentApiKey, session, siteId, slug, message,
     activeBlockId, activeBlockType, activeEditablePath, locale, sitePurpose,
     setStreamStatus, setStreamSteps, applyChatResult, pushAssistantFromResult, postToSite, setActiveBlockId,
   } = args
 
+  let eventSource: EventSource | null = null
+  let canceled = false
+
+  const cancel = () => {
+    canceled = true
+    eventSource?.close()
+    setStreamStatus(null)
+    setStreamSteps([])
+  }
+
+  const promise = (async (): Promise<boolean> => {
   setStreamStatus("Agent thinking...")
   setStreamSteps([{ label: "Starting agent", done: false }])
 
@@ -64,9 +80,12 @@ export async function submitAgentStream(args: AgentTransportArgs): Promise<boole
     return false
   }
 
+  if (canceled) return false
+
   // Step 2: Connect SSE to /agent/stream
   return await new Promise<boolean>((resolve) => {
     const source = new EventSource(withAccessTokenQuery(`${orchestrator}/agent/stream?streamId=${streamId}`))
+    eventSource = source
     let settled = false
     let summaryText = ""
 
@@ -142,4 +161,7 @@ export async function submitAgentStream(args: AgentTransportArgs): Promise<boole
       source.close()
     }
   })
+  })()
+
+  return { promise, cancel }
 }
