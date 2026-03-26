@@ -87,6 +87,7 @@ import { isCancelError as _isCancelError } from "../errors.js"
 const isCancelError = _isCancelError
 import { isMultiStepCandidate, decomposeRequest } from "./decomposer.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic, type DeferredNativeImageCall } from "./anthropic-planner.js"
+import { generatePlanWithGemini, parseIntentWithGemini } from "./gemini-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import { executeToolCall } from "../tools/runtime.js"
 
@@ -132,6 +133,16 @@ export function setParseIntentWithOpenAIForTests(fn?: typeof parseIntentWithOpen
 let parseIntentWithAnthropicImpl = parseIntentWithAnthropic
 export function setParseIntentWithAnthropicForTests(fn?: typeof parseIntentWithAnthropic) {
   parseIntentWithAnthropicImpl = fn ?? parseIntentWithAnthropic
+}
+
+let generatePlanWithGeminiImpl = generatePlanWithGemini
+export function setGeneratePlanWithGeminiForTests(fn?: typeof generatePlanWithGemini) {
+  generatePlanWithGeminiImpl = fn ?? generatePlanWithGemini
+}
+
+let parseIntentWithGeminiImpl = parseIntentWithGemini
+export function setParseIntentWithGeminiForTests(fn?: typeof parseIntentWithGemini) {
+  parseIntentWithGeminiImpl = fn ?? parseIntentWithGemini
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +359,7 @@ export async function runChatPipeline(
       ? ("fast" as const)
       : baseModelKey
   const modelUsed = ctx.modelLookup[provider][modelKey]
-  const plannerSource: "openai" | "anthropic" | "demo" = resolvePlannerSource(provider)
+  const plannerSource = resolvePlannerSource(provider)
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
   const pipelineStartedAtMs = Date.now()
@@ -787,7 +798,7 @@ export async function runChatPipeline(
     strictJsonEnabled: isStrictJsonResponseEnabled()
   }
 
-  const guardrailFailureResponse = (args: { reason: string; source: "openai" | "anthropic" | "demo" }) => {
+  const guardrailFailureResponse = (args: { reason: string; source: "openai" | "anthropic" | "gemini" | "demo" }) => {
     const category = classifyGuardrailError(args.reason)
     ctx.chatTelemetry.push({
       id: chatRequestId,
@@ -850,7 +861,7 @@ export async function runChatPipeline(
 
   const respondFromPlan = async (
     plan: EditPlan,
-    source: "openai" | "anthropic" | "demo",
+    source: "openai" | "anthropic" | "gemini" | "demo",
     applyMode: "apply_now" | "plan_only" = "apply_now",
     optionsOverride?: { preResolvedPlan?: boolean; preApplied?: boolean; undoSnapshot?: PageDoc },
     plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
@@ -2227,7 +2238,7 @@ export async function runChatPipeline(
     !contentQuery &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
-    (plannerSource === "openai" || plannerSource === "anthropic")
+    (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")
 
   // --- Parallel intent router + full planner ---
   // When intent routing is enabled, launch both the fast intent router and the
@@ -2237,7 +2248,10 @@ export async function runChatPipeline(
   const parallelPlannerEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_PARALLEL_PLANNER ?? "1").trim())
   const routerHeadStartMs = Math.max(0, Math.min(Number(process.env.CHAT_ROUTER_HEAD_START_MS ?? 200), 1000))
 
-  const generatePlanImpl = plannerSource === "anthropic" ? generatePlanWithAnthropicImpl : generatePlanWithOpenAIImpl
+  const isGeminiPlanner = plannerSource === "gemini"
+  const isAnthropicPlanner = plannerSource === "anthropic"
+  const supportsNativeTools = isAnthropicPlanner || isGeminiPlanner
+  const generatePlanImpl = isAnthropicPlanner ? generatePlanWithAnthropicImpl : isGeminiPlanner ? generatePlanWithGeminiImpl : generatePlanWithOpenAIImpl
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
   const planningErrors: string[] = []
@@ -2261,7 +2275,7 @@ export async function runChatPipeline(
     emitStatusTone("understanding")
     const routerPromise = (async () => {
       const routedIntent =
-        plannerSource === "anthropic"
+        isAnthropicPlanner
           ? await parseIntentWithAnthropicImpl({
               message: plannerMessage,
               slug: effectiveSlug,
@@ -2272,15 +2286,26 @@ export async function runChatPipeline(
               model: routerModel,
               log: ctx.log
             })
-          : await parseIntentWithOpenAIImpl({
-              message: plannerMessage,
-              slug: effectiveSlug,
-              currentPage: current,
-              activeBlockId: planningActiveBlockId,
-              activeBlockType: body.activeBlockType,
-              activeEditablePath: planningActiveEditablePath,
-              model: routerModel
-            })
+          : isGeminiPlanner
+            ? await parseIntentWithGeminiImpl({
+                message: plannerMessage,
+                slug: effectiveSlug,
+                currentPage: current,
+                activeBlockId: planningActiveBlockId,
+                activeBlockType: body.activeBlockType,
+                activeEditablePath: planningActiveEditablePath,
+                model: routerModel,
+                log: ctx.log
+              })
+            : await parseIntentWithOpenAIImpl({
+                message: plannerMessage,
+                slug: effectiveSlug,
+                currentPage: current,
+                activeBlockId: planningActiveBlockId,
+                activeBlockType: body.activeBlockType,
+                activeEditablePath: planningActiveEditablePath,
+                model: routerModel
+              })
 
       const routedPlan = compileDeterministicPlan({
         session: body.session!,
@@ -2341,8 +2366,8 @@ export async function runChatPipeline(
         locale: body.locale,
         history: isLightweightEdit ? [] : sessionChatHistory,
         siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
-        toolRuntime: plannerSource === "anthropic" && !isLightweightEdit ? ctx.toolRuntime : undefined,
-        toolCallContext: plannerSource === "anthropic" && !isLightweightEdit
+        toolRuntime: supportsNativeTools && !isLightweightEdit ? ctx.toolRuntime : undefined,
+        toolCallContext: supportsNativeTools && !isLightweightEdit
           ? {
               siteId: body.siteId ?? "default",
               sessionId: body.session ?? "dev",
@@ -2352,7 +2377,7 @@ export async function runChatPipeline(
           : undefined,
         onStatusUpdate: options?.onStatusUpdate,
         onImageProgress: options?.onImageProgress,
-        onToolExecution: plannerSource === "anthropic" && !isLightweightEdit
+        onToolExecution: supportsNativeTools && !isLightweightEdit
           ? (event) => {
               if (event.ok && !event.deferred && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
               if (event.ok && !event.deferred && event.toolName === "image.generate") usedNativeImageTool = true
@@ -2517,7 +2542,7 @@ export async function runChatPipeline(
         modelUsed
 
       const routedIntent =
-        plannerSource === "anthropic"
+        isAnthropicPlanner
           ? await parseIntentWithAnthropicImpl({
               message: plannerMessage,
               slug: effectiveSlug,
@@ -2528,15 +2553,26 @@ export async function runChatPipeline(
               model: routerModel,
               log: ctx.log
             })
-          : await parseIntentWithOpenAIImpl({
-              message: plannerMessage,
-              slug: effectiveSlug,
-              currentPage: current,
-              activeBlockId: planningActiveBlockId,
-              activeBlockType: body.activeBlockType,
-              activeEditablePath: planningActiveEditablePath,
-              model: routerModel
-            })
+          : isGeminiPlanner
+            ? await parseIntentWithGeminiImpl({
+                message: plannerMessage,
+                slug: effectiveSlug,
+                currentPage: current,
+                activeBlockId: planningActiveBlockId,
+                activeBlockType: body.activeBlockType,
+                activeEditablePath: planningActiveEditablePath,
+                model: routerModel,
+                log: ctx.log
+              })
+            : await parseIntentWithOpenAIImpl({
+                message: plannerMessage,
+                slug: effectiveSlug,
+                currentPage: current,
+                activeBlockId: planningActiveBlockId,
+                activeBlockType: body.activeBlockType,
+                activeEditablePath: planningActiveEditablePath,
+                model: routerModel
+              })
 
       emitStatusTone("planning")
       const routedPlan = compileDeterministicPlan({
@@ -2614,7 +2650,7 @@ export async function runChatPipeline(
     executionMode === "auto" &&
     !continuationChainBySession.has(body.session) &&
     isMultiStepCandidate(plannerMessage) &&
-    (plannerSource === "openai" || plannerSource === "anthropic")
+    (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")
   ) {
     try {
       emitStatusTone("breaking_down")
@@ -2720,8 +2756,8 @@ export async function runChatPipeline(
         locale: body.locale,
         history: isLightweightEdit ? [] : sessionChatHistory,
         siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
-        toolRuntime: plannerSource === "anthropic" && !isLightweightEdit ? ctx.toolRuntime : undefined,
-        toolCallContext: plannerSource === "anthropic" && !isLightweightEdit
+        toolRuntime: supportsNativeTools && !isLightweightEdit ? ctx.toolRuntime : undefined,
+        toolCallContext: supportsNativeTools && !isLightweightEdit
           ? {
               siteId: body.siteId ?? "default",
               sessionId: body.session ?? "dev",
@@ -2731,7 +2767,7 @@ export async function runChatPipeline(
           : undefined,
         onStatusUpdate: options?.onStatusUpdate,
         onImageProgress: options?.onImageProgress,
-        onToolExecution: plannerSource === "anthropic" && !isLightweightEdit
+        onToolExecution: supportsNativeTools && !isLightweightEdit
           ? (event) => {
               if (event.ok && !event.deferred && event.toolName === "unsplash.search") usedNativeUnsplashTool = true
               if (event.ok && !event.deferred && event.toolName === "image.generate") usedNativeImageTool = true

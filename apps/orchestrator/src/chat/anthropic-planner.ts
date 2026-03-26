@@ -39,20 +39,9 @@ import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "./anthro
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
 
-/**
- * A native image tool call that was deferred during planning so text ops
- * stream immediately. The real tool is executed post-apply and the result
- * is patched into the preview via follow-up SSE events.
- */
-export type DeferredNativeImageCall = {
-  toolName: "image.generate" | "unsplash.search"
-  input: Record<string, unknown>
-  /** The placeholder URL returned to the LLM so it can finish the plan */
-  placeholderUrl: string
-}
-
-/** Set of tool names whose execution is deferred to avoid blocking text streaming */
-const DEFERRABLE_IMAGE_TOOLS = new Set(["image.generate", "unsplash.search"])
+import { type DeferredNativeImageCall, DEFERRABLE_IMAGE_TOOLS } from "./chat-pipeline-shared.js"
+// Re-export so existing importers (chat-pipeline.ts) don't break
+export type { DeferredNativeImageCall }
 
 // Minimum text length to treat a text-only model response as meaningful
 // content (rather than discarding it in favor of the hardcoded fallback).
@@ -277,13 +266,16 @@ export async function generatePlanWithAnthropic(args: {
     locale: args.locale,
   })
 
+  const lowerMsg = args.message.toLowerCase()
   const includeContracts =
     !args.lightweight && (
       batchOverride ||
       pageWideTranslation ||
-      /\b(create|add|insert|build|generate)\b/.test(args.message.toLowerCase()) ||
-      /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(args.message.toLowerCase()) ||
-      /\d{2,3}\s*char/i.test(args.message)
+      /\b(create|add|insert|build|generate)\b/.test(lowerMsg) ||
+      /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/.test(lowerMsg) ||
+      /\d{2,3}\s*char/i.test(args.message) ||
+      // Multi-field updates need block contracts to know valid prop names
+      (lowerMsg.match(/['''"""\u201C\u201D\u2018\u2019]/g)?.length ?? 0) >= 4
     )
   const schemaContext = args.lightweight
     ? {

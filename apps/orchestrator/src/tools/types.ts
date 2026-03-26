@@ -32,7 +32,7 @@ export type ToolCallContext = {
   sessionId: string
   userId?: string
   traceId: string
-  plannerProvider: "anthropic" | "openai" | "demo"
+  plannerProvider: "anthropic" | "openai" | "gemini" | "demo"
   authHeader?: string
   gdriveFolderId?: string
   onStatusUpdate?: (message: string) => void

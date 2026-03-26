@@ -13,12 +13,21 @@ export function shouldPreferFastModelForMessage(message: string) {
   if (inferTranslationScopeFromMessage(message) !== "none") return false
   if (isStandalonePageOperation(message)) return false
   if (isClarificationFollowUp(message)) return false
+  // Compound multi-field requests (2+ quoted values) need full context, not lightweight mode
+  if (isCompoundMultiFieldRequest(message)) return false
   if (isRewriteLikeMessage(message)) return true
   // Simple targeted prop edits — single-block text/label/emoji modifications
   // don't need the balanced model. Fast is sufficient.
   const lower = message.toLowerCase()
   if (isSingleBlockPropEdit(lower)) return true
   return false
+}
+
+/** Detects compound multi-field requests with 2+ quoted values, e.g.
+ * "set subheading to 'X' and change CTA text to 'Y'" */
+function isCompoundMultiFieldRequest(message: string) {
+  const quoteChars = message.match(/['''"""\u201C\u201D\u2018\u2019]/g)
+  return !!(quoteChars && quoteChars.length >= 4)
 }
 
 function isSingleBlockPropEdit(lower: string) {

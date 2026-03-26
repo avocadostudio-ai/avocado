@@ -19,6 +19,7 @@ import {
   refreshPublishStatusFromVercel,
   requirePublishToken,
   listRestoreSnapshots,
+  deletePublishSnapshot,
   loadPublishedSnapshotFromCommit,
   publishViaGit,
   collectInlineAssets,
@@ -326,6 +327,21 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
       }
     } catch (error) {
       return reply.code(400).send({ error: toErrorDetail(error) })
+    }
+  })
+
+  app.delete("/restore/snapshot", async (request, reply) => {
+    const body = (request.body ?? {}) as { commit?: string }
+    const commit = typeof body.commit === "string" ? body.commit.trim() : ""
+    if (!/^[0-9a-f]{7,40}$/i.test(commit)) {
+      return reply.code(400).send({ error: "commit is required (7-40 hex chars)" })
+    }
+    try {
+      const ok = await deletePublishSnapshot(commit)
+      if (!ok) return reply.code(400).send({ error: "Failed to delete snapshot." })
+      return { status: "deleted", commit }
+    } catch (error) {
+      return reply.code(500).send({ error: toErrorDetail(error) })
     }
   })
 }

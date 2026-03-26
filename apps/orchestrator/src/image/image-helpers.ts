@@ -284,6 +284,8 @@ export async function generateVariationImageWithOpenAI(args: {
   altText: string
   size?: string
   model?: string
+  background?: "transparent" | "opaque" | "auto"
+  outputFormat?: "png" | "webp" | "jpeg"
   log?: ImageLogger
 }): Promise<UnsplashImage | null> {
   if (!process.env.OPENAI_API_KEY) {
@@ -293,18 +295,22 @@ export async function generateVariationImageWithOpenAI(args: {
 
   const model = args.model ?? process.env.OPENAI_IMAGE_MODEL?.trim() ?? "gpt-image-1-mini"
   const size = args.size ?? "1536x1024"
+  const background = args.background ?? "auto"
+  const outputFormat = args.outputFormat ?? "png"
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
   const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
 
-  args.log?.info({ event: "openai_image_start", model, size, promptLength: args.prompt.length }, "Starting OpenAI image generation")
+  args.log?.info({ event: "openai_image_start", model, size, background, outputFormat, promptLength: args.prompt.length }, "Starting OpenAI image generation")
 
   const genStartMs = Date.now()
   try {
     const result = await client.images.generate({
       model,
       prompt: args.prompt,
-      size: size as "1536x1024"
+      size: size as "1536x1024",
+      background,
+      output_format: outputFormat,
     })
     const durationMs = Date.now() - genStartMs
 
@@ -324,7 +330,8 @@ export async function generateVariationImageWithOpenAI(args: {
     if (!bytes || bytes.byteLength === 0) return null
 
     await mkdir(generatedImageDir, { recursive: true })
-    const fileName = `var_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
+    const ext = outputFormat === "jpeg" ? "jpg" : outputFormat
+    const fileName = `var_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
     await writeFile(resolve(generatedImageDir, fileName), bytes)
 
     args.log?.info(
@@ -410,6 +417,7 @@ export async function generateVariationImageWithGemini(args: {
   altText: string
   aspectRatio?: string
   quality?: "draft" | "final"
+  background?: "transparent" | "opaque" | "auto"
   model?: string
   log?: ImageLogger
 }): Promise<UnsplashImage | null> {
@@ -425,11 +433,16 @@ export async function generateVariationImageWithGemini(args: {
 
   args.log?.info({ event: "gemini_image_start", model, aspectRatio: geminiAspectRatio, imageSize, promptLength: args.prompt.length }, "Starting Gemini image generation")
 
+  // Gemini has no native transparency param — use prompt hint
+  const effectivePrompt = args.background === "transparent"
+    ? `${args.prompt}\n\nIMPORTANT: Generate this image on a fully transparent background with no background elements.`
+    : args.prompt
+
   const genStartMs = Date.now()
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: args.prompt,
+      contents: effectivePrompt,
       config: {
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: { aspectRatio: geminiAspectRatio, imageSize }

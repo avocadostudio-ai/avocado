@@ -134,6 +134,50 @@ export async function loadPublishedSnapshotFromCommit(commit: string): Promise<P
   return pages
 }
 
+// In-memory cache: full commit hash → descriptor (snapshots are immutable)
+const snapshotDescriptorCache = new Map<string, { descriptor: SnapshotDescriptor; signature: string } | null>()
+
+type ParsedCommitLine = { commit: string; committedAt: string; message: string }
+
+function parseCommitLine(line: string): ParsedCommitLine | null {
+  const first = line.indexOf("|")
+  const second = line.indexOf("|", first + 1)
+  if (first <= 0 || second <= first) return null
+  const commit = line.slice(0, first).trim()
+  const committedAt = line.slice(first + 1, second).trim()
+  const message = line.slice(second + 1).trim()
+  if (!commit) return null
+  return { commit, committedAt, message }
+}
+
+async function resolveCommitDescriptor(parsed: ParsedCommitLine): Promise<{ descriptor: SnapshotDescriptor; signature: string } | null> {
+  const cached = snapshotDescriptorCache.get(parsed.commit)
+  if (cached !== undefined) return cached
+
+  try {
+    const pages = await loadPublishedSnapshotFromCommit(parsed.commit)
+    const home = pages.find((page) => page.slug === "/")
+    const homeHeadingRaw = home?.blocks.find((block) => block.type === "Hero")?.props?.heading
+    const homeHeading = typeof homeHeadingRaw === "string" && homeHeadingRaw.trim().length > 0 ? homeHeadingRaw.trim() : "(no hero heading)"
+    const signature = `${pages.length}::${homeHeading}::${pages.map((page) => page.slug).join("|")}`
+    const result = {
+      descriptor: {
+        commit: parsed.commit.slice(0, 7),
+        committedAt: parsed.committedAt,
+        message: parsed.message,
+        pageCount: pages.length,
+        homeHeading
+      },
+      signature
+    }
+    snapshotDescriptorCache.set(parsed.commit, result)
+    return result
+  } catch {
+    snapshotDescriptorCache.set(parsed.commit, null)
+    return null
+  }
+}
+
 export async function listRestoreSnapshots(limit = 30, siteId?: string): Promise<SnapshotDescriptor[]> {
   const repoRoot = resolve(process.cwd(), "../..")
   const targetPath = "apps/site/lib/published-content.json"
@@ -151,42 +195,54 @@ export async function listRestoreSnapshots(limit = 30, siteId?: string): Promise
   }
   gitArgs.push("--", targetPath)
   const rawLog = (await runGit(gitArgs, repoRoot)).stdout
-  const lines = rawLog
+  const parsedLines = rawLog
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
+    .map(parseCommitLine)
+    .filter((p): p is ParsedCommitLine => p !== null)
 
   const seen = new Set<string>()
   const snapshots: SnapshotDescriptor[] = []
-  for (const line of lines) {
-    const first = line.indexOf("|")
-    const second = line.indexOf("|", first + 1)
-    if (first <= 0 || second <= first) continue
-    const commit = line.slice(0, first).trim()
-    const committedAt = line.slice(first + 1, second).trim()
-    const message = line.slice(second + 1).trim()
-    if (!commit) continue
-    try {
-      const pages = await loadPublishedSnapshotFromCommit(commit)
-      const home = pages.find((page) => page.slug === "/")
-      const homeHeadingRaw = home?.blocks.find((block) => block.type === "Hero")?.props?.heading
-      const homeHeading = typeof homeHeadingRaw === "string" && homeHeadingRaw.trim().length > 0 ? homeHeadingRaw.trim() : "(no hero heading)"
-      const signature = `${pages.length}::${homeHeading}::${pages.map((page) => page.slug).join("|")}`
+  const CONCURRENCY = 5
+
+  for (let i = 0; i < parsedLines.length && snapshots.length < cappedLimit; i += CONCURRENCY) {
+    const batch = parsedLines.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(batch.map(resolveCommitDescriptor))
+    for (const result of results) {
+      if (result.status !== "fulfilled" || !result.value) continue
+      const { descriptor, signature } = result.value
       if (seen.has(signature)) continue
       seen.add(signature)
-      snapshots.push({
-        commit: commit.slice(0, 7),
-        committedAt,
-        message,
-        pageCount: pages.length,
-        homeHeading
-      })
+      snapshots.push(descriptor)
       if (snapshots.length >= cappedLimit) break
-    } catch {
-      // Ignore malformed/unrelated historical snapshots.
     }
   }
   return snapshots
+}
+
+/**
+ * Delete a publish snapshot by reverting its git commit.
+ * Uses `git revert --no-commit` + `git commit` to keep history linear.
+ * Returns true if the revert succeeded, false otherwise.
+ */
+export async function deletePublishSnapshot(commit: string): Promise<boolean> {
+  const repoRoot = resolve(process.cwd(), "../..")
+  if (!/^[0-9a-f]{7,40}$/i.test(commit)) return false
+  try {
+    // Resolve short hash to full hash
+    const fullHash = (await runGit(["rev-parse", commit], repoRoot)).stdout.trim()
+    // Revert without auto-commit, then commit with a descriptive message
+    await runGit(["revert", "--no-commit", fullHash], repoRoot)
+    await runGit(["commit", "-m", `revert publish snapshot ${commit}`], repoRoot)
+    // Invalidate cache for this commit
+    snapshotDescriptorCache.delete(fullHash)
+    return true
+  } catch {
+    // Reset any partial revert state
+    try { await runGit(["revert", "--abort"], repoRoot) } catch { /* ignore */ }
+    return false
+  }
 }
 
 export function isTemplateFallbackSession(sessionDraft: Map<string, PageDoc>) {

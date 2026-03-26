@@ -16,7 +16,7 @@ import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
 // ModelKey inline type (avoids circular dependency with index.ts)
 // ---------------------------------------------------------------------------
 export type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
-export type AIProvider = "openai" | "anthropic"
+export type AIProvider = "openai" | "anthropic" | "gemini"
 
 // ---------------------------------------------------------------------------
 // Session-key helpers
@@ -69,7 +69,7 @@ export type PendingApprovalPlan = {
   requestedSlug: string
   effectiveSlug: string
   summary: string
-  source: "openai" | "anthropic" | "demo"
+  source: "openai" | "anthropic" | "gemini" | "demo"
   modelUsed: string
   modelKey: ModelKey
   plan: EditPlan

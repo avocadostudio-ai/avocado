@@ -79,7 +79,7 @@ export type ChatResult = {
   focusBlockId?: string
   updatedSlug?: string
   undoSlug?: string
-  plannerSource: "openai" | "anthropic" | "demo"
+  plannerSource: "openai" | "anthropic" | "gemini" | "demo"
   modelUsed: string
   modelKey: ModelKey
   pendingPlanId?: string
@@ -107,7 +107,7 @@ export type ChatResult = {
     estimatedUsd?: number | null
     plannerTier?: "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo"
     modelUsed?: string
-    plannerSource?: "openai" | "anthropic" | "demo"
+    plannerSource?: "openai" | "anthropic" | "gemini" | "demo"
     planningAttempts?: number
     executionMode?: string
     skippedOpCount?: number
@@ -260,7 +260,7 @@ export function isAdviceQuery(message: string) {
 export function adviceResponse(args: {
   body: ChatRequestBody
   current: PageDoc
-  plannerSource: "openai" | "anthropic" | "demo"
+  plannerSource: "openai" | "anthropic" | "gemini" | "demo"
   modelUsed: string
   modelKey: ModelKey
 }): { code: number; payload: ChatResult } {
@@ -571,7 +571,7 @@ function childSuggestions(args: { selected: PageDoc["blocks"][number]; editableP
 export function infoResponse(args: {
   body: ChatRequestBody
   current: PageDoc
-  plannerSource: "openai" | "anthropic" | "demo"
+  plannerSource: "openai" | "anthropic" | "gemini" | "demo"
   modelUsed: string
   modelKey: ModelKey
 }): { code: number; payload: ChatResult } {
