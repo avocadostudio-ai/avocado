@@ -761,13 +761,6 @@ export function useChatEngine(config: ChatEngineConfig) {
         activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
         pendingFocusBlockId = null
-        // Re-apply shimmer after preview refresh — the draftUpdated above
-        // triggers a DOM rebuild that destroys injected shimmer elements.
-        if (focusId) {
-          setTimeout(() => {
-            postToSite("aiFieldLoading", { blockId: focusId, active: true })
-          }, 400)
-        }
       }
 
       const clearOpRefreshTimer = () => {
