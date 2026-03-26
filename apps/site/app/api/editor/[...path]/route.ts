@@ -9,6 +9,7 @@ export const { GET, POST, OPTIONS } = createEditorApiHandler({
       .map((slug) => getPublishedPage(slug))
       .filter((page): page is NonNullable<typeof page> => page !== null),
   onPublish: createJsonFilePublishHandler(
-    resolve(process.cwd(), "lib/published-content.json")
+    resolve(process.cwd(), "lib/published-content.json"),
+    { publicDir: resolve(process.cwd(), "public/generated-images") }
   ),
 })

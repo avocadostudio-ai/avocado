@@ -20,6 +20,7 @@ function toPageDoc(slug: string, raw: RawPage): PageDoc {
 export const { GET, POST, OPTIONS } = createEditorApiHandler({
   getPages: () => Object.entries(pages).map(([slug, raw]) => toPageDoc(slug, raw)),
   onPublish: createJsonFilePublishHandler(
-    resolve(process.cwd(), "content/pages.json")
+    resolve(process.cwd(), "content/pages.json"),
+    { publicDir: resolve(process.cwd(), "public/generated-images") }
   ),
 })

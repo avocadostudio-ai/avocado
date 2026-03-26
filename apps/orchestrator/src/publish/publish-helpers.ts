@@ -371,34 +371,17 @@ export async function recordPublishSnapshot(
   const targetPath = "apps/site/lib/published-content.json"
   const absoluteTargetPath = resolve(repoRoot, targetPath)
   try {
-    // Rewrite localhost image URLs → relative paths and copy files into public/
-    let rewrittenPages = pages
-    const imageUrlMap = findLocalhostImageUrls(pages)
-    const imageDestDir = resolve(repoRoot, "apps/site/public/generated-images")
-    let copiedImages = false
-    if (imageUrlMap.size > 0) {
-      const generatedImageDir =
-        process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ??
-        resolve(process.cwd(), "../../.data/generated-images")
-      await mkdir(imageDestDir, { recursive: true })
-      for (const [, fileName] of imageUrlMap) {
-        try {
-          await copyFile(resolve(generatedImageDir, fileName), resolve(imageDestDir, fileName))
-          copiedImages = true
-        } catch {
-          // Source file missing — still rewrite URL (relative 404 > unreachable localhost)
-        }
-      }
-      rewrittenPages = rewriteImageUrlsInPages(pages, imageUrlMap)
-      log?.info({ session, imageCount: imageUrlMap.size, copiedImages }, "recordPublishSnapshot: rewrote image URLs")
-    }
-
-    const payload = `${JSON.stringify(rewrittenPages, null, 2)}\n`
+    // The site's publish handler is responsible for rewriting image URLs
+    // and saving assets. We just commit whatever state is on disk.
+    const payload = `${JSON.stringify(pages, null, 2)}\n`
     await writeFile(absoluteTargetPath, payload, "utf8")
+    await runGit(["add", targetPath], repoRoot)
 
-    const addPaths = [targetPath]
-    if (copiedImages) addPaths.push("apps/site/public/generated-images")
-    await runGit(["add", ...addPaths], repoRoot)
+    // Also stage generated images if the site handler wrote them
+    const imageDir = resolve(repoRoot, "apps/site/public/generated-images")
+    if (existsSync(imageDir)) {
+      await runGit(["add", "apps/site/public/generated-images"], repoRoot)
+    }
 
     // Check if there are staged changes
     try {
