@@ -53,6 +53,11 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   setStreamStatus("Agent thinking...")
   setStreamSteps([{ label: "Starting agent", done: false }])
 
+  // Activate shimmer immediately on the active block while agent thinks
+  if (activeBlockId) {
+    postToSite("aiFieldLoading", { blockId: activeBlockId, active: true })
+  }
+
   // Step 1: POST /agent/start to get streamId
   let streamId: string
   try {
@@ -60,7 +65,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-anthropic-api-key": agentApiKey,
+        "x-agent-api-key": agentApiKey,
       },
       body: JSON.stringify({
         session, siteId, slug, message,
@@ -88,6 +93,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
     eventSource = source
     let settled = false
     let summaryText = ""
+    let lastFocusBlockId = activeBlockId ?? ""
 
     source.onmessage = (e: MessageEvent) => {
       try {
@@ -101,11 +107,16 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
             const done = prev.map((s) => ({ ...s, done: true }))
             return [...done, { label: msg.replace(/\.\.\.$/, ""), done: false }]
           })
+          // Keep shimmer alive while agent is thinking between tool calls
+          if (lastFocusBlockId && !canceled) {
+            postToSite("aiFieldLoading", { blockId: lastFocusBlockId, active: true })
+          }
         } else if (type === "summary_token") {
           summaryText += d.text as string
           setStreamStatus("Agent responding...")
         } else if (type === "op_applied") {
           const focusBlockId = d.focusBlockId as string | undefined
+          if (focusBlockId) lastFocusBlockId = focusBlockId
           setStreamSteps((prev) => {
             const done = prev.map((s) => ({ ...s, done: true }))
             return [...done, { label: `Applied ${d.toolName}`, done: true }]
