@@ -50,6 +50,7 @@ export {
 export {
   defaultPropsForType,
   resolveHeadingTag,
+  resolveItemHeadingTag,
   DEFAULT_HEADING_LEVELS,
 } from "./blocks/index.ts"
 

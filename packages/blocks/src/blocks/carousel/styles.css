@@ -46,11 +46,7 @@
   border-top: 1px solid var(--border);
 }
 
-.carousel__caption h2,
-.carousel__caption h3,
-.carousel__caption h4,
-.carousel__caption h5,
-.carousel__caption h6 {
+.carousel__caption :is(h2, h3, h4, h5, h6) {
   margin: 0 0 6px;
   font-size: 1.25rem;
   font-weight: 600;
@@ -119,8 +115,6 @@
   background: var(--brand);
   border-color: var(--brand);
 }
-
-/* Dark mode — handled by CSS variables, no overrides needed */
 
 /* Mobile */
 @media (max-width: 900px) {

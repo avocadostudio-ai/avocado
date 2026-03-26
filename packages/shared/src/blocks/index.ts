@@ -56,4 +56,4 @@ export function defaultPropsForType(type: BlockType): Record<string, unknown> {
   return defaults[type]?.() ?? { ...fallback }
 }
 
-export { DEFAULT_HEADING_LEVELS, resolveHeadingTag } from "./_helpers.ts"
+export { DEFAULT_HEADING_LEVELS, resolveHeadingTag, resolveItemHeadingTag } from "./_helpers.ts"
