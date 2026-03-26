@@ -14,7 +14,7 @@ export function Banner(props: Record<string, unknown>): JSX.Element {
   const ctaHref = String(props.ctaHref ?? "")
 
   return (
-    <section className={`banner ${variantClass[variant] ?? variantClass.info}`}>
+    <section className={`banner ${variantClass[variant] ?? variantClass.info}`} role="status">
       <div className="banner__inner section__inner">
         <p className="banner__text" data-editable-target="text" data-editable-target-label="text" data-editable-label="text">
           {renderInline(text)}

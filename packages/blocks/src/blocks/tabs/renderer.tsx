@@ -14,6 +14,7 @@ export function Tabs(props: Record<string, unknown>): JSX.Element {
             return (
               <button
                 key={idx}
+                id={`tabs-tab-${idx}`}
                 className={`tabs-block__tab${idx === 0 ? " tabs-block__tab--active" : ""}`}
                 role="tab"
                 type="button"
@@ -38,6 +39,8 @@ export function Tabs(props: Record<string, unknown>): JSX.Element {
               className="tabs-block__panel"
               id={`tabs-panel-${idx}`}
               role="tabpanel"
+              aria-labelledby={`tabs-tab-${idx}`}
+              tabIndex={0}
               style={idx === 0 ? undefined : { display: "none" }}
               data-editable-target={`tabs[${idx}].content`}
               data-editable-target-label={`tabs[${idx}].content`}
