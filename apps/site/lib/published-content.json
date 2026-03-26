@@ -3,12 +3,22 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-19T18:58:47.175Z",
+    "updatedAt": "2026-03-26T07:55:43.529Z",
     "meta": {
       "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
       "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
     },
     "blocks": [
+      {
+        "id": "b_banner_1774511536845_733",
+        "type": "Banner",
+        "props": {
+          "text": "🥑 New recipes just dropped — explore them now!",
+          "variant": "success",
+          "ctaText": "See Recipes",
+          "ctaHref": "/recipes"
+        }
+      },
       {
         "id": "b_hero_1772138902220_copy",
         "type": "Hero",
