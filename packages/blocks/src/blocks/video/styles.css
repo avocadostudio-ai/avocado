@@ -56,6 +56,7 @@
   z-index: 1;
   width: 68px;
   height: 48px;
+  color: var(--brand, #e00);
   opacity: 0.85;
   transition: opacity 0.15s;
 }

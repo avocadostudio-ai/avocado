@@ -31,13 +31,13 @@
 }
 
 .banner--success {
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--banner-success-bg, #d1fae5);
+  color: var(--banner-success-text, #065f46);
 }
 
 .banner--warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--banner-warning-bg, #fef3c7);
+  color: var(--banner-warning-text, #92400e);
 }
 
 /* Dark mode */
@@ -47,13 +47,13 @@
 }
 
 .dark .banner--success {
-  background: color-mix(in srgb, #10b981 15%, var(--bg-1));
-  color: #6ee7b7;
+  background: var(--banner-success-bg, color-mix(in srgb, #10b981 15%, var(--bg-1)));
+  color: var(--banner-success-text, #6ee7b7);
 }
 
 .dark .banner--warning {
-  background: color-mix(in srgb, #f59e0b 15%, var(--bg-1));
-  color: #fcd34d;
+  background: var(--banner-warning-bg, color-mix(in srgb, #f59e0b 15%, var(--bg-1)));
+  color: var(--banner-warning-text, #fcd34d);
 }
 
 @media (max-width: 900px) {

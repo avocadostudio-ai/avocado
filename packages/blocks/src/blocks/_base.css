@@ -85,20 +85,20 @@ section {
 }
 
 .dark .btn-secondary {
-  color: #5eead4;
-  border-color: #14b8a6;
+  color: var(--brand);
+  border-color: var(--brand);
 }
 
 .dark .btn-secondary:hover {
-  background: rgb(20 184 166 / 0.16);
+  background: var(--brand-subtle);
 }
 
 .dark .btn-tertiary {
-  color: #5eead4;
+  color: var(--brand);
 }
 
 .dark .btn-tertiary:hover {
-  background: rgb(20 184 166 / 0.16);
+  background: var(--brand-subtle);
 }
 
 @media (max-width: 900px) {
