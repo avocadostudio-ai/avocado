@@ -59,7 +59,7 @@ function isSafeOrigin(raw: string): boolean {
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
   const host = parsed.hostname
-  if (
+  const isPrivate =
     host === "localhost" ||
     host === "127.0.0.1" ||
     host === "[::1]" ||
@@ -68,9 +68,13 @@ function isSafeOrigin(raw: string): boolean {
     host.startsWith("192.168.") ||
     host.startsWith("169.254.") ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(host)
-  ) {
-    // Allow in development
-    if (process.env.NODE_ENV === "production") return false
+  if (isPrivate) {
+    if (process.env.NODE_ENV !== "production") return true
+    // In production, allow if the origin is in ORCHESTRATOR_CORS_ORIGINS
+    const corsOrigins = (process.env.ORCHESTRATOR_CORS_ORIGINS ?? "").split(",").map(s => s.trim().replace(/\/+$/, ""))
+    const normalized = parsed.origin
+    if (corsOrigins.some(o => o === normalized)) return true
+    return false
   }
   return true
 }
