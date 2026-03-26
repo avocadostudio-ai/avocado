@@ -371,19 +371,45 @@ export async function recordPublishSnapshot(
   const targetPath = "apps/site/lib/published-content.json"
   const absoluteTargetPath = resolve(repoRoot, targetPath)
   try {
-    const payload = `${JSON.stringify(pages, null, 2)}\n`
+    // Rewrite localhost image URLs → relative paths and copy files into public/
+    let rewrittenPages = pages
+    const imageUrlMap = findLocalhostImageUrls(pages)
+    const imageDestDir = resolve(repoRoot, "apps/site/public/generated-images")
+    let copiedImages = false
+    if (imageUrlMap.size > 0) {
+      const generatedImageDir =
+        process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ??
+        resolve(process.cwd(), "../../.data/generated-images")
+      await mkdir(imageDestDir, { recursive: true })
+      for (const [, fileName] of imageUrlMap) {
+        try {
+          await copyFile(resolve(generatedImageDir, fileName), resolve(imageDestDir, fileName))
+          copiedImages = true
+        } catch {
+          // Source file missing — still rewrite URL (relative 404 > unreachable localhost)
+        }
+      }
+      rewrittenPages = rewriteImageUrlsInPages(pages, imageUrlMap)
+      log?.info({ session, imageCount: imageUrlMap.size, copiedImages }, "recordPublishSnapshot: rewrote image URLs")
+    }
+
+    const payload = `${JSON.stringify(rewrittenPages, null, 2)}\n`
     await writeFile(absoluteTargetPath, payload, "utf8")
-    await runGit(["add", targetPath], repoRoot)
+
+    const addPaths = [targetPath]
+    if (copiedImages) addPaths.push("apps/site/public/generated-images")
+    await runGit(["add", ...addPaths], repoRoot)
+
     // Check if there are staged changes
     try {
-      await runGit(["diff", "--cached", "--quiet", "--", targetPath], repoRoot)
+      await runGit(["diff", "--cached", "--quiet"], repoRoot)
       log?.info({ session }, "recordPublishSnapshot: no content changes to commit")
       return undefined // no changes
     } catch {
       // Has staged changes — commit them
     }
     const commitMessage = `publish: session ${session} ${new Date().toISOString()}`
-    await runGit(["commit", "-m", commitMessage, "--", targetPath], repoRoot)
+    await runGit(["commit", "-m", commitMessage], repoRoot)
     const rev = await runGit(["rev-parse", "HEAD"], repoRoot)
     const commitSha = rev.stdout.trim()
     log?.info({ session, commitSha: commitSha.slice(0, 12) }, "recordPublishSnapshot: committed")
