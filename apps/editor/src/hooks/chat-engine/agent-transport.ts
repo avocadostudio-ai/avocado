@@ -21,6 +21,9 @@ type AgentTransportArgs = {
   sitePurpose?: string
   setStreamStatus: (value: string | null) => void
   setStreamSteps: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
+  setStreamingText: (value: string | null | ((prev: string | null) => string | null)) => void
+  setStreamingChanges: (value: string[] | ((prev: string[]) => string[])) => void
+  setLatestStreamFocusBlockId: (value: string | null) => void
   applyChatResult: (data: AssistantResponse) => void
   pushAssistantFromResult: (data: AssistantResponse) => void
   postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
@@ -36,7 +39,8 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   const {
     orchestrator, agentApiKey, session, siteId, slug, message,
     activeBlockId, activeBlockType, activeEditablePath, locale, sitePurpose,
-    setStreamStatus, setStreamSteps, applyChatResult, pushAssistantFromResult, postToSite, setActiveBlockId,
+    setStreamStatus, setStreamSteps, setStreamingText, setStreamingChanges, setLatestStreamFocusBlockId,
+    applyChatResult, pushAssistantFromResult, postToSite, setActiveBlockId,
   } = args
 
   let eventSource: EventSource | null = null
@@ -113,10 +117,17 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           }
         } else if (type === "summary_token") {
           summaryText += d.text as string
+          setStreamingText((prev) => (prev ?? "") + (d.text as string))
           setStreamStatus("Agent responding...")
+        } else if (type === "changelog_entry") {
+          const entry = d.entry as string
+          if (entry) setStreamingChanges((prev) => [...prev, entry])
         } else if (type === "op_applied") {
           const focusBlockId = d.focusBlockId as string | undefined
-          if (focusBlockId) lastFocusBlockId = focusBlockId
+          if (focusBlockId) {
+            lastFocusBlockId = focusBlockId
+            setLatestStreamFocusBlockId(focusBlockId)
+          }
           setStreamSteps((prev) => {
             const done = prev.map((s) => ({ ...s, done: true }))
             return [...done, { label: `Applied ${d.toolName}`, done: true }]
@@ -140,6 +151,9 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           const suggestions = Array.isArray(result.suggestions) ? result.suggestions as string[] : []
           setStreamStatus(null)
           setStreamSteps([])
+          setStreamingText(null)
+          setStreamingChanges([])
+          setLatestStreamFocusBlockId(null)
           // Parse variation data if present
           const vr = result.variations as Record<string, unknown> | undefined
           const variations = vr && Array.isArray(vr.variations) ? {
@@ -167,6 +181,9 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           const result = d.result as Record<string, unknown>
           setStreamStatus(null)
           setStreamSteps([])
+          setStreamingText(null)
+          setStreamingChanges([])
+          setLatestStreamFocusBlockId(null)
           pushAssistantFromResult({
             status: "error",
             summary: (result.summary as string) || "Agent error",
@@ -182,6 +199,9 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
       if (!settled) {
         setStreamStatus(null)
         setStreamSteps([])
+        setStreamingText(null)
+        setStreamingChanges([])
+        setLatestStreamFocusBlockId(null)
         pushAssistantFromResult({
           status: "error",
           summary: "Agent connection lost",
