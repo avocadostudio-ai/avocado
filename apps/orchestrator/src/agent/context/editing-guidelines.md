@@ -23,6 +23,14 @@
 - Use empty string "" for no image
 - Image alt text should be descriptive and accessible
 
+### Image Generation Context
+- Always pass blockType, blockId, and pageSlug to image_generate for context-aware results
+- Hero/Banner blocks → aspectRatio: "landscape", style: "photorealistic", cinematic composition
+- Card/Feature blocks → aspectRatio: "square", focused subject
+- Use background: "transparent" when the block has a colored/gradient background and the image should blend seamlessly
+- Use style: "photorealistic" for hero images, "illustration" for feature icons or decorative elements
+- Use outputFormat: "png" when transparency is needed; "webp" for smaller file size
+
 ### What NOT to Do
 - Don't modify block IDs of existing blocks
 - Don't use internal block IDs in user-facing text (headings, descriptions)

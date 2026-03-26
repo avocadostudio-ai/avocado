@@ -57,6 +57,10 @@ export type AssistantResponse = {
     plannerSource?: string
     planningAttempts?: number
     executionMode?: string
+    currentPage?: string
+    siteId?: string
+    activeBlockId?: string
+    activeEditablePath?: string
     skippedOpCount?: number
     skippedOps?: Array<{
       index: number
@@ -154,6 +158,10 @@ export type ChatEntry = {
     currentStep: number
     totalSteps: number
     nextStepLabel: string
+  }
+  feedback?: {
+    rating: "up" | "down"
+    note?: string
   }
 }
 

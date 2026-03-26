@@ -37,6 +37,26 @@ type AgentStreamEntry = {
   subscribers: Set<FastifyReply>
 }
 
+/**
+ * Parse "Suggested next actions:" bullet list from the agent's summary text.
+ * Returns the summary without the suggestion block, plus the extracted suggestions.
+ */
+function parseSuggestionsFromSummary(text: string): { summary: string; suggestions: string[] } {
+  const marker = /\n*(?:suggested\s+(?:next\s+)?actions|next\s+steps|you\s+(?:could|might)\s+(?:also|want\s+to)):\s*\n/i
+  const match = text.match(marker)
+  if (!match || match.index === undefined) return { summary: text.trim(), suggestions: [] }
+
+  const before = text.slice(0, match.index).trim()
+  const after = text.slice(match.index + match[0].length)
+  const suggestions = after
+    .split("\n")
+    .map(line => line.replace(/^[-•*]\s*/, "").replace(/\*\*/g, "").trim())
+    .filter(line => line.length > 5 && line.length < 120)
+    .slice(0, 4)
+
+  return { summary: before, suggestions }
+}
+
 const streamContexts = new Map<string, AgentStreamEntry>()
 const STREAM_TTL_MS = 120_000
 
@@ -158,16 +178,18 @@ export async function registerAgentRoutes(app: FastifyInstance) {
                   try {
                     const parsed = JSON.parse(event.result)
                     if (parsed.status === "applied") {
-                      emitEvent(streamId, { type: "op_applied", toolName: event.toolName, previewVersion: parsed.previewVersion })
+                      emitEvent(streamId, { type: "op_applied", toolName: event.toolName, previewVersion: parsed.previewVersion, focusBlockId: parsed.focusBlockId })
                     }
                   } catch { /* read-only tool */ }
                 } else {
                   emitEvent(streamId, { type: "tool_error", toolName: event.toolName, error: event.result })
                 }
                 break
-              case "done":
-                emitEvent(streamId, { type: "final", result: { status: "applied", summary: event.summary, toolCallCount: event.toolCallCount } })
+              case "done": {
+                const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(event.summary)
+                emitEvent(streamId, { type: "final", result: { status: "applied", summary: cleanSummary, suggestions, toolCallCount: event.toolCallCount } })
                 break
+              }
               case "error":
                 emitEvent(streamId, { type: "error", result: { status: "error", summary: event.message } })
                 break

@@ -10,7 +10,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk"
 import { type Operation, type PageDoc, type BlockManifest, defaultPropsForType, type BlockType } from "@ai-site-editor/shared"
-import { applyOpsAtomically, type ApplyOpsOptions } from "../ops/ops-engine.js"
+import { applyOpsAtomically, pickFocusBlockId, type ApplyOpsOptions } from "../ops/ops-engine.js"
 import { getPage, getSessionDraft, bumpVersion, orderSlugsHomeFirst, getSiteConfig } from "../state/session-state.js"
 import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins/unsplash-search.js"
 import { imageGenerateHandler, imageGenerateManifest } from "../tools/builtins/image-generate.js"
@@ -36,11 +36,13 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
       const result = await applyOpsAtomically(session, ops, applyOpts)
       console.log("[agent-tools] Applied successfully:", result.appliedCount)
       const version = bumpVersion(session)
+      const focusBlockId = pickFocusBlockId(ops)
       return {
         result: JSON.stringify({
           status: "applied",
           appliedCount: result.appliedCount,
           previewVersion: version,
+          focusBlockId,
           skippedOps: result.skippedOps,
         })
       }
@@ -621,7 +623,7 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
     {
       definition: {
         name: "image_generate",
-        description: "Generate an AI image from a text prompt using DALL-E or Gemini. Returns an image URL. Use the imageUrl from the result to update a block's image property via batch_update_props. Default to 'draft' quality unless the user asks for high quality.",
+        description: "Generate an AI image from a text prompt using DALL-E or Gemini. Returns an image URL. Use the imageUrl from the result to update a block's image property via batch_update_props. Default to 'draft' quality unless the user asks for high quality. Always provide blockType, blockId, and pageSlug for context-aware generation.",
         input_schema: {
           type: "object" as const,
           properties: {
@@ -629,6 +631,11 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
             aspectRatio: { type: "string", enum: ["landscape", "square", "portrait"], description: "Aspect ratio (default: landscape)" },
             quality: { type: "string", enum: ["draft", "final"], description: "Quality: 'draft' for fast, 'final' for production" },
             style: { type: "string", description: "Optional style guidance, e.g. 'photorealistic', 'illustration', 'flat design'" },
+            background: { type: "string", enum: ["transparent", "opaque", "auto"], description: "Background: 'transparent' for logos/icons/cutouts, 'opaque' for full scenes, 'auto' lets the model decide (default: auto)" },
+            outputFormat: { type: "string", enum: ["png", "webp", "jpeg"], description: "Output format (default: png). Use png for transparency." },
+            blockType: { type: "string", description: "Block type (e.g. 'Hero', 'Card') — helps match image composition to layout" },
+            blockId: { type: "string", description: "Block ID — enables context-aware generation using block content" },
+            pageSlug: { type: "string", description: "Page slug — used with blockId to look up page context" },
           },
           required: ["prompt"],
         },
