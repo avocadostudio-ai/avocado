@@ -362,7 +362,11 @@ export async function collectInlineAssets(
  * Used after site-contract publishes so version history can find them.
  * Best-effort: failures are silently ignored.
  */
-export async function recordPublishSnapshot(session: string, pages: PageDoc[]): Promise<string | undefined> {
+export async function recordPublishSnapshot(
+  session: string,
+  pages: PageDoc[],
+  log?: FastifyBaseLogger
+): Promise<string | undefined> {
   const repoRoot = resolve(process.cwd(), "../..")
   const targetPath = "apps/site/lib/published-content.json"
   const absoluteTargetPath = resolve(repoRoot, targetPath)
@@ -373,6 +377,7 @@ export async function recordPublishSnapshot(session: string, pages: PageDoc[]): 
     // Check if there are staged changes
     try {
       await runGit(["diff", "--cached", "--quiet", "--", targetPath], repoRoot)
+      log?.info({ session }, "recordPublishSnapshot: no content changes to commit")
       return undefined // no changes
     } catch {
       // Has staged changes — commit them
@@ -380,8 +385,21 @@ export async function recordPublishSnapshot(session: string, pages: PageDoc[]): 
     const commitMessage = `publish: session ${session} ${new Date().toISOString()}`
     await runGit(["commit", "-m", commitMessage, "--", targetPath], repoRoot)
     const rev = await runGit(["rev-parse", "HEAD"], repoRoot)
-    return rev.stdout.trim()
-  } catch {
+    const commitSha = rev.stdout.trim()
+    log?.info({ session, commitSha: commitSha.slice(0, 12) }, "recordPublishSnapshot: committed")
+
+    // Push to remote so the commit is durable and visible
+    const branch = sanitizeBranch(process.env.PUBLISH_GIT_BRANCH ?? "main")
+    try {
+      await runGit(["push", "origin", `HEAD:${branch}`], repoRoot)
+      log?.info({ session, branch }, "recordPublishSnapshot: pushed to remote")
+    } catch (pushErr) {
+      log?.warn({ err: toErrorDetail(pushErr), branch }, "recordPublishSnapshot: push failed (commit exists locally)")
+    }
+
+    return commitSha
+  } catch (err) {
+    log?.warn({ err: toErrorDetail(err), session }, "recordPublishSnapshot: failed to record snapshot")
     return undefined
   }
 }
