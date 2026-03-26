@@ -11,7 +11,7 @@
 import type Anthropic from "@anthropic-ai/sdk"
 import { type Operation, type PageDoc, type BlockManifest, defaultPropsForType, type BlockType } from "@ai-site-editor/shared"
 import { applyOpsAtomically, type ApplyOpsOptions } from "../ops/ops-engine.js"
-import { getPage, getSessionDraft, bumpVersion, orderSlugsHomeFirst } from "../state/session-state.js"
+import { getPage, getSessionDraft, bumpVersion, orderSlugsHomeFirst, getSiteConfig } from "../state/session-state.js"
 import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins/unsplash-search.js"
 import { imageGenerateHandler, imageGenerateManifest } from "../tools/builtins/image-generate.js"
 import type { ToolCallContext } from "../tools/types.js"
@@ -346,6 +346,55 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
             hint: "These are the default props. The actual schema may accept additional fields. Use the default props structure as a guide.",
           }, null, 2),
         }
+      },
+    },
+
+    // ================================================================
+    // SITE CONFIG TOOLS
+    // ================================================================
+
+    {
+      definition: {
+        name: "get_site_config",
+        description: "Get the site configuration — site name, logo URL, navigation labels, and navigation groups.",
+        input_schema: {
+          type: "object" as const,
+          properties: {},
+        },
+      },
+      handler: async () => {
+        const config = getSiteConfig(session)
+        return { result: JSON.stringify(config, null, 2) }
+      },
+    },
+
+    {
+      definition: {
+        name: "update_site_config",
+        description: "Update site configuration — site name, logo, navigation labels (custom text for nav links), and navigation groups (dropdown menus). Use this to edit the site header, rename the site, or reorganize navigation.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            name: { type: "string", description: "Site name displayed in the header" },
+            logo: { type: "string", description: "Logo URL" },
+            navLabels: {
+              type: "object",
+              description: "Custom navigation labels. Keys are page slugs, values are display text. E.g. { \"/pricing\": \"Plans & Pricing\" }",
+            },
+            navGroups: {
+              type: "object",
+              description: "Navigation dropdown groups. Keys are group labels, values are arrays of page slugs. E.g. { \"Products\": [\"/bananas\", \"/cherries\"] }",
+            },
+          },
+        },
+      },
+      handler: async (input) => {
+        const patch: Record<string, unknown> = {}
+        if (input.name !== undefined) patch.name = input.name
+        if (input.logo !== undefined) patch.logo = input.logo
+        if (input.navLabels !== undefined) patch.navLabels = input.navLabels
+        if (input.navGroups !== undefined) patch.navGroups = input.navGroups
+        return applyOps([{ op: "update_site_config", patch } as unknown as Operation])
       },
     },
 
