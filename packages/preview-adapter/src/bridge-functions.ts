@@ -265,6 +265,13 @@ export function clearAllHighlights(): void {
 }
 
 export function applyAiFieldLoading(blockId: string, editablePath: string, active: boolean): void {
+  // Early-out: if shimmer is already active on the same target, skip DOM rebuild
+  if (active && blockId) {
+    const existing = document.querySelector(".aifx-shimmer-overlay")
+    if (existing?.parentElement?.closest(`[data-block-id="${blockId}"]`) || existing?.parentElement?.getAttribute("data-block-id") === blockId) {
+      return
+    }
+  }
   // Remove all existing shimmer overlays and restore inline styles
   document.querySelectorAll(".aifx-shimmer-sparkle").forEach((el) => el.remove())
   document.querySelectorAll(".aifx-shimmer-overlay").forEach((el) => {

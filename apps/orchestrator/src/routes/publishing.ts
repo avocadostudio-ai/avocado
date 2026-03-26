@@ -3,6 +3,7 @@ import {
   type PublishTracker,
   normalizeSession,
   normalizeSiteId,
+  isLegacySiteId,
   scopedSessionKey,
   publishStatusBySession,
   getSessionPages,
@@ -169,9 +170,7 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
       // CMS sites (sanity, contentful, strapi) publish to their CMS directly;
       // writing their pages to apps/site/lib/published-content.json would
       // overwrite the avocado-stories content.
-      const siteIdNormalized = normalizeSiteId(body.siteId)
-      const isJsonFileSite = siteIdNormalized === "avocado-stories" || siteIdNormalized === "default"
-      const snapshotCommit = isJsonFileSite
+      const snapshotCommit = isLegacySiteId(normalizeSiteId(body.siteId))
         ? await recordPublishSnapshot(scopedSession, pages, request.log)
         : undefined
 

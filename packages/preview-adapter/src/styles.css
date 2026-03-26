@@ -1025,19 +1025,6 @@
 }
 @keyframes editor-cursor-blink { 50% { opacity: 0; } }
 
-/* Skeleton shimmer for incoming blocks */
-.editor-skeleton-block {
-  min-height: 120px;
-  border-radius: 4px;
-  background: linear-gradient(110deg, #f1f5f9 30%, #e2e8f0 50%, #f1f5f9 70%);
-  background-size: 200% 100%;
-  animation: editor-skeleton-shimmer 1.2s ease-in-out infinite;
-}
-@keyframes editor-skeleton-shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
-}
-
 /* AI image reveal: blur→sharp transition when generated image replaces placeholder */
 .ai-image-reveal {
   animation: ai-image-reveal 1.2s cubic-bezier(0.2, 0.9, 0.2, 1) both;
@@ -1045,88 +1032,6 @@
 @keyframes ai-image-reveal {
   from { filter: blur(20px) saturate(1.1); transform: scale(1.04); opacity: 0.6; }
   to   { filter: blur(0) saturate(1); transform: scale(1); opacity: 1; }
-}
-
-/* AI field loading shimmer — injected child div to avoid ::before/::after conflicts */
-.aifx-shimmer-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 23;
-  pointer-events: none;
-  border-radius: inherit;
-  overflow: clip;
-  background: linear-gradient(
-    108deg,
-    transparent 22%,
-    rgba(208, 214, 221, 0.04) 34%,
-    rgba(219, 224, 231, 0.24) 49%,
-    rgba(247, 250, 252, 0.2) 56%,
-    rgba(208, 214, 221, 0.05) 64%,
-    transparent 78%
-  );
-  background-size: 220% 100%;
-  background-position: 160% 0;
-  animation: aifx-shimmer-sweep 1.45s linear infinite;
-  mix-blend-mode: screen;
-}
-
-/* Force toolbar visible while AI shimmer is active */
-.editor-block-toolbar:has(.aifx-shimmer-sparkle) {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-.aifx-shimmer-sparkle {
-  position: static;
-  z-index: 1;
-  width: 28px !important;
-  height: 28px !important;
-  flex-shrink: 0;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  color: #fff !important;
-  background: rgba(15, 23, 42, 0.85) !important;
-  border-radius: 50% !important;
-  animation: aifx-sparkle-blink 1s ease-in-out infinite;
-}
-
-.aifx-shimmer-sparkle svg {
-  display: block;
-  width: 13px;
-  height: 13px;
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 6px rgba(170, 178, 186, 0.45));
-}
-
-@media (prefers-color-scheme: light) {
-  .aifx-shimmer-overlay {
-    background: linear-gradient(
-      108deg,
-      transparent 18%,
-      rgba(210, 216, 223, 0.08) 32%,
-      rgba(226, 231, 237, 0.34) 47%,
-      rgba(255, 255, 255, 0.34) 54%,
-      rgba(216, 222, 229, 0.1) 68%,
-      transparent 84%
-    );
-    animation-duration: 1.2s;
-  }
-
-  .aifx-shimmer-sparkle svg {
-    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.28));
-  }
-}
-
-@keyframes aifx-sparkle-blink {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(0.8); }
-}
-
-@keyframes aifx-shimmer-sweep {
-  to {
-    background-position: -60% 0;
-  }
 }
 
 /* Image change hover button */
