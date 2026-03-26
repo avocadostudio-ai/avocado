@@ -1,13 +1,11 @@
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag, resolveItemHeadingTag } from "@ai-site-editor/shared"
 import { PrimaryButton, BlockImage } from "../_shared"
 
 export function CardGrid(props: Record<string, unknown>) {
   const cards = Array.isArray(props.cards) ? props.cards : []
-  const headingTag = resolveHeadingTag("CardGrid", props)
-  const HeadingTag = headingTag as keyof JSX.IntrinsicElements
-  const sectionLevel = parseInt(headingTag[1])
-  const ItemHeadingTag = (`h${Math.min(6, sectionLevel + 1)}`) as keyof JSX.IntrinsicElements
+  const HeadingTag = resolveHeadingTag("CardGrid", props) as keyof JSX.IntrinsicElements
+  const ItemHeadingTag = resolveItemHeadingTag("CardGrid", props) as keyof JSX.IntrinsicElements
   return (
     <section className="card-grid-section">
       <div className="section__inner">
