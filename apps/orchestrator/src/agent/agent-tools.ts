@@ -266,6 +266,198 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
       handler: async (input) => applyOps([{ op: "remove_page", pageSlug: input.pageSlug as string }]),
     },
 
+    {
+      definition: {
+        name: "duplicate_block",
+        description: "Clone a block. Optionally place the copy on a different page or after a specific block.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            blockId: { type: "string", description: "Block to duplicate" },
+            toPageSlug: { type: "string", description: "Target page (omit for same page)" },
+            afterBlockId: { type: "string", description: "Place copy after this block" },
+          },
+          required: ["pageSlug", "blockId"],
+        },
+      },
+      handler: async (input) => {
+        const op: Record<string, unknown> = { op: "duplicate_block", pageSlug: input.pageSlug, blockId: input.blockId }
+        if (input.toPageSlug) op.toPageSlug = input.toPageSlug
+        if (input.afterBlockId) op.afterBlockId = input.afterBlockId
+        return applyOps([op as unknown as Operation])
+      },
+    },
+
+    {
+      definition: {
+        name: "duplicate_page",
+        description: "Clone a page with all its blocks.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string", description: "Page to duplicate" },
+            newPageSlug: { type: "string", description: "Slug for the copy (e.g. '/pricing-v2')" },
+            newTitle: { type: "string", description: "Title for the copy" },
+          },
+          required: ["pageSlug"],
+        },
+      },
+      handler: async (input) => {
+        const op: Record<string, unknown> = { op: "duplicate_page", pageSlug: input.pageSlug }
+        if (input.newPageSlug) op.newPageSlug = input.newPageSlug
+        if (input.newTitle) op.newTitle = input.newTitle
+        return applyOps([op as unknown as Operation])
+      },
+    },
+
+    {
+      definition: {
+        name: "move_page",
+        description: "Reorder a page in the site navigation. Set afterPageSlug to place it after a specific page, or omit to move to the top.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            afterPageSlug: { type: "string", description: "Place after this page. Omit to move to top." },
+          },
+          required: ["pageSlug"],
+        },
+      },
+      handler: async (input) => {
+        const op: Record<string, unknown> = { op: "move_page", pageSlug: input.pageSlug }
+        if (input.afterPageSlug) op.afterPageSlug = input.afterPageSlug
+        return applyOps([op as unknown as Operation])
+      },
+    },
+
+    {
+      definition: {
+        name: "update_page_meta",
+        description: "Update page SEO metadata — title, description, and Open Graph image.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            patch: {
+              type: "object",
+              description: "SEO fields to update",
+              properties: {
+                title: { type: "string", description: "Page title (browser tab, search results)" },
+                description: { type: "string", description: "Meta description for search engines" },
+                ogImage: { type: "string", description: "Open Graph image URL for social sharing" },
+              },
+            },
+          },
+          required: ["pageSlug", "patch"],
+        },
+      },
+      handler: async (input) => applyOps([{
+        op: "update_page_meta",
+        pageSlug: input.pageSlug as string,
+        patch: input.patch as Record<string, unknown>,
+      } as unknown as Operation]),
+    },
+
+    {
+      definition: {
+        name: "add_item",
+        description: "Add an item to an array property on a block (e.g. FAQ items, feature cards, testimonials).",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            blockId: { type: "string" },
+            listKey: { type: "string", description: "Array property name (e.g. 'items', 'features', 'testimonials')" },
+            item: { type: "object", description: "Item data to add" },
+            afterIndex: { type: "number", description: "Insert after this index. Omit to append." },
+          },
+          required: ["pageSlug", "blockId", "listKey", "item"],
+        },
+      },
+      handler: async (input) => {
+        const op: Record<string, unknown> = { op: "add_item", pageSlug: input.pageSlug, blockId: input.blockId, listKey: input.listKey, item: input.item }
+        if (input.afterIndex !== undefined) op.afterIndex = input.afterIndex
+        return applyOps([op as unknown as Operation])
+      },
+    },
+
+    {
+      definition: {
+        name: "update_item",
+        description: "Update a single item in an array property on a block.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            blockId: { type: "string" },
+            listKey: { type: "string" },
+            index: { type: "number", description: "Item index (0-based)" },
+            patch: { type: "object", description: "Key-value pairs to update on the item" },
+          },
+          required: ["pageSlug", "blockId", "listKey", "index", "patch"],
+        },
+      },
+      handler: async (input) => applyOps([{
+        op: "update_item",
+        pageSlug: input.pageSlug as string,
+        blockId: input.blockId as string,
+        listKey: input.listKey as string,
+        itemIndex: input.index as number,
+        patch: input.patch as Record<string, unknown>,
+      } as unknown as Operation]),
+    },
+
+    {
+      definition: {
+        name: "remove_item",
+        description: "Remove an item from an array property on a block.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            blockId: { type: "string" },
+            listKey: { type: "string" },
+            index: { type: "number", description: "Item index to remove (0-based)" },
+          },
+          required: ["pageSlug", "blockId", "listKey", "index"],
+        },
+      },
+      handler: async (input) => applyOps([{
+        op: "remove_item",
+        pageSlug: input.pageSlug as string,
+        blockId: input.blockId as string,
+        listKey: input.listKey as string,
+        itemIndex: input.index as number,
+      } as unknown as Operation]),
+    },
+
+    {
+      definition: {
+        name: "move_item",
+        description: "Reorder an item within an array property on a block.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string" },
+            blockId: { type: "string" },
+            listKey: { type: "string" },
+            index: { type: "number", description: "Current item index (0-based)" },
+            afterIndex: { type: "number", description: "Move to after this index" },
+          },
+          required: ["pageSlug", "blockId", "listKey", "index", "afterIndex"],
+        },
+      },
+      handler: async (input) => applyOps([{
+        op: "move_item",
+        pageSlug: input.pageSlug as string,
+        blockId: input.blockId as string,
+        listKey: input.listKey as string,
+        itemIndex: input.index as number,
+        afterIndex: input.afterIndex as number,
+      } as unknown as Operation]),
+    },
+
     // ================================================================
     // READ-ONLY CONTEXT TOOLS
     // ================================================================
