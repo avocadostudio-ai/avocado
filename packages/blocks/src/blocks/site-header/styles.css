@@ -13,7 +13,7 @@
 .site-top-nav-inner {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.25rem;
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
@@ -28,6 +28,7 @@
   font-weight: 600;
   font-size: 1.125rem;
   flex-shrink: 0;
+  margin-right: 0.75rem;
 }
 
 .site-logo {
@@ -45,8 +46,7 @@
 .site-nav-links-desktop {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
+  gap: 0.125rem;
 }
 
 .site-nav-links-desktop > a {
