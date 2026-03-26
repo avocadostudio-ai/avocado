@@ -647,7 +647,7 @@
     "id": "p_blueberries",
     "slug": "/blueberries",
     "title": "Blueberries",
-    "updatedAt": "2026-03-24T20:09:49.199Z",
+    "updatedAt": "2026-03-26T10:34:13.627Z",
     "meta": {
       "title": "Blueberry Varieties, Growing Tips & Community Guide",
       "description": "Learn about blueberry varieties, growing guides, and health benefits. Join our community of growers and enthusiasts. Discover highbush, lowbush, and rabbiteye blueberries."
@@ -657,7 +657,7 @@
         "id": "b_hero_blueberriy-lovers",
         "type": "Hero",
         "props": {
-          "heading": "Blueberriy Lovers Unite",
+          "heading": "Blueberry Lovers Unite",
           "subheading": "Discover the world's finest blueberries—packed with antioxidants, bursting with flavor. Join our community of passionate blueberry enthusiasts.",
           "ctaText": "Explore Our Collection",
           "ctaHref": "/community",
@@ -741,6 +741,44 @@
           "description": "Attend exclusive blueberry events, gain early access to premium varieties, and network with passionate growers and collectors worldwide.",
           "ctaText": "Join Now",
           "ctaHref": "/community"
+        }
+      },
+      {
+        "id": "b_cardgrid_1774521117453_330",
+        "type": "CardGrid",
+        "props": {
+          "title": "Featured Recipes",
+          "subtitle": "From smoothie bowls to cheesecakes, explore delicious ways to enjoy blueberries in every meal.",
+          "cards": [
+            {
+              "title": "Blueberry Smoothie Bowl",
+              "description": "A vibrant, nutrient-packed smoothie bowl topped with fresh blueberries, granola, and honey. The perfect energizing start to your morning.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1554495644-8ce87fe3e713?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycnklMjBzbW9vdGhpZSUyMGJvd2wlMjBicmVha2Zhc3R8ZW58MXwwfHx8MTc3NDUyMTIwOXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+            },
+            {
+              "title": "Classic Blueberry Muffins",
+              "description": "Fluffy, golden muffins bursting with juicy blueberries. A timeless bake that's perfect for breakfast, brunch, or an afternoon treat.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1762417420596-b90e84efcfad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw3fHxibHVlYmVycnklMjBtdWZmaW5zJTIwYmFrZWQlMjBnb2xkZW58ZW58MXwwfHx8MTc3NDUyMTIxMHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+            },
+            {
+              "title": "Blueberry Lemon Cheesecake",
+              "description": "A rich, creamy cheesecake with a bright lemon zest and a luscious blueberry compote topping. Elegant enough for any occasion.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1768260730506-72cca589bb91?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycnklMjBsZW1vbiUyMGNoZWVzZWNha2UlMjBkZXNzZXJ0fGVufDF8MHx8fDE3NzQ1MjEyMTF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+            },
+            {
+              "title": "Blueberry Chia Jam",
+              "description": "A wholesome, no-cook jam packed with fresh blueberries and chia seeds. Ready in minutes and perfect on toast, yogurt, or oatmeal.",
+              "ctaText": "View Recipe",
+              "ctaHref": "/recipes",
+              "imageUrl": "https://images.unsplash.com/photo-1750469501607-3bbbcb7112a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycnklMjBjaGlhJTIwamFtJTIwdG9hc3R8ZW58MXwwfHx8MTc3NDUyMTIxMnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
+            }
+          ]
         }
       }
     ]
