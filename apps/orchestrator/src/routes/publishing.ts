@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify"
 import {
   type PublishTracker,
   normalizeSession,
+  normalizeSiteId,
   scopedSessionKey,
   publishStatusBySession,
   getSessionPages,
@@ -164,8 +165,15 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
         })
       }
 
-      // Record snapshot in git so version history can find it
-      const snapshotCommit = await recordPublishSnapshot(scopedSession, pages, request.log)
+      // Record snapshot in git only for the default site (json-file based).
+      // CMS sites (sanity, contentful, strapi) publish to their CMS directly;
+      // writing their pages to apps/site/lib/published-content.json would
+      // overwrite the avocado-stories content.
+      const siteIdNormalized = normalizeSiteId(body.siteId)
+      const isJsonFileSite = siteIdNormalized === "avocado-stories" || siteIdNormalized === "default"
+      const snapshotCommit = isJsonFileSite
+        ? await recordPublishSnapshot(scopedSession, pages, request.log)
+        : undefined
 
       const publishedSlugs = siteResult.slugs ?? slugs
       const pageNames = publishedSlugs.map((s) => s === "/" ? "Home" : s.replace(/^\//, ""))
