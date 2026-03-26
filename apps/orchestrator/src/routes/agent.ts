@@ -1,16 +1,16 @@
 /**
- * Agent route: /agent/chat
+ * Agent route: POST /agent/chat (non-SSE, returns full result)
  *
- * Accepts a user message + Anthropic API key, runs the agent loop,
- * and streams SSE events back to the client.
+ * For the PoC, we use a simple POST that waits for the full agent loop
+ * to complete and returns the result as JSON. SSE streaming can be added
+ * later using the start/stream pattern from chat routes.
  */
 
 import type { FastifyInstance } from "fastify"
 import { scopedSessionKey } from "../state/session-state.js"
 import { createAgentTools } from "../agent/agent-tools.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
-import { runAgentLoop } from "../agent/agent-loop.js"
-import { sseWrite } from "../chat/chat-pipeline-shared.js"
+import { runAgentLoop, type AgentEvent } from "../agent/agent-loop.js"
 
 type AgentChatBody = {
   session?: string
@@ -38,108 +38,56 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     const slug = body.slug ?? "/"
     const message = body.message?.trim()
 
-    if (!message) {
-      return reply.code(400).send({ error: "message is required" })
-    }
-    if (!siteId) {
-      return reply.code(400).send({ error: "siteId is required" })
-    }
+    if (!message) return reply.code(400).send({ error: "message is required" })
+    if (!siteId) return reply.code(400).send({ error: "siteId is required" })
 
     const session = scopedSessionKey(sessionRaw, siteId)
-
-    // Build tools and context
     const tools = createAgentTools(session)
-    const systemPrompt = buildAgentSystemPrompt({
-      locale: body.locale,
-      sitePurpose: body.sitePurpose,
-    })
-    const contextMessage = buildContextMessage(session, {
-      slug,
-      activeBlockId: body.activeBlockId,
-      activeEditablePath: body.activeEditablePath,
-    })
-    const fullMessage = `${contextMessage}\n\n---\n\nUser request: ${message}`
+    const systemPrompt = buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
+    const contextMsg = buildContextMessage(session, { slug, activeBlockId: body.activeBlockId, activeEditablePath: body.activeEditablePath })
+    const fullMessage = `${contextMsg}\n\n---\n\nUser request: ${message}`
 
-    const reqOrigin = (request.headers.origin as string) ?? "*"
-    reply.raw.setHeader("Content-Type", "text/event-stream")
-    reply.raw.setHeader("Cache-Control", "no-cache, no-transform")
-    reply.raw.setHeader("Connection", "keep-alive")
-    reply.raw.setHeader("X-Accel-Buffering", "no")
-    reply.raw.setHeader("Access-Control-Allow-Origin", reqOrigin)
-    reply.raw.setHeader("Vary", "Origin")
-    reply.raw.write("retry: 60000\n\n")
-
-    let seq = 0
-    const emit = (data: Record<string, unknown>) => {
-      seq++
-      sseWrite(reply, { ...data, _seq: seq })
-    }
-
-    emit({ type: "status", message: "Agent starting..." })
+    // Collect all events from the agent loop
+    const events: AgentEvent[] = []
+    let summary = ""
+    let toolCallCount = 0
+    let error: string | null = null
 
     try {
-      console.log("[agent] Starting loop with model:", body.model ?? "default")
-      const agentLoop = runAgentLoop({
+      for await (const event of runAgentLoop({
         apiKey,
         model: body.model,
         systemPrompt,
         tools,
         userMessage: fullMessage,
-      })
-
-      for await (const event of agentLoop) {
-        if (request.raw.destroyed) break
-
-        switch (event.type) {
-          case "text_delta":
-            emit({ type: "summary_token", text: event.text })
-            break
-          case "tool_start":
-            emit({ type: "status", message: `Using ${event.toolName}...` })
-            break
-          case "tool_done":
-            if (!event.isError) {
-              try {
-                const parsed = JSON.parse(event.result)
-                if (parsed.status === "applied") {
-                  emit({
-                    type: "op_applied",
-                    toolName: event.toolName,
-                    previewVersion: parsed.previewVersion,
-                    appliedCount: parsed.appliedCount,
-                  })
-                }
-              } catch {
-                // Non-JSON result (read-only tools), skip
-              }
-            } else {
-              emit({ type: "tool_error", toolName: event.toolName, error: event.result })
-            }
-            break
-          case "done":
-            emit({
-              type: "final",
-              result: {
-                status: "applied",
-                summary: event.summary,
-                toolCallCount: event.toolCallCount,
-              },
-            })
-            break
-          case "error":
-            emit({
-              type: "error",
-              result: { status: "error", summary: event.message },
-            })
-            break
+      })) {
+        events.push(event)
+        if (event.type === "done") {
+          summary = event.summary
+          toolCallCount = event.toolCallCount
+        }
+        if (event.type === "error") {
+          error = event.message
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      emit({ type: "error", result: { status: "error", summary: msg } })
+      error = err instanceof Error ? err.message : String(err)
     }
 
-    reply.raw.end()
-    return reply
+    if (error) {
+      return reply.code(500).send({ status: "error", error, events })
+    }
+
+    return {
+      status: "applied",
+      summary,
+      toolCallCount,
+      events: events.map(e => {
+        if (e.type === "tool_done") return { type: e.type, toolName: e.toolName, isError: e.isError }
+        if (e.type === "tool_start") return { type: e.type, toolName: e.toolName }
+        if (e.type === "text_delta") return { type: e.type, text: e.text }
+        return e
+      }),
+    }
   })
 }

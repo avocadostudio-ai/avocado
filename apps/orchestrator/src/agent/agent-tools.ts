@@ -29,7 +29,9 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
   // Helper: apply ops and return result
   async function applyOps(ops: Operation[]): Promise<{ result: string; isError?: boolean }> {
     try {
+      console.log("[agent-tools] Applying ops:", JSON.stringify(ops.map(o => o.op)))
       const result = await applyOpsAtomically(session, ops, applyOpts)
+      console.log("[agent-tools] Applied successfully:", result.appliedCount)
       const version = bumpVersion(session)
       return {
         result: JSON.stringify({
