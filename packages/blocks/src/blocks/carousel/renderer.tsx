@@ -1,13 +1,12 @@
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveItemHeadingTag } from "@ai-site-editor/shared"
 import { renderInline, PrimaryButton, BlockImage } from "../_shared"
 
 export function Carousel(props: Record<string, unknown>): JSX.Element {
   const items = Array.isArray(props.items) ? props.items : []
   const autoplay = String(props.autoplay) === "true"
   const interval = Number(props.interval) || 5000
-  const sectionLevel = parseInt(resolveHeadingTag("Carousel", props)[1])
-  const ItemHeadingTag = (`h${Math.min(6, sectionLevel + 1)}`) as keyof JSX.IntrinsicElements
+  const ItemHeadingTag = resolveItemHeadingTag("Carousel", props) as keyof JSX.IntrinsicElements
 
   return (
     <section
