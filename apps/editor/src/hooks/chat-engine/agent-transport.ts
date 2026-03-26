@@ -129,11 +129,21 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           const suggestions = Array.isArray(result.suggestions) ? result.suggestions as string[] : []
           setStreamStatus(null)
           setStreamSteps([])
+          // Parse variation data if present
+          const vr = result.variations as Record<string, unknown> | undefined
+          const variations = vr && Array.isArray(vr.variations) ? {
+            blockId: vr.blockId as string,
+            blockType: vr.blockType as string,
+            pageSlug: vr.pageSlug as string,
+            baseProps: (vr.baseProps ?? {}) as Record<string, unknown>,
+            options: vr.variations as { id: string; title: string; summary: string; patch: Record<string, unknown>; changedKeys: string[] }[],
+          } : undefined
           applyChatResult({
             status: "applied",
             summary,
             changes: [],
             suggestions,
+            variations,
             previewVersion: result.previewVersion as number | undefined,
             focusBlockId: result.focusBlockId as string | undefined,
           })

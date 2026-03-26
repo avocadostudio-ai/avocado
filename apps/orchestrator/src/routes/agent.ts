@@ -158,6 +158,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
       // Run agent loop in a detached async task (NOT awaited in this handler)
       const runLoop = async () => {
+        let pendingVariations: Record<string, unknown> | undefined
         try {
           for await (const event of runAgentLoop({
             apiKey: entry.apiKey,
@@ -179,6 +180,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
                     const parsed = JSON.parse(event.result)
                     if (parsed.status === "applied") {
                       emitEvent(streamId, { type: "op_applied", toolName: event.toolName, previewVersion: parsed.previewVersion, focusBlockId: parsed.focusBlockId })
+                    } else if (parsed.status === "ok" && Array.isArray(parsed.variations)) {
+                      // Variation result — store for inclusion in final event
+                      pendingVariations = parsed
+                      emitEvent(streamId, { type: "status", message: `Generated ${parsed.variations.length} variations` })
                     }
                   } catch { /* read-only tool */ }
                 } else {
@@ -187,7 +192,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
                 break
               case "done": {
                 const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(event.summary)
-                emitEvent(streamId, { type: "final", result: { status: "applied", summary: cleanSummary, suggestions, toolCallCount: event.toolCallCount } })
+                emitEvent(streamId, { type: "final", result: { status: "applied", summary: cleanSummary, suggestions, variations: pendingVariations, toolCallCount: event.toolCallCount } })
                 break
               }
               case "error":

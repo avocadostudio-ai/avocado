@@ -1065,7 +1065,55 @@ function EditorPage({
                   </ul>
                 )
               })()}
-              {(entry.suggestions ?? []).length > 0 ? (
+              {entry.variations && entry.variations.options.length > 0 ? (
+                <div className="msg-variations">
+                  {entry.variations.options.map((option, idx) => (
+                    <button
+                      key={option.id ?? `${entry.id}-v-${idx}`}
+                      type="button"
+                      className="msg-variation-card"
+                      disabled={chatEngine.isLoading}
+                      onClick={async () => {
+                        const v = entry.variations!
+                        try {
+                          const res = await fetch(`${orchestrator}/ops`, {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                              session,
+                              siteId,
+                              ops: [{ op: "update_props", pageSlug: v.pageSlug, blockId: v.blockId, patch: option.patch }],
+                            }),
+                          })
+                          if (res.ok) {
+                            preview.postToSite("draftUpdated", { focusBlockId: v.blockId })
+                            chatEngine.pushAssistantFromResult({
+                              status: "applied",
+                              summary: `Applied variation: ${option.title}`,
+                              changes: [option.summary],
+                            })
+                          }
+                        } catch { /* ignore */ }
+                      }}
+                    >
+                      <div className="msg-variation-preview-wrap">
+                        <VariationScaledPreview
+                          block={{ id: entry.variations!.blockId, type: entry.variations!.blockType, props: { ...entry.variations!.baseProps, ...option.patch } }}
+                          virtualWidth={1280}
+                        />
+                      </div>
+                      <div className="msg-variation-meta">
+                        <span className="msg-variation-badge">{String.fromCharCode(65 + idx)}</span>
+                        <div className="msg-variation-content">
+                          <span className="msg-variation-title">{option.title}</span>
+                          <span className="msg-variation-summary">{option.summary}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {!entry.variations && (entry.suggestions ?? []).length > 0 ? (
                 <div className="msg-suggestions">
                   {entry.suggestions?.map((line, idx) => (
                     <button
