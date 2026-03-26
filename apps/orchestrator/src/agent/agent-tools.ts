@@ -12,6 +12,9 @@ import type Anthropic from "@anthropic-ai/sdk"
 import { type Operation, type PageDoc, type BlockManifest, defaultPropsForType, type BlockType } from "@ai-site-editor/shared"
 import { applyOpsAtomically, type ApplyOpsOptions } from "../ops/ops-engine.js"
 import { getPage, getSessionDraft, bumpVersion, orderSlugsHomeFirst } from "../state/session-state.js"
+import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins/unsplash-search.js"
+import { imageGenerateHandler, imageGenerateManifest } from "../tools/builtins/image-generate.js"
+import type { ToolCallContext } from "../tools/types.js"
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<{ result: string; isError?: boolean }>
 
@@ -342,6 +345,60 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
             defaultProps: defaults,
             hint: "These are the default props. The actual schema may accept additional fields. Use the default props structure as a guide.",
           }, null, 2),
+        }
+      },
+    },
+
+    // ================================================================
+    // IMAGE/MEDIA TOOLS
+    // ================================================================
+
+    {
+      definition: {
+        name: "unsplash_search",
+        description: "Search Unsplash for stock photos. Returns a list of image candidates with URLs. Use the imageUrl from the result to update a block's image property via batch_update_props.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            query: { type: "string", description: "Natural-language photo search query, e.g. 'modern office workspace' or 'tropical beach sunset'" },
+            limit: { type: "number", description: "Number of candidates to return (1-5, default 3)" },
+          },
+          required: ["query"],
+        },
+      },
+      handler: async (input) => {
+        try {
+          const ctx: ToolCallContext = { siteId: "", sessionId: session, traceId: "agent", plannerProvider: "anthropic" }
+          const result = await unsplashSearchHandler({ input, context: ctx, manifest: unsplashSearchManifest })
+          return { result: JSON.stringify(result) }
+        } catch (e: unknown) {
+          return { result: `Error: ${e instanceof Error ? e.message : String(e)}`, isError: true }
+        }
+      },
+    },
+
+    {
+      definition: {
+        name: "image_generate",
+        description: "Generate an AI image from a text prompt using DALL-E or Gemini. Returns an image URL. Use the imageUrl from the result to update a block's image property via batch_update_props. Default to 'draft' quality unless the user asks for high quality.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            prompt: { type: "string", description: "Detailed text prompt describing the image to generate" },
+            aspectRatio: { type: "string", enum: ["landscape", "square", "portrait"], description: "Aspect ratio (default: landscape)" },
+            quality: { type: "string", enum: ["draft", "final"], description: "Quality: 'draft' for fast, 'final' for production" },
+            style: { type: "string", description: "Optional style guidance, e.g. 'photorealistic', 'illustration', 'flat design'" },
+          },
+          required: ["prompt"],
+        },
+      },
+      handler: async (input) => {
+        try {
+          const ctx: ToolCallContext = { siteId: "", sessionId: session, traceId: "agent", plannerProvider: "anthropic" }
+          const result = await imageGenerateHandler({ input, context: ctx, manifest: imageGenerateManifest })
+          return { result: JSON.stringify(result) }
+        } catch (e: unknown) {
+          return { result: `Error: ${e instanceof Error ? e.message : String(e)}`, isError: true }
         }
       },
     },
