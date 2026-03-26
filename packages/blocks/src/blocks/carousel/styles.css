@@ -46,7 +46,11 @@
   border-top: 1px solid var(--border);
 }
 
-.carousel__caption h3 {
+.carousel__caption h2,
+.carousel__caption h3,
+.carousel__caption h4,
+.carousel__caption h5,
+.carousel__caption h6 {
   margin: 0 0 6px;
   font-size: 1.25rem;
   font-weight: 600;
@@ -75,8 +79,8 @@
   height: 40px;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  color: #1a1a1a;
+  background: color-mix(in srgb, var(--bg-1) 85%, transparent);
+  color: var(--text-100);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -86,7 +90,7 @@
 }
 
 .carousel__btn:hover {
-  background: #fff;
+  background: var(--bg-1);
 }
 
 .carousel__btn--prev { left: 12px; }
@@ -116,15 +120,7 @@
   border-color: var(--brand);
 }
 
-/* Dark mode */
-.dark .carousel__btn {
-  background: rgba(30, 30, 30, 0.85);
-  color: #e5e5e5;
-}
-
-.dark .carousel__btn:hover {
-  background: rgba(50, 50, 50, 0.95);
-}
+/* Dark mode — handled by CSS variables, no overrides needed */
 
 /* Mobile */
 @media (max-width: 900px) {
