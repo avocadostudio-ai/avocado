@@ -21,7 +21,7 @@ Use this page as the entry point for connecting the AI Site Editor to your websi
 |---|---|---|---|
 | **Next.js Embedded** | Startups, product teams on Next.js 15+ (App Router) | ~30 min | [nextjs-mvp-embedded.md](nextjs-mvp-embedded.md) |
 | **Custom blocks** | Sites with their own component library | ~15 min | [custom-blocks.md](custom-blocks.md) |
-| **Custom tools** | Teams needing PIM, DAM, or other tool integrations | Variable | [tools-mvp.md](tools-mvp.md) |
+| **Custom tools (bootstrap manifest)** | Teams needing PIM, DAM, or other tool integrations | Variable | [tools-mvp.md](tools-mvp.md) |
 
 **MVP requirements:** Next.js 15+ with App Router. The `@ai-site-editor/site-sdk` package handles all integration plumbing. Pages Router is not supported.
 

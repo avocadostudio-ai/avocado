@@ -30,6 +30,22 @@ import {
 } from "../state/session-state.js"
 
 // ---------------------------------------------------------------------------
+// Passthrough Zod schema cache — avoids allocating a new ZodObject per call
+// ---------------------------------------------------------------------------
+
+const _passthroughSchemaCache = new Map<string, z.ZodObject<any>>()
+
+function _getPassthroughSchema(blockType: string): z.ZodObject<any> | undefined {
+  const cached = _passthroughSchemaCache.get(blockType)
+  if (cached) return cached
+  const schema = blockSchemas[blockType as BlockType]
+  if (!schema) return undefined
+  const pt = schema.passthrough()
+  _passthroughSchemaCache.set(blockType, pt)
+  return pt
+}
+
+// ---------------------------------------------------------------------------
 // Route link rewriting (used by rename_page operation)
 // ---------------------------------------------------------------------------
 
@@ -299,12 +315,11 @@ function _validateWithManifestIfPresent(
   const manifestComponent = manifestByType.get(blockType)
 
   if (manifestComponent) {
-    // When a manifest declares this block, use passthrough Zod (keeps extra keys)
-    // so site-specific fields survive coercion of shared-registry fields.
-    const schema = blockSchemas[blockType as BlockType]
+    // Passthrough Zod keeps extra keys so site-specific fields survive coercion.
+    const ptSchema = _getPassthroughSchema(blockType)
     let coerced = nextProps
-    if (schema) {
-      const result = schema.passthrough().safeParse(nextProps)
+    if (ptSchema) {
+      const result = ptSchema.safeParse(nextProps)
       if (result.success) coerced = result.data as Record<string, unknown>
     }
     if (!validateByJsonSchemaLike(manifestComponent.propsSchema, coerced)) {
