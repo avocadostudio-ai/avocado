@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-26T12:31:28.331Z",
+    "updatedAt": "2026-03-26T12:32:55.527Z",
     "blocks": [
       {
         "id": "block-block-block-b_hero_home",
@@ -35,6 +35,10 @@
             {
               "title": "Live updates",
               "description": "Preview changes immediately."
+            },
+            {
+              "title": "Open Sanity Studio",
+              "description": "Manage your content directly in Sanity Studio."
             }
           ]
         }
@@ -43,10 +47,10 @@
         "id": "block-block-block-b_cta_home",
         "type": "CTA",
         "props": {
-          "ctaHref": "/explore",
-          "ctaText": "Get started",
+          "title": "Ready to get started?",
           "description": "Explore our platform today and transform your content workflow.",
-          "title": "Ready to get started?"
+          "ctaText": "Open Sanity Studio",
+          "ctaHref": "http://localhost:3333"
         }
       }
     ]
