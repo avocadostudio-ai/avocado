@@ -266,9 +266,11 @@ export function clearAllHighlights(): void {
 
 export function applyAiFieldLoading(blockId: string, editablePath: string, active: boolean): void {
   // Early-out: if shimmer is already active on the same target, skip DOM rebuild
-  if (active && blockId) {
-    const existing = document.querySelector(".aifx-shimmer-overlay")
-    if (existing?.parentElement?.closest(`[data-block-id="${blockId}"]`) || existing?.parentElement?.getAttribute("data-block-id") === blockId) {
+  if (active) {
+    const existing = document.querySelector<HTMLElement>(".aifx-shimmer-overlay")
+    const existingBlockId = existing?.getAttribute("data-aifx-block-id") ?? ""
+    const existingPath = existing?.getAttribute("data-aifx-editable-path") ?? ""
+    if (existingBlockId === (blockId ?? "") && existingPath === (editablePath ?? "")) {
       return
     }
   }
@@ -293,28 +295,37 @@ export function applyAiFieldLoading(blockId: string, editablePath: string, activ
       if (!parent.style.cssText.trim()) parent.removeAttribute("style")
     }
   })
-  if (active && blockId) {
-    const block = findBlockNode(blockId)
-    if (block) {
-      const target = editablePath ? findEditableNode(block, editablePath) : block
-      if (target) {
-        const overlay = document.createElement("div")
-        overlay.className = "aifx-shimmer-overlay"
-        const sparkle = document.createElement("div")
-        sparkle.className = "aifx-shimmer-sparkle"
-        sparkle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>'
-        if (!target.hasAttribute("data-aifx-prev-position")) {
-          target.setAttribute("data-aifx-prev-position", target.style.position)
-        }
-        target.style.position = target.style.position || "relative"
-        target.appendChild(overlay)
-        const highlight = block.closest(".editor-highlight") ?? block
-        const toolbar = highlight.querySelector(".editor-block-toolbar")
-        if (toolbar) {
-          toolbar.appendChild(sparkle)
-        } else {
-          target.appendChild(sparkle)
-        }
+  if (active) {
+    const scopedBlock =
+      (blockId ? findBlockNode(blockId) : null) ??
+      document.querySelector<HTMLElement>(".editor-highlight[data-block-id]") ??
+      document.querySelector<HTMLElement>("[data-block-id]") ??
+      document.querySelector<HTMLElement>("main.editor-mode, main")
+    if (!scopedBlock) return
+
+    // Always paint shimmer on block/root so it's clearly visible in preview.
+    // Field-level nodes are often inline/small and can make shimmer imperceptible.
+    const target = scopedBlock
+    const overlay = document.createElement("div")
+    overlay.className = "aifx-shimmer-overlay"
+    overlay.setAttribute("data-aifx-block-id", blockId ?? "")
+    overlay.setAttribute("data-aifx-editable-path", editablePath ?? "")
+    const sparkle = document.createElement("div")
+    sparkle.className = "aifx-shimmer-sparkle"
+    sparkle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>'
+    if (!target.hasAttribute("data-aifx-prev-position")) {
+      target.setAttribute("data-aifx-prev-position", target.style.position)
+    }
+    target.style.position = target.style.position || "relative"
+    target.appendChild(overlay)
+
+    if (blockId) {
+      const highlight = scopedBlock.closest(".editor-highlight") ?? scopedBlock
+      const toolbar = highlight.querySelector(".editor-block-toolbar")
+      if (toolbar) {
+        toolbar.appendChild(sparkle)
+      } else {
+        target.appendChild(sparkle)
       }
     }
   }
@@ -1131,10 +1142,12 @@ export function createBridgeFunctions(
         let attempts = 0
         const tryReapply = () => {
           if (!state.activeShimmer || state.activeShimmer.blockId !== blockId) return
-          const node = findBlockNode(blockId)
-          if (node) {
-            applyAiFieldLoading(blockId, editablePath, true)
-          } else if (attempts < 8) {
+          applyAiFieldLoading(blockId, editablePath, true)
+          const node = blockId ? findBlockNode(blockId) : null
+          const hasOverlay = node
+            ? Boolean(node.querySelector(".aifx-shimmer-overlay"))
+            : Boolean(document.querySelector(".aifx-shimmer-overlay"))
+          if (!hasOverlay && attempts < 8) {
             attempts++
             setTimeout(tryReapply, 60)
           }

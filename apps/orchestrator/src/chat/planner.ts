@@ -4,6 +4,7 @@ import {
   allowedBlockTypes,
   blockSchemas,
   editPlanSchema,
+  type BlockManifest,
   type EditPlan,
   type Operation,
   type PageDoc
@@ -242,10 +243,12 @@ function buildContractsForMode(args: {
   mode: PlannerContractMode
   targetBlockTypes: string[]
   includePageMetaContract: boolean
+  componentsManifest?: BlockManifest
+  effectiveBlockTypes?: string[]
 }): PlannerSchemaContextPayload {
-  const allContracts = blockContractsSummary()
+  const allContracts = blockContractsSummary(args.componentsManifest)
   const payload: PlannerSchemaContextPayload = {
-    knownBlockTypes: Object.keys(blockSchemas),
+    knownBlockTypes: args.effectiveBlockTypes ?? Object.keys(blockSchemas),
     editPlanShape: EDIT_PLAN_SHAPE_HINT
   }
 
@@ -270,17 +273,20 @@ export function buildPlannerSchemaContext(args: {
   pageWideTranslation: boolean
   legacyIncludeContracts: boolean
   forceFullContracts?: boolean
+  componentsManifest?: BlockManifest
+  effectiveBlockTypes?: string[]
 }): { payload: PlannerSchemaContextPayload; meta: PlannerSchemaContextMeta } {
   const strictJsonEnabled = isStrictJsonResponseEnabled()
   const targetBlockTypes = pickTargetBlockTypes({ message: args.message, contextPack: args.contextPack })
   const includePageMetaContract = /\b(seo|meta|metadata|og\s*image|open\s*graph|description|structured\s*data|schema\.org)\b/i.test(args.message) || /\d{2,3}\s*char/i.test(args.message)
+  const knownTypes = args.effectiveBlockTypes ?? Object.keys(blockSchemas)
 
   if (!isAdaptiveSchemaContextEnabled()) {
     const payload: PlannerSchemaContextPayload = args.legacyIncludeContracts
       ? {
-          blockContracts: blockContractsSummary(),
+          blockContracts: blockContractsSummary(args.componentsManifest),
           pageMetaContract: pageMetaContractSummary(),
-          knownBlockTypes: Object.keys(blockSchemas),
+          knownBlockTypes: knownTypes,
           editPlanShape: EDIT_PLAN_SHAPE_HINT
         }
       : {}
@@ -321,12 +327,14 @@ export function buildPlannerSchemaContext(args: {
   let selectedPayload = buildContractsForMode({
     mode: selectedMode,
     targetBlockTypes,
-    includePageMetaContract
+    includePageMetaContract,
+    componentsManifest: args.componentsManifest,
+    effectiveBlockTypes: args.effectiveBlockTypes
   })
   let selectedBytes = bytesForPayload(selectedPayload)
 
   for (const mode of fallbackOrder) {
-    const payload = buildContractsForMode({ mode, targetBlockTypes, includePageMetaContract })
+    const payload = buildContractsForMode({ mode, targetBlockTypes, includePageMetaContract, componentsManifest: args.componentsManifest, effectiveBlockTypes: args.effectiveBlockTypes })
     const bytes = bytesForPayload(payload)
     selectedMode = mode
     selectedPayload = payload
@@ -836,6 +844,7 @@ export async function generatePlanWithOpenAI(args: {
   siteContextBlock?: string | null
   forceFullSchemaContracts?: boolean
   manifestBlockTypes?: string[]
+  componentsManifest?: BlockManifest
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
@@ -899,7 +908,9 @@ export async function generatePlanWithOpenAI(args: {
         batchOverride,
         pageWideTranslation,
         legacyIncludeContracts: includeContracts,
-        forceFullContracts: args.forceFullSchemaContracts
+        forceFullContracts: args.forceFullSchemaContracts,
+        componentsManifest: args.componentsManifest,
+        effectiveBlockTypes
       })
 
   const user = {

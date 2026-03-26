@@ -554,14 +554,27 @@ function EditorPage({
     }
 
     const blockId = chatEngine.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? activeBlockId ?? ""
-    if (!blockId) return
-    // Avoid re-sending if already shimmering the same target
-    if (shimmerActiveRef.current && shimmerTargetRef.current?.blockId === blockId) return
-    const editablePath = blockId === (activeBlockIdRef.current ?? "") ? (activeEditablePathRef.current ?? "") : ""
+    const activeTargetBlockId = activeBlockIdRef.current ?? activeBlockId ?? ""
+    const editablePath = blockId && blockId === activeTargetBlockId ? (activeEditablePathRef.current ?? activeEditablePath ?? "") : ""
     postToSite("aiFieldLoading", { blockId, editablePath, active: true })
     shimmerTargetRef.current = { blockId, editablePath }
     shimmerActiveRef.current = true
-  }, [chatEngine.isLoading, chatEngine.latestStreamFocusBlockId, activeBlockId])
+  }, [chatEngine.isLoading, chatEngine.latestStreamFocusBlockId, activeBlockId, activeEditablePath])
+
+  // Keep shimmer alive across async preview re-renders/remounts while loading.
+  useEffect(() => {
+    if (!chatEngine.isLoading) return
+    const timer = window.setInterval(() => {
+      const target = shimmerTargetRef.current
+      if (!target) return
+      previewPostToSiteRef.current("aiFieldLoading", {
+        blockId: target.blockId,
+        editablePath: target.editablePath,
+        active: true
+      })
+    }, 1200)
+    return () => window.clearInterval(timer)
+  }, [chatEngine.isLoading])
 
   // Re-sync selection mode after route changes (preview bridge re-mounts and loses the attribute)
   useEffect(() => {
@@ -804,6 +817,12 @@ function EditorPage({
   const streamIsError = chatEngine.streamStatus ? /failed|error/i.test(chatEngine.streamStatus) : false
   const streamLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? t("stream.shapingUpdate") : t("stream.gettingReady")))
   const streamTextLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? t("stream.updating") : t("stream.thinking")))
+  const reconnectMatch = chatEngine.streamStatus?.match(/reconnecting(?:\s+agent\s+stream)?(?:\s+\((\d+)\/(\d+)\))?/i) ?? null
+  const reconnectAttempt = reconnectMatch?.[1] ? Number(reconnectMatch[1]) : null
+  const reconnectTotal = reconnectMatch?.[2] ? Number(reconnectMatch[2]) : null
+  const reconnectBadgeLabel = reconnectMatch
+    ? (reconnectAttempt && reconnectTotal ? `Reconnect ${reconnectAttempt}/${reconnectTotal}` : "Reconnecting")
+    : null
   const fieldDraftDebugLabel = `field_draft ${chatEngine.fieldDraftDebug.eventsPerSecond}/s · chars ${chatEngine.fieldDraftDebug.charsPerSecond}/s · lag ${chatEngine.fieldDraftDebug.typingLagChars}`
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const chatPanelClassName = `chat-panel ${activeTab === "properties" ? "chat-panel--properties" : "chat-panel--chat"}`
@@ -1342,7 +1361,6 @@ function EditorPage({
               ) : null}
               <div className="msg-main">
                 {renderSimpleMarkdown(chatEngine.streamingText)}
-                <span className="streaming-cursor" aria-hidden="true" />
               </div>
               {chatEngine.streamingChanges.length > 0 ? (
                 <ul className="msg-list">
@@ -1356,6 +1374,11 @@ function EditorPage({
               ) : null}
               {chatEngine.streamStatus ? (
                 <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{streamTextLabel}</span>
+              ) : null}
+              {reconnectBadgeLabel ? (
+                <span className="stream-reconnect-badge stream-reconnect-badge-inline" title={chatEngine.streamStatus ?? undefined}>
+                  {reconnectBadgeLabel}
+                </span>
               ) : null}
               {showDebugDetails && chatEngine.fieldDraftDebugEnabled ? (
                 <div className="streaming-debug-inline">{fieldDraftDebugLabel}</div>
@@ -1389,6 +1412,11 @@ function EditorPage({
                   ) : null}
                 </>
               )}
+              {reconnectBadgeLabel ? (
+                <span className="stream-reconnect-badge" title={chatEngine.streamStatus ?? undefined}>
+                  {reconnectBadgeLabel}
+                </span>
+              ) : null}
               {chatEngine.imageProgress ? (
                 <div className="image-gen-progress">
                   <div className="image-gen-progress-fill" style={{ width: `${chatEngine.imageProgress.percent}%` }} />

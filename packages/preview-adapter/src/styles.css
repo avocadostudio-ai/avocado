@@ -246,29 +246,37 @@
 .aifx-shimmer-overlay {
   position: absolute;
   inset: 0;
-  z-index: 23;
+  z-index: 21;
   pointer-events: none;
   border-radius: inherit;
-  overflow: clip;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    rgba(208, 214, 221, 0.03) 22%,
-    rgba(219, 224, 231, 0.18) 44%,
-    rgba(247, 250, 252, 0.22) 50%,
-    rgba(219, 224, 231, 0.18) 56%,
-    rgba(208, 214, 221, 0.03) 78%,
-    transparent 100%
-  );
-  background-size: 250% 100%;
-  background-position: 180% 0;
-  animation: aifx-shimmer-sweep 1.6s ease-in-out infinite;
-  mix-blend-mode: screen;
+  overflow: hidden;
+  background: transparent;
+  mix-blend-mode: normal;
+  box-shadow: none;
 }
 
-@keyframes aifx-shimmer-sweep {
-  0% { background-position: 180% 0; }
-  100% { background-position: -80% 0; }
+.aifx-shimmer-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.0) 42%,
+    rgba(255, 255, 255, 0.42) 50%,
+    rgba(219, 234, 254, 0.30) 54%,
+    rgba(255, 255, 255, 0.0) 60%,
+    transparent 66%,
+    transparent 100%
+  );
+  transform: translateX(120%);
+  animation: aifx-shimmer-slide 2.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes aifx-shimmer-slide {
+  0% { transform: translateX(120%); }
+  100% { transform: translateX(-120%); }
 }
 
 /* Force toolbar visible while AI shimmer is active */
@@ -288,9 +296,9 @@
   justify-content: center;
   pointer-events: none;
   color: #fff !important;
-  background: rgba(15, 23, 42, 0.85) !important;
+  background: rgba(15, 23, 42, 0.72) !important;
   border-radius: 50% !important;
-  animation: aifx-sparkle-blink 1.2s ease-in-out infinite;
+  animation: aifx-sparkle-blink 1.6s ease-in-out infinite;
 }
 
 .aifx-shimmer-sparkle svg {
@@ -301,28 +309,34 @@
 }
 
 @keyframes aifx-sparkle-blink {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(0.82); opacity: 0.7; }
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(0.9); opacity: 0.65; }
 }
 
 @media (prefers-color-scheme: light) {
   .aifx-shimmer-overlay {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .aifx-shimmer-overlay::before {
     background: linear-gradient(
-      105deg,
+      110deg,
       transparent 0%,
-      rgba(210, 216, 223, 0.06) 22%,
-      rgba(226, 231, 237, 0.28) 44%,
-      rgba(255, 255, 255, 0.30) 50%,
-      rgba(226, 231, 237, 0.28) 56%,
-      rgba(216, 222, 229, 0.06) 78%,
+      transparent 36%,
+      rgba(255, 255, 255, 0.0) 41%,
+      rgba(255, 255, 255, 0.46) 50%,
+      rgba(191, 219, 254, 0.34) 54%,
+      rgba(255, 255, 255, 0.0) 60%,
+      transparent 66%,
       transparent 100%
     );
-    animation-duration: 1.4s;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .aifx-shimmer-overlay,
+  .aifx-shimmer-overlay::before,
   .aifx-shimmer-sparkle,
   .editor-skeleton-block::before {
     animation: none !important;
