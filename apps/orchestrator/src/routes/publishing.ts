@@ -160,7 +160,7 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
       }
 
       // Record snapshot in git so version history can find it
-      void recordPublishSnapshot(scopedSession, pages).catch(() => {})
+      const snapshotCommit = await recordPublishSnapshot(scopedSession, pages, request.log)
 
       const publishedSlugs = siteResult.slugs ?? slugs
       const pageNames = publishedSlugs.map((s) => s === "/" ? "Home" : s.replace(/^\//, ""))
@@ -169,6 +169,7 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
         session,
         slugs: publishedSlugs,
         vercelState: "READY",
+        commitSha: snapshotCommit?.slice(0, 12),
         message: `Published ${pageNames.join(", ")} to site.`
       }
     }
