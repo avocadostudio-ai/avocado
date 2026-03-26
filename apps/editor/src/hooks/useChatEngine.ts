@@ -223,6 +223,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       changes: parsedChanges.changes,
       mentionedSlugs: Array.isArray(data.mentionedSlugs) ? data.mentionedSlugs.filter((s): s is string => typeof s === "string") : [],
       suggestions: data.suggestions ?? [],
+      variations: data.variations,
       errors,
       meta: data.modelUsed ? `${data.modelUsed}${data.modelKey ? ` (${data.modelKey})` : ""}` : undefined,
       debug: data.debug,
