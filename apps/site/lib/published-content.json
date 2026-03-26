@@ -3,7 +3,7 @@
     "id": "p_home",
     "slug": "/",
     "title": "Home",
-    "updatedAt": "2026-03-26T10:39:03.803Z",
+    "updatedAt": "2026-03-26T11:21:40.890Z",
     "meta": {
       "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
       "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -17,8 +17,8 @@
           "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
           "ctaText": "Explore Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "https://images.unsplash.com/photo-1594921194380-d4d03d481e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxBdm9jYWRvfGVufDF8MHx8fDE3NzM3NTIyMjl8MA&ixlib=rb-4.1.0&q=80&w=1080",
-          "imageAlt": "sliced green and yellow fruit",
+          "imageUrl": "http://localhost:4200/generated-images/gen_1774524098653_o7l6dq.jpg",
+          "imageAlt": "remove blueberries from the dish itself",
           "imagePosition": "right",
           "secondaryCtaText": "Read Research Studies"
         }
