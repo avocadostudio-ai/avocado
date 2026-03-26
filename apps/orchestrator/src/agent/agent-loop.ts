@@ -73,7 +73,8 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
         tools: toolDefs,
         messages,
       })
-      console.log("[agent-loop] Got response, stop_reason:", response.stop_reason, "content blocks:", response.content.length)
+      console.log("[agent-loop] Got response, stop_reason:", response.stop_reason, "content blocks:", response.content.length,
+        "tools:", response.content.filter(b => b.type === "tool_use").map(b => (b as { name: string }).name))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error("[agent-loop] API error:", msg)
@@ -113,8 +114,11 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
 
     for (const toolUse of toolUseBlocks) {
       toolCallCount++
-      yield { type: "tool_start", toolName: toolUse.name, toolUseId: toolUse.id }
+      console.log("[agent-loop] PRE-YIELD tool_start for:", toolUse.name)
+      yield { type: "tool_start" as const, toolName: toolUse.name, toolUseId: toolUse.id }
+      console.log("[agent-loop] POST-YIELD tool_start for:", toolUse.name)
 
+      console.log("[agent-loop] Executing tool:", toolUse.name, "input:", JSON.stringify(toolUse.input).slice(0, 200))
       const handler = handlerMap.get(toolUse.name)
       if (!handler) {
         const errorResult = `Unknown tool: ${toolUse.name}`
