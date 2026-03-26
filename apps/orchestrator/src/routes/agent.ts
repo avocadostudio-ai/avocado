@@ -10,6 +10,8 @@ import type { FastifyInstance, FastifyReply } from "fastify"
 import { scopedSessionKey } from "../state/session-state.js"
 import { createAgentTools } from "../agent/agent-tools.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
+import { createMigrationTools } from "../migration/migration-tools.js"
+import { buildMigrationSystemPrompt } from "../migration/migration-prompt.js"
 import { runAgentLoop, type AgentEvent } from "../agent/agent-loop.js"
 import { type AgentProvider, detectProviderFromKey, resolveAgentModel } from "../agent/agent-provider.js"
 import { sseWrite } from "../chat/chat-pipeline-shared.js"
@@ -86,6 +88,11 @@ const TOOL_LABELS: Record<string, string> = {
   image_generate: "Generating image",
   update_site_config: "Updating site settings",
   generate_variations: "Creating alternatives",
+  fetch_and_screenshot: "Analyzing external website",
+  extract_design_tokens: "Extracting design tokens",
+  download_remote_image: "Downloading image",
+  apply_theme: "Applying theme",
+  create_block_type: "Creating new block type",
   add_item: "Adding list item",
   update_item: "Updating list item",
   remove_item: "Removing list item",
@@ -212,8 +219,16 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
       const body = entry.body
       const session = scopedSessionKey(body.session ?? "dev", body.siteId ?? "")
-      const tools = createAgentTools(session)
-      const systemPrompt = buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
+
+      // Detect migration intent: message contains "migrate" + URL pattern
+      const isMigration = /\bmigrat[ei]/i.test(body.message ?? "") && /https?:\/\/\S+/i.test(body.message ?? "")
+
+      const tools = isMigration
+        ? [...createMigrationTools(session), ...createAgentTools(session)]
+        : createAgentTools(session)
+      const systemPrompt = isMigration
+        ? buildMigrationSystemPrompt()
+        : buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
       const contextMsg = buildContextMessage(session, {
         slug: body.slug ?? "/",
         activeBlockId: body.activeBlockId,
