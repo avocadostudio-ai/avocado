@@ -105,25 +105,35 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           summaryText += d.text as string
           setStreamStatus("Agent responding...")
         } else if (type === "op_applied") {
+          const focusBlockId = d.focusBlockId as string | undefined
           setStreamSteps((prev) => {
             const done = prev.map((s) => ({ ...s, done: true }))
             return [...done, { label: `Applied ${d.toolName}`, done: true }]
           })
           // Refresh preview
-          postToSite("draftUpdated", { focusBlockId: d.focusBlockId ?? undefined })
+          postToSite("draftUpdated", { focusBlockId })
+          // Re-apply shimmer after preview re-renders the block DOM
+          if (focusBlockId) {
+            setTimeout(() => {
+              if (!canceled) {
+                postToSite("aiFieldLoading", { blockId: focusBlockId, active: true })
+              }
+            }, 350)
+          }
         } else if (type === "tool_error") {
           setStreamSteps((prev) => [...prev, { label: `Error: ${d.toolName}`, done: true }])
         } else if (type === "final") {
           settled = true
           const result = d.result as Record<string, unknown>
           const summary = (result.summary as string) || summaryText
+          const suggestions = Array.isArray(result.suggestions) ? result.suggestions as string[] : []
           setStreamStatus(null)
           setStreamSteps([])
           applyChatResult({
             status: "applied",
             summary,
             changes: [],
-            suggestions: [],
+            suggestions,
             previewVersion: result.previewVersion as number | undefined,
             focusBlockId: result.focusBlockId as string | undefined,
           })
