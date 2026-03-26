@@ -371,6 +371,7 @@ export type BridgeState = {
   hoveredItemRoot: HTMLElement | null
   hoveredBlockRoot: HTMLElement | null
   observer: MutationObserver | null
+  activeShimmer: { blockId: string; editablePath: string } | null
 }
 
 export function createBridgeState(): BridgeState {
@@ -401,6 +402,7 @@ export function createBridgeState(): BridgeState {
     hoveredItemRoot: null,
     hoveredBlockRoot: null,
     observer: null,
+    activeShimmer: null,
   }
 }
 
@@ -1115,6 +1117,10 @@ export function createBridgeFunctions(
         state.pendingScrollRestore = null
       }
       queueFocusAfterRefresh()
+      // Re-apply shimmer if it was active before the refresh destroyed DOM
+      if (state.activeShimmer) {
+        applyAiFieldLoading(state.activeShimmer.blockId, state.activeShimmer.editablePath, true)
+      }
     }
 
     const doRefreshAndRestore = () => {
