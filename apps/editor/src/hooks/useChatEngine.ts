@@ -201,6 +201,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   // Track last sent message so server-forced plan_only can populate pendingPlanMessage
   const lastSentMessageRef = useRef<string | null>(null)
   const activeStreamIdRef = useRef<string | null>(null)
+  const agentCancelRef = useRef<(() => void) | null>(null)
 
   // Use refs for values accessed in closures to avoid stale captures
   const slugRef = useRef(slug)
@@ -1192,6 +1193,16 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function cancelChat() {
+    // Cancel agent mode if active
+    if (agentCancelRef.current) {
+      agentCancelRef.current()
+      agentCancelRef.current = null
+      setIsLoading(false)
+      setStreamStatus(null)
+      setStreamSteps([])
+      return
+    }
+
     const currentStreamId = activeStreamIdRef.current
     if (!currentStreamId) return
     setStreamStatus(t("streamError.canceling"))
@@ -1343,7 +1354,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
       // Agent mode: when user has provided their own Anthropic API key
       if (config.agentApiKey?.trim()) {
-        const ok = await submitAgentStream({
+        const handle = submitAgentStream({
           orchestrator,
           agentApiKey: config.agentApiKey.trim(),
           session: config.session,
@@ -1362,6 +1373,9 @@ export function useChatEngine(config: ChatEngineConfig) {
           postToSite: config.postToSite,
           setActiveBlockId: config.setActiveBlockId,
         })
+        agentCancelRef.current = handle.cancel
+        const ok = await handle.promise
+        agentCancelRef.current = null
         if (!ok) {
           pushAssistantFromResult({ status: "error", summary: "Agent failed. Check your API key in settings.", changes: [] })
         }
