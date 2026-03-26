@@ -24,6 +24,7 @@ import { historyRoutes } from "./routes/history.js"
 import { toolsRoutes } from "./routes/tools.js"
 import { authRoutes } from "./routes/auth.js"
 import { gdriveRoutes } from "./routes/gdrive.js"
+import { registerAgentRoutes } from "./routes/agent.js"
 import { createToolRuntime } from "./tools/runtime.js"
 
 const app = Fastify({ logger: true })
@@ -96,10 +97,17 @@ const modelLookup = {
     reasoning: process.env.ANTHROPIC_MODEL_REASONING ?? "claude-sonnet-4-6",
     codex: process.env.ANTHROPIC_MODEL_CODEX ?? "claude-opus-4-6",
   },
+  gemini: {
+    fast: process.env.GOOGLE_GENAI_MODEL_FAST ?? "gemini-2.5-flash",
+    balanced: process.env.GOOGLE_GENAI_MODEL_BALANCED ?? "gemini-2.5-flash",
+    reasoning: process.env.GOOGLE_GENAI_MODEL_REASONING ?? "gemini-2.5-pro",
+    codex: process.env.GOOGLE_GENAI_MODEL_CODEX ?? "gemini-2.5-pro",
+  },
 }
 const availableProviders: AIProvider[] = [
   ...(process.env.OPENAI_API_KEY ? ["openai" as const] : []),
   ...(process.env.ANTHROPIC_API_KEY ? ["anthropic" as const] : []),
+  ...(process.env.GOOGLE_GENAI_API_KEY ? ["gemini" as const] : []),
 ]
 
 // ---------------------------------------------------------------------------
@@ -117,6 +125,7 @@ await app.register((instance) => historyRoutes(instance, ctx))
 await app.register((instance) => toolsRoutes(instance, ctx))
 await app.register((instance) => authRoutes(instance))
 await app.register((instance) => gdriveRoutes(instance, ctx))
+await app.register((instance) => registerAgentRoutes(instance))
 
 // ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)
