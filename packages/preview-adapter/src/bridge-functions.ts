@@ -1117,9 +1117,22 @@ export function createBridgeFunctions(
         state.pendingScrollRestore = null
       }
       queueFocusAfterRefresh()
-      // Re-apply shimmer if it was active before the refresh destroyed DOM
+      // Re-apply shimmer after DOM settles — poll briefly since React
+      // reconciliation after router.refresh() is async and rAF isn't enough.
       if (state.activeShimmer) {
-        applyAiFieldLoading(state.activeShimmer.blockId, state.activeShimmer.editablePath, true)
+        const { blockId, editablePath } = state.activeShimmer
+        let attempts = 0
+        const tryReapply = () => {
+          if (!state.activeShimmer || state.activeShimmer.blockId !== blockId) return
+          const node = findBlockNode(blockId)
+          if (node) {
+            applyAiFieldLoading(blockId, editablePath, true)
+          } else if (attempts < 8) {
+            attempts++
+            setTimeout(tryReapply, 60)
+          }
+        }
+        setTimeout(tryReapply, 50)
       }
     }
 
