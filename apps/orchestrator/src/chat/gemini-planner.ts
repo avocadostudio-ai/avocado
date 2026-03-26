@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   allowedBlockTypes,
   editPlanSchema,
+  type BlockManifest,
   type EditPlan,
   type Operation,
   type PageDoc
@@ -195,6 +196,7 @@ export async function generatePlanWithGemini(args: {
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
   manifestBlockTypes?: string[]
+  componentsManifest?: BlockManifest
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
@@ -255,7 +257,9 @@ export async function generatePlanWithGemini(args: {
         batchOverride,
         pageWideTranslation,
         legacyIncludeContracts: includeContracts,
-        forceFullContracts: args.forceFullSchemaContracts
+        forceFullContracts: args.forceFullSchemaContracts,
+        componentsManifest: args.componentsManifest,
+        effectiveBlockTypes
       })
 
   const userPayload = {

@@ -1,12 +1,16 @@
 /**
- * Agent loop: multi-turn tool-use conversation with Claude.
+ * Agent loop: multi-turn tool-use conversation with an LLM.
  *
- * Uses the Anthropic Messages API **with streaming** for real-time text deltas.
- * Handles the loop: send message → Claude streams response → execute tools → feed results back → repeat.
+ * Dispatches to provider-specific implementations (Anthropic / OpenAI) based on
+ * the `provider` field in options (required — routes validate before calling).
  */
 
 import Anthropic from "@anthropic-ai/sdk"
 import type { AgentTool } from "./agent-tools.js"
+import type { AgentProvider } from "./agent-provider.js"
+import { AGENT_MAX_TOOL_CALLS } from "./agent-provider.js"
+import { runOpenAIAgentLoop } from "./agent-loop-openai.js"
+import { anthropicSystemPromptWithCache, anthropicToolWithCache } from "../chat/anthropic-cache.js"
 
 export type AgentEvent =
   | { type: "text_delta"; text: string }
@@ -17,7 +21,8 @@ export type AgentEvent =
 
 export type AgentLoopOptions = {
   apiKey: string
-  model?: string
+  model: string
+  provider: AgentProvider
   systemPrompt: string
   tools: AgentTool[]
   userMessage: string
@@ -25,23 +30,33 @@ export type AgentLoopOptions = {
   signal?: AbortSignal
 }
 
-const DEFAULT_MODEL = "claude-sonnet-4-6"
-const DEFAULT_MAX_TOOL_CALLS = 20
-
+/** Provider-agnostic entry point — dispatches to Anthropic or OpenAI loop. */
 export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<AgentEvent> {
+  if (options.provider === "openai") {
+    yield* runOpenAIAgentLoop(options)
+    return
+  }
+  yield* runAnthropicAgentLoop(options)
+}
+
+async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator<AgentEvent> {
   const {
     apiKey,
-    model = DEFAULT_MODEL,
+    model,
     systemPrompt,
     tools,
     userMessage,
-    maxToolCalls = DEFAULT_MAX_TOOL_CALLS,
+    maxToolCalls = AGENT_MAX_TOOL_CALLS,
     signal,
   } = options
 
   const client = new Anthropic({ apiKey })
 
-  const toolDefs: Anthropic.Messages.Tool[] = tools.map((t) => t.definition)
+  // Apply prompt caching to system prompt and last tool (cache breakpoints)
+  const cachedSystem = anthropicSystemPromptWithCache(systemPrompt)
+  const toolDefs: Anthropic.Messages.Tool[] = tools.map((t, i) =>
+    i === tools.length - 1 ? anthropicToolWithCache(t.definition) : t.definition
+  )
   const handlerMap = new Map(tools.map((t) => [t.definition.name, t.handler]))
 
   const messages: Anthropic.Messages.MessageParam[] = [
@@ -68,7 +83,7 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
       const stream = client.messages.stream({
         model,
         max_tokens: 4096,
-        system: systemPrompt,
+        system: cachedSystem,
         tools: toolDefs,
         messages,
       })
@@ -132,7 +147,7 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
     messages.push({ role: "assistant", content: response.content })
 
     if (response.stop_reason === "end_turn" || toolUseBlocks.length === 0) {
-      fullSummary = textParts.join("")
+      fullSummary += textParts.join("")
       yield { type: "done", summary: fullSummary, toolCallCount }
       return
     }

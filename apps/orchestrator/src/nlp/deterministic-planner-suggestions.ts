@@ -6,7 +6,9 @@ import {
   getPropDisplayName,
   type BlockType,
   type EditPlan,
-  type PageDoc
+  type PageDoc,
+  type BlockManifest,
+  deriveFieldMetaFromSchema
 } from "@ai-site-editor/shared"
 import {
   type ChatRequestBody,
@@ -422,10 +424,26 @@ type BlockContract = { allowedProps: string[]; required: string[]; optional?: st
 /**
  * Derive block contracts from the registry so new blocks are automatically
  * included without maintaining a parallel hardcoded map.
+ *
+ * When a `manifest` is provided (external site), manifest-declared props are
+ * merged into the contract for shared-name blocks (e.g. Hero with extra
+ * `logoUrl`, `carouselImages`), and manifest-only blocks (e.g. ContactForm)
+ * get a contract derived from their JSON schema.
  */
-export function blockContractsSummary() {
+export function blockContractsSummary(manifest?: BlockManifest) {
   const allMeta = getAllBlockMeta()
   const result: Record<string, BlockContract> = {}
+
+  // Build a lookup of manifest block types → propsSchema properties
+  const manifestByType = new Map<string, Record<string, unknown>>()
+  if (manifest) {
+    for (const def of manifest.blocks) {
+      const props = def.propsSchema?.properties
+      if (props && typeof props === "object" && !Array.isArray(props)) {
+        manifestByType.set(def.type, props as Record<string, unknown>)
+      }
+    }
+  }
 
   for (const type of allowedBlockTypes) {
     const schema = blockSchemas[type]
@@ -444,6 +462,18 @@ export function blockContractsSummary() {
       } else {
         required.push(key)
       }
+    }
+
+    // Merge manifest-declared props that the shared Zod schema doesn't know about
+    const manifestProps = manifestByType.get(type)
+    if (manifestProps) {
+      for (const key of Object.keys(manifestProps)) {
+        if (!allProps.includes(key)) {
+          allProps.push(key)
+          optional.push(key)
+        }
+      }
+      manifestByType.delete(type) // consumed — remaining are manifest-only blocks
     }
 
     // Collect image spec hints for scalar fields
@@ -487,6 +517,24 @@ export function blockContractsSummary() {
     if (optional.length > 0) entry.optional = optional
 
     result[type] = entry
+  }
+
+  // Add manifest-only blocks (not in shared registry) — derive contracts from JSON schema
+  for (const [type, manifestProps] of manifestByType) {
+    const derived = deriveFieldMetaFromSchema({ type: "object", properties: manifestProps })
+    const allProps = Object.keys(manifestProps)
+    // Derive list-field notes
+    const listParts: string[] = []
+    for (const [listKey, listMeta] of Object.entries(derived.listFields)) {
+      const itemKeys = Object.keys(listMeta.itemFields).join(", ")
+      listParts.push(`${listKey} must be a non-empty array of {${itemKeys}}`)
+    }
+    const autoNotes = listParts.length > 0 ? listParts.join(". ") + "." : `${type} block. Never invent prop names.`
+    result[type] = {
+      allowedProps: allProps,
+      required: allProps, // conservative: treat all as required
+      notes: autoNotes
+    }
   }
 
   return result

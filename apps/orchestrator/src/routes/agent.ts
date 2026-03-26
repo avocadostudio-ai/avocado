@@ -11,7 +11,13 @@ import { scopedSessionKey } from "../state/session-state.js"
 import { createAgentTools } from "../agent/agent-tools.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
 import { runAgentLoop, type AgentEvent } from "../agent/agent-loop.js"
+import { type AgentProvider, detectProviderFromKey, resolveAgentModel } from "../agent/agent-provider.js"
 import { sseWrite } from "../chat/chat-pipeline-shared.js"
+
+/** Extract API key from request headers (new generic header, with backward compat). */
+function extractAgentApiKey(headers: Record<string, unknown>): string | undefined {
+  return ((headers["x-agent-api-key"] as string) ?? (headers["x-anthropic-api-key"] as string))?.trim() || undefined
+}
 
 type AgentRequestBody = {
   session?: string
@@ -29,12 +35,14 @@ type AgentRequestBody = {
 type AgentStreamEntry = {
   body: AgentRequestBody
   apiKey: string
+  provider: AgentProvider
   origin: string
   createdAt: number
   state: "pending" | "active" | "done" | "error"
   events: Array<{ seq: number; payload: Record<string, unknown> }>
   lastSeq: number
   subscribers: Set<FastifyReply>
+  abortController: AbortController
 }
 
 /**
@@ -57,12 +65,41 @@ function parseSuggestionsFromSummary(text: string): { summary: string; suggestio
   return { summary: before, suggestions }
 }
 
+/** Human-readable labels for agent tool names shown in the streaming UI. */
+const TOOL_LABELS: Record<string, string> = {
+  get_page: "Reading page content",
+  list_pages: "Checking available pages",
+  get_block_schema: "Looking up block structure",
+  get_site_config: "Reading site settings",
+  batch_update_props: "Updating content",
+  edit_page: "Editing page",
+  add_block_with_content: "Adding new section",
+  remove_block: "Removing section",
+  move_block: "Rearranging sections",
+  create_page: "Creating new page",
+  rename_page: "Renaming page",
+  remove_page: "Removing page",
+  move_page: "Moving page",
+  duplicate_block: "Duplicating section",
+  duplicate_page: "Duplicating page",
+  unsplash_search: "Searching for photos",
+  image_generate: "Generating image",
+  update_site_config: "Updating site settings",
+  generate_variations: "Creating alternatives",
+  add_item: "Adding list item",
+  update_item: "Updating list item",
+  remove_item: "Removing list item",
+  move_item: "Reordering list",
+}
+
 const streamContexts = new Map<string, AgentStreamEntry>()
 const STREAM_TTL_MS = 120_000
+const STREAM_HEARTBEAT_INTERVAL_MS = 4_000
 
 function cleanExpired() {
   const now = Date.now()
   for (const [id, entry] of streamContexts) {
+    if (entry.state === "active") continue // never drop active streams
     if (now - entry.createdAt > STREAM_TTL_MS) streamContexts.delete(id)
   }
 }
@@ -85,8 +122,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   app.post("/agent/start", async (request, reply) => {
     cleanExpired()
-    const apiKey = (request.headers["x-anthropic-api-key"] as string)?.trim()
-    if (!apiKey) return reply.code(401).send({ error: "X-Anthropic-API-Key header required" })
+    const apiKey = extractAgentApiKey(request.headers as Record<string, unknown>)
+    if (!apiKey) return reply.code(401).send({ error: "x-agent-api-key header required" })
+
+    const provider = detectProviderFromKey(apiKey)
+    if (!provider) return reply.code(401).send({ error: "Unrecognized API key format. Provide an Anthropic (sk-ant-...) or OpenAI (sk-...) key." })
 
     const body = request.body as AgentRequestBody
     if (!body.message?.trim()) return reply.code(400).send({ error: "message is required" })
@@ -96,14 +136,39 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     streamContexts.set(streamId, {
       body,
       apiKey,
+      provider,
       origin: (request.headers.origin as string) ?? "*",
       createdAt: Date.now(),
       state: "pending",
       events: [],
       lastSeq: 0,
       subscribers: new Set(),
+      abortController: new AbortController(),
     })
     return reply.code(200).send({ streamId })
+  })
+
+  // ---------------------------------------------------------------------------
+  // POST /agent/cancel — abort a running agent loop
+  // ---------------------------------------------------------------------------
+  app.post("/agent/cancel", async (request, reply) => {
+    const { streamId } = request.body as { streamId?: string }
+    if (!streamId) return reply.code(400).send({ error: "streamId is required" })
+
+    const entry = streamContexts.get(streamId)
+    if (!entry) return reply.code(410).send({ error: "Stream not found or expired" })
+
+    if (entry.state === "active" || entry.state === "pending") {
+      entry.abortController.abort()
+      entry.state = "done"
+      emitEvent(streamId, { type: "error", result: { status: "error", summary: "Canceled by user" } })
+      for (const sub of entry.subscribers) {
+        try { sub.raw.end() } catch { /* already closed */ }
+      }
+      entry.subscribers.clear()
+    }
+
+    return { ok: true }
   })
 
   // ---------------------------------------------------------------------------
@@ -159,27 +224,47 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       // Run agent loop in a detached async task (NOT awaited in this handler)
       const runLoop = async () => {
         let pendingVariations: Record<string, unknown> | undefined
+        const startedAt = Date.now()
+        let heartbeatStage: "thinking" | "tool" | "responding" | "applying" = "thinking"
+        const heartbeatTimer = setInterval(() => {
+          if (entry.state !== "active") return
+          emitEvent(streamId, {
+            type: "heartbeat",
+            stage: heartbeatStage,
+            elapsedMs: Date.now() - startedAt
+          })
+        }, STREAM_HEARTBEAT_INTERVAL_MS)
         try {
           for await (const event of runAgentLoop({
             apiKey: entry.apiKey,
-            model: body.model,
+            provider: entry.provider,
+            model: resolveAgentModel(entry.provider, body.model),
             systemPrompt,
             tools,
             userMessage: fullMessage,
+            signal: entry.abortController.signal,
           })) {
             switch (event.type) {
               case "text_delta":
+                heartbeatStage = "responding"
                 emitEvent(streamId, { type: "summary_token", text: event.text })
                 break
               case "tool_start":
-                emitEvent(streamId, { type: "status", message: `Using ${event.toolName}...` })
+                heartbeatStage = "tool"
+                emitEvent(streamId, { type: "status", message: `${TOOL_LABELS[event.toolName] ?? event.toolName}...` })
                 break
               case "tool_done":
+                heartbeatStage = "thinking"
                 if (!event.isError) {
                   try {
                     const parsed = JSON.parse(event.result)
                     if (parsed.status === "applied") {
+                      heartbeatStage = "applying"
                       emitEvent(streamId, { type: "op_applied", toolName: event.toolName, previewVersion: parsed.previewVersion, focusBlockId: parsed.focusBlockId })
+                      const desc = parsed.changeDescription ?? parsed.summary
+                      if (typeof desc === "string" && desc.length > 0) {
+                        emitEvent(streamId, { type: "changelog_entry", entry: desc })
+                      }
                     } else if (parsed.status === "ok" && Array.isArray(parsed.variations)) {
                       // Variation result — store for inclusion in final event
                       pendingVariations = parsed
@@ -189,6 +274,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
                 } else {
                   emitEvent(streamId, { type: "tool_error", toolName: event.toolName, error: event.result })
                 }
+                heartbeatStage = "thinking"
                 break
               case "done": {
                 const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(event.summary)
@@ -202,13 +288,15 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           }
         } catch (err: unknown) {
           emitEvent(streamId, { type: "error", result: { status: "error", summary: err instanceof Error ? err.message : String(err) } })
+        } finally {
+          clearInterval(heartbeatTimer)
+          entry.state = "done"
+          // Close all subscriber connections
+          for (const sub of entry.subscribers) {
+            try { sub.raw.end() } catch { /* already closed */ }
+          }
+          entry.subscribers.clear()
         }
-        entry.state = "done"
-        // Close all subscriber connections
-        for (const sub of entry.subscribers) {
-          try { sub.raw.end() } catch { /* already closed */ }
-        }
-        entry.subscribers.clear()
       }
 
       // Fire and forget — the loop runs independently of this handler
@@ -223,8 +311,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
   // POST /agent/chat — blocking (non-SSE) for testing
   // ---------------------------------------------------------------------------
   app.post("/agent/chat", async (request, reply) => {
-    const apiKey = (request.headers["x-anthropic-api-key"] as string)?.trim()
-    if (!apiKey) return reply.code(401).send({ error: "X-Anthropic-API-Key header required" })
+    const apiKey = extractAgentApiKey(request.headers as Record<string, unknown>)
+    if (!apiKey) return reply.code(401).send({ error: "x-agent-api-key header required" })
+
+    const provider = detectProviderFromKey(apiKey)
+    if (!provider) return reply.code(401).send({ error: "Unrecognized API key format. Provide an Anthropic (sk-ant-...) or OpenAI (sk-...) key." })
 
     const body = request.body as AgentRequestBody
     if (!body.message?.trim()) return reply.code(400).send({ error: "message is required" })
@@ -242,7 +333,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     let error: string | null = null
 
     try {
-      for await (const event of runAgentLoop({ apiKey, model: body.model, systemPrompt, tools, userMessage: fullMessage })) {
+      for await (const event of runAgentLoop({ apiKey, provider, model: resolveAgentModel(provider, body.model), systemPrompt, tools, userMessage: fullMessage })) {
         events.push(event)
         if (event.type === "done") { summary = event.summary; toolCallCount = event.toolCallCount }
         if (event.type === "error") { error = event.message }

@@ -76,6 +76,7 @@ export type ToolHandler = (args: {
   input: unknown
   context: ToolCallContext
   manifest: ToolManifest
+  signal?: AbortSignal
 }) => Promise<unknown>
 
 export type RegisteredTool = {
