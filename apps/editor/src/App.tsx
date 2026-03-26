@@ -540,6 +540,8 @@ function EditorPage({
   }, [showNestedLabels])
 
   // Keep iframe shimmer aligned to the actual component being processed.
+  // Activates immediately when loading starts (using active block as fallback),
+  // then re-targets when the stream identifies the actual focus block.
   useEffect(() => {
     const postToSite = previewPostToSiteRef.current
     if (!chatEngine.isLoading) {
@@ -551,13 +553,15 @@ function EditorPage({
       return
     }
 
-    const blockId = chatEngine.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? ""
+    const blockId = chatEngine.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? activeBlockId ?? ""
     if (!blockId) return
+    // Avoid re-sending if already shimmering the same target
+    if (shimmerActiveRef.current && shimmerTargetRef.current?.blockId === blockId) return
     const editablePath = blockId === (activeBlockIdRef.current ?? "") ? (activeEditablePathRef.current ?? "") : ""
     postToSite("aiFieldLoading", { blockId, editablePath, active: true })
     shimmerTargetRef.current = { blockId, editablePath }
     shimmerActiveRef.current = true
-  }, [chatEngine.isLoading, chatEngine.latestStreamFocusBlockId])
+  }, [chatEngine.isLoading, chatEngine.latestStreamFocusBlockId, activeBlockId])
 
   // Re-sync selection mode after route changes (preview bridge re-mounts and loses the attribute)
   useEffect(() => {
