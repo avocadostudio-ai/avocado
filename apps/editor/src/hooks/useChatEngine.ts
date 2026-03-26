@@ -752,14 +752,22 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
 
       const flushOpRefresh = () => {
-        postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId })
-        if (pendingFocusBlockId) {
-          activeBlockIdRef.current = pendingFocusBlockId
-          setActiveBlockId(pendingFocusBlockId)
+        const focusId = pendingFocusBlockId
+        postToSite("draftUpdated", { focusBlockId: focusId })
+        if (focusId) {
+          activeBlockIdRef.current = focusId
+          setActiveBlockId(focusId)
         }
         activeEditablePathRef.current = undefined
         setActiveEditablePath(undefined)
         pendingFocusBlockId = null
+        // Re-apply shimmer after preview refresh — the draftUpdated above
+        // triggers a DOM rebuild that destroys injected shimmer elements.
+        if (focusId) {
+          setTimeout(() => {
+            postToSite("aiFieldLoading", { blockId: focusId, active: true })
+          }, 400)
+        }
       }
 
       const clearOpRefreshTimer = () => {
@@ -1369,6 +1377,9 @@ export function useChatEngine(config: ChatEngineConfig) {
           sitePurpose: config.activeSiteConfig.purpose,
           setStreamStatus,
           setStreamSteps,
+          setStreamingText,
+          setStreamingChanges,
+          setLatestStreamFocusBlockId,
           applyChatResult,
           pushAssistantFromResult,
           postToSite: config.postToSite,
