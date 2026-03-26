@@ -650,5 +650,80 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
         }
       },
     },
+
+    // ================================================================
+    // VARIATION TOOLS
+    // ================================================================
+
+    {
+      definition: {
+        name: "generate_variations",
+        description: "Present content variations for a block to the user. YOU generate the alternative content — provide 2-4 variations with different tones, styles, or approaches. Each variation needs a title, summary, and patch (key-value pairs to change on the block). The user sees these as clickable cards and picks their favorite. Always call get_page first to see current block props before generating variations. Do NOT apply changes after calling this — let the user pick.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            pageSlug: { type: "string", description: "Page slug containing the block" },
+            blockId: { type: "string", description: "Block ID to generate variations for" },
+            variations: {
+              type: "array",
+              description: "2-4 alternative content options. Each must be materially different.",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string", description: "Short label, e.g. 'Crisp & Direct', 'Benefit-Led', 'Action-Driven'" },
+                  summary: { type: "string", description: "One-line explanation of the approach" },
+                  patch: { type: "object", description: "Key-value pairs to change on the block props. Only include props that differ from current values." },
+                },
+                required: ["title", "summary", "patch"],
+              },
+            },
+          },
+          required: ["pageSlug", "blockId", "variations"],
+        },
+      },
+      handler: async (input) => {
+        const page = getPage(session, input.pageSlug as string)
+        if (!page) return { result: `Page "${input.pageSlug}" not found`, isError: true }
+        const block = page.blocks.find(b => b.id === input.blockId)
+        if (!block) return { result: `Block "${input.blockId}" not found`, isError: true }
+
+        const rawVariations = input.variations as Array<{ title: string; summary: string; patch: Record<string, unknown> }>
+        if (!Array.isArray(rawVariations) || rawVariations.length === 0) {
+          return { result: "At least one variation is required", isError: true }
+        }
+
+        const blockProps = block.props as Record<string, unknown>
+        const validatedVariations = rawVariations.slice(0, 6).map((v, idx) => {
+          // Filter patch to only keys that exist on the block and differ from current value
+          const cleanPatch: Record<string, unknown> = {}
+          const changedKeys: string[] = []
+          for (const [key, value] of Object.entries(v.patch)) {
+            if (key in blockProps && JSON.stringify(blockProps[key]) !== JSON.stringify(value)) {
+              cleanPatch[key] = value
+              changedKeys.push(key)
+            }
+          }
+          return {
+            id: `var_${idx}_${Date.now()}`,
+            title: v.title || `Option ${String.fromCharCode(65 + idx)}`,
+            summary: v.summary || "",
+            patch: Object.keys(cleanPatch).length > 0 ? cleanPatch : v.patch,
+            changedKeys: changedKeys.length > 0 ? changedKeys : Object.keys(v.patch),
+          }
+        })
+
+        return {
+          result: JSON.stringify({
+            status: "ok",
+            summary: `Generated ${validatedVariations.length} variations for ${block.type}.`,
+            blockId: block.id,
+            blockType: block.type,
+            pageSlug: input.pageSlug,
+            baseProps: blockProps,
+            variations: validatedVariations,
+          })
+        }
+      },
+    },
   ]
 }

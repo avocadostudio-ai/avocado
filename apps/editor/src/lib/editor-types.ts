@@ -36,6 +36,13 @@ export type AssistantResponse = {
   updatedSlug?: string
   undoSlug?: string
   suggestions?: string[]
+  variations?: {
+    blockId: string
+    blockType: string
+    pageSlug: string
+    baseProps: Record<string, unknown>
+    options: VariationOption[]
+  }
   debug?: {
     traceId?: string
     promptHash?: string
@@ -146,6 +153,7 @@ export type ChatEntry = {
   changes?: string[]
   mentionedSlugs?: string[]
   suggestions?: string[]
+  variations?: AssistantResponse["variations"]
   errors?: string[]
   meta?: string
   debug?: AssistantResponse["debug"]

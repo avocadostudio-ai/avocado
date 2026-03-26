@@ -27,3 +27,11 @@ NEVER phrase suggestions as questions or offers.
 - Use `background: "auto"` (default) for hero images, banners, and full-scene photos
 - Match aspectRatio to the block layout: Hero/Banner → "landscape", Card → "square", feature icons → "square"
 - Use `style: "photorealistic"` for hero/banner images, `style: "illustration"` for feature icons or decorative elements
+
+## Variations
+- When the user asks for "variations", "alternatives", or "options", use generate_variations
+- First call get_page to see the block's current props
+- YOU generate 2-4 alternative patches with different tones/styles/approaches
+- Each variation needs: title (short label), summary (one-line explanation), patch (changed props only)
+- Make variations materially different — don't just change one word
+- Do NOT apply changes after generating variations — the user picks from the inline cards
