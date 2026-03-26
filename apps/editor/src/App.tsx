@@ -554,10 +554,6 @@ function EditorPage({
     const blockId = chatEngine.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? ""
     if (!blockId) return
     const editablePath = blockId === (activeBlockIdRef.current ?? "") ? (activeEditablePathRef.current ?? "") : ""
-    const previous = shimmerTargetRef.current
-    if (previous && previous.blockId === blockId && previous.editablePath === editablePath && shimmerActiveRef.current) {
-      return
-    }
     postToSite("aiFieldLoading", { blockId, editablePath, active: true })
     shimmerTargetRef.current = { blockId, editablePath }
     shimmerActiveRef.current = true

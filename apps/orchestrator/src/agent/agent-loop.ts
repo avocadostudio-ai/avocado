@@ -1,8 +1,8 @@
 /**
  * Agent loop: multi-turn tool-use conversation with Claude.
  *
- * Uses the raw Anthropic Messages API with tools.
- * Handles the loop: send message → Claude calls tools → execute → feed results back → repeat.
+ * Uses the Anthropic Messages API **with streaming** for real-time text deltas.
+ * Handles the loop: send message → Claude streams response → execute tools → feed results back → repeat.
  */
 
 import Anthropic from "@anthropic-ai/sdk"
@@ -41,13 +41,9 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
 
   const client = new Anthropic({ apiKey })
 
-  // Build tool definitions for the API
   const toolDefs: Anthropic.Messages.Tool[] = tools.map((t) => t.definition)
-
-  // Build handler map
   const handlerMap = new Map(tools.map((t) => [t.definition.name, t.handler]))
 
-  // Conversation messages
   const messages: Anthropic.Messages.MessageParam[] = [
     { role: "user", content: userMessage },
   ]
@@ -62,19 +58,70 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
       return
     }
 
-    // Call Claude
     let response: Anthropic.Messages.Message
+    const textParts: string[] = []
+    const toolUseBlocks: Array<{ id: string; name: string; input: Record<string, unknown> }> = []
+
     try {
-      console.log("[agent-loop] Calling Anthropic API, turn", toolCallCount + 1)
-      response = await client.messages.create({
+      console.log("[agent-loop] Calling Anthropic API (streaming), turn", toolCallCount + 1)
+
+      const stream = client.messages.stream({
         model,
         max_tokens: 4096,
         system: systemPrompt,
         tools: toolDefs,
         messages,
       })
-      console.log("[agent-loop] Got response, stop_reason:", response.stop_reason, "content blocks:", response.content.length,
+
+      // Event-driven queue: callbacks push events, notify wakes the generator
+      const pendingEvents: AgentEvent[] = []
+      let notify: () => void
+      let dataReady = new Promise<void>(r => { notify = r })
+
+      stream.on("text", (text) => {
+        pendingEvents.push({ type: "text_delta", text })
+        notify()
+      })
+
+      stream.on("contentBlock", (block) => {
+        if (block.type === "text") {
+          textParts.push(block.text)
+        } else if (block.type === "tool_use") {
+          toolUseBlocks.push({
+            id: block.id,
+            name: block.name,
+            input: block.input as Record<string, unknown>,
+          })
+          pendingEvents.push({ type: "tool_start", toolName: block.name, toolUseId: block.id })
+          notify()
+        }
+      })
+
+      const streamDone = stream.finalMessage()
+      let done = false
+      streamDone.then(() => { done = true; notify() })
+
+      // Drain events as they arrive — no polling, wake only on data or completion
+      while (!done) {
+        await Promise.race([dataReady, streamDone])
+        while (pendingEvents.length > 0) {
+          yield pendingEvents.shift()!
+        }
+        // Reset the notify promise for next wakeup
+        dataReady = new Promise<void>(r => { notify = r })
+      }
+
+      // Final drain after stream completes
+      while (pendingEvents.length > 0) {
+        yield pendingEvents.shift()!
+      }
+
+      response = await streamDone
+
+      console.log("[agent-loop] Stream complete, stop_reason:", response.stop_reason,
+        "content blocks:", response.content.length,
         "tools:", response.content.filter(b => b.type === "tool_use").map(b => (b as { name: string }).name))
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error("[agent-loop] API error:", msg)
@@ -82,29 +129,10 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
       return
     }
 
-    // Process response content
-    const textBlocks: string[] = []
-    const toolUseBlocks: Array<{ id: string; name: string; input: Record<string, unknown> }> = []
-
-    for (const block of response.content) {
-      if (block.type === "text") {
-        textBlocks.push(block.text)
-        yield { type: "text_delta", text: block.text }
-      } else if (block.type === "tool_use") {
-        toolUseBlocks.push({
-          id: block.id,
-          name: block.name,
-          input: block.input as Record<string, unknown>,
-        })
-      }
-    }
-
-    // Add assistant message to conversation
     messages.push({ role: "assistant", content: response.content })
 
-    // If stop_reason is end_turn (no tool calls), we're done
     if (response.stop_reason === "end_turn" || toolUseBlocks.length === 0) {
-      fullSummary = textBlocks.join("\n")
+      fullSummary = textParts.join("")
       yield { type: "done", summary: fullSummary, toolCallCount }
       return
     }
@@ -114,9 +142,6 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
 
     for (const toolUse of toolUseBlocks) {
       toolCallCount++
-      console.log("[agent-loop] PRE-YIELD tool_start for:", toolUse.name)
-      yield { type: "tool_start" as const, toolName: toolUse.name, toolUseId: toolUse.id }
-      console.log("[agent-loop] POST-YIELD tool_start for:", toolUse.name)
 
       console.log("[agent-loop] Executing tool:", toolUse.name, "input:", JSON.stringify(toolUse.input).slice(0, 200))
       const handler = handlerMap.get(toolUse.name)
@@ -144,10 +169,12 @@ export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<A
       yield { type: "tool_done", toolName: toolUse.name, toolUseId: toolUse.id, result, isError }
     }
 
-    // Add tool results to conversation
+    if (textParts.length > 0) {
+      fullSummary += textParts.join("")
+    }
+
     messages.push({ role: "user", content: toolResults })
   }
 
-  // Max tool calls reached
   yield { type: "done", summary: `Completed with ${toolCallCount} tool calls (limit reached).`, toolCallCount }
 }
