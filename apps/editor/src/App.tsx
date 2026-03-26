@@ -51,11 +51,13 @@ const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
   anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
+  gemini: { fast: "Flash 2.5", balanced: "Flash 2.5", reasoning: "Pro 2.5", codex: "Pro 2.5" },
 }
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   openai: "OpenAI",
   anthropic: "Claude",
+  gemini: "Gemini",
 }
 
 function selectionValue(provider: AIProvider, model: ModelKey) {
@@ -113,6 +115,9 @@ function EditorPage({
   const [activeBlockType, setActiveBlockType] = useState<string | undefined>()
   const [activeEditablePath, setActiveEditablePath] = useState<string | undefined>()
   const [useStreaming, setUseStreaming] = useState(true)
+  const [agentApiKey, setAgentApiKey] = useState(() => {
+    try { return localStorage.getItem("editor-agent-api-key") ?? "" } catch { return "" }
+  })
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showDebugDetails, setShowDebugDetails] = useState(() => resolveDefaultDebugMode())
@@ -394,7 +399,8 @@ function EditorPage({
     siteCapabilities: componentManifest.siteCapabilities,
     allowStructuralEdits: componentManifest.allowStructuralEdits,
     getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null,
-    onApplied: () => { onAppliedRef.current?.() }
+    onApplied: () => { onAppliedRef.current?.() },
+    agentApiKey: agentApiKey || undefined
   })
 
   const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin, () => {
@@ -506,7 +512,7 @@ function EditorPage({
             setAvailableProviders(data.availableProviders)
             if (!data.availableProviders.includes(provider)) setProvider(data.availableProviders[0])
           }
-          if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "demo") {
+          if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "gemini" || data.plannerSource === "demo") {
             chatEngine.setPlannerBadgeState(data.plannerSource)
             return
           }
@@ -1665,6 +1671,11 @@ function EditorPage({
         availableProviders={availableProviders}
         onModelChange={(p, m) => { setProvider(p); setModelKey(m) }}
         onClearChat={chatEngine.clearChat}
+        agentApiKey={agentApiKey}
+        onAgentApiKeyChange={(key) => {
+          setAgentApiKey(key)
+          try { localStorage.setItem("editor-agent-api-key", key) } catch {}
+        }}
       />
 
       <Sheet open={!!sites.configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>

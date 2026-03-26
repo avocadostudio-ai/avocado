@@ -24,11 +24,13 @@ import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
   anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
+  gemini: { fast: "Flash 2.5", balanced: "Flash 2.5", reasoning: "Pro 2.5", codex: "Pro 2.5" },
 }
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   openai: "OpenAI",
   anthropic: "Claude",
+  gemini: "Gemini",
 }
 
 function selectionValue(provider: AIProvider, model: ModelKey) {
@@ -53,6 +55,8 @@ interface SettingsModalProps {
   availableProviders: AIProvider[]
   onModelChange: (provider: AIProvider, model: ModelKey) => void
   onClearChat: () => void
+  agentApiKey?: string
+  onAgentApiKeyChange?: (key: string) => void
 }
 
 export function SettingsModal({
@@ -73,6 +77,8 @@ export function SettingsModal({
   availableProviders,
   onModelChange,
   onClearChat,
+  agentApiKey,
+  onAgentApiKeyChange,
 }: SettingsModalProps) {
   const { t, locale, setLocale } = useT()
   const currentValue = selectionValue(provider, modelKey)
@@ -150,6 +156,22 @@ export function SettingsModal({
               </SelectContent>
             </Select>
           </div>
+
+          {onAgentApiKeyChange && (
+            <div className="grid gap-1.5 text-left">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Agent Mode (Your API Key)</span>
+              <input
+                type="password"
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="sk-ant-..."
+                value={agentApiKey ?? ""}
+                onChange={(e) => onAgentApiKeyChange(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {agentApiKey ? "Agent mode active — Claude uses tools to edit your site directly." : "Paste your Anthropic API key to enable agent mode. Key stays in your browser."}
+              </p>
+            </div>
+          )}
 
           <Button variant="destructive" size="sm" className="w-full" onClick={handleClearChat}>
             <Eraser className="size-4" />
