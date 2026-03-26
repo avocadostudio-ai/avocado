@@ -30,6 +30,7 @@ import { usePlanApproval } from "./chat-engine/usePlanApproval"
 import { useStructuralOps } from "./chat-engine/useStructuralOps"
 import { useUndoHistory } from "./chat-engine/useUndoHistory"
 import { useVariations } from "./chat-engine/useVariations"
+import { submitAgentStream } from "./chat-engine/agent-transport"
 
 export type ChatEngineConfig = {
   session: string
@@ -56,6 +57,7 @@ export type ChatEngineConfig = {
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
   onApplied?: () => void
+  agentApiKey?: string
 }
 
 function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
@@ -237,7 +239,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   function applyChatResult(data: AssistantResponse) {
-    if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "demo") {
+    if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "gemini" || data.plannerSource === "demo") {
       planApproval.setPlannerBadgeState(data.plannerSource)
     }
     if (data.status === "plan_ready" && typeof data.pendingPlanId === "string" && data.pendingPlanId.length > 0) {
@@ -1339,6 +1341,33 @@ export function useChatEngine(config: ChatEngineConfig) {
         await variations.submitVariations(finalMessage)
         return
       }
+      // Agent mode: when user has provided their own Anthropic API key
+      if (config.agentApiKey?.trim()) {
+        const ok = await submitAgentStream({
+          orchestrator,
+          agentApiKey: config.agentApiKey.trim(),
+          session: config.session,
+          siteId: config.siteId,
+          slug: config.slug,
+          message: finalMessage,
+          activeBlockId: config.activeBlockIdRef.current,
+          activeBlockType: config.activeBlockTypeRef.current,
+          activeEditablePath: config.activeEditablePathRef.current,
+          locale,
+          sitePurpose: config.activeSiteConfig.purpose,
+          setStreamStatus,
+          setStreamSteps,
+          applyChatResult,
+          pushAssistantFromResult,
+          postToSite: config.postToSite,
+          setActiveBlockId: config.setActiveBlockId,
+        })
+        if (!ok) {
+          pushAssistantFromResult({ status: "error", summary: "Agent failed. Check your API key in settings.", changes: [] })
+        }
+        return
+      }
+
       const requiresPlanApproval = isComplexTaskRequest(finalMessage)
       if (requiresPlanApproval) {
         planApproval.setPendingPlanMessage(finalMessage)
