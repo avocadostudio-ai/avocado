@@ -337,14 +337,37 @@ export function inferDeterministicIntent(args: {
 }
 
 /**
+ * Returns true when the message mentions a specific block type or block-synonymous
+ * term, indicating the user is talking about a block — not about the page itself.
+ * Used to guard page-level operations from misclassifying block-level requests.
+ *
+ * Strips noise that causes false positives:
+ * - Text after "this/the page" (page name refs like "move this page before Pricing")
+ * - Route slugs ("/pricing", "/about-us") — these are page refs, not block types
+ */
+function messageRefersToBlock(message: string, activeBlockId?: string): boolean {
+  if (activeBlockId) return true
+  // Strip text after "this/the/current page" (page name references)
+  // and strip route slugs (/pricing, /about) that could false-match block keywords
+  const cleaned = message
+    .replace(/\b(?:this|the|current)\s+page\b.*/i, "")
+    .replace(/\/[a-z0-9_-]+/gi, "")
+  if (inferBlockTypeFromText(cleaned)) return true
+  // "the/this section", "a component", "the block" — block-synonymous terms with article
+  if (/\b(?:the|this|a|that)\s+(?:section|component|block|element|widget)\b/i.test(cleaned)) return true
+  return false
+}
+
+/**
  * Detects "move (this) page before/after X" — page nav move requests.
  * Matches both route-based ("move page after /pricing") and natural language
  * ("move this page before About us") anchor references.
- * Requires "this/the/current page" to distinguish from block moves like "move page hero to bottom".
+ * Requires "move" directly adjacent to "this/the/current page" to avoid matching
+ * block positioning phrases like "move CTA to the top of the page".
  */
 function isNavMoveRequest(message: string) {
   const lower = message.toLowerCase()
-  const movesThisPage = /\bmove\b.*\b(this|the|current)\s+page\b/.test(lower)
+  const movesThisPage = /\bmove\s+(?:this|the|current)\s+page\b/.test(lower)
   const hasPlacement = /\b(before|after|above|below|first|last|top|bottom|start|end|beginning)\b/.test(lower)
   return movesThisPage && hasPlacement
 }
@@ -422,9 +445,10 @@ export function isHighConfidenceDeterministicCase(args: {
   // Case: page rename — "rename page to Our community", "rename this page to /plans"
   if (action === "update" && isPageRouteRenameRequest(raw)) return true
   // Case: page nav move — "move this page before About us", "move page after /pricing"
-  if (action === "move" && isNavMoveRequest(raw)) return true
+  // Guard: if message mentions a block type, it's a block move, not a nav move
+  if (action === "move" && isNavMoveRequest(raw) && !messageRefersToBlock(raw, args.activeBlockId)) return true
   // Case: page-level delete — "delete this page", "remove the page"
-  if (action === "remove" && /\b(delete|remove)\b.*\bpage\b/i.test(raw) && !inferBlockTypeFromText(raw)) return true
+  if (action === "remove" && /\b(delete|remove)\b.*\bpage\b/i.test(raw) && !messageRefersToBlock(raw, args.activeBlockId)) return true
   const removeType = inferBlockTypeFromText(raw)
   if (action === "remove" && removeType) {
     if (args.currentPage.blocks.filter((b) => b.type === removeType).length > 1) return false
@@ -696,7 +720,7 @@ export function compileDeterministicPlan(args: {
     }
   }
 
-  const asksPageDelete = /\b(delete|remove)\b.*\bpage\b/.test(lowerMessage) && !inferBlockTypeFromText(cleanMessage)
+  const asksPageDelete = /\b(delete|remove)\b.*\bpage\b/.test(lowerMessage) && !messageRefersToBlock(cleanMessage, args.activeBlockId)
   if ((intent.action === "remove" || intent.action === "clarify") && asksPageDelete) {
     const targetSlug = routeMentions[0] ?? slug
     if (targetSlug === "/") {
@@ -727,11 +751,13 @@ export function compileDeterministicPlan(args: {
 
   const hasNavContext = /\b(nav|navigation|menu|first|last|position)\b/.test(lowerMessage) || routeMentions.length >= 2
   const asksNavMove =
-    /\b(nav|navigation|menu|tabs?|tab order|page order)\b/.test(lowerMessage) ||
-    /\bmove\b.*\btab\b/.test(lowerMessage) ||
-    (/\bmove\b.*\bpage\b/.test(lowerMessage) && hasNavContext) ||
-    /\breorder\b.*\b(page|nav|menu|tabs?)\b/.test(lowerMessage) ||
-    isNavMoveRequest(cleanMessage)
+    !messageRefersToBlock(cleanMessage, args.activeBlockId) && (
+      /\b(nav|navigation|menu|tabs?|tab order|page order)\b/.test(lowerMessage) ||
+      /\bmove\b.*\btab\b/.test(lowerMessage) ||
+      (/\bmove\b.*\bpage\b/.test(lowerMessage) && hasNavContext) ||
+      /\breorder\b.*\b(page|nav|menu|tabs?)\b/.test(lowerMessage) ||
+      isNavMoveRequest(cleanMessage)
+    )
   if ((intent.action === "move" || intent.action === "clarify") && asksNavMove) {
     const sessionDraft = getSessionDraft(session)
     const slugsRaw = Array.from(sessionDraft.keys())

@@ -69,7 +69,7 @@ export type VariationResult = {
   pageSlug: string
   baseProps: Record<string, unknown>
   variations: VariationOption[]
-  plannerSource: "openai" | "anthropic" | "demo"
+  plannerSource: "openai" | "anthropic" | "gemini" | "demo"
   modelUsed: string
   modelKey: ModelKey
   usage?: {
@@ -618,7 +618,7 @@ export async function runVariationPipeline(
   })
   const modelUsed = ctx.modelLookup[provider][modelKey]
   const count = requestedVariationCount(contextualMessage)
-  const plannerSource: "openai" | "anthropic" | "demo" = resolvePlannerSource(provider)
+  const plannerSource: "openai" | "anthropic" | "gemini" | "demo" = resolvePlannerSource(provider)
 
   let variations: VariationOption[] = []
   let generatorUsage: TokenUsage | undefined

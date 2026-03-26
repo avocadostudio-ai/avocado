@@ -226,6 +226,67 @@ describe("planner-e2e: Anthropic claude-haiku", { timeout: 30_000 }, () => {
 })
 
 // ---------------------------------------------------------------------------
+// Gemini E2E tests
+// ---------------------------------------------------------------------------
+describe("planner-e2e: Gemini flash", { timeout: 30_000 }, () => {
+  const hasKey = !!process.env.GOOGLE_GENAI_API_KEY
+
+  before(() => {
+    if (!hasKey) {
+      console.log("⏭  Skipping Gemini E2E tests — GOOGLE_GENAI_API_KEY not set")
+    }
+  })
+
+  it("generates valid update_props plan for 'add emojis to tab labels'", { skip: !hasKey }, async () => {
+    const { generatePlanWithGemini } = await import("./chat/gemini-planner.js")
+
+    const contextPack = buildTestContextPack(testPage, "b_tabs_avocado")
+    const start = performance.now()
+
+    const result = await generatePlanWithGemini({
+      message: "add emojis to tab labels",
+      slug: "/",
+      currentPage: testPage,
+      contextPack: contextPack as ReturnType<typeof import("./nlp/deterministic-planner.js").plannerContextPack>,
+      model: process.env.GOOGLE_GENAI_MODEL_FAST ?? "gemini-2.5-flash",
+      lightweight: true
+    })
+
+    const latencyMs = performance.now() - start
+    console.log(`  Gemini flash "add emojis" — ${latencyMs.toFixed(0)}ms, tokens: ${JSON.stringify(result.usage)}`)
+
+    assert.equal(result.plan.intent, "edit_plan", `Expected edit_plan, got ${result.plan.intent}`)
+    assert.ok(result.plan.ops.length >= 1, `Expected at least 1 op, got ${result.plan.ops.length}`)
+    // Gemini may use update_props with full tabs array OR individual update_item ops
+    const hasUpdateProps = result.plan.ops.some(op => op.op === "update_props")
+    const hasUpdateItem = result.plan.ops.some(op => op.op === "update_item")
+    assert.ok(hasUpdateProps || hasUpdateItem, `Expected update_props or update_item ops, got: ${result.plan.ops.map(o => o.op).join(", ")}`)
+  })
+
+  it("streams tokens via onToken callback", { skip: !hasKey }, async () => {
+    const { generatePlanWithGemini } = await import("./chat/gemini-planner.js")
+
+    const contextPack = buildTestContextPack(testPage, "b_tabs_avocado")
+    const tokens: string[] = []
+
+    const result = await generatePlanWithGemini({
+      message: "make the Overview tab content shorter, 1 sentence max",
+      slug: "/",
+      currentPage: testPage,
+      contextPack: contextPack as ReturnType<typeof import("./nlp/deterministic-planner.js").plannerContextPack>,
+      model: process.env.GOOGLE_GENAI_MODEL_FAST ?? "gemini-2.5-flash",
+      lightweight: true,
+      onToken: (token) => tokens.push(token)
+    })
+
+    console.log(`  Gemini flash streaming — ${tokens.length} token chunks, plan intent: ${result.plan.intent}`)
+    assert.ok(tokens.length > 0, "Expected at least one token chunk from streaming")
+    assert.equal(result.plan.intent, "edit_plan")
+    assert.ok(result.plan.ops.length >= 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Create page with multiple blocks — tests the full LLM path
 // ---------------------------------------------------------------------------
 describe("planner-e2e: create_page with enumerated blocks", { timeout: 60_000 }, () => {

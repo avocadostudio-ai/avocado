@@ -2570,6 +2570,82 @@ test("compileDeterministicPlan does not interpret 'move page block' as nav move"
 })
 
 // ---------------------------------------------------------------------------
+// Block-aware disambiguation guards — page-level ops must not match when
+// the user is clearly referring to a block (block type, section, component).
+// ---------------------------------------------------------------------------
+
+test("isHighConfidenceDeterministicCase rejects 'Move the CTA to the top of the page' (block move, not nav)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "Move the call-to-action section to the top of the page", currentPage }),
+    false
+  )
+})
+
+test("isHighConfidenceDeterministicCase rejects 'move the hero to the bottom of the page' (block move)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "move the hero to the bottom of the page", currentPage }),
+    false
+  )
+})
+
+test("isHighConfidenceDeterministicCase accepts 'move this page after About' (genuine nav move)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "move this page after About", currentPage }),
+    true
+  )
+})
+
+test("isHighConfidenceDeterministicCase accepts 'delete the FAQ from this page' as block delete, not page delete", () => {
+  const currentPage = demoPublishedPages()[0]
+  // Should be high confidence — correctly classified as block delete (FAQ), not page delete
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "delete the FAQ from this page", currentPage }),
+    true
+  )
+})
+
+test("isHighConfidenceDeterministicCase accepts 'delete this page' (genuine page delete)", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "delete this page", currentPage }),
+    true
+  )
+})
+
+test("compileDeterministicPlan does not generate move_page for 'move CTA to top of the page'", () => {
+  const currentPage = demoPublishedPages()[0]
+  const plan = compileDeterministicPlan({
+    session: "test-block-move-guard",
+    intent: { action: "move" },
+    message: "Move the CTA section to the top of the page",
+    slug: "/",
+    currentPage
+  })
+  // Should either generate move_block or return null (fall through to LLM)
+  if (plan && plan.intent === "edit_plan" && plan.ops.length > 0) {
+    assert.notEqual(plan.ops[0].op, "move_page", "Should not generate move_page for block move request")
+  }
+})
+
+test("compileDeterministicPlan generates move_page for 'move this page to the top'", () => {
+  const currentPage = demoPublishedPages().find((p) => p.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-genuine-nav-move",
+    intent: { action: "move" },
+    message: "move this page to the top",
+    slug: "/pricing",
+    currentPage: currentPage!
+  })
+  assert.ok(plan)
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops[0]?.op, "move_page")
+})
+
+// ---------------------------------------------------------------------------
 // Step 5: page rename with single route and 'this page'
 // ---------------------------------------------------------------------------
 

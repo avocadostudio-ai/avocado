@@ -85,7 +85,7 @@ ${localeInstruction(opts.locale).join("\n")}`
 // ---------------------------------------------------------------------------
 
 export interface PlannerPromptOptions {
-  provider: "openai" | "anthropic"
+  provider: "openai" | "anthropic" | "gemini"
   lightweight: boolean
   selectedBlockId: string
   explicitOtherReference: boolean
@@ -177,6 +177,7 @@ const BLOCK_NAME_PRIVACY_ANTHROPIC =
 
 function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
   const isAnthropic = opts.provider === "anthropic"
+  const hasNativeTools = opts.provider === "anthropic" || opts.provider === "gemini"
 
   return [
     "You are an editing planner for a website builder.",
@@ -191,7 +192,7 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     "When reasonably clear, make a practical assumption and proceed.",
     "Include any important assumption briefly in summary_for_user and change_log.",
     "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
-    ...(isAnthropic
+    ...(hasNativeTools
       ? [
           "For edit_plan intent: summary_for_user must be ONE short sentence (max ~20 words) confirming what will happen. Do NOT elaborate, explain why, or describe the content being added — let change_log carry the detail. Bad: 'I'll add a RichText section about blueberry varieties right after the FeatureGrid.' Good: 'Adding a **text section** about blueberry varieties after the features grid.'",
           "change_log entries should add specific detail NOT already in summary_for_user — e.g. list the actual content, items, or values being set. Do not paraphrase the summary.",
@@ -225,9 +226,9 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     "If rewrite/rephrase of a specific field is requested but contextPack.selected.editablePath or selected editable text is missing, return intent=needs_clarification and ask the user to select the exact text first. This does NOT apply to page-wide rewrite/refocus/rebrand requests — those should generate update_props ops across all blocks.",
     "When rewriting text, return plain text unless the user explicitly asks for markdown formatting. Do not wrap the entire rewrite in **bold** markers.",
     // Hero image URL — provider-specific
-    isAnthropic ? HERO_IMAGE_URL_BASE : HERO_IMAGE_URL_BASE + HERO_IMAGE_URL_OPENAI_EXT,
-    // Anthropic image tool instructions
-    ...(isAnthropic ? ANTHROPIC_IMAGE_TOOL_LINES : []),
+    hasNativeTools ? HERO_IMAGE_URL_BASE : HERO_IMAGE_URL_BASE + HERO_IMAGE_URL_OPENAI_EXT,
+    // Native image tool instructions (Anthropic + Gemini)
+    ...(hasNativeTools ? ANTHROPIC_IMAGE_TOOL_LINES : []),
     // Op count constraints
     ...(opts.chatStrictPrimaryOpMode
       ? [
@@ -260,7 +261,7 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     // Suggested next actions
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next (max 6 words each). Each suggestion MUST be a logical follow-up to the specific change just made — not a generic action. Ask yourself: 'what would the user likely want to do next given THIS edit?' For example, after rewriting stats labels, suggest refining the same section ('Make the numbers bigger', 'Add a stat about X') — not unrelated actions like 'Change title' or 'Add a Testimonials section'. For needs_clarification, suggest the most likely concrete answers. Omit suggested_next_actions entirely if no contextual follow-up is obvious. Every suggestion must be an action the user can perform inside this editor (editing content, adding/removing sections, changing images, updating SEO metadata). Never suggest actions outside the editor's scope such as A/B testing, analytics, performance monitoring, user research, or marketing strategy.",
     // Block name privacy — provider-specific
-    isAnthropic ? BLOCK_NAME_PRIVACY_ANTHROPIC : BLOCK_NAME_PRIVACY_OPENAI,
+    opts.provider !== "openai" ? BLOCK_NAME_PRIVACY_ANTHROPIC : BLOCK_NAME_PRIVACY_OPENAI,
     // Selected block targeting
     opts.selectedBlockId.length > 0 && !opts.explicitOtherReference
       ? `Selected block is ${opts.selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`

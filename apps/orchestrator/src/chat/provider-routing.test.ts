@@ -15,6 +15,12 @@ const MODEL_LOOKUP: Record<AIProvider, Record<ModelKey, string>> = {
     balanced: "claude-sonnet-4-6",
     reasoning: "claude-sonnet-4-6",
     codex: "claude-opus-4-6"
+  },
+  gemini: {
+    fast: "gemini-2.5-flash",
+    balanced: "gemini-2.5-flash",
+    reasoning: "gemini-2.5-pro",
+    codex: "gemini-2.5-pro"
   }
 }
 
