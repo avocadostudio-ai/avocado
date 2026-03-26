@@ -616,7 +616,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       </Sheet>
       {sites.restoreState.siteId ? (
         <div className="sites-modal-backdrop" onClick={() => sites.updateRestoreState({ siteId: null })}>
-          <section className="sites-modal" role="dialog" aria-modal="true" aria-label={t("sites.versionHistory")} onClick={(event) => event.stopPropagation()}>
+          <section className="sites-modal sites-modal-wide" role="dialog" aria-modal="true" aria-label={t("sites.versionHistory")} onClick={(event) => event.stopPropagation()}>
             <header className="sites-modal-header">
               <h2>{t("sites.versionHistory")}</h2>
               <button type="button" className="settings-close-btn" onClick={() => sites.updateRestoreState({ siteId: null })} aria-label={t("sites.close")}>
@@ -625,37 +625,64 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             </header>
             <div className="sites-modal-body">
               <p className="site-purpose">{t("sites.restoreDescription")} <strong>{sites.restoreState.siteId}</strong>.</p>
-              <label className="sites-form-field">
-                <span>{t("sites.snapshotVersion")}</span>
-                <select
-                  value={sites.restoreState.commit}
-                  onChange={(event) => sites.updateRestoreState({ commit: event.target.value })}
-                  disabled={sites.restoreState.isLoading || sites.restoreState.isRestoring || sites.restoreState.options.length === 0}
-                >
-                  {sites.restoreState.options.map((option) => {
-                    const dateLabel = new Date(option.committedAt).toLocaleString()
-                    const label = `${option.commit} · ${option.pageCount} pages · ${option.homeHeading} · ${dateLabel}`
-                    return (
-                      <option key={option.commit} value={option.commit}>
-                        {label}
-                      </option>
-                    )
-                  })}
-                </select>
-              </label>
-              {sites.restoreState.error ? <p className="site-purpose">{sites.restoreState.error}</p> : null}
+              {sites.restoreState.isLoading ? (
+                <div className="sites-restore-loading">
+                  <span className="sites-restore-spinner" />
+                  <span>{t("sites.loadingSnapshots")}</span>
+                </div>
+              ) : sites.restoreState.options.length === 0 ? (
+                <p className="site-purpose">{t("sites.noSnapshots")}</p>
+              ) : (
+                <div className="sites-snapshot-table-wrap">
+                  <table className="sites-snapshot-table">
+                    <thead>
+                      <tr>
+                        <th>{t("sites.snapshotCommit")}</th>
+                        <th>{t("sites.snapshotPages")}</th>
+                        <th>{t("sites.snapshotHeading")}</th>
+                        <th>{t("sites.snapshotDate")}</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sites.restoreState.options.map((option) => (
+                        <tr key={option.commit} className={sites.restoreState.commit === option.commit ? "sites-snapshot-row-selected" : ""}>
+                          <td className="sites-snapshot-commit">{option.commit}</td>
+                          <td>{option.pageCount}</td>
+                          <td className="sites-snapshot-heading">{option.homeHeading}</td>
+                          <td className="sites-snapshot-date">{new Date(option.committedAt).toLocaleString()}</td>
+                          <td className="sites-snapshot-actions">
+                            <button
+                              type="button"
+                              className="primary-btn sites-snapshot-restore-btn"
+                              onClick={() => void sites.restoreSnapshotForSite(option.commit)}
+                              disabled={sites.restoreState.isRestoring}
+                            >
+                              {t("sites.restore")}
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-btn sites-snapshot-delete-btn"
+                              onClick={() => void sites.deleteSnapshot(option.commit)}
+                              disabled={sites.restoreState.isRestoring}
+                              aria-label={`Delete ${option.commit}`}
+                            >
+                              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+                                <path d="M6 2h8M3 5h14M5 5l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {sites.restoreState.error ? <p className="site-purpose" style={{ color: "#f87171" }}>{sites.restoreState.error}</p> : null}
             </div>
             <footer className="sites-modal-footer">
               <button type="button" className="secondary-btn" onClick={() => sites.updateRestoreState({ siteId: null })} disabled={sites.restoreState.isRestoring}>
-                {t("sites.cancel")}
-              </button>
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={() => void sites.restoreSnapshotForSite()}
-                disabled={sites.restoreState.isLoading || sites.restoreState.isRestoring || !sites.restoreState.commit}
-              >
-                {sites.restoreState.isRestoring ? t("sites.restoring") : t("sites.restore")}
+                {t("sites.close")}
               </button>
             </footer>
           </section>

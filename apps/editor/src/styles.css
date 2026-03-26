@@ -2912,6 +2912,107 @@ textarea {
   padding-bottom: 24px;
 }
 
+.sites-restore-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+  color: #6b7a8d;
+  font-size: 14px;
+}
+
+.sites-restore-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d2dbe5;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: sites-spin 0.7s linear infinite;
+}
+
+@keyframes sites-spin {
+  to { transform: rotate(360deg); }
+}
+
+.sites-modal-wide {
+  max-width: 720px;
+}
+
+.sites-snapshot-table-wrap {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+
+.sites-snapshot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sites-snapshot-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7a8d;
+  border-bottom: 1px solid #d2dbe5;
+  white-space: nowrap;
+}
+
+.sites-snapshot-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef1f5;
+  vertical-align: middle;
+}
+
+.sites-snapshot-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.sites-snapshot-commit {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #475569;
+}
+
+.sites-snapshot-heading {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sites-snapshot-date {
+  white-space: nowrap;
+  color: #6b7a8d;
+  font-size: 12px;
+}
+
+.sites-snapshot-actions {
+  white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sites-snapshot-restore-btn {
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+}
+
+.sites-snapshot-delete-btn {
+  padding: 4px 6px !important;
+  color: #94a3b8 !important;
+  border: none !important;
+  background: none !important;
+}
+
+.sites-snapshot-delete-btn:hover {
+  color: #ef4444 !important;
+}
+
 .sites-modal-footer {
   padding: 12px 14px;
   border-top: 1px solid #d2dbe5;
@@ -4122,6 +4223,35 @@ textarea {
 
 .editor-dark .sites-modal-footer {
   border-top-color: #334155;
+}
+
+.editor-dark .sites-snapshot-table th {
+  color: #94a3b8;
+  border-bottom-color: #334155;
+}
+
+.editor-dark .sites-snapshot-table td {
+  border-bottom-color: #1e293b;
+}
+
+.editor-dark .sites-snapshot-table tbody tr:hover {
+  background: #1e293b;
+}
+
+.editor-dark .sites-snapshot-commit {
+  color: #94a3b8;
+}
+
+.editor-dark .sites-snapshot-date {
+  color: #64748b;
+}
+
+.editor-dark .sites-snapshot-delete-btn {
+  color: #64748b !important;
+}
+
+.editor-dark .sites-snapshot-delete-btn:hover {
+  color: #ef4444 !important;
 }
 
 .editor-dark .sites-form-section-title {

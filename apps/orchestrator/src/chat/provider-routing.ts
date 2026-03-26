@@ -1,6 +1,6 @@
 import type { AIProvider, ModelKey } from "../state/session-state.js"
 
-export type PlannerSource = "openai" | "anthropic" | "demo"
+export type PlannerSource = "openai" | "anthropic" | "gemini" | "demo"
 
 export function resolveEffectiveProvider(args: {
   requestedProvider?: AIProvider
@@ -26,13 +26,17 @@ export function resolveModelKeyForProvider(args: {
 }
 
 export function resolvePlannerSource(provider: AIProvider): PlannerSource {
-  return provider === "anthropic" && process.env.ANTHROPIC_API_KEY
-    ? "anthropic"
-    : provider === "openai" && process.env.OPENAI_API_KEY
-      ? "openai"
-      : process.env.OPENAI_API_KEY
+  return provider === "gemini" && process.env.GOOGLE_GENAI_API_KEY
+    ? "gemini"
+    : provider === "anthropic" && process.env.ANTHROPIC_API_KEY
+      ? "anthropic"
+      : provider === "openai" && process.env.OPENAI_API_KEY
         ? "openai"
-        : process.env.ANTHROPIC_API_KEY
-          ? "anthropic"
-          : "demo"
+        : process.env.OPENAI_API_KEY
+          ? "openai"
+          : process.env.ANTHROPIC_API_KEY
+            ? "anthropic"
+            : process.env.GOOGLE_GENAI_API_KEY
+              ? "gemini"
+              : "demo"
 }

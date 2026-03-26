@@ -26,7 +26,7 @@ export function resolveDefaultDebugMode() {
 }
 
 const VALID_MODEL_KEYS = new Set<string>(["fast", "balanced", "reasoning", "codex"])
-const VALID_PROVIDERS = new Set<string>(["openai", "anthropic"])
+const VALID_PROVIDERS = new Set<string>(["openai", "anthropic", "gemini"])
 
 export function resolveDefaultModelKey(): import("./editor-types").ModelKey {
   if (typeof window === "undefined") return "balanced"

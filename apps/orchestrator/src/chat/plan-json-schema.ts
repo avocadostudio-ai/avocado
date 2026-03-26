@@ -1,5 +1,4 @@
-import { z } from "zod"
-import { allowedBlockTypes, type BlockType } from "@ai-site-editor/shared"
+import { allowedBlockTypes } from "@ai-site-editor/shared"
 
 // ---------------------------------------------------------------------------
 // JSON Schema for EditPlan — used as Anthropic tool_use input_schema and
@@ -67,30 +66,30 @@ export const editPlanJsonSchema = {
 // ---------------------------------------------------------------------------
 // JSON Schema for intent parsing — used with output_config.format for
 // constrained decoding (guaranteed valid JSON matching this schema).
-// Generated from intentSchemaForAI (Zod) via z.toJSONSchema().
+// Hand-crafted to stay within the intersection of OpenAI strict mode and
+// Anthropic json_schema constraints (no propertyNames, $ref, oneOf, etc.).
 // ---------------------------------------------------------------------------
 
-const blockTypeEnum = z.enum(allowedBlockTypes as [BlockType, ...BlockType[]])
-
-/** Zod schema for AI structured output — uses .nullable() so all fields are required (OpenAI strict mode). */
-const intentSchemaForAI = z.object({
-  action: z.enum(["add", "move", "update", "remove", "info", "clarify"]),
-  target_block_ref: z.string().nullable(),
-  target_block_type: blockTypeEnum.nullable(),
-  new_block_type: blockTypeEnum.nullable(),
-  position: z.enum(["top", "bottom", "before", "after"]).nullable(),
-  anchor_block_ref: z.string().nullable(),
-  patch: z.record(z.string(), z.unknown()).nullable(),
-  summary: z.string().nullable(),
-  assumption: z.string().nullable(),
-  complexity: z.enum(["simple", "standard"]).nullable()
-})
-
-function stripSchemaKey(obj: Record<string, unknown>): Record<string, unknown> {
-  const { $schema, ...rest } = obj
-  return rest
+function nullable(schema: Record<string, unknown>) {
+  return { anyOf: [schema, { type: "null" as const }] }
 }
 
-export const intentJsonSchema = stripSchemaKey(
-  z.toJSONSchema(intentSchemaForAI) as Record<string, unknown>
-)
+const blockTypeEnumSchema = { type: "string" as const, enum: [...allowedBlockTypes] }
+
+export const intentJsonSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  properties: {
+    action: { type: "string" as const, enum: ["add", "move", "update", "remove", "info", "clarify"] },
+    target_block_ref: nullable({ type: "string" as const }),
+    target_block_type: nullable(blockTypeEnumSchema),
+    new_block_type: nullable(blockTypeEnumSchema),
+    position: nullable({ type: "string" as const, enum: ["top", "bottom", "before", "after"] }),
+    anchor_block_ref: nullable({ type: "string" as const }),
+    summary: nullable({ type: "string" as const }),
+    assumption: nullable({ type: "string" as const }),
+    complexity: nullable({ type: "string" as const, enum: ["simple", "standard"] })
+  },
+  required: ["action", "target_block_ref", "target_block_type", "new_block_type",
+    "position", "anchor_block_ref", "summary", "assumption", "complexity"] as string[]
+}

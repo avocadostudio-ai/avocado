@@ -24,7 +24,7 @@ export type ChatTelemetryEntry = {
   session: string
   requestedSlug: string
   effectiveSlug: string
-  plannerSource: "openai" | "anthropic" | "demo"
+  plannerSource: "openai" | "anthropic" | "gemini" | "demo"
   modelKey: string
   modelUsed: string
   promptHash: string

@@ -205,15 +205,43 @@ export function useSiteList(siteId: string, session: string) {
     }
   }
 
-  const restoreSnapshotForSite = async () => {
-    if (!restoreState.siteId || !restoreState.commit) return
+  const deleteSnapshot = async (commit: string) => {
+    if (!restoreState.siteId) return
+    setRestoreState((prev) => ({ ...prev, error: null }))
+    try {
+      const res = await fetch(`${orchestrator}/restore/snapshot`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ commit })
+      })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) {
+        setRestoreState((prev) => ({ ...prev, error: data.error ?? "Failed to delete snapshot." }))
+        return
+      }
+      setRestoreState((prev) => {
+        const options = prev.options.filter((o) => o.commit !== commit)
+        return {
+          ...prev,
+          options,
+          commit: prev.commit === commit ? (options[0]?.commit ?? "") : prev.commit
+        }
+      })
+    } catch {
+      setRestoreState((prev) => ({ ...prev, error: "Failed to delete snapshot." }))
+    }
+  }
+
+  const restoreSnapshotForSite = async (commitOverride?: string) => {
+    const commit = commitOverride ?? restoreState.commit
+    if (!restoreState.siteId || !commit) return
     setRestoreState((prev) => ({ ...prev, error: null, isRestoring: true }))
     try {
       const res = await fetch(`${orchestrator}/restore/snapshot`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          commit: restoreState.commit,
+          commit,
           session,
           siteId: restoreState.siteId
         })
@@ -332,6 +360,7 @@ export function useSiteList(siteId: string, session: string) {
     addSiteFromName,
     openEditorForSite,
     openRestoreModal,
+    deleteSnapshot,
     restoreSnapshotForSite,
     updateConfigSite,
     updateActiveSiteConfig,

@@ -9,10 +9,17 @@ import { setPage, scopedSessionKey } from "./state/session-state.js"
 // ---------------------------------------------------------------------------
 
 const SITE_ID = "e2e-test"
-const E2E_PROVIDER = ((process.env.E2E_CHAT_PROVIDER ?? "openai").trim().toLowerCase() === "anthropic" ? "anthropic" : "openai")
+const E2E_PROVIDER = (() => {
+  const raw = (process.env.E2E_CHAT_PROVIDER ?? "openai").trim().toLowerCase()
+  if (raw === "anthropic") return "anthropic" as const
+  if (raw === "gemini") return "gemini" as const
+  return "openai" as const
+})()
 const E2E_MODEL_KEY = (process.env.E2E_CHAT_MODEL_KEY ?? "balanced").trim()
 const E2E_PROVIDER_AVAILABLE =
-  E2E_PROVIDER === "anthropic" ? Boolean(process.env.ANTHROPIC_API_KEY?.trim()) : Boolean(process.env.OPENAI_API_KEY?.trim())
+  E2E_PROVIDER === "anthropic" ? Boolean(process.env.ANTHROPIC_API_KEY?.trim())
+  : E2E_PROVIDER === "gemini" ? Boolean(process.env.GOOGLE_GENAI_API_KEY?.trim())
+  : Boolean(process.env.OPENAI_API_KEY?.trim())
 const E2E_DESCRIBE_OPTIONS = { timeout: 120_000, skip: !E2E_PROVIDER_AVAILABLE }
 let sessionCounter = 0
 const bootstrappedSessions = new Set<string>()

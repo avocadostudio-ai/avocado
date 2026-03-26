@@ -71,6 +71,20 @@ export const GENERATING_IMAGE_PLACEHOLDER = buildShimmerPlaceholder(SPARKLE_ICON
 export const SEARCHING_IMAGE_PLACEHOLDER = buildShimmerPlaceholder(SEARCH_ICON, "Searching%E2%80%A6")
 
 /** Returns true if the URL is a shimmer placeholder used during deferred image generation/search. */
+/**
+ * A native image tool call deferred during planning so text ops stream
+ * immediately. The real tool is executed post-apply and the result is
+ * patched into the preview via follow-up SSE events.
+ */
+export type DeferredNativeImageCall = {
+  toolName: "image.generate" | "unsplash.search"
+  input: Record<string, unknown>
+  placeholderUrl: string
+}
+
+/** Tool names whose execution is deferred to avoid blocking text streaming */
+export const DEFERRABLE_IMAGE_TOOLS = new Set(["image.generate", "unsplash.search"])
+
 export function isGeneratingPlaceholder(url: string): boolean {
   if (url.startsWith("data:image/svg+xml,") && (url.includes("Generating%20image") || url.includes("Generating image") || url.includes("Searching"))) return true
   if (url.includes("placehold.co") && (url.includes("Generating") || url.includes("Searching"))) return true
