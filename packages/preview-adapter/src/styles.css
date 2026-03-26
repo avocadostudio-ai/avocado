@@ -128,13 +128,17 @@
   inset: 0;
   pointer-events: none;
   background: linear-gradient(
-    110deg,
-    rgba(var(--editor-selected-rgb), 0.02) 0%,
-    rgba(var(--editor-selected-rgb), 0.09) 46%,
-    rgba(var(--editor-selected-rgb), 0.02) 100%
+    105deg,
+    transparent 0%,
+    rgba(var(--editor-selected-rgb), 0.03) 20%,
+    rgba(var(--editor-selected-rgb), 0.10) 45%,
+    rgba(var(--editor-selected-rgb), 0.14) 50%,
+    rgba(var(--editor-selected-rgb), 0.10) 55%,
+    rgba(var(--editor-selected-rgb), 0.03) 80%,
+    transparent 100%
   );
-  background-size: 210% 100%;
-  animation: editor-live-draft-shimmer 1.45s linear infinite;
+  background-size: 250% 100%;
+  animation: editor-live-draft-shimmer 1.8s ease-in-out infinite;
 }
 
 .editor-block-badge-status {
@@ -162,13 +166,167 @@
 }
 
 @keyframes editor-live-draft-shimmer {
-  from { background-position: 180% 0; }
-  to { background-position: -20% 0; }
+  0% { background-position: 200% 0; }
+  100% { background-position: -50% 0; }
 }
 
 @keyframes editor-live-draft-pulse {
   from { transform: scale(0.7); opacity: 0.45; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* ──────────────────────────────────────────────────────
+   AI Generation Shimmer Effects
+   These run inside the iframe preview during AI operations.
+   ────────────────────────────────────────────────────── */
+
+/* Skeleton shimmer for incoming blocks */
+.editor-skeleton-block {
+  min-height: 140px;
+  border-radius: 12px;
+  background: var(--bg-100, #f8fafc);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.06));
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-skeleton-block::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(148, 163, 184, 0.07) 25%,
+    rgba(148, 163, 184, 0.14) 50%,
+    rgba(148, 163, 184, 0.07) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: editor-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.editor-skeleton-block::after {
+  content: "";
+  position: absolute;
+  top: 28px;
+  left: 24px;
+  right: 40%;
+  height: 18px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.10);
+}
+
+@keyframes editor-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.dark .editor-skeleton-block {
+  background: var(--bg-100, #1e293b);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .editor-skeleton-block::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(148, 163, 184, 0.04) 25%,
+    rgba(148, 163, 184, 0.09) 50%,
+    rgba(148, 163, 184, 0.04) 75%,
+    transparent 100%
+  );
+}
+
+.dark .editor-skeleton-block::after {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+/* AI field loading shimmer */
+.aifx-shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 23;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: clip;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(208, 214, 221, 0.03) 22%,
+    rgba(219, 224, 231, 0.18) 44%,
+    rgba(247, 250, 252, 0.22) 50%,
+    rgba(219, 224, 231, 0.18) 56%,
+    rgba(208, 214, 221, 0.03) 78%,
+    transparent 100%
+  );
+  background-size: 250% 100%;
+  background-position: 180% 0;
+  animation: aifx-shimmer-sweep 1.6s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes aifx-shimmer-sweep {
+  0% { background-position: 180% 0; }
+  100% { background-position: -80% 0; }
+}
+
+/* Force toolbar visible while AI shimmer is active */
+.editor-block-toolbar:has(.aifx-shimmer-sparkle) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.aifx-shimmer-sparkle {
+  position: static;
+  z-index: 1;
+  width: 28px !important;
+  height: 28px !important;
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #fff !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border-radius: 50% !important;
+  animation: aifx-sparkle-blink 1.2s ease-in-out infinite;
+}
+
+.aifx-shimmer-sparkle svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 6px rgba(170, 178, 186, 0.45));
+}
+
+@keyframes aifx-sparkle-blink {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.82); opacity: 0.7; }
+}
+
+@media (prefers-color-scheme: light) {
+  .aifx-shimmer-overlay {
+    background: linear-gradient(
+      105deg,
+      transparent 0%,
+      rgba(210, 216, 223, 0.06) 22%,
+      rgba(226, 231, 237, 0.28) 44%,
+      rgba(255, 255, 255, 0.30) 50%,
+      rgba(226, 231, 237, 0.28) 56%,
+      rgba(216, 222, 229, 0.06) 78%,
+      transparent 100%
+    );
+    animation-duration: 1.4s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aifx-shimmer-overlay,
+  .aifx-shimmer-sparkle,
+  .editor-skeleton-block::before {
+    animation: none !important;
+  }
 }
 
 [data-editor-active] .editor-highlight::before {
