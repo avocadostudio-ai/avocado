@@ -27,7 +27,7 @@ export class ToolRegistry {
     if (!/^https?:\/\//i.test(endpoint)) throw new Error("remote tool endpoint must be http(s)")
 
     const key = normalizeToolName(args.manifest.name)
-    const handler: ToolHandler = async ({ input, context }) => {
+    const handler: ToolHandler = async ({ input, context, signal }) => {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -45,7 +45,8 @@ export class ToolRegistry {
             traceId: context.traceId,
             plannerProvider: context.plannerProvider
           }
-        })
+        }),
+        signal,
       })
       if (!response.ok) {
         const body = await response.text().catch(() => "")

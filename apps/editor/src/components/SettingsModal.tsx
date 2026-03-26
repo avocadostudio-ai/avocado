@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils"
 import type { AIProvider, ModelKey } from "@/lib/editor-types"
 import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
 
+function agentProviderLabel(key: string): string {
+  if (key.startsWith("sk-ant-")) return "Claude"
+  if (key.startsWith("sk-")) return "GPT-4o"
+  return "Unknown provider"
+}
+
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
   anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
@@ -163,12 +169,14 @@ export function SettingsModal({
               <input
                 type="password"
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="sk-ant-..."
+                placeholder="sk-ant-... or sk-..."
                 value={agentApiKey ?? ""}
                 onChange={(e) => onAgentApiKeyChange(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground">
-                {agentApiKey ? "Agent mode active — Claude uses tools to edit your site directly." : "Paste your Anthropic API key to enable agent mode. Key stays in your browser."}
+                {agentApiKey
+                  ? `Agent mode: ${agentProviderLabel(agentApiKey)} — uses tools to edit your site directly.`
+                  : "Paste your Anthropic or OpenAI API key to enable agent mode. Key stays in your browser."}
               </p>
             </div>
           )}

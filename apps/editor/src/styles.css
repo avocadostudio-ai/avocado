@@ -1905,6 +1905,41 @@ textarea {
   line-height: 1.45;
 }
 
+.stream-reconnect-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+.stream-reconnect-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.75;
+  animation: stream-reconnect-pulse 1.2s ease-in-out infinite;
+}
+
+.stream-reconnect-badge-inline {
+  margin-top: 6px;
+  align-self: flex-start;
+}
+
+@keyframes stream-reconnect-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 0.95; transform: scale(1); }
+}
+
 .streaming-debug-inline {
   width: 100%;
   margin-top: 6px;

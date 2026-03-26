@@ -110,18 +110,7 @@ export class ToolExecutor {
         const combinedSignal = args.signal
           ? AbortSignal.any([args.signal, AbortSignal.timeout(tool.manifest.timeoutMs)])
           : AbortSignal.timeout(tool.manifest.timeoutMs)
-        const output = await Promise.race([
-          tool.handler({ input: args.input, context: args.context, manifest: tool.manifest }),
-          new Promise<never>((_resolve, reject) => {
-            if (combinedSignal.aborted) {
-              reject(new Error(combinedSignal.reason ?? `Tool timed out after ${tool.manifest.timeoutMs}ms`))
-              return
-            }
-            combinedSignal.addEventListener("abort", () => {
-              reject(new Error(combinedSignal.reason ?? `Tool timed out after ${tool.manifest.timeoutMs}ms`))
-            }, { once: true })
-          })
-        ])
+        const output = await tool.handler({ input: args.input, context: args.context, manifest: tool.manifest, signal: combinedSignal })
 
         const outputValidation = validateAgainstSchema(output, tool.manifest.outputSchema)
         if (!outputValidation.ok) {

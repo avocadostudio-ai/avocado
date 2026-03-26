@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import {
   allowedBlockTypes,
   editPlanSchema,
+  type BlockManifest,
   type EditPlan,
   type Operation,
   type PageDoc
@@ -231,6 +232,7 @@ export async function generatePlanWithAnthropic(args: {
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
   forceFullSchemaContracts?: boolean
   manifestBlockTypes?: string[]
+  componentsManifest?: BlockManifest
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
@@ -294,7 +296,9 @@ export async function generatePlanWithAnthropic(args: {
         batchOverride,
         pageWideTranslation,
         legacyIncludeContracts: includeContracts,
-        forceFullContracts: args.forceFullSchemaContracts
+        forceFullContracts: args.forceFullSchemaContracts,
+        componentsManifest: args.componentsManifest,
+        effectiveBlockTypes
       })
 
   const user = {

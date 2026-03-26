@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import type { BlockManifest } from "@ai-site-editor/shared"
 import { createSessionFactory, postOps, getPage, getSlugs } from "./test/fixtures.js"
 import { getSiteConfig } from "./state/session-state.js"
 
@@ -719,4 +720,93 @@ test("atomicity: batch with a valid op followed by an invalid op is fully rolled
     "Build websites with plain language",
     "heading should still be the original demo value"
   )
+})
+
+// ---------------------------------------------------------------------------
+// Manifest-aware validation: extra props survive when manifest declares them
+// ---------------------------------------------------------------------------
+
+test("update_props: manifest-declared extra props survive Zod passthrough", async () => {
+  // Scenario: external site (e.g. villa) has a Hero block with extra fields
+  // (logoUrl, carouselImages) not in the shared Zod Hero schema.
+  // The manifest declares these fields — they must NOT be stripped.
+  const session = newSession()
+
+  // Seed a page with a Hero that has extra villa-specific fields
+  await postOps({
+    session,
+    ops: [{
+      op: "create_page",
+      page: {
+        id: "p_villa_home",
+        slug: "/villa-home",
+        title: "Villa Home",
+        updatedAt: new Date().toISOString(),
+        blocks: [{
+          id: "b_villa_hero",
+          type: "Hero",
+          props: {
+            heading: "Welcome",
+            subheading: "To Villa",
+            ctaText: "Book",
+            ctaHref: "/book",
+            imageUrl: "/hero.jpg",
+            imageAlt: "Villa hero",
+            logoUrl: "/logo.png",
+            logoAlt: "Villa logo",
+            carouselImages: [{ src: "/img1.jpg", alt: "Pool" }]
+          }
+        }]
+      }
+    }]
+  })
+
+  // Now update heading — with a manifest that declares logoUrl + carouselImages
+  const manifest: BlockManifest = {
+    version: 1,
+    blocks: [{
+      type: "Hero",
+      displayName: "Hero",
+      propsSchema: {
+        type: "object",
+        properties: {
+          heading: { type: "string" },
+          subheading: { type: "string" },
+          ctaText: { type: "string" },
+          ctaHref: { type: "string" },
+          imageUrl: { type: "string" },
+          imageAlt: { type: "string" },
+          logoUrl: { type: "string" },
+          logoAlt: { type: "string" },
+          carouselImages: {
+            type: "array",
+            items: { type: "object", properties: { src: { type: "string" }, alt: { type: "string" } } }
+          }
+        }
+      }
+    }]
+  }
+
+  const res = await postOps({
+    session,
+    componentsManifest: manifest,
+    ops: [{
+      op: "update_props",
+      pageSlug: "/villa-home",
+      blockId: "b_villa_hero",
+      patch: { heading: "Willkommen" }
+    }]
+  })
+  assert.equal(res.statusCode, 200, `Expected 200 but got ${res.statusCode}: ${res.body}`)
+
+  const pageRes = await getPage(session, "/villa-home")
+  const page = JSON.parse(pageRes.body)
+  const hero = page.blocks.find((b: any) => b.id === "b_villa_hero")
+  assert.ok(hero, "hero block should exist")
+  assert.equal(hero.props.heading, "Willkommen", "heading should be updated")
+  assert.equal(hero.props.logoUrl, "/logo.png", "logoUrl must survive (not stripped by Zod)")
+  assert.equal(hero.props.logoAlt, "Villa logo", "logoAlt must survive")
+  assert.ok(Array.isArray(hero.props.carouselImages), "carouselImages must survive")
+  assert.equal(hero.props.carouselImages.length, 1, "carouselImages items preserved")
+  assert.equal(hero.props.carouselImages[0].src, "/img1.jpg", "carousel item data preserved")
 })

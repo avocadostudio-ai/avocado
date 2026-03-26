@@ -265,7 +265,7 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
         const blockId = String(msg.payload.blockId ?? "")
         const editablePath = String(msg.payload.editablePath ?? "")
         const active = Boolean(msg.payload.active)
-        state.activeShimmer = active && blockId ? { blockId, editablePath } : null
+        state.activeShimmer = active ? { blockId, editablePath } : null
         applyAiFieldLoading(blockId, editablePath, active)
       }
     }

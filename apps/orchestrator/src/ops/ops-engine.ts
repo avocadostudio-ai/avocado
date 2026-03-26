@@ -296,19 +296,27 @@ function _validateWithManifestIfPresent(
   blockType: string,
   nextProps: Record<string, unknown>
 ) {
-  // Always run Zod validation first — it coerces values (e.g. numbers → strings)
-  const propCheck = validateBlockProps(blockType as BlockType, nextProps)
-  const coerced = propCheck.success ? (propCheck.data as Record<string, unknown>) : nextProps
-
   const manifestComponent = manifestByType.get(blockType)
+
   if (manifestComponent) {
+    // When a manifest declares this block, use passthrough Zod (keeps extra keys)
+    // so site-specific fields survive coercion of shared-registry fields.
+    const schema = blockSchemas[blockType as BlockType]
+    let coerced = nextProps
+    if (schema) {
+      const result = schema.passthrough().safeParse(nextProps)
+      if (result.success) coerced = result.data as Record<string, unknown>
+    }
     if (!validateByJsonSchemaLike(manifestComponent.propsSchema, coerced)) {
       throw new OperationError(`Invalid props for ${blockType}: does not match block manifest schema`, { category: "schema_violation" })
     }
     return coerced
   }
+
+  // No manifest entry — Zod-only validation (strips unknown keys as before)
+  const propCheck = validateBlockProps(blockType as BlockType, nextProps)
   if (!propCheck.success) throw new OperationError(`Invalid props for ${blockType}: ${_describeValidationIssue(propCheck.error)}`, { category: "schema_violation" })
-  return coerced
+  return propCheck.data as Record<string, unknown>
 }
 
 function _requireManifestComponent(

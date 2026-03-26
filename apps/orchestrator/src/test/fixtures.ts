@@ -179,7 +179,7 @@ export function parseSseData(body: string) {
 // HTTP helpers (for integration tests via Fastify .inject())
 // ---------------------------------------------------------------------------
 
-type OpsPayload = { session: string; ops: unknown[] }
+type OpsPayload = { session: string; ops: unknown[]; componentsManifest?: BlockManifest }
 
 export async function postOps(payload: OpsPayload) {
   return app.inject({
