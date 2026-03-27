@@ -3,7 +3,7 @@
 .rich-text__body p {
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--body-secondary);
+  color: var(--body);
   margin-bottom: 1em;
 }
 
@@ -15,7 +15,7 @@
 .rich-text__body ol {
   margin: 0 0 1em;
   padding-left: 1.4em;
-  color: var(--body-secondary);
+  color: var(--body);
   line-height: 1.75;
 }
 
