@@ -20,6 +20,12 @@ fi
 
 mkdir -p "$RUN_DIR"
 
+# Reduce file-watcher FD usage: poll instead of native FSEvents.
+# Trades ~1% CPU for stability when running many dev servers in parallel.
+export WATCHPACK_POLLING=true
+export CHOKIDAR_USEPOLLING=true
+export CHOKIDAR_INTERVAL=1000
+
 if [[ -z "$PNPM_BIN" ]]; then
   echo "pnpm not found on PATH."
   echo "Set PNPM_BIN explicitly, e.g. PNPM_BIN=/opt/homebrew/bin/pnpm ./scripts/devctl.sh start"
@@ -40,9 +46,10 @@ DEV_MATCH_PATTERN="pnpm -r --parallel --filter @ai-site-editor/site --filter @ai
 
 cleanup_orphans() {
   # Only target this workspace's known dev commands.
-  pkill -f "/Users/yury/Projects/ai-site-editor/apps/site/node_modules/.*/next dev -p 3000" 2>/dev/null || true
-  pkill -f "/Users/yury/Projects/ai-site-editor/apps/editor/node_modules/.*/vite/bin/vite.js --port 4100 --strictPort" 2>/dev/null || true
-  pkill -f "/Users/yury/Projects/ai-site-editor/apps/orchestrator/node_modules/.*/tsx/dist/cli.mjs watch src/index.ts" 2>/dev/null || true
+  pkill -f "/Users/yury/Projects/ai-site-editor/apps/site/node_modules/.*/next dev" 2>/dev/null || true
+  pkill -f "/Users/yury/Projects/ai-site-editor/apps/editor/node_modules/.*/vite/bin/vite.js" 2>/dev/null || true
+  # Kill both tsx parent (cli.mjs watch) and tsx child (preflight.cjs + loader.mjs) processes
+  pkill -f "/Users/yury/Projects/ai-site-editor/apps/orchestrator/node_modules/.*/tsx/" 2>/dev/null || true
   pkill -f "$DEV_MATCH_PATTERN" 2>/dev/null || true
 }
 
