@@ -22,7 +22,23 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { dev }) => {
     if (dev) {
-      config.watchOptions = { ...config.watchOptions, followSymlinks: true }
+      config.watchOptions = {
+        ...config.watchOptions,
+        followSymlinks: true,
+        poll: 1000,
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/coverage/**',
+          '**/apps/**',
+          '**/examples/strapi-site/**',
+          '**/examples/contentful-site/**',
+          '**/examples/sample-site/**',
+        ],
+      }
       config.resolve = { ...config.resolve, symlinks: false }
     }
     return config

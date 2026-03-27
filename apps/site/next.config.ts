@@ -17,6 +17,18 @@ const nextConfig: NextConfig = {
       config.watchOptions = {
         ...config.watchOptions,
         followSymlinks: true,
+        poll: 1000,
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/coverage/**',
+          '**/apps/editor/**',
+          '**/apps/orchestrator/**',
+          '**/examples/**',
+        ],
       }
       // Resolve workspace symlinks to their real paths so webpack tracks them
       config.resolve = {
