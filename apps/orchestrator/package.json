@@ -26,7 +26,9 @@
     "benchmark:ops:stability:anthropic": "tsx src/scripts/benchmark-models.ts --provider anthropic --eval-mode ops-json --ops-cardinality single --prompts src/scripts/test-sets/prompt-examples.json --runs 20 --variants 3 --min-pass-rate 0.9 --fail-on-threshold true --group-variants-by-base-id true --out ../../.data/evals/ops-stability-anthropic.json"
   },
   "dependencies": {
+    "@ai-site-editor/migration-sdk": "workspace:*",
     "@ai-site-editor/shared": "workspace:*",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
     "@anthropic-ai/sdk": "^0.80.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^9.4.0",

@@ -15,7 +15,7 @@ function ChevronDown({ className }: { className?: string }) {
 
 export function SiteHeader(props: Record<string, unknown>) {
   const siteName = String(props.siteName ?? "Site")
-  const logoUrl = String(props.logoUrl ?? "/logos/default.svg")
+  const logoUrl = String(props.logoUrl ?? "/logo.svg")
   const activePath = typeof props.activePath === "string" ? props.activePath : undefined
   const links: NavLink[] = Array.isArray(props.links)
     ? (props.links as NavLink[]).filter(
@@ -81,7 +81,7 @@ export function SiteHeader(props: Record<string, unknown>) {
       <header className="site-top-nav" data-block-chrome="true">
         <div className="site-top-nav-inner">
           <a className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
-            <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" />
+            {logoUrl ? <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" /> : null}
             <span className="site-brand-text">{siteName}</span>
           </a>
 

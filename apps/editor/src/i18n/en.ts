@@ -104,6 +104,8 @@ const en = {
   "sites.templateDescription": "Describe the page structure: which sections, in what order, with what content focus.",
   "sites.settings": "Settings",
   "sites.openEditor": "Open editor",
+  "sites.deleteSite": "Delete",
+  "sites.confirmDelete": "Remove \"{{name}}\" from your site list?",
   "sites.cancel": "Cancel",
   "sites.create": "Create",
   "sites.siteConfig": "Site Config",
@@ -312,6 +314,15 @@ const en = {
   "theme.switchDark": "Switch site to dark mode",
   "theme.light": "Light mode",
   "theme.dark": "Dark mode",
+
+  // -- Sites agent --
+  "sitesAgent.title": "Site Assistant",
+  "sitesAgent.clear": "Clear chat",
+  "sitesAgent.welcome": "I can help you create a new site or migrate an existing one. Tell me what you'd like to build, or paste a URL to import.",
+  "sitesAgent.placeholder": "Create a site, migrate a URL...",
+  "sitesAgent.suggestion1": "Create a portfolio site",
+  "sitesAgent.suggestion2": "Migrate an existing website",
+  "sitesAgent.stop": "Stop",
 } as const
 
 export type LocaleKeys = keyof typeof en

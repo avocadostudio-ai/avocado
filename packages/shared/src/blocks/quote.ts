@@ -29,6 +29,6 @@ export function quoteDefaultProps(): Record<string, unknown> {
     quote: "The best way to predict the future is to create it.",
     author: "Peter Drucker",
     role: "Management Consultant",
-    imageUrl: "https://i.pravatar.cc/300",
+    imageUrl: "https://placehold.co/300x300/e2e8f0/475569?text=PD",
   }
 }

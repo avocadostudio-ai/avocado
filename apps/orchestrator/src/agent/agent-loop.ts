@@ -12,11 +12,18 @@ import { AGENT_MAX_TOOL_CALLS, AGENT_MAX_TOKENS, AGENT_TEMPERATURE, AGENT_THINKI
 import { runOpenAIAgentLoop } from "./agent-loop-openai.js"
 import { anthropicSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "../chat/anthropic-cache.js"
 
+export type AgentTokenUsage = {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+}
+
 export type AgentEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_start"; toolName: string; toolUseId: string }
   | { type: "tool_done"; toolName: string; toolUseId: string; result: string; isError?: boolean }
-  | { type: "done"; summary: string; toolCallCount: number }
+  | { type: "done"; summary: string; toolCallCount: number; usage: AgentTokenUsage }
   | { type: "error"; message: string }
 
 export type AgentLoopOptions = {
@@ -65,6 +72,7 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
 
   let toolCallCount = 0
   let fullSummary = ""
+  const totalUsage: AgentTokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }
 
   // Tool-use loop
   while (toolCallCount < maxToolCalls) {
@@ -131,6 +139,15 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
         }
       }
 
+      // Accumulate token usage
+      const u = response.usage
+      if (u) {
+        totalUsage.inputTokens += u.input_tokens ?? 0
+        totalUsage.outputTokens += u.output_tokens ?? 0
+        totalUsage.cacheReadTokens += (u as unknown as Record<string, number>).cache_read_input_tokens ?? 0
+        totalUsage.cacheCreationTokens += (u as unknown as Record<string, number>).cache_creation_input_tokens ?? 0
+      }
+
       console.log("[agent-loop] Stream complete, stop_reason:", response.stop_reason,
         "content blocks:", response.content.length,
         "tools:", toolUseBlocks.map(b => b.name))
@@ -146,7 +163,7 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
 
     if (response.stop_reason === "end_turn" || toolUseBlocks.length === 0) {
       fullSummary += textParts.join("")
-      yield { type: "done", summary: fullSummary, toolCallCount }
+      yield { type: "done", summary: fullSummary, toolCallCount, usage: totalUsage }
       return
     }
 
@@ -189,5 +206,5 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
     messages.push({ role: "user", content: toolResults })
   }
 
-  yield { type: "done", summary: `Completed with ${toolCallCount} tool calls (limit reached).`, toolCallCount }
+  yield { type: "done", summary: `Completed with ${toolCallCount} tool calls (limit reached).`, toolCallCount, usage: totalUsage }
 }

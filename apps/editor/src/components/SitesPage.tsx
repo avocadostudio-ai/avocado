@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { blockManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
+import { SitesAgentChat } from "./SitesAgentChat"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, orchestrator, resolveSiteOrigin } from "../lib/editor-utils"
 import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
+import { useSitesAgent } from "../hooks/useSitesAgent"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
+import type { SiteConfig } from "../lib/editor-types"
 
 function compactPurposeText(value: string) {
   const normalized = value
@@ -25,6 +28,12 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
   const [configTab, setConfigTab] = useState<"general" | "media" | "hosting">("general")
   const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
   useEffect(() => { if (!sites.configSiteId) setDriveValidation(null) }, [sites.configSiteId])
+
+  const handleSiteCreated = useCallback((config: SiteConfig) => {
+    sites.addSiteFromConfig(config)
+  }, [sites.addSiteFromConfig])
+
+  const agent = useSitesAgent({ session, locale, onSiteCreated: handleSiteCreated })
 
   const dedupedSites = useMemo(() => sites.siteList
     .filter((site, index, all) => all.findIndex((row) => row.id === site.id) === index)
@@ -123,6 +132,8 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
   }, [dedupedSites])
 
   return (
+    <div className="sites-layout">
+    <SitesAgentChat agent={agent} />
     <main className="sites-page">
       <header className="sites-header">
         <div>
@@ -203,6 +214,20 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path d="M7 5h8v8" />
                       <path d="m7 13 8-8" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-btn site-delete-btn"
+                    onClick={() => {
+                      if (window.confirm(t("sites.confirmDelete", { name: site.name }))) {
+                        sites.removeSite(site.id)
+                      }
+                    }}
+                    aria-label={`${t("sites.deleteSite")} ${site.name}`}
+                  >
+                    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+                      <path d="M6 4V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h3v2H3V4h3zm1 4h2v8H7V8zm4 0h2v8h-2V8zM4 6h12l-1 12H5L4 6z" />
                     </svg>
                   </button>
                 </div>
@@ -689,5 +714,6 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
         </div>
       ) : null}
     </main>
+    </div>
   )
 }

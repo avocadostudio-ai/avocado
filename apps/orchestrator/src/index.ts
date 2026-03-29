@@ -24,6 +24,7 @@ import { historyRoutes } from "./routes/history.js"
 import { authRoutes } from "./routes/auth.js"
 import { gdriveRoutes } from "./routes/gdrive.js"
 import { registerAgentRoutes } from "./routes/agent.js"
+import { registerSitesAgentRoutes } from "./routes/sites-agent.js"
 import { createToolRuntime } from "./tools/runtime.js"
 
 const app = Fastify({ logger: true })
@@ -124,6 +125,7 @@ await app.register((instance) => historyRoutes(instance, ctx))
 await app.register((instance) => authRoutes(instance))
 await app.register((instance) => gdriveRoutes(instance, ctx))
 await app.register((instance) => registerAgentRoutes(instance))
+await app.register((instance) => registerSitesAgentRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)

@@ -13,6 +13,7 @@
   list-style: none;
   position: relative;
   user-select: none;
+  color: var(--heading);
 }
 
 .faq-item summary::-webkit-details-marker {
@@ -43,7 +44,3 @@
   line-height: 1.65;
 }
 
-/* Dark */
-.dark .faq-item summary {
-  color: #e2e8f0;
-}

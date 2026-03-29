@@ -214,6 +214,21 @@ export function raceCancel<T>(promise: Promise<T>, signal?: AbortSignal): Promis
 // SSE write helper
 // ---------------------------------------------------------------------------
 
+/** Parse "Suggested next actions:" bullet list from summary text. */
+export function parseSuggestionsFromSummary(text: string): { summary: string; suggestions: string[] } {
+  const marker = /\n*(?:suggested\s+(?:next\s+)?actions|next\s+steps|you\s+(?:could|might)\s+(?:also|want\s+to)):\s*\n/i
+  const match = text.match(marker)
+  if (!match || match.index === undefined) return { summary: text.trim(), suggestions: [] }
+  const before = text.slice(0, match.index).trim()
+  const after = text.slice(match.index + match[0].length)
+  const suggestions = after
+    .split("\n")
+    .map(line => line.replace(/^[-•*]\s*/, "").replace(/\*\*/g, "").trim())
+    .filter(line => line.length > 5 && line.length < 120)
+    .slice(0, 4)
+  return { summary: before, suggestions }
+}
+
 export function sseWrite(reply: { raw: NodeJS.WritableStream }, payload: unknown) {
   const stream = reply.raw as NodeJS.WritableStream & {
     destroyed?: boolean

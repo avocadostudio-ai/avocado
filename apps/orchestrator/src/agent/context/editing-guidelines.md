@@ -10,12 +10,13 @@
 - Block IDs follow the pattern: b_{type}_{identifier}, e.g. "b_hero_home", "b_faq_pricing"
 - When adding blocks, use descriptive IDs that indicate the block's purpose
 - The afterBlockId parameter controls insertion position — omit it to append at the end
-- To move a block to the top of the page, use `move_block` (not add_block)
+- To insert at the top, omit afterBlockId in add_block
 
-### IMPORTANT: Block Schemas
-- **Before creating or adding any block, call `get_block_schema` first** to get the exact property names and structure.
-- Never guess property names — always verify with `get_block_schema`. Wrong prop names cause blocks to render as empty/broken.
-- When creating a page with multiple blocks, call `get_block_schema` for each block type you plan to use.
+### Array Properties (Lists)
+- FAQ items use: { q: "Question?", a: "Answer." }
+- Feature items use: { title: "Feature", description: "Details" }
+- Card items use: { title: "Card", description: "Details", imageUrl: "", ctaText: "Learn More", ctaHref: "/" }
+- Testimonial items use: { quote: "...", author: "Name", role: "Title" }
 
 ### Images
 - imageUrl props accept full URLs (https://...)

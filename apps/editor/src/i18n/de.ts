@@ -106,6 +106,8 @@ const de: LocaleDict = {
   "sites.templateDescription": "Beschreibe die Seitenstruktur: welche Bereiche, in welcher Reihenfolge, mit welchem inhaltlichen Fokus.",
   "sites.settings": "Einstellungen",
   "sites.openEditor": "Editor öffnen",
+  "sites.deleteSite": "Löschen",
+  "sites.confirmDelete": "\"{{name}}\" aus der Siteliste entfernen?",
   "sites.cancel": "Abbrechen",
   "sites.create": "Erstellen",
   "sites.siteConfig": "Seitenkonfiguration",
@@ -314,6 +316,15 @@ const de: LocaleDict = {
   "theme.switchDark": "Seite in den dunklen Modus wechseln",
   "theme.light": "Heller Modus",
   "theme.dark": "Dunkler Modus",
+
+  // -- Sites agent --
+  "sitesAgent.title": "Seiten-Assistent",
+  "sitesAgent.clear": "Chat leeren",
+  "sitesAgent.welcome": "Ich kann dir helfen, eine neue Seite zu erstellen oder eine bestehende zu migrieren. Sag mir, was du bauen möchtest, oder füge eine URL ein.",
+  "sitesAgent.placeholder": "Seite erstellen, URL migrieren...",
+  "sitesAgent.suggestion1": "Portfolio-Seite erstellen",
+  "sitesAgent.suggestion2": "Bestehende Website migrieren",
+  "sitesAgent.stop": "Stopp",
 }
 
 export default de
