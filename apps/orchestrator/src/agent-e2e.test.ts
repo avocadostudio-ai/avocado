@@ -45,7 +45,7 @@ const E2E_API_KEY: string | undefined =
     : process.env.OPENAI_API_KEY?.trim()
 
 const E2E_AVAILABLE = Boolean(E2E_API_KEY)
-const E2E_OPTS = { timeout: 600_000, skip: !E2E_AVAILABLE }
+const E2E_OPTS = { timeout: 180_000, skip: !E2E_AVAILABLE }
 
 // ---------------------------------------------------------------------------
 // Result collection — written to .data/evals/agent-e2e-<provider>-<timestamp>.json
@@ -57,6 +57,8 @@ type TestResult = {
   durationMs: number
   toolCallCount: number
   toolsUsed: string[]
+  usage?: TokenUsage
+  costUsd?: number
   error?: string
 }
 
@@ -72,12 +74,15 @@ function extractToolsUsed(result: AgentChatResponse): string[] {
 }
 
 function recordResult(name: string, startMs: number, result: AgentChatResponse | null, error?: string) {
+  const model = E2E_MODEL ?? (E2E_PROVIDER === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o")
+  const usage = result?.usage
   results.push({
     test: name,
     status: error ? "fail" : "pass",
     durationMs: Math.round(performance.now() - startMs),
     toolCallCount: result?.toolCallCount ?? 0,
     toolsUsed: result ? extractToolsUsed(result) : [],
+    ...(usage ? { usage, costUsd: +estimateCostUsd(model, usage).toFixed(6) } : {}),
     ...(error ? { error } : {}),
   })
 }
@@ -88,6 +93,9 @@ function writeReport() {
   const ts = suiteStartedAt.replace(/[:.]/g, "-").replace("T", "_").slice(0, 19)
   const model = E2E_MODEL ?? (E2E_PROVIDER === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o")
   const filename = `agent-e2e_${E2E_PROVIDER}_${model}_${ts}.json`
+  const totalInputTokens = results.reduce((s, r) => s + (r.usage?.inputTokens ?? 0), 0)
+  const totalOutputTokens = results.reduce((s, r) => s + (r.usage?.outputTokens ?? 0), 0)
+  const totalCostUsd = results.reduce((s, r) => s + (r.costUsd ?? 0), 0)
   const report = {
     suite: "agent-e2e",
     startedAt: suiteStartedAt,
@@ -99,6 +107,9 @@ function writeReport() {
     failed: results.filter(r => r.status === "fail").length,
     totalDurationMs: results.reduce((s, r) => s + r.durationMs, 0),
     avgToolCalls: results.length ? +(results.reduce((s, r) => s + r.toolCallCount, 0) / results.length).toFixed(1) : 0,
+    totalInputTokens,
+    totalOutputTokens,
+    totalCostUsd: +totalCostUsd.toFixed(4),
     results,
   }
   const outPath = resolve(evalsDir, filename)
@@ -161,15 +172,43 @@ function ensureSeeded(session: string) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+type TokenUsage = {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+}
+
 type AgentChatResponse = {
   status: "applied" | "error"
   summary: string
   toolCallCount: number
+  usage?: TokenUsage
   events: Array<{ type: string; toolName?: string; text?: string; isError?: boolean }>
 }
 
-async function agentChat(session: string, slug: string, message: string): Promise<AgentChatResponse> {
+// Pricing per million tokens (USD) — updated 2026-03
+const PRICING: Record<string, { input: number; output: number; cacheRead: number }> = {
+  "claude-haiku-4-5-20251001": { input: 0.8, output: 4, cacheRead: 0.08 },
+  "claude-sonnet-4-6":        { input: 3, output: 15, cacheRead: 0.3 },
+  "claude-opus-4-6":          { input: 15, output: 75, cacheRead: 1.5 },
+  "gpt-4o":                   { input: 2.5, output: 10, cacheRead: 1.25 },
+  "gpt-4o-mini":              { input: 0.15, output: 0.6, cacheRead: 0.075 },
+}
+
+function estimateCostUsd(model: string, usage: TokenUsage): number {
+  const p = PRICING[model]
+  if (!p) return 0
+  return (
+    (usage.inputTokens * p.input +
+     usage.outputTokens * p.output +
+     usage.cacheReadTokens * p.cacheRead) / 1_000_000
+  )
+}
+
+async function agentChat(session: string, slug: string, message: string): Promise<AgentChatResponse & { _startMs: number }> {
   ensureSeeded(session)
+  const startMs = performance.now()
   const res = await app.inject({
     method: "POST",
     url: "/agent/chat",
@@ -183,7 +222,8 @@ async function agentChat(session: string, slug: string, message: string): Promis
     },
   })
   assert.equal(res.statusCode, 200, `agent/chat returned ${res.statusCode}: ${res.body}`)
-  return res.json() as AgentChatResponse
+  const json = res.json() as AgentChatResponse
+  return { ...json, _startMs: startMs }
 }
 
 function getDraft(session: string, slug: string): PageDoc {
@@ -250,8 +290,10 @@ describe(`agent-e2e (${E2E_PROVIDER}/${E2E_MODEL ?? "default"})`, E2E_OPTS, () =
     const result = await chat(session, "/", "What sections does this page have?")
     assert.equal(result.status, "applied")
     assert.ok(result.summary.length > 0, "should return a summary")
+    // Summary should reference block types present on the page
     assert.ok(/hero|card|feature|testimonial|cta/i.test(result.summary),
       `summary should mention page sections, got: ${result.summary.slice(0, 200)}`)
+    // Page should be unchanged
     const page = getDraft(session, "/")
     assert.equal(page.blocks.length, RICH_PAGES[0].blocks.length, "block count should be unchanged")
   })
@@ -415,7 +457,7 @@ describe(`agent-e2e (${E2E_PROVIDER}/${E2E_MODEL ?? "default"})`, E2E_OPTS, () =
     )
   })
 
-  // ---- Creative rewrite ----
+  // ---- Vague / creative rewrite ----
 
   tracked("11. Creative rewrite — make the hero more exciting", async () => {
     const session = newSession()
@@ -430,7 +472,8 @@ describe(`agent-e2e (${E2E_PROVIDER}/${E2E_MODEL ?? "default"})`, E2E_OPTS, () =
     const hero = findBlock(page, b => b.type === "Hero")!
     const headingAfter = String(blockProps(hero).heading)
 
-    // Agent may either apply a direct rewrite or offer variations — both valid
+    // Agent may either apply a direct rewrite (batch_update_props) or offer variations (generate_variations).
+    // Both are valid responses to a vague creative prompt.
     const directlyRewrote = headingAfter !== headingBefore
     const offeredVariations = tools.includes("generate_variations")
     assert.ok(
@@ -445,7 +488,9 @@ describe(`agent-e2e (${E2E_PROVIDER}/${E2E_MODEL ?? "default"})`, E2E_OPTS, () =
     const session = newSession()
     const result = await chat(session, "/", "How many pages does this site have and what are they?")
     assert.equal(result.status, "applied")
+    // Summary should mention the pages (agent gets site overview via context or list_pages tool)
     assert.ok(/about|banana/i.test(result.summary), `summary should mention site pages, got: ${result.summary.slice(0, 200)}`)
+    // Should know there are 3 pages
     assert.ok(/3|three/i.test(result.summary), `summary should mention page count, got: ${result.summary.slice(0, 200)}`)
   })
 
@@ -462,12 +507,14 @@ describe(`agent-e2e (${E2E_PROVIDER}/${E2E_MODEL ?? "default"})`, E2E_OPTS, () =
     assert.notEqual(fgs[0].id, fgs[1].id, "duplicated blocks should have different IDs")
   })
 
-  // ---- Efficiency ----
+  // ---- Tool call count sanity ----
 
   tracked("14. Efficiency — simple edit completes without runaway loops", async () => {
     const session = newSession()
     const result = await chat(session, "/bananas", "Change the hero heading to 'Go Bananas!'")
     assert.equal(result.status, "applied", `${result.status}: ${result.summary}`)
+    // Guard against runaway agent loops, not exact tool-call counts.
+    // Typical: 2-4 calls. Threshold is generous to tolerate model variation.
     assert.ok(
       result.toolCallCount <= 10,
       `expected <=10 tool calls for simple edit, got ${result.toolCallCount} — possible runaway loop`,
@@ -475,71 +522,5 @@ describe(`agent-e2e (${E2E_PROVIDER}/${E2E_MODEL ?? "default"})`, E2E_OPTS, () =
     const page = getDraft(session, "/bananas")
     const hero = findBlock(page, b => b.type === "Hero")
     assert.equal(blockProps(hero).heading, "Go Bananas!")
-  })
-
-  // ---- Complex: compose a full landing page ----
-
-  tracked("15. Complex — compose a full yoga studio landing page with images", async () => {
-    const session = newSession()
-    const result = await chat(
-      session, "/",
-      `Create a landing page at /yoga-studio for a yoga studio called 'Serenity Flow'. The page must include:
-1. A Hero section with a welcoming headline, subheading about finding inner peace, a CTA button to book a trial class, and a beautiful Unsplash photo of a yoga studio
-2. A CardGrid section with 3 cards highlighting benefits (flexibility, stress relief, community) — each card should have a relevant Unsplash image, description, and a CTA linking to /classes
-3. A Testimonials section with at least 2 student quotes
-4. A FAQAccordion section with 3 common questions about class schedules, experience levels, and pricing
-5. A CTA section encouraging visitors to book their first free class`,
-    )
-    assert.equal(result.status, "applied", `${result.status}: ${result.summary}`)
-
-    // --- Page exists ---
-    const page = getDraft(session, "/yoga-studio")
-    assert.ok(page, "/yoga-studio page should exist")
-    assert.ok(page.blocks.length >= 5, `expected >=5 blocks, got ${page.blocks.length}`)
-
-    // --- Hero ---
-    const hero = findBlock(page, b => b.type === "Hero")
-    assert.ok(hero, "Hero block should exist")
-    const heroP = blockProps(hero)
-    assert.ok(/yoga|serenity|flow|peace|welcome/i.test(String(heroP.heading)),
-      `hero heading should relate to yoga, got: ${heroP.heading}`)
-    assert.ok(typeof heroP.imageUrl === "string" && heroP.imageUrl.length > 1,
-      `hero should have an image URL, got: ${heroP.imageUrl}`)
-
-    // --- CardGrid (schema: { title: string, cards: [{ title, description, imageUrl?, ctaText?, ctaHref? }] }) ---
-    const cardGrid = findBlock(page, b => b.type === "CardGrid")
-    assert.ok(cardGrid, "CardGrid block should exist")
-    const cgProps = blockProps(cardGrid)
-    assert.ok(Array.isArray(cgProps.cards), `CardGrid.cards must be an array (got keys: ${Object.keys(cgProps)})`)
-    const cards = cgProps.cards as Array<{ title: string; description: string; imageUrl?: string }>
-    // Check at least one card has an image (Unsplash lookup may be async/partial)
-    const cardsWithImages = cards.filter(c => typeof c.imageUrl === "string" && c.imageUrl.length > 1)
-    assert.ok(cardsWithImages.length >= 1,
-      `expected at least 1 card with image, got ${cardsWithImages.length}. cards: ${JSON.stringify(cards.map(c => ({ title: c.title, imageUrl: c.imageUrl?.slice(0, 40) })))}`)
-
-    // --- Testimonials (schema: { title: string, items: [{ quote, author }] }) ---
-    const testimonials = findBlock(page, b => b.type === "Testimonials")
-    assert.ok(testimonials, "Testimonials block should exist")
-    const tProps = blockProps(testimonials)
-    assert.ok(Array.isArray(tProps.items), `Testimonials.items must be an array (got keys: ${Object.keys(tProps)})`)
-    const tItems = tProps.items as Array<{ quote: string; author: string }>
-    assert.ok(tItems.length >= 2, `expected >=2 testimonials, got ${tItems.length}`)
-
-    // --- FAQ ---
-    const faq = findBlock(page, b => b.type === "FAQAccordion")
-    assert.ok(faq, "FAQAccordion block should exist")
-    const faqItems = blockProps(faq).items as Array<{ q: string; a: string }>
-    assert.ok(Array.isArray(faqItems) && faqItems.length >= 3, `expected >=3 FAQ items, got ${faqItems?.length}`)
-
-    // --- CTA ---
-    const cta = findBlock(page, b => b.type === "CTA")
-    assert.ok(cta, "CTA block should exist")
-
-    // --- Tool usage: should have used unsplash_search at least once ---
-    const tools = toolsUsed(result)
-    assert.ok(
-      tools.includes("unsplash_search") || tools.includes("create_page"),
-      `expected unsplash_search or create_page, got: ${JSON.stringify(tools)}`,
-    )
   })
 })

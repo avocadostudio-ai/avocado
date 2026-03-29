@@ -14,6 +14,7 @@ This document tracks high-impact product and architecture improvements for the A
 8. Expand automated e2e coverage for critical user flows.
 9. Add deterministic field-source binding (`ai.bind`-style) for sensitive outputs (hero image URL, CTA links, product pricing, legal copy snippets) so those fields can only be populated from approved tools or explicit constants.
 10. Add first-class request middleware (`prepareRequest`-style) in orchestrator AI clients to inject auth, tenant headers, policy tags, redaction, and audit metadata before every provider call.
+11. Add a dedicated deterministic agent SSE integration suite for `/agent/start`, `/agent/stream`, and `/agent/cancel` (separate from live LLM edit e2e), including replay (`afterSeq`), cancel behavior, auth/validation errors, and final event contract assertions.
 
 ## Why these matter
 
@@ -43,3 +44,12 @@ Extracted modules:
 - `src/routes/media.ts` — audio transcribe + image interpret routes
 - `src/routes/history.ts` — undo/redo routes
 - `src/routes/route-context.ts` — shared route context type
+
+## Execution plan for #11
+
+- Add a test seam in `apps/orchestrator/src/routes/agent.ts` so tests can inject a deterministic `runAgentLoop` implementation.
+- Create `apps/orchestrator/src/agent-stream-integration.test.ts` using `app.inject` to validate start/stream/cancel contracts without provider API calls.
+- Cover `POST /agent/start` validation (`x-agent-api-key`, key format, required `message`, required `siteId`).
+- Cover SSE sequence behavior for `/agent/stream`: buffered replay with `afterSeq`, ordered `_seq` progression, and terminal `final` or `error`.
+- Cover `/agent/cancel` while active and assert stream closure plus terminal error payload.
+- Add a dedicated script (`test:integration:agent`) and document the split: deterministic stream contract tests vs live `test:e2e:agent` behavior tests.
