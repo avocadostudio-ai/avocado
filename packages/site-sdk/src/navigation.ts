@@ -73,7 +73,7 @@ export function buildNavItems(opts: {
   const { navSlugs, currentSlug, siteConfig, siteId, editorQuery } = opts
 
   const siteName = siteConfig.name || siteNameFallback(siteId) || "Site"
-  const siteLogo = siteConfig.logo || opts.defaultLogo || "/logos/default.svg"
+  const siteLogo = siteConfig.logo || opts.defaultLogo || ""
 
   const allSlugs = Array.from(
     new Set([...(navSlugs.length > 0 ? navSlugs : ["/"]), currentSlug])

@@ -29,7 +29,8 @@ export function SiteTileDesktopPreview(args: { title: string; src: string; onCli
           width: `${virtualWidth}px`,
           height: `${virtualHeight}px`,
           transform: `scale(${scale})`,
-          transformOrigin: "top left"
+          transformOrigin: "top left",
+          pointerEvents: "none"
         }}
       />
     </div>

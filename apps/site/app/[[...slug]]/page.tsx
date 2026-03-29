@@ -12,6 +12,7 @@ import { getPublishedPage, getPublishedSlugs } from "../../lib/published-content
 import { derivePageDescription } from "../../lib/seo"
 import { buildNavItems, buildSiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import { DEFAULT_SITE_ID, DEFAULT_SESSION } from "../../lib/defaults"
+import { ThemeOverrides } from "../../components/theme-overrides"
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>
@@ -166,9 +167,12 @@ export default async function SitePage({ params, searchParams }: PageProps) {
 
   const chromeHeader = buildSiteHeaderBlock({ navItems, siteName, siteLogo, activePath: slug })
 
+  // Theme overrides apply to all render modes
+  const themeOverlay = <ThemeOverrides siteConfig={siteConfig} />
+
   // Published mode: pure renderer, no editor imports evaluated
   if (!editorMode) {
-    return <SitePageContent page={page} chromeHeader={chromeHeader} />
+    return <>{themeOverlay}<SitePageContent page={page} chromeHeader={chromeHeader} /></>
   }
 
   // Immersive mode: widget rendered directly on page, no iframe needed
@@ -183,23 +187,24 @@ export default async function SitePage({ params, searchParams }: PageProps) {
     const immersiveNav = buildNavItems({ navSlugs, currentSlug: slug, siteConfig, siteId, editorQuery: immersiveQuery })
     const immersiveHeader = buildSiteHeaderBlock({ navItems: immersiveNav.navItems, siteName: immersiveNav.siteName, siteLogo: immersiveNav.siteLogo, activePath: slug })
     return (
-      <ImmersivePageWrapper
-        page={page}
-        chromeHeader={immersiveHeader}
-        slug={slug}
-        config={{ orchestratorUrl, session, siteId }}
-        siteContext={{ siteName: siteConfig.name }}
-      />
+      <>
+        {themeOverlay}
+        <ImmersivePageWrapper
+          page={page}
+          chromeHeader={immersiveHeader}
+          slug={slug}
+          config={{ orchestratorUrl, session, siteId }}
+          siteContext={{ siteName: siteConfig.name }}
+        />
+      </>
     )
   }
 
   // Editor mode: wrapper with overlays and block selection (iframe)
   return (
-    <EditorPageWrapper
-      page={page}
-      chromeHeader={chromeHeader}
-      slug={slug}
-      editorOrigin={editorOrigin}
-    />
+    <>
+      {themeOverlay}
+      <EditorPageWrapper page={page} chromeHeader={chromeHeader} slug={slug} editorOrigin={editorOrigin} />
+    </>
   )
 }

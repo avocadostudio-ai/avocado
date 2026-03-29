@@ -120,18 +120,20 @@ export function resolveEditorSiteId() {
 
 export function defaultSiteList(siteId: string): SiteConfig[] {
   const resolvedId = sanitizeSiteId(siteId) || "dev-site"
+  const matchedPreset = DEFAULT_SITE_PRESETS.find((preset) => preset.id === resolvedId)
   const defaults: SiteConfig[] = [
     {
+      ...(matchedPreset ?? {}),
       id: resolvedId,
-      name: siteNameFromId(resolvedId) || "Site",
-      purpose: "",
-      hosting: DEFAULT_SITE_HOSTING,
-      vercelProjectId: "",
-      vercelTeamId: "",
-      vercelProductionUrl: "",
-      vercelDeployHookUrl: "",
-      tone: "",
-      constraints: []
+      name: matchedPreset?.name ?? siteNameFromId(resolvedId) ?? "Site",
+      purpose: matchedPreset?.purpose ?? "",
+      hosting: matchedPreset?.hosting ?? DEFAULT_SITE_HOSTING,
+      vercelProjectId: matchedPreset?.vercelProjectId ?? "",
+      vercelTeamId: matchedPreset?.vercelTeamId ?? "",
+      vercelProductionUrl: matchedPreset?.vercelProductionUrl ?? "",
+      vercelDeployHookUrl: matchedPreset?.vercelDeployHookUrl ?? "",
+      tone: matchedPreset?.tone ?? "",
+      constraints: matchedPreset?.constraints ?? [],
     }
   ]
   const existing = new Set(defaults.map((site) => site.id))
@@ -200,7 +202,7 @@ export function loadSiteListFromStorage(siteId: string) {
         if (!preset) return site
         return {
           ...site,
-          ...(!site.previewUrl && preset.previewUrl ? { previewUrl: preset.previewUrl } : {}),
+          ...(preset.previewUrl ? { previewUrl: preset.previewUrl } : {}),
           ...(!site.cmsMedia && preset.cmsMedia ? { cmsMedia: preset.cmsMedia } : {}),
         }
       })

@@ -171,8 +171,9 @@ export function useSiteList(siteId: string, session: string) {
   }, [siteId, siteList])
 
   const openEditorForSite = (targetSiteId: string) => {
-    const url = new URL("/", window.location.origin)
+    const url = new URL("/editor", window.location.origin)
     url.searchParams.set("siteId", targetSiteId)
+    url.searchParams.delete("poc")
     window.location.href = url.toString()
   }
 
@@ -358,6 +359,16 @@ export function useSiteList(siteId: string, session: string) {
     updateRestoreState,
     siteTileRefreshToken,
     addSiteFromName,
+    addSiteFromConfig: (config: SiteConfig) => {
+      setSiteList((prev) => {
+        if (prev.some((s) => s.id === config.id)) return prev
+        return [...prev, config]
+      })
+    },
+    removeSite: (id: string) => {
+      setSiteList((prev) => prev.filter((s) => s.id !== id))
+      if (configSiteId === id) setConfigSiteId(null)
+    },
     openEditorForSite,
     openRestoreModal,
     deleteSnapshot,

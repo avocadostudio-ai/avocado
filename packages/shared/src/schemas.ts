@@ -10,6 +10,7 @@ export const siteConfigSchema = z.object({
   logo: z.string().optional(),
   navLabels: z.record(z.string(), z.string()).optional(), // slug → custom label, e.g. { "/pricing": "Plans & Pricing" }
   navGroups: z.record(z.string(), z.array(z.string())).optional(), // parent label → child slugs, e.g. { "Products": ["/bananas", "/cherries"] }
+  themeOverrides: z.record(z.string(), z.string()).optional(), // CSS variable overrides, e.g. { "--brand": "#2563eb" }
 })
 export type SiteConfig = z.infer<typeof siteConfigSchema>
 

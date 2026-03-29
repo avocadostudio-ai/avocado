@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
     "@ai-site-editor/shared": "workspace:*",
+    "@puckeditor/core": "^0.21.1",
     "@tailwindcss/vite": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -10,7 +10,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from "openai/reso
 import { openAIChatOptionsForModel } from "../chat/planner.js"
 import type { AgentTool } from "./agent-tools.js"
 import { AGENT_MAX_TOOL_CALLS, AGENT_MAX_TOKENS } from "./agent-provider.js"
-import type { AgentEvent, AgentLoopOptions } from "./agent-loop.js"
+import type { AgentEvent, AgentLoopOptions, AgentTokenUsage } from "./agent-loop.js"
 
 type ToolCallAccumulator = {
   id: string
@@ -52,6 +52,7 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
 
   let toolCallCount = 0
   let fullSummary = ""
+  const totalUsage: AgentTokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }
   const modelOptions = openAIChatOptionsForModel(model)
 
   while (toolCallCount < maxToolCalls) {
@@ -76,7 +77,12 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
         ...modelOptions,
       }, { signal })
 
-      for await (const chunk of stream) {
+      for await (const chunk of stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+        // Accumulate usage from streaming chunks
+        if (chunk.usage) {
+          totalUsage.inputTokens += chunk.usage.prompt_tokens ?? 0
+          totalUsage.outputTokens += chunk.usage.completion_tokens ?? 0
+        }
         if (signal?.aborted) {
           yield { type: "error", message: "Canceled" }
           return
@@ -153,7 +159,7 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
     // No tool calls → done
     if (toolCallAccumulators.size === 0 || finishReason === "stop") {
       fullSummary += turnText
-      yield { type: "done", summary: fullSummary, toolCallCount }
+      yield { type: "done", summary: fullSummary, toolCallCount, usage: totalUsage }
       return
     }
 
@@ -203,5 +209,5 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
     messages.push(...toolResults)
   }
 
-  yield { type: "done", summary: `Completed with ${toolCallCount} tool calls (limit reached).`, toolCallCount }
+  yield { type: "done", summary: `Completed with ${toolCallCount} tool calls (limit reached).`, toolCallCount, usage: totalUsage }
 }

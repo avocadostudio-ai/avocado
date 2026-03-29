@@ -1,0 +1,78 @@
+import { useCallback, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from "react"
+import { applyLiveDraftToPuckData, pageToPuckData } from "./adapters"
+import { fetchDraftPage } from "./draft-api"
+import type { PuckData } from "./types"
+
+type UsePuckSiteSyncArgs = {
+  session: string
+  siteId: string
+  slugRef: RefObject<string>
+  setSlug: (slug: string) => void
+  puckDispatchRef: MutableRefObject<((action: any) => void) | null>
+  setPuckData: Dispatch<SetStateAction<PuckData | null>>
+  onRemoteData?: (data: PuckData) => void
+}
+
+export function usePuckSiteSync({
+  session,
+  siteId,
+  slugRef,
+  setSlug,
+  puckDispatchRef,
+  setPuckData,
+  onRemoteData,
+}: UsePuckSiteSyncArgs) {
+  const syncDraftPage = useCallback(async (targetSlug: string) => {
+    const page = await fetchDraftPage(session, siteId, targetSlug)
+    const nextData = pageToPuckData(page)
+    if (puckDispatchRef.current) {
+      puckDispatchRef.current({ type: "setData", data: nextData })
+    }
+    setPuckData(nextData)
+    onRemoteData?.(nextData)
+  }, [session, siteId, puckDispatchRef, setPuckData, onRemoteData])
+
+  const postToSite = useCallback((
+    type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading",
+    payload: Record<string, unknown>
+  ) => {
+    if (type === "liveDraft") {
+      const blockId = typeof payload.blockId === "string" ? payload.blockId : ""
+      const rawFields = payload.fields
+      if (!blockId || !rawFields || typeof rawFields !== "object" || Array.isArray(rawFields)) return
+
+      setPuckData((prev) => {
+        if (!prev) return prev
+        const next = applyLiveDraftToPuckData(prev, blockId, rawFields as Record<string, unknown>)
+        if (next !== prev && puckDispatchRef.current) {
+          puckDispatchRef.current({ type: "setData", data: next })
+        }
+        return next
+      })
+      return
+    }
+
+    if (type !== "draftUpdated") return
+    const navigateTo = typeof payload.navigateTo === "string" && payload.navigateTo.length > 0
+      ? payload.navigateTo
+      : slugRef.current
+    if (navigateTo !== slugRef.current) setSlug(navigateTo)
+
+    void syncDraftPage(navigateTo).catch(() => undefined)
+  }, [setPuckData, puckDispatchRef, slugRef, setSlug, syncDraftPage])
+
+  const postPatchToSite = useCallback((
+    _op: unknown,
+    _fromVersion: number,
+    _toVersion: number,
+    _focusBlockId?: string
+  ) => {
+    void syncDraftPage(slugRef.current).catch(() => undefined)
+  }, [slugRef, syncDraftPage])
+
+  return {
+    postToSite,
+    postPatchToSite,
+    syncDraftPage,
+  }
+}
