@@ -50,6 +50,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   const MAX_RECONNECT_ATTEMPTS = 4
   const RECONNECT_DELAY_MS = 700
   const IDLE_HEARTBEAT_MS = 15_000
+  const MAX_STREAM_DURATION_MS = 180_000
 
   const cancel = () => {
     canceled = true
@@ -119,6 +120,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
     let reconnectAttempts = 0
     let reconnectTimer: number | null = null
     let heartbeatWatchdogTimer: number | null = null
+    let hardTimeoutTimer: number | null = null
     let lastEventAt = Date.now()
 
     const clearStreamUi = () => {
@@ -141,6 +143,12 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
       heartbeatWatchdogTimer = null
     }
 
+    const clearHardTimeout = () => {
+      if (hardTimeoutTimer === null) return
+      window.clearTimeout(hardTimeoutTimer)
+      hardTimeoutTimer = null
+    }
+
     const keepShimmerAlive = () => {
       if (lastFocusBlockId && !canceled) {
         postToSite("aiFieldLoading", { blockId: lastFocusBlockId, active: true })
@@ -153,6 +161,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
       settleFromOutside = null
       clearReconnectTimer()
       clearHeartbeatWatchdog()
+      clearHardTimeout()
       eventSource?.close()
       eventSource = null
       resolve(ok)
@@ -191,6 +200,20 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
         setStreamStatus(`Agent still thinking… ${idleSec}s`)
         keepShimmerAlive()
       }, 4000)
+    }
+
+    const startHardTimeout = () => {
+      clearHardTimeout()
+      hardTimeoutTimer = window.setTimeout(() => {
+        if (settled || canceled) return
+        clearStreamUi()
+        pushAssistantFromResult({
+          status: "error",
+          summary: "Agent timed out. Please try again.",
+          changes: [],
+        })
+        settle(false)
+      }, MAX_STREAM_DURATION_MS)
     }
 
     const onMessage = (e: MessageEvent) => {
@@ -330,6 +353,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
       source.onerror = onError
     }
     startHeartbeatWatchdog()
+    startHardTimeout()
     connect()
   })
   })()

@@ -10,11 +10,9 @@ import type { FastifyInstance, FastifyReply } from "fastify"
 import { scopedSessionKey } from "../state/session-state.js"
 import { createAgentTools } from "../agent/agent-tools.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
-import { createMigrationTools } from "../migration/migration-tools.js"
-import { buildMigrationSystemPrompt } from "../migration/migration-prompt.js"
-import { runAgentLoop, type AgentEvent } from "../agent/agent-loop.js"
+import { runAgentLoop, type AgentEvent, type AgentTokenUsage } from "../agent/agent-loop.js"
 import { type AgentProvider, detectProviderFromKey, resolveAgentModel } from "../agent/agent-provider.js"
-import { sseWrite } from "../chat/chat-pipeline-shared.js"
+import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 
 /** Extract API key from request headers (new generic header, with backward compat). */
 function extractAgentApiKey(headers: Record<string, unknown>): string | undefined {
@@ -47,26 +45,6 @@ type AgentStreamEntry = {
   abortController: AbortController
 }
 
-/**
- * Parse "Suggested next actions:" bullet list from the agent's summary text.
- * Returns the summary without the suggestion block, plus the extracted suggestions.
- */
-function parseSuggestionsFromSummary(text: string): { summary: string; suggestions: string[] } {
-  const marker = /\n*(?:suggested\s+(?:next\s+)?actions|next\s+steps|you\s+(?:could|might)\s+(?:also|want\s+to)):\s*\n/i
-  const match = text.match(marker)
-  if (!match || match.index === undefined) return { summary: text.trim(), suggestions: [] }
-
-  const before = text.slice(0, match.index).trim()
-  const after = text.slice(match.index + match[0].length)
-  const suggestions = after
-    .split("\n")
-    .map(line => line.replace(/^[-•*]\s*/, "").replace(/\*\*/g, "").trim())
-    .filter(line => line.length > 5 && line.length < 120)
-    .slice(0, 4)
-
-  return { summary: before, suggestions }
-}
-
 /** Human-readable labels for agent tool names shown in the streaming UI. */
 const TOOL_LABELS: Record<string, string> = {
   get_page: "Reading page content",
@@ -88,11 +66,6 @@ const TOOL_LABELS: Record<string, string> = {
   image_generate: "Generating image",
   update_site_config: "Updating site settings",
   generate_variations: "Creating alternatives",
-  fetch_and_screenshot: "Analyzing external website",
-  extract_design_tokens: "Extracting design tokens",
-  download_remote_image: "Downloading image",
-  apply_theme: "Applying theme",
-  create_block_type: "Creating new block type",
   add_item: "Adding list item",
   update_item: "Updating list item",
   remove_item: "Removing list item",
@@ -219,16 +192,8 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
       const body = entry.body
       const session = scopedSessionKey(body.session ?? "dev", body.siteId ?? "")
-
-      // Detect migration intent: message contains "migrate" + URL pattern
-      const isMigration = /\bmigrat[ei]/i.test(body.message ?? "") && /https?:\/\/\S+/i.test(body.message ?? "")
-
-      const tools = isMigration
-        ? [...createMigrationTools(session), ...createAgentTools(session)]
-        : createAgentTools(session)
-      const systemPrompt = isMigration
-        ? buildMigrationSystemPrompt()
-        : buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
+      const tools = createAgentTools(session)
+      const systemPrompt = buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
       const contextMsg = buildContextMessage(session, {
         slug: body.slug ?? "/",
         activeBlockId: body.activeBlockId,
@@ -345,12 +310,13 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     const events: AgentEvent[] = []
     let summary = ""
     let toolCallCount = 0
+    let usage: AgentTokenUsage | undefined
     let error: string | null = null
 
     try {
       for await (const event of runAgentLoop({ apiKey, provider, model: resolveAgentModel(provider, body.model), systemPrompt, tools, userMessage: fullMessage })) {
         events.push(event)
-        if (event.type === "done") { summary = event.summary; toolCallCount = event.toolCallCount }
+        if (event.type === "done") { summary = event.summary; toolCallCount = event.toolCallCount; usage = event.usage }
         if (event.type === "error") { error = event.message }
       }
     } catch (err: unknown) {
@@ -358,7 +324,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     }
 
     if (error) return reply.code(500).send({ status: "error", error, events })
-    return { status: "applied", summary, toolCallCount, events: events.map(e => {
+    return { status: "applied", summary, toolCallCount, usage, events: events.map(e => {
       if (e.type === "tool_done") return { type: e.type, toolName: e.toolName, isError: e.isError }
       if (e.type === "tool_start") return { type: e.type, toolName: e.toolName }
       if (e.type === "text_delta") return { type: e.type, text: e.text }

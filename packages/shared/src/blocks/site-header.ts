@@ -40,7 +40,7 @@ registerBlock("SiteHeader", {
 export function siteHeaderDefaultProps(): Record<string, unknown> {
   return {
     siteName: "My Site",
-    logoUrl: "/logos/default.svg",
+    logoUrl: "/logo.svg",
     links: [
       { label: "Home", href: "/" },
       { label: "About", href: "/about" },

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Bot, Check, ChevronDown, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
-import { renderFinalMarkdown, renderSimpleMarkdown } from "./lib/markdown-renderer"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
+import { ChatComposerCore, ChatThreadCore } from "./components/ChatSurface"
 import Settings2Icon from "./components/settings2-icon"
 import { SettingsModal } from "./components/SettingsModal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -17,6 +17,7 @@ import { useBlockProps } from "./hooks/useBlockProps"
 import { usePageMeta } from "./hooks/usePageMeta"
 import { PropertyPanel } from "./components/PropertyPanel"
 import { useBlockManifest } from "./hooks/useBlockManifest"
+import { PuckChatPrototype } from "./components/PuckChatPrototype"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
@@ -66,6 +67,8 @@ function selectionValue(provider: AIProvider, model: ModelKey) {
 
 export function App() {
   const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
+  const isEditorPath = pathName === "/" || pathName === "/editor" || pathName === "/editor/"
+  const isPuckPrototype = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("poc") === "puck"
   const isSitesPage = pathName === "/sites" || pathName === "/sites/"
   const [chatDarkMode, setChatDarkMode] = useState(() => resolveDefaultChatDarkMode())
   const [session] = useState("dev")
@@ -80,7 +83,9 @@ export function App() {
     window.localStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
   }, [chatDarkMode])
 
+  if (isPuckPrototype) return <PuckChatPrototype />
   if (isSitesPage) return <SitesPage sites={sites} session={session} />
+  if (!isEditorPath) return <SitesPage sites={sites} session={session} />
 
   return <EditorPage siteId={siteId} session={session} sites={sites} chatDarkMode={chatDarkMode} onSetChatDarkMode={setChatDarkMode} />
 }
@@ -155,7 +160,9 @@ function EditorPage({
   }, [showSiteSwitcher])
 
   const chatPanelRef = useRef<HTMLElement>(null)
-  const chatThreadRef = useRef<HTMLElement>(null)
+  const chatThreadRef = useRef<HTMLDivElement>(null)
+  const shouldAutoScrollThreadRef = useRef(true)
+  const didInitialThreadScrollRef = useRef(false)
   const splitHandleRef = useRef<HTMLDivElement>(null)
   const activeBlockIdRef = useRef<string | undefined>(undefined)
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
@@ -527,12 +534,51 @@ function EditorPage({
     return () => { active = false; window.clearInterval(timer) }
   }, [])
 
-  // Scroll chat on new entries
   useEffect(() => {
     const thread = chatThreadRef.current
     if (!thread) return
-    thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" })
-  }, [chatEngine.chatLog, chatEngine.streamStatus, chatEngine.streamingText])
+    const onScroll = () => {
+      const distanceToBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight
+      shouldAutoScrollThreadRef.current = distanceToBottom < 72
+    }
+    thread.addEventListener("scroll", onScroll, { passive: true })
+    return () => {
+      thread.removeEventListener("scroll", onScroll)
+    }
+  }, [])
+
+  // Scroll chat to latest on open/new stream updates (while user is near bottom).
+  useEffect(() => {
+    if (activeTab !== "chat") return
+    const thread = chatThreadRef.current
+    if (!thread) return
+    const hasThreadContent = chatEngine.chatLog.length > 0 || Boolean(chatEngine.streamStatus) || Boolean(chatEngine.streamingText)
+    if (!hasThreadContent) return
+
+    const isInitialRender = !didInitialThreadScrollRef.current
+    const hasUserEntryInLog = chatEngine.chatLog.some((entry) => entry.role === "user")
+    if (isInitialRender && !hasUserEntryInLog && !chatEngine.streamStatus && !chatEngine.streamingText) {
+      didInitialThreadScrollRef.current = true
+      shouldAutoScrollThreadRef.current = false
+      return
+    }
+
+    const shouldForceInitial = isInitialRender
+    if (!shouldForceInitial && !shouldAutoScrollThreadRef.current) return
+
+    const raf = window.requestAnimationFrame(() => {
+      thread.scrollTop = thread.scrollHeight
+      didInitialThreadScrollRef.current = true
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [
+    activeTab,
+    chatEngine.chatLog.length,
+    chatEngine.streamStatus,
+    chatEngine.streamingText,
+    chatEngine.streamSteps.length,
+    chatEngine.streamingChanges.length
+  ])
 
   // Nested labels sync
   useEffect(() => {
@@ -771,6 +817,8 @@ function EditorPage({
     return () => {
       window.removeEventListener("pointermove", onPointerMove)
       window.removeEventListener("pointerup", onPointerUp)
+      document.body.style.userSelect = ""
+      document.body.classList.remove("panel-resizing")
     }
   }, [])
 
@@ -1034,60 +1082,24 @@ function EditorPage({
           </label>
         </header>
 
-        <nav className="panel-tabs panel-tabs-main">
-          <button
-            type="button"
-            className={`panel-tab panel-tab-main ${activeTab === "chat" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("chat")}
-            aria-label={t("tabs.chat")}
-            title={t("tabs.chat")}
-          >
-            <Bot size={14} />
-            <span className="panel-tab-label">{t("tabs.chat")}</span>
-          </button>
-          <button
-            type="button"
-            className={`panel-tab panel-tab-main ${activeTab === "properties" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("properties")}
-            aria-label={t("tabs.properties")}
-            title={t("tabs.properties")}
-          >
-            <SlidersHorizontal size={14} />
-            <span className="panel-tab-label">{t("tabs.properties")}</span>
-            {activeBlockId ? <span className="panel-tab-dot" /> : null}
-          </button>
-        </nav>
-
-        <section className="chat-thread" ref={chatThreadRef} style={{ display: activeTab === "chat" ? "" : "none" }}>
-          {chatEngine.chatLog.map((entry) => (
-            <article
-              key={entry.id}
-              className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""} ${entry.fieldAiContext ? "msg-field-context" : ""}`}
-            >
-              <div className="msg-main">{entry.role === "assistant" ? renderFinalMarkdown(entry.text) : entry.text}</div>
-              {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
-              {(() => {
-                const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(entry.text, line))
-                if (changeLines.length === 0) return null
-                if (changeLines.length > 8) {
-                  const summaryLabel = /translat/i.test(entry.text)
-                    ? `${changeLines.length} fields translated`
-                    : `${changeLines.length} changes applied`
-                  return (
-                    <details className="msg-list-details">
-                      <summary>{summaryLabel}</summary>
-                      <ul className="msg-list">
-                        {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
-                      </ul>
-                    </details>
-                  )
-                }
-                return (
-                  <ul className="msg-list">
-                    {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
-                  </ul>
-                )
-              })()}
+        <ChatThreadCore
+          ref={chatThreadRef}
+          className="chat-thread"
+          style={{ display: activeTab === "chat" ? "" : "none" }}
+          entries={chatEngine.chatLog}
+          isLoading={chatEngine.isLoading}
+          streamStatus={chatEngine.streamStatus}
+          streamStatusLabel={streamTextLabel}
+          streamingText={chatEngine.streamingText}
+          streamSteps={chatEngine.streamSteps}
+          streamingChanges={chatEngine.streamingChanges}
+          undoInFlightEntryId={chatEngine.undoInFlightEntryId}
+          onSuggestionClick={(line) => void chatEngine.submitChat(line)}
+          onUndo={(entryId) => void chatEngine.applyUndoHistory(entryId)}
+          undoLabel={t("chat.undo")}
+          undoneLabel={t("chat.undone")}
+          renderEntryExtras={(entry) => (
+            <>
               {entry.variations && entry.variations.options.length > 0 ? (
                 <div className="msg-variations">
                   {entry.variations.options.map((option, idx) => (
@@ -1116,7 +1128,9 @@ function EditorPage({
                               changes: [option.summary],
                             })
                           }
-                        } catch { /* ignore */ }
+                        } catch {
+                          // ignore
+                        }
                       }}
                     >
                       <div className="msg-variation-preview-wrap">
@@ -1136,21 +1150,6 @@ function EditorPage({
                   ))}
                 </div>
               ) : null}
-              {!entry.variations && (entry.suggestions ?? []).length > 0 ? (
-                <div className="msg-suggestions">
-                  {entry.suggestions?.map((line, idx) => (
-                    <button
-                      key={`${entry.id}-${idx}`}
-                      type="button"
-                      className="msg-suggestion"
-                      onClick={() => void chatEngine.submitChat(line)}
-                      disabled={chatEngine.isLoading}
-                    >
-                      {line}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               {entry.status === "plan_ready" && entry.pendingPlanId ? (
                 <div className="msg-plan-actions">
                   {(() => {
@@ -1158,22 +1157,22 @@ function EditorPage({
                     const disabled = chatEngine.isLoading || chatEngine.pendingPlanId !== currentPlanId
                     return (
                       <>
-                  <button
-                    type="button"
-                    className="primary-btn msg-plan-btn"
-                    onClick={() => void chatEngine.approvePendingPlan(currentPlanId)}
-                    disabled={disabled}
-                  >
-                    Approve plan
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-btn msg-plan-btn"
-                    onClick={() => void chatEngine.stopPendingPlan(currentPlanId)}
-                    disabled={disabled}
-                  >
-                    Stop
-                  </button>
+                        <button
+                          type="button"
+                          className="primary-btn msg-plan-btn"
+                          onClick={() => void chatEngine.approvePendingPlan(currentPlanId)}
+                          disabled={disabled}
+                        >
+                          Approve plan
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-btn msg-plan-btn"
+                          onClick={() => void chatEngine.stopPendingPlan(currentPlanId)}
+                          disabled={disabled}
+                        >
+                          Stop
+                        </button>
                       </>
                     )
                   })()}
@@ -1277,22 +1276,6 @@ function EditorPage({
                   </button>
                 </div>
               ) : null}
-              {entry.canUndo || entry.wasUndone ? (
-                <div className="msg-undo-row">
-                  <button
-                    type="button"
-                    className="msg-undo-btn"
-                    onClick={() => void chatEngine.applyUndoHistory(entry.id)}
-                    disabled={!entry.canUndo || chatEngine.isLoading || chatEngine.undoInFlightEntryId !== null}
-                  >
-                    <span>{entry.wasUndone ? t("chat.undone") : t("chat.undo")}</span>
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M9 7 4 12l5 5" />
-                      <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
-                    </svg>
-                  </button>
-                </div>
-              ) : null}
               {entry.role === "assistant" && entry.debug?.traceId && entry.id !== "welcome" ? (
                 <div className="msg-feedback-row">
                   <button
@@ -1348,33 +1331,10 @@ function EditorPage({
                   ) : null}
                 </div>
               ) : null}
-            </article>
-          ))}
-          {chatEngine.streamingText ? (
-            <article className="msg msg-assistant msg-streaming">
-              {chatEngine.streamSteps.filter((s) => s.done).length > 0 ? (
-                <ul className="stream-steps stream-steps-in-bubble">
-                  {chatEngine.streamSteps.filter((s) => s.done).map((step, idx) => (
-                    <li key={idx} className="stream-step is-done">{step.label}</li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="msg-main">
-                {renderSimpleMarkdown(chatEngine.streamingText)}
-              </div>
-              {chatEngine.streamingChanges.length > 0 ? (
-                <ul className="msg-list">
-                  {chatEngine.streamingChanges.slice(0, 8).map((line, idx) => (
-                    <li key={idx}>{line}</li>
-                  ))}
-                  {chatEngine.streamingChanges.length > 8 ? (
-                    <li className="msg-list-overflow">and {chatEngine.streamingChanges.length - 8} more…</li>
-                  ) : null}
-                </ul>
-              ) : null}
-              {chatEngine.streamStatus ? (
-                <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{streamTextLabel}</span>
-              ) : null}
+            </>
+          )}
+          renderStreamingExtras={() => (
+            <>
               {reconnectBadgeLabel ? (
                 <span className="stream-reconnect-badge stream-reconnect-badge-inline" title={chatEngine.streamStatus ?? undefined}>
                   {reconnectBadgeLabel}
@@ -1383,8 +1343,9 @@ function EditorPage({
               {showDebugDetails && chatEngine.fieldDraftDebugEnabled ? (
                 <div className="streaming-debug-inline">{fieldDraftDebugLabel}</div>
               ) : null}
-            </article>
-          ) : chatEngine.streamStatus ? (
+            </>
+          )}
+          renderStreamStatusFallback={() => (
             <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"} ${STREAMING_INDICATOR_STYLE === "text" ? "is-text" : "is-legacy"}`}>
               {STREAMING_INDICATOR_STYLE === "text" ? (
                 <>
@@ -1440,9 +1401,8 @@ function EditorPage({
                 <div className="streaming-debug-inline">{fieldDraftDebugLabel}</div>
               ) : null}
             </div>
-          ) : null}
-          <div />
-        </section>
+          )}
+        />
 
         <PropertyPanel
           style={{ display: activeTab === "properties" ? "" : "none" }}
@@ -1520,25 +1480,47 @@ function EditorPage({
           }}
         />
 
-        <footer className="composer" style={{ display: activeTab === "chat" ? "" : "none" }}>
-          <ClaudeStyleChatInput
-            message={message}
-            isLoading={chatEngine.isLoading}
-            hasUserEntry={hasUserEntry}
-            onMessageChange={setMessage}
-            onSubmit={(explicitMessage) => {
-              setMessage("")
-              void chatEngine.submitChat(explicitMessage, message)
-            }}
-            onTranscribeAudio={media.transcribeAudio}
-            onInterpretImage={media.interpretPastedImage}
-            onUploadImage={media.uploadPastedImage}
-            onCancel={chatEngine.cancelChat}
-            onAutoHeightChange={handleComposerAutoHeight}
-            selectionModeEnabled={selectionModeEnabled}
-            onToggleSelectionMode={() => toggleSelectionMode()}
-          />
-        </footer>
+        <ChatComposerCore
+          className="composer"
+          style={{ display: activeTab === "chat" ? "" : "none" }}
+          message={message}
+          isLoading={chatEngine.isLoading}
+          hasUserEntry={hasUserEntry}
+          onMessageChange={setMessage}
+          onSubmit={(explicitMessage) => {
+            setMessage("")
+            void chatEngine.submitChat(explicitMessage, message)
+          }}
+          onTranscribeAudio={media.transcribeAudio}
+          onInterpretImage={media.interpretPastedImage}
+          onUploadImage={media.uploadPastedImage}
+          onCancel={chatEngine.cancelChat}
+          onAutoHeightChange={handleComposerAutoHeight}
+          selectionModeEnabled={selectionModeEnabled}
+          onToggleSelectionMode={() => toggleSelectionMode()}
+        />
+
+        <nav className="panel-tabs panel-tabs-main">
+          <button
+            type="button"
+            className={`panel-tab panel-tab-main ${activeTab === "chat" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("chat")}
+            aria-label={t("tabs.chat")}
+            title={t("tabs.chat")}
+          >
+            <Bot size={22} />
+          </button>
+          <button
+            type="button"
+            className={`panel-tab panel-tab-main ${activeTab === "properties" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("properties")}
+            aria-label={t("tabs.properties")}
+            title={t("tabs.properties")}
+          >
+            <SlidersHorizontal size={22} />
+            {activeBlockId ? <span className="panel-tab-dot" /> : null}
+          </button>
+        </nav>
       </aside>
 
       <div
@@ -1555,7 +1537,7 @@ function EditorPage({
         }}
       />
 
-      <section className="preview">
+      <div className="preview">
         <iframe
           ref={preview.iframeRef}
           title={t("preview.title")}
@@ -1568,7 +1550,7 @@ function EditorPage({
             preview.postToSite("setNestedLabelsVisibility", { visible: showNestedLabels })
           }}
         />
-      </section>
+      </div>
 
       {anchoredPosition && anchoredExpanded ? (
         <div

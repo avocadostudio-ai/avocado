@@ -1,0 +1,265 @@
+import React, { forwardRef, type CSSProperties, type ReactNode } from "react"
+import type { ChatEntry } from "../lib/editor-types"
+import { renderFinalMarkdown, renderSimpleMarkdown } from "../lib/markdown-renderer"
+import { isRedundantChangeLine } from "../lib/editor-utils"
+import ClaudeStyleChatInput from "./claude-style-chat-input"
+
+type MediaHandler = (blob: Blob, mimeType: string) => Promise<string>
+
+export type ChatThreadCoreProps = {
+  entries: ChatEntry[]
+  isLoading: boolean
+  streamStatus: string | null
+  streamStatusLabel?: string | null
+  streamingText: string | null
+  streamSteps: { label: string; done: boolean }[]
+  streamingChanges: string[]
+  undoInFlightEntryId: string | null
+  className?: string
+  style?: CSSProperties
+  onSuggestionClick: (prompt: string) => void
+  onUndo: (entryId: string) => void
+  renderEntryExtras?: (entry: ChatEntry) => ReactNode
+  renderStreamingExtras?: () => ReactNode
+  renderStreamStatusFallback?: () => ReactNode
+  undoLabel?: string
+  undoneLabel?: string
+}
+
+export const ChatThreadCore = forwardRef<HTMLDivElement, ChatThreadCoreProps>(function ChatThreadCore({
+  entries,
+  isLoading,
+  streamStatus,
+  streamStatusLabel,
+  streamingText,
+  streamSteps,
+  streamingChanges,
+  undoInFlightEntryId,
+  className = "chat-thread",
+  style,
+  onSuggestionClick,
+  onUndo,
+  renderEntryExtras,
+  renderStreamingExtras,
+  renderStreamStatusFallback,
+  undoLabel = "Undo",
+  undoneLabel = "Undone",
+}, ref) {
+  const doneStreamSteps = streamSteps.filter((s) => s.done)
+  const fallbackStatusLabel = streamStatusLabel ?? streamStatus
+  const hasRenderableEntry = entries.some((entry) => {
+    const text = typeof entry.text === "string" ? entry.text.trim() : ""
+    return (
+      text.length > 0
+      || Boolean(entry.status)
+      || Boolean((entry.suggestions ?? []).length)
+      || Boolean((entry.changes ?? []).length)
+      || Boolean(entry.variations)
+      || Boolean(entry.canUndo)
+      || Boolean(entry.wasUndone)
+      || Boolean(entry.errors?.length)
+    )
+  })
+  const isEmpty = !hasRenderableEntry && !streamingText && !streamStatus
+
+  return (
+    <div className={className} style={style} ref={ref}>
+      {isEmpty ? (
+        <article className="chat-thread-empty">
+          Start chatting to see responses here.
+        </article>
+      ) : null}
+      {entries.map((entry) => (
+        (() => {
+          const rawText = typeof entry.text === "string" ? entry.text : ""
+          const safeText = rawText.trim().length > 0 ? rawText : (entry.role === "assistant" ? "…" : "")
+          return (
+        <article
+          key={entry.id}
+          className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""} ${entry.fieldAiContext ? "msg-field-context" : ""}`}
+        >
+          <div className="msg-main">{entry.role === "assistant" ? renderFinalMarkdown(safeText) : safeText}</div>
+          {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
+          {(() => {
+            const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(rawText, line))
+            if (changeLines.length === 0) return null
+            if (changeLines.length > 8) {
+              const summaryLabel = /translat/i.test(rawText)
+                ? `${changeLines.length} fields translated`
+                : `${changeLines.length} changes applied`
+              return (
+                <details className="msg-list-details">
+                  <summary>{summaryLabel}</summary>
+                  <ul className="msg-list">
+                    {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
+                  </ul>
+                </details>
+              )
+            }
+            return (
+              <ul className="msg-list">
+                {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
+              </ul>
+            )
+          })()}
+          {!entry.variations && (entry.suggestions ?? []).length > 0 ? (
+            <div className="msg-suggestions">
+              {entry.suggestions?.map((line, idx) => (
+                <button
+                  key={`${entry.id}-${idx}`}
+                  type="button"
+                  className="msg-suggestion"
+                  onClick={() => onSuggestionClick(line)}
+                  disabled={isLoading}
+                >
+                  {line}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {renderEntryExtras ? renderEntryExtras(entry) : null}
+          {entry.canUndo || entry.wasUndone ? (
+            <div className="msg-undo-row">
+              <button
+                type="button"
+                className="msg-undo-btn"
+                onClick={() => onUndo(entry.id)}
+                disabled={!entry.canUndo || isLoading || undoInFlightEntryId !== null}
+              >
+                <span>{entry.wasUndone ? undoneLabel : undoLabel}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 7 4 12l5 5" />
+                  <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
+                </svg>
+              </button>
+            </div>
+          ) : null}
+        </article>
+          )
+        })()
+      ))}
+      {streamingText ? (
+        <article className="msg msg-assistant msg-streaming">
+          {doneStreamSteps.length > 0 ? (
+            <ul className="stream-steps stream-steps-in-bubble">
+              {doneStreamSteps.map((step, idx) => (
+                <li key={idx} className="stream-step is-done">{step.label}</li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="msg-main">
+            {renderSimpleMarkdown(streamingText)}
+          </div>
+          {streamingChanges.length > 0 ? (
+            <ul className="msg-list">
+              {streamingChanges.slice(0, 8).map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+              {streamingChanges.length > 8 ? (
+                <li className="msg-list-overflow">and {streamingChanges.length - 8} more…</li>
+              ) : null}
+            </ul>
+          ) : null}
+          {fallbackStatusLabel ? (
+            <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{fallbackStatusLabel}</span>
+          ) : null}
+          {renderStreamingExtras ? renderStreamingExtras() : null}
+        </article>
+      ) : streamStatus ? (
+        renderStreamStatusFallback ? renderStreamStatusFallback() : (
+          <article className="msg msg-assistant msg-streaming">
+            {doneStreamSteps.length > 0 ? (
+              <ul className="stream-steps stream-steps-in-bubble">
+                {doneStreamSteps.map((step, idx) => (
+                  <li key={idx} className="stream-step is-done">{step.label}</li>
+                ))}
+              </ul>
+            ) : null}
+            {fallbackStatusLabel ? (
+              <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{fallbackStatusLabel}</span>
+            ) : null}
+            {renderStreamingExtras ? renderStreamingExtras() : null}
+          </article>
+        )
+      ) : null}
+      <div />
+    </div>
+  )
+})
+
+export type ChatComposerCoreProps = {
+  message: string
+  isLoading: boolean
+  hasUserEntry: boolean
+  onMessageChange: (value: string) => void
+  onSubmit: (explicitMessage?: string) => void
+  onTranscribeAudio: MediaHandler
+  onInterpretImage: MediaHandler
+  onUploadImage: MediaHandler
+  onCancel?: () => void
+  onAutoHeightChange?: (height: number) => void
+  selectionModeEnabled?: boolean
+  onToggleSelectionMode?: () => void
+  compact?: boolean
+  className?: string
+  style?: CSSProperties
+}
+
+export function ChatComposerCore({
+  message,
+  isLoading,
+  hasUserEntry,
+  onMessageChange,
+  onSubmit,
+  onTranscribeAudio,
+  onInterpretImage,
+  onUploadImage,
+  onCancel,
+  onAutoHeightChange,
+  selectionModeEnabled,
+  onToggleSelectionMode,
+  compact,
+  className = "composer",
+  style,
+}: ChatComposerCoreProps) {
+  return (
+    <div className={className} style={style}>
+      <ClaudeStyleChatInput
+        message={message}
+        isLoading={isLoading}
+        hasUserEntry={hasUserEntry}
+        onMessageChange={onMessageChange}
+        onSubmit={onSubmit}
+        onTranscribeAudio={onTranscribeAudio}
+        onInterpretImage={onInterpretImage}
+        onUploadImage={onUploadImage}
+        onCancel={onCancel}
+        onAutoHeightChange={onAutoHeightChange ?? (() => {})}
+        selectionModeEnabled={selectionModeEnabled}
+        onToggleSelectionMode={onToggleSelectionMode}
+        compact={compact}
+      />
+    </div>
+  )
+}
+
+export type ChatSurfaceProps = {
+  containerClassName?: string
+  containerStyle?: CSSProperties
+  threadProps: ChatThreadCoreProps
+  composerProps: ChatComposerCoreProps
+}
+
+export function ChatSurface({
+  containerClassName,
+  containerStyle,
+  threadProps,
+  composerProps,
+}: ChatSurfaceProps) {
+  return (
+    <div className={containerClassName} style={containerStyle}>
+      <ChatThreadCore {...threadProps} />
+      <ChatComposerCore {...composerProps} />
+    </div>
+  )
+}

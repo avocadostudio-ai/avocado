@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shimmer Effects Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; padding: 40px; }
+  h1 { font-size: 1.5rem; margin-bottom: 8px; }
+  p.subtitle { color: #64748b; margin-bottom: 32px; }
+  .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 900px; }
+  .demo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; }
+  .demo-card h2 { font-size: 0.875rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+  .demo-content { position: relative; overflow: hidden; border-radius: 8px; }
+  .demo-text { padding: 20px; background: #f1f5f9; border-radius: 8px; }
+  .demo-text h3 { font-size: 1.25rem; margin-bottom: 8px; }
+  .demo-text p { color: #64748b; line-height: 1.6; }
+  .demo-image { width: 100%; aspect-ratio: 16/9; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.875rem; }
+  .demo-skeleton { min-height: 120px; border-radius: 8px; }
+  .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: #1d4ed8; }
+  .status { margin-top: 12px; font-size: 0.8rem; color: #94a3b8; }
+
+  /* ── Shimmer overlay (light theme) ── */
+  .aifx-shimmer-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 23;
+    pointer-events: none;
+    border-radius: inherit;
+    overflow: clip;
+    background: linear-gradient(
+      105deg,
+      transparent 0%,
+      rgba(210, 216, 223, 0.06) 22%,
+      rgba(226, 231, 237, 0.28) 44%,
+      rgba(255, 255, 255, 0.30) 50%,
+      rgba(226, 231, 237, 0.28) 56%,
+      rgba(216, 222, 229, 0.06) 78%,
+      transparent 100%
+    );
+    background-size: 250% 100%;
+    background-position: 180% 0;
+    animation: aifx-shimmer-sweep 1.4s ease-in-out infinite;
+  }
+
+  @keyframes aifx-shimmer-sweep {
+    0% { background-position: 180% 0; }
+    100% { background-position: -80% 0; }
+  }
+
+  /* ── Skeleton block (light theme) ── */
+  .editor-skeleton-block {
+    min-height: 140px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .editor-skeleton-block::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(148, 163, 184, 0.08) 25%,
+      rgba(148, 163, 184, 0.15) 50%,
+      rgba(148, 163, 184, 0.08) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: editor-skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  .editor-skeleton-block::after {
+    content: "";
+    position: absolute;
+    top: 28px;
+    left: 24px;
+    right: 40%;
+    height: 18px;
+    border-radius: 6px;
+    background: rgba(148, 163, 184, 0.12);
+  }
+
+  @keyframes editor-skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── Live draft shimmer (from preview-adapter) ── */
+  .editor-live-draft-active [data-editable-target] {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .editor-live-draft-active [data-editable-target]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 0%,
+      rgba(37, 99, 235, 0.03) 20%,
+      rgba(37, 99, 235, 0.10) 45%,
+      rgba(37, 99, 235, 0.14) 50%,
+      rgba(37, 99, 235, 0.10) 55%,
+      rgba(37, 99, 235, 0.03) 80%,
+      transparent 100%
+    );
+    background-size: 250% 100%;
+    animation: editor-live-draft-shimmer 1.8s ease-in-out infinite;
+  }
+
+  @keyframes editor-live-draft-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -50% 0; }
+  }
+
+  /* ── Sparkle badge ── */
+  .aifx-shimmer-sparkle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 24;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: #fff;
+    background: rgba(37, 99, 235, 0.9);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    animation: aifx-sparkle-blink 1.2s ease-in-out infinite;
+  }
+
+  .aifx-shimmer-sparkle svg {
+    display: block;
+    width: 13px;
+    height: 13px;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.28));
+  }
+
+  @keyframes aifx-sparkle-blink {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.82); opacity: 0.7; }
+  }
+</style>
+</head>
+<body>
+  <h1>Shimmer Effects Demo</h1>
+  <p class="subtitle">Click the button to activate all shimmer effects for 5 seconds.</p>
+  <button class="btn" onclick="activateAll()">Activate Shimmer (5s)</button>
+  <div class="status" id="status">Idle</div>
+
+  <div class="demo-grid" style="margin-top: 24px;">
+
+    <!-- 1. Field shimmer overlay on text -->
+    <div class="demo-card">
+      <h2>1. Field Shimmer (Text)</h2>
+      <div class="demo-content" id="text-target">
+        <div class="demo-text">
+          <h3>Eat Smarter. Feel Better.</h3>
+          <p>Get instant access to science-backed recipes, wellness tips, and expert guidance — no credit card needed.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Field shimmer overlay on image -->
+    <div class="demo-card">
+      <h2>2. Field Shimmer (Image)</h2>
+      <div class="demo-content" id="image-target">
+        <div class="demo-image">
+          <span>480 x 270 image placeholder</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Skeleton block -->
+    <div class="demo-card">
+      <h2>3. Skeleton Block (New section)</h2>
+      <div id="skeleton-target"></div>
+    </div>
+
+    <!-- 4. Live draft shimmer -->
+    <div class="demo-card">
+      <h2>4. Live Draft (Streaming text)</h2>
+      <div class="demo-content" id="live-draft-target">
+        <div class="demo-text">
+          <h3 data-editable-target="heading">Featured Recipes</h3>
+          <p data-editable-target="description">A vibrant, tropical salsa bursting with fresh mango, cilantro, and creamy avocado.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const sparkleSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>';
+
+    function activateAll() {
+      document.getElementById("status").textContent = "Shimmer active...";
+
+      // 1. Text shimmer overlay
+      const textTarget = document.getElementById("text-target");
+      textTarget.style.position = "relative";
+      const textOverlay = document.createElement("div");
+      textOverlay.className = "aifx-shimmer-overlay";
+      const textSparkle = document.createElement("div");
+      textSparkle.className = "aifx-shimmer-sparkle";
+      textSparkle.innerHTML = sparkleSvg;
+      textTarget.appendChild(textOverlay);
+      textTarget.appendChild(textSparkle);
+
+      // 2. Image shimmer overlay
+      const imageTarget = document.getElementById("image-target");
+      imageTarget.style.position = "relative";
+      const imgOverlay = document.createElement("div");
+      imgOverlay.className = "aifx-shimmer-overlay";
+      const imgSparkle = document.createElement("div");
+      imgSparkle.className = "aifx-shimmer-sparkle";
+      imgSparkle.innerHTML = sparkleSvg;
+      imageTarget.appendChild(imgOverlay);
+      imageTarget.appendChild(imgSparkle);
+
+      // 3. Skeleton block
+      const skeletonTarget = document.getElementById("skeleton-target");
+      const skeleton = document.createElement("div");
+      skeleton.className = "editor-skeleton-block";
+      skeletonTarget.appendChild(skeleton);
+
+      // 4. Live draft shimmer
+      const liveDraftTarget = document.getElementById("live-draft-target");
+      liveDraftTarget.classList.add("editor-live-draft-active");
+
+      // Remove after 5 seconds
+      setTimeout(() => {
+        textOverlay.remove();
+        textSparkle.remove();
+        textTarget.style.removeProperty("position");
+
+        imgOverlay.remove();
+        imgSparkle.remove();
+        imageTarget.style.removeProperty("position");
+
+        skeleton.remove();
+
+        liveDraftTarget.classList.remove("editor-live-draft-active");
+
+        document.getElementById("status").textContent = "Done. Click again to replay.";
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

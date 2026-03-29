@@ -1,4 +1,5 @@
-export { SharedBlockRenderer } from "./renderer"
+export { SharedBlockRenderer, registerCustomRenderer, hasRenderer } from "./renderer"
+export type { BlockRenderer } from "./renderer"
 export { BlockCatalogue } from "./catalogue"
 export { BlocksHydrator } from "./blocks-hydrator"
 export { BlockErrorBoundary } from "./block-error-boundary"
