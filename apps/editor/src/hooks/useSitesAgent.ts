@@ -18,11 +18,20 @@ export type SitesAgentMessage = {
   timestamp: number
 }
 
+export type PhaseStatus = {
+  id: string
+  activeLabel: string
+  doneLabel: string
+  status: "active" | "done"
+  outcome?: string
+}
+
 export type UseSitesAgentReturn = {
   messages: SitesAgentMessage[]
   isStreaming: boolean
   streamStatus: string | null
   streamSteps: { label: string; done: boolean; count?: number }[]
+  streamPhases: PhaseStatus[]
   streamingText: string | null
   sendMessage: (text: string) => void
   cancelStream: () => void
@@ -72,6 +81,7 @@ export function useSitesAgent(options: {
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamSteps, setStreamSteps] = useState<{ label: string; done: boolean; count?: number }[]>([])
+  const [streamPhases, setStreamPhases] = useState<PhaseStatus[]>([])
   const [streamingText, setStreamingText] = useState<string | null>(null)
 
   const activeStreamId = useRef<string | null>(null)
@@ -127,9 +137,23 @@ export function useSitesAgent(options: {
         const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000))
         setStreamStatus(`Agent working... ${elapsedSec}s`)
       } else if (type === "summary_token") {
+        // Accumulate for the final assistant message, but don't stream to UI —
+        // the StepTracker provides real-time progress; text is shown only at completion.
         summaryTextRef.current += d.text as string
-        setStreamingText(prev => (prev ?? "") + (d.text as string))
-        setStreamStatus("Agent responding...")
+      } else if (type === "phase") {
+        const phaseId = d.phase as string
+        const activeLabel = d.activeLabel as string
+        const doneLabel = d.doneLabel as string
+        setStreamPhases(prev => {
+          const updated = prev.map(p => p.status === "active" ? { ...p, status: "done" as const } : p)
+          return [...updated, { id: phaseId, activeLabel, doneLabel, status: "active" as const }]
+        })
+      } else if (type === "phase_outcome") {
+        const phaseId = d.phase as string
+        const outcome = d.outcome as string
+        setStreamPhases(prev =>
+          prev.map(p => p.id === phaseId ? { ...p, outcome } : p)
+        )
       } else if (type === "site_created") {
         const config = d.config as SiteConfig
         if (config && onSiteCreatedRef.current) onSiteCreatedRef.current(config)
@@ -156,6 +180,7 @@ export function useSitesAgent(options: {
         setIsStreaming(false)
         setStreamStatus(null)
         setStreamSteps([])
+        setStreamPhases([])
         setStreamingText(null)
       } else if (type === "error") {
         const result = d.result as Record<string, unknown>
@@ -170,6 +195,7 @@ export function useSitesAgent(options: {
         setIsStreaming(false)
         setStreamStatus(null)
         setStreamSteps([])
+        setStreamPhases([])
         setStreamingText(null)
       }
     }
@@ -235,6 +261,7 @@ export function useSitesAgent(options: {
     setIsStreaming(true)
     setStreamStatus("Starting...")
     setStreamSteps([{ label: "Starting agent", done: false }])
+    setStreamPhases([])
     setStreamingText(null)
     summaryTextRef.current = ""
 
@@ -279,6 +306,7 @@ export function useSitesAgent(options: {
     isStreaming,
     streamStatus,
     streamSteps,
+    streamPhases,
     streamingText,
     sendMessage,
     cancelStream,

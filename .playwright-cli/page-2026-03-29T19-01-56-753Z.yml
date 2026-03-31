@@ -1,0 +1,57 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - button "Adventure Atlas" [ref=e8] [cursor=pointer]:
+            - generic [ref=e9]: Adventure Atlas
+            - img [ref=e10]
+          - button "Site settings" [ref=e12] [cursor=pointer]:
+            - img [ref=e13]
+          - button "Sync from site" [ref=e16] [cursor=pointer]:
+            - img [ref=e17]
+        - generic [ref=e22]:
+          - button "More options" [ref=e23] [cursor=pointer]:
+            - img [ref=e24]
+          - button "Publish" [ref=e28] [cursor=pointer]
+      - combobox [ref=e30]:
+        - option "Home (/)" [selected]
+    - article [ref=e32]:
+      - paragraph [ref=e34]: Welcome to Adventure Atlas! Tell me what you'd like to change — I can add sections, rewrite copy, create new pages, and more.
+      - generic [ref=e35]:
+        - button "Change the headline and subheading" [ref=e36] [cursor=pointer]
+        - button "Add a new section" [ref=e37] [cursor=pointer]
+        - button "Create a new /about page" [ref=e38] [cursor=pointer]
+    - separator "Resize input panel"
+    - generic [ref=e40]:
+      - textbox "Ask anything" [ref=e42]
+      - generic [ref=e43]:
+        - button "Add image" [ref=e44] [cursor=pointer]:
+          - img [ref=e45]
+        - button "Select an element" [ref=e46] [cursor=pointer]:
+          - img [ref=e47]
+        - group "Voice and send actions" [ref=e53]:
+          - button "Start voice input" [ref=e54] [cursor=pointer]:
+            - img [ref=e55]
+          - button "Send message" [disabled] [ref=e58]:
+            - img [ref=e60]
+            - img [ref=e63]
+    - navigation [ref=e65]:
+      - button "Chat" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+      - button "Properties" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+  - separator "Resize chat panel" [ref=e72]
+  - iframe [ref=e74]:
+    - generic [active] [ref=f1e1]:
+      - main [ref=f1e2]:
+        - img [ref=f1e3]
+        - heading "Draft unavailable" [level=1] [ref=f1e8]
+        - paragraph [ref=f1e9]:
+          - text: Could not load draft content from orchestrator for
+          - code [ref=f1e10]: /
+          - text: .
+          - text: Make sure the orchestrator is running and try refreshing.
+      - button "Open Next.js Dev Tools" [ref=f1e16] [cursor=pointer]:
+        - img [ref=f1e17]
+      - alert [ref=f1e20]

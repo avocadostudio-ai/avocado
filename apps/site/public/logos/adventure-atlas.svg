@@ -1,8 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
-  <title id="title">Adventure Atlas logo</title>
-  <desc id="desc">Folded map with route pin.</desc>
+  <title id="title">The Avocado Hub logo</title>
+  <desc id="desc">Avocado with a hub network motif in the pit.</desc>
+  <defs>
+    <radialGradient id="hubskin" cx="35%" cy="25%">
+      <stop offset="0" stop-color="#bbf7d0"/>
+      <stop offset="0.5" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#166534"/>
+    </radialGradient>
+  </defs>
   <rect x="4" y="4" width="88" height="88" rx="20" fill="#f0fdf4"/>
-  <path d="M20 68V32l16-5 20 6 20-6v36l-20 6-20-6z" fill="#dcfce7" stroke="#166534" stroke-width="3"/>
-  <path d="M36 27v36M56 33v36" stroke="#16a34a" stroke-width="2"/>
-  <path d="M48 40c-4 0-7 3-7 7 0 5 7 12 7 12s7-7 7-12c0-4-3-7-7-7z" fill="#ef4444"/>
+  <!-- avocado body -->
+  <path d="M48 14c-14 0-26 13-26 30 0 18 11 34 26 34s26-16 26-34c0-17-12-30-26-30z" fill="url(#hubskin)" stroke="#166534" stroke-width="2.5"/>
+  <!-- inner flesh ring -->
+  <circle cx="48" cy="50" r="16" fill="#fef9c3" opacity="0.5"/>
+  <!-- pit -->
+  <circle cx="48" cy="50" r="9" fill="#92400e"/>
+  <!-- hub nodes on pit -->
+  <circle cx="48" cy="44" r="2" fill="#fef3c7"/>
+  <circle cx="43" cy="53" r="2" fill="#fef3c7"/>
+  <circle cx="53" cy="53" r="2" fill="#fef3c7"/>
+  <!-- hub connections -->
+  <line x1="48" y1="44" x2="43" y2="53" stroke="#fef3c7" stroke-width="1.2"/>
+  <line x1="48" y1="44" x2="53" y2="53" stroke="#fef3c7" stroke-width="1.2"/>
+  <line x1="43" y1="53" x2="53" y2="53" stroke="#fef3c7" stroke-width="1.2"/>
+  <!-- leaf -->
+  <path d="M48 14c2-4 8-7 14-6-3 5-8 8-14 6z" fill="#16a34a"/>
 </svg>

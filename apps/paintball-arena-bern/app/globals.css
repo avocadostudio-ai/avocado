@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@import "@ai-site-editor/blocks/styles.css";
+
+:root {
+  /* Backgrounds */
+  --bg-0: #020101;
+  --bg-100: #1f2124;
+  --bg-1: #1f2124;
+  --section-bg: var(--bg-100);
+
+  /* Text */
+  --text-100: #f0f0f0;
+  --text-200: #a3a3a3;
+  --heading: #f0f0f0;
+  --body: #f0f0f0;
+  --body-secondary: #a3a3a3;
+  --text-300: #52525b;
+  --caption: #64748b;
+
+  /* Brand */
+  --brand: #e74721;
+  --brand-hover: #c23a18;
+  --brand-subtle: #dbeafe;
+  --brand-fg: #f0f0f0;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-border: #e5e7eb;
+  --border: #e5e7eb;
+  --card-bg: #1f2124;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --hero-bg: var(--bg-0);
+  --cta-bg: var(--bg-100);
+  --placeholder-img: #e2e8f0;
+
+  /* Footer */
+  --footer-bg: #020101;
+  --footer-text: #fbfbfb;
+  --footer-heading: #f0f0f0;
+  --footer-link: #a3a3a3;
+  --footer-link-hover: #e2e8f0;
+  --footer-border: #33373d;
+
+  /* Typography */
+  --font-body: Montserrat, sans-serif;
+  --font-heading: Montserrat, sans-serif;
+
+  /* Shapes */
+  --radius-btn: 0px;
+  --radius-card: 0px;
+  --radius-feature: 0px;
+}
+
+/* Dark mode — follows system preference or .dark class on <html> */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg-0: #0f172a;
+    --bg-100: #1e293b;
+    --bg-1: #0f172a;
+    --section-bg: var(--bg-100);
+
+    --text-100: #f1f5f9;
+    --text-200: #cbd5e1;
+    --heading: #f1f5f9;
+    --body: #cbd5e1;
+    --body-secondary: #94a3b8;
+    --text-300: #94a3b8;
+    --caption: #94a3b8;
+
+    --brand: #3b82f6;
+    --brand-hover: #60a5fa;
+    --brand-subtle: #1e3a5f;
+    --brand-fg: #ffffff;
+
+    --surface: #1e293b;
+    --surface-border: #334155;
+    --border: #334155;
+    --card-bg: #1e293b;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --hero-bg: var(--bg-0);
+    --cta-bg: var(--bg-100);
+    --placeholder-img: #334155;
+
+    --footer-bg: #020617;
+    --footer-text: #94a3b8;
+    --footer-heading: #e2e8f0;
+    --footer-link: #64748b;
+    --footer-link-hover: #cbd5e1;
+    --footer-border: #1e293b;
+  }
+}
+
+/* Explicit .dark class override (from JS toggle or localStorage) */
+.dark {
+  --bg-0: #0f172a;
+  --bg-100: #1e293b;
+  --bg-1: #0f172a;
+  --section-bg: var(--bg-100);
+
+  --text-100: #f1f5f9;
+  --text-200: #cbd5e1;
+  --heading: #f1f5f9;
+  --body: #cbd5e1;
+  --body-secondary: #94a3b8;
+  --text-300: #94a3b8;
+  --caption: #94a3b8;
+
+  --brand: #3b82f6;
+  --brand-hover: #60a5fa;
+  --brand-subtle: #1e3a5f;
+  --brand-fg: #ffffff;
+
+  --surface: #1e293b;
+  --surface-border: #334155;
+  --border: #334155;
+  --card-bg: #1e293b;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --hero-bg: var(--bg-0);
+  --cta-bg: var(--bg-100);
+  --placeholder-img: #334155;
+
+  --footer-bg: #020617;
+  --footer-text: #94a3b8;
+  --footer-heading: #e2e8f0;
+  --footer-link: #64748b;
+  --footer-link-hover: #cbd5e1;
+  --footer-border: #1e293b;
+}

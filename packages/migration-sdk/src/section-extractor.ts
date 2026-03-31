@@ -425,19 +425,31 @@ const MIN_REPEAT_GROUP = 3
  * Segment layout nodes into visual sections by detecting vertical gaps.
  */
 export function segmentByVisualGaps(nodes: LayoutNode[], viewportWidth = 1440): VisualSection[] {
-  // Use top-level nodes (depth 0-2) that span most of the viewport width
+  // Find section-level elements: wide enough to be sections, not so tall they're page wrappers.
+  // Use depth <= 5 to handle deeply nested CMS layouts (WordPress/Elementor often nest at depth 3-5).
+  // Exclude elements taller than 3000px (likely full-page wrappers, not individual sections).
   const topLevel = nodes
-    .filter(n => n.depth <= 2 && n.rect.w > viewportWidth * 0.5)
+    .filter(n => n.depth <= 5 && n.rect.w > viewportWidth * 0.5 && n.rect.h < 3000 && n.rect.h >= 100)
     .sort((a, b) => a.rect.y - b.rect.y)
 
-  if (topLevel.length === 0) return []
+  // Deduplicate overlapping nodes — keep the shallowest (most likely the section root)
+  const deduped: LayoutNode[] = []
+  for (const node of topLevel) {
+    const overlaps = deduped.some(existing =>
+      Math.abs(existing.rect.y - node.rect.y) < 50 && Math.abs(existing.rect.h - node.rect.h) < 50
+    )
+    if (!overlaps) deduped.push(node)
+  }
+  const filtered = deduped.length > 0 ? deduped : topLevel
+
+  if (filtered.length === 0) return []
 
   const sections: VisualSection[] = []
-  let currentNodes: LayoutNode[] = [topLevel[0]]
+  let currentNodes: LayoutNode[] = [filtered[0]]
 
-  for (let i = 1; i < topLevel.length; i++) {
-    const prev = topLevel[i - 1]
-    const curr = topLevel[i]
+  for (let i = 1; i < filtered.length; i++) {
+    const prev = filtered[i - 1]
+    const curr = filtered[i]
     const gap = curr.rect.y - (prev.rect.y + prev.rect.h)
 
     if (gap > VISUAL_GAP_THRESHOLD) {

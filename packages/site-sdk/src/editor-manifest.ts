@@ -17,23 +17,25 @@ export {
   type BlockManifest
 }
 
-// --- Manifest builder (cached) ---
-
-let cachedManifest: BlockManifest | undefined
+// --- Manifest builder ---
+// Built fresh each time to include custom blocks registered after initial load.
+// Custom site blocks call registerBlock() in their schema.ts (imported via blocks/register.ts),
+// which adds them to allowedBlockTypes. The manifest must reflect ALL registered blocks,
+// not just the standard library ones.
 
 export function buildBlockManifest(): BlockManifest {
-  if (cachedManifest) return cachedManifest
-  const blocks: BlockDefinition[] = allowedBlockTypes.map((type) => {
-    const meta = getBlockMeta(type)
-    const propsSchema = getBlockJsonSchema(type)
-    if (!propsSchema) throw new Error(`Missing JSON schema for block type: ${type}`)
-    return {
-      type,
-      displayName: meta?.displayName ?? type,
-      propsSchema: propsSchema as Record<string, unknown>,
-      defaultProps: defaultPropsForType(type)
-    }
-  })
-  cachedManifest = { version: 1, blocks }
-  return cachedManifest
+  const blocks: BlockDefinition[] = allowedBlockTypes
+    .map((type) => {
+      const meta = getBlockMeta(type)
+      const propsSchema = getBlockJsonSchema(type)
+      if (!propsSchema) return null // skip blocks without schema (shouldn't happen but be safe)
+      return {
+        type,
+        displayName: meta?.displayName ?? type,
+        propsSchema: propsSchema as Record<string, unknown>,
+        defaultProps: defaultPropsForType(type)
+      }
+    })
+    .filter((b) => b !== null) as BlockDefinition[]
+  return { version: 1, blocks }
 }

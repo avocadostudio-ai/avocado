@@ -81,8 +81,12 @@ export type BlockInstance = {
 // Block registry
 // ---------------------------------------------------------------------------
 
-const _blockSchemas: Record<string, z.ZodObject<any>> = {}
-const _blockMeta: Record<string, BlockMeta> = {}
+// Use globalThis to ensure a single registry survives Next.js webpack module duplication
+// across RSC / SSR / API route layers. Without this, registerBlock() in custom blocks
+// populates a different registry copy than buildBlockManifest() reads.
+const G = globalThis as Record<string, unknown>
+const _blockSchemas: Record<string, z.ZodObject<any>> = (G.__ase_blockSchemas as Record<string, z.ZodObject<any>>) ?? (G.__ase_blockSchemas = {} as Record<string, z.ZodObject<any>>)
+const _blockMeta: Record<string, BlockMeta> = (G.__ase_blockMeta as Record<string, BlockMeta>) ?? (G.__ase_blockMeta = {} as Record<string, BlockMeta>)
 
 export type BlockRegistration = {
   schema: z.ZodObject<any>
@@ -245,9 +249,9 @@ export function getImageSpec(blockType: string, fieldPath: string): ImageSpec | 
  * Block schemas keyed by type name.
  * Prefer `registerBlock()` for new blocks; this object is kept for backwards compat.
  */
-export const blockSchemas: Record<string, z.ZodObject<any>> = _blockSchemas
+export const blockSchemas = _blockSchemas
 
-export const allowedBlockTypes: string[] = []
+export const allowedBlockTypes: string[] = (G.__ase_allowedBlockTypes as string[]) ?? (G.__ase_allowedBlockTypes = [] as string[])
 
 export function getPropDisplayName(blockType: string | undefined, propKey: string) {
   if (!blockType) return propKey

@@ -1,9 +1,9 @@
-import { siteOrigin } from "../../lib/editor-utils"
+import { getPuckHostApi } from "../../host/runtime"
 
 function resolvePreviewImageUrl(url: string): string {
   if (!url) return ""
   if (/^(https?:\/\/|data:|blob:)/i.test(url)) return url
-  if (url.startsWith("/")) return `${siteOrigin}${url}`
+  if (url.startsWith("/")) return `${getPuckHostApi().siteOrigin}${url}`
   return url
 }
 

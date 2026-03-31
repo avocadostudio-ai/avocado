@@ -2,19 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Puck, blocksPlugin, fieldsPlugin, outlinePlugin } from "@puckeditor/core"
 import "@puckeditor/core/puck.css"
 import "@ai-site-editor/blocks/styles.css"
+import "../puck-prototype.css"
 import { BotMessageSquare } from "lucide-react"
-import {
-  LEGACY_AVOCADO_SITE_ID,
-  LEGACY_AVOCADO_SITE_NAME,
-  loadSiteListFromStorage,
-  resolveDefaultModelKey,
-  resolveDefaultProvider,
-  siteNameFromId,
-  siteOrigin,
-  slugLabel,
-} from "../lib/editor-utils"
-import { useChatEngine } from "../hooks/useChatEngine"
-import { ImagePickerModal } from "./ImagePickerModal"
 import { FALLBACK_SESSION, FALLBACK_SLUG } from "./puck/constants"
 import { createPuckConfig } from "./puck/createPuckConfig"
 import { PuckChatContextProvider } from "./puck/PuckChatContext"
@@ -23,7 +12,8 @@ import { PuckDispatchBridge } from "./puck/PuckDispatchBridge"
 import { PuckPreviewIframeOverride } from "./puck/PuckPreviewIframeOverride"
 import { resolvePuckSiteId } from "./puck/site"
 import type { ChatPanelProps, ImagePickerTarget, PuckData, SelectionContext } from "./puck/types"
-import type { AIProvider, ModelKey } from "../lib/editor-types"
+import { getPuckHostApi, setPuckHostApi } from "../host/runtime"
+import type { PuckHostApi } from "../host/types"
 import { usePuckBootstrap } from "./puck/usePuckBootstrap"
 import { usePuckPlannerFeatures } from "./puck/usePuckPlannerFeatures"
 import { usePuckSiteSync } from "./puck/usePuckSiteSync"
@@ -32,12 +22,14 @@ import { applyDraftOps } from "./puck/draft-api"
 
 const PUCK_AUTOSAVE_DEBOUNCE_MS = 600
 
-export function PuckChatPrototype() {
+export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
+  setPuckHostApi(host)
+  const hostApi = getPuckHostApi()
   const [session] = useState(FALLBACK_SESSION)
   const [siteId] = useState(() => resolvePuckSiteId())
   const [slug, setSlug] = useState(FALLBACK_SLUG)
-  const [modelKey] = useState<ModelKey>(() => resolveDefaultModelKey())
-  const [provider] = useState<AIProvider>(() => resolveDefaultProvider())
+  const [modelKey] = useState(() => hostApi.resolveDefaultModelKey())
+  const [provider] = useState(() => hostApi.resolveDefaultProvider())
   const [useStreaming] = useState(true)
   const [activeBlockId, setActiveBlockId] = useState<string | undefined>(undefined)
   const [activeBlockType, setActiveBlockType] = useState<string | undefined>(undefined)
@@ -54,17 +46,14 @@ export function PuckChatPrototype() {
   const persistTimerRef = useRef<number | null>(null)
   const persistInFlightRef = useRef(false)
 
-  const envAgentApiKey = useMemo(
-    () => ((import.meta.env.VITE_AGENT_API_KEY as string | undefined)?.trim() ?? ""),
-    []
-  )
+  const envAgentApiKey = useMemo(() => (hostApi.agentApiKey?.trim() ?? ""), [hostApi.agentApiKey])
 
   const activeSiteConfig = useMemo(() => {
-    const list = loadSiteListFromStorage(siteId)
+    const list = hostApi.loadSiteListFromStorage(siteId)
     const match = list.find((site) => site.id === siteId)
-    const canonicalName = siteId === LEGACY_AVOCADO_SITE_ID
-      ? LEGACY_AVOCADO_SITE_NAME
-      : (siteNameFromId(siteId) || match?.name || "Site")
+    const canonicalName = siteId === hostApi.LEGACY_AVOCADO_SITE_ID
+      ? hostApi.LEGACY_AVOCADO_SITE_NAME
+      : (hostApi.siteNameFromId(siteId) || match?.name || "Site")
     if (match) return { ...match, name: canonicalName }
     return {
       id: siteId,
@@ -78,7 +67,7 @@ export function PuckChatPrototype() {
       tone: "",
       constraints: [],
     }
-  }, [siteId])
+  }, [siteId, hostApi])
 
   useEffect(() => {
     // Defensive: if main editor drag state leaked, preview iframe can become non-interactive/non-scrollable.
@@ -141,7 +130,7 @@ export function PuckChatPrototype() {
     return def.defaultProps as Record<string, unknown>
   }, [manifest])
 
-  const chatEngine = useChatEngine({
+  const chatEngine = hostApi.useChatEngine({
     session,
     siteId,
     activeSiteConfig,
@@ -305,8 +294,8 @@ export function PuckChatPrototype() {
         <PuckDispatchBridge dispatchRef={puckDispatchRef} />
         <label className="puck-poc-header-page-select" title="Select page">
           <select value={slug} onChange={(e) => setSlug(e.target.value)} disabled={headerBusy}>
-            {availableSlugs.map((candidate) => (
-              <option key={candidate} value={candidate}>{slugLabel(candidate)}</option>
+              {availableSlugs.map((candidate) => (
+              <option key={candidate} value={candidate}>{hostApi.slugLabel(candidate)}</option>
             ))}
           </select>
         </label>
@@ -388,7 +377,7 @@ export function PuckChatPrototype() {
             />
           </div>
         </PuckChatContextProvider>
-        <ImagePickerModal
+        <hostApi.ImagePickerModal
           open={Boolean(imagePickerTarget)}
           features={{
             ...backendFeatures,
@@ -397,9 +386,9 @@ export function PuckChatPrototype() {
           currentUrl={imagePickerTarget?.currentUrl}
           gdriveFolderId={activeSiteConfig?.gdriveFolderId}
           cmsMedia={activeSiteConfig?.cmsMedia}
-          siteOrigin={siteOrigin}
+          siteOrigin={hostApi.siteOrigin}
           onClose={() => setImagePickerTarget(null)}
-          onSelect={(imageUrl) => {
+          onSelect={(imageUrl: string) => {
             imagePickerTarget?.onSelect(imageUrl)
             setImagePickerTarget(null)
           }}

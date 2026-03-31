@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises"
-import { basename, resolve } from "node:path"
+import { basename, dirname, resolve } from "node:path"
 import type { FastifyBaseLogger } from "fastify"
 import {
   demoPublishedPages,
@@ -136,8 +136,9 @@ export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assi
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
 export const publishStatusBySession = new Map<string, PublishTracker>()
 export const siteConfigs = new Map<string, SiteConfig>()
-// Seed default config for avocado-stories
+// Seed default configs
 siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
+siteConfigs.set("adventure-atlas::dev", { name: "The Avocado Hub", logo: "/logos/adventure-atlas.svg" })
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
@@ -227,19 +228,67 @@ export function orderSlugsHomeFirst(slugs: string[]) {
 // ---------------------------------------------------------------------------
 // Accessor functions
 // ---------------------------------------------------------------------------
+/** Resolve monorepo root (orchestrator lives at apps/orchestrator/) */
+function monorepoRoot(): string {
+  return resolve(dirname(new URL(import.meta.url).pathname), "../../../")
+}
+
+/**
+ * Try to read a site's content/pages.json synchronously.
+ * Returns parsed PageDoc[] or empty array on failure.
+ */
+function readSitePages(siteId: string): PageDoc[] {
+  try {
+    const pagesPath = resolve(monorepoRoot(), "apps", siteId, "content", "pages.json")
+    if (!existsSync(pagesPath)) return []
+    const raw = readFileSync(pagesPath, "utf-8")
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Try to read a site's content/site-config.json synchronously.
+ * Seeds siteConfigs with nav labels, logo, footer, etc.
+ */
+function seedSiteConfig(session: string, siteId: string): void {
+  try {
+    const configPath = resolve(monorepoRoot(), "apps", siteId, "content", "site-config.json")
+    if (!existsSync(configPath)) return
+    const config = JSON.parse(readFileSync(configPath, "utf-8"))
+    if (config && typeof config === "object") {
+      siteConfigs.set(session, { ...siteConfigs.get(session), ...config })
+    }
+  } catch { /* ignore */ }
+}
+
 export function getSessionDraft(session: string) {
   let sessionMap = draftPages.get(session)
   if (!sessionMap) {
     sessionMap = new Map<string, PageDoc>()
-    // Legacy/default sessions are seeded from published pages so the orchestrator can
-    // serve content immediately. The editor's bootstrapFromSite() will overwrite this
-    // with the site's actual published-content.json on first load.
-    // Site-scoped sessions (<siteId>::<session>) start empty and are bootstrapped explicitly.
+
     if (!session.includes("::")) {
+      // Legacy/default sessions — seed from published demo pages
       for (const [slug, page] of publishedPages) {
         const copy = structuredClone(page)
         ensureHeroImageProps(copy)
         sessionMap.set(slug, copy)
+      }
+    } else {
+      // Site-scoped sessions — seed from the site's content/pages.json on disk.
+      // This ensures migrated sites load immediately without waiting for async bootstrap.
+      const siteId = session.split("::")[0]
+      const sitePages = readSitePages(siteId)
+      if (sitePages.length > 0) {
+        for (const page of sitePages) {
+          const copy = structuredClone(page)
+          ensureHeroImageProps(copy)
+          sessionMap.set(copy.slug, copy)
+        }
+        seedSiteConfig(session, siteId)
+        console.log(`[session-state] Seeded ${session} from apps/${siteId}/content/pages.json (${sitePages.length} pages)`)
       }
     }
     draftPages.set(session, sessionMap)
@@ -463,8 +512,9 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
   }
 
   siteConfigs.clear()
-  // Re-seed default
+  // Re-seed defaults
   siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
+  siteConfigs.set("adventure-atlas::dev", { name: "The Avocado Hub", logo: "/logos/adventure-atlas.svg" })
   if (parsed.siteConfigs && typeof parsed.siteConfigs === "object") {
     for (const [session, config] of Object.entries(parsed.siteConfigs)) {
       if (config && typeof config === "object") {

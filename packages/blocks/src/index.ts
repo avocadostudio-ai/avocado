@@ -1,4 +1,4 @@
-export { SharedBlockRenderer, registerCustomRenderer, hasRenderer } from "./renderer"
+export { SharedBlockRenderer, registerCustomRenderer, hasRenderer, getCustomRenderer } from "./renderer"
 export type { BlockRenderer } from "./renderer"
 export { BlockCatalogue } from "./catalogue"
 export { BlocksHydrator } from "./blocks-hydrator"

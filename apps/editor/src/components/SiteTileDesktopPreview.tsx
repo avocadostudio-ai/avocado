@@ -17,10 +17,9 @@ export function SiteTileDesktopPreview(args: { title: string; src: string; onCli
   }, [])
 
   const scale = shellWidth > 0 ? Math.min(1, shellWidth / virtualWidth) : 1
-  const scaledHeight = Math.max(170, Math.ceil(virtualHeight * scale))
 
   return (
-    <div ref={shellRef} className="site-tile-preview" style={{ height: scaledHeight, cursor: args.onClick ? "pointer" : undefined }} onClick={args.onClick}>
+    <div ref={shellRef} className="site-tile-preview" style={{ cursor: args.onClick ? "pointer" : undefined }} onClick={args.onClick}>
       <iframe
         title={args.title}
         src={args.src}

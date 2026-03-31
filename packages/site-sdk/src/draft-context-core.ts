@@ -30,7 +30,10 @@ export async function resolveDraftContextCore(
     ?? process.env.NEXT_PUBLIC_EDITOR_ORIGIN?.replace(/\/+$/, "")
     ?? (isDev ? "http://localhost:4100" : "")
 
-  const siteId = single(searchParams.siteId) ?? adapter.getCookie(DRAFT_SITE_COOKIE)?.trim() ?? defaultSiteId
+  // Query param (from editor iframe) wins, then the site's own configured siteId,
+  // then cookie fallback. This prevents stale cookies from a different site
+  // overriding the current site's identity when accessed directly.
+  const siteId = single(searchParams.siteId) ?? (defaultSiteId || adapter.getCookie(DRAFT_SITE_COOKIE)?.trim()) ?? ""
   if (!siteId) return null
 
   const session = single(searchParams.session) ?? adapter.getCookie(DRAFT_SESSION_COOKIE)?.trim() ?? defaultSession

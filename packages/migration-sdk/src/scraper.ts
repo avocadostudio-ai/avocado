@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join, extname } from "node:path"
 import type { FetchResult, ScreenshotResult, DownloadedImage, SiteStructure, DiscoveredPage, FullPageScrape } from "./types.ts"
-import { extractSections, resolveLazyImages, extractNavigation, extractPageOutline } from "./section-extractor.ts"
+import { extractSections, resolveLazyImages, extractNavigation, extractPageOutline, segmentByVisualGaps } from "./section-extractor.ts"
 
 const USER_AGENT = "MigrationBot/1.0 (ai-site-editor)"
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -197,18 +197,28 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
     await page.setViewportSize({ width, height })
     await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 })
 
-    // Scroll to bottom to trigger lazy loading
+    // Scroll to bottom slowly to trigger lazy loading (300ms per step for Intersection Observer)
     /* eslint-disable @typescript-eslint/no-unsafe-return */
     await page.evaluate(`(async () => {
       const delay = ms => new Promise(r => setTimeout(r, ms));
       const h = document.body.scrollHeight, step = window.innerHeight;
-      for (let y = 0; y < h; y += step) { window.scrollTo(0, y); await delay(150); }
+      for (let y = 0; y < h; y += step) { window.scrollTo(0, y); await delay(300); }
       window.scrollTo(0, 0);
-      await delay(300);
+      await delay(500);
     })()`)
 
     // Wait for lazy-loaded content to settle
     await page.waitForLoadState("networkidle").catch(() => { /* ok */ })
+
+    // Force-resolve lazy images that use data-src attributes (in the live page, before screenshots)
+    await page.evaluate(`(() => {
+      document.querySelectorAll('img[data-src], img[data-lazy-src], img[data-original], img[data-bg]').forEach(img => {
+        const lazySrc = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('data-original');
+        if (lazySrc) img.setAttribute('src', lazySrc);
+        const bgSrc = img.getAttribute('data-bg');
+        if (bgSrc) img.style.backgroundImage = 'url(' + bgSrc + ')';
+      });
+    })()`)
 
     // Extract rendered DOM and computed CSS
     const { renderedHtml, stylesheets } = await page.evaluate(`(() => {
@@ -250,29 +260,247 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       return nodes;
     })()`) as import("./types.ts").LayoutNode[]
 
-    // Extract CSS background images from hero/large sections (not available in HTML source)
+    // Extract CSS background images from ALL visible elements (CMS-agnostic)
     const bgImages = await page.evaluate(`(() => {
       const results = [];
-      const els = document.querySelectorAll('section, [class*="hero"], [class*="banner"], [class*="cover"], [data-widget_type]');
+      const seen = new Set();
+      const els = document.querySelectorAll('*');
       for (const el of els) {
         const style = window.getComputedStyle(el);
         const bg = style.backgroundImage;
         if (bg && bg !== 'none' && bg.includes('url(')) {
           const match = bg.match(/url\\(["']?([^"')]+)["']?\\)/);
-          if (match && match[1] && !match[1].startsWith('data:')) {
+          if (match && match[1] && !match[1].startsWith('data:') && !seen.has(match[1])) {
+            seen.add(match[1]);
             const rect = el.getBoundingClientRect();
-            results.push({ url: match[1], y: Math.round(rect.y), height: Math.round(rect.height) });
+            if (rect.height > 20 && rect.width > 20) {
+              results.push({ url: match[1], y: Math.round(rect.y), height: Math.round(rect.height) });
+            }
           }
         }
       }
       return results;
     })()`) as Array<{ url: string; y: number; height: number }>
 
-    // Take full-page screenshot
+    // Extract embedded iframes AND video URLs from data attributes / consent placeholders
+    const embeds = await page.evaluate(`(() => {
+      const results = [];
+      const seen = new Set();
+
+      // 1. Standard iframes
+      document.querySelectorAll('iframe[src]').forEach(el => {
+        const src = el.src || '';
+        if (!src || seen.has(src)) return;
+        seen.add(src);
+        const rect = el.getBoundingClientRect();
+        let type = 'other';
+        if (/youtube\\.com|youtu\\.be/i.test(src)) type = 'youtube';
+        else if (/vimeo\\.com/i.test(src)) type = 'vimeo';
+        else if (/google\\.com\\/maps|maps\\.google/i.test(src)) type = 'map';
+        if (rect.height > 20) results.push({ src, type, y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) });
+      });
+
+      // 2. Grep the entire HTML for video URLs — catches any embed method
+      //    (data attributes, inline scripts, JSON-LD, consent placeholders, etc.)
+      const html = document.documentElement.outerHTML;
+
+      // YouTube: youtu.be/ID or youtube.com/watch?v=ID or youtube.com/embed/ID
+      // Also matches JSON-escaped slashes (\\\\/) common in data attributes
+      const ytMatches = html.match(/youtu(?:\\.be[\\/\\\\\\\\]+|be\\.com[\\/\\\\\\\\]+(?:watch\\?v=|embed[\\/\\\\\\\\]+))([\\w-]{11})/g) || [];
+      for (const match of ytMatches) {
+        const id = match.match(/([\\w-]{11})$/)?.[1];
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          // Try to find the element that contains this URL for Y position
+          const el = document.querySelector('[data-settings*=\"' + id + '\"], [src*=\"' + id + '\"], [data-src*=\"' + id + '\"]');
+          const rect = el ? el.getBoundingClientRect() : { y: 0, width: 0, height: 0 };
+          results.push({ src: 'https://www.youtube.com/embed/' + id, type: 'youtube', y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height || 400) });
+        }
+      }
+
+      // Vimeo: vimeo.com/ID or vimeo.com/video/ID
+      const vimeoMatches = html.match(/vimeo\\.com\\/(?:video\\/)?(\\d{6,})/g) || [];
+      for (const match of vimeoMatches) {
+        const id = match.match(/(\\d{6,})$/)?.[1];
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          results.push({ src: 'https://player.vimeo.com/video/' + id, type: 'vimeo', y: 0, width: 0, height: 0 });
+        }
+      }
+
+      // Google Maps embed URLs
+      const mapMatches = html.match(/google\\.com\\/maps\\/embed[^\"'\\s]*/g) || [];
+      for (const src of mapMatches) {
+        if (!seen.has(src)) {
+          seen.add(src);
+          const el = document.querySelector('iframe[src*=\"maps/embed\"]');
+          const rect = el ? el.getBoundingClientRect() : { y: 0, width: 0, height: 0 };
+          results.push({ src: 'https://www.' + src, type: 'map', y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height || 400) });
+        }
+      }
+
+      return results;
+    })()`) as import("./types.ts").ExtractedEmbed[]
+
+    // Extract actual rendered fonts via getComputedStyle (more reliable than CSS regex)
+    const computedFonts = await page.evaluate(`(() => {
+      const fonts = { heading: null, body: null };
+      // Get heading font from first h1/h2
+      const heading = document.querySelector('h1, h2');
+      if (heading) {
+        const family = getComputedStyle(heading).fontFamily.split(',')[0].trim().replace(/['"]/g, '');
+        if (family && family !== 'inherit' && family !== 'initial') fonts.heading = family;
+      }
+      // Get body font from first visible paragraph or body
+      const body = document.querySelector('p') || document.body;
+      if (body) {
+        const family = getComputedStyle(body).fontFamily.split(',')[0].trim().replace(/['"]/g, '');
+        if (family && family !== 'inherit' && family !== 'initial') fonts.body = family;
+      }
+      // Also check for Google Fonts links
+      const googleFonts = [...document.querySelectorAll('link[href*="fonts.googleapis.com"]')]
+        .map(l => l.getAttribute('href'))
+        .filter(Boolean);
+      return { ...fonts, googleFontLinks: googleFonts };
+    })()`) as { heading: string | null; body: string | null; googleFontLinks: string[] }
+
+    // Compute visual section boundaries from layout nodes (CMS-agnostic)
+    const visualSections = segmentByVisualGaps(layoutNodes)
+
+    // Extract computed styles per visual section (Site_Clone technique: getComputedStyle walker)
+    // Pass Y-ranges from visual gap analysis so the browser finds elements by position, not by tag
+    const sectionYRanges = visualSections.map(vs => ({ y: vs.y, h: vs.height }))
+
+    const sectionStyles = await page.evaluate(`((yRanges) => {
+      const PROPS = [
+        'fontSize','fontWeight','fontFamily','lineHeight','letterSpacing','color',
+        'textTransform','textDecoration','textAlign',
+        'backgroundColor','background','backgroundImage',
+        'padding','paddingTop','paddingRight','paddingBottom','paddingLeft',
+        'margin','marginTop','marginRight','marginBottom','marginLeft',
+        'width','height','maxWidth','minWidth','maxHeight','minHeight',
+        'display','flexDirection','justifyContent','alignItems','gap',
+        'gridTemplateColumns','gridTemplateRows',
+        'borderRadius','border','boxShadow',
+        'overflow','position','top','right','bottom','left','zIndex',
+        'opacity','transform','transition','cursor',
+        'objectFit','objectPosition'
+      ];
+      const DEFAULTS = new Set(['none','normal','auto','0px','0','rgba(0, 0, 0, 0)','','0px 0px','0px 0px 0px 0px','start','stretch','visible','static']);
+      const MAX_NODES = 200;
+      const MAX_DEPTH = 4;
+
+      function extractStyles(el) {
+        const cs = getComputedStyle(el);
+        const styles = {};
+        for (const p of PROPS) {
+          const v = cs[p];
+          if (v && !DEFAULTS.has(v)) styles[p] = v;
+        }
+        return styles;
+      }
+
+      function selectorFor(el, parent) {
+        const tag = el.tagName.toLowerCase();
+        if (!parent) return tag;
+        const siblings = [...parent.children].filter(c => c.tagName === el.tagName);
+        if (siblings.length === 1) return tag;
+        const idx = siblings.indexOf(el) + 1;
+        return tag + ':nth-child(' + idx + ')';
+      }
+
+      let nodeCount = 0;
+      function walk(el, depth, parentSelector) {
+        if (depth > MAX_DEPTH || nodeCount >= MAX_NODES) return null;
+        const rect = el.getBoundingClientRect();
+        if (rect.height < 5 || rect.width < 5) return null;
+        const tag = el.tagName.toLowerCase();
+        if (['script','style','svg','path','link','meta','noscript'].includes(tag)) return null;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return null;
+
+        nodeCount++;
+        const seg = selectorFor(el, el.parentElement);
+        const selector = parentSelector ? parentSelector + ' > ' + seg : seg;
+
+        const isLeaf = el.children.length === 0;
+        const text = isLeaf && el.textContent ? el.textContent.trim().slice(0, 200) : null;
+        const image = tag === 'img' ? {
+          src: el.src || el.currentSrc || '',
+          alt: el.alt || '',
+          naturalWidth: el.naturalWidth || 0,
+          naturalHeight: el.naturalHeight || 0
+        } : null;
+
+        const children = [];
+        for (const child of el.children) {
+          if (nodeCount >= MAX_NODES) break;
+          const c = walk(child, depth + 1, selector);
+          if (c) children.push(c);
+        }
+
+        return { tag, depth, selector, styles: extractStyles(el), text, image, children };
+      }
+
+      // Find the best DOM element for each visual section Y-range.
+      // Uses document-relative coordinates (getBoundingClientRect + scrollY).
+      // CMS-agnostic — works on any site regardless of HTML structure.
+      function findElementForRange(y, h) {
+        const scrollY = window.scrollY;
+        // Collect candidate elements at various depths
+        const allEls = document.querySelectorAll('body *');
+        let best = null;
+        let bestScore = Infinity;
+        for (const el of allEls) {
+          const tag = el.tagName.toLowerCase();
+          if (['script','style','svg','path','link','meta','noscript','br','hr'].includes(tag)) continue;
+          const rect = el.getBoundingClientRect();
+          const absY = rect.y + scrollY;
+          const absH = rect.height;
+          if (absH < 40 || rect.width < 100) continue;
+          // Check if this element overlaps the target Y range
+          const overlapStart = Math.max(absY, y);
+          const overlapEnd = Math.min(absY + absH, y + h);
+          if (overlapEnd <= overlapStart) continue;
+          const overlap = overlapEnd - overlapStart;
+          const coverage = overlap / h; // how much of the target range is covered
+          if (coverage < 0.5) continue;
+          // Score: prefer elements whose height is closest to the target
+          const heightDiff = Math.abs(absH - h) / h;
+          if (heightDiff < bestScore) {
+            bestScore = heightDiff;
+            best = el;
+          }
+        }
+        return best;
+      }
+
+      return yRanges.slice(0, 20).map((range, i) => {
+        const el = findElementForRange(range.y, range.h);
+        if (!el) return null;
+        nodeCount = 0;
+        const root = walk(el, 0, '');
+        return root ? { sectionIndex: i, root } : null;
+      }).filter(Boolean);
+    })(${JSON.stringify(sectionYRanges)})`) as import("./types.ts").SectionStyles[]
+
+    // Take full-page screenshots at desktop and mobile viewports
     let screenshot: ScreenshotResult | null = null
+    let mobileScreenshot: ScreenshotResult | null = null
     try {
       const buffer = await page.screenshot({ fullPage: true, type: "jpeg", quality: 75 })
       screenshot = { base64: buffer.toString("base64"), viewport: { width, height } }
+    } catch { /* non-fatal */ }
+
+    // Mobile screenshot (390px) — captures responsive layout for better block decisions
+    try {
+      const mobileWidth = 390
+      await page.setViewportSize({ width: mobileWidth, height })
+      await page.waitForTimeout(500) // let responsive styles settle
+      const buffer = await page.screenshot({ fullPage: true, type: "jpeg", quality: 60 })
+      mobileScreenshot = { base64: buffer.toString("base64"), viewport: { width: mobileWidth, height } }
+      // Restore desktop viewport
+      await page.setViewportSize({ width, height })
     } catch { /* non-fatal */ }
 
     // Process the rendered HTML
@@ -313,7 +541,7 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       }
     }
 
-    return { content, screenshot, sections, outline, nav }
+    return { content, screenshot, mobileScreenshot, sections, outline, nav, sectionStyles, visualSections, embeds, computedFonts }
   } finally {
     await browser.close()
   }
