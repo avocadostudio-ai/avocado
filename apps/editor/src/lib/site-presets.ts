@@ -23,6 +23,9 @@ export const DEFAULT_SITE_HOSTING = "Vercel production site (single shared proje
 export const LEGACY_AVOCADO_SITE_ID = "avocado-stories"
 export const LEGACY_AVOCADO_SITE_NAME = "Avocado Stories"
 export const LEGACY_AVOCADO_SITE_PURPOSE = "Marketing site for Avocado Stories products, recipes, and sustainability messaging."
+export const DEFAULT_AVOCADO_SITE_ID = "adventure-atlas"
+export const DEFAULT_AVOCADO_SITE_NAME = "The Avocado Hub"
+export const DEFAULT_AVOCADO_SITE_PURPOSE = "Healthy living hub — recipes, wellness tips, and sustainability resources."
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
 const ENABLE_AUTO_SITE_PRESETS = IS_DEMO_MODE || import.meta.env.VITE_ENABLE_AUTO_SITE_PRESETS === "1"
 const LOCK_SITE_ID = import.meta.env.VITE_LOCK_SITE_ID === "1"
@@ -100,7 +103,16 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
 
 const CONFIGURED_SITE_PRESETS = parseConfiguredSitePresets(import.meta.env.VITE_SITE_PRESETS_JSON as string | undefined)
 
-const DEFAULT_SITE_PRESETS: SiteConfig[] = [...CONFIGURED_SITE_PRESETS, ...AUTO_SITE_PRESETS]
+const BUILTIN_SITE_PRESETS: SiteConfig[] = [
+  {
+    id: DEFAULT_AVOCADO_SITE_ID,
+    name: DEFAULT_AVOCADO_SITE_NAME,
+    purpose: DEFAULT_AVOCADO_SITE_PURPOSE,
+    hosting: DEFAULT_SITE_HOSTING,
+  },
+]
+
+const DEFAULT_SITE_PRESETS: SiteConfig[] = [...CONFIGURED_SITE_PRESETS, ...BUILTIN_SITE_PRESETS, ...AUTO_SITE_PRESETS]
 
 export function siteNameFromId(id: string) {
   return id
@@ -116,6 +128,14 @@ export function resolveEditorSiteId() {
   if (typeof window === "undefined") return fallback
   const fromQuery = sanitizeSiteId(new URLSearchParams(window.location.search).get("siteId") ?? "")
   return fromQuery || fallback
+}
+
+/** Read ?previewUrl= from the query string (used when opening a non-preset site). */
+export function resolveEditorPreviewUrl(): string | undefined {
+  if (typeof window === "undefined") return undefined
+  const raw = new URLSearchParams(window.location.search).get("previewUrl")?.trim()
+  if (!raw) return undefined
+  try { new URL(raw); return raw.replace(/\/+$/, "") } catch { return undefined }
 }
 
 export function defaultSiteList(siteId: string): SiteConfig[] {

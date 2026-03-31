@@ -1,19 +1,21 @@
 import type { BlockManifest, PageDoc } from "@ai-site-editor/shared"
-import { orchestrator, siteOrigin } from "../../lib/editor-utils"
+import { getPuckHostApi } from "../../host/runtime"
 import { fetchJson } from "./fetch-json"
 import { type PlannerFeatures } from "./types"
 
 export async function fetchEditorPages(siteId: string): Promise<PageDoc[]> {
+  const hostApi = getPuckHostApi()
   const source = await fetchJson<{ pages?: unknown }>(
-    `${siteOrigin}/api/editor/pages?siteId=${encodeURIComponent(siteId)}`
+    `${hostApi.siteOrigin}/api/editor/pages?siteId=${encodeURIComponent(siteId)}`
   )
   return Array.isArray(source.pages) ? source.pages as PageDoc[] : []
 }
 
 export async function bootstrapDraft(session: string, siteId: string, pages: PageDoc[]): Promise<void> {
+  const hostApi = getPuckHostApi()
   // Preserve existing draft content for the session (including unsynced local edits).
   // The orchestrator bootstrap route will initialize only when draft is empty.
-  await fetch(`${orchestrator}/draft/bootstrap`, {
+  await fetch(`${hostApi.orchestrator}/draft/bootstrap`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -26,19 +28,22 @@ export async function bootstrapDraft(session: string, siteId: string, pages: Pag
 }
 
 export function fetchManifest(): Promise<BlockManifest> {
-  return fetchJson<BlockManifest>(`${siteOrigin}/api/editor/blocks`)
+  const hostApi = getPuckHostApi()
+  return fetchJson<BlockManifest>(`${hostApi.siteOrigin}/api/editor/blocks`)
 }
 
 export async function fetchDraftSlugs(session: string, siteId: string): Promise<string[]> {
+  const hostApi = getPuckHostApi()
   const payload = await fetchJson<{ slugs?: string[] }>(
-    `${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`
+    `${hostApi.orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`
   )
   return Array.isArray(payload.slugs) && payload.slugs.length > 0 ? payload.slugs : ["/"]
 }
 
 export function fetchDraftPage(session: string, siteId: string, slug: string): Promise<PageDoc> {
+  const hostApi = getPuckHostApi()
   return fetchJson<PageDoc>(
-    `${orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slug)}`
+    `${hostApi.orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slug)}`
   )
 }
 
@@ -47,8 +52,9 @@ export async function applyDraftOps(
   siteId: string,
   ops: Array<Record<string, unknown>>
 ): Promise<boolean> {
+  const hostApi = getPuckHostApi()
   if (ops.length === 0) return true
-  const res = await fetch(`${orchestrator}/ops`, {
+  const res = await fetch(`${hostApi.orchestrator}/ops`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ session, siteId, ops }),
@@ -58,9 +64,10 @@ export async function applyDraftOps(
 }
 
 export async function fetchPlannerFeatures(): Promise<PlannerFeatures | null> {
-  const urls = [`${orchestrator}/status/planner`]
-  if (orchestrator.includes("localhost")) {
-    urls.push(`${orchestrator.replace("localhost", "127.0.0.1")}/status/planner`)
+  const hostApi = getPuckHostApi()
+  const urls = [`${hostApi.orchestrator}/status/planner`]
+  if (hostApi.orchestrator.includes("localhost")) {
+    urls.push(`${hostApi.orchestrator.replace("localhost", "127.0.0.1")}/status/planner`)
   }
 
   for (const url of urls) {

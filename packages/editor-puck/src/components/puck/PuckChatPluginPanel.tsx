@@ -1,9 +1,7 @@
 import { createUsePuck, useGetPuck } from "@puckeditor/core"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChatComposerCore } from "../ChatSurface"
-import { useMediaInput } from "../../hooks/useMediaInput"
-import type { ChatEntry } from "../../lib/editor-types"
-import { renderFinalMarkdown, renderSimpleMarkdown } from "../../lib/markdown-renderer"
+import { getPuckHostApi } from "../../host/runtime"
+import type { ChatEntry } from "../../host/types"
 import { deriveSelectionContextFromPuck } from "./selection"
 import { usePuckChatContext } from "./PuckChatContext"
 import type { ChatPanelProps, PuckSelectionStore, SelectionContext } from "./types"
@@ -33,7 +31,9 @@ export function PuckChatPluginPanel({
   onUndo,
   onSelectionChange
 }: ChatPanelProps) {
-  const media = useMediaInput()
+  const hostApi = getPuckHostApi()
+  const media = hostApi.useMediaInput()
+  const ChatComposerCore = hostApi.ChatComposerCore
   const [draft, setDraft] = useState("")
   const threadRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
@@ -180,11 +180,11 @@ export function PuckChatPluginPanel({
                 <div className="puck-poc-msg__main">
                   {(() => {
                     if (entry.role !== "assistant") return safeText
-                    try {
-                      return renderFinalMarkdown(safeText)
-                    } catch {
+                      try {
+                      return hostApi.renderFinalMarkdown(safeText)
+                      } catch {
                       return safeText
-                    }
+                      }
                   })()}
                 </div>
                 {safeSuggestions.length > 0 ? (
@@ -226,7 +226,7 @@ export function PuckChatPluginPanel({
                   ))}
                 </ul>
               ) : null}
-              <div className="puck-poc-msg__main">{renderSimpleMarkdown(streamingText)}</div>
+              <div className="puck-poc-msg__main">{hostApi.renderSimpleMarkdown(streamingText)}</div>
               {streamingChanges.length > 0 ? (
                 <ul className="msg-list">
                   {streamingChanges.slice(0, 8).map((line, idx) => (

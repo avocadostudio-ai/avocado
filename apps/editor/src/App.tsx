@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Bot, Check, ChevronDown, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import { ChatComposerCore, ChatThreadCore } from "./components/ChatSurface"
@@ -17,7 +17,6 @@ import { useBlockProps } from "./hooks/useBlockProps"
 import { usePageMeta } from "./hooks/usePageMeta"
 import { PropertyPanel } from "./components/PropertyPanel"
 import { useBlockManifest } from "./hooks/useBlockManifest"
-import { PuckChatPrototype } from "./components/PuckChatPrototype"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
 import type { AIProvider, ChatEntry, ModelKey, PlannerSource } from "./lib/editor-types"
@@ -48,6 +47,15 @@ import {
 } from "./lib/editor-utils"
 
 const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
+const PuckChatPrototype = lazy(
+  () => import("./components/PuckPrototypeRoute").then((mod) => ({ default: mod.PuckPrototypeRoute }))
+)
+const PUCK_ROUTE_PATHS = new Set(["/editor/puck", "/editor/puck/"])
+
+function isPuckRouteEnabled() {
+  const raw = (import.meta.env.VITE_ENABLE_PUCK as string | undefined)?.trim().toLowerCase() ?? ""
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on"
+}
 
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
@@ -68,7 +76,7 @@ function selectionValue(provider: AIProvider, model: ModelKey) {
 export function App() {
   const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
   const isEditorPath = pathName === "/" || pathName === "/editor" || pathName === "/editor/"
-  const isPuckPrototype = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("poc") === "puck"
+  const isPuckPrototype = PUCK_ROUTE_PATHS.has(pathName) && isPuckRouteEnabled()
   const isSitesPage = pathName === "/sites" || pathName === "/sites/"
   const [chatDarkMode, setChatDarkMode] = useState(() => resolveDefaultChatDarkMode())
   const [session] = useState("dev")
@@ -83,7 +91,13 @@ export function App() {
     window.localStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
   }, [chatDarkMode])
 
-  if (isPuckPrototype) return <PuckChatPrototype />
+  if (isPuckPrototype) {
+    return (
+      <Suspense fallback={<div style={{ height: "100vh", display: "grid", placeItems: "center" }}>Loading prototype…</div>}>
+        <PuckChatPrototype />
+      </Suspense>
+    )
+  }
   if (isSitesPage) return <SitesPage sites={sites} session={session} />
   if (!isEditorPath) return <SitesPage sites={sites} session={session} />
 
@@ -1974,13 +1988,13 @@ function EditorPage({
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(withIntegrationContext({ session, siteId, ops }, componentManifest.manifest))
               })
-              const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string }
+              const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string; details?: unknown }
               if (res.ok && data.status === "applied") {
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
                 chatEngine.pushAssistantFromResult({ status: "applied", summary: t("ops.changedImage") }, { canUndo: true })
                 void blockProps.refetch()
               } else {
-                console.error("[ImagePicker] ops response:", res.status, data, "request:", { session, siteId, ops })
+                console.error("[ImagePicker] ops failed:", res.status, data.error, data.details ?? "", "ops:", JSON.stringify(ops))
               }
             } catch (err) { console.error("[ImagePicker] ops failed:", err) }
           })()

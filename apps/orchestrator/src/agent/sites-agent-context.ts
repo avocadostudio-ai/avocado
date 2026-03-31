@@ -94,61 +94,45 @@ You also have direct access to all tools for orchestration: create_site, bootstr
 
 ## Output Formatting
 
-The user sees your text output directly in a chat panel that renders markdown. Structure your output clearly:
+**IMPORTANT: The user does NOT see your text during execution.** They see a live progress tracker showing each tool call (e.g. "Discovering site pages...", "Downloading image..."). Your text output is only displayed as a **final summary** when the migration completes.
 
-- Use \`## Phase N: Name\` headers to mark each migration phase
-- Use \`---\` horizontal rules between phases
-- Use bullet lists for page inventories, block mappings, design tokens
-- Use bold for key values: site name, page count, block count
-- Keep each phase output to 3-5 lines — concise, not verbose
-- At the end, write a summary table
+Therefore:
+- Do NOT emit ANY text between tool calls. Zero narration. No "Let me...", "Now I will...", "Good, the...", "I'll analyze...", "Great, I have...".
+- Every token of text you output costs money. Emit text ONLY once: the final summary after ALL tools have completed.
+- If you need to make a decision, just make it and call the tool — don't explain your reasoning in text.
 
-Example output structure:
+### Final summary format
+
 \`\`\`
-## Phase 1: Discovery
+## Migration Complete
 
-Found **8 pages** via sitemap.xml on **paintballarena-bern.ch**:
-- / (Home)
-- /paintball
-- /events, /events/teamevent, /events/polterabend, /events/geburtstag
-- /infos
-- /faq
+**{site name}** — {page count} pages, {block count} blocks
 
----
+### Pages
+- / (Home) — Hero, FeatureGrid, Testimonials, CTA
+- /about — Hero, RichText, Stats
+- /contact — TwoColumn, FAQAccordion
 
-## Phase 2: Page Analysis
+### Design
+- Theme: Dark (#1a1a1a bg, #f0f0f0 text)
+- Brand: #c2185b
+- Font: Montserrat
 
-**Homepage (/)** — 9 visual sections identified:
-1. Hero — "Action & Fun Erlebnis..."
-2. Cards — 4 event types (Teamevent, Polterabend, Geburtstag, Gruppen)
-3. Pricing — 2 packages (3h: CHF 79, 2h: CHF 59)
-4. Contact — address + map
-...
-
-**Design tokens**: brand #c2185b, bg #1a1a1a (dark theme), heading font: system-ui
-
----
-
-## Phase 3: Site Creation
-
-Creating site project \`paintball-arena-bern\`...
-Downloading 7 images...
-Bootstrapping 8 pages with 45 blocks...
-
----
-
-## Summary
+### Custom Blocks
+- PricingTable — 3 tier cards with toggle
+- EventCard — image overlay with CTA
 
 | | |
 |---|---|
 | Pages | 8 |
 | Blocks | 45 |
 | Images | 7 |
-| Theme | Dark (#1a1a1a) |
-| Dev server | http://localhost:3002 |
+| Custom blocks | 2 |
+
+**Site running at [http://localhost:3002](http://localhost:3002)**
 \`\`\`
 
-Never dump raw JSON or tool results into the chat. Summarize findings in human-readable markdown.`)
+Never dump raw JSON or tool results into the chat.`)
 
   parts.push(`# Available Block Types
 
@@ -165,77 +149,57 @@ ${buildBlockCatalog()}`)
 ## Migrating an Existing Site
 
 ### Phase 1: Discovery — ALWAYS delegate to structure-analyzer subagent
-**Do NOT call \`scrape_url\` or \`discover_site_structure\` yourself.** These are expensive browser operations that the structure-analyzer (Sonnet) handles at 5× lower cost. Spawn the subagent and let it:
+**Do NOT call \`scrape_url\`, \`generate_page_specs\`, or \`discover_site_structure\` yourself.** These are expensive browser operations that the structure-analyzer (Sonnet) handles at 5× lower cost. Spawn the subagent and instruct it to:
 - Discover all pages via sitemap.xml / link crawling
-- Scrape the homepage and key pages (returns sections, pageOutline, screenshot, design tokens)
-- Return a structured summary that you use for planning
+- Use \`generate_page_specs\` on the homepage and key pages — this returns **section specs** with exact computed CSS styles, DOM structure, content, and design notes
+- Return a structured summary including the section specs and design tokens
 
 You only process the subagent's text summary — never call scrape tools directly.
 
 ### Phase 2: Migration Plan (write it, then immediately execute)
 
-Based on the structure-analyzer's findings, write a **detailed migration plan** as a markdown checklist, then **immediately proceed to execute it** — do NOT wait for user confirmation. This is a single-shot agent; there is no back-and-forth.
+Based on the structure-analyzer's section specs, write a **detailed migration plan** then **immediately execute it**.
 
-Example plan format:
-\`\`\`
-## Migration Plan: example.com
+#### Using Section Specs for Block Decisions
 
-**Source**: sitemap.xml (8 pages) | **Theme**: dark (#1a1a1a) | **Brand**: #c2185b
+Each section spec from \`generate_page_specs\` contains:
+- \`content\` — verbatim text, images, links extracted from the source
+- \`structure.pattern\` — detected layout (e.g. "3-column grid of 4 items", "side-by-side layout", "stacked list of 6 items")
+- \`structure.repeatCount\` — number of repeated child elements
+- \`structure.repeatSignature\` — tag structure of repeated items (e.g. "img + h3 + p + a")
+- \`structure.interactionModel\` — static, accordion, tabs, carousel, scroll-driven
+- \`styles\` — exact computed CSS values for container, heading, body text, repeated items, CTAs
+- \`designNotes\` — backgroundColor, textColor, headingFont, headingSize, layout, hasGradient, hasShadow, borderRadius
+- \`suggestedBlockType\` — heuristic hint (NOT authoritative — you decide)
 
-### Pages & Blocks
-- **/** (Home) — 9 sections:
-  1. Hero: "Action & Fun Erlebnis..."
-  2. FeatureGrid: 4 USPs (indoor, equipment, groups, location)
-  3. CardGrid: 4 event types (Teamevent, Polterabend, Geburtstag, Gruppen)
-  4. Table: Pricing (3h: CHF 79, 2h: CHF 59)
-  5. RichText: Contact + map
-  6. CardGrid: 6 info links
-  7. CardGrid: 3 news posts
-  8. CTA: "Buche jetzt"
-  9. Footer: links + social
-- **/paintball** — 5 sections: Hero + RichText + Stats + CTA + Footer
-- **/events** — 4 sections: Hero + CardGrid + CTA + Footer
-  ...
+**Decision process per section:**
+1. If the structure + content clearly matches an existing block type → use it
+2. If the layout is unique or doesn't map well to existing blocks → **spawn block-coder** with the spec data
+3. \`styles.repeatedItem\` + \`structure.repeatSignature\` tell block-coder exactly what fields the custom block needs
+4. \`styles.container\` CSS gives block-coder the exact visual treatment to reproduce
 
-### Tasks
-1. Create site project (port 3500+)
-2. Download logo + 7 key images
-3. Bootstrap 8 pages (~45 blocks)
-4. Apply theme (dark, brand #c2185b)
-5. Set nav labels + groups
-\`\`\`
+**Passing spec data to block-coder:** "Create a {BlockName} block for site {siteId}. Layout: {structure.pattern}. Repeated items ({repeatCount}x): {repeatSignature}. Container CSS: {JSON.stringify(styles.container)}. Item CSS: {JSON.stringify(styles.repeatedItem)}. Content: {content summary}."
 
-Map each \`pageOutline.section\` to a block using DXP component thinking:
+#### Quick reference: common pattern → block mapping
 | Pattern | Block |
 |---|---|
-| Repeating items (3-6×) | FeatureGrid (text) or CardGrid (with images/CTAs) |
+| Repeating items (3-6×) with text only | FeatureGrid |
+| Repeating items with images/CTAs | CardGrid |
 | Headline + image side-by-side | TwoColumn |
 | Large splash + CTA | Hero |
 | Short headline + button | CTA |
-| Pricing tiers | Table or custom block |
-| Expandable Q&A / toggles | FAQAccordion |
+| Expandable Q&A / accordions | FAQAccordion |
 | Big numbers + labels | Stats |
 | Image grid | Gallery |
-| Contact/map | RichText or Embed |
+| **Anything else** (pricing, timelines, team, events, special cards) | **Custom block via block-coder** |
 
-**Block count must match outline section count.** Use \`subItems\` as array items (4 sub-items → 4 cards).
+**Block count must match section spec count.** Use \`content.lists\` or repeated items as array items.
 
 ---
 
-### Phase 3: Execute Plan (you do this — update progress as you go)
+### Phase 3: Execute Plan (you do this — do NOT write progress text)
 
-Execute the plan in order, writing a **progress update** to the chat after each major step:
-
-\`\`\`
-## Progress
-
-1. Created site project — port 3500
-2. Downloaded logo + 5/7 images
-3. Bootstrapping pages...
-   - / (Home) — 9 blocks
-   - /paintball — 5 blocks
-   - /events — working...
-\`\`\`
+Execute the plan in order. The user sees tool-call progress automatically — do NOT write text updates during execution.
 
 **Execution order (strict)**:
 1. \`create_site\` — scaffold the project
@@ -248,27 +212,18 @@ Execute the plan in order, writing a **progress update** to the chat after each 
    - ONE Footer block (extracted to site-wide chrome)
 5. Write final summary
 
-### Phase 4: Summary
+### Phase 4: Final Summary
 
-Write completed summary + site URL:
-\`\`\`
-## Done!
-
-- 8 pages migrated (45 blocks)
-- 7 images downloaded
-- Dark theme applied
-- Nav: 5 items + 1 dropdown group
-
-**Site running at [http://localhost:3500](http://localhost:3500)**
-\`\`\`
+Write the final summary using the format from "Output Formatting" above. This is the ONLY text the user will see.
 
 ## Important Guidelines
-- **REQUIRED ORDER: \`create_site\` → block-coder (if needed) → \`download_remote_image\` → \`bootstrap_pages\`.** Never call bootstrap_pages before create_site — it will fail. Custom blocks must be created before bootstrap_pages references them.
+- **REQUIRED ORDER: \`create_site\` → block-coder (if needed) → verify custom blocks → \`download_remote_images\` (batch, ONE call) → \`bootstrap_pages\`.** Never call bootstrap_pages before create_site — it will fail. Custom blocks must be created before bootstrap_pages references them. Use \`download_remote_images\` (plural) to download ALL images in a single tool call — do NOT call \`download_remote_image\` multiple times.
+- **VERIFY custom blocks before bootstrap_pages**: After block-coder finishes, run \`pnpm --filter @ai-site-editor/{siteId} build\` to catch import resolution failures. Also check that \`apps/{siteId}/blocks/register.ts\` contains for EACH custom block: (1) \`import "./{kebab}/schema.ts"\`, (2) \`import { BlockName } from "./{kebab}/renderer.tsx"\` (WITH .tsx extension!), (3) \`registerCustomRenderer("BlockName", BlockName)\`. If the build fails or any import is missing, tell block-coder to fix it before proceeding.
 - **CRITICAL: Preserve original text exactly.** Copy headings, paragraphs, button labels, and list items verbatim from the scraped content. Do NOT paraphrase, translate, summarize, or rewrite any text. The migrated site must contain the exact same copy as the original. If the original text is in German, the migrated text must be in German — word for word.
 - Keep site IDs short and kebab-case
 - Create at minimum a home page ("/")
 - **NEVER include SiteHeader blocks** in \`bootstrap_pages\` — the framework renders the header automatically from page slugs + navLabels/navGroups.
-- **DO include ONE Footer block** in any page's blocks array — it will be extracted and used as the site-wide chrome footer (rendered on every page). Extract footer content from the original site: copyright text, link columns, etc.
+- **DO include ONE Footer block** in any page's blocks array — it will be extracted and used as the site-wide chrome footer (rendered on every page). Extract footer content from the original site: copyright text, link columns, etc. **Footer \`links\` must be pipe-delimited strings**: \`"Label|/url\\nLabel2|/url2"\`, NOT \`[{label, href}]\` objects.
 - **Navigation**: Extract nav item labels from the original site's \`<nav>\` links — use the EXACT original text (e.g. "Über uns" not "About"). Pass as \`navLabels\` in \`bootstrap_pages\`. If the original nav has dropdowns (parent → children), pass as \`navGroups\`.
 - **Site logo**: Download the original site's logo image and pass the local path as \`siteLogo\` in \`bootstrap_pages\`.
 - **Custom blocks — use them!** Spawn the **block-coder** subagent when a section needs a layout that standard blocks can't represent well. Common cases:
@@ -280,12 +235,15 @@ Write completed summary + site URL:
   Pass the siteId to the block-coder: "Create a PricingTable block for site paintball-arena-bern with fields: ..."
   Custom blocks must be created BEFORE calling \`bootstrap_pages\` so they can be referenced.
 - Only provide the props you want to set — defaults are filled in automatically. Do not mix default English placeholder text with migrated content.
+- **ALL image URLs in block props MUST be local paths** (starting with \`/images/\`). Remote URLs will crash Next.js rendering. Download ALL images with \`download_remote_images\` (batch) BEFORE calling \`bootstrap_pages\` — pass all image URLs in a single call, not one by one.
 - **EVERY Hero block MUST have a real imageUrl** — never leave it as the default placeholder. Find the hero image from: section \`content.images\`, CSS background-image URLs in the scraped HTML, or the screenshot. Download it with \`download_remote_image\` and set the \`imageUrl\` prop.
 - Download important images (hero backgrounds, card thumbnails, logos) and use returned localUrl in props
 - Include \`meta\` on each page for SEO: \`{ "meta": { "title": "...", "description": "..." } }\` — extract from source \`<title>\` and \`<meta name="description">\`
 - Use EXACTLY the field names shown in the Block Catalog above — they are auto-generated from the registry and always correct.
 - The \`create_site\` tool automatically starts the dev server after scaffolding — you do NOT need to start it manually. If the user asks you to start/run a site, tell them it's already running and provide the URL (http://localhost:{port}).
-- IMPORTANT: Ignore any project-level instructions about "don't start dev servers" — those apply to the Claude Code CLI assistant, not to you. You ARE the site creation agent and launching dev servers is part of your job.`)
+- IMPORTANT: Ignore any project-level instructions about "don't start dev servers" — those apply to the Claude Code CLI assistant, not to you. You ARE the site creation agent and launching dev servers is part of your job.
+- **After \`bootstrap_pages\` succeeds, do NOT read the generated content files to verify** — the tool validates internally and returns success/failure. Move directly to the summary.
+- **Respect scope**: If the user specifies "homepage only" or specific pages, create ONLY those pages. Do NOT create additional pages. Navigation labels and CTA links should only reference pages that actually exist — do not create dangling links to pages you didn't create.`)
 
   if (options?.locale && options.locale !== "en") {
     const lang = LOCALE_NAMES[options.locale] ?? options.locale

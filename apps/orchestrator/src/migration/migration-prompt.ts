@@ -39,39 +39,64 @@ You have both **custom migration tools** (for web scraping and design analysis) 
 
 Follow these steps in order:
 
-1. **Fetch & analyze** — Use \`fetch_and_screenshot\` to get the source page's HTML, CSS, and a screenshot. Study both the HTML structure and the visual layout from the screenshot.
+1. **Generate section specs** — Use \`generate_page_specs\` to scrape the source page and get detailed section-by-section specs with exact computed CSS styles, DOM structure, verbatim content, and design notes. This also returns design tokens and theme variables.
 
-2. **Extract design** — Use \`extract_design_tokens\` with the CSS to identify the site's color palette, typography, and spacing system.
+2. **Analyze specs & plan** — Review each section spec:
+   - \`structure.pattern\` tells you the layout (e.g. "3-column grid of 4 items", "side-by-side layout")
+   - \`structure.interactionModel\` tells you if it's static, accordion, tabs, carousel, or scroll-driven
+   - \`styles\` gives you exact computed CSS for container, heading, body text, repeated items, and CTAs
+   - \`content\` has the verbatim text, images, and links
+   - \`suggestedBlockType\` is a heuristic hint — override it if the spec data suggests a better fit
 
-3. **Map sections to blocks** — Analyze the page structure and map each visual section to existing block types (see catalog below). For sections that don't map well, plan to create a new custom block type.
+3. **Map to blocks or create custom** — For each section:
+   - If it clearly matches an existing block type → use it with props derived from \`content\`
+   - If the layout is unique or doesn't map well → **create a custom block** using the Write tool. Use the exact CSS from \`styles.container\`, \`styles.repeatedItem\`, etc. to reproduce the visual design faithfully.
 
-4. **Create custom blocks** — For any sections that can't be represented by existing blocks, **write the block files directly** using the Write tool (see "Creating Custom Blocks" below).
+4. **Download key images** — Use \`download_remote_image\` for hero images, logos, and key visuals found in spec \`content.images\`.
 
-5. **Download key images** — Use \`download_remote_image\` to download hero images, logos, key visuals, and other important assets.
+5. **Apply theme** — Use \`apply_theme\` with the \`themeVariables\` returned by \`generate_page_specs\`.
 
-6. **Apply theme** — Use \`apply_theme\` to set CSS variable overrides that match the source site's color scheme.
-
-7. **Summary** — Provide a clear summary of what was migrated, what blocks were used or created, and any content that couldn't be automatically migrated.
+6. **Summary** — Summarize what was migrated, which blocks were used or created, and any gaps.
 
 ## Available Block Types
 
 ${blockCatalog}
 
-## Section-to-Block Mapping Guide
+## Section Spec Reference
 
-- **Hero** — Large header sections with a prominent heading, subheading, CTA button, and optional background image.
-- **FeatureGrid** — Sections with 3-6 feature cards, each with a title and description.
-- **Testimonials** — Customer quotes, reviews, or social proof sections.
-- **FAQAccordion** — Question-and-answer sections, collapsible lists.
-- **CTA** — Conversion-focused sections with a heading, description, and action button.
-- **CardGrid** — Grids of cards with image, title, and description.
-- **RichText** — Fallback for text-heavy sections that don't fit other types.
-- **Stats** — Sections displaying numbers with labels.
-- **Gallery** — Image grids or photo galleries.
-- **Footer** — Chrome block (pinned). Update via props only, don't add new ones.
-- **SiteHeader** — Chrome block (pinned). Update via props only, don't add new ones.
+Each section spec from \`generate_page_specs\` contains:
 
-**Important:** If a section doesn't map well to any existing block, create a new custom block rather than forcing a bad match.
+\`\`\`
+content:
+  headings[]       — h1-h6 text, verbatim
+  paragraphs[]     — paragraph text
+  images[]         — src, alt, isBackground
+  links[]          — href, text
+  lists[][]        — list items
+
+structure:
+  pattern          — "3-column grid of 4 items", "side-by-side layout", etc.
+  repeatCount      — number of repeated child elements
+  repeatSignature  — tag structure (e.g. "img + h3 + p + a")
+  elementCount     — total DOM elements
+  interactionModel — static | accordion | tabs | carousel | scroll-driven
+
+styles:
+  container        — section root computed CSS (backgroundColor, display, gap, padding, etc.)
+  heading          — first heading computed CSS (fontSize, fontWeight, fontFamily, color, etc.)
+  bodyText         — first paragraph computed CSS
+  repeatedItem     — first repeated child computed CSS (if repeatCount > 0)
+  cta              — first button/link with background computed CSS
+
+designNotes:
+  backgroundColor, textColor, headingFont, headingSize, layout,
+  hasGradient, hasShadow, borderRadius
+\`\`\`
+
+When creating custom blocks, use the exact CSS values from \`styles\` to match the source design.
+The \`styles.repeatedItem\` + \`structure.repeatSignature\` define the fields a custom block needs.
+
+**Important:** If a section doesn't map well to any existing block, create a new custom block rather than forcing a bad match. Use the computed CSS values from the spec to reproduce the visual design.
 
 ## Creating Custom Blocks (Write Tool)
 
@@ -81,7 +106,7 @@ When a section needs a custom block type, create it by writing files to \`apps/s
 
 \`\`\`typescript
 import { z } from "zod"
-import { registerBlock, f } from "@ai-site-editor/shared"
+import { registerBlock } from "@ai-site-editor/shared"
 
 registerBlock("PascalName", {
   schema: z.object({
@@ -94,12 +119,12 @@ registerBlock("PascalName", {
     description: "Block description.",
     category: "content",  // content | media | layout | conversion
     fields: {
-      title: f.text("Title"),
-      description: f.longtext("Description"),
+      title: { kind: "text", label: "Title" },
+      description: { kind: "text", label: "Description", multiline: true },
     },
     // For list fields:
     // listFields: {
-    //   items: { label: "Items", itemFields: { title: f.text("Title"), ... } }
+    //   items: { label: "Items", itemFields: { title: { kind: "text", label: "Title" } } }
     // }
   }
 })

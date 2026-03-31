@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { useT } from "@/i18n"
 import { renderSimpleMarkdown } from "../lib/markdown-renderer"
-import { Bot, Trash2, Square, ArrowUp, Sparkles } from "lucide-react"
-import type { UseSitesAgentReturn, SitesAgentMessage } from "../hooks/useSitesAgent"
+import { Bot, Trash2, Square, ArrowUp, Sparkles, ChevronDown, ChevronRight } from "lucide-react"
+import type { UseSitesAgentReturn, SitesAgentMessage, PhaseStatus } from "../hooks/useSitesAgent"
 
 type Props = {
   agent: UseSitesAgentReturn
@@ -84,8 +84,12 @@ export function SitesAgentChat({ agent }: Props) {
           </div>
         )}
 
+        {agent.isStreaming && agent.streamPhases.length > 0 && (
+          <PhaseTracker phases={agent.streamPhases} />
+        )}
+
         {agent.isStreaming && agent.streamSteps.length > 0 && (
-          <StepTracker steps={agent.streamSteps} />
+          <StepTracker steps={agent.streamSteps} phaseLabels={agent.streamPhases.flatMap(p => [p.activeLabel, p.doneLabel])} />
         )}
       </div>
 
@@ -136,36 +140,66 @@ export function SitesAgentChat({ agent }: Props) {
   )
 }
 
-const MAX_VISIBLE_STEPS = 6
+function PhaseTracker({ phases }: { phases: PhaseStatus[] }) {
+  return (
+    <div className="sites-agent-phases">
+      {phases.map((phase) => (
+        <div key={phase.id} className={`sites-agent-phase ${phase.status}`}>
+          <div className="sites-agent-phase-header">
+            {phase.status === "done" ? (
+              <svg viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 4.5l-7 7L3 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            ) : (
+              <span className="sites-agent-step-spinner" />
+            )}
+            <span className="sites-agent-phase-label">{phase.status === "done" ? phase.doneLabel : phase.activeLabel}</span>
+          </div>
+          {phase.outcome && (
+            <div className="sites-agent-phase-outcome">{phase.outcome}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 
-function StepTracker({ steps }: { steps: { label: string; done: boolean; count?: number }[] }) {
-  // Filter out duplicate consecutive done steps (already collapsed via count)
-  // and skip steps with count > 1 that are done (show only the collapsed version)
-  const visibleSteps = steps.filter(s => !(s.done && (s.count ?? 1) > 1))
-  const hiddenCount = steps.length - visibleSteps.length
-  const capped = visibleSteps.length > MAX_VISIBLE_STEPS
-    ? visibleSteps.slice(visibleSteps.length - MAX_VISIBLE_STEPS)
-    : visibleSteps
-  const extraHidden = hiddenCount + (visibleSteps.length - capped.length)
+function StepTracker({ steps, phaseLabels }: { steps: { label: string; done: boolean; count?: number }[]; phaseLabels: string[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  // Filter out steps that duplicate phase labels (e.g. "Analyzing website" shown in both)
+  const phaseLower = phaseLabels.map(l => l.toLowerCase())
+  const filtered = steps.filter(s => {
+    const label = s.label.toLowerCase()
+    return !phaseLower.some(p => label.startsWith(p) || p.startsWith(label))
+  })
+
+  const doneSteps = filtered.filter(s => s.done)
+  const activeStep = filtered.find(s => !s.done)
+  const doneCount = doneSteps.length
 
   return (
     <div className="sites-agent-steps">
-      {extraHidden > 0 && (
-        <div className="sites-agent-step done" style={{ opacity: 0.5, fontSize: 11 }}>
-          <svg viewBox="0 0 16 16" width="10" height="10"><path d="M13.5 4.5l-7 7L3 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <span>{extraHidden} earlier step{extraHidden > 1 ? "s" : ""} completed</span>
-        </div>
+      {doneCount > 0 && (
+        <button
+          type="button"
+          className="sites-agent-steps-toggle"
+          onClick={() => setExpanded(e => !e)}
+        >
+          {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          <span>{expanded ? "Hide" : `${doneCount}`} step{doneCount > 1 ? "s" : ""}{expanded ? "" : " completed"}</span>
+        </button>
       )}
-      {capped.map((step, i) => (
-        <div key={i} className={`sites-agent-step ${step.done ? "done" : "active"}`}>
-          {step.done ? (
-            <svg viewBox="0 0 16 16" width="12" height="12"><path d="M13.5 4.5l-7 7L3 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          ) : (
-            <span className="sites-agent-step-spinner" />
-          )}
+      {expanded && doneSteps.map((step, i) => (
+        <div key={`d${i}`} className="sites-agent-step done">
+          <svg viewBox="0 0 16 16" width="12" height="12"><path d="M13.5 4.5l-7 7L3 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           <span>{step.label}{step.count && step.count > 1 ? ` (x${step.count})` : ""}</span>
         </div>
       ))}
+      {activeStep && (
+        <div className="sites-agent-step active">
+          <span className="sites-agent-step-spinner" />
+          <span>{activeStep.label}</span>
+        </div>
+      )}
     </div>
   )
 }

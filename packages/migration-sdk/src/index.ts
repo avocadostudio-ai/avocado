@@ -2,6 +2,7 @@ export { fetchPageContent, takeScreenshot, downloadImage, discoverSitePages, scr
 export { extractDesignTokens, mapToThemeVariables } from "./design-tokens.ts"
 export { generateBlock, regenerateManifest } from "./block-codegen.ts"
 export { extractSections, resolveLazyImages, extractNavigation, extractPageOutline, segmentByVisualGaps, detectRepeatedPatterns } from "./section-extractor.ts"
+export { buildSectionSpec, buildPageSpecs } from "./section-spec.ts"
 export type {
   FetchResult,
   ScreenshotResult,
@@ -24,4 +25,8 @@ export type {
   LayoutNode,
   VisualSection,
   RepeatGroup,
+  ComputedStyleNode,
+  SectionStyles,
+  SectionSpec,
+  ExtractedEmbed,
 } from "./types.ts"
