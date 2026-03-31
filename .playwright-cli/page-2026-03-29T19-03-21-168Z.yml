@@ -1,0 +1,51 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - button "Adventure Atlas" [ref=e8] [cursor=pointer]:
+            - generic [ref=e9]: Adventure Atlas
+            - img [ref=e10]
+          - button "Site settings" [ref=e12] [cursor=pointer]:
+            - img [ref=e13]
+          - button "Sync from site" [ref=e16] [cursor=pointer]:
+            - img [ref=e17]
+        - generic [ref=e22]:
+          - button "More options" [ref=e23] [cursor=pointer]:
+            - img [ref=e24]
+          - button "Publish" [ref=e28] [cursor=pointer]
+      - combobox [ref=e30]:
+        - option "Home (/)" [selected]
+        - option "Olives (/olives)"
+        - option "Oranges (/oranges)"
+        - option "Grapefruits (/grapefruits)"
+        - option "Community (/community)"
+        - option "Blueberries (/blueberries)"
+        - option "Recipes (/recipes)"
+    - article [ref=e32]:
+      - paragraph [ref=e34]: Welcome to Adventure Atlas! Tell me what you'd like to change — I can add sections, rewrite copy, create new pages, and more.
+      - generic [ref=e35]:
+        - button "Rewrite the hero headline" [ref=e36] [cursor=pointer]
+        - button "Create a new /about page" [ref=e37] [cursor=pointer]
+    - separator "Resize input panel"
+    - generic [ref=e39]:
+      - textbox "Ask anything" [ref=e41]
+      - generic [ref=e42]:
+        - button "Add image" [ref=e43] [cursor=pointer]:
+          - img [ref=e44]
+        - button "Select an element" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+        - group "Voice and send actions" [ref=e52]:
+          - button "Start voice input" [ref=e53] [cursor=pointer]:
+            - img [ref=e54]
+          - button "Send message" [disabled] [ref=e57]:
+            - img [ref=e59]
+            - img [ref=e62]
+    - navigation [ref=e64]:
+      - button "Chat" [ref=e65] [cursor=pointer]:
+        - img [ref=e66]
+      - button "Properties" [ref=e69] [cursor=pointer]:
+        - img [ref=e70]
+  - separator "Resize chat panel" [ref=e71]
+  - iframe [ref=e73]:
+    

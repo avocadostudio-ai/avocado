@@ -6,7 +6,8 @@ import {
   loadSiteListFromStorage,
   orchestrator,
   sanitizeSiteId,
-  siteNameFromId
+  siteNameFromId,
+  resolveEditorPreviewUrl
 } from "../lib/editor-utils"
 
 /** Orchestrator-side site header config (name, logo, navLabels). */
@@ -153,9 +154,15 @@ export function useSiteList(siteId: string, session: string) {
     [headerConfig, session, configSiteId, siteId]
   )
 
+  const queryPreviewUrl = resolveEditorPreviewUrl()
+
   const activeSiteConfig = useMemo(() => {
     const match = siteList.find((site) => site.id === siteId)
-    if (match) return match
+    if (match) {
+      // Query-param previewUrl overrides the stored config
+      if (queryPreviewUrl && !match.previewUrl) return { ...match, previewUrl: queryPreviewUrl }
+      return match
+    }
     return {
       id: siteId,
       name: siteNameFromId(siteId) || "Site",
@@ -166,9 +173,10 @@ export function useSiteList(siteId: string, session: string) {
       vercelProductionUrl: "",
       vercelDeployHookUrl: "",
       tone: "",
-      constraints: []
+      constraints: [],
+      ...(queryPreviewUrl ? { previewUrl: queryPreviewUrl } : {}),
     } satisfies SiteConfig
-  }, [siteId, siteList])
+  }, [siteId, siteList, queryPreviewUrl])
 
   const openEditorForSite = (targetSiteId: string) => {
     const url = new URL("/editor", window.location.origin)

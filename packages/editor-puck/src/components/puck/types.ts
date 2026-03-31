@@ -1,5 +1,5 @@
 import type { Data } from "@puckeditor/core"
-import type { ChatEntry } from "../../lib/editor-types"
+import type { ChatEntry } from "../../host/types"
 
 export type PuckData = Data<Record<string, Record<string, unknown>>>
 

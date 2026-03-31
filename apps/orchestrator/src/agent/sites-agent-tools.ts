@@ -10,10 +10,57 @@ import { mkdir, writeFile, readFile } from "node:fs/promises"
 import { resolve, join, dirname } from "node:path"
 import { existsSync } from "node:fs"
 import { tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk"
+import { createMigrationTools } from "../migration/migration-tools.js"
 import { z } from "zod"
 import { getAllBlockMeta, defaultPropsForType, validateBlockProps, type BlockType } from "@ai-site-editor/shared"
 import { fetchPageContent, takeScreenshot, downloadImage, extractDesignTokens, mapToThemeVariables, discoverSitePages, scrapeFullPage } from "@ai-site-editor/migration-sdk"
+import { getCachedScrape, setCachedScrape } from "../migration/scrape-cache.js"
+import { saveScreenshot } from "../migration/migration-tools.js"
 import { scopedSessionKey, setPage, bumpVersion, getSiteConfig, setSiteConfig } from "../state/session-state.js"
+
+// Match remote image URLs — extension-based OR known image CDN hostnames
+const IMAGE_URL_RE = /^https?:\/\/.+\.(jpe?g|png|webp|gif|svg|avif|ico)(\?.*)?$/i
+const IMAGE_CDN_RE = /^https?:\/\/(images\.unsplash\.com|plus\.unsplash\.com|res\.cloudinary\.com|images\.ctfassets\.net|cdn\.sanity\.io)/i
+
+function isRemoteImageUrl(url: string): boolean {
+  return IMAGE_URL_RE.test(url) || IMAGE_CDN_RE.test(url)
+}
+
+/** Recursively walk props and download any remote image URLs, replacing with local paths. */
+async function localizeRemoteImages(
+  props: Record<string, unknown>,
+  imagesDir: string,
+): Promise<{ props: Record<string, unknown>; downloaded: number }> {
+  let downloaded = 0
+
+  async function walk(value: unknown): Promise<unknown> {
+    if (typeof value === "string" && isRemoteImageUrl(value)) {
+      try {
+        const result = await downloadImage(value, undefined, imagesDir)
+        downloaded++
+        console.log(`[sites-agent] Auto-downloaded remote image: ${value} → ${result.localPath}`)
+        return `/images/${result.fileName}`
+      } catch {
+        console.warn(`[sites-agent] Failed to auto-download image: ${value}`)
+        return value
+      }
+    }
+    if (Array.isArray(value)) {
+      return Promise.all(value.map(walk))
+    }
+    if (value && typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>)
+      const resolved = await Promise.all(entries.map(([, v]) => walk(v)))
+      const result: Record<string, unknown> = {}
+      entries.forEach(([k], i) => { result[k] = resolved[i] })
+      return result
+    }
+    return value
+  }
+
+  const result = await walk(props) as Record<string, unknown>
+  return { props: result, downloaded }
+}
 
 /** Sanitize a site name into a kebab-case ID */
 function sanitizeSiteId(name: string): string {
@@ -192,8 +239,9 @@ function validateAndCorrectProps(
 export function createSitesAgentMcpServer(options: {
   session: string
   emitSiteCreated: (config: Record<string, unknown>) => void
+  emitPhaseOutcome?: (outcome: { tool: string; data: Record<string, unknown> }) => void
 }) {
-  const { session, emitSiteCreated } = options
+  const { session, emitSiteCreated, emitPhaseOutcome } = options
 
   // ── LIST SITES ──
   const listSitesTool = tool(
@@ -232,6 +280,7 @@ export function createSitesAgentMcpServer(options: {
     async (args) => {
       try {
         const structure = await discoverSitePages(args.url)
+        emitPhaseOutcome?.({ tool: "discover_site_structure", data: { totalPages: structure.totalFound, origin: structure.origin } })
         return {
           content: [{
             type: "text" as const,
@@ -266,11 +315,27 @@ export function createSitesAgentMcpServer(options: {
         const root = monorepoRoot()
         const projectDir = join(root, "apps", siteId)
 
+        let existingPort = 0
         if (existsSync(projectDir)) {
-          return { content: [{ type: "text" as const, text: `Error: Directory apps/${siteId} already exists` }], isError: true }
+          // Clean content from previous migration but keep project skeleton (package.json, node_modules, etc.)
+          const { rm } = await import("node:fs/promises")
+          for (const dir of ["content", "blocks", "public/images", ".next"]) {
+            const target = join(projectDir, dir)
+            if (existsSync(target)) await rm(target, { recursive: true, force: true })
+          }
+          console.log(`[sites-agent] Cleaned previous content from apps/${siteId}`)
+
+          // Reuse the existing port if not explicitly overridden
+          if (!args.port) {
+            try {
+              const existingPkg = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
+              const portMatch = existingPkg.scripts?.dev?.match(/-p\s*(\d+)/)
+              if (portMatch) existingPort = Number(portMatch[1])
+            } catch { /* use new port */ }
+          }
         }
 
-        const port = args.port || await findAvailablePort(root)
+        const port = args.port || existingPort || await findAvailablePort(root)
 
         // Create project structure
         await mkdir(projectDir, { recursive: true })
@@ -299,10 +364,14 @@ export function createSitesAgentMcpServer(options: {
         const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=dev-secret\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${args.name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
         await writeFile(join(projectDir, ".env.local"), envContent, "utf-8")
 
-        // Run pnpm install (async to avoid blocking event loop)
-        const { execFile } = await import("node:child_process")
-        const { promisify } = await import("node:util")
-        await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
+        // Run pnpm install if needed (skip if node_modules exists from previous run)
+        if (!existsSync(join(projectDir, "node_modules"))) {
+          const { execFile } = await import("node:child_process")
+          const { promisify } = await import("node:util")
+          await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
+        } else {
+          console.log(`[sites-agent] Skipping pnpm install — node_modules exists`)
+        }
 
         const siteConfig = {
           id: siteId,
@@ -321,6 +390,18 @@ export function createSitesAgentMcpServer(options: {
         })
         bumpVersion(sessionKey)
 
+        // Kill any existing process on the allocated port before starting
+        try {
+          const { execSync } = await import("node:child_process")
+          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
+          if (pids) {
+            for (const pid of pids.split("\n")) {
+              try { process.kill(Number(pid), "SIGKILL") } catch { /* already dead */ }
+            }
+            console.log(`[sites-agent] Killed existing process(es) on port ${port}`)
+          }
+        } catch { /* no process on port — fine */ }
+
         // Launch dev server in background (fire-and-forget)
         console.log(`[sites-agent] Starting dev server for ${siteId} on port ${port}...`)
         const { spawn } = await import("node:child_process")
@@ -332,6 +413,7 @@ export function createSitesAgentMcpServer(options: {
         devProcess.unref() // don't block orchestrator shutdown
 
         emitSiteCreated(siteConfig)
+        emitPhaseOutcome?.({ tool: "create_site", data: { siteId, port, name: args.name } })
 
         return {
           content: [{
@@ -361,7 +443,11 @@ export function createSitesAgentMcpServer(options: {
     },
     async (args) => {
       try {
-        const result = await scrapeFullPage(args.url)
+        let result = getCachedScrape(args.url)
+        if (!result) {
+          result = await scrapeFullPage(args.url)
+          setCachedScrape(args.url, result)
+        }
         const { content, screenshot, sections, outline, nav } = result
 
         // Extract design tokens from CSS
@@ -389,16 +475,20 @@ export function createSitesAgentMcpServer(options: {
           themeVariables: themeVars,
         })
 
-        if (screenshot) {
-          return {
-            content: [
-              { type: "text" as const, text: textData },
-              { type: "image" as const, data: screenshot.base64, mimeType: "image/jpeg" as const },
-            ],
-          }
-        }
+        const { mobileScreenshot } = result
+        const contentBlocks: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: "image/jpeg" }> = [
+          { type: "text" as const, text: textData },
+        ]
+        if (screenshot) contentBlocks.push({ type: "image" as const, data: screenshot.base64, mimeType: "image/jpeg" as const })
+        if (mobileScreenshot) contentBlocks.push({ type: "image" as const, data: mobileScreenshot.base64, mimeType: "image/jpeg" as const })
 
-        return { content: [{ type: "text" as const, text: textData }] }
+        // Fire-and-forget screenshot saves — non-critical debug artifacts
+        const writes: Promise<string>[] = []
+        if (screenshot) writes.push(saveScreenshot("desktop", screenshot.base64, args.url))
+        if (mobileScreenshot) writes.push(saveScreenshot("mobile", mobileScreenshot.base64, args.url))
+        if (writes.length) Promise.all(writes).then(() => console.log(`[scrape_url] Screenshots saved`)).catch(() => {})
+
+        return { content: contentBlocks }
       } catch (e: unknown) {
         // Fall back to simple HTTP fetch (no browser)
         try {
@@ -507,7 +597,13 @@ export function createSitesAgentMcpServer(options: {
         }))
 
         // Build page docs once — reused for both session state and file persistence
-        const pageDocs = normalizedPages.map(page => {
+        const imagesDir = join(root, "apps", args.siteId, "public", "images")
+        await mkdir(imagesDir, { recursive: true })
+        let totalAutoDownloaded = 0
+
+        // Process pages sequentially to avoid unbounded concurrent image downloads
+        const pageDocs = []
+        for (const page of normalizedPages) {
           const contentBlocks = page.blocks.filter(b => {
             if (b.type === "SiteHeader") { strippedCount++; return false }
             if (b.type === "Footer") {
@@ -538,16 +634,26 @@ export function createSitesAgentMcpServer(options: {
             return { id: `b_${b.type.toLowerCase()}_${i + 1}`, type: b.type, props: mergedProps }
           })
 
-          return {
+          // Auto-download any remote image URLs the agent missed
+          for (const block of blocks) {
+            const { props: localizedProps, downloaded } = await localizeRemoteImages(block.props as Record<string, unknown>, imagesDir)
+            if (downloaded > 0) {
+              block.props = localizedProps
+              totalAutoDownloaded += downloaded
+            }
+          }
+
+          pageDocs.push({
             id: `p_${page.slug === "/" ? "home" : page.slug.replace(/^\//, "").replace(/\//g, "_")}`,
             slug: page.slug,
             title: page.title,
             blocks,
             ...(page.meta ? { meta: page.meta } : {}),
             updatedAt: new Date().toISOString(),
-          }
-        })
+          })
+        }
         if (strippedCount > 0) console.log(`[sites-agent] Stripped ${strippedCount} chrome blocks (SiteHeader/Footer)`)
+        if (totalAutoDownloaded > 0) console.log(`[sites-agent] Auto-downloaded ${totalAutoDownloaded} remote images as safety net`)
 
         // Write to session state
         for (const doc of pageDocs) setPage(sessionKey, doc)
@@ -620,13 +726,16 @@ export function createSitesAgentMcpServer(options: {
           }
         }
 
+        const totalBlocks = args.pages.reduce((sum, p) => sum + p.blocks.length, 0)
+        emitPhaseOutcome?.({ tool: "bootstrap_pages", data: { pagesCreated: createdPages.length, totalBlocks, pages: createdPages } })
+
         return {
           content: [{
             type: "text" as const,
             text: JSON.stringify({
               status: "applied",
               pagesCreated: createdPages,
-              totalBlocks: args.pages.reduce((sum, p) => sum + p.blocks.length, 0),
+              totalBlocks,
               persistedToFile: true,
             }),
           }],
@@ -652,10 +761,50 @@ export function createSitesAgentMcpServer(options: {
         const outputDir = join(root, "apps", args.siteId, "public", "images")
         const result = await downloadImage(args.url, args.alt, outputDir)
         const localUrl = `/images/${result.fileName}`
+        emitPhaseOutcome?.({ tool: "download_remote_image", data: { fileName: result.fileName } })
         return { content: [{ type: "text" as const, text: JSON.stringify({ localUrl, fileName: result.fileName }) }] }
       } catch {
         return { content: [{ type: "text" as const, text: JSON.stringify({ localUrl: args.url, error: "Download failed, using original URL" }) }] }
       }
+    }
+  )
+
+  // ── BATCH DOWNLOAD IMAGES ──
+  const downloadImagesTool = tool(
+    "download_remote_images",
+    "Download multiple remote images in one call. Much more efficient than calling download_remote_image repeatedly — use this when you have 3+ images to download. Returns an array of { url, localUrl } mappings.",
+    {
+      siteId: z.string().describe("Site ID — images saved to apps/{siteId}/public/images/"),
+      images: z.array(z.object({
+        url: z.string().describe("Image URL to download"),
+        alt: z.string().optional().describe("Alt text"),
+      })).describe("Array of images to download"),
+    },
+    async (args) => {
+      const root = monorepoRoot()
+      const outputDir = join(root, "apps", args.siteId, "public", "images")
+      await mkdir(outputDir, { recursive: true })
+
+      // Download 4 at a time to avoid overwhelming the source server
+      const results: Array<{ url: string; localUrl: string; error?: string }> = []
+      for (let i = 0; i < args.images.length; i += 4) {
+        const batch = args.images.slice(i, i + 4)
+        const batchResults = await Promise.all(batch.map(async (img) => {
+          try {
+            const result = await downloadImage(img.url, img.alt, outputDir)
+            return { url: img.url, localUrl: `/images/${result.fileName}` }
+          } catch {
+            return { url: img.url, localUrl: img.url, error: "Download failed" }
+          }
+        }))
+        results.push(...batchResults)
+      }
+
+      const succeeded = results.filter(r => !r.error).length
+      emitPhaseOutcome?.({ tool: "download_remote_image", data: { fileName: `${succeeded}/${results.length} images` } })
+      console.log(`[sites-agent] Batch downloaded ${succeeded}/${results.length} images`)
+
+      return { content: [{ type: "text" as const, text: JSON.stringify({ results, succeeded, failed: results.length - succeeded }) }] }
     }
   )
 
@@ -694,7 +843,7 @@ export function createSitesAgentMcpServer(options: {
   return createSdkMcpServer({
     name: "sites-agent",
     version: "1.0.0",
-    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, applyThemeTool],
+    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, applyThemeTool, ...createMigrationTools()],
   })
 }
 
@@ -937,6 +1086,9 @@ import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
 import type { PageDoc } from "@ai-site-editor/shared"
 
+// Import custom blocks so they're included in the editor manifest (/api/editor/blocks)
+import "../../../../blocks/register"
+
 const PAGES_PATH = resolve(process.cwd(), "content/pages.json")
 
 async function loadPages(): Promise<PageDoc[]> {
@@ -1005,12 +1157,13 @@ export { generateStaticParams }
 
 function blocksRegisterTs(): string {
   return `// Custom blocks — auto-updated by block-coder subagent
-// Each custom block adds: import schema (side-effect), import renderer, registerCustomRenderer()
+// Each custom block adds 3 lines: schema import (side-effect), renderer import, registerCustomRenderer()
+// IMPORTANT: Always use .ts/.tsx file extensions — without them imports fail silently
 import { registerCustomRenderer } from "@ai-site-editor/blocks"
 
-// Block imports will be added here by the block-coder:
-// import "./pricing-table/schema"
-// import { PricingTable } from "./pricing-table/renderer"
+// Example (block-coder will replace these comments with real imports):
+// import "./pricing-table/schema.ts"
+// import { PricingTable } from "./pricing-table/renderer.tsx"
 // registerCustomRenderer("PricingTable", PricingTable)
 `
 }

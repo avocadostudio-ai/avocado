@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Commands
 
@@ -57,7 +57,7 @@ pnpm monorepo — chat-driven website editor with live preview. Three apps + two
 - **apps/editor** (Vite+React :4100) — chat UI, model selection, iframe communication via postMessage
 - **apps/site** (Next.js :3000) — renders `BlockInstance` pages, fetches drafts from orchestrator, editor overlay via preview-adapter
 - **packages/shared** — Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
-- **packages/blocks** — block renderers (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText)
+- **packages/blocks** — build-in block renderers (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText)
 - **packages/preview-adapter** — PreviewBridge component, postMessage protocol (`site-editor/v1`), CSS overlay system
 
 See `.claude/skills/` for deep architecture, block system, preview-editor, and chat pipeline docs.
@@ -104,10 +104,9 @@ function myHelper(t: TFunction) { return t("some.key") }
 
 ### What is NOT translated
 - Block type names (Hero, CTA, FAQAccordion) — code identifiers
-- Model/provider names (gpt-4o, Claude, OpenAI) — brand names
+- Model/provider names (gpt-4o, Claude, OpenAI) — vendor-specific brand names
 - Field AI suggestion pills — sent as prompts to the LLM, must stay in English
 - Preview adapter overlay labels — deferred (separate package, needs postMessage protocol)
-
 
 ## Environment
 
