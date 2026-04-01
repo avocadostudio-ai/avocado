@@ -11,6 +11,8 @@ import { orchestrator } from "../lib/site-urls"
 import { withAccessTokenQuery } from "../lib/access-auth"
 import type { SiteConfig } from "../lib/editor-types"
 
+import { toPastTense } from "../lib/utils"
+
 export type SitesAgentMessage = {
   id: string
   role: "user" | "assistant"
@@ -36,6 +38,16 @@ export type UseSitesAgentReturn = {
   sendMessage: (text: string) => void
   cancelStream: () => void
   clearMessages: () => void
+}
+
+/** Detect whether the user wants to integrate an existing codebase vs migrate a URL. */
+function detectAgentMode(text: string): "migrate" | "integrate" {
+  const lower = text.toLowerCase()
+  if (/\bintegrat(e|ion|ing)\b/.test(lower)) return "integrate"
+  if (/\badd\s+(the\s+)?sdk\b/.test(lower)) return "integrate"
+  if (/\bexisting\s+(site|project|codebase|repo)\b/.test(lower)) return "integrate"
+  if (/\bconnect\s+(to\s+)?(the\s+)?editor\b/.test(lower)) return "integrate"
+  return "migrate"
 }
 
 const STORAGE_KEY = "sites-agent-messages"
@@ -124,8 +136,8 @@ export function useSitesAgent(options: {
         setStreamStatus(msg)
         const label = msg.replace(/\.\.\.$/, "")
         setStreamSteps(prev => {
-          const done = prev.map(s => ({ ...s, done: true }))
-          if (done.length > 0 && done[done.length - 1].label === label) {
+          const done = prev.map(s => s.done ? s : { ...s, label: toPastTense(s.label), done: true })
+          if (done.length > 0 && done[done.length - 1].label === toPastTense(label)) {
             const last = done[done.length - 1]
             done[done.length - 1] = { ...last, count: (last.count ?? 1) + 1 }
             return [...done, { label, done: false }]
@@ -260,7 +272,7 @@ export function useSitesAgent(options: {
     setMessages(prev => [...prev, userMsg])
     setIsStreaming(true)
     setStreamStatus("Starting...")
-    setStreamSteps([{ label: "Starting agent", done: false }])
+    setStreamSteps([])
     setStreamPhases([])
     setStreamingText(null)
     summaryTextRef.current = ""
@@ -270,7 +282,7 @@ export function useSitesAgent(options: {
       const res = await fetch(`${orchestrator}/sites-agent/start`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, message: text.trim(), locale }),
+        body: JSON.stringify({ session, message: text.trim(), locale, useCliAgent: true, mode: detectAgentMode(text) }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `Status ${res.status}` }))
