@@ -47,7 +47,7 @@ type StreamEntry = {
 
 // ── Phase tracking ──
 
-export type PhaseId = "cloning" | "analyzing" | "creating" | "custom-blocks" | "images" | "pages" | "installing" | "integrating" | "verifying"
+export type PhaseId = "cloning" | "analyzing" | "creating" | "custom-blocks" | "images" | "pages" | "installing" | "integrating" | "launching" | "verifying"
 
 export const PHASES: { id: PhaseId; activeLabel: string; doneLabel: string }[] = [
   { id: "analyzing", activeLabel: "Analyzing website", doneLabel: "Website analyzed" },
@@ -62,6 +62,7 @@ export const INTEGRATION_PHASES: { id: PhaseId; activeLabel: string; doneLabel: 
   { id: "analyzing", activeLabel: "Analyzing codebase", doneLabel: "Codebase analyzed" },
   { id: "installing", activeLabel: "Installing dependencies", doneLabel: "Dependencies installed" },
   { id: "integrating", activeLabel: "Creating integration files", doneLabel: "Integration complete" },
+  { id: "launching", activeLabel: "Starting dev server", doneLabel: "Site is live" },
   { id: "pages", activeLabel: "Bootstrapping content", doneLabel: "Content created" },
   { id: "verifying", activeLabel: "Verifying build", doneLabel: "Build verified" },
 ]
@@ -78,6 +79,7 @@ export const TOOL_PHASE_MAP: Record<string, PhaseId> = {
   "mcp__sites-agent__download_remote_images": "images",
   "mcp__sites-agent__bootstrap_pages": "pages",
   "mcp__sites-agent__integrate_site": "integrating",
+  "mcp__sites-agent__launch_site": "launching",
   "mcp__sites-agent__register_site": "integrating",
 }
 
@@ -99,6 +101,7 @@ export const TOOL_LABELS: Record<string, string> = {
   "mcp__sites-agent__clone_repo": "Cloning repository",
   "mcp__sites-agent__analyze_codebase": "Analyzing codebase",
   "mcp__sites-agent__integrate_site": "Integrating site",
+  "mcp__sites-agent__launch_site": "Starting site",
   "mcp__sites-agent__register_site": "Registering site",
 }
 
@@ -270,6 +273,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
             "mcp__sites-agent__clone_repo",
             "mcp__sites-agent__analyze_codebase",
             "mcp__sites-agent__integrate_site",
+            "mcp__sites-agent__launch_site",
             "mcp__sites-agent__register_site",
             "mcp__sites-agent__list_sites",
             "mcp__sites-agent__bootstrap_pages",

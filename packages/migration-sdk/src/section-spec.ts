@@ -323,39 +323,61 @@ export function buildPageSpecs(scrape: FullPageScrape): SectionSpec[] {
     }
   }
 
+  // Collect ALL images from all regex-extracted sections for redistribution by Y-position
+  const allExtractedImages = scrape.sections.flatMap((s) =>
+    s.content.images.map((img) => ({ ...img, sectionIndex: s.index }))
+  )
+
   // If we have visual sections AND computed styles from them, use those as primary
   if (scrape.visualSections && scrape.visualSections.length > 0 && scrape.sectionStyles && scrape.sectionStyles.length > 0) {
     return scrape.visualSections.map((vs, i) => {
       const styles = stylesMap.get(i)
+      const styleHeadings = styles?.root ? findHeadingTexts(styles.root) : []
 
-      // Find the best matching extractedSection by Y-position overlap
-      const matchedSection = scrape.sections.find((s) => {
-        // ExtractedSection doesn't have Y position, so match by content overlap
-        // Use the first heading text as a proxy for matching
-        if (!styles?.root) return false
-        const styleHeadings = findHeadingTexts(styles.root)
-        return s.content.headings.some((h) => styleHeadings.includes(h.text))
-      })
+      // Match by heading text first, then by content overlap
+      const matchedSection = scrape.sections.find((s) =>
+        s.content.headings.some((h) => styleHeadings.includes(h.text))
+      )
 
       // Find matching outline section
-      const outlineSection = scrape.outline.sections.find((os) => {
-        if (!os.heading) return false
-        const styleHeadings = styles?.root ? findHeadingTexts(styles.root) : []
-        return styleHeadings.includes(os.heading)
-      }) ?? scrape.outline.sections[i]
+      const outlineSection = scrape.outline.sections.find((os) =>
+        os.heading && styleHeadings.includes(os.heading)
+      ) ?? scrape.outline.sections[i]
 
-      // Build a synthetic ExtractedSection from the visual section + computed styles
-      const section: ExtractedSection = matchedSection ?? {
-        index: i,
-        tag: "div",
-        classHints: [],
-        content: extractContentFromStyleTree(styles?.root, scrape.embeds, vs),
-        rawHtml: "",
+      // Build content: start with matched section's content (best images from regex parser),
+      // then enrich with style tree data and page-level image data for anything missing
+      const styleContent = extractContentFromStyleTree(styles?.root, scrape.embeds, vs)
+      const baseContent = matchedSection?.content ?? { headings: [], paragraphs: [], images: [], links: [], lists: [] }
+
+      // Collect page images that fall within this visual section's Y range
+      const sectionPageImages: Array<{ src: string; alt: string; isLazy: boolean }> = []
+      if (scrape.pageImages) {
+        for (const img of scrape.pageImages) {
+          if (img.y >= vs.y && img.y < vs.y + vs.height) {
+            sectionPageImages.push({ src: img.src, alt: img.alt, isLazy: false })
+          }
+        }
       }
 
-      // Override the index to match the visual section order
-      const sectionWithIndex = { ...section, index: i }
-      return buildSectionSpec(sectionWithIndex, styles, outlineSection)
+      // Merge all image sources: regex-extracted > page-level by Y > style tree
+      const mergedContent: ExtractedSection["content"] = {
+        headings: baseContent.headings.length > 0 ? baseContent.headings : styleContent.headings,
+        paragraphs: baseContent.paragraphs.length > 0 ? baseContent.paragraphs : styleContent.paragraphs,
+        images: mergeImages(mergeImages(baseContent.images, sectionPageImages), styleContent.images),
+        links: baseContent.links.length > 0 ? baseContent.links : styleContent.links,
+        lists: baseContent.lists.length > 0 ? baseContent.lists : styleContent.lists,
+      }
+
+      const section: ExtractedSection = {
+        index: i,
+        tag: matchedSection?.tag ?? "div",
+        classHints: matchedSection?.classHints ?? [],
+        suggestedBlockType: matchedSection?.suggestedBlockType,
+        content: mergedContent,
+        rawHtml: matchedSection?.rawHtml ?? "",
+      }
+
+      return buildSectionSpec(section, styles, outlineSection)
     })
   }
 
@@ -365,6 +387,21 @@ export function buildPageSpecs(scrape: FullPageScrape): SectionSpec[] {
     const outlineSection = scrape.outline.sections[i]
     return buildSectionSpec(section, styles, outlineSection)
   })
+}
+
+/** Merge images from two sources, deduplicating by src. */
+function mergeImages(
+  a: Array<{ src: string; alt: string; isLazy?: boolean; isBackground?: boolean }>,
+  b: Array<{ src: string; alt: string; isLazy?: boolean; isBackground?: boolean }>,
+): Array<{ src: string; alt: string; isLazy: boolean }> {
+  const seen = new Set<string>()
+  const result: Array<{ src: string; alt: string; isLazy: boolean }> = []
+  for (const img of [...a, ...b]) {
+    if (!img.src || seen.has(img.src)) continue
+    seen.add(img.src)
+    result.push({ src: img.src, alt: img.alt, isLazy: (img as { isLazy?: boolean }).isLazy ?? false })
+  }
+  return result
 }
 
 /** Extract heading texts from a computed style tree for section matching. */

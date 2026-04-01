@@ -318,12 +318,13 @@ const de: LocaleDict = {
   "theme.dark": "Dunkler Modus",
 
   // -- Sites agent --
-  "sitesAgent.title": "Seiten-Assistent",
+  "sitesAgent.title": "Site Agent",
   "sitesAgent.clear": "Chat leeren",
-  "sitesAgent.welcome": "Ich kann dir helfen, eine neue Seite zu erstellen oder eine bestehende zu migrieren. Sag mir, was du bauen möchtest, oder füge eine URL ein.",
-  "sitesAgent.placeholder": "Seite erstellen, URL migrieren...",
-  "sitesAgent.suggestion1": "Portfolio-Seite erstellen",
-  "sitesAgent.suggestion2": "Bestehende Website migrieren",
+  "sitesAgent.welcome": "Ich kann eine neue Seite erstellen, eine bestehende Website von ihrer URL migrieren oder den Editor in dein Next.js-Projekt integrieren. Was möchtest du tun?",
+  "sitesAgent.placeholder": "Frag mich etwas...",
+  "sitesAgent.suggestion1": "Neue Seite von Grund auf erstellen",
+  "sitesAgent.suggestion2": "Website von URL migrieren",
+  "sitesAgent.suggestion3": "Über ein GitHub-Projekt integrieren",
   "sitesAgent.stop": "Stopp",
 }
 

@@ -1,18 +1,18 @@
 {
   "name": "Paintball Arena Bern",
+  "logo": "/images/migrated_1774990078337_iyvm23.png",
   "navLabels": {
     "/": "Arena",
     "/paintball": "Paintball",
-    "/events": "Dein Event",
-    "/news": "News",
-    "/infos": "Infos"
+    "/events": "Events"
   },
   "footer": {
     "id": "chrome_footer",
     "type": "Footer",
     "props": {
-      "links": "Kontakt|https://paintballarena-bern.ch/kontakt/\nStandort & Öffnungszeiten|https://paintballarena-bern.ch/infos/\nPreise|https://paintballarena-bern.ch/infos/\nGutscheine|https://paintballarena-bern.ch/infos/\nMenükarte|https://paintballarena-bern.ch/infos/\nFragen & Antworten|https://paintballarena-bern.ch/faq/\nTeamevent|/events\nPolterabend|/events\nGeburtstag|/events\nGruppenevent|/events\nPaintball|/paintball\nAdventure|/events\nNews|/news\nInfos|/infos",
-      "copyright": "©2026 Paintball Arena Bern"
+      "tagline": "Action & Fun Erlebnis in der Paintball Arena Bern",
+      "links": "Arena|/\nPaintball|/paintball\nEvents|/events\nKontakt|/infos\nFragen & Antworten|/faq\nImpressum & Datenschutz|/impressum-datenschutz",
+      "copyright": "©2025 Paintball Arena Bern"
     }
   }
 }

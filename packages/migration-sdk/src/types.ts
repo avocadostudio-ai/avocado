@@ -221,6 +221,8 @@ export type FullPageScrape = {
   embeds?: ExtractedEmbed[]
   /** Actual rendered fonts from getComputedStyle (more reliable than CSS regex) */
   computedFonts?: { heading: string | null; body: string | null; googleFontLinks: string[] }
+  /** All <img> elements on the page with Y positions (for distributing to visual sections) */
+  pageImages?: Array<{ src: string; alt: string; y: number; width: number; height: number }>
 }
 
 // ── Computed style extraction types ──

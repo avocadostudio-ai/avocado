@@ -12,7 +12,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem('site-theme-v1')
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="de" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
