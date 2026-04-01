@@ -10,7 +10,7 @@ registerBlock("Hero", {
     ctaHref: z.string().min(1),
     imageUrl: z.string().min(1),
     imageAlt: z.string().min(1),
-    imagePosition: z.enum(["left", "right"]).default("right"),
+    imagePosition: z.enum(["left", "right", "full"]).default("right"),
     secondaryCtaText: z.string().optional(),
     secondaryCtaHref: z.string().optional()
   }),
@@ -25,7 +25,7 @@ registerBlock("Hero", {
       ctaHref: f.url("CTA link"),
       imageUrl: f.image("Hero image", { aspectRatio: "landscape", width: 1536, height: 1024 }),
       imageAlt: f.imageAlt("Hero image alt text"),
-      imagePosition: { kind: "enum", label: "Image position", options: ["left", "right"], inlineEditable: false },
+      imagePosition: { kind: "enum", label: "Image position", options: ["left", "right", "full"], inlineEditable: false },
       secondaryCtaText: f.text("Secondary CTA text"),
       secondaryCtaHref: f.url("Secondary CTA link"),
       headingLevel: f.headingLevel(),

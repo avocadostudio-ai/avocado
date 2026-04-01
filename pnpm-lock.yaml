@@ -240,7 +240,7 @@ importers:
         specifier: ^4.0.3
         version: 4.0.3
       next:
-        specifier: ^15.5.12
+        specifier: ^15.5.14
         version: 15.5.14(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       nodemailer:
         specifier: ^7.0.13
@@ -283,7 +283,7 @@ importers:
         specifier: ^9.14.0
         version: 9.39.4(jiti@1.21.7)
       eslint-config-next:
-        specifier: ^15.5.12
+        specifier: ^15.5.14
         version: 15.5.14(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
       postcss:
         specifier: ^8.4.47

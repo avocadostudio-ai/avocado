@@ -17,7 +17,7 @@
           "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
           "ctaText": "Explore Recipes",
           "ctaHref": "/recipes",
-          "imageUrl": "http://localhost:4200/generated-images/gen_1774524098653_o7l6dq.jpg",
+          "imageUrl": "/generated-images/gen_1774524098653_o7l6dq.jpg",
           "imageAlt": "remove blueberries from the dish itself",
           "imagePosition": "right",
           "secondaryCtaText": "Read Research Studies"
@@ -777,7 +777,7 @@
     "id": "p_recipes",
     "slug": "/recipes",
     "title": "Recipes",
-    "updatedAt": "2026-03-24T20:10:35.338Z",
+    "updatedAt": "2026-03-31T21:18:25.358Z",
     "blocks": [
       {
         "id": "b_hero_for-recipes",
@@ -787,8 +787,8 @@
           "subheading": "Discover easy, delicious recipes for every kitchen skill level.",
           "ctaText": "Browse Recipes",
           "ctaHref": "/olives",
-          "imageUrl": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
-          "imageAlt": "Fresh ingredients and cooking preparation",
+          "imageUrl": "/generated-images/gen_1774991902955_0p1i2o.jpg",
+          "imageAlt": "I want the woman to look at me smiling, replace lemons by avocados. do not change anything else",
           "imagePosition": "right"
         }
       },

@@ -110,6 +110,13 @@ const BUILTIN_SITE_PRESETS: SiteConfig[] = [
     purpose: DEFAULT_AVOCADO_SITE_PURPOSE,
     hosting: DEFAULT_SITE_HOSTING,
   },
+  {
+    id: "paintball-arena-bern",
+    name: "Paintball Arena Bern",
+    purpose: "Indoor paintball arena in Bern, Switzerland.",
+    hosting: "local",
+    previewUrl: "http://localhost:3500",
+  },
 ]
 
 const DEFAULT_SITE_PRESETS: SiteConfig[] = [...CONFIGURED_SITE_PRESETS, ...BUILTIN_SITE_PRESETS, ...AUTO_SITE_PRESETS]

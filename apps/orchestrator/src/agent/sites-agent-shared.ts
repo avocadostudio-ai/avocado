@@ -88,7 +88,12 @@ const PROP_RENAME_RULES: Record<string, Record<string, string>> = {
   Footer: { heading: "title" },
 }
 
-function fixFooterLinks(props: Record<string, unknown>): Record<string, unknown> {
+export function fixFooterLinks(props: Record<string, unknown>): Record<string, unknown> {
+  // Case 1: flat "links" string without columns — wrap into a single column
+  if (typeof props.links === "string" && !Array.isArray(props.columns)) {
+    const { links, tagline, ...rest } = props
+    return { ...rest, columns: [{ title: typeof tagline === "string" ? tagline : "Links", links }] }
+  }
   const columns = props.columns
   if (!Array.isArray(columns)) return props
   return {
@@ -180,7 +185,12 @@ export function normalizePageBlocks(
     .filter(b => {
       if (b.type === "SiteHeader") { strippedCount++; return false }
       if (b.type === "Footer") {
-        if (!footerBlock) footerBlock = { type: b.type, props: b.props }
+        if (!footerBlock) {
+          let fp = fixFooterLinks(b.props)
+          const v = validateAndCorrectProps(b.type, fp)
+          if (v.corrected) fp = v.props
+          footerBlock = { type: b.type, props: fp }
+        }
         strippedCount++
         return false
       }
@@ -409,7 +419,8 @@ export const { GET, POST, OPTIONS } = createEditorApiHandler({
 `
 }
 
-export function pageTsx(siteId: string): string {
+export function pageTsx(siteId: string, options?: { chrome?: boolean }): string {
+  const chromeOpt = options?.chrome === false ? "\n  chrome: false," : ""
   return `import { createSitePage } from "@ai-site-editor/site-sdk/page"
 import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
@@ -449,7 +460,7 @@ const { Page, generateStaticParams } = createSitePage({
     return pages.map((p) => p.slug)
   },
   getSiteConfig: loadSiteConfig,
-  footer: _siteConfig.footer ?? undefined,
+  footer: _siteConfig.footer ?? undefined,${chromeOpt}
 })
 
 export default Page
@@ -457,8 +468,108 @@ export { generateStaticParams }
 `
 }
 
-export function blocksRegisterTs(): string {
-  return `// Custom blocks — auto-updated by block-coder subagent
+export function hybridPageTsx(siteId: string): string {
+  return `import { resolve } from "node:path"
+import { readFile } from "node:fs/promises"
+import type { Metadata } from "next"
+import type { PageDoc } from "@ai-site-editor/shared"
+
+import EditorPage, { generateStaticParams as editorStaticParams } from "./_editor-page"
+import OriginalPage from "./_original-page"
+
+// Re-export original generateStaticParams if available, or provide fallback
+const origStaticParams = (OriginalPage as unknown as { generateStaticParams?: () => Promise<Array<{ slug?: string[] }>> }).generateStaticParams
+
+const PAGES_PATH = resolve(process.cwd(), "content/pages.json")
+
+let _editorSlugsPromise: Promise<Set<string>> | null = null
+function loadEditorSlugs(): Promise<Set<string>> {
+  if (!_editorSlugsPromise) {
+    _editorSlugsPromise = (async () => {
+      try {
+        const raw = await readFile(PAGES_PATH, "utf-8")
+        const pages = JSON.parse(raw) as PageDoc[]
+        return new Set(pages.map((p) => p.slug))
+      } catch { return new Set() }
+    })()
+  }
+  return _editorSlugsPromise
+}
+
+function buildSlug(parts?: string[]): string {
+  if (!parts || parts.length === 0) return "/"
+  return "/" + parts.join("/")
+}
+
+async function isEditorManaged(slug: string): Promise<boolean> {
+  // Check if this slug exists in editor content (pages.json)
+  const editorSlugs = await loadEditorSlugs()
+  if (editorSlugs.has(slug)) return true
+
+  // In dev mode, also check orchestrator for draft pages
+  if (process.env.NODE_ENV !== "production") {
+    const orchestratorUrl = process.env.ORCHESTRATOR_URL ?? "http://localhost:4200"
+    const siteId = process.env.NEXT_PUBLIC_DEFAULT_SITE_ID ?? ${JSON.stringify(siteId)}
+    try {
+      const res = await fetch(
+        orchestratorUrl + "/draft/pages?session=" + encodeURIComponent(siteId + "::dev") + "&siteId=" + encodeURIComponent(siteId) + "&slug=" + encodeURIComponent(slug),
+        { cache: "no-store", signal: AbortSignal.timeout(1000) }
+      )
+      if (res.ok) return true
+    } catch { /* orchestrator not running or slug not found */ }
+  }
+  return false
+}
+
+type PageProps = { params: Promise<{ slug?: string[] }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+
+export default async function HybridPage(props: PageProps) {
+  const slug = buildSlug((await props.params).slug)
+  const sp = await props.searchParams
+
+  // When accessed from editor iframe, always use editor rendering
+  // so blocks are selectable and editable. The editor passes these
+  // params via the draft enable URL / postMessage bridge.
+  const isEditorAccess = sp.__editor === "1" || !!sp.editorOrigin || !!sp.session
+  if (isEditorAccess || await isEditorManaged(slug)) {
+    return <EditorPage {...props} />
+  }
+
+  // Standalone/production: use original site rendering
+  return <OriginalPage {...props} />
+}
+
+export async function generateStaticParams() {
+  const editorParams = editorStaticParams ? await editorStaticParams() : []
+  const originalParams = origStaticParams ? await origStaticParams() : []
+  // Merge, deduplicating by slug
+  const seen = new Set<string>()
+  const merged = []
+  for (const p of [...editorParams, ...originalParams]) {
+    const key = (p.slug ?? []).join("/")
+    if (!seen.has(key)) { seen.add(key); merged.push(p) }
+  }
+  return merged
+}
+
+export async function generateMetadata(props: PageProps): Promise<Metadata> {
+  const slug = buildSlug((await props.params).slug)
+  if (await isEditorManaged(slug)) {
+    // Editor pages get metadata from createSitePage
+    const editorMeta = (EditorPage as unknown as { generateMetadata?: (props: PageProps) => Promise<Metadata> }).generateMetadata
+    if (editorMeta) return editorMeta(props)
+  }
+  // Fall through to original page metadata
+  const origMeta = (OriginalPage as unknown as { generateMetadata?: (props: PageProps) => Promise<Metadata> }).generateMetadata
+  if (origMeta) return origMeta(props)
+  return {}
+}
+`
+}
+
+export function blocksRegisterTsx(): string {
+  return `// Custom block renderers — register site-specific components here.
+// Use JSX syntax for adapters: <Comp block={...} /> (NOT function calls).
 import { registerCustomRenderer } from "@ai-site-editor/blocks"
 `
 }
@@ -527,7 +638,7 @@ export async function scaffoldSiteProject(options: {
   await mkdir(join(projectDir, "public"), { recursive: true })
   await writeFile(join(projectDir, "public/.gitkeep"), "", "utf-8")
   await mkdir(join(projectDir, "blocks"), { recursive: true })
-  await writeFile(join(projectDir, "blocks/register.ts"), blocksRegisterTs(), "utf-8")
+  await writeFile(join(projectDir, "blocks/register.tsx"), blocksRegisterTsx(), "utf-8")
   await writeFile(join(projectDir, "public/logo.svg"), defaultLogoSvg(name), "utf-8")
   await writeFile(join(projectDir, "public/favicon.svg"), faviconSvg(name), "utf-8")
 
