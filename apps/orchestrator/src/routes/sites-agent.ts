@@ -14,6 +14,7 @@ import type { RouteContext } from "./route-context.js"
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import { createSitesAgentMcpServer } from "../agent/sites-agent-tools.js"
 import { buildSitesAgentSystemPrompt } from "../agent/sites-agent-context.js"
+import { buildIntegrationSystemPrompt } from "../agent/integration-prompt.js"
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 import { pushMigrationTelemetry } from "../telemetry/migration-telemetry.js"
 import { runCliAgent, type CliStreamEntry } from "./sites-agent-cli.js"
@@ -24,6 +25,8 @@ type SitesAgentRequestBody = {
   locale?: string
   /** Use Claude CLI (subscription-based, $0 cost) instead of Agent SDK (pay-per-token) */
   useCliAgent?: boolean
+  /** Agent mode: "migrate" scrapes a URL, "integrate" adds SDK to an existing codebase */
+  mode?: "migrate" | "integrate"
 }
 
 type StreamEntry = {
@@ -44,7 +47,7 @@ type StreamEntry = {
 
 // ── Phase tracking ──
 
-export type PhaseId = "analyzing" | "creating" | "custom-blocks" | "images" | "pages"
+export type PhaseId = "cloning" | "analyzing" | "creating" | "custom-blocks" | "images" | "pages" | "installing" | "integrating" | "verifying"
 
 export const PHASES: { id: PhaseId; activeLabel: string; doneLabel: string }[] = [
   { id: "analyzing", activeLabel: "Analyzing website", doneLabel: "Website analyzed" },
@@ -54,16 +57,32 @@ export const PHASES: { id: PhaseId; activeLabel: string; doneLabel: string }[] =
   { id: "pages", activeLabel: "Creating pages", doneLabel: "Pages created" },
 ]
 
+export const INTEGRATION_PHASES: { id: PhaseId; activeLabel: string; doneLabel: string }[] = [
+  { id: "cloning", activeLabel: "Cloning repository", doneLabel: "Repository cloned" },
+  { id: "analyzing", activeLabel: "Analyzing codebase", doneLabel: "Codebase analyzed" },
+  { id: "installing", activeLabel: "Installing dependencies", doneLabel: "Dependencies installed" },
+  { id: "integrating", activeLabel: "Creating integration files", doneLabel: "Integration complete" },
+  { id: "pages", activeLabel: "Bootstrapping content", doneLabel: "Content created" },
+  { id: "verifying", activeLabel: "Verifying build", doneLabel: "Build verified" },
+]
+
 /** Map tool names to the phase they belong to */
 export const TOOL_PHASE_MAP: Record<string, PhaseId> = {
   "mcp__sites-agent__discover_site_structure": "analyzing",
   "mcp__sites-agent__scrape_url": "analyzing",
   "mcp__sites-agent__extract_design_tokens": "analyzing",
+  "mcp__sites-agent__clone_repo": "cloning",
+  "mcp__sites-agent__analyze_codebase": "analyzing",
   "mcp__sites-agent__create_site": "creating",
   "mcp__sites-agent__download_remote_image": "images",
   "mcp__sites-agent__download_remote_images": "images",
   "mcp__sites-agent__bootstrap_pages": "pages",
+  "mcp__sites-agent__integrate_site": "integrating",
+  "mcp__sites-agent__register_site": "integrating",
 }
+
+/** Tools that should not emit status/step events (SDK bootstrap internals). */
+const SILENT_TOOLS = new Set(["ToolSearch", "ListMcpResourcesTool"])
 
 /** Human-readable labels for tool names shown in SSE status events. */
 export const TOOL_LABELS: Record<string, string> = {
@@ -77,13 +96,10 @@ export const TOOL_LABELS: Record<string, string> = {
   "mcp__sites-agent__download_remote_image": "Downloading image",
   "mcp__sites-agent__download_remote_images": "Downloading images",
   "mcp__sites-agent__apply_theme": "Applying theme",
-  // Built-in tools
-  Write: "Writing file",
-  Edit: "Editing file",
-  Read: "Reading file",
-  Bash: "Running command",
-  Glob: "Searching files",
-  Grep: "Searching code",
+  "mcp__sites-agent__clone_repo": "Cloning repository",
+  "mcp__sites-agent__analyze_codebase": "Analyzing codebase",
+  "mcp__sites-agent__integrate_site": "Integrating site",
+  "mcp__sites-agent__register_site": "Registering site",
 }
 
 const streamContexts = new Map<string, StreamEntry>()
@@ -230,26 +246,48 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
             emitEvent(streamId, { type: "phase_outcome", phase: "images", outcome: `${entry.imageCount} image${entry.imageCount > 1 ? "s" : ""} downloaded` })
           } else if (tool === "bootstrap_pages") {
             emitEvent(streamId, { type: "phase_outcome", phase: "pages", outcome: `${data.pagesCreated} pages, ${data.totalBlocks} blocks` })
+          } else if (tool === "analyze_codebase") {
+            emitEvent(streamId, { type: "phase_outcome", phase: "analyzing", outcome: `${data.framework} — ${data.routes} routes` })
+          } else if (tool === "integrate_site") {
+            emitEvent(streamId, { type: "phase_outcome", phase: "integrating", outcome: `${data.name} — ${data.filesCreated} files created, port ${data.port}` })
+          } else if (tool === "register_site") {
+            emitEvent(streamId, { type: "phase_outcome", phase: "integrating", outcome: `${data.name} — port ${data.port}` })
           }
         },
       })
 
-      const systemPrompt = buildSitesAgentSystemPrompt({ locale: body.locale })
+      const isIntegrate = body.mode === "integrate"
+      const systemPrompt = isIntegrate
+        ? buildIntegrationSystemPrompt({ locale: body.locale })
+        : buildSitesAgentSystemPrompt({ locale: body.locale })
 
-      // Main agent (Opus): orchestration tools only — NO scrape/discover tools
-      // Scraping is done by the structure-analyzer subagent (Sonnet, 5× cheaper)
-      const orchestratorTools = [
-        "Agent",
-        "mcp__sites-agent__list_sites",
-        "mcp__sites-agent__create_site",
-        "mcp__sites-agent__bootstrap_pages",
-        "mcp__sites-agent__download_remote_image",
-        "mcp__sites-agent__download_remote_images",
-        "mcp__sites-agent__apply_theme",
-      ]
+      // Phase config depends on mode
+      const activePhases = isIntegrate ? INTEGRATION_PHASES : PHASES
 
-      // Structure-analyzer (Sonnet): analysis tools only — generate_page_specs supersedes scrape_url
-      const analyzerTools = [
+      // Main agent tools depend on mode
+      const orchestratorTools = isIntegrate
+        ? [
+            "mcp__sites-agent__clone_repo",
+            "mcp__sites-agent__analyze_codebase",
+            "mcp__sites-agent__integrate_site",
+            "mcp__sites-agent__register_site",
+            "mcp__sites-agent__list_sites",
+            "mcp__sites-agent__bootstrap_pages",
+            "mcp__sites-agent__apply_theme",
+            "Read", "Write", "Edit", "Bash", "Glob", "Grep",
+          ]
+        : [
+            "Agent",
+            "mcp__sites-agent__list_sites",
+            "mcp__sites-agent__create_site",
+            "mcp__sites-agent__bootstrap_pages",
+            "mcp__sites-agent__download_remote_image",
+            "mcp__sites-agent__download_remote_images",
+            "mcp__sites-agent__apply_theme",
+          ]
+
+      // Structure-analyzer (Sonnet): analysis tools only — migrate mode only
+      const analyzerTools = isIntegrate ? [] : [
         "mcp__sites-agent__discover_site_structure",
         "mcp__sites-agent__generate_page_specs",
         "mcp__sites-agent__extract_design_tokens",
@@ -288,6 +326,11 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
         try {
           const maxBudgetUsd = Number(process.env.SITES_AGENT_MAX_BUDGET_USD || "2")
 
+          // Build agents config — integrate mode uses a single agent, migrate mode uses subagents
+          const mainAgentDesc = isIntegrate
+            ? "Site integration agent. Analyzes an existing codebase and adds AI Site Editor SDK integration."
+            : "Site creation and migration orchestrator. Plans migrations, delegates analysis to subagents, then executes the plan."
+
           const result = query({
             prompt: body.message!,
             options: {
@@ -297,13 +340,14 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
               agent: "sites-agent",
               agents: {
                 "sites-agent": {
-                  description: "Site creation and migration orchestrator. Plans migrations, delegates analysis to subagents, then executes the plan.",
+                  description: mainAgentDesc,
                   prompt: systemPrompt,
                   tools: orchestratorTools,
-                  skills: ["site-scaffolding", "image-migration"],
+                  skills: isIntegrate ? ["site-integration"] : ["site-scaffolding", "image-migration"],
                   model: process.env.SITES_AGENT_MODEL ?? "claude-sonnet-4-6",
                 },
-                "structure-analyzer": {
+                // Subagents only used in migrate mode
+                ...(!isIntegrate ? { "structure-analyzer": {
                   description: "Analyzes website structure — discovers pages, scrapes HTML/CSS with Playwright, extracts sections/outline/screenshots/design tokens. Returns a comprehensive text summary for the main agent to plan from.",
                   prompt: `You analyze external websites for migration. Your job is to produce a comprehensive analysis summary.
 
@@ -510,7 +554,7 @@ Key patterns to follow:
                   tools: ["Write", "Edit", "Bash"],
                   skills: ["custom-block-creation"],
                   model: "claude-sonnet-4-6",
-                },
+                } } : {}),
               },
               tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
               allowedTools: allTools,
@@ -565,7 +609,8 @@ Key patterns to follow:
                   stallToolCalls = 0
                   lastPhaseChangeAt = Date.now()
                   stallWarningEmitted = false
-                  const phaseInfo = PHASES.find(p => p.id === detectedPhase)!
+                  const phaseInfo = activePhases.find(p => p.id === detectedPhase)!
+                  if (!phaseInfo) continue // phase not in current mode
                   emitEvent(streamId, { type: "phase", phase: detectedPhase, activeLabel: phaseInfo.activeLabel, doneLabel: phaseInfo.doneLabel })
                 }
 
@@ -590,7 +635,7 @@ Key patterns to follow:
                 console.log(`[sites-agent] Stream ${streamId}: permission denials:`, message.permission_denials)
               }
               const resultText = isSuccess ? message.result : summaryText
-              const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(resultText)
+              const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(cleanAgentSummary(resultText))
               const modelBreakdown = message.modelUsage
                 ? Object.fromEntries(
                     Object.entries(message.modelUsage).map(([model, u]) => [
@@ -711,6 +756,27 @@ function logSdkMessage(streamId: string, message: SDKMessage) {
   }
 }
 
+/** Strip agent thinking/narration from the final summary, keeping only the structured output. */
+function cleanAgentSummary(text: string): string {
+  // Fix headings missing preceding newlines (e.g. "integrate.## Integration Complete")
+  let cleaned = text.replace(/([^\n])(#{1,6}\s)/g, "$1\n\n$2")
+
+  // If there's a structured heading, take from there (skip agent narration before it)
+  const headingMatch = cleaned.match(/\n*(## .+)/)
+  if (headingMatch?.index !== undefined) {
+    cleaned = cleaned.slice(headingMatch.index).trim()
+  }
+
+  // Strip remaining agent narration and internal noise lines
+  cleaned = cleaned
+    .split("\n")
+    .filter(line => !/^(?:Now I|Let me|Good[,.]|I'll |I have|Great[,.]|I need to|OK[,.])/i.test(line.trim()))
+    .filter(line => !/Background (?:fetch|task) .* completed/i.test(line))
+    .join("\n")
+
+  return cleaned.trim()
+}
+
 /** Show last 2 path segments for readable context (e.g. "pricing-table/schema.ts") */
 function shortPath(fullPath: string): string {
   const parts = fullPath.split("/").filter(Boolean)
@@ -738,8 +804,13 @@ export function describeToolUse(toolName: string, input?: Record<string, unknown
       if (/rm\s+-rf.*\.next/i.test(command)) return "Clearing build cache"
       if (/grep\s+.*register/i.test(command)) return "Verifying block registration"
       if (/grep\s/i.test(command)) return "Verifying files"
-      const short = command.replace(/^(?:cd\s+\S+\s*&&\s*)?/, "").slice(0, 40).trim()
-      return `Running: ${short}${command.length > 40 ? "..." : ""}`
+      // Strip project root prefix, cd preamble, then truncate
+      const cleaned = command
+        .replace(/^(?:cd\s+\S+\s*&&\s*)?/, "")
+        .replace(/\/Users\/\w+\/Projects\/[^/]+\/?/g, "")
+        .slice(0, 60)
+        .trim()
+      return `${cleaned}${command.length > 60 ? "..." : ""}`
     }
     case "Write":
       return filePath ? `Writing ${filePath}` : "Writing file"
@@ -780,7 +851,7 @@ function translateSdkMessage(message: SDKMessage): SSEEvent[] {
             const agentType = (input?.subagent_type ?? input?.description ?? "subagent") as string
             events.push({ type: "status", message: `Delegating to ${agentType}...` })
             events.push({ type: "tool_use", toolName, agentType })
-          } else {
+          } else if (!SILENT_TOOLS.has(toolName)) {
             const prefix = isSubagent ? "[sub] " : ""
             const label = describeToolUse(toolName, input)
             events.push({ type: "status", message: `${prefix}${label}...` })
