@@ -17,6 +17,23 @@ import { fetchPageContent, takeScreenshot, downloadImage, extractDesignTokens, m
 import { getCachedScrape, setCachedScrape } from "../migration/scrape-cache.js"
 import { saveScreenshot } from "../migration/migration-tools.js"
 import { scopedSessionKey, setPage, bumpVersion, getSiteConfig, setSiteConfig } from "../state/session-state.js"
+import {
+  sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
+  validateAndCorrectProps, normalizePageBlocks, scaffoldSiteProject,
+  analyzeCodebase, cloneRepo, detectSitePort,
+  packageJson, nextConfigTs, tsconfigJson, postcssConfig, layoutTsx,
+  globalsCss, defaultsTs, editorApiRoute, pageTsx, blocksRegisterTs,
+  samplePagesJson, defaultLogoSvg, faviconSvg,
+} from "./sites-agent-shared.js"
+
+/** Convert a package name like "villa-puravida-web" → "Villa Puravida Web" */
+function humanizePkgName(name: string): string {
+  return name
+    .replace(/^@[^/]+\//, "") // strip scope
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim() || "My Site"
+}
 
 // Match remote image URLs — extension-based OR known image CDN hostnames
 const IMAGE_URL_RE = /^https?:\/\/.+\.(jpe?g|png|webp|gif|svg|avif|ico)(\?.*)?$/i
@@ -62,176 +79,7 @@ async function localizeRemoteImages(
   return { props: result, downloaded }
 }
 
-/** Sanitize a site name into a kebab-case ID */
-function sanitizeSiteId(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "my-site"
-}
-
-/** Resolve the monorepo root */
-function monorepoRoot(): string {
-  return resolve(dirname(new URL(import.meta.url).pathname), "../../../../")
-}
-
-async function findAvailablePort(root: string): Promise<number> {
-  const appsDir = join(root, "apps")
-  const { readdir } = await import("node:fs/promises")
-  const usedPorts = new Set<number>([3000, 4100, 4200])
-  try {
-    // Scan apps/ and examples/ for used ports
-    for (const dir of [appsDir, join(root, "examples")]) {
-      if (!existsSync(dir)) continue
-      const entries = await readdir(dir)
-      for (const entry of entries) {
-        const pkgPath = join(dir, entry, "package.json")
-        if (!existsSync(pkgPath)) continue
-        try {
-          const pkg = JSON.parse(await readFile(pkgPath, "utf-8"))
-          const devScript = pkg.scripts?.dev ?? ""
-          // Match all port patterns: -p 3001, --port 3001, -p3001
-          const portMatches = devScript.matchAll(/(?:-p\s*|--port\s+)(\d+)/g)
-          for (const m of portMatches) usedPorts.add(Number(m[1]))
-        } catch { /* skip */ }
-      }
-    }
-  } catch { /* skip */ }
-
-  // Also check if ports are actually in use via net.createServer
-  const { createServer } = await import("node:net")
-  let port = 3500
-  while (usedPorts.has(port) || !(await isPortFree(createServer, port))) port++
-  console.log(`[sites-agent] Selected port ${port} (used: ${[...usedPorts].sort().join(", ")})`)
-  return port
-}
-
-function isPortFree(createServer: typeof import("node:net").createServer, port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = createServer()
-    server.once("error", () => resolve(false))
-    server.once("listening", () => { server.close(() => resolve(true)) })
-    server.listen(port, "127.0.0.1")
-  })
-}
-
-// ── CSS variable persistence ──
-
-/** Patch CSS variables into a globals.css :root block. */
-async function patchGlobalsCssVars(cssPath: string, vars: Record<string, string>): Promise<void> {
-  if (!existsSync(cssPath)) return
-  let css = await readFile(cssPath, "utf-8")
-  for (const [prop, value] of Object.entries(vars)) {
-    const varRegex = new RegExp(`(${prop.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}):\\s*[^;]+;`)
-    if (varRegex.test(css)) {
-      css = css.replace(varRegex, `$1: ${value};`)
-    } else {
-      css = css.replace(/(:root\s*\{[^}]*)(\})/, `$1  ${prop}: ${value};\n$2`)
-    }
-  }
-  await writeFile(cssPath, css, "utf-8")
-}
-
-// ── Schema validation + auto-correction ──
-
-/** Common LLM prop-name mistakes per block type */
-const PROP_RENAME_RULES: Record<string, Record<string, string>> = {
-  FAQAccordion: { question: "q", answer: "a" },
-  FeatureGrid: { items: "features" },
-  Stats: { items: "stats" },
-  CardGrid: { items: "cards" },
-  CTA: { heading: "title", buttonText: "ctaText", buttonHref: "ctaHref" },
-  Testimonials: { testimonials: "items" },
-  Footer: { heading: "title" },
-}
-
-/**
- * Fix Footer columns.links — LLMs send [{label,href}] objects but schema expects
- * pipe-delimited strings: "Label|/url\nLabel2|/url2"
- */
-function fixFooterLinks(props: Record<string, unknown>): Record<string, unknown> {
-  const columns = props.columns
-  if (!Array.isArray(columns)) return props
-  return {
-    ...props,
-    columns: columns.map((col: unknown) => {
-      if (!col || typeof col !== "object") return col
-      const c = col as Record<string, unknown>
-      const links = c.links
-      // Already a string — fine
-      if (typeof links === "string") return c
-      // Array of {label, href} objects → convert to pipe-delimited string
-      if (Array.isArray(links)) {
-        const formatted = links
-          .filter((l: unknown) => l && typeof l === "object")
-          .map((l: unknown) => {
-            const link = l as Record<string, unknown>
-            const label = String(link.label ?? link.text ?? "")
-            const href = String(link.href ?? link.url ?? "")
-            return href ? `${label}|${href}` : label
-          })
-          .join("\n")
-        return { ...c, links: formatted }
-      }
-      return c
-    }),
-  }
-}
-
-/** Rename keys in an object (top-level and within arrays) */
-function renameKeys(obj: Record<string, unknown>, renames: Record<string, string>): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(obj)) {
-    const newKey = renames[key] ?? key
-    if (Array.isArray(value)) {
-      result[newKey] = value.map(item =>
-        item && typeof item === "object" && !Array.isArray(item)
-          ? renameKeys(item as Record<string, unknown>, renames)
-          : item
-      )
-    } else {
-      result[newKey] = value
-    }
-  }
-  return result
-}
-
-/** Auto-correct common LLM mistakes and validate block props */
-function validateAndCorrectProps(
-  blockType: string,
-  props: Record<string, unknown>,
-): { props: Record<string, unknown>; corrected: boolean; error?: string } {
-  // First try validation as-is
-  const first = validateBlockProps(blockType, props)
-  if (first.success) return { props, corrected: false }
-
-  // Try auto-correction: rename keys + type-specific fixes
-  let corrected = { ...props }
-
-  // Coerce booleans to strings for enum fields that expect "true"/"false"
-  for (const [key, value] of Object.entries(corrected)) {
-    if (typeof value === "boolean") corrected[key] = String(value)
-  }
-
-  const renames = PROP_RENAME_RULES[blockType]
-  if (renames) corrected = renameKeys(corrected, renames)
-  if (blockType === "Footer") corrected = fixFooterLinks(corrected)
-
-  const second = validateBlockProps(blockType, corrected)
-  if (second.success) {
-    console.log(`[sites-agent] Auto-corrected ${blockType} props`)
-    return { props: corrected, corrected: true }
-  }
-
-  // Return original with error — caller decides fallback
-  const errorMsg = first.success === false && "error" in first
-    ? (first.error as { issues?: Array<{ path: unknown[]; message: string }> }).issues?.map(
-        (i: { path: unknown[]; message: string }) => `${i.path.join(".")}: ${i.message}`
-      ).join("; ") ?? "validation failed"
-    : "validation failed"
-  return { props, corrected: false, error: errorMsg }
-}
+// Shared utilities imported from sites-agent-shared.ts
 
 /**
  * Create the MCP server with all sites-agent tools.
@@ -361,7 +209,7 @@ export function createSitesAgentMcpServer(options: {
         await writeFile(join(projectDir, "public/logo.svg"), defaultLogoSvg(args.name), "utf-8")
         await writeFile(join(projectDir, "public/favicon.svg"), faviconSvg(args.name), "utf-8")
 
-        const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=dev-secret\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${args.name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
+        const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=top-secret\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${args.name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
         await writeFile(join(projectDir, ".env.local"), envContent, "utf-8")
 
         // Run pnpm install if needed (skip if node_modules exists from previous run)
@@ -840,355 +688,387 @@ export function createSitesAgentMcpServer(options: {
     }
   )
 
+  // ── CLONE REPO ──
+  const cloneRepoTool = tool(
+    "clone_repo",
+    "Clone a GitHub repository to a local directory inside the monorepo. Uses `gh repo clone` for auth, falls back to `git clone`. Returns the local path for use with analyze_codebase.",
+    {
+      url: z.string().describe("GitHub repo URL (e.g. 'https://github.com/user/repo') or shorthand ('user/repo')"),
+      targetDir: z.string().optional().describe("Target directory name inside apps/. Defaults to repo name."),
+    },
+    async (args) => {
+      try {
+        const result = await cloneRepo(args.url, args.targetDir)
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
+      } catch (e: unknown) {
+        return { content: [{ type: "text" as const, text: `Error cloning repo: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+      }
+    }
+  )
+
+  // ── INTEGRATE SITE (composite — replaces 8-10 individual tool calls) ──
+  const integrateSiteTool = tool(
+    "integrate_site",
+    "Add AI Site Editor SDK integration to an existing Next.js project in ONE step. Creates all integration files (catch-all page, editor API route, CMS adapter, content directory, .env.local, blocks register), adds block styles import to layout, installs workspace deps if needed, and starts the dev server. Returns the site config. Use this AFTER analyze_codebase confirms the project is a Next.js app-router site without existing integration.",
+    {
+      siteId: z.string().describe("Site ID (kebab-case, matches the directory name in apps/)"),
+      name: z.string().describe("Human-readable site name"),
+      purpose: z.string().optional().describe("What the site is about"),
+      layoutPath: z.string().optional().describe("Relative path to layout file (from analyze_codebase)"),
+      useSrcDir: z.boolean().optional().describe("Whether the project uses src/app/ instead of app/"),
+    },
+    async (args) => {
+      try {
+        const root = monorepoRoot()
+        const projectDir = join(root, "apps", args.siteId)
+
+        if (!existsSync(join(projectDir, "package.json"))) {
+          return { content: [{ type: "text" as const, text: `Error: apps/${args.siteId}/package.json not found.` }], isError: true }
+        }
+
+        const appDir = args.useSrcDir ? "src/app" : "app"
+        const filesCreated: string[] = []
+
+        // 1. Add workspace deps to package.json if missing
+        const pkgPath = join(projectDir, "package.json")
+        const pkg = JSON.parse(await readFile(pkgPath, "utf-8"))
+
+        // Auto-detect site name: prefer <title> from layout metadata, fall back to package.json
+        let siteName = args.name
+        const genericNames = new Set(["sample site", "my site", "site", "test site", "new site", "untitled", ""])
+        if (!siteName || genericNames.has(siteName.toLowerCase())) {
+          // Try extracting title from layout metadata
+          const layoutFile = args.layoutPath
+            ? join(projectDir, args.layoutPath)
+            : join(projectDir, appDir, "layout.tsx")
+          if (existsSync(layoutFile)) {
+            const layoutSrc = await readFile(layoutFile, "utf-8")
+            // Match: title: "..." or title: { default: "..." }
+            const titleMatch = layoutSrc.match(/title:\s*(?:\{\s*default:\s*)?["']([^"']+)["']/)
+            if (titleMatch?.[1]) siteName = titleMatch[1]
+          }
+          // Fall back to humanized package name
+          if (!siteName || genericNames.has(siteName.toLowerCase())) {
+            siteName = humanizePkgName(String(pkg.name ?? args.siteId))
+          }
+        }
+        const deps = pkg.dependencies ?? {}
+        let depsAdded = false
+        for (const dep of ["@ai-site-editor/site-sdk", "@ai-site-editor/blocks", "@ai-site-editor/shared"]) {
+          if (!deps[dep]) {
+            deps[dep] = "workspace:*"
+            depsAdded = true
+          }
+        }
+        if (depsAdded) {
+          pkg.dependencies = deps
+          await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8")
+          filesCreated.push("package.json (deps added)")
+        }
+
+        // 2. Create or replace catch-all page route with site-sdk version
+        const catchAllDir = join(projectDir, appDir, "[[...slug]]")
+        const blocksPrefix = args.useSrcDir ? "../../../" : "../../"
+        const catchAllPage = join(catchAllDir, "page.tsx")
+        const needsNewPage = !existsSync(catchAllPage)
+          || !(await readFile(catchAllPage, "utf-8")).includes("createSitePage")
+        if (needsNewPage) {
+          await mkdir(catchAllDir, { recursive: true })
+          // Back up existing page if present
+          if (existsSync(catchAllPage)) {
+            await writeFile(join(catchAllDir, "page.original.tsx"), await readFile(catchAllPage, "utf-8"), "utf-8")
+            filesCreated.push(`${appDir}/[[...slug]]/page.original.tsx (backup)`)
+          }
+          const pageContent = pageTsx(args.siteId)
+            .replace('import "../../blocks/register"', `import "${blocksPrefix}blocks/register"`)
+          await writeFile(catchAllPage, pageContent, "utf-8")
+          filesCreated.push(`${appDir}/[[...slug]]/page.tsx`)
+        }
+
+        // 3. Create editor API route
+        const apiDir = join(projectDir, appDir, "api/editor/[...path]")
+        if (!existsSync(apiDir)) {
+          await mkdir(apiDir, { recursive: true })
+          const apiBlocksPrefix = args.useSrcDir ? "../../../../../" : "../../../../"
+          const routeContent = editorApiRoute()
+            .replace('import "../../../../blocks/register"', `import "${apiBlocksPrefix}blocks/register"`)
+          await writeFile(join(apiDir, "route.ts"), routeContent, "utf-8")
+          filesCreated.push(`${appDir}/api/editor/[...path]/route.ts`)
+        }
+
+        // 4. Create content directory with default home page
+        const contentDir = join(projectDir, "content")
+        if (!existsSync(join(contentDir, "pages.json"))) {
+          await mkdir(contentDir, { recursive: true })
+          await writeFile(join(contentDir, "pages.json"), samplePagesJson(), "utf-8")
+          filesCreated.push("content/pages.json")
+        }
+
+        // 5. Create blocks register file
+        const blocksDir = join(projectDir, "blocks")
+        if (!existsSync(join(blocksDir, "register.ts"))) {
+          await mkdir(blocksDir, { recursive: true })
+          await writeFile(join(blocksDir, "register.ts"), blocksRegisterTs(), "utf-8")
+          filesCreated.push("blocks/register.ts")
+        }
+
+        // 6. Create lib/defaults.ts
+        const libDir = join(projectDir, "lib")
+        if (!existsSync(join(libDir, "defaults.ts"))) {
+          await mkdir(libDir, { recursive: true })
+          await writeFile(join(libDir, "defaults.ts"), defaultsTs(args.siteId, siteName), "utf-8")
+          filesCreated.push("lib/defaults.ts")
+        }
+
+        // 7. Create/merge .env.local
+        const envPath = join(projectDir, ".env.local")
+        const envVars: Record<string, string> = {
+          ORCHESTRATOR_URL: "http://localhost:4200",
+          DRAFT_MODE_SECRET: "top-secret",
+          NEXT_PUBLIC_DEFAULT_SITE_ID: args.siteId,
+          NEXT_PUBLIC_SITE_NAME: siteName,
+          NEXT_PUBLIC_EDITOR_ORIGIN: "http://localhost:4100",
+        }
+        if (existsSync(envPath)) {
+          const existing = await readFile(envPath, "utf-8")
+          const existingKeys = new Set(existing.split("\n").map(l => l.split("=")[0]).filter(Boolean))
+          const newLines: string[] = []
+          for (const [k, v] of Object.entries(envVars)) {
+            if (!existingKeys.has(k)) newLines.push(`${k}=${v}`)
+          }
+          if (newLines.length > 0) {
+            await writeFile(envPath, existing.trimEnd() + "\n" + newLines.join("\n") + "\n", "utf-8")
+            filesCreated.push(".env.local (merged)")
+          }
+        } else {
+          await writeFile(envPath, Object.entries(envVars).map(([k, v]) => `${k}=${v}`).join("\n") + "\n", "utf-8")
+          filesCreated.push(".env.local")
+        }
+
+        // 8. Add block styles import to existing layout
+        const layoutFile = args.layoutPath
+          ? join(projectDir, args.layoutPath)
+          : join(projectDir, appDir, "layout.tsx")
+        if (existsSync(layoutFile)) {
+          const layoutContent = await readFile(layoutFile, "utf-8")
+          if (!layoutContent.includes("@ai-site-editor/blocks/styles.css")) {
+            // Insert import after the last import statement
+            const lines = layoutContent.split("\n")
+            let lastImportIdx = -1
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].startsWith("import ")) lastImportIdx = i
+            }
+            if (lastImportIdx >= 0) {
+              lines.splice(lastImportIdx + 1, 0, 'import "@ai-site-editor/blocks/styles.css"')
+            } else {
+              lines.unshift('import "@ai-site-editor/blocks/styles.css"')
+            }
+            await writeFile(layoutFile, lines.join("\n"), "utf-8")
+            filesCreated.push(args.layoutPath ?? `${appDir}/layout.tsx (styles import added)`)
+          }
+        }
+
+        // 9. Create public dir and default assets if missing
+        const publicDir = join(projectDir, "public")
+        if (!existsSync(publicDir)) await mkdir(publicDir, { recursive: true })
+        if (!existsSync(join(publicDir, "logo.svg"))) {
+          await writeFile(join(publicDir, "logo.svg"), defaultLogoSvg(siteName), "utf-8")
+          filesCreated.push("public/logo.svg")
+        }
+        if (!existsSync(join(publicDir, "favicon.svg"))) {
+          await writeFile(join(publicDir, "favicon.svg"), faviconSvg(siteName), "utf-8")
+          filesCreated.push("public/favicon.svg")
+        }
+
+        // 10. Install dependencies (skip if monorepo root node_modules exists)
+        const rootNodeModules = join(root, "node_modules")
+        if (depsAdded && existsSync(rootNodeModules)) {
+          const { execFile } = await import("node:child_process")
+          const { promisify } = await import("node:util")
+          await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
+        }
+
+        // 11. Detect port and start dev server + register
+        const port = await detectSitePort(projectDir)
+
+        // Kill any existing process on the port
+        try {
+          const { execSync } = await import("node:child_process")
+          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
+          if (pids) {
+            for (const pid of pids.split("\n")) {
+              try { process.kill(Number(pid), "SIGKILL") } catch { /* already dead */ }
+            }
+          }
+        } catch { /* no process on port */ }
+
+        // Initialize orchestrator session
+        const sessionKey = scopedSessionKey(session, args.siteId)
+        setPage(sessionKey, {
+          id: "p_home", slug: "/", title: "Home", blocks: [], updatedAt: new Date().toISOString(),
+        })
+        bumpVersion(sessionKey)
+
+        // Start dev server
+        console.log(`[sites-agent] Starting dev server for ${args.siteId} on port ${port}...`)
+        const { spawn } = await import("node:child_process")
+        const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${args.siteId}`, "dev"], {
+          cwd: root,
+          stdio: "ignore",
+          detached: true,
+        })
+        devProcess.unref()
+
+        const siteConfig = {
+          id: args.siteId,
+          name: siteName,
+          purpose: args.purpose ?? "",
+          tone: "",
+          hosting: "local",
+          previewUrl: `http://localhost:${port}`,
+          constraints: [],
+        }
+
+        emitSiteCreated(siteConfig)
+        emitPhaseOutcome?.({ tool: "integrate_site", data: { siteId: args.siteId, port, name: siteName, filesCreated: filesCreated.length } })
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              status: "integrated",
+              siteId: args.siteId,
+              port,
+              previewUrl: `http://localhost:${port}`,
+              filesCreated,
+              devServerStarted: true,
+            }),
+          }],
+        }
+      } catch (e: unknown) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+      }
+    }
+  )
+
+  // ── REGISTER SITE ──
+  const registerSiteTool = tool(
+    "register_site",
+    "Register an existing site project with the editor and start its dev server. Call this AFTER integrating the SDK into an existing codebase. The site will appear in the editor's site list and be ready for editing.",
+    {
+      siteId: z.string().describe("Site ID (kebab-case, matches the directory name in apps/)"),
+      name: z.string().describe("Human-readable site name"),
+      purpose: z.string().optional().describe("What the site is about"),
+      port: z.number().optional().describe("Dev server port (auto-detected from package.json if omitted)"),
+    },
+    async (args) => {
+      try {
+        const root = monorepoRoot()
+        const projectDir = join(root, "apps", args.siteId)
+
+        if (!existsSync(join(projectDir, "package.json"))) {
+          return { content: [{ type: "text" as const, text: `Error: apps/${args.siteId}/package.json not found. Ensure the project exists.` }], isError: true }
+        }
+
+        const port = args.port || await detectSitePort(projectDir)
+
+        // Initialize orchestrator session state
+        const sessionKey = scopedSessionKey(session, args.siteId)
+        setPage(sessionKey, {
+          id: "p_home", slug: "/", title: "Home", blocks: [], updatedAt: new Date().toISOString(),
+        })
+        bumpVersion(sessionKey)
+
+        // Kill any existing process on the allocated port
+        try {
+          const { execSync } = await import("node:child_process")
+          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
+          if (pids) {
+            for (const pid of pids.split("\n")) {
+              try { process.kill(Number(pid), "SIGKILL") } catch { /* already dead */ }
+            }
+          }
+        } catch { /* no process on port */ }
+
+        // Install dependencies if needed
+        if (!existsSync(join(projectDir, "node_modules"))) {
+          const { execFile } = await import("node:child_process")
+          const { promisify } = await import("node:util")
+          await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
+        }
+
+        // Start dev server
+        console.log(`[sites-agent] Starting dev server for ${args.siteId} on port ${port}...`)
+        const { spawn } = await import("node:child_process")
+        const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${args.siteId}`, "dev"], {
+          cwd: root,
+          stdio: "ignore",
+          detached: true,
+        })
+        devProcess.unref()
+
+        const siteConfig = {
+          id: args.siteId,
+          name: args.name,
+          purpose: args.purpose ?? "",
+          tone: "",
+          hosting: "local",
+          previewUrl: `http://localhost:${port}`,
+          constraints: [],
+        }
+
+        // Emit site_created so the editor picks it up
+        emitSiteCreated(siteConfig)
+        emitPhaseOutcome?.({ tool: "register_site", data: { siteId: args.siteId, port, name: args.name } })
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              status: "registered",
+              siteId: args.siteId,
+              config: siteConfig,
+              port,
+              name: args.name,
+              previewUrl: `http://localhost:${port}`,
+              devServerStarted: true,
+            }),
+          }],
+        }
+      } catch (e: unknown) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+      }
+    }
+  )
+
+  // ── ANALYZE CODEBASE ──
+  const analyzeCodebaseTool = tool(
+    "analyze_codebase",
+    "Analyze an existing site project to detect its framework, CMS, routes, styling, and readiness for AI Site Editor integration. Use this before integrating an existing codebase.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root directory"),
+    },
+    async (args) => {
+      try {
+        const analysis = await analyzeCodebase(args.projectPath)
+        emitPhaseOutcome?.({ tool: "analyze_codebase", data: { framework: analysis.framework, routes: analysis.existingRoutes.length } })
+        return { content: [{ type: "text" as const, text: JSON.stringify(analysis, null, 2) }] }
+      } catch (e: unknown) {
+        return { content: [{ type: "text" as const, text: `Error analyzing codebase: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+      }
+    }
+  )
+
   return createSdkMcpServer({
     name: "sites-agent",
     version: "1.0.0",
-    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, applyThemeTool, ...createMigrationTools()],
+    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, applyThemeTool, analyzeCodebaseTool, cloneRepoTool, integrateSiteTool, registerSiteTool, ...createMigrationTools()],
   })
 }
 
-// ── Boilerplate template functions (unchanged from original) ──
-
-function packageJson(siteId: string, name: string, port: number): string {
-  return JSON.stringify({
-    name: `@ai-site-editor/${siteId}`,
-    version: "0.0.1",
-    private: true,
-    type: "module",
-    scripts: { dev: `next dev -p ${port}`, build: "next build", start: `next start -p ${port}`, typecheck: "tsc --noEmit" },
-    dependencies: {
-      "@ai-site-editor/blocks": "workspace:*", "@ai-site-editor/shared": "workspace:*", "@ai-site-editor/site-sdk": "workspace:*",
-      "@tailwindcss/postcss": "^4.2.1", next: "15.2.8", react: "^19.0.0", "react-dom": "^19.0.0", tailwindcss: "^4.2.1", zod: "^4.3.6",
-    },
-    devDependencies: { "@types/node": "^22.13.10", "@types/react": "^19.0.10", "@types/react-dom": "^19.0.4", typescript: "^5.7.3" },
-  }, null, 2) + "\n"
-}
-
-function nextConfigTs(): string {
-  return `import type { NextConfig } from "next"
-
-const nextConfig: NextConfig = {
-  transpilePackages: [
-    "@ai-site-editor/preview-adapter",
-    "@ai-site-editor/site-sdk",
-    "@ai-site-editor/blocks",
-    "@ai-site-editor/shared",
-  ],
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "plus.unsplash.com" },
-      { protocol: "https", hostname: "oaidalleapiprodscus.blob.core.windows.net" },
-      { protocol: "https", hostname: "placehold.co" },
-      { protocol: "http", hostname: "localhost" },
-    ],
-  },
-  webpack: (config, { dev }) => {
-    if (dev) {
-      config.watchOptions = { ...config.watchOptions, followSymlinks: true }
-      config.resolve = { ...config.resolve, symlinks: false }
-      config.cache = { ...config.cache, version: \`\${process.env.WORKSPACE_CACHE_BUST ?? Date.now()}\` }
-    }
-    return config
-  },
-}
-
-export default nextConfig
-`
-}
-
-function tsconfigJson(): string {
-  return JSON.stringify({
-    compilerOptions: {
-      target: "ES2022", lib: ["dom", "dom.iterable", "es2022"], allowJs: false, skipLibCheck: true,
-      strict: true, noEmit: true, esModuleInterop: true, module: "esnext", moduleResolution: "bundler",
-      resolveJsonModule: true, isolatedModules: true, allowImportingTsExtensions: true, jsx: "preserve",
-      incremental: true, plugins: [{ name: "next" }],
-    },
-    include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-    exclude: ["node_modules"],
-  }, null, 2) + "\n"
-}
-
-function postcssConfig(): string {
-  return `export default {\n  plugins: {\n    "@tailwindcss/postcss": {}\n  }\n}\n`
-}
-
-function layoutTsx(siteName: string): string {
-  return `import "./globals.css"
-import type { Metadata } from "next"
-import type { ReactNode } from "react"
-
-export const metadata: Metadata = {
-  title: { default: ${JSON.stringify(siteName)}, template: \`%s · ${siteName}\` },
-  description: ${JSON.stringify(siteName)},
-  icons: { icon: "/favicon.svg" },
-}
-
-const themeScript = \`(function(){try{var t=localStorage.getItem('site-theme-v1');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()\`
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
-      <body>{children}</body>
-    </html>
-  )
-}
-`
-}
-
-function globalsCss(): string {
-  return `@import "tailwindcss";
-@import "@ai-site-editor/blocks/styles.css";
-
-:root {
-  /* Backgrounds */
-  --bg-0: #ffffff;
-  --bg-100: #f8f9fa;
-  --bg-1: #ffffff;
-  --section-bg: var(--bg-100);
-
-  /* Text */
-  --text-100: #1a1a2e;
-  --text-200: #4a4a6a;
-  --heading: #1a1a2e;
-  --body: #333355;
-  --body-secondary: #6b7280;
-  --text-300: #52525b;
-  --caption: #64748b;
-
-  /* Brand */
-  --brand: #2563eb;
-  --brand-hover: #1d4ed8;
-  --brand-subtle: #dbeafe;
-  --brand-fg: #ffffff;
-
-  /* Surfaces */
-  --surface: #ffffff;
-  --surface-border: #e5e7eb;
-  --border: #e5e7eb;
-  --card-bg: #f8fafc;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  --hero-bg: var(--bg-0);
-  --cta-bg: var(--bg-100);
-  --placeholder-img: #e2e8f0;
-
-  /* Footer */
-  --footer-bg: #1a1a2e;
-  --footer-text: #cbd5e1;
-  --footer-heading: #f1f5f9;
-  --footer-link: #94a3b8;
-  --footer-link-hover: #e2e8f0;
-  --footer-border: #2d2d4a;
-
-  /* Typography */
-  --font-body: system-ui, -apple-system, sans-serif;
-  --font-heading: system-ui, -apple-system, sans-serif;
-
-  /* Shapes */
-  --radius-btn: 6px;
-  --radius-card: 8px;
-  --radius-feature: 8px;
-}
-
-/* Dark mode — follows system preference or .dark class on <html> */
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    --bg-0: #0f172a;
-    --bg-100: #1e293b;
-    --bg-1: #0f172a;
-    --section-bg: var(--bg-100);
-
-    --text-100: #f1f5f9;
-    --text-200: #cbd5e1;
-    --heading: #f1f5f9;
-    --body: #cbd5e1;
-    --body-secondary: #94a3b8;
-    --text-300: #94a3b8;
-    --caption: #94a3b8;
-
-    --brand: #3b82f6;
-    --brand-hover: #60a5fa;
-    --brand-subtle: #1e3a5f;
-    --brand-fg: #ffffff;
-
-    --surface: #1e293b;
-    --surface-border: #334155;
-    --border: #334155;
-    --card-bg: #1e293b;
-    --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    --hero-bg: var(--bg-0);
-    --cta-bg: var(--bg-100);
-    --placeholder-img: #334155;
-
-    --footer-bg: #020617;
-    --footer-text: #94a3b8;
-    --footer-heading: #e2e8f0;
-    --footer-link: #64748b;
-    --footer-link-hover: #cbd5e1;
-    --footer-border: #1e293b;
-  }
-}
-
-/* Explicit .dark class override (from JS toggle or localStorage) */
-.dark {
-  --bg-0: #0f172a;
-  --bg-100: #1e293b;
-  --bg-1: #0f172a;
-  --section-bg: var(--bg-100);
-
-  --text-100: #f1f5f9;
-  --text-200: #cbd5e1;
-  --heading: #f1f5f9;
-  --body: #cbd5e1;
-  --body-secondary: #94a3b8;
-  --text-300: #94a3b8;
-  --caption: #94a3b8;
-
-  --brand: #3b82f6;
-  --brand-hover: #60a5fa;
-  --brand-subtle: #1e3a5f;
-  --brand-fg: #ffffff;
-
-  --surface: #1e293b;
-  --surface-border: #334155;
-  --border: #334155;
-  --card-bg: #1e293b;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  --hero-bg: var(--bg-0);
-  --cta-bg: var(--bg-100);
-  --placeholder-img: #334155;
-
-  --footer-bg: #020617;
-  --footer-text: #94a3b8;
-  --footer-heading: #e2e8f0;
-  --footer-link: #64748b;
-  --footer-link-hover: #cbd5e1;
-  --footer-border: #1e293b;
-}
-`
-}
-
-function defaultsTs(siteId: string, siteName: string): string {
-  return `export const DEFAULT_SITE_ID = process.env.NEXT_PUBLIC_DEFAULT_SITE_ID?.trim() || ${JSON.stringify(siteId)}
-export const DEFAULT_SESSION = process.env.DRAFT_DEFAULT_SESSION?.trim() || "dev"
-export const DEFAULT_SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME?.trim() || ${JSON.stringify(siteName)}
-`
-}
-
-function editorApiRoute(): string {
-  return `import { createEditorApiHandler } from "@ai-site-editor/site-sdk/routes"
-import { createJsonFilePublishHandler } from "@ai-site-editor/site-sdk/publish-handlers/json-file"
-import { resolve } from "node:path"
-import { readFile } from "node:fs/promises"
-import type { PageDoc } from "@ai-site-editor/shared"
-
-// Import custom blocks so they're included in the editor manifest (/api/editor/blocks)
-import "../../../../blocks/register"
-
-const PAGES_PATH = resolve(process.cwd(), "content/pages.json")
-
-async function loadPages(): Promise<PageDoc[]> {
-  try {
-    return JSON.parse(await readFile(PAGES_PATH, "utf-8")) as PageDoc[]
-  } catch { return [] }
-}
-
-export const { GET, POST, OPTIONS } = createEditorApiHandler({
-  getPages: loadPages,
-  publishSecret: process.env.PUBLISH_TOKEN?.trim() || undefined,
-  onPublish: createJsonFilePublishHandler(PAGES_PATH),
-})
-`
-}
-
-function pageTsx(siteId: string): string {
-  return `import { createSitePage } from "@ai-site-editor/site-sdk/page"
-import { resolve } from "node:path"
-import { readFile } from "node:fs/promises"
-import { readFileSync, existsSync } from "node:fs"
-import type { PageDoc } from "@ai-site-editor/shared"
-
-// Import custom blocks manifest — registers schemas + renderers (file created by block-coder)
-import "../../blocks/register"
-
-const PAGES_PATH = resolve(process.cwd(), "content/pages.json")
-const CONFIG_PATH = resolve(process.cwd(), "content/site-config.json")
-
-async function loadPages(): Promise<PageDoc[]> {
-  try {
-    const raw = await readFile(PAGES_PATH, "utf-8")
-    return JSON.parse(raw) as PageDoc[]
-  } catch { return [] }
-}
-
-async function loadSiteConfig() {
-  try {
-    return JSON.parse(await readFile(CONFIG_PATH, "utf-8"))
-  } catch { return {} }
-}
-
-// Load footer at module init (sync) so it can be passed to createSitePage
-const _siteConfig = existsSync(CONFIG_PATH)
-  ? (() => { try { return JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) } catch { return {} } })()
-  : {}
-
-const { Page, generateStaticParams } = createSitePage({
-  siteId: ${JSON.stringify(siteId)},
-  getPage: async (slug) => {
-    const pages = await loadPages()
-    return pages.find((p) => p.slug === slug) ?? null
-  },
-  getSlugs: async () => {
-    const pages = await loadPages()
-    return pages.map((p) => p.slug)
-  },
-  getSiteConfig: loadSiteConfig,
-  footer: _siteConfig.footer ?? undefined,
-})
-
-export default Page
-export { generateStaticParams }
-`
-}
-
-function blocksRegisterTs(): string {
-  return `// Custom blocks — auto-updated by block-coder subagent
-// Each custom block adds 3 lines: schema import (side-effect), renderer import, registerCustomRenderer()
-// IMPORTANT: Always use .ts/.tsx file extensions — without them imports fail silently
-import { registerCustomRenderer } from "@ai-site-editor/blocks"
-
-// Example (block-coder will replace these comments with real imports):
-// import "./pricing-table/schema.ts"
-// import { PricingTable } from "./pricing-table/renderer.tsx"
-// registerCustomRenderer("PricingTable", PricingTable)
-`
-}
-
-function samplePagesJson(): string {
-  return `[\n  {\n    "id": "home",\n    "slug": "/",\n    "title": "Home",\n    "blocks": [],\n    "updatedAt": "${new Date().toISOString()}"\n  }\n]\n`
-}
-
-function defaultLogoSvg(siteName: string): string {
-  const initials = siteInitials(siteName)
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 38" width="38" height="38">
-  <rect width="38" height="38" rx="8" fill="var(--brand, #2563eb)"/>
-  <text x="19" y="20" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="16" fill="var(--brand-fg, #fff)">${initials}</text>
-</svg>`
-}
-
-function faviconSvg(siteName: string): string {
-  const initials = siteInitials(siteName)
-  // Favicon uses hardcoded colors (no CSS vars) for browser tab compatibility
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="6" fill="#2563eb"/>
-  <text x="16" y="17" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="14" fill="#fff">${initials}</text>
-</svg>`
-}
-
-function siteInitials(siteName: string): string {
-  return siteName.split(/\s+/).map(w => w[0]?.toUpperCase() ?? "").join("").slice(0, 2) || "S"
-}
+// Template functions now live in sites-agent-shared.ts — imported at the top of this file.
+// (sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
+//  validateAndCorrectProps, normalizePageBlocks, scaffoldSiteProject,
+//  packageJson, nextConfigTs, tsconfigJson, postcssConfig, layoutTsx, globalsCss,
+//  defaultsTs, editorApiRoute, pageTsx, blocksRegisterTs, samplePagesJson,
+//  defaultLogoSvg, faviconSvg)

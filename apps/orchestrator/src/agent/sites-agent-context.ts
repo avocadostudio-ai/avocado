@@ -40,7 +40,7 @@ const BLOCK_VISUAL_GUIDE: Record<string, { layout: string; whenToUse: string; co
 // Auto-generated block catalog from registry metadata
 // ---------------------------------------------------------------------------
 
-function buildBlockCatalog(): string {
+export function buildBlockCatalog(): string {
   const allMeta = getAllBlockMeta()
   const lines: string[] = ["### Block Catalog\nUse EXACTLY these prop names. Chrome blocks (SiteHeader, Footer) are auto-rendered — never include them.\n"]
 
