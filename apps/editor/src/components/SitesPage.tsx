@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { Trash2 } from "lucide-react"
 import { blockManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
 import { SitesAgentChat } from "./SitesAgentChat"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { buildSiteDraftEnableUrl, LEGACY_AVOCADO_SITE_ID, orchestrator, resolveSiteOrigin } from "../lib/editor-utils"
 import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
 import { useSitesAgent } from "../hooks/useSitesAgent"
@@ -42,6 +45,8 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
       const bLegacy = b.id === LEGACY_AVOCADO_SITE_ID ? 1 : 0
       return aLegacy - bLegacy
     }), [sites.siteList])
+
+  const [showAllSites, setShowAllSites] = useState(false)
 
   const [capabilityBySiteId, setCapabilityBySiteId] = useState<Record<string, {
     status: "loading" | "ready" | "degraded"
@@ -131,6 +136,14 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
     }
   }, [dedupedSites])
 
+  const allChecked = Object.keys(capabilityBySiteId).length === dedupedSites.length
+  const offlineCount = allChecked ? dedupedSites.filter(s => capabilityBySiteId[s.id]?.status !== "ready").length : 0
+  const visibleSites = showAllSites ? dedupedSites : dedupedSites.filter(s => {
+    const cap = capabilityBySiteId[s.id]
+    // Show while still loading (checking), hide only confirmed offline
+    return !cap || cap.status === "loading" || cap.status === "ready"
+  })
+
   return (
     <div className="sites-layout">
     <SitesAgentChat agent={agent} />
@@ -169,8 +182,14 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           </button>
         </div>
       </header>
+      {offlineCount > 0 && (
+        <div className="sites-offline-toggle">
+          <Switch id="show-offline" checked={showAllSites} onCheckedChange={setShowAllSites} />
+          <Label htmlFor="show-offline">Show {offlineCount} offline site{offlineCount > 1 ? "s" : ""}</Label>
+        </div>
+      )}
       <section className="sites-grid" aria-label="Site tiles">
-        {dedupedSites.map((site) => {
+        {visibleSites.map((site) => {
           const capability = capabilityBySiteId[site.id]
           const previewSrc = buildSiteDraftEnableUrl("/", {
             session,
@@ -179,6 +198,18 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           }, resolveSiteOrigin(site))
           return (
             <article key={site.id} className="site-tile">
+              <button
+                type="button"
+                className="site-tile-delete-btn"
+                onClick={() => {
+                  if (window.confirm(t("sites.confirmDelete", { name: site.name }))) {
+                    sites.removeSite(site.id)
+                  }
+                }}
+                aria-label={`${t("sites.deleteSite")} ${site.name}`}
+              >
+                <Trash2 size={14} />
+              </button>
               <SiteTileDesktopPreview title={`${site.name} home preview`} src={previewSrc} onClick={() => sites.openEditorForSite(site.id)} />
               <div className="site-tile-meta">
                 <h2>
@@ -199,35 +230,23 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                 <p className="site-local-url">{resolveSiteOrigin(site)}</p>
                 {site.purpose ? <p className="site-purpose">{compactPurposeText(site.purpose)}</p> : null}
                 <div className="site-tile-actions">
-                  <button type="button" className="secondary-btn site-config-btn" onClick={() => sites.setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`}>
+                  <button type="button" className="secondary-btn site-config-btn" onClick={() => sites.setConfigSiteId(site.id)} aria-label={`Configure ${site.name}`} title={t("sites.settings")}>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path d="M8.8 2h2.4l.5 2.1a6.7 6.7 0 0 1 1.5.6l1.9-1.1 1.7 1.7-1.1 1.9c.2.5.4 1 .5 1.5l2.1.5v2.4l-2.1.5a6.7 6.7 0 0 1-.6 1.5l1.1 1.9-1.7 1.7-1.9-1.1a6.7 6.7 0 0 1-1.5.6L11.2 18H8.8l-.5-2.1a6.7 6.7 0 0 1-1.5-.6l-1.9 1.1-1.7-1.7 1.1-1.9a6.7 6.7 0 0 1-.6-1.5L2 11.2V8.8l2.1-.5c.1-.5.3-1 .6-1.5L3.6 4.9l1.7-1.7 1.9 1.1c.5-.2 1-.4 1.5-.5L8.8 2z" />
                       <circle cx="10" cy="10" r="2.4" />
                     </svg>
-                    <span>{t("sites.settings")}</span>
                   </button>
-                  <button type="button" className="secondary-btn site-config-btn" onClick={() => void sites.openRestoreModal(site.id)} aria-label={`Version history for ${site.name}`}>
-                    <span>{t("sites.versionHistory")}</span>
+                  <button type="button" className="secondary-btn site-config-btn" onClick={() => void sites.openRestoreModal(site.id)} aria-label={`Version history for ${site.name}`} title={t("sites.versionHistory")}>
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M10 2a8 8 0 1 0 8 8 8 8 0 0 0-8-8zm0 14a6 6 0 1 1 6-6 6 6 0 0 1-6 6z" />
+                      <path d="M10 6v4l3 2" />
+                    </svg>
                   </button>
                   <button type="button" className="primary-btn" onClick={() => sites.openEditorForSite(site.id)}>
                     <span>{t("sites.openEditor")}</span>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path d="M7 5h8v8" />
                       <path d="m7 13 8-8" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-btn site-delete-btn"
-                    onClick={() => {
-                      if (window.confirm(t("sites.confirmDelete", { name: site.name }))) {
-                        sites.removeSite(site.id)
-                      }
-                    }}
-                    aria-label={`${t("sites.deleteSite")} ${site.name}`}
-                  >
-                    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-                      <path d="M6 4V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1h3v2H3V4h3zm1 4h2v8H7V8zm4 0h2v8h-2V8zM4 6h12l-1 12H5L4 6z" />
                     </svg>
                   </button>
                 </div>

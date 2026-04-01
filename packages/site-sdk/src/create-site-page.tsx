@@ -51,6 +51,8 @@ export type SitePageConfig = {
   defaultLogo?: string
   /** Footer block to render below content. Omit to hide footer. */
   footer?: BlockInstance
+  /** Render site header/footer chrome. Set false when the host layout provides its own. Defaults to true. */
+  chrome?: boolean
 }
 
 type PageProps = {
@@ -73,6 +75,7 @@ export function createSitePage(config: SitePageConfig) {
     getSiteConfig: cmsGetSiteConfig,
     defaultLogo = "/logo.svg",
     footer,
+    chrome = true,
   } = config
 
   async function generateStaticParams() {
@@ -132,12 +135,12 @@ export function createSitePage(config: SitePageConfig) {
     if (!pageResult) {
       return (
         <>
-          <SharedBlockRenderer block={chromeHeader} />
+          {chrome && <SharedBlockRenderer block={chromeHeader} />}
           <main style={{ padding: "4rem", textAlign: "center" }}>
             <h1>{editorMode ? "Draft unavailable" : "404"}</h1>
             <p>{editorMode ? `Could not load draft content for ${slug}.` : "Page not found."}</p>
           </main>
-          {footer ? <SharedBlockRenderer block={footer} /> : null}
+          {chrome && footer ? <SharedBlockRenderer block={footer} /> : null}
         </>
       )
     }
@@ -145,11 +148,11 @@ export function createSitePage(config: SitePageConfig) {
     if (editorMode) {
       return (
         <>
-          <SharedBlockRenderer block={chromeHeader} />
+          {chrome && <SharedBlockRenderer block={chromeHeader} />}
           <main className="editor-mode">
             {renderBlocks(pageResult.blocks, { editable: true })}
           </main>
-          {footer ? <SharedBlockRenderer block={footer} /> : null}
+          {chrome && footer ? <SharedBlockRenderer block={footer} /> : null}
           <EditorOverlay slug={slug} editorOrigin={editorOrigin} />
         </>
       )
@@ -157,12 +160,12 @@ export function createSitePage(config: SitePageConfig) {
 
     return (
       <>
-        <SharedBlockRenderer block={chromeHeader} />
+        {chrome && <SharedBlockRenderer block={chromeHeader} />}
         <main>
           {renderBlocks(pageResult.blocks)}
           <BlocksHydrator />
         </main>
-        {footer ? <SharedBlockRenderer block={footer} /> : null}
+        {chrome && footer ? <SharedBlockRenderer block={footer} /> : null}
       </>
     )
   }

@@ -316,12 +316,13 @@ const en = {
   "theme.dark": "Dark mode",
 
   // -- Sites agent --
-  "sitesAgent.title": "Site Assistant",
+  "sitesAgent.title": "Site Agent",
   "sitesAgent.clear": "Clear chat",
-  "sitesAgent.welcome": "I can help you create a new site or migrate an existing one. Tell me what you'd like to build, or paste a URL to import.",
-  "sitesAgent.placeholder": "Create a site, migrate a URL...",
-  "sitesAgent.suggestion1": "Create a portfolio site",
-  "sitesAgent.suggestion2": "Migrate an existing website",
+  "sitesAgent.welcome": "I can create a new site from scratch, migrate an existing website from its URL, or integrate the editor into your Next.js project. What would you like to do?",
+  "sitesAgent.placeholder": "Ask me anything...",
+  "sitesAgent.suggestion1": "Create a new site from scratch",
+  "sitesAgent.suggestion2": "Migrate a website from URL",
+  "sitesAgent.suggestion3": "Integrate using a GitHub project",
   "sitesAgent.stop": "Stop",
 } as const
 

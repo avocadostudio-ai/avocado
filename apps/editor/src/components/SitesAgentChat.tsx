@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useT } from "@/i18n"
 import { renderSimpleMarkdown } from "../lib/markdown-renderer"
-import { Bot, Trash2, Square, ArrowUp, Sparkles, ChevronDown, ChevronRight } from "lucide-react"
+import { Bot, Trash2, Square, ArrowUp, Sparkles, ChevronDown, ChevronRight, Copy, Check } from "lucide-react"
 import type { UseSitesAgentReturn, SitesAgentMessage, PhaseStatus } from "../hooks/useSitesAgent"
 
 type Props = {
@@ -44,16 +44,6 @@ export function SitesAgentChat({ agent }: Props) {
           <Bot size={18} />
           <span>{t("sitesAgent.title")}</span>
         </div>
-        {agent.messages.length > 0 && (
-          <button
-            type="button"
-            className="sites-agent-clear-btn"
-            onClick={agent.clearMessages}
-            title={t("sitesAgent.clear")}
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
       </header>
 
       <div className="sites-agent-thread" ref={threadRef}>
@@ -108,7 +98,7 @@ export function SitesAgentChat({ agent }: Props) {
       )}
 
       <div className="sites-agent-composer">
-        <div className="sites-agent-input-wrap">
+        <div className={`sites-agent-input-wrap${agent.isStreaming ? " is-loading" : ""}`}>
           <textarea
             ref={textareaRef}
             value={input}
@@ -209,9 +199,22 @@ function StepTracker({ steps, phaseLabels }: { steps: { label: string; done: boo
 
 function MessageBubble({ message }: { message: SitesAgentMessage }) {
   const isUser = message.role === "user"
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
   return (
-    <div className={`sites-agent-message ${isUser ? "sites-agent-message-user" : "sites-agent-message-assistant"}`}>
-      <div className="sites-agent-message-content">{renderSimpleMarkdown(message.text)}</div>
+    <div className={`sites-agent-message-wrap ${isUser ? "sites-agent-message-wrap-user" : ""}`}>
+      <div className={`sites-agent-message ${isUser ? "sites-agent-message-user" : "sites-agent-message-assistant"}`}>
+        <div className="sites-agent-message-content">{renderSimpleMarkdown(message.text)}</div>
+      </div>
+      {isUser && (
+        <button type="button" className="sites-agent-copy-btn" onClick={handleCopy} title="Copy">
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+        </button>
+      )}
     </div>
   )
 }

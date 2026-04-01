@@ -39,6 +39,60 @@
   margin-top: 24px;
 }
 
+/* ── Full-width image variant ─────────────────────────────── */
+.hero--full-width {
+  position: relative;
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+}
+
+.hero--full-width .hero__bg-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.hero--full-width::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 0;
+}
+
+.hero--full-width .hero__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+.hero--full-width .hero__content {
+  max-width: 720px;
+}
+
+.hero--full-width .hero__content h1,
+.hero--full-width .hero__content h2,
+.hero--full-width .hero__content h3 {
+  color: #fff;
+}
+
+.hero--full-width .hero__content p {
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 52ch;
+}
+
+.hero--full-width .hero__actions {
+  justify-content: center;
+}
+
 /* Dark */
 .dark .hero__content p {
   color: var(--body);

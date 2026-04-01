@@ -342,6 +342,23 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       return results;
     })()`) as import("./types.ts").ExtractedEmbed[]
 
+    // Extract ALL page images with Y positions (for distributing to visual sections)
+    const pageImages = await page.evaluate(`(() => {
+      const results = [];
+      const seen = new Set();
+      // Regular <img> elements
+      document.querySelectorAll('img').forEach(img => {
+        const src = img.src || img.currentSrc || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
+        if (!src || src.startsWith('data:') || seen.has(src)) return;
+        const rect = img.getBoundingClientRect();
+        if (rect.width < 30 || rect.height < 30) return;
+        seen.add(src);
+        const scrollY = window.scrollY;
+        results.push({ src, alt: img.alt || '', y: Math.round(rect.y + scrollY), width: Math.round(rect.width), height: Math.round(rect.height) });
+      });
+      return results;
+    })()`) as Array<{ src: string; alt: string; y: number; width: number; height: number }>
+
     // Extract actual rendered fonts via getComputedStyle (more reliable than CSS regex)
     const computedFonts = await page.evaluate(`(() => {
       const fonts = { heading: null, body: null };
@@ -541,7 +558,7 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       }
     }
 
-    return { content, screenshot, mobileScreenshot, sections, outline, nav, sectionStyles, visualSections, embeds, computedFonts }
+    return { content, screenshot, mobileScreenshot, sections, outline, nav, sectionStyles, visualSections, embeds, computedFonts, pageImages }
   } finally {
     await browser.close()
   }

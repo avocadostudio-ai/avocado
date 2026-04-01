@@ -19,10 +19,10 @@ import { saveScreenshot } from "../migration/migration-tools.js"
 import { scopedSessionKey, setPage, bumpVersion, getSiteConfig, setSiteConfig } from "../state/session-state.js"
 import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
-  validateAndCorrectProps, normalizePageBlocks, scaffoldSiteProject,
+  validateAndCorrectProps, fixFooterLinks, normalizePageBlocks, scaffoldSiteProject,
   analyzeCodebase, cloneRepo, detectSitePort,
   packageJson, nextConfigTs, tsconfigJson, postcssConfig, layoutTsx,
-  globalsCss, defaultsTs, editorApiRoute, pageTsx, blocksRegisterTs,
+  globalsCss, defaultsTs, editorApiRoute, pageTsx, hybridPageTsx, blocksRegisterTsx,
   samplePagesJson, defaultLogoSvg, faviconSvg,
 } from "./sites-agent-shared.js"
 
@@ -205,7 +205,7 @@ export function createSitesAgentMcpServer(options: {
         await mkdir(join(projectDir, "public"), { recursive: true })
         await writeFile(join(projectDir, "public/.gitkeep"), "", "utf-8")
         await mkdir(join(projectDir, "blocks"), { recursive: true })
-        await writeFile(join(projectDir, "blocks/register.ts"), blocksRegisterTs(), "utf-8")
+        await writeFile(join(projectDir, "blocks/register.tsx"), blocksRegisterTsx(), "utf-8")
         await writeFile(join(projectDir, "public/logo.svg"), defaultLogoSvg(args.name), "utf-8")
         await writeFile(join(projectDir, "public/favicon.svg"), faviconSvg(args.name), "utf-8")
 
@@ -403,7 +403,7 @@ export function createSitesAgentMcpServer(options: {
   // ── BOOTSTRAP PAGES ──
   const bootstrapPagesTool = tool(
     "bootstrap_pages",
-    `Create pages with blocks for a site. REQUIRES create_site to be called first — will error if the site project doesn't exist. Available block types: ${Object.keys(getAllBlockMeta()).join(", ")}`,
+    `Create pages with blocks for a site. The site project must exist under apps/{siteId} (created via create_site or integrate_site). Built-in block types: ${Object.keys(getAllBlockMeta()).join(", ")}. Custom block types registered in blocks/register.ts are also supported — use the exact component name as the block type.`,
     {
       siteId: z.string().describe("Site ID to create pages for"),
       pages: z.array(z.object({
@@ -455,7 +455,12 @@ export function createSitesAgentMcpServer(options: {
           const contentBlocks = page.blocks.filter(b => {
             if (b.type === "SiteHeader") { strippedCount++; return false }
             if (b.type === "Footer") {
-              if (!footerBlock) footerBlock = { type: b.type, props: b.props }
+              if (!footerBlock) {
+                let fp = fixFooterLinks(b.props)
+                const v = validateAndCorrectProps("Footer", fp)
+                if (v.corrected) fp = v.props
+                footerBlock = { type: b.type, props: fp }
+              }
               strippedCount++
               return false
             }
@@ -766,23 +771,35 @@ export function createSitesAgentMcpServer(options: {
           filesCreated.push("package.json (deps added)")
         }
 
-        // 2. Create or replace catch-all page route with site-sdk version
+        // 2. Create or wrap catch-all page route for editor-managed pages
         const catchAllDir = join(projectDir, appDir, "[[...slug]]")
-        const blocksPrefix = args.useSrcDir ? "../../../" : "../../"
         const catchAllPage = join(catchAllDir, "page.tsx")
-        const needsNewPage = !existsSync(catchAllPage)
-          || !(await readFile(catchAllPage, "utf-8")).includes("createSitePage")
-        if (needsNewPage) {
+        const originalPage = join(catchAllDir, "_original-page.tsx")
+        const editorPage = join(catchAllDir, "_editor-page.tsx")
+        const blocksPrefix = args.useSrcDir ? "../../../" : "../../"
+        let isHybrid = false
+
+        if (!existsSync(catchAllDir)) {
+          // Case A: No catch-all — create standard editor catch-all
           await mkdir(catchAllDir, { recursive: true })
-          // Back up existing page if present
-          if (existsSync(catchAllPage)) {
-            await writeFile(join(catchAllDir, "page.original.tsx"), await readFile(catchAllPage, "utf-8"), "utf-8")
-            filesCreated.push(`${appDir}/[[...slug]]/page.original.tsx (backup)`)
-          }
           const pageContent = pageTsx(args.siteId)
             .replace('import "../../blocks/register"', `import "${blocksPrefix}blocks/register"`)
           await writeFile(catchAllPage, pageContent, "utf-8")
           filesCreated.push(`${appDir}/[[...slug]]/page.tsx`)
+        } else if (existsSync(catchAllPage) && !existsSync(originalPage)) {
+          // Case B: Existing catch-all, not yet wrapped — create hybrid
+          isHybrid = true
+          const { rename } = await import("node:fs/promises")
+          await rename(catchAllPage, originalPage)
+          const editorContent = pageTsx(args.siteId, { chrome: false })
+            .replace('import "../../blocks/register"', `import "${blocksPrefix}blocks/register"`)
+          await writeFile(editorPage, editorContent, "utf-8")
+          await writeFile(catchAllPage, hybridPageTsx(args.siteId), "utf-8")
+          filesCreated.push(`${appDir}/[[...slug]]/_original-page.tsx (preserved)`)
+          filesCreated.push(`${appDir}/[[...slug]]/_editor-page.tsx`)
+          filesCreated.push(`${appDir}/[[...slug]]/page.tsx (hybrid wrapper)`)
+        } else if (existsSync(originalPage)) {
+          isHybrid = true // already integrated
         }
 
         // 3. Create editor API route
@@ -796,20 +813,20 @@ export function createSitesAgentMcpServer(options: {
           filesCreated.push(`${appDir}/api/editor/[...path]/route.ts`)
         }
 
-        // 4. Create content directory with default home page
+        // 4. Create content directory (empty for hybrid — existing pages fall through to original)
         const contentDir = join(projectDir, "content")
         if (!existsSync(join(contentDir, "pages.json"))) {
           await mkdir(contentDir, { recursive: true })
-          await writeFile(join(contentDir, "pages.json"), samplePagesJson(), "utf-8")
+          await writeFile(join(contentDir, "pages.json"), isHybrid ? "[]\n" : samplePagesJson(), "utf-8")
           filesCreated.push("content/pages.json")
         }
 
         // 5. Create blocks register file
         const blocksDir = join(projectDir, "blocks")
-        if (!existsSync(join(blocksDir, "register.ts"))) {
+        if (!existsSync(join(blocksDir, "register.ts")) && !existsSync(join(blocksDir, "register.tsx"))) {
           await mkdir(blocksDir, { recursive: true })
-          await writeFile(join(blocksDir, "register.ts"), blocksRegisterTs(), "utf-8")
-          filesCreated.push("blocks/register.ts")
+          await writeFile(join(blocksDir, "register.tsx"), blocksRegisterTsx(), "utf-8")
+          filesCreated.push("blocks/register.tsx")
         }
 
         // 6. Create lib/defaults.ts
@@ -845,14 +862,16 @@ export function createSitesAgentMcpServer(options: {
           filesCreated.push(".env.local")
         }
 
-        // 8. Add block styles import to existing layout
+        // 8. Add block styles import + EditorOverlay to existing layout
         const layoutFile = args.layoutPath
           ? join(projectDir, args.layoutPath)
           : join(projectDir, appDir, "layout.tsx")
         if (existsSync(layoutFile)) {
-          const layoutContent = await readFile(layoutFile, "utf-8")
+          let layoutContent = await readFile(layoutFile, "utf-8")
+          let layoutModified = false
+
+          // Add block styles import
           if (!layoutContent.includes("@ai-site-editor/blocks/styles.css")) {
-            // Insert import after the last import statement
             const lines = layoutContent.split("\n")
             let lastImportIdx = -1
             for (let i = 0; i < lines.length; i++) {
@@ -863,8 +882,37 @@ export function createSitesAgentMcpServer(options: {
             } else {
               lines.unshift('import "@ai-site-editor/blocks/styles.css"')
             }
-            await writeFile(layoutFile, lines.join("\n"), "utf-8")
-            filesCreated.push(args.layoutPath ?? `${appDir}/layout.tsx (styles import added)`)
+            layoutContent = lines.join("\n")
+            layoutModified = true
+          }
+
+          // Add EditorOverlay for preview bridge (enables editor communication)
+          if (!layoutContent.includes("EditorOverlay")) {
+            // Add import
+            const lines = layoutContent.split("\n")
+            let lastImportIdx = -1
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].startsWith("import ")) lastImportIdx = i
+            }
+            const overlayImport = 'import { EditorOverlay } from "@ai-site-editor/site-sdk/editor"'
+            if (lastImportIdx >= 0) {
+              lines.splice(lastImportIdx + 1, 0, overlayImport)
+            } else {
+              lines.unshift(overlayImport)
+            }
+            layoutContent = lines.join("\n")
+
+            // Insert <EditorOverlay /> before closing </body>
+            layoutContent = layoutContent.replace(
+              "</body>",
+              `        <EditorOverlay slug="/" editorOrigin={process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? "http://localhost:4100"} />\n      </body>`
+            )
+            layoutModified = true
+          }
+
+          if (layoutModified) {
+            await writeFile(layoutFile, layoutContent, "utf-8")
+            filesCreated.push(args.layoutPath ?? `${appDir}/layout.tsx (styles + editor overlay added)`)
           }
         }
 
@@ -888,48 +936,9 @@ export function createSitesAgentMcpServer(options: {
           await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
         }
 
-        // 11. Detect port and start dev server + register
+        // 11. Detect port for reference (dev server started separately via launch_site)
         const port = await detectSitePort(projectDir)
 
-        // Kill any existing process on the port
-        try {
-          const { execSync } = await import("node:child_process")
-          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
-          if (pids) {
-            for (const pid of pids.split("\n")) {
-              try { process.kill(Number(pid), "SIGKILL") } catch { /* already dead */ }
-            }
-          }
-        } catch { /* no process on port */ }
-
-        // Initialize orchestrator session
-        const sessionKey = scopedSessionKey(session, args.siteId)
-        setPage(sessionKey, {
-          id: "p_home", slug: "/", title: "Home", blocks: [], updatedAt: new Date().toISOString(),
-        })
-        bumpVersion(sessionKey)
-
-        // Start dev server
-        console.log(`[sites-agent] Starting dev server for ${args.siteId} on port ${port}...`)
-        const { spawn } = await import("node:child_process")
-        const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${args.siteId}`, "dev"], {
-          cwd: root,
-          stdio: "ignore",
-          detached: true,
-        })
-        devProcess.unref()
-
-        const siteConfig = {
-          id: args.siteId,
-          name: siteName,
-          purpose: args.purpose ?? "",
-          tone: "",
-          hosting: "local",
-          previewUrl: `http://localhost:${port}`,
-          constraints: [],
-        }
-
-        emitSiteCreated(siteConfig)
         emitPhaseOutcome?.({ tool: "integrate_site", data: { siteId: args.siteId, port, name: siteName, filesCreated: filesCreated.length } })
 
         return {
@@ -939,10 +948,108 @@ export function createSitesAgentMcpServer(options: {
               status: "integrated",
               siteId: args.siteId,
               port,
-              previewUrl: `http://localhost:${port}`,
+              name: siteName,
               filesCreated,
-              devServerStarted: true,
             }),
+          }],
+        }
+      } catch (e: unknown) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+      }
+    }
+  )
+
+  // ── LAUNCH SITE ──
+  const launchSiteTool = tool(
+    "launch_site",
+    "Start the dev server for an integrated site, wait for it to be ready, and register it in the editor. Call this AFTER integrate_site completes. Returns the confirmed preview URL once the server is responding.",
+    {
+      siteId: z.string().describe("Site ID (matches the directory name in apps/)"),
+      name: z.string().optional().describe("Human-readable site name"),
+      purpose: z.string().optional().describe("What the site is about"),
+    },
+    async (args) => {
+      try {
+        const root = monorepoRoot()
+        const projectDir = join(root, "apps", args.siteId)
+
+        if (!existsSync(join(projectDir, "package.json"))) {
+          return { content: [{ type: "text" as const, text: `Error: apps/${args.siteId}/package.json not found.` }], isError: true }
+        }
+
+        let port = await detectSitePort(projectDir)
+
+        // Check if port is in use — if so, find a free one and update package.json
+        try {
+          const { execSync } = await import("node:child_process")
+          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
+          if (pids) {
+            console.log(`[sites-agent] Port ${port} in use, finding free port...`)
+            port = await findAvailablePort(root)
+            // Update dev script with new port
+            const pkg = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
+            if (pkg.scripts?.dev) {
+              pkg.scripts.dev = pkg.scripts.dev.replace(/-p\s*\d+/, `-p ${port}`)
+              await writeFile(join(projectDir, "package.json"), JSON.stringify(pkg, null, 2) + "\n", "utf-8")
+            }
+          }
+        } catch { /* no process on port — good */ }
+
+        // Initialize orchestrator session
+        const sessionKey = scopedSessionKey(session, args.siteId)
+        setPage(sessionKey, {
+          id: "p_home", slug: "/", title: "Home", blocks: [], updatedAt: new Date().toISOString(),
+        })
+        bumpVersion(sessionKey)
+
+        // Start dev server and listen for "Ready" message
+        const previewUrl = `http://localhost:${port}`
+        console.log(`[sites-agent] Starting dev server for ${args.siteId} on port ${port}...`)
+        const { spawn } = await import("node:child_process")
+        const devProcess = spawn("pnpm", ["dev"], {
+          cwd: projectDir,
+          stdio: ["ignore", "pipe", "pipe"],
+          detached: true,
+        })
+        devProcess.unref()
+
+        let serverReady = false
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => { resolve() }, 60_000)
+          const onData = (chunk: Buffer) => {
+            const text = chunk.toString()
+            if (text.includes("Ready") || text.includes(`localhost:${port}`)) {
+              serverReady = true
+              clearTimeout(timeout)
+              devProcess.stdout?.removeAllListeners()
+              devProcess.stderr?.removeAllListeners()
+              resolve()
+            }
+          }
+          devProcess.stdout?.on("data", onData)
+          devProcess.stderr?.on("data", onData)
+          devProcess.on("exit", () => { clearTimeout(timeout); resolve() })
+        })
+        console.log(`[sites-agent] Dev server ${serverReady ? "ready" : "timed out"} at ${previewUrl}`)
+
+        const siteName = args.name ?? args.siteId
+        const siteConfig = {
+          id: args.siteId,
+          name: siteName,
+          purpose: args.purpose ?? "",
+          tone: "",
+          hosting: "local",
+          previewUrl,
+          constraints: [],
+        }
+
+        emitSiteCreated(siteConfig)
+        emitPhaseOutcome?.({ tool: "launch_site", data: { siteId: args.siteId, port, name: siteName, serverReady } })
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({ status: serverReady ? "running" : "timeout", siteId: args.siteId, port, previewUrl, name: siteName, serverReady }),
           }],
         }
       } catch (e: unknown) {
@@ -1062,7 +1169,7 @@ export function createSitesAgentMcpServer(options: {
   return createSdkMcpServer({
     name: "sites-agent",
     version: "1.0.0",
-    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, applyThemeTool, analyzeCodebaseTool, cloneRepoTool, integrateSiteTool, registerSiteTool, ...createMigrationTools()],
+    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, applyThemeTool, analyzeCodebaseTool, cloneRepoTool, integrateSiteTool, launchSiteTool, registerSiteTool, ...createMigrationTools()],
   })
 }
 
@@ -1070,5 +1177,5 @@ export function createSitesAgentMcpServer(options: {
 // (sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
 //  validateAndCorrectProps, normalizePageBlocks, scaffoldSiteProject,
 //  packageJson, nextConfigTs, tsconfigJson, postcssConfig, layoutTsx, globalsCss,
-//  defaultsTs, editorApiRoute, pageTsx, blocksRegisterTs, samplePagesJson,
+//  defaultsTs, editorApiRoute, pageTsx, blocksRegisterTsx, samplePagesJson,
 //  defaultLogoSvg, faviconSvg)

@@ -91,6 +91,15 @@ export function App() {
     window.localStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
   }, [chatDarkMode])
 
+  // Follow system dark mode preference changes
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    const handler = (e: MediaQueryListEvent) => setChatDarkMode(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
+
   if (isPuckPrototype) {
     return (
       <Suspense fallback={<div style={{ height: "100vh", display: "grid", placeItems: "center" }}>Loading prototype…</div>}>

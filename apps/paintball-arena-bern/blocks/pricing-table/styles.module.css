@@ -1,0 +1,142 @@
+/* PricingTable Block */
+
+.section {
+  background: var(--bg-0);
+  padding: 80px 24px;
+  width: 100%;
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.heading {
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--heading);
+  text-align: center;
+  margin: 0 0 48px 0;
+  letter-spacing: 0.02em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0;
+}
+
+.column {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 40px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.duration {
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(3rem, 6vw, 5rem);
+  font-weight: 700;
+  color: var(--heading);
+  line-height: 1;
+  margin: 0;
+}
+
+.category {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--brand);
+  letter-spacing: 0.12em;
+  margin: 4px 0 0 0;
+}
+
+.days {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 14px;
+  color: var(--body-secondary);
+  margin: 0;
+}
+
+.priceDivider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.price {
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--heading);
+  line-height: 1;
+  margin: 0;
+}
+
+.unit {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 13px;
+  color: var(--body-secondary);
+  margin: 4px 0 0 0;
+}
+
+.inclusions {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inclusionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 13px;
+  color: var(--heading);
+  line-height: 1.4;
+}
+
+.inclusionItem::before {
+  content: "✓";
+  color: var(--brand);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.footerNote {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--body-secondary);
+  text-align: center;
+  margin: 32px auto 0 auto;
+  max-width: 760px;
+  line-height: 1.6;
+}
+
+/* Tablet: 2x2 grid */
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile: single column */
+@media (max-width: 600px) {
+  .section {
+    padding: 48px 16px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

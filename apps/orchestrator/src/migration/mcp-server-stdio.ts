@@ -26,7 +26,7 @@ import { saveScreenshot, saveScrapeDebug } from "./migration-tools.js"
 import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
   normalizePageBlocks, scaffoldSiteProject, analyzeCodebase, cloneRepo, detectSitePort,
-  pageTsx, editorApiRoute, blocksRegisterTs, defaultsTs, samplePagesJson,
+  pageTsx, hybridPageTsx, editorApiRoute, blocksRegisterTsx, defaultsTs, samplePagesJson,
   defaultLogoSvg, faviconSvg,
 } from "../agent/sites-agent-shared.js"
 
@@ -174,7 +174,7 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
       await mkdir(join(projectDir, "content"), { recursive: true })
       await mkdir(join(projectDir, "blocks"), { recursive: true })
       await mkdir(join(projectDir, "public/images"), { recursive: true })
-      await writeFile(join(projectDir, "blocks/register.ts"),
+      await writeFile(join(projectDir, "blocks/register.tsx"),
         `import { registerCustomRenderer } from "@ai-site-editor/blocks"\n`, "utf-8")
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ status: "reused", siteId, port, projectPath: projectDir }) }] }
@@ -210,7 +210,7 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
 })
 
 // ── bootstrap_pages ──
-server.tool("bootstrap_pages", `Create pages with blocks for a site. Available block types: ${Object.keys(getAllBlockMeta()).join(", ")}`, {
+server.tool("bootstrap_pages", `Create pages with blocks for a site. Built-in block types: ${Object.keys(getAllBlockMeta()).join(", ")}. Custom block types registered in blocks/register.ts are also supported — use the exact component name as the block type.`, {
   siteId: z.string().describe("Site ID"),
   pages: z.array(z.object({
     slug: z.string(),
@@ -370,20 +370,32 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
       filesCreated.push("package.json (deps added)")
     }
 
-    // Create or replace catch-all page with site-sdk version
+    // Create or wrap catch-all page route for editor-managed pages
     const catchAllDir = join(projectDir, appDir, "[[...slug]]")
-    const blocksPrefix = useSrcDir ? "../../../" : "../../"
     const catchAllPage = join(catchAllDir, "page.tsx")
-    const needsNewPage = !existsSync(catchAllPage)
-      || !(await readFile(catchAllPage, "utf-8")).includes("createSitePage")
-    if (needsNewPage) {
+    const originalPage = join(catchAllDir, "_original-page.tsx")
+    const editorPage = join(catchAllDir, "_editor-page.tsx")
+    const blocksPrefix = useSrcDir ? "../../../" : "../../"
+
+    let isHybrid = false
+    if (!existsSync(catchAllDir)) {
+      // Case A: No catch-all — create standard editor catch-all
       await mkdir(catchAllDir, { recursive: true })
-      if (existsSync(catchAllPage)) {
-        await writeFile(join(catchAllDir, "page.original.tsx"), await readFile(catchAllPage, "utf-8"), "utf-8")
-        filesCreated.push(`${appDir}/[[...slug]]/page.original.tsx (backup)`)
-      }
       await writeFile(catchAllPage, pageTsx(siteId).replace('import "../../blocks/register"', `import "${blocksPrefix}blocks/register"`), "utf-8")
       filesCreated.push(`${appDir}/[[...slug]]/page.tsx`)
+    } else if (existsSync(catchAllPage) && !existsSync(originalPage)) {
+      // Case B: Existing catch-all, not yet wrapped — create hybrid
+      isHybrid = true
+      const { rename } = await import("node:fs/promises")
+      await rename(catchAllPage, originalPage)
+      const editorContent = pageTsx(siteId, { chrome: false }).replace('import "../../blocks/register"', `import "${blocksPrefix}blocks/register"`)
+      await writeFile(editorPage, editorContent, "utf-8")
+      await writeFile(catchAllPage, hybridPageTsx(siteId), "utf-8")
+      filesCreated.push(`${appDir}/[[...slug]]/_original-page.tsx (preserved)`)
+      filesCreated.push(`${appDir}/[[...slug]]/_editor-page.tsx`)
+      filesCreated.push(`${appDir}/[[...slug]]/page.tsx (hybrid wrapper)`)
+    } else if (existsSync(originalPage)) {
+      isHybrid = true
     }
 
     // Create editor API route
@@ -395,20 +407,20 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
       filesCreated.push(`${appDir}/api/editor/[...path]/route.ts`)
     }
 
-    // Create content dir
+    // Create content dir (empty for hybrid — existing pages fall through to original)
     const contentDir = join(projectDir, "content")
     if (!existsSync(join(contentDir, "pages.json"))) {
       await mkdir(contentDir, { recursive: true })
-      await writeFile(join(contentDir, "pages.json"), samplePagesJson(), "utf-8")
+      await writeFile(join(contentDir, "pages.json"), isHybrid ? "[]\n" : samplePagesJson(), "utf-8")
       filesCreated.push("content/pages.json")
     }
 
     // Create blocks register
     const blocksDir = join(projectDir, "blocks")
-    if (!existsSync(join(blocksDir, "register.ts"))) {
+    if (!existsSync(join(blocksDir, "register.ts")) && !existsSync(join(blocksDir, "register.tsx"))) {
       await mkdir(blocksDir, { recursive: true })
-      await writeFile(join(blocksDir, "register.ts"), blocksRegisterTs(), "utf-8")
-      filesCreated.push("blocks/register.ts")
+      await writeFile(join(blocksDir, "register.tsx"), blocksRegisterTsx(), "utf-8")
+      filesCreated.push("blocks/register.tsx")
     }
 
     // Create lib/defaults.ts
@@ -444,10 +456,12 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
       filesCreated.push(".env.local")
     }
 
-    // Add block styles import to layout
+    // Add block styles import + EditorOverlay to layout
     const layoutFile = layoutPath ? join(projectDir, layoutPath) : join(projectDir, appDir, "layout.tsx")
     if (existsSync(layoutFile)) {
-      const layoutContent = await readFile(layoutFile, "utf-8")
+      let layoutContent = await readFile(layoutFile, "utf-8")
+      let layoutModified = false
+
       if (!layoutContent.includes("@ai-site-editor/blocks/styles.css")) {
         const lines = layoutContent.split("\n")
         let lastImportIdx = -1
@@ -459,8 +473,33 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
         } else {
           lines.unshift('import "@ai-site-editor/blocks/styles.css"')
         }
-        await writeFile(layoutFile, lines.join("\n"), "utf-8")
-        filesCreated.push(layoutPath ?? `${appDir}/layout.tsx (styles import added)`)
+        layoutContent = lines.join("\n")
+        layoutModified = true
+      }
+
+      if (!layoutContent.includes("EditorOverlay")) {
+        const lines = layoutContent.split("\n")
+        let lastImportIdx = -1
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith("import ")) lastImportIdx = i
+        }
+        const overlayImport = 'import { EditorOverlay } from "@ai-site-editor/site-sdk/editor"'
+        if (lastImportIdx >= 0) {
+          lines.splice(lastImportIdx + 1, 0, overlayImport)
+        } else {
+          lines.unshift(overlayImport)
+        }
+        layoutContent = lines.join("\n")
+        layoutContent = layoutContent.replace(
+          "</body>",
+          `        <EditorOverlay slug="/" editorOrigin={process.env.NEXT_PUBLIC_EDITOR_ORIGIN ?? "http://localhost:4100"} />\n      </body>`
+        )
+        layoutModified = true
+      }
+
+      if (layoutModified) {
+        await writeFile(layoutFile, layoutContent, "utf-8")
+        filesCreated.push(layoutPath ?? `${appDir}/layout.tsx (styles + editor overlay added)`)
       }
     }
 
@@ -483,17 +522,49 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
       await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
     }
 
-    // Start dev server
+    // Detect port for reference (dev server started separately via launch_site)
     const port = await detectSitePort(projectDir)
+
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({ status: "integrated", siteId, port, name: siteName, filesCreated }),
+      }],
+    }
+  } catch (e: unknown) {
+    return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+  }
+})
+
+// ── launch_site ──
+server.tool("launch_site", "Start the dev server for an integrated site, wait for it to be ready, and register it in the editor. Call this AFTER integrate_site completes. Returns the confirmed preview URL once the server is responding.", {
+  siteId: z.string().describe("Site ID (matches directory name in apps/)"),
+  name: z.string().optional().describe("Human-readable site name"),
+  purpose: z.string().optional().describe("What the site is about"),
+}, async ({ siteId, name, purpose }) => {
+  try {
+    const root = monorepoRoot()
+    const projectDir = join(root, "apps", siteId)
+
+    if (!existsSync(join(projectDir, "package.json"))) {
+      return { content: [{ type: "text" as const, text: `Error: apps/${siteId}/package.json not found.` }], isError: true }
+    }
+
+    let port = await detectSitePort(projectDir)
+
+    // Check if port is in use — if so, find a free one and update package.json
     try {
       const { execSync } = await import("node:child_process")
       const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
-      if (pids) { for (const pid of pids.split("\n")) { try { process.kill(Number(pid), "SIGKILL") } catch {} } }
+      if (pids) {
+        port = await findAvailablePort(root)
+        const pkg2 = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
+        if (pkg2.scripts?.dev) {
+          pkg2.scripts.dev = pkg2.scripts.dev.replace(/-p\s*\d+/, `-p ${port}`)
+          await writeFile(join(projectDir, "package.json"), JSON.stringify(pkg2, null, 2) + "\n", "utf-8")
+        }
+      }
     } catch {}
-
-    const { spawn } = await import("node:child_process")
-    const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${siteId}`, "dev"], { cwd: root, stdio: "ignore", detached: true })
-    devProcess.unref()
 
     // Sync with orchestrator
     const orchestratorUrl = process.env.ORCHESTRATOR_URL ?? "http://localhost:4200"
@@ -505,10 +576,35 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
       })
     } catch {}
 
+    // Start dev server and listen for "Ready" message
+    const { spawn } = await import("node:child_process")
+    const devProcess = spawn("pnpm", ["dev"], { cwd: projectDir, stdio: ["ignore", "pipe", "pipe"], detached: true })
+    devProcess.unref()
+
+    let serverReady = false
+    const previewUrl = `http://localhost:${port}`
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => { resolve() }, 60_000)
+      const onData = (chunk: Buffer) => {
+        const text = chunk.toString()
+        if (text.includes("Ready") || text.includes(`localhost:${port}`)) {
+          serverReady = true
+          clearTimeout(timeout)
+          devProcess.stdout?.removeAllListeners()
+          devProcess.stderr?.removeAllListeners()
+          resolve()
+        }
+      }
+      devProcess.stdout?.on("data", onData)
+      devProcess.stderr?.on("data", onData)
+      devProcess.on("exit", () => { clearTimeout(timeout); resolve() })
+    })
+
+    const siteName = name ?? siteId
     return {
       content: [{
         type: "text" as const,
-        text: JSON.stringify({ status: "integrated", siteId, port, name: siteName, previewUrl: `http://localhost:${port}`, filesCreated, devServerStarted: true }),
+        text: JSON.stringify({ status: serverReady ? "running" : "timeout", siteId, port, previewUrl, name: siteName, serverReady }),
       }],
     }
   } catch (e: unknown) {

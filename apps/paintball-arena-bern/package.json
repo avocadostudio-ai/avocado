@@ -2,11 +2,10 @@
   "name": "@ai-site-editor/paintball-arena-bern",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "next dev -p 3500",
     "build": "next build",
-    "start": "next start -p 3002",
+    "start": "next start -p 3500",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

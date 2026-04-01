@@ -71,7 +71,7 @@ export async function runCliAgent(
 
     // Spawn claude CLI
     const allowedTools = isIntegrate
-      ? "mcp__sites-agent__clone_repo,mcp__sites-agent__analyze_codebase,mcp__sites-agent__integrate_site,mcp__sites-agent__register_site,mcp__sites-agent__list_sites,mcp__sites-agent__bootstrap_pages,mcp__sites-agent__apply_theme,Read,Write,Edit,Bash,Glob,Grep"
+      ? "mcp__sites-agent__clone_repo,mcp__sites-agent__analyze_codebase,mcp__sites-agent__integrate_site,mcp__sites-agent__launch_site,mcp__sites-agent__register_site,mcp__sites-agent__list_sites,mcp__sites-agent__bootstrap_pages,mcp__sites-agent__apply_theme,Read,Write,Edit,Bash,Glob,Grep"
       : "mcp__sites-agent__discover_site_structure,mcp__sites-agent__generate_page_specs,mcp__sites-agent__scrape_url,mcp__sites-agent__extract_design_tokens,mcp__sites-agent__create_site,mcp__sites-agent__bootstrap_pages,mcp__sites-agent__download_remote_image,mcp__sites-agent__download_remote_images,mcp__sites-agent__apply_theme,Write,Edit,Bash"
 
     const cliArgs = [
@@ -215,18 +215,59 @@ export async function runCliAgent(
   }
 }
 
-/** Extract tool result data from CLI messages (for detecting site creation, etc.) */
+/** Extract tool result data from CLI stream-json messages (for detecting site creation, etc.) */
 function extractToolResults(msg: Record<string, unknown>): Array<Record<string, unknown>> {
   const results: Array<Record<string, unknown>> = []
-  if (msg.type !== "user") return results
-  const message = msg.message as { content?: Array<Record<string, unknown>> } | undefined
-  if (!message?.content) return results
-  for (const block of message.content) {
-    if (block.type === "tool_result" && typeof block.content === "string") {
-      try {
-        const parsed = JSON.parse(block.content) as Record<string, unknown>
-        if (parsed.siteId || parsed.port) results.push(parsed)
-      } catch { /* not JSON */ }
+
+  // Try to find JSON with siteId/port in any text content within the message
+  const textsToCheck: string[] = []
+
+  // Format 1: user message with tool_result blocks (SDK-style)
+  if (msg.type === "user") {
+    const message = msg.message as { content?: Array<Record<string, unknown>> } | undefined
+    if (message?.content) {
+      for (const block of message.content) {
+        if (block.type === "tool_result" && typeof block.content === "string") {
+          textsToCheck.push(block.content)
+        }
+      }
+    }
+  }
+
+  // Format 2: result message (CLI stream-json tool results)
+  if (msg.type === "result") {
+    const result = msg.result as string | undefined
+    if (result) textsToCheck.push(result)
+    // Also check subResult for MCP
+    const subResult = msg.subResult as string | undefined
+    if (subResult) textsToCheck.push(subResult)
+  }
+
+  // Format 3: assistant message with tool_result content blocks
+  if (msg.type === "assistant") {
+    const message = msg.message as { content?: Array<Record<string, unknown>> } | undefined
+    if (message?.content) {
+      for (const block of message.content) {
+        if (typeof block.text === "string") textsToCheck.push(block.text)
+        if (typeof block.content === "string") textsToCheck.push(block.content)
+      }
+    }
+  }
+
+  // Parse any JSON strings that contain siteId or port
+  for (const text of textsToCheck) {
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>
+      if (parsed.siteId || parsed.port) results.push(parsed)
+    } catch {
+      // Try to find JSON within the text (MCP results may have wrapper text)
+      const jsonMatch = text.match(/\{[^{}]*"siteId"[^{}]*\}/)
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>
+          if (parsed.siteId || parsed.port) results.push(parsed)
+        } catch { /* not valid JSON */ }
+      }
     }
   }
   return results
