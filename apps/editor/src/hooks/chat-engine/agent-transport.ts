@@ -6,6 +6,7 @@
 
 import { withAccessTokenQuery } from "../../lib/access-auth"
 import type { AssistantResponse } from "../../lib/editor-types"
+import { toPastTense } from "../../lib/utils"
 
 type AgentTransportArgs = {
   orchestrator: string
@@ -73,7 +74,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
 
   const promise = (async (): Promise<boolean> => {
   setStreamStatus("Agent thinking...")
-  setStreamSteps([{ label: "Starting agent", done: false }])
+  setStreamSteps([])
 
   // Activate shimmer immediately on the active block while agent thinks
   if (activeBlockId) {
@@ -236,7 +237,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
         const msg = d.message as string
         setStreamStatus(msg)
         setStreamSteps((prev) => {
-          const done = prev.map((s) => ({ ...s, done: true }))
+          const done = prev.map((s) => s.done ? s : { ...s, label: toPastTense(s.label), done: true })
           return [...done, { label: msg.replace(/\.\.\.$/, ""), done: false }]
         })
         keepShimmerAlive()

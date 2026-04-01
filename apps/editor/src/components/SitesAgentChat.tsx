@@ -70,6 +70,9 @@ export function SitesAgentChat({ agent }: Props) {
               <button type="button" onClick={() => { setInput(t("sitesAgent.suggestion2")); textareaRef.current?.focus() }}>
                 {t("sitesAgent.suggestion2")}
               </button>
+              <button type="button" onClick={() => { setInput(t("sitesAgent.suggestion3")); textareaRef.current?.focus() }}>
+                {t("sitesAgent.suggestion3")}
+              </button>
             </div>
           </div>
         )}
@@ -190,13 +193,13 @@ function StepTracker({ steps, phaseLabels }: { steps: { label: string; done: boo
       )}
       {expanded && doneSteps.map((step, i) => (
         <div key={`d${i}`} className="sites-agent-step done">
-          <svg viewBox="0 0 16 16" width="12" height="12"><path d="M13.5 4.5l-7 7L3 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="sites-agent-step-dot-done" />
           <span>{step.label}{step.count && step.count > 1 ? ` (x${step.count})` : ""}</span>
         </div>
       ))}
       {activeStep && (
         <div className="sites-agent-step active">
-          <span className="sites-agent-step-spinner" />
+          <span className="sites-agent-step-dot" />
           <span>{activeStep.label}</span>
         </div>
       )}
