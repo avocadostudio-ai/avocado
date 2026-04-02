@@ -1,6 +1,6 @@
 import React, { forwardRef, type CSSProperties, type ReactNode } from "react"
 import type { ChatEntry } from "../lib/editor-types"
-import { renderFinalMarkdown, renderSimpleMarkdown } from "../lib/markdown-renderer"
+import { renderFinalMarkdown, renderStreamingMarkdown } from "../lib/markdown-renderer"
 import { isRedundantChangeLine } from "../lib/editor-utils"
 import ClaudeStyleChatInput from "./claude-style-chat-input"
 
@@ -148,7 +148,7 @@ export const ChatThreadCore = forwardRef<HTMLDivElement, ChatThreadCoreProps>(fu
             </ul>
           ) : null}
           <div className="msg-main">
-            {renderSimpleMarkdown(streamingText)}
+            {renderStreamingMarkdown(streamingText)}
           </div>
           {streamingChanges.length > 0 ? (
             <ul className="msg-list">
@@ -166,21 +166,23 @@ export const ChatThreadCore = forwardRef<HTMLDivElement, ChatThreadCoreProps>(fu
           {renderStreamingExtras ? renderStreamingExtras() : null}
         </article>
       ) : streamStatus ? (
-        renderStreamStatusFallback ? renderStreamStatusFallback() : (
-          <article className="msg msg-assistant msg-streaming">
-            {doneStreamSteps.length > 0 ? (
-              <ul className="stream-steps stream-steps-in-bubble">
-                {doneStreamSteps.map((step, idx) => (
-                  <li key={idx} className="stream-step is-done">{step.label}</li>
-                ))}
-              </ul>
-            ) : null}
-            {fallbackStatusLabel ? (
-              <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{fallbackStatusLabel}</span>
-            ) : null}
-            {renderStreamingExtras ? renderStreamingExtras() : null}
-          </article>
-        )
+        <article className="msg msg-assistant msg-streaming">
+          {renderStreamStatusFallback ? renderStreamStatusFallback() : (
+            <>
+              {doneStreamSteps.length > 0 ? (
+                <ul className="stream-steps stream-steps-in-bubble">
+                  {doneStreamSteps.map((step, idx) => (
+                    <li key={idx} className="stream-step is-done">{step.label}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {fallbackStatusLabel ? (
+                <span className="streaming-pill-status streaming-pill-status-text stream-status-inline">{fallbackStatusLabel}</span>
+              ) : null}
+            </>
+          )}
+          {renderStreamingExtras ? renderStreamingExtras() : null}
+        </article>
       ) : null}
       <div />
     </div>

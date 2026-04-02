@@ -6,8 +6,48 @@ export function renderFinalMarkdown(text: string) {
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
 }
 
-export function renderSimpleMarkdown(text: string) {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n")
+/**
+ * Streaming-safe markdown renderer. Strips incomplete trailing lines to prevent
+ * layout shifts, then delegates to react-markdown for full CommonMark rendering.
+ */
+export function renderStreamingMarkdown(text: string) {
+  const allLines = text.replace(/\r\n?/g, "\n").split("\n")
+  const lastLine = allLines.length > 1 ? allLines[allLines.length - 1]?.trim() ?? "" : ""
+  const skipLast = allLines.length > 1 && (
+    /^#{1,6}\s*$/.test(lastLine) ||         // bare heading markers
+    /^-{1,2}$/.test(lastLine) ||            // incomplete hr
+    /^\*{1,2}$/.test(lastLine) ||           // incomplete hr or bold
+    /^_{1,2}$/.test(lastLine) ||            // incomplete hr
+    /^```\s*\S*$/.test(lastLine) ||         // opening code fence
+    /^\|[^|]*$/.test(lastLine) ||           // incomplete table row
+    /^\d+\.\s*$/.test(lastLine) ||          // bare ordered list number ("2.")
+    /^[-*•]\s*$/.test(lastLine) ||          // bare unordered list marker
+    /^>\s*$/.test(lastLine)                 // bare blockquote marker
+  )
+  const cleaned = skipLast ? allLines.slice(0, -1).join("\n") : text
+  return <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleaned}</ReactMarkdown>
+}
+
+// TODO: delete renderSimpleMarkdown — replaced by renderStreamingMarkdown above.
+// Keeping temporarily in case we need to revert.
+export function renderSimpleMarkdown(text: string, streaming = true) {
+  const allLines = text.replace(/\r\n?/g, "\n").split("\n")
+  // When streaming, skip the last line if it looks like an incomplete markdown
+  // block element (e.g. bare "###" or "--") to avoid layout shift when the
+  // line is completed and re-parsed as a heading or hr.
+  const lastLine = streaming && allLines.length > 1 ? allLines[allLines.length - 1]?.trim() ?? "" : ""
+  const skipLast = streaming && allLines.length > 1 && (
+    /^#{1,6}\s*$/.test(lastLine) ||         // bare heading markers (with or without space)
+    /^-{1,2}$/.test(lastLine) ||            // incomplete hr
+    /^\*{1,2}$/.test(lastLine) ||           // incomplete hr or bold
+    /^_{1,2}$/.test(lastLine) ||            // incomplete hr
+    /^```\s*\S*$/.test(lastLine) ||         // opening code fence
+    /^\|[^|]*$/.test(lastLine) ||           // incomplete table row
+    /^\d+\.\s*$/.test(lastLine) ||          // bare ordered list number ("2.")
+    /^[-*•]\s*$/.test(lastLine) ||          // bare unordered list marker
+    /^>\s*$/.test(lastLine)                 // bare blockquote marker
+  )
+  const lines = skipLast ? allLines.slice(0, -1) : allLines
   const elements: (React.ReactNode)[] = []
   let listItems: string[] = []
   let orderedListItems: string[] = []
@@ -271,6 +311,11 @@ export function renderSimpleMarkdown(text: string) {
       continue
     }
     flushLists()
+
+    if (/^-{2,}$|^\*{2,}$|^_{2,}$/.test(trimmed)) {
+      elements.push(<hr key={`hr-${elements.length}`} />)
+      continue
+    }
 
     const headingMatch = /^\s{0,3}(#{1,6})\s+(.+)$/.exec(line)
     if (headingMatch) {
