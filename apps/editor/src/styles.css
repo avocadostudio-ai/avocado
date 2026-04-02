@@ -1295,6 +1295,7 @@ textarea {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 10px;
+  animation: msg-section-appear 0.2s ease-out;
 }
 
 .msg-undo-btn {
@@ -1709,6 +1710,21 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  animation: msg-section-appear 0.2s ease-out;
+}
+
+.msg-streaming {
+  animation: msg-appear 0.15s ease-out;
+}
+
+@keyframes msg-section-appear {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes msg-appear {
+  from { opacity: 0.6; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .msg-suggestion {
@@ -1864,6 +1880,13 @@ textarea {
   border: none;
   box-shadow: none;
   animation: none;
+}
+
+.msg-streaming .streaming-pill {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 .streaming-pill.is-error {

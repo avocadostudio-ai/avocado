@@ -136,6 +136,9 @@ export function useSitesAgent(options: {
         setStreamStatus(msg)
         const label = msg.replace(/\.\.\.$/, "")
         setStreamSteps(prev => {
+          // If the same step is still active, skip the update
+          const activeIdx = prev.findIndex(s => !s.done)
+          if (activeIdx >= 0 && prev[activeIdx].label === label) return prev
           const done = prev.map(s => s.done ? s : { ...s, label: toPastTense(s.label), done: true })
           if (done.length > 0 && done[done.length - 1].label === toPastTense(label)) {
             const last = done[done.length - 1]
@@ -147,7 +150,10 @@ export function useSitesAgent(options: {
       } else if (type === "heartbeat") {
         const elapsedMs = Number(d.elapsedMs ?? 0)
         const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000))
-        setStreamStatus(`Agent working... ${elapsedSec}s`)
+        // Only update every 5s to reduce re-renders
+        if (elapsedSec % 5 === 0) {
+          setStreamStatus(`Agent working... ${elapsedSec}s`)
+        }
       } else if (type === "summary_token") {
         // Accumulate for the final assistant message, but don't stream to UI —
         // the StepTracker provides real-time progress; text is shown only at completion.
