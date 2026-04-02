@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useT } from "@/i18n"
-import { renderSimpleMarkdown } from "../lib/markdown-renderer"
+import { renderStreamingMarkdown, renderFinalMarkdown } from "../lib/markdown-renderer"
 import { Bot, Trash2, Square, ArrowUp, Sparkles, ChevronDown, ChevronRight, Copy, Check } from "lucide-react"
 import type { UseSitesAgentReturn, SitesAgentMessage, PhaseStatus } from "../hooks/useSitesAgent"
 
@@ -14,12 +14,26 @@ export function SitesAgentChat({ agent }: Props) {
   const threadRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-scroll on new messages or streaming text
+  // Auto-scroll: only when user is near bottom, use rAF to avoid layout race
+  const shouldAutoScrollRef = useRef(true)
+
   useEffect(() => {
     const el = threadRef.current
     if (!el) return
-    el.scrollTop = el.scrollHeight
-  }, [agent.messages, agent.streamingText, agent.streamStatus])
+    const onScroll = () => {
+      shouldAutoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+    }
+    el.addEventListener("scroll", onScroll, { passive: true })
+    return () => el.removeEventListener("scroll", onScroll)
+  }, [])
+
+  useEffect(() => {
+    if (!shouldAutoScrollRef.current) return
+    const el = threadRef.current
+    if (!el) return
+    const raf = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
+    return () => cancelAnimationFrame(raf)
+  }, [agent.messages.length, agent.streamingText, agent.streamStatus])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -73,17 +87,17 @@ export function SitesAgentChat({ agent }: Props) {
 
         {agent.streamingText && (
           <div className="sites-agent-message sites-agent-message-assistant">
-            <div className="sites-agent-message-content">{renderSimpleMarkdown(agent.streamingText)}</div>
+            <div className="sites-agent-message-content">{renderStreamingMarkdown(agent.streamingText)}</div>
           </div>
         )}
 
-        {agent.isStreaming && agent.streamPhases.length > 0 && (
+        {/* Always mount to prevent layout jumps — hide via CSS when empty */}
+        <div style={{ display: agent.isStreaming && agent.streamPhases.length > 0 ? undefined : "none" }}>
           <PhaseTracker phases={agent.streamPhases} />
-        )}
-
-        {agent.isStreaming && agent.streamSteps.length > 0 && (
+        </div>
+        <div style={{ display: agent.isStreaming && agent.streamSteps.length > 0 ? undefined : "none" }}>
           <StepTracker steps={agent.streamSteps} phaseLabels={agent.streamPhases.flatMap(p => [p.activeLabel, p.doneLabel])} />
-        )}
+        </div>
       </div>
 
       {agent.messages.length > 0 && !agent.isStreaming && (
@@ -181,8 +195,8 @@ function StepTracker({ steps, phaseLabels }: { steps: { label: string; done: boo
           <span>{expanded ? "Hide" : `${doneCount}`} step{doneCount > 1 ? "s" : ""}{expanded ? "" : " completed"}</span>
         </button>
       )}
-      {expanded && doneSteps.map((step, i) => (
-        <div key={`d${i}`} className="sites-agent-step done">
+      {expanded && doneSteps.map((step) => (
+        <div key={step.label} className="sites-agent-step done">
           <span className="sites-agent-step-dot-done" />
           <span>{step.label}{step.count && step.count > 1 ? ` (x${step.count})` : ""}</span>
         </div>
@@ -208,7 +222,7 @@ function MessageBubble({ message }: { message: SitesAgentMessage }) {
   return (
     <div className={`sites-agent-message-wrap ${isUser ? "sites-agent-message-wrap-user" : ""}`}>
       <div className={`sites-agent-message ${isUser ? "sites-agent-message-user" : "sites-agent-message-assistant"}`}>
-        <div className="sites-agent-message-content">{renderSimpleMarkdown(message.text)}</div>
+        <div className="sites-agent-message-content">{renderFinalMarkdown(message.text)}</div>
       </div>
       {isUser && (
         <button type="button" className="sites-agent-copy-btn" onClick={handleCopy} title="Copy">

@@ -591,6 +591,7 @@ function EditorPage({
 
     const raf = window.requestAnimationFrame(() => {
       thread.scrollTop = thread.scrollHeight
+      shouldAutoScrollThreadRef.current = true // re-arm after programmatic scroll
       didInitialThreadScrollRef.current = true
     })
     return () => window.cancelAnimationFrame(raf)
