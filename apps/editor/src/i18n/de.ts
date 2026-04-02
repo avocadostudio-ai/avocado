@@ -323,8 +323,11 @@ const de: LocaleDict = {
   "sitesAgent.welcome": "Ich kann eine neue Seite erstellen, eine bestehende Website von ihrer URL migrieren oder den Editor in dein Next.js-Projekt integrieren. Was möchtest du tun?",
   "sitesAgent.placeholder": "Frag mich etwas...",
   "sitesAgent.suggestion1": "Neue Seite von Grund auf erstellen",
+  "sitesAgent.suggestion1Desc": "Beschreibe den Zweck deiner Seite und ich erstelle sie",
   "sitesAgent.suggestion2": "Website von URL migrieren",
+  "sitesAgent.suggestion2Desc": "Gib mir eine URL und ich analysiere und erstelle sie neu",
   "sitesAgent.suggestion3": "Über ein GitHub-Projekt integrieren",
+  "sitesAgent.suggestion3Desc": "Verbinde den Editor mit deiner bestehenden Next.js-App",
   "sitesAgent.stop": "Stopp",
 }
 

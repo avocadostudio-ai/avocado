@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import TextareaAutosize from "react-textarea-autosize"
 import { useT } from "@/i18n"
 import { renderStreamingMarkdown, renderFinalMarkdown } from "../lib/markdown-renderer"
 import { Bot, Trash2, Square, ArrowUp, Sparkles, ChevronDown, ChevronRight, Copy, Check } from "lucide-react"
@@ -14,34 +15,40 @@ export function SitesAgentChat({ agent }: Props) {
   const threadRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-scroll: only when user is near bottom, use rAF to avoid layout race
-  const shouldAutoScrollRef = useRef(true)
+  // Auto-scroll: track if user is at bottom (1px tolerance for sub-pixel rounding)
+  const isAtBottomRef = useRef(true)
+  const lastScrollTopRef = useRef(0)
+  const scrollBehaviorRef = useRef<ScrollBehavior | null>(null)
 
   useEffect(() => {
     const el = threadRef.current
     if (!el) return
     const onScroll = () => {
-      shouldAutoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+      const atBottom = Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < 1 || el.scrollHeight <= el.clientHeight
+      // Only mark as "not at bottom" if user scrolled up manually
+      if (!atBottom && el.scrollTop < lastScrollTopRef.current) {
+        isAtBottomRef.current = false
+        scrollBehaviorRef.current = null
+      } else if (atBottom) {
+        isAtBottomRef.current = true
+        scrollBehaviorRef.current = null
+      }
+      lastScrollTopRef.current = el.scrollTop
     }
     el.addEventListener("scroll", onScroll, { passive: true })
     return () => el.removeEventListener("scroll", onScroll)
   }, [])
 
+  // Scroll to bottom on new content (smooth for new messages, instant for init)
   useEffect(() => {
-    if (!shouldAutoScrollRef.current) return
+    if (!isAtBottomRef.current) return
     const el = threadRef.current
     if (!el) return
-    const raf = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
+    const raf = requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: scrollBehaviorRef.current ?? "smooth" })
+    })
     return () => cancelAnimationFrame(raf)
-  }, [agent.messages.length, agent.streamingText, agent.streamStatus])
-
-  // Auto-resize textarea
-  useEffect(() => {
-    const ta = textareaRef.current
-    if (!ta) return
-    ta.style.height = "0px"
-    ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`
-  }, [input])
+  }, [agent.messages.length, agent.streamingText, agent.streamStatus, agent.streamPhases, agent.streamSteps])
 
   function handleSubmit() {
     if (!input.trim() || agent.isStreaming) return
@@ -68,14 +75,17 @@ export function SitesAgentChat({ agent }: Props) {
             </div>
             <p className="sites-agent-welcome-text">{t("sitesAgent.welcome")}</p>
             <div className="sites-agent-suggestions">
-              <button type="button" onClick={() => { setInput(t("sitesAgent.suggestion1")); textareaRef.current?.focus() }}>
-                {t("sitesAgent.suggestion1")}
+              <button type="button" onClick={() => agent.sendMessage("Create a new site from scratch")}>
+                <span className="sites-agent-suggestion-title">{t("sitesAgent.suggestion1")}</span>
+                <span className="sites-agent-suggestion-desc">{t("sitesAgent.suggestion1Desc")}</span>
               </button>
-              <button type="button" onClick={() => { setInput(t("sitesAgent.suggestion2")); textareaRef.current?.focus() }}>
-                {t("sitesAgent.suggestion2")}
+              <button type="button" onClick={() => agent.sendMessage("Migrate a website from URL")}>
+                <span className="sites-agent-suggestion-title">{t("sitesAgent.suggestion2")}</span>
+                <span className="sites-agent-suggestion-desc">{t("sitesAgent.suggestion2Desc")}</span>
               </button>
-              <button type="button" onClick={() => { setInput(t("sitesAgent.suggestion3")); textareaRef.current?.focus() }}>
-                {t("sitesAgent.suggestion3")}
+              <button type="button" onClick={() => agent.sendMessage("Integrate the editor into my existing Next.js project")}>
+                <span className="sites-agent-suggestion-title">{t("sitesAgent.suggestion3")}</span>
+                <span className="sites-agent-suggestion-desc">{t("sitesAgent.suggestion3Desc")}</span>
               </button>
             </div>
           </div>
@@ -85,19 +95,32 @@ export function SitesAgentChat({ agent }: Props) {
           <MessageBubble key={msg.id} message={msg} />
         ))}
 
-        {agent.streamingText && (
-          <div className="sites-agent-message sites-agent-message-assistant">
-            <div className="sites-agent-message-content">{renderStreamingMarkdown(agent.streamingText)}</div>
+        {agent.isStreaming && (
+          <div className="sites-agent-message sites-agent-message-assistant sites-agent-message-streaming">
+            <div className="sites-agent-message-content">
+              {agent.streamingText ? (
+                <>
+                  {renderStreamingMarkdown(agent.streamingText)}
+                  <span className="sites-agent-typing-dot"> ●</span>
+                </>
+              ) : !agent.streamPhases.length && (
+                <span className="sites-agent-thinking-dots"><span /><span /><span /></span>
+              )}
+              {agent.streamPhases.length > 0 && <PhaseTracker phases={agent.streamPhases} />}
+              {agent.streamSteps.length > 0 && (
+                <StepTracker steps={agent.streamSteps} phaseLabels={agent.streamPhases.flatMap(p => [p.activeLabel, p.doneLabel])} />
+              )}
+            </div>
           </div>
         )}
 
-        {/* Always mount to prevent layout jumps — hide via CSS when empty */}
-        <div style={{ display: agent.isStreaming && agent.streamPhases.length > 0 ? undefined : "none" }}>
-          <PhaseTracker phases={agent.streamPhases} />
-        </div>
-        <div style={{ display: agent.isStreaming && agent.streamSteps.length > 0 ? undefined : "none" }}>
-          <StepTracker steps={agent.streamSteps} phaseLabels={agent.streamPhases.flatMap(p => [p.activeLabel, p.doneLabel])} />
-        </div>
+        {!agent.isStreaming && agent.followUpSuggestions.length > 0 && (
+          <div className="sites-agent-followups">
+            {agent.followUpSuggestions.map((s, i) => (
+              <button key={i} type="button" onClick={() => agent.sendMessage(s)}>{s}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {agent.messages.length > 0 && !agent.isStreaming && (
@@ -113,7 +136,7 @@ export function SitesAgentChat({ agent }: Props) {
 
       <div className="sites-agent-composer">
         <div className={`sites-agent-input-wrap${agent.isStreaming ? " is-loading" : ""}`}>
-          <textarea
+          <TextareaAutosize
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -124,7 +147,8 @@ export function SitesAgentChat({ agent }: Props) {
               }
             }}
             placeholder={t("sitesAgent.placeholder")}
-            rows={1}
+            minRows={1}
+            maxRows={6}
             disabled={agent.isStreaming}
           />
           {agent.isStreaming ? (
@@ -192,7 +216,12 @@ function StepTracker({ steps, phaseLabels }: { steps: { label: string; done: boo
           onClick={() => setExpanded(e => !e)}
         >
           {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-          <span>{expanded ? "Hide" : `${doneCount}`} step{doneCount > 1 ? "s" : ""}{expanded ? "" : " completed"}</span>
+          <span>
+            {expanded
+              ? `Hide step${doneCount > 1 ? "s" : ""}`
+              : `${doneCount} step${doneCount > 1 ? "s" : ""}${doneSteps.length > 0 ? ` · ${doneSteps[doneSteps.length - 1].label}` : ""}`
+            }
+          </span>
         </button>
       )}
       {expanded && doneSteps.map((step) => (

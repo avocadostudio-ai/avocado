@@ -182,6 +182,30 @@ function EditorPage({
     return () => { document.removeEventListener("mousedown", onClickOutside); document.removeEventListener("keydown", onKey) }
   }, [showSiteSwitcher])
 
+  // Check which sites are reachable when the dropdown opens
+  const [reachableSiteIds, setReachableSiteIds] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    if (!showSiteSwitcher) { setReachableSiteIds(null); return }
+    let active = true
+    const check = async () => {
+      const results = await Promise.all(
+        sites.siteList.map(async (site) => {
+          const origin = resolveSiteOrigin(site)
+          try {
+            const res = await fetch(`${origin}/api/editor/blocks?siteId=${encodeURIComponent(site.id)}`, { signal: AbortSignal.timeout(2500) })
+            return res.ok ? site.id : null
+          } catch { return null }
+        })
+      )
+      if (active) setReachableSiteIds(new Set(results.filter(Boolean) as string[]))
+    }
+    void check()
+    return () => { active = false }
+  }, [showSiteSwitcher, sites.siteList])
+  const dropdownSites = reachableSiteIds
+    ? sites.siteList.filter(site => site.id === siteId || reachableSiteIds.has(site.id))
+    : sites.siteList
+
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLDivElement>(null)
   const shouldAutoScrollThreadRef = useRef(true)
@@ -557,12 +581,20 @@ function EditorPage({
     return () => { active = false; window.clearInterval(timer) }
   }, [])
 
+  const lastScrollTopRef = useRef(0)
   useEffect(() => {
     const thread = chatThreadRef.current
     if (!thread) return
     const onScroll = () => {
-      const distanceToBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight
-      shouldAutoScrollThreadRef.current = distanceToBottom < 72
+      const atBottom = Math.abs(thread.scrollHeight - thread.scrollTop - thread.clientHeight) < 2 || thread.scrollHeight <= thread.clientHeight
+      // Only disable auto-scroll when user manually scrolls UP — not on programmatic
+      // scrolls that haven't caught up with new content yet
+      if (!atBottom && thread.scrollTop < lastScrollTopRef.current) {
+        shouldAutoScrollThreadRef.current = false
+      } else if (atBottom) {
+        shouldAutoScrollThreadRef.current = true
+      }
+      lastScrollTopRef.current = thread.scrollTop
     }
     thread.addEventListener("scroll", onScroll, { passive: true })
     return () => {
@@ -1028,7 +1060,7 @@ function EditorPage({
               {showSiteSwitcher && (
                 <div className="site-switcher-dropdown" role="menu" aria-label={t("header.allSites")}>
                   <div className="site-switcher-list">
-                    {sites.siteList.map((site) => (
+                    {dropdownSites.map((site) => (
                       <button
                         key={site.id}
                         type="button"

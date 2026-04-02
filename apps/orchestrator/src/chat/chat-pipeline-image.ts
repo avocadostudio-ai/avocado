@@ -7,6 +7,7 @@ import {
 } from "@ai-site-editor/shared"
 import type { UnsplashImage } from "../variation-images.js"
 import type { PendingImageGeneration } from "../state/session-state.js"
+import { inferTranslationScopeFromMessage } from "./chat-pipeline-translation.js"
 import {
   heroImageQueryFromContext,
   imageKeywordsFromQuery,
@@ -873,6 +874,8 @@ export function detectImageOps(args: {
 }): PendingImageGeneration[] {
   const lowerMessage = args.message.toLowerCase()
   if (args.plan.intent !== "edit_plan") return []
+  // Translation requests don't need image resolution — skip to avoid forcing approval mode
+  if (inferTranslationScopeFromMessage(args.message) !== "none") return []
 
   const explicitUnsplashRequest = lowerMessage.includes("unsplash")
   const explicitGdriveRequest = /\b(drive|brand\s+(?:assets?|images?|photos?)|our\s+(?:photos?|images?|folder)|company\s+(?:images?|photos?))\b/.test(lowerMessage)

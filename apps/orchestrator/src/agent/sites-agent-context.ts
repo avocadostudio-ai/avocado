@@ -210,6 +210,9 @@ Execute the plan in order. The user sees tool-call progress automatically — do
    - \`themeOverrides\` from scrape \`themeVariables\`
    - \`siteName\`, \`siteLogo\`, \`navLabels\`, \`navGroups\`
    - ONE Footer block (extracted to site-wide chrome)
+   - \`purpose\` — 1-2 sentence description of what the business/site does (inferred from hero text, meta description, and overall content)
+   - \`tone\` — voice/tone guide derived from the site's copy style (e.g. "Informal, action-oriented, uses du-form German, emphasizes fun and team experiences")
+   - \`constraints\` — content rules inferred from the site (e.g. language, pricing minimums, brand-specific terms that must be preserved)
 5. Write final summary
 
 ### Phase 4: Final Summary
@@ -226,13 +229,14 @@ Write the final summary using the format from "Output Formatting" above. This is
 - **DO include ONE Footer block** in any page's blocks array — it will be extracted and used as the site-wide chrome footer (rendered on every page). Extract footer content from the original site: copyright text, link columns, etc. **Footer \`links\` must be pipe-delimited strings**: \`"Label|/url\\nLabel2|/url2"\`, NOT \`[{label, href}]\` objects.
 - **Navigation**: Extract nav item labels from the original site's \`<nav>\` links — use the EXACT original text (e.g. "Über uns" not "About"). Pass as \`navLabels\` in \`bootstrap_pages\`. If the original nav has dropdowns (parent → children), pass as \`navGroups\`.
 - **Site logo**: Download the original site's logo image and pass the local path as \`siteLogo\` in \`bootstrap_pages\`.
-- **Custom blocks — use them!** Spawn the **block-coder** subagent when a section needs a layout that standard blocks can't represent well. Common cases:
-  - Pricing cards with multiple tiers, toggle pricing, feature comparison → custom **PricingTable**
-  - Event/service cards with background images, overlay text, special layout → custom **EventCard**
-  - Location section with embedded map + address + hours → custom **LocationBlock**
-  - Team/staff grid with photos, names, roles, social links → custom **TeamGrid**
+- **Custom blocks — use them!** Spawn the **block-coder** subagent when a section needs a layout that standard blocks can't represent well. **NEVER use RichText as a fallback for structured data** — if the source has pricing tiers, event cards, team members, timelines, or any structured/tabular content, you MUST create a custom block. RichText is only for freeform prose.
+  Common custom block triggers:
+  - Pricing cards / tiers / comparison tables → custom **PricingTable**
+  - Event/service cards with background images, overlay text → custom **EventCard**
+  - Location section with map + address + hours → custom **LocationBlock**
+  - Team/staff grid with photos, names, roles → custom **TeamGrid**
   - Timeline/roadmap/process steps → custom **Timeline**
-  Pass the siteId to the block-coder: "Create a PricingTable block for site paintball-arena-bern with fields: ..."
+  Pass the siteId to the block-coder: "Create a PricingTable block for site {siteId} with fields: ..."
   Custom blocks must be created BEFORE calling \`bootstrap_pages\` so they can be referenced.
 - Only provide the props you want to set — defaults are filled in automatically. Do not mix default English placeholder text with migrated content.
 - **ALL image URLs in block props MUST be local paths** (starting with \`/images/\`). Remote URLs will crash Next.js rendering. Download ALL images with \`download_remote_images\` (batch) BEFORE calling \`bootstrap_pages\` — pass all image URLs in a single call, not one by one.

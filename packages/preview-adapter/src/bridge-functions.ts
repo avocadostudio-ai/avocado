@@ -320,13 +320,7 @@ export function applyAiFieldLoading(blockId: string, editablePath: string, activ
     target.appendChild(overlay)
 
     if (blockId) {
-      const highlight = scopedBlock.closest(".editor-highlight") ?? scopedBlock
-      const toolbar = highlight.querySelector(".editor-block-toolbar")
-      if (toolbar) {
-        toolbar.appendChild(sparkle)
-      } else {
-        target.appendChild(sparkle)
-      }
+      target.appendChild(sparkle)
     }
   }
 }

@@ -266,6 +266,64 @@ export function findFullPageTranslationCoverageGap(args: {
   }
 
   if (missingPaths.length === 0) return null
+
+  // Auto-patch: fill missing fields with original (untranslated) values rather than failing.
+  // This ensures partial LLM translations still apply — untranslated text is better than no translation.
+  let patched = 0
+  for (const path of missingPaths) {
+    // Parse path: "b_hero_1.heading" or "b_cardgrid_7.cards[0].imageAlt"
+    const topMatch = path.match(/^([^.]+)\.([^[]+)$/)
+    const listMatch = path.match(/^([^.]+)\.([^[]+)\[(\d+)\]\.(.+)$/)
+
+    if (topMatch) {
+      const [, blockId, key] = topMatch
+      const block = args.currentPage.blocks.find(b => b.id === blockId)
+      if (!block) continue
+      const originalValue = (block.props as Record<string, unknown>)[key]
+      if (!isNonEmptyString(originalValue)) continue
+      // Find the existing update_props op for this block and add the missing key
+      const existingOp = args.plan.ops.find(
+        op => op.op === "update_props" && "blockId" in op && op.blockId === blockId && "pageSlug" in op && op.pageSlug === args.slug
+      )
+      if (existingOp && "patch" in existingOp) {
+        const patch = existingOp.patch as Record<string, unknown>
+        if (!isNonEmptyString(patch[key])) {
+          patch[key] = originalValue
+          patched++
+        }
+      }
+    } else if (listMatch) {
+      const [, blockId, listKey, indexStr, field] = listMatch
+      const idx = Number(indexStr)
+      const block = args.currentPage.blocks.find(b => b.id === blockId)
+      if (!block) continue
+      const listValue = (block.props as Record<string, unknown>)[listKey]
+      if (!Array.isArray(listValue) || !listValue[idx]) continue
+      const originalItem = listValue[idx] as Record<string, unknown>
+      const originalValue = originalItem[field]
+      if (!isNonEmptyString(originalValue)) continue
+      // Find the existing update_props op and patch the list item
+      const existingOp = args.plan.ops.find(
+        op => op.op === "update_props" && "blockId" in op && op.blockId === blockId && "pageSlug" in op && op.pageSlug === args.slug
+      )
+      if (existingOp && "patch" in existingOp) {
+        const patch = existingOp.patch as Record<string, unknown>
+        if (Array.isArray(patch[listKey]) && patch[listKey][idx] && typeof patch[listKey][idx] === "object") {
+          const itemPatch = patch[listKey][idx] as Record<string, unknown>
+          if (!isNonEmptyString(itemPatch[field])) {
+            itemPatch[field] = originalValue
+            patched++
+          }
+        }
+      }
+    }
+  }
+
+  if (patched > 0) {
+    console.log(`[translation-coverage] Auto-patched ${patched} missing fields with original values`)
+    return null  // Patched — no gap anymore
+  }
+
   return `Invalid full-page translation coverage. Missing translated fields: ${missingPaths.join(", ")}`
 }
 
