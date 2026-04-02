@@ -20,7 +20,7 @@ import { scopedSessionKey, setPage, bumpVersion, getSiteConfig, setSiteConfig } 
 import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
   validateAndCorrectProps, fixFooterLinks, normalizePageBlocks, scaffoldSiteProject,
-  analyzeCodebase, cloneRepo, detectSitePort,
+  analyzeCodebase, cloneRepo, detectSitePort, startAndWaitForDevServer,
   packageJson, nextConfigTs, tsconfigJson, postcssConfig, layoutTsx,
   globalsCss, defaultsTs, editorApiRoute, pageTsx, hybridPageTsx, blocksRegisterTsx,
   samplePagesJson, defaultLogoSvg, faviconSvg,
@@ -127,7 +127,9 @@ export function createSitesAgentMcpServer(options: {
     },
     async (args) => {
       try {
+        console.log(`[discover_structure] Discovering pages on ${args.url}...`)
         const structure = await discoverSitePages(args.url)
+        console.log(`[discover_structure] Found ${structure.totalFound} pages via ${structure.source} on ${structure.origin}`)
         emitPhaseOutcome?.({ tool: "discover_site_structure", data: { totalPages: structure.totalFound, origin: structure.origin } })
         return {
           content: [{
@@ -183,7 +185,23 @@ export function createSitesAgentMcpServer(options: {
           }
         }
 
-        const port = args.port || existingPort || await findAvailablePort(root)
+        // Validate requested/existing port is actually free; fall back to auto-assign
+        let port = args.port || existingPort || 0
+        if (port) {
+          const { createServer } = await import("node:net")
+          const free = await new Promise<boolean>((res) => {
+            const s = createServer()
+            s.once("error", () => res(false))
+            s.once("listening", () => { s.close(() => res(true)) })
+            s.listen(port, "127.0.0.1")
+          })
+          if (!free) {
+            console.log(`[create_site] Requested port ${port} in use, auto-assigning...`)
+            port = 0
+          }
+        }
+        if (!port) port = await findAvailablePort(root)
+        console.log(`[create_site] START siteId=${siteId} port=${port} name="${args.name}"`)
 
         // Create project structure
         await mkdir(projectDir, { recursive: true })
@@ -211,14 +229,17 @@ export function createSitesAgentMcpServer(options: {
 
         const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=top-secret\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${args.name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
         await writeFile(join(projectDir, ".env.local"), envContent, "utf-8")
+        console.log(`[create_site] Wrote 13 project files to apps/${siteId}/`)
 
         // Run pnpm install if needed (skip if node_modules exists from previous run)
         if (!existsSync(join(projectDir, "node_modules"))) {
+          console.log(`[create_site] Running pnpm install...`)
           const { execFile } = await import("node:child_process")
           const { promisify } = await import("node:util")
           await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
+          console.log(`[create_site] pnpm install complete`)
         } else {
-          console.log(`[sites-agent] Skipping pnpm install — node_modules exists`)
+          console.log(`[create_site] Skipping pnpm install — node_modules exists`)
         }
 
         const siteConfig = {
@@ -238,30 +259,16 @@ export function createSitesAgentMcpServer(options: {
         })
         bumpVersion(sessionKey)
 
-        // Kill any existing process on the allocated port before starting
-        try {
-          const { execSync } = await import("node:child_process")
-          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
-          if (pids) {
-            for (const pid of pids.split("\n")) {
-              try { process.kill(Number(pid), "SIGKILL") } catch { /* already dead */ }
-            }
-            console.log(`[sites-agent] Killed existing process(es) on port ${port}`)
-          }
-        } catch { /* no process on port — fine */ }
-
-        // Launch dev server in background (fire-and-forget)
-        console.log(`[sites-agent] Starting dev server for ${siteId} on port ${port}...`)
-        const { spawn } = await import("node:child_process")
-        const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${siteId}`, "dev"], {
-          cwd: root,
-          stdio: "ignore",
-          detached: true,
+        // Start dev server and wait for it to be ready
+        console.log(`[create_site] Starting dev server on port ${port}...`)
+        const { serverReady } = await startAndWaitForDevServer({
+          siteId, port, cwd: root, useFilter: true,
         })
-        devProcess.unref() // don't block orchestrator shutdown
+        console.log(`[create_site] Dev server ${serverReady ? "READY" : "FAILED"} on port ${port}`)
 
         emitSiteCreated(siteConfig)
-        emitPhaseOutcome?.({ tool: "create_site", data: { siteId, port, name: args.name } })
+        emitPhaseOutcome?.({ tool: "create_site", data: { siteId, port, name: args.name, serverReady } })
+        console.log(`[create_site] DONE siteId=${siteId} port=${port} serverReady=${serverReady}`)
 
         return {
           content: [{
@@ -271,12 +278,15 @@ export function createSitesAgentMcpServer(options: {
               config: siteConfig,
               projectPath: projectDir,
               port,
-              devServerStarted: true,
-              instructions: `Site scaffolded at apps/${siteId} and dev server starting on port ${port}.`,
+              devServerStarted: serverReady,
+              instructions: serverReady
+                ? `Site scaffolded at apps/${siteId} and dev server running on port ${port}.`
+                : `Site scaffolded at apps/${siteId} but dev server failed to start on port ${port}.`,
             }),
           }],
         }
       } catch (e: unknown) {
+        console.error(`[create_site] ERROR: ${e instanceof Error ? e.message : String(e)}`)
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
     }
@@ -291,12 +301,16 @@ export function createSitesAgentMcpServer(options: {
     },
     async (args) => {
       try {
+        const scrapeStart = Date.now()
         let result = getCachedScrape(args.url)
+        const cached = !!result
         if (!result) {
+          console.log(`[scrape_url] Scraping ${args.url} (browser)...`)
           result = await scrapeFullPage(args.url)
           setCachedScrape(args.url, result)
         }
         const { content, screenshot, sections, outline, nav } = result
+        console.log(`[scrape_url] ${cached ? "CACHED" : "SCRAPED"} ${args.url} in ${Date.now() - scrapeStart}ms — ${sections.length} sections, screenshot=${!!screenshot}, nav=${!!nav}`)
 
         // Extract design tokens from CSS
         const tokens = extractDesignTokens(content.css)
@@ -424,13 +438,21 @@ export function createSitesAgentMcpServer(options: {
       navGroups: z.record(z.string(), z.array(z.string())).optional().describe("Group child pages under a parent nav dropdown, e.g. { 'Events': ['/events/teamevent', '/events/polterabend'] }. Parent has no href, children shown in dropdown."),
       siteLogo: z.string().optional().describe("Logo URL (relative, e.g. '/images/logo.png'). Set after downloading with download_remote_image."),
       siteName: z.string().optional().describe("Site name displayed in the header nav bar."),
+      purpose: z.string().optional().describe("What the site is about — 1-2 sentences describing the business/project. Shown in editor settings and used as AI context for future edits."),
+      tone: z.string().optional().describe("Voice/tone guide for AI content generation, e.g. 'Professional but approachable, uses du-form (German informal)'"),
+      constraints: z.array(z.string()).optional().describe("Content rules the AI must follow, e.g. ['Always use Swiss German spelling', 'Never discount below CHF 49']"),
     },
     async (args) => {
       try {
+        const totalBlocks = args.pages.reduce((sum, p) => sum + p.blocks.length, 0)
+        const slugs = args.pages.map(p => p.slug)
+        console.log(`[bootstrap_pages] START siteId=${args.siteId} pages=${args.pages.length} blocks=${totalBlocks} slugs=[${slugs.join(", ")}]`)
+
         // Verify the site project was scaffolded first
         const root = monorepoRoot()
         const projectPkg = join(root, "apps", args.siteId, "package.json")
         if (!existsSync(projectPkg)) {
+          console.error(`[bootstrap_pages] GUARD FAILED: apps/${args.siteId}/package.json not found — create_site was not called`)
           return { content: [{ type: "text" as const, text: `Error: Site project apps/${args.siteId} does not exist. Call create_site first.` }], isError: true }
         }
 
@@ -451,7 +473,8 @@ export function createSitesAgentMcpServer(options: {
 
         // Process pages sequentially to avoid unbounded concurrent image downloads
         const pageDocs = []
-        for (const page of normalizedPages) {
+        for (const [pageIdx, page] of normalizedPages.entries()) {
+          console.log(`[bootstrap_pages] Processing page ${pageIdx + 1}/${normalizedPages.length}: ${page.slug} (${page.blocks.length} blocks)`)
           const contentBlocks = page.blocks.filter(b => {
             if (b.type === "SiteHeader") { strippedCount++; return false }
             if (b.type === "Footer") {
@@ -476,13 +499,16 @@ export function createSitesAgentMcpServer(options: {
             if (blockMeta) {
               const validation = validateAndCorrectProps(b.type, mergedProps)
               if (validation.corrected) {
+                console.log(`[bootstrap_pages]   Block ${b.type}: auto-corrected props`)
                 mergedProps = { ...baseProps }
                 for (const [key, value] of Object.entries(validation.props)) {
                   mergedProps[key] = value
                 }
               } else if (validation.error) {
-                console.warn(`[sites-agent] ${b.type} block validation: ${validation.error}`)
+                console.warn(`[bootstrap_pages]   Block ${b.type}: validation error — ${validation.error}`)
               }
+            } else if (!getAllBlockMeta()[b.type]) {
+              console.log(`[bootstrap_pages]   Block ${b.type}: custom type (not in built-in registry)`)
             }
             return { id: `b_${b.type.toLowerCase()}_${i + 1}`, type: b.type, props: mergedProps }
           })
@@ -522,6 +548,9 @@ export function createSitesAgentMcpServer(options: {
         if (args.navGroups) patch.navGroups = { ...(existing.navGroups ?? {}), ...args.navGroups }
         if (args.siteLogo) patch.logo = args.siteLogo
         if (args.siteName) patch.name = args.siteName
+        if (args.purpose) patch.purpose = args.purpose
+        if (args.tone) patch.tone = args.tone
+        if (args.constraints && args.constraints.length > 0) patch.constraints = args.constraints
         setSiteConfig(sessionKey, patch)
         bumpVersion(sessionKey)
 
@@ -556,6 +585,9 @@ export function createSitesAgentMcpServer(options: {
             const config: Record<string, unknown> = { ...existing }
             if (args.siteName) config.name = args.siteName
             if (args.siteLogo) config.logo = args.siteLogo
+            if (args.purpose) config.purpose = args.purpose
+            if (args.tone) config.tone = args.tone
+            if (args.constraints && args.constraints.length > 0) config.constraints = args.constraints
             if (args.navLabels) config.navLabels = { ...(existing.navLabels as Record<string, string> ?? {}), ...args.navLabels }
             if (args.navGroups) config.navGroups = { ...(existing.navGroups as Record<string, string[]> ?? {}), ...args.navGroups }
             if (footerBlock) {
@@ -579,8 +611,9 @@ export function createSitesAgentMcpServer(options: {
           }
         }
 
-        const totalBlocks = args.pages.reduce((sum, p) => sum + p.blocks.length, 0)
-        emitPhaseOutcome?.({ tool: "bootstrap_pages", data: { pagesCreated: createdPages.length, totalBlocks, pages: createdPages } })
+        const totalBlocksFinal = args.pages.reduce((sum, p) => sum + p.blocks.length, 0)
+        emitPhaseOutcome?.({ tool: "bootstrap_pages", data: { pagesCreated: createdPages.length, totalBlocks: totalBlocksFinal, pages: createdPages } })
+        console.log(`[bootstrap_pages] DONE siteId=${args.siteId} pages=${createdPages.length} blocks=${totalBlocksFinal} autoDownloaded=${totalAutoDownloaded}`)
 
         return {
           content: [{
@@ -588,12 +621,13 @@ export function createSitesAgentMcpServer(options: {
             text: JSON.stringify({
               status: "applied",
               pagesCreated: createdPages,
-              totalBlocks,
+              totalBlocks: totalBlocksFinal,
               persistedToFile: true,
             }),
           }],
         }
       } catch (e: unknown) {
+        console.error(`[bootstrap_pages] ERROR: ${e instanceof Error ? e.message : String(e)}`)
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
     }
@@ -612,11 +646,14 @@ export function createSitesAgentMcpServer(options: {
       try {
         const root = monorepoRoot()
         const outputDir = join(root, "apps", args.siteId, "public", "images")
+        console.log(`[download_image] ${args.url.slice(0, 100)}`)
         const result = await downloadImage(args.url, args.alt, outputDir)
         const localUrl = `/images/${result.fileName}`
+        console.log(`[download_image] OK → ${localUrl}`)
         emitPhaseOutcome?.({ tool: "download_remote_image", data: { fileName: result.fileName } })
         return { content: [{ type: "text" as const, text: JSON.stringify({ localUrl, fileName: result.fileName }) }] }
-      } catch {
+      } catch (e: unknown) {
+        console.warn(`[download_image] FAILED ${args.url.slice(0, 100)} — ${e instanceof Error ? e.message : String(e)}`)
         return { content: [{ type: "text" as const, text: JSON.stringify({ localUrl: args.url, error: "Download failed, using original URL" }) }] }
       }
     }
@@ -654,7 +691,7 @@ export function createSitesAgentMcpServer(options: {
       }
 
       const succeeded = results.filter(r => !r.error).length
-      emitPhaseOutcome?.({ tool: "download_remote_image", data: { fileName: `${succeeded}/${results.length} images` } })
+      emitPhaseOutcome?.({ tool: "download_remote_images", data: { succeeded, total: results.length } })
       console.log(`[sites-agent] Batch downloaded ${succeeded}/${results.length} images`)
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ results, succeeded, failed: results.length - succeeded }) }] }
@@ -1002,35 +1039,11 @@ export function createSitesAgentMcpServer(options: {
         })
         bumpVersion(sessionKey)
 
-        // Start dev server and listen for "Ready" message
+        // Start dev server and wait for it to be ready
         const previewUrl = `http://localhost:${port}`
-        console.log(`[sites-agent] Starting dev server for ${args.siteId} on port ${port}...`)
-        const { spawn } = await import("node:child_process")
-        const devProcess = spawn("pnpm", ["dev"], {
-          cwd: projectDir,
-          stdio: ["ignore", "pipe", "pipe"],
-          detached: true,
+        const { serverReady } = await startAndWaitForDevServer({
+          siteId: args.siteId, port, cwd: projectDir,
         })
-        devProcess.unref()
-
-        let serverReady = false
-        await new Promise<void>((resolve) => {
-          const timeout = setTimeout(() => { resolve() }, 60_000)
-          const onData = (chunk: Buffer) => {
-            const text = chunk.toString()
-            if (text.includes("Ready") || text.includes(`localhost:${port}`)) {
-              serverReady = true
-              clearTimeout(timeout)
-              devProcess.stdout?.removeAllListeners()
-              devProcess.stderr?.removeAllListeners()
-              resolve()
-            }
-          }
-          devProcess.stdout?.on("data", onData)
-          devProcess.stderr?.on("data", onData)
-          devProcess.on("exit", () => { clearTimeout(timeout); resolve() })
-        })
-        console.log(`[sites-agent] Dev server ${serverReady ? "ready" : "timed out"} at ${previewUrl}`)
 
         const siteName = args.name ?? args.siteId
         const siteConfig = {
@@ -1104,15 +1117,10 @@ export function createSitesAgentMcpServer(options: {
           await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
         }
 
-        // Start dev server
-        console.log(`[sites-agent] Starting dev server for ${args.siteId} on port ${port}...`)
-        const { spawn } = await import("node:child_process")
-        const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${args.siteId}`, "dev"], {
-          cwd: root,
-          stdio: "ignore",
-          detached: true,
+        // Start dev server and wait for readiness
+        const { serverReady } = await startAndWaitForDevServer({
+          siteId: args.siteId, port, cwd: root, useFilter: true,
         })
-        devProcess.unref()
 
         const siteConfig = {
           id: args.siteId,
@@ -1124,9 +1132,8 @@ export function createSitesAgentMcpServer(options: {
           constraints: [],
         }
 
-        // Emit site_created so the editor picks it up
         emitSiteCreated(siteConfig)
-        emitPhaseOutcome?.({ tool: "register_site", data: { siteId: args.siteId, port, name: args.name } })
+        emitPhaseOutcome?.({ tool: "register_site", data: { siteId: args.siteId, port, name: args.name, serverReady } })
 
         return {
           content: [{
@@ -1138,7 +1145,7 @@ export function createSitesAgentMcpServer(options: {
               port,
               name: args.name,
               previewUrl: `http://localhost:${port}`,
-              devServerStarted: true,
+              devServerStarted: serverReady,
             }),
           }],
         }

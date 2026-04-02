@@ -64,11 +64,11 @@ export const PlannerOutputError = PlannerError
 export const isPlannerOutputError = isPlannerError
 
 const rawPlanCandidateSchema = z.looseObject({
-  intent: z.enum(["edit_plan", "needs_clarification", "content_answer"]).optional(),
+  intent: z.enum(["edit_plan", "needs_clarification", "content_answer"]).optional().catch(undefined),
   summary_for_user: z.string().optional(),
-  change_log: z.array(z.string()).optional(),
+  change_log: z.union([z.array(z.string()), z.string()]).optional(),
   ops: z.array(z.record(z.string(), z.unknown())).optional(),
-  suggested_next_actions: z.array(z.string()).optional()
+  suggested_next_actions: z.union([z.array(z.string()), z.string()]).optional()
 })
 
 function asObject(value: unknown) {

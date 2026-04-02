@@ -66,6 +66,28 @@ function resolveImageUrl(url: string | undefined, siteOrigin: string | undefined
   return url
 }
 
+/** Detect the aspect ratio of an image URL. Returns a Gemini-compatible ratio string (e.g. "3:2"). */
+function detectImageAspectRatio(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const w = img.naturalWidth; const h = img.naturalHeight
+      if (!w || !h) { resolve(null); return }
+      const ratio = w / h
+      // Map to closest Gemini-supported ratio
+      const candidates: [string, number][] = [["1:1", 1], ["3:2", 1.5], ["2:3", 2/3], ["16:9", 16/9], ["9:16", 9/16]]
+      let best = "3:2"; let bestDist = Infinity
+      for (const [name, target] of candidates) {
+        const dist = Math.abs(ratio - target)
+        if (dist < bestDist) { bestDist = dist; best = name }
+      }
+      resolve(best)
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
 export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gdriveFolderId, cmsMedia, siteOrigin, onClose, onSelect }: ImagePickerModalProps) {
   const { t } = useT()
   const currentUrl = resolveImageUrl(unwrapNextImageUrl(rawCurrentUrl), siteOrigin)
@@ -103,6 +125,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   const [loadingMore, setLoadingMore] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [lightboxShowOriginal, setLightboxShowOriginal] = useState(false)
+  const [detectedAspectRatio, setDetectedAspectRatio] = useState<string | null>(null)
   const [referenceImages, setReferenceImages] = useState<Array<{ url: string; thumbUrl: string; uploading?: boolean }>>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const refImageInputRef = useRef<HTMLInputElement>(null)
@@ -191,9 +214,14 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     setUploadResult(null)
     setUploadPreview(null)
     setReferenceImages([])
+    setDetectedAspectRatio(null)
     setCurrentPage(1)
     setHasMore(false)
     setLoadingMore(false)
+    // Detect aspect ratio from the current image so generated images match
+    if (hasEditableImage && currentUrl) {
+      void detectImageAspectRatio(currentUrl).then(r => { if (r) setDetectedAspectRatio(r) })
+    }
     if (activeTab === "drive" && features.googleDrive) void fetchDriveImages()
     if ((activeTab === "contentful" || activeTab === "sanity" || activeTab === "strapi") && cmsMedia) void fetchCmsMediaAssets()
   }, [open, activeTab, features.googleDrive, cmsMedia, fetchDriveImages, fetchCmsMediaAssets])
@@ -244,6 +272,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             prompt: userPrompt, chatId: chatId ?? undefined, stream: true,
+            ...(detectedAspectRatio ? { aspectRatio: detectedAspectRatio } : {}),
             ...(editMode === "edit" && hasEditableImage && currentUrl && !chatId ? { referenceImageUrl: currentUrl } : {}),
             ...(referenceImages.length > 0 && !chatId ? { referenceImageUrls: referenceImages.filter(r => r.url).map(r => r.url) } : {})
           })
@@ -270,6 +299,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
                 const data = JSON.parse(line.slice(6))
                 if (eventType === "chatId") {
                   setChatId(data.chatId)
+                  if (data.aspectRatio) setDetectedAspectRatio(data.aspectRatio)
                 } else if (eventType === "status") {
                   setGenerateStatus(data.stage ?? "Generating image\u2026")
                 } else if (eventType === "text") {

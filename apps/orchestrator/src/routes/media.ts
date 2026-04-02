@@ -329,7 +329,7 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
   // ---------------------------------------------------------------------------
   // Multi-turn Gemini image generation chat sessions
   // ---------------------------------------------------------------------------
-  const geminiChatSessions = new Map<string, { chat: unknown; lastUsed: number }>()
+  const geminiChatSessions = new Map<string, { chat: unknown; lastUsed: number; aspectRatio: string }>()
   const MAX_CHAT_SESSIONS = 200
 
   if (process.env.GOOGLE_GENAI_API_KEY) {
@@ -339,6 +339,36 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
         if (session.lastUsed < cutoff) geminiChatSessions.delete(id)
       }
     }, 10 * 60 * 1000).unref()
+  }
+
+  /** Detect aspect ratio override from user prompt text. Returns a Gemini ratio string or null. */
+  function detectAspectRatioFromPrompt(text: string): string | null {
+    const lower = text.toLowerCase()
+    // Explicit ratios: "2:1", "16:9", "1:1", "4:3", etc.
+    const ratioMatch = lower.match(/\b(\d+)\s*:\s*(\d+)\b/)
+    if (ratioMatch) {
+      const w = Number(ratioMatch[1]); const h = Number(ratioMatch[2])
+      if (w > 0 && h > 0) return `${w}:${h}`
+    }
+    // Named ratios
+    if (/\bsquare\b/.test(lower)) return "1:1"
+    if (/\bportrait\b/.test(lower) && /\b(ratio|aspect|orientation|format)\b/.test(lower)) return "2:3"
+    if (/\blandscape\b/.test(lower) && /\b(ratio|aspect|orientation|format)\b/.test(lower)) return "3:2"
+    if (/\bwidescreen\b|\bultra.?wide\b/.test(lower)) return "16:9"
+    return null
+  }
+
+  /** Pick the closest Gemini-supported ratio for arbitrary w:h dimensions. */
+  function closestGeminiRatio(w: number, h: number): string {
+    const ratio = w / h
+    // Gemini supports: 1:1 (1.0), 3:2 (1.5), 2:3 (0.667), 16:9 (1.78), 9:16 (0.5625)
+    const candidates: [string, number][] = [["1:1", 1], ["3:2", 1.5], ["2:3", 2/3], ["16:9", 16/9], ["9:16", 9/16]]
+    let best = "3:2"; let bestDist = Infinity
+    for (const [name, target] of candidates) {
+      const dist = Math.abs(ratio - target)
+      if (dist < bestDist) { bestDist = dist; best = name }
+    }
+    return best
   }
 
   app.post("/image/generate/chat", async (request, reply) => {
@@ -352,7 +382,10 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
     try {
       const ai = await getGeminiClient()
       const model = getGeminiImageModel()
-      const geminiAspectRatio = GEMINI_ASPECT_RATIOS[body.aspectRatio ?? "landscape"] ?? "3:2"
+
+      // Determine aspect ratio: prompt override > client-specified > session default > "3:2"
+      const promptRatio = detectAspectRatioFromPrompt(prompt)
+      const clientRatio = body.aspectRatio ? (GEMINI_ASPECT_RATIOS[body.aspectRatio] ?? body.aspectRatio) : null
 
       let chatId = body.chatId ?? ""
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -360,16 +393,28 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
 
       if (chatId && geminiChatSessions.has(chatId)) {
         const session = geminiChatSessions.get(chatId)!
-        chat = session.chat
-        session.lastUsed = Date.now()
+        const desiredRatio = promptRatio ?? clientRatio ?? session.aspectRatio
+
+        if (desiredRatio !== session.aspectRatio) {
+          // Aspect ratio changed — must create a new Gemini session (config is immutable)
+          console.log(`[image/chat] Aspect ratio changed ${session.aspectRatio} → ${desiredRatio}, creating new session`)
+          geminiChatSessions.delete(chatId)
+          chatId = randomUUID()
+          chat = ai.chats.create({
+            model,
+            config: { responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: desiredRatio } }
+          })
+          geminiChatSessions.set(chatId, { chat, lastUsed: Date.now(), aspectRatio: desiredRatio })
+        } else {
+          chat = session.chat
+          session.lastUsed = Date.now()
+        }
       } else {
         chatId = randomUUID()
+        const geminiAspectRatio = promptRatio ?? clientRatio ?? "3:2"
         chat = ai.chats.create({
           model,
-          config: {
-            responseModalities: ["TEXT", "IMAGE"],
-            imageConfig: { aspectRatio: geminiAspectRatio }
-          }
+          config: { responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: geminiAspectRatio } }
         })
         // Evict oldest session if at capacity
         if (geminiChatSessions.size >= MAX_CHAT_SESSIONS) {
@@ -377,7 +422,7 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
           for (const [id, s] of geminiChatSessions) { if (s.lastUsed < oldestTime) { oldestTime = s.lastUsed; oldestId = id } }
           if (oldestId) geminiChatSessions.delete(oldestId)
         }
-        geminiChatSessions.set(chatId, { chat, lastUsed: Date.now() })
+        geminiChatSessions.set(chatId, { chat, lastUsed: Date.now(), aspectRatio: promptRatio ?? clientRatio ?? "3:2" })
       }
 
       // Build message — include reference images on first message (Gemini supports up to 14)
@@ -425,7 +470,8 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
             reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
           }
         }
-        send("chatId", { chatId })
+        const effectiveRatio = geminiChatSessions.get(chatId)?.aspectRatio ?? "3:2"
+        send("chatId", { chatId, aspectRatio: effectiveRatio })
         send("status", { stage: "Generating image\u2026" })
 
         try {
@@ -466,7 +512,8 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
         }
       }
 
-      return { chatId, url: imageUrl, alt: prompt.slice(0, 200), text: textResponse || undefined }
+      const effectiveRatioFinal = geminiChatSessions.get(chatId)?.aspectRatio ?? "3:2"
+      return { chatId, url: imageUrl, alt: prompt.slice(0, 200), text: textResponse || undefined, aspectRatio: effectiveRatioFinal }
     } catch (error) {
       return reply.code(502).send({ error: "Gemini image generation failed", detail: toErrorDetail(error) })
     }

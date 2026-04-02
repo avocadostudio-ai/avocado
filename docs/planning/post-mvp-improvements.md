@@ -53,6 +53,13 @@ Scope: Improvements to pursue after the initial editor-first focus items.
 - Save periodic snapshots for fast recovery from accidental destructive changes.
 - Keep snapshot history short and UI-driven.
 
+5. Consolidate streaming JSON parser (`planner.ts:492-771`)
+- `extractOpsFromPlanBuffer` and `extractUpdatePropsFieldDraftsFromPlanBuffer` contain ~280 lines of hand-rolled JSON streaming logic.
+- Brace/quote/escape walking is duplicated 3 times; partial-op field extraction uses regex on raw JSON strings.
+- Works today because op schema is flat patches, but fragile if schema grows nested structures.
+- Evaluate replacing with `@streamparser/json` or similar streaming JSON library.
+- Alternatively, deduplicate the three brace-walker copies into one shared iterator and add tests for edge cases (nested objects in patch values, unicode escapes mid-stream).
+
 ## Phase 3: Developer-facing improvements that directly help editors
 
 1. Bridge protocol cleanup (minimal)

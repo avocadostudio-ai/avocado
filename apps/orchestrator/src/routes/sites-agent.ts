@@ -15,6 +15,7 @@ import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import { createSitesAgentMcpServer } from "../agent/sites-agent-tools.js"
 import { buildSitesAgentSystemPrompt } from "../agent/sites-agent-context.js"
 import { buildIntegrationSystemPrompt } from "../agent/integration-prompt.js"
+import { triageWithHaiku, SITES_AGENT_MODELS } from "../agent/sites-agent-shared.js"
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 import { pushMigrationTelemetry } from "../telemetry/migration-telemetry.js"
 import { runCliAgent, type CliStreamEntry } from "./sites-agent-cli.js"
@@ -231,6 +232,43 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
 
       const body = entry.body
       const session = body.session ?? "dev"
+      console.log(`[sites-agent] Stream ${streamId}: INIT mode=${body.mode ?? "migrate"} cli=${!!body.useCliAgent} message="${body.message?.slice(0, 100)}"`)
+
+      // ── Haiku triage — classify intent, extract params, short-circuit questions ──
+      let triage: Awaited<ReturnType<typeof triageWithHaiku>> | null = null
+      if (!body.useCliAgent && entry.apiKey) {
+        try {
+          triage = await triageWithHaiku(body.message!, entry.apiKey)
+
+          // Short-circuit: answer simple questions without spawning the agent
+          if (triage.intent === "question" && triage.answer) {
+            emitEvent(streamId, { type: "summary_token", text: triage.answer })
+            emitEvent(streamId, {
+              type: "final",
+              result: {
+                status: "applied",
+                summary: triage.answer,
+                suggestions: [],
+                toolCallCount: 0,
+                sitesCreated: [],
+                usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, totalCostUsd: 0, numTurns: 0, triageOnly: true },
+              },
+            })
+            entry.state = "done"
+            for (const sub of entry.subscribers) {
+              try { sub.raw.end() } catch { /* already closed */ }
+            }
+            entry.subscribers.clear()
+            return reply
+          }
+
+          // Override mode from triage (more accurate than client-side regex)
+          if (triage.intent === "integrate") body.mode = "integrate"
+          else if (triage.intent === "create" || triage.intent === "migrate") body.mode = "migrate"
+        } catch (err: unknown) {
+          console.log(`[sites-agent] Triage failed, continuing without: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
 
       const mcpServer = createSitesAgentMcpServer({
         session,
@@ -247,6 +285,22 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
           } else if (tool === "download_remote_image") {
             entry.imageCount++
             emitEvent(streamId, { type: "phase_outcome", phase: "images", outcome: `${entry.imageCount} image${entry.imageCount > 1 ? "s" : ""} downloaded` })
+          } else if (tool === "download_remote_images") {
+            entry.imageCount += (data.succeeded as number) ?? (data.total as number) ?? 0
+            emitEvent(streamId, { type: "phase_outcome", phase: "images", outcome: `${entry.imageCount} image${entry.imageCount > 1 ? "s" : ""} downloaded` })
+            // Batch download is the last image tool — mark images phase done so UI
+            // doesn't spin while agent moves on to block-coder / bootstrap_pages
+            emitEvent(streamId, { type: "phase_done", phase: "images" })
+            // Pre-start the next phase immediately to avoid a long dead gap while
+            // the LLM composes the bootstrap_pages tool call (can take 30-60s)
+            if (!entry.emittedPhases.has("pages")) {
+              entry.emittedPhases.add("pages")
+              entry.currentPhase = "pages"
+              const pagesPhase = activePhases.find(p => p.id === "pages")
+              if (pagesPhase) {
+                emitEvent(streamId, { type: "phase", phase: "pages", activeLabel: pagesPhase.activeLabel, doneLabel: pagesPhase.doneLabel })
+              }
+            }
           } else if (tool === "bootstrap_pages") {
             emitEvent(streamId, { type: "phase_outcome", phase: "pages", outcome: `${data.pagesCreated} pages, ${data.totalBlocks} blocks` })
           } else if (tool === "analyze_codebase") {
@@ -300,7 +354,10 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
       ]
 
       // All tools combined for allowedTools (SDK needs full list)
-      const allTools = [...new Set([...orchestratorTools, ...analyzerTools, "Read", "Write", "Edit", "Bash", "Glob", "Grep", "Skill"])]
+      // In migrate mode, block-coder subagent needs file tools but main agent should NOT have them
+      // — otherwise it bypasses our MCP tools (e.g. scaffolding with Write/Bash instead of create_site)
+      const blockCoderTools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
+      const allTools = [...new Set([...orchestratorTools, ...analyzerTools, ...blockCoderTools])]
 
       const heartbeatTimer = setInterval(() => {
         if (entry.state !== "active") return
@@ -335,8 +392,19 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
             ? "Site integration agent. Analyzes an existing codebase and adds AI Site Editor SDK integration."
             : "Site creation and migration orchestrator. Plans migrations, delegates analysis to subagents, then executes the plan."
 
+          // Enrich prompt with triage results so the agent doesn't re-discover intent
+          let enrichedPrompt = body.message!
+          if (triage && triage.intent !== "question") {
+            const parts: string[] = [body.message!]
+            if (triage.url) parts.push(`\n[Triage: URL=${triage.url}]`)
+            if (triage.siteName) parts.push(`[Triage: siteName=${triage.siteName}]`)
+            if (triage.scope) parts.push(`[Triage: scope=${triage.scope}]`)
+            if (triage.intent) parts.push(`[Triage: intent=${triage.intent}]`)
+            enrichedPrompt = parts.join("")
+          }
+
           const result = query({
-            prompt: body.message!,
+            prompt: enrichedPrompt,
             options: {
               abortController: entry.abortController,
               maxBudgetUsd,
@@ -348,7 +416,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
                   prompt: systemPrompt,
                   tools: orchestratorTools,
                   skills: isIntegrate ? ["site-integration"] : ["site-scaffolding", "image-migration"],
-                  model: process.env.SITES_AGENT_MODEL ?? "claude-sonnet-4-6",
+                  model: SITES_AGENT_MODELS.balanced,
                 },
                 // Subagents only used in migrate mode
                 ...(!isIntegrate ? { "structure-analyzer": {
@@ -404,7 +472,7 @@ For each section spec, include:
 \`\`\``,
                   tools: analyzerTools,
                   skills: ["site-structure-analysis"],
-                  model: "claude-sonnet-4-6",
+                  model: SITES_AGENT_MODELS.balanced,
                 },
                 "block-coder": {
                   description: "Creates custom block types. Tell it: 'Create a {BlockName} block for site {siteId} with fields: {list}'. It writes schema, renderer, styles, and manifest files.",
@@ -557,10 +625,13 @@ Key patterns to follow:
 - \`clamp()\` for responsive typography`,
                   tools: ["Write", "Edit", "Bash"],
                   skills: ["custom-block-creation"],
-                  model: "claude-sonnet-4-6",
+                  model: SITES_AGENT_MODELS.balanced,
                 } } : {}),
               },
-              tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+              // In integrate mode, main agent needs file tools directly.
+              // In migrate mode, only subagents (block-coder) need file tools —
+              // main agent should use MCP tools (create_site, bootstrap_pages, etc.)
+              tools: isIntegrate ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep"] : [],
               allowedTools: allTools,
               settingSources: ["project"],
               mcpServers: { "sites-agent": mcpServer },
@@ -739,7 +810,10 @@ function logSdkMessage(streamId: string, message: SDKMessage) {
       if (toolUses.length > 0) {
         for (const tu of toolUses) {
           const name = "name" in tu ? tu.name : "?"
-          console.log(`${prefix}${ctx} tool_use: ${name}`)
+          const input = "input" in tu ? tu.input as Record<string, unknown> : undefined
+          // Log tool name + key parameters for debugging
+          const paramSummary = input ? summarizeToolInput(name, input) : ""
+          console.log(`${prefix}${ctx} tool_use: ${name}${paramSummary}`)
         }
       }
       if (textBlocks.length > 0) {
@@ -757,6 +831,44 @@ function logSdkMessage(streamId: string, message: SDKMessage) {
     default:
       // Log other message types at debug level
       if ("type" in message) console.log(`${prefix} ${message.type}`)
+  }
+}
+
+/** Extract key parameters from tool input for concise logging. */
+function summarizeToolInput(toolName: string, input: Record<string, unknown>): string {
+  switch (toolName) {
+    case "mcp__sites-agent__create_site":
+      return ` (name=${input.name}, siteId=${input.siteId ?? "auto"}, port=${input.port ?? "auto"})`
+    case "mcp__sites-agent__bootstrap_pages": {
+      const pages = Array.isArray(input.pages) ? input.pages : []
+      const totalBlocks = pages.reduce((sum: number, p: Record<string, unknown>) => sum + (Array.isArray(p.blocks) ? p.blocks.length : 0), 0)
+      const slugs = pages.map((p: Record<string, unknown>) => p.slug).join(", ")
+      return ` (siteId=${input.siteId}, pages=${pages.length} [${slugs}], blocks=${totalBlocks})`
+    }
+    case "mcp__sites-agent__scrape_url":
+      return ` (url=${input.url})`
+    case "mcp__sites-agent__discover_site_structure":
+      return ` (url=${input.url})`
+    case "mcp__sites-agent__download_remote_image":
+      return ` (siteId=${input.siteId}, url=${String(input.url ?? "").slice(0, 80)})`
+    case "mcp__sites-agent__download_remote_images": {
+      const imgs = Array.isArray(input.images) ? input.images : []
+      return ` (siteId=${input.siteId}, count=${imgs.length})`
+    }
+    case "mcp__sites-agent__apply_theme": {
+      const vars = input.variables && typeof input.variables === "object" ? Object.keys(input.variables) : []
+      return ` (siteId=${input.siteId}, vars=${vars.length})`
+    }
+    case "mcp__sites-agent__generate_page_specs":
+      return ` (url=${input.url})`
+    case "mcp__sites-agent__list_sites":
+      return ""
+    case "Agent": {
+      const prompt = typeof input.prompt === "string" ? input.prompt.slice(0, 80) : ""
+      return ` (${prompt}${prompt.length >= 80 ? "..." : ""})`
+    }
+    default:
+      return ""
   }
 }
 
@@ -868,9 +980,7 @@ function translateSdkMessage(message: SDKMessage): SSEEvent[] {
     }
 
     case "system": {
-      if ("subtype" in message && message.subtype === "init") {
-        return [{ type: "status", message: "Agent initialized" }]
-      }
+      // system:init is internal — don't surface to UI (pulsing dot is enough)
       return []
     }
 

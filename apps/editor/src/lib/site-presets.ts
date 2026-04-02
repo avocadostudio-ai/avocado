@@ -23,7 +23,7 @@ export const DEFAULT_SITE_HOSTING = "Vercel production site (single shared proje
 export const LEGACY_AVOCADO_SITE_ID = "avocado-stories"
 export const LEGACY_AVOCADO_SITE_NAME = "Avocado Stories"
 export const LEGACY_AVOCADO_SITE_PURPOSE = "Marketing site for Avocado Stories products, recipes, and sustainability messaging."
-export const DEFAULT_AVOCADO_SITE_ID = "adventure-atlas"
+export const DEFAULT_AVOCADO_SITE_ID = "avocado-hub"
 export const DEFAULT_AVOCADO_SITE_NAME = "The Avocado Hub"
 export const DEFAULT_AVOCADO_SITE_PURPOSE = "Healthy living hub — recipes, wellness tips, and sustainability resources."
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
@@ -103,6 +103,7 @@ function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
 
 const CONFIGURED_SITE_PRESETS = parseConfiguredSitePresets(import.meta.env.VITE_SITE_PRESETS_JSON as string | undefined)
 
+// Builtin presets are fallbacks when no VITE_SITE_PRESETS_JSON is configured
 const BUILTIN_SITE_PRESETS: SiteConfig[] = [
   {
     id: DEFAULT_AVOCADO_SITE_ID,
@@ -110,16 +111,13 @@ const BUILTIN_SITE_PRESETS: SiteConfig[] = [
     purpose: DEFAULT_AVOCADO_SITE_PURPOSE,
     hosting: DEFAULT_SITE_HOSTING,
   },
-  {
-    id: "paintball-arena-bern",
-    name: "Paintball Arena Bern",
-    purpose: "Indoor paintball arena in Bern, Switzerland.",
-    hosting: "local",
-    previewUrl: "http://localhost:3500",
-  },
 ]
 
-const DEFAULT_SITE_PRESETS: SiteConfig[] = [...CONFIGURED_SITE_PRESETS, ...BUILTIN_SITE_PRESETS, ...AUTO_SITE_PRESETS]
+const DEFAULT_SITE_PRESETS: SiteConfig[] = [
+  ...CONFIGURED_SITE_PRESETS,
+  ...(CONFIGURED_SITE_PRESETS.length > 0 ? [] : BUILTIN_SITE_PRESETS),
+  ...AUTO_SITE_PRESETS,
+]
 
 export function siteNameFromId(id: string) {
   return id

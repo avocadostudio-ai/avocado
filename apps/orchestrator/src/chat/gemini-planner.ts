@@ -59,7 +59,7 @@ const geminiEditPlanSchema = {
 // Lenient: change_log can be string or array (Gemini returns string per schema,
 // normalizePlanCandidate converts it downstream).
 const rawPlanCandidateSchema = z.looseObject({
-  intent: z.enum(["edit_plan", "needs_clarification", "content_answer"]).optional(),
+  intent: z.enum(["edit_plan", "needs_clarification", "content_answer"]).optional().catch(undefined),
   summary_for_user: z.string().optional(),
   change_log: z.union([z.array(z.string()), z.string()]).optional(),
   ops: z.array(z.record(z.string(), z.unknown())).optional(),

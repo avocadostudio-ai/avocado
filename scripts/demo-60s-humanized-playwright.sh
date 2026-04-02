@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # Humanized 60s demo runner for the local editor using Playwright CLI.
-# Default target: adventure-atlas
+# Default target: avocado-hub
 
-SITE_ID="${SITE_ID:-adventure-atlas}"
-START_URL="${START_URL:-http://localhost:4100/?siteId=adventure-atlas}"
+SITE_ID="${SITE_ID:-avocado-hub}"
+START_URL="${START_URL:-http://localhost:4100/?siteId=avocado-hub}"
 SESSION_NAME="${PLAYWRIGHT_CLI_SESSION:-demo-human-60s}"
 DEMO_SLOWNESS="${DEMO_SLOWNESS:-1.6}"
 DEMO_FULLSCREEN="${DEMO_FULLSCREEN:-1}"

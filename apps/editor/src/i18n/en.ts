@@ -321,8 +321,11 @@ const en = {
   "sitesAgent.welcome": "I can create a new site from scratch, migrate an existing website from its URL, or integrate the editor into your Next.js project. What would you like to do?",
   "sitesAgent.placeholder": "Ask me anything...",
   "sitesAgent.suggestion1": "Create a new site from scratch",
+  "sitesAgent.suggestion1Desc": "Describe your site's purpose and I'll scaffold it",
   "sitesAgent.suggestion2": "Migrate a website from URL",
+  "sitesAgent.suggestion2Desc": "Give me a URL and I'll analyze and recreate it",
   "sitesAgent.suggestion3": "Integrate using a GitHub project",
+  "sitesAgent.suggestion3Desc": "Connect the editor to your existing Next.js app",
   "sitesAgent.stop": "Stop",
 } as const
 

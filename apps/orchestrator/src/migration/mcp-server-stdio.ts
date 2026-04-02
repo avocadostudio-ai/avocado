@@ -26,6 +26,7 @@ import { saveScreenshot, saveScrapeDebug } from "./migration-tools.js"
 import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
   normalizePageBlocks, scaffoldSiteProject, analyzeCodebase, cloneRepo, detectSitePort,
+  startAndWaitForDevServer,
   pageTsx, hybridPageTsx, editorApiRoute, blocksRegisterTsx, defaultsTs, samplePagesJson,
   defaultLogoSvg, faviconSvg,
 } from "../agent/sites-agent-shared.js"
@@ -159,12 +160,25 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
   try {
     // If project already exists, clean it and reuse
     if (existsSync(projectDir)) {
-      let port = 3500
+      let port = 0
       try {
         const pkg = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
         const m = pkg.scripts?.dev?.match(/-p\s*(\d+)/)
         if (m) port = Number(m[1])
       } catch { /* use default */ }
+
+      // Validate existing port is free; fall back to auto-assign
+      if (port) {
+        const { createServer } = await import("node:net")
+        const free = await new Promise<boolean>((res) => {
+          const s = createServer()
+          s.once("error", () => res(false))
+          s.once("listening", () => { s.close(() => res(true)) })
+          s.listen(port, "127.0.0.1")
+        })
+        if (!free) port = 0
+      }
+      if (!port) port = await findAvailablePort(root)
 
       const { rm } = await import("node:fs/promises")
       for (const dir of ["content", "blocks", "public/images", ".next"]) {
@@ -176,6 +190,12 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
       await mkdir(join(projectDir, "public/images"), { recursive: true })
       await writeFile(join(projectDir, "blocks/register.tsx"),
         `import { registerCustomRenderer } from "@ai-site-editor/blocks"\n`, "utf-8")
+      // Update package.json with validated port
+      const existingPkg = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
+      if (existingPkg.scripts?.dev) {
+        existingPkg.scripts.dev = existingPkg.scripts.dev.replace(/-p\s*\d+/, `-p ${port}`)
+        await writeFile(join(projectDir, "package.json"), JSON.stringify(existingPkg, null, 2), "utf-8")
+      }
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ status: "reused", siteId, port, projectPath: projectDir }) }] }
     }
@@ -183,14 +203,10 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
     // New project — use shared scaffolding
     const result = await scaffoldSiteProject({ siteId, name, purpose })
 
-    // Start dev server in background
-    const { spawn } = await import("node:child_process")
-    const devProcess = spawn("pnpm", ["--filter", `@ai-site-editor/${siteId}`, "dev"], {
-      cwd: root,
-      stdio: "ignore",
-      detached: true,
+    // Start dev server and wait for readiness
+    const { serverReady } = await startAndWaitForDevServer({
+      siteId, port: result.port, cwd: root, useFilter: true,
     })
-    devProcess.unref()
 
     return {
       content: [{
@@ -200,7 +216,7 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
           siteId: result.siteId,
           port: result.port,
           projectPath: result.projectDir,
-          devServerStarted: true,
+          devServerStarted: serverReady,
         }),
       }],
     }
@@ -578,7 +594,12 @@ server.tool("launch_site", "Start the dev server for an integrated site, wait fo
 
     // Start dev server and listen for "Ready" message
     const { spawn } = await import("node:child_process")
-    const devProcess = spawn("pnpm", ["dev"], { cwd: projectDir, stdio: ["ignore", "pipe", "pipe"], detached: true })
+    const devProcess = spawn("pnpm", ["dev"], {
+      cwd: projectDir,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+      env: { ...process.env, WATCHPACK_POLLING: "true", WATCHPACK_POLLING_INTERVAL: "1000", CHOKIDAR_USEPOLLING: "true", CHOKIDAR_INTERVAL: "1000" },
+    })
     devProcess.unref()
 
     let serverReady = false
@@ -642,6 +663,7 @@ server.tool("register_site", "Register an existing site project with the editor 
       cwd: root,
       stdio: "ignore",
       detached: true,
+      env: { ...process.env, WATCHPACK_POLLING: "true", WATCHPACK_POLLING_INTERVAL: "1000", CHOKIDAR_USEPOLLING: "true", CHOKIDAR_INTERVAL: "1000" },
     })
     devProcess.unref()
 
