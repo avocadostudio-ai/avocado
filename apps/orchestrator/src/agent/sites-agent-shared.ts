@@ -60,15 +60,93 @@ function isPortFree(createServer: typeof import("node:net").createServer, port: 
   })
 }
 
+// ── Sites agent model tiers ──
+
+/** Model tiers for the sites agent pipeline. */
+export const SITES_AGENT_MODELS = {
+  /** Haiku — triage, intent detection, simple Q&A ($0.001/call) */
+  fast: process.env.SITES_AGENT_MODEL_FAST ?? "claude-haiku-4-5-20251001",
+  /** Sonnet — main agent, subagents, standard migrations */
+  balanced: process.env.SITES_AGENT_MODEL_BALANCED ?? "claude-sonnet-4-6",
+  /** Opus — complex migrations, multi-page sites, custom block design */
+  powerful: process.env.SITES_AGENT_MODEL_POWERFUL ?? "claude-opus-4-6",
+}
+
+export type TriageResult = {
+  intent: "create" | "migrate" | "integrate" | "question"
+  url?: string
+  siteName?: string
+  scope?: string
+  answer?: string
+}
+
+/**
+ * Fast triage using Haiku — classifies intent, extracts params, answers simple questions.
+ * ~200ms, ~$0.001 per call.
+ */
+export async function triageWithHaiku(message: string, apiKey: string): Promise<TriageResult> {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk")
+  const client = new Anthropic({ apiKey })
+
+  const response = await client.messages.create({
+    model: SITES_AGENT_MODELS.fast,
+    max_tokens: 256,
+    messages: [{ role: "user", content: message }],
+    system: `You are a triage router for a site creation agent. Classify the user's message and extract parameters.
+
+Reply with ONLY a JSON object (no markdown, no explanation):
+{
+  "intent": "create" | "migrate" | "integrate" | "question",
+  "url": "extracted URL if any",
+  "siteName": "extracted site name if any",
+  "scope": "e.g. 'homepage only', 'all pages', specific pages",
+  "answer": "direct answer if intent is 'question'"
+}
+
+Intent definitions:
+- "create": user wants to build a new site from scratch
+- "migrate": user wants to recreate/copy an existing website from a URL
+- "integrate": user wants to add the editor SDK to an existing Next.js project (mentions GitHub, repo, existing project, codebase)
+- "question": user is asking a question about capabilities, block types, how things work — answer it directly in "answer" field
+
+Available block types: Hero, FeatureGrid, CardGrid, CTA, FAQAccordion, Stats, RichText, Testimonials, TwoColumn, Table, Gallery, Quote, Banner, Tabs, Carousel, Video, Embed, Card. Custom blocks can also be created during migration.
+
+If intent is "migrate" but no URL is provided, or "integrate" but no repo/project is mentioned, set intent to "question" and write a friendly follow-up in "answer" asking for the missing info.
+
+Extract URLs, site names, and scope constraints from the message. If not present, omit the field.`,
+  })
+
+  const text = response.content[0]?.type === "text" ? response.content[0].text : "{}"
+  try {
+    // Strip markdown code fences if present
+    const clean = text.replace(/^```json?\s*|\s*```$/g, "").trim()
+    const parsed = JSON.parse(clean) as TriageResult
+    console.log(`[sites-agent] Triage: intent=${parsed.intent} url=${parsed.url ?? "-"} site=${parsed.siteName ?? "-"} scope=${parsed.scope ?? "-"}`)
+    return parsed
+  } catch {
+    console.log(`[sites-agent] Triage parse failed, defaulting to migrate: ${text.slice(0, 100)}`)
+    return { intent: "migrate" }
+  }
+}
+
 // ── CSS variable persistence ──
 
 export async function patchGlobalsCssVars(cssPath: string, vars: Record<string, string>): Promise<void> {
   if (!existsSync(cssPath)) return
   let css = await readFile(cssPath, "utf-8")
+
+  // Remove generic dark-mode and .dark overrides — migrated sites have a single
+  // authoritative palette extracted from the source; the template defaults would
+  // stomp on it for users with prefers-color-scheme: dark.
+  css = css.replace(/\/\*\s*Dark mode\s*\*\/\s*\n@media\s*\(prefers-color-scheme:\s*dark\)\s*\{[^}]*\{[^}]*\}\s*\}/g, "")
+  css = css.replace(/\.dark\s*\{[^}]*\}/g, "")
+  css = css.replace(/\n{3,}/g, "\n\n") // collapse leftover blank lines
+
   for (const [prop, value] of Object.entries(vars)) {
-    const varRegex = new RegExp(`(${prop.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}):\\s*[^;]+;`)
+    const escaped = prop.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const varRegex = new RegExp(`(${escaped}):\\s*[^;]+;`, "g")
     if (varRegex.test(css)) {
-      css = css.replace(varRegex, `$1: ${value};`)
+      css = css.replace(new RegExp(`(${escaped}):\\s*[^;]+;`, "g"), `$1: ${value};`)
     } else {
       css = css.replace(/(:root\s*\{[^}]*)(\})/, `$1  ${prop}: ${value};\n$2`)
     }
@@ -258,7 +336,7 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { dev }) => {
     if (dev) {
-      config.watchOptions = { ...config.watchOptions, followSymlinks: true }
+      config.watchOptions = { ...config.watchOptions, followSymlinks: true, poll: 1000 }
       config.resolve = { ...config.resolve, symlinks: false }
       config.cache = { ...config.cache, version: \`\${process.env.WORKSPACE_CACHE_BUST ?? Date.now()}\` }
     }
@@ -875,4 +953,72 @@ export async function detectSitePort(projectDir: string): Promise<number> {
   } catch { /* no package.json */ }
   // Allocate a new port
   return findAvailablePort(monorepoRoot())
+}
+
+/**
+ * Start a Next.js dev server and wait for it to report "Ready" (or timeout).
+ * Replaces fire-and-forget spawn patterns that reported success before the server was up.
+ */
+export async function startAndWaitForDevServer(opts: {
+  siteId: string
+  port: number
+  cwd: string
+  useFilter?: boolean
+  timeoutMs?: number
+}): Promise<{ serverReady: boolean }> {
+  const { spawn } = await import("node:child_process")
+  const args = opts.useFilter
+    ? ["--filter", `@ai-site-editor/${opts.siteId}`, "dev"]
+    : ["dev"]
+
+  // Kill any existing process on the port first
+  try {
+    const { execSync } = await import("node:child_process")
+    const pids = execSync(`lsof -ti:${opts.port} 2>/dev/null`, { encoding: "utf-8" }).trim()
+    if (pids) {
+      for (const pid of pids.split("\n")) {
+        try { process.kill(Number(pid), "SIGKILL") } catch { /* already dead */ }
+      }
+      console.log(`[sites-agent] Killed existing process(es) on port ${opts.port}`)
+    }
+  } catch { /* no process on port — fine */ }
+
+  console.log(`[sites-agent] Starting dev server for ${opts.siteId} on port ${opts.port}...`)
+  const devProcess = spawn("pnpm", args, {
+    cwd: opts.cwd,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
+    env: {
+      ...process.env,
+      // Reduce file-watcher FD usage: poll instead of native FSEvents.
+      // Without this, each Next.js dev server opens thousands of FDs for
+      // node_modules watchers, quickly hitting EMFILE when multiple sites run.
+      WATCHPACK_POLLING: "true",
+      WATCHPACK_POLLING_INTERVAL: "1000",
+      CHOKIDAR_USEPOLLING: "true",
+      CHOKIDAR_INTERVAL: "1000",
+    },
+  })
+  devProcess.unref()
+
+  let serverReady = false
+  const timeoutMs = opts.timeoutMs ?? 60_000
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(() => resolve(), timeoutMs)
+    const onData = (chunk: Buffer) => {
+      const text = chunk.toString()
+      if (text.includes("Ready") || text.includes(`localhost:${opts.port}`)) {
+        serverReady = true
+        clearTimeout(timer)
+        devProcess.stdout?.removeAllListeners()
+        devProcess.stderr?.removeAllListeners()
+        resolve()
+      }
+    }
+    devProcess.stdout?.on("data", onData)
+    devProcess.stderr?.on("data", onData)
+    devProcess.on("exit", () => { clearTimeout(timer); resolve() })
+  })
+  console.log(`[sites-agent] Dev server ${serverReady ? "ready" : "timed out"} for ${opts.siteId} at http://localhost:${opts.port}`)
+  return { serverReady }
 }

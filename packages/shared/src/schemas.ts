@@ -8,6 +8,9 @@ import { blockInstanceSchema, blockInstanceSchemaLenient, IMAGE_PLACEHOLDER, typ
 export const siteConfigSchema = z.object({
   name: z.string().optional(),
   logo: z.string().optional(),
+  purpose: z.string().optional(), // What the site is about — used as AI context for editing
+  tone: z.string().optional(), // Voice/tone guide for AI-generated content
+  constraints: z.array(z.string()).optional(), // Content rules the AI must follow (e.g. "Never mention competitor X")
   navLabels: z.record(z.string(), z.string()).optional(), // slug → custom label, e.g. { "/pricing": "Plans & Pricing" }
   navGroups: z.record(z.string(), z.array(z.string())).optional(), // parent label → child slugs, e.g. { "Products": ["/bananas", "/cherries"] }
   themeOverrides: z.record(z.string(), z.string()).optional(), // CSS variable overrides, e.g. { "--brand": "#2563eb" }

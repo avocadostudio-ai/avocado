@@ -35,6 +35,7 @@ export type UseSitesAgentReturn = {
   streamSteps: { label: string; done: boolean; count?: number }[]
   streamPhases: PhaseStatus[]
   streamingText: string | null
+  followUpSuggestions: string[]
   sendMessage: (text: string) => void
   cancelStream: () => void
   clearMessages: () => void
@@ -48,6 +49,30 @@ function detectAgentMode(text: string): "migrate" | "integrate" {
   if (/\bexisting\s+(site|project|codebase|repo)\b/.test(lower)) return "integrate"
   if (/\bconnect\s+(to\s+)?(the\s+)?editor\b/.test(lower)) return "integrate"
   return "migrate"
+}
+
+const STEP_LABEL_MAP: Record<string, string> = {
+  "Agent": "Processing",
+  "generate_page_specs": "Generating page specs",
+  "download_remote_image": "Downloading image",
+  "download_remote_images": "Downloading images",
+  "create_site": "Creating site",
+  "bootstrap_pages": "Building pages",
+  "apply_theme": "Applying theme",
+  "clone_repo": "Cloning repository",
+  "analyze_codebase": "Analyzing codebase",
+  "integrate_site": "Integrating site",
+  "launch_site": "Launching site",
+  "register_site": "Registering site",
+}
+
+function humanizeStepLabel(label: string): string {
+  if (STEP_LABEL_MAP[label]) return STEP_LABEL_MAP[label]
+  // Convert snake_case/camelCase to readable text
+  return label
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, c => c.toUpperCase())
 }
 
 const STORAGE_KEY = "sites-agent-messages"
@@ -95,6 +120,7 @@ export function useSitesAgent(options: {
   const [streamSteps, setStreamSteps] = useState<{ label: string; done: boolean; count?: number }[]>([])
   const [streamPhases, setStreamPhases] = useState<PhaseStatus[]>([])
   const [streamingText, setStreamingText] = useState<string | null>(null)
+  const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([])
 
   const activeStreamId = useRef<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -134,7 +160,7 @@ export function useSitesAgent(options: {
       if (type === "status") {
         const msg = d.message as string
         setStreamStatus(msg)
-        const label = msg.replace(/\.\.\.$/, "")
+        const label = humanizeStepLabel(msg.replace(/\.\.\.$/, ""))
         setStreamSteps(prev => {
           // If the same step is still active, skip the update
           const activeIdx = prev.findIndex(s => !s.done)
@@ -172,6 +198,11 @@ export function useSitesAgent(options: {
         setStreamPhases(prev =>
           prev.map(p => p.id === phaseId ? { ...p, outcome } : p)
         )
+      } else if (type === "phase_done") {
+        const phaseId = d.phase as string
+        setStreamPhases(prev =>
+          prev.map(p => p.id === phaseId && p.status === "active" ? { ...p, status: "done" as const } : p)
+        )
       } else if (type === "site_created") {
         const config = d.config as SiteConfig
         if (config && onSiteCreatedRef.current) onSiteCreatedRef.current(config)
@@ -189,6 +220,9 @@ export function useSitesAgent(options: {
             onSiteCreatedRef.current(config as SiteConfig)
           }
         }
+
+        const suggestions = Array.isArray(result.suggestions) ? (result.suggestions as string[]).filter(s => typeof s === "string" && s.trim()) : []
+        setFollowUpSuggestions(suggestions)
 
         source.close()
         eventSourceRef.current = null
@@ -281,6 +315,7 @@ export function useSitesAgent(options: {
     setStreamSteps([])
     setStreamPhases([])
     setStreamingText(null)
+    setFollowUpSuggestions([])
     summaryTextRef.current = ""
 
     let streamId: string
@@ -288,7 +323,7 @@ export function useSitesAgent(options: {
       const res = await fetch(`${orchestrator}/sites-agent/start`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, message: text.trim(), locale, useCliAgent: true, mode: detectAgentMode(text) }),
+        body: JSON.stringify({ session, message: text.trim(), locale, useCliAgent: import.meta.env.VITE_AGENT_USE_CLI === "true", mode: detectAgentMode(text) }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `Status ${res.status}` }))
@@ -326,6 +361,7 @@ export function useSitesAgent(options: {
     streamSteps,
     streamPhases,
     streamingText,
+    followUpSuggestions,
     sendMessage,
     cancelStream,
     clearMessages,

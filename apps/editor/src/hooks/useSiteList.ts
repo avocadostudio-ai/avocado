@@ -369,7 +369,11 @@ export function useSiteList(siteId: string, session: string) {
     addSiteFromName,
     addSiteFromConfig: (config: SiteConfig) => {
       setSiteList((prev) => {
-        if (prev.some((s) => s.id === config.id)) return prev
+        const existing = prev.find((s) => s.id === config.id)
+        if (existing) {
+          // Update existing entry with new config (e.g. previewUrl from migration)
+          return prev.map((s) => s.id === config.id ? { ...s, ...config } : s)
+        }
         return [...prev, config]
       })
     },

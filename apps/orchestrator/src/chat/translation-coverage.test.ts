@@ -144,27 +144,30 @@ test("translation coverage: flags missing Hero top-level props", () => {
       }
     ]
   }
+  const plan = {
+    intent: "edit_plan" as const,
+    summary_for_user: "Translate page to German",
+    change_log: [],
+    ops: [
+      { op: "update_props" as const, pageSlug: "/test", blockId: "b_hero", patch: { heading: "Mit Vertrauen bauen" } }
+    ]
+  }
   const gap = findFullPageTranslationCoverageGap({
-    plan: {
-      intent: "edit_plan",
-      summary_for_user: "Translate page to German",
-      change_log: [],
-      ops: [
-        { op: "update_props", pageSlug: "/test", blockId: "b_hero", patch: { heading: "Mit Vertrauen bauen" } }
-      ]
-    },
+    plan,
     message: "translate this page to german",
     currentPage: page,
     slug: "/test"
   })
-  assert.ok(gap)
-  assert.match(String(gap), /b_hero\.subheading/)
-  assert.match(String(gap), /b_hero\.ctaText/)
-  assert.match(String(gap), /b_hero\.imageAlt/)
-  // Non-translatable props should NOT appear
-  assert.doesNotMatch(String(gap), /ctaHref/)
-  assert.doesNotMatch(String(gap), /imageUrl/)
-  assert.doesNotMatch(String(gap), /imagePosition/)
+  // Auto-patch fills missing fields with originals — gap should be null
+  assert.equal(gap, null)
+  const patch = plan.ops[0].patch as Record<string, unknown>
+  assert.equal(patch.subheading, "Make changes safely.")
+  assert.equal(patch.ctaText, "Get Started")
+  assert.equal(patch.imageAlt, "Abstract illustration")
+  // Non-translatable props should NOT be added
+  assert.equal(patch.ctaHref, undefined)
+  assert.equal(patch.imageUrl, undefined)
+  assert.equal(patch.imagePosition, undefined)
 })
 
 test("translation coverage: passes when all translatable Hero props covered", () => {
@@ -317,20 +320,23 @@ test("translation coverage: CTA block missing title/description", () => {
       }
     ]
   }
+  const plan = {
+    intent: "edit_plan" as const,
+    summary_for_user: "Translate page to German",
+    change_log: [],
+    ops: [
+      { op: "update_props" as const, pageSlug: "/test", blockId: "b_cta", patch: { ctaText: "Jetzt starten" } }
+    ]
+  }
   const gap = findFullPageTranslationCoverageGap({
-    plan: {
-      intent: "edit_plan",
-      summary_for_user: "Translate page to German",
-      change_log: [],
-      ops: [
-        { op: "update_props", pageSlug: "/test", blockId: "b_cta", patch: { ctaText: "Jetzt starten" } }
-      ]
-    },
+    plan,
     message: "translate this page to german",
     currentPage: page,
     slug: "/test"
   })
-  assert.ok(gap)
-  assert.match(String(gap), /b_cta\.title/)
-  assert.match(String(gap), /b_cta\.description/)
+  // Auto-patch fills missing fields with originals
+  assert.equal(gap, null)
+  const patch = plan.ops[0].patch as Record<string, unknown>
+  assert.equal(patch.title, "Ready to start?")
+  assert.equal(patch.description, "Apply your next change.")
 })

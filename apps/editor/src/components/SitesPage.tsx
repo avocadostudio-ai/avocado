@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Trash2 } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Bot, Trash2, X } from "lucide-react"
 import { blockManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
 import { SitesAgentChat } from "./SitesAgentChat"
@@ -47,6 +47,16 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
     }), [sites.siteList])
 
   const [showAllSites, setShowAllSites] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(false)
+
+  // Auto-open sidebar when agent starts streaming (assistant-ui openOnRunStart pattern)
+  const wasStreamingRef = useRef(false)
+  useEffect(() => {
+    if (agent.isStreaming && !wasStreamingRef.current) {
+      setAgentOpen(true)
+    }
+    wasStreamingRef.current = agent.isStreaming
+  }, [agent.isStreaming])
 
   const [capabilityBySiteId, setCapabilityBySiteId] = useState<Record<string, {
     status: "loading" | "ready" | "degraded"
@@ -146,7 +156,19 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
 
   return (
     <div className="sites-layout">
-    <SitesAgentChat agent={agent} />
+    {agentOpen && (
+      <div className="sites-agent-sidebar">
+        <button type="button" className="sites-agent-sidebar-close" onClick={() => setAgentOpen(false)}>
+          <X size={16} />
+        </button>
+        <SitesAgentChat agent={agent} />
+      </div>
+    )}
+    {!agentOpen && (
+      <button type="button" className="sites-agent-fab" onClick={() => setAgentOpen(true)} title={t("sitesAgent.title")}>
+        <Bot size={20} />
+      </button>
+    )}
     <main className="sites-page">
       <header className="sites-header">
         <div>

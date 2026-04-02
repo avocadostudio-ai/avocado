@@ -138,7 +138,7 @@ export const publishStatusBySession = new Map<string, PublishTracker>()
 export const siteConfigs = new Map<string, SiteConfig>()
 // Seed default configs
 siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
-siteConfigs.set("adventure-atlas::dev", { name: "The Avocado Hub", logo: "/logos/adventure-atlas.svg" })
+siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
@@ -514,7 +514,7 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
   siteConfigs.clear()
   // Re-seed defaults
   siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
-  siteConfigs.set("adventure-atlas::dev", { name: "The Avocado Hub", logo: "/logos/adventure-atlas.svg" })
+  siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
   if (parsed.siteConfigs && typeof parsed.siteConfigs === "object") {
     for (const [session, config] of Object.entries(parsed.siteConfigs)) {
       if (config && typeof config === "object") {

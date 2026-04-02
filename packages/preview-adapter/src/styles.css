@@ -286,8 +286,10 @@
 }
 
 .aifx-shimmer-sparkle {
-  position: static;
-  z-index: 1;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
   width: 28px !important;
   height: 28px !important;
   flex-shrink: 0;
