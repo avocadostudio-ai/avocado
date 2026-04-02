@@ -3,8 +3,8 @@ import styles from "./styles.module.css"
 
 export function PricingTable(props: Record<string, unknown>): JSX.Element {
   const title = String(props.title ?? "")
-  const footerNote = String(props.footerNote ?? "")
-  const columns = Array.isArray(props.columns) ? props.columns : []
+  const footnote = String(props.footnote ?? "")
+  const tiers = Array.isArray(props.tiers) ? props.tiers : []
 
   return (
     <section className={styles.section}>
@@ -21,89 +21,65 @@ export function PricingTable(props: Record<string, unknown>): JSX.Element {
         )}
 
         <div className={styles.grid}>
-          {columns.map((raw, idx) => {
-            const col = (raw ?? {}) as Record<string, unknown>
-            const duration = String(col.duration ?? "")
-            const category = String(col.category ?? "")
-            const days = String(col.days ?? "")
-            const price = String(col.price ?? "")
-            const unit = String(col.unit ?? "")
-            const inclusions = Array.isArray(col.inclusions) ? col.inclusions : []
+          {tiers.map((raw, idx) => {
+            const tier = (raw ?? {}) as Record<string, unknown>
+            const duration = String(tier.duration ?? "")
+            const days = String(tier.days ?? "")
+            const price = String(tier.price ?? "")
+            const isSpecial = tier.isSpecial === true
+            const features = Array.isArray(tier.features) ? tier.features : []
 
             return (
-              <div key={idx} className={styles.column}>
-                <p
-                  className={styles.duration}
-                  data-editable-target={`columns[${idx}].duration`}
-                  data-editable-target-label={`columns[${idx}].duration`}
-                  data-editable-label={`columns[${idx}].duration`}
+              <div key={idx} className={`${styles.card} ${isSpecial ? styles.cardSpecial : ""}`}>
+                {isSpecial && (
+                  <div className={styles.badge}>SPEZIALPREIS</div>
+                )}
+
+                <div className={styles.duration}
+                  data-editable-target={`tiers[${idx}].duration`}
+                  data-editable-target-label={`tiers[${idx}].duration`}
+                  data-editable-label={`tiers[${idx}].duration`}
                 >
                   {duration}
-                </p>
-                <p
-                  className={styles.category}
-                  data-editable-target={`columns[${idx}].category`}
-                  data-editable-target-label={`columns[${idx}].category`}
-                  data-editable-label={`columns[${idx}].category`}
-                >
-                  {category}
-                </p>
-                <p
-                  className={styles.days}
-                  data-editable-target={`columns[${idx}].days`}
-                  data-editable-target-label={`columns[${idx}].days`}
-                  data-editable-label={`columns[${idx}].days`}
+                </div>
+
+                <div className={styles.days}
+                  data-editable-target={`tiers[${idx}].days`}
+                  data-editable-target-label={`tiers[${idx}].days`}
+                  data-editable-label={`tiers[${idx}].days`}
                 >
                   {days}
-                </p>
+                </div>
 
-                <hr className={styles.priceDivider} />
-
-                <p
-                  className={styles.price}
-                  data-editable-target={`columns[${idx}].price`}
-                  data-editable-target-label={`columns[${idx}].price`}
-                  data-editable-label={`columns[${idx}].price`}
+                <div className={styles.price}
+                  data-editable-target={`tiers[${idx}].price`}
+                  data-editable-target-label={`tiers[${idx}].price`}
+                  data-editable-label={`tiers[${idx}].price`}
                 >
                   {price}
-                </p>
-                <p
-                  className={styles.unit}
-                  data-editable-target={`columns[${idx}].unit`}
-                  data-editable-target-label={`columns[${idx}].unit`}
-                  data-editable-label={`columns[${idx}].unit`}
-                >
-                  {unit}
-                </p>
+                </div>
 
-                {inclusions.length > 0 && (
-                  <ul className={styles.inclusions}>
-                    {inclusions.map((item, iIdx) => (
-                      <li
-                        key={iIdx}
-                        className={styles.inclusionItem}
-                        data-editable-target={`columns[${idx}].inclusions[${iIdx}]`}
-                        data-editable-target-label={`columns[${idx}].inclusions[${iIdx}]`}
-                        data-editable-label={`columns[${idx}].inclusions[${iIdx}]`}
-                      >
-                        {String(item ?? "")}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <ul className={styles.features}>
+                  {features.map((feature, fIdx) => (
+                    <li key={fIdx} className={styles.feature}>
+                      <span className={styles.featureCheck} aria-hidden="true">✓</span>
+                      <span>{String(feature ?? "")}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )
           })}
         </div>
 
-        {footerNote.length > 0 && (
+        {footnote.length > 0 && (
           <p
-            className={styles.footerNote}
-            data-editable-target="footerNote"
-            data-editable-target-label="footerNote"
-            data-editable-label="footerNote"
+            className={styles.footnote}
+            data-editable-target="footnote"
+            data-editable-target-label="footnote"
+            data-editable-label="footnote"
           >
-            {footerNote}
+            {footnote}
           </p>
         )}
       </div>

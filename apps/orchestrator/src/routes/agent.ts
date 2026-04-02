@@ -258,7 +258,30 @@ export async function registerAgentRoutes(app: FastifyInstance) {
                 break
               case "done": {
                 const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(event.summary)
-                emitEvent(streamId, { type: "final", result: { status: "applied", summary: cleanSummary, suggestions, variations: pendingVariations, toolCallCount: event.toolCallCount } })
+                const durationMs = Date.now() - startedAt
+                emitEvent(streamId, { type: "final", result: {
+                  status: "applied",
+                  summary: cleanSummary,
+                  suggestions,
+                  variations: pendingVariations,
+                  toolCallCount: event.toolCallCount,
+                  plannerSource: entry.provider === "openai" ? "openai" : "anthropic",
+                  modelUsed: resolveAgentModel(entry.provider, body.model),
+                  debug: {
+                    traceId: streamId,
+                    outcome: "applied",
+                    plannerTier: "agent",
+                    modelUsed: resolveAgentModel(entry.provider, body.model),
+                    plannerSource: entry.provider,
+                    opCount: event.toolCallCount,
+                    inputTokens: event.usage.inputTokens,
+                    outputTokens: event.usage.outputTokens,
+                    totalTokens: event.usage.inputTokens + event.usage.outputTokens,
+                    cacheReadInputTokens: event.usage.cacheReadTokens,
+                    cacheCreationInputTokens: event.usage.cacheCreationTokens,
+                    timeline: [{ stage: "done", atMs: durationMs }],
+                  },
+                } })
                 break
               }
               case "error":
