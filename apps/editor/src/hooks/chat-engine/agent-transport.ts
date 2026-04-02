@@ -303,6 +303,9 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           variations,
           previewVersion: result.previewVersion as number | undefined,
           focusBlockId: result.focusBlockId as string | undefined,
+          plannerSource: result.plannerSource as AssistantResponse["plannerSource"],
+          modelUsed: result.modelUsed as string | undefined,
+          debug: result.debug as AssistantResponse["debug"],
         })
         // Refresh preview with latest state
         postToSite("draftUpdated", { focusBlockId: result.focusBlockId ?? undefined })

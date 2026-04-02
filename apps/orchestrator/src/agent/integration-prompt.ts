@@ -103,21 +103,46 @@ Call \`launch_site\` with the siteId and name from the previous step. This start
 
 ## Step 7: Add inline editing attributes — REQUIRED
 
-Search the project for block/section components that render page content. For each component, add \`data-editable-target\` attributes to text elements.
+Search the project for ALL block/section components that render page content — including child/nested components. For each text element, add \`data-editable-target\` attributes so the editor can identify and highlight individual fields.
 
 **Rules:**
-- Add \`data-editable-target="{propName}"\` and \`data-editable-label="{propName}"\` to text elements displaying block prop values
-- For array items: \`data-editable-target="items[0].title"\`
-- Only add to text elements (headings, paragraphs, buttons) — NOT images or containers
+- Add \`data-editable-target="{propPath}"\` and \`data-editable-label="{propPath}"\` to every text element displaying a block prop value
+- Only add to text elements (headings, paragraphs, spans, buttons/links with text) — NOT images, containers, or wrappers
 - Do NOT change component logic, styles, or structure
 
-**Example:**
+**Simple props:**
 \`\`\`tsx
-// Before:
-<h1>{heading}</h1>
-// After:
 <h1 data-editable-target="heading" data-editable-label="heading">{heading}</h1>
+<p data-editable-target="description" data-editable-label="description">{description}</p>
 \`\`\`
+
+**Array items — use the loop index variable in the path:**
+\`\`\`tsx
+{cards.map((card, index) => (
+  <div key={index}>
+    <h3 data-editable-target={\`cards[\${index}].title\`} data-editable-label={\`cards[\${index}].title\`}>
+      {card.title}
+    </h3>
+    <p data-editable-target={\`cards[\${index}].description\`} data-editable-label={\`cards[\${index}].description\`}>
+      {card.description}
+    </p>
+  </div>
+))}
+\`\`\`
+
+**Nested children (e.g. TwoColumn with left/right arrays):**
+\`\`\`tsx
+{leftItems.map((item, i) => {
+  if (item.type === "heading") return (
+    <h2 data-editable-target={\`left[\${i}].text\`} data-editable-label={\`left[\${i}].text\`}>{item.text}</h2>
+  )
+  if (item.type === "paragraph") return (
+    <p data-editable-target={\`left[\${i}].text\`} data-editable-label={\`left[\${i}].text\`}>{item.text}</p>
+  )
+})}
+\`\`\`
+
+**IMPORTANT:** Do NOT skip components that render arrays or nested children. CardGrid cards, TwoColumn left/right items, list items, and CTA buttons all need editable markers with indexed paths.
 
 ## Step 8: Verify the build
 
