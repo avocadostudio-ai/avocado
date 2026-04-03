@@ -18,6 +18,7 @@ import { buildIntegrationSystemPrompt } from "../agent/integration-prompt.js"
 import { triageWithHaiku, SITES_AGENT_MODELS } from "../agent/sites-agent-shared.js"
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 import { pushMigrationTelemetry } from "../telemetry/migration-telemetry.js"
+import { logAgent } from "../agent/agent-logger.js"
 import { runCliAgent, type CliStreamEntry } from "./sites-agent-cli.js"
 
 type SitesAgentRequestBody = {
@@ -108,6 +109,10 @@ export const TOOL_LABELS: Record<string, string> = {
 
 const streamContexts = new Map<string, StreamEntry>()
 const STREAM_TTL_MS = 300_000 // 5 min
+
+// ── Approval bridge for AskUserQuestion ──
+// When the agent calls AskUserQuestion, we emit an SSE event and wait for user response via POST /sites-agent/respond.
+const pendingApprovals = new Map<string, { resolve: (answers: Record<string, string>) => void }>()
 const STREAM_HEARTBEAT_INTERVAL_MS = 4_000
 
 function cleanExpired() {
@@ -195,6 +200,23 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
   })
 
   // ---------------------------------------------------------------------------
+  // POST /sites-agent/respond — user answers to AskUserQuestion
+  // ---------------------------------------------------------------------------
+  app.post("/sites-agent/respond", async (request, reply) => {
+    const { streamId, answers } = request.body as { streamId?: string; answers?: Record<string, string> }
+    if (!streamId) return reply.code(400).send({ error: "streamId is required" })
+    if (!answers) return reply.code(400).send({ error: "answers is required" })
+
+    const pending = pendingApprovals.get(streamId)
+    if (!pending) return reply.code(410).send({ error: "No pending approval for this stream" })
+
+    pending.resolve(answers)
+    pendingApprovals.delete(streamId)
+    console.log(`[sites-agent] Stream ${streamId}: received user response for AskUserQuestion`)
+    return { ok: true }
+  })
+
+  // ---------------------------------------------------------------------------
   // GET /sites-agent/stream?streamId=X — SSE, runs Agent SDK query()
   // ---------------------------------------------------------------------------
   app.get("/sites-agent/stream", async (request, reply) => {
@@ -233,22 +255,35 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
       const body = entry.body
       const session = body.session ?? "dev"
       console.log(`[sites-agent] Stream ${streamId}: INIT mode=${body.mode ?? "migrate"} cli=${!!body.useCliAgent} message="${body.message?.slice(0, 100)}"`)
+      logAgent(streamId, "init", { mode: body.mode ?? "migrate", message: body.message?.slice(0, 100) })
 
       // ── Haiku triage — classify intent, extract params, short-circuit questions ──
       let triage: Awaited<ReturnType<typeof triageWithHaiku>> | null = null
       if (!body.useCliAgent && entry.apiKey) {
         try {
           triage = await triageWithHaiku(body.message!, entry.apiKey)
+          logAgent(streamId, "triage", { intent: triage.intent, url: triage.url, scope: triage.scope, siteName: triage.siteName })
 
           // Short-circuit: answer simple questions without spawning the agent
           if (triage.intent === "question" && triage.answer) {
             emitEvent(streamId, { type: "summary_token", text: triage.answer })
+            // Generate contextual suggestions based on what's missing
+            const suggestions: string[] = []
+            if (body.message?.match(/integrat|sdk|existing|next\.?js/i)) {
+              suggestions.push("Integrate https://github.com/my-org/my-site")
+            }
+            if (body.message?.match(/migrat|copy|recreat|clone/i)) {
+              suggestions.push("Migrate https://example.com")
+            }
+            if (suggestions.length === 0) {
+              suggestions.push("Create a website for my business", "Migrate https://example.com")
+            }
             emitEvent(streamId, {
               type: "final",
               result: {
                 status: "applied",
                 summary: triage.answer,
-                suggestions: [],
+                suggestions,
                 toolCallCount: 0,
                 sitesCreated: [],
                 usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, totalCostUsd: 0, numTurns: 0, triageOnly: true },
@@ -327,8 +362,6 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
             "mcp__sites-agent__clone_repo",
             "mcp__sites-agent__analyze_codebase",
             "mcp__sites-agent__integrate_site",
-            "mcp__sites-agent__launch_site",
-            "mcp__sites-agent__register_site",
             "mcp__sites-agent__list_sites",
             "mcp__sites-agent__bootstrap_pages",
             "mcp__sites-agent__apply_theme",
@@ -407,6 +440,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
             prompt: enrichedPrompt,
             options: {
               abortController: entry.abortController,
+              includePartialMessages: true,
               maxBudgetUsd,
               cwd: process.cwd(),
               agent: "sites-agent",
@@ -429,7 +463,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
    - \`specs[]\`: per-section block-type-agnostic specs with exact computed CSS styles, DOM structure, content, and design notes
    - \`designTokens\` + \`themeVariables\`: colors, fonts, radii mapped to CSS vars
    - \`nav\`: site name, logo URL, nav items with hierarchy
-3. Use \`generate_page_specs\` on 3-5 other key pages (not ALL — prioritize unique layouts)
+3. **Scope-aware scraping**: If the user request mentions "homepage only" or a single page, do NOT scrape additional pages — skip step 3 entirely. Otherwise, use \`generate_page_specs\` on 2-3 other key pages (not ALL — prioritize unique layouts). Speed matters: fewer pages = faster migration.
 4. Download the site logo with \`download_remote_image\` if found in nav.logoUrl
 
 ## Output Format
@@ -625,19 +659,51 @@ Key patterns to follow:
 - \`clamp()\` for responsive typography`,
                   tools: ["Write", "Edit", "Bash"],
                   skills: ["custom-block-creation"],
-                  model: SITES_AGENT_MODELS.balanced,
+                  model: SITES_AGENT_MODELS.powerful,
                 } } : {}),
               },
               // In integrate mode, main agent needs file tools directly.
               // In migrate mode, only subagents (block-coder) need file tools —
               // main agent should use MCP tools (create_site, bootstrap_pages, etc.)
-              tools: isIntegrate ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep"] : [],
+              // AskUserQuestion enables the analysis approval gate for migrations.
+              tools: isIntegrate
+                ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "AskUserQuestion"]
+                : ["AskUserQuestion"],
               allowedTools: allTools,
               settingSources: ["project"],
               mcpServers: { "sites-agent": mcpServer },
               env: { ...process.env, ANTHROPIC_API_KEY: entry.apiKey },
               permissionMode: "bypassPermissions",
               persistSession: false,
+              canUseTool: async (toolName: string, input: Record<string, unknown>) => {
+                if (toolName === "AskUserQuestion") {
+                  // Emit questions to frontend via SSE
+                  emitEvent(streamId, { type: "approval_required", input })
+                  console.log(`[sites-agent] Stream ${streamId}: AskUserQuestion — waiting for user response`)
+
+                  // Wait for user response via POST /sites-agent/respond
+                  const answers = await new Promise<Record<string, string>>((resolve) => {
+                    pendingApprovals.set(streamId, { resolve })
+                    // Safety timeout: auto-approve after 10 minutes
+                    setTimeout(() => {
+                      if (pendingApprovals.has(streamId)) {
+                        pendingApprovals.delete(streamId)
+                        const autoAnswers: Record<string, string> = {}
+                        const questions = (input.questions ?? []) as Array<{ question: string; options: Array<{ label: string }> }>
+                        for (const q of questions) {
+                          autoAnswers[q.question] = q.options?.[0]?.label ?? "Proceed"
+                        }
+                        resolve(autoAnswers)
+                      }
+                    }, 10 * 60 * 1000)
+                  })
+
+                  console.log(`[sites-agent] Stream ${streamId}: User responded to AskUserQuestion`)
+                  return { behavior: "allow" as const, updatedInput: { ...input, answers } }
+                }
+                // Auto-approve all other tools
+                return { behavior: "allow" as const, updatedInput: input }
+              },
             },
           })
 
@@ -654,15 +720,39 @@ Key patterns to follow:
           let lastPhaseChangeAt = startedAt
           let stallWarningEmitted = false
 
-          console.log(`[sites-agent] Stream ${streamId}: agent loop started`)
+          console.log(`[sites-agent] Stream ${streamId}: agent loop started at +${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
+          logAgent(streamId, "loop_started", {}, startedAt)
 
           for await (const message of result) {
-            // Log every SDK message for debugging
-            logSdkMessage(streamId, message)
+            // Stream events: emit text deltas immediately, skip heavy processing
+            if (message.type === "stream_event") {
+              const evt = message.event as unknown as Record<string, unknown>
+              const isSubagent = !!message.parent_tool_use_id
+              if (evt.type === "content_block_delta") {
+                const delta = evt.delta as Record<string, unknown> | undefined
+                if (delta?.type === "text_delta" && !isSubagent) {
+                  const text = delta.text as string
+                  summaryText += text
+                  emitEvent(streamId, { type: "summary_token", text })
+                }
+              } else if (evt.type === "content_block_start") {
+                const block = evt.content_block as Record<string, unknown> | undefined
+                if (block?.type === "tool_use" && !SILENT_TOOLS.has(block.name as string)) {
+                  const toolName = block.name as string
+                  const prefix = isSubagent ? "[sub] " : ""
+                  emitEvent(streamId, { type: "status", message: `${prefix}${TOOL_LABELS[toolName] ?? toolName}...` })
+                }
+              }
+              continue
+            }
+
+            // Log every SDK message for debugging (with elapsed time)
+            logSdkMessage(streamId, message, startedAt)
 
             const events = translateSdkMessage(message)
             for (const event of events) {
-              if (event.type === "summary_token") summaryText += event.text
+              // Skip summary_token from complete messages — already streamed via stream_event
+              if (event.type === "summary_token") continue
               if (event.type === "tool_use") {
                 toolCallCount++
                 stallToolCalls++
@@ -704,7 +794,9 @@ Key patterns to follow:
             if (message.type === "result") {
               const isSuccess = message.subtype === "success"
               const usage = message.usage
-              console.log(`[sites-agent] Stream ${streamId}: result subtype=${message.subtype} turns=${isSuccess ? message.num_turns : "?"} cost=$${message.total_cost_usd?.toFixed(4) ?? "?"}`)
+              const totalDuration = ((Date.now() - startedAt) / 1000).toFixed(1)
+              console.log(`[sites-agent] Stream ${streamId}: result subtype=${message.subtype} turns=${isSuccess ? message.num_turns : "?"} cost=$${message.total_cost_usd?.toFixed(4) ?? "?"} duration=${totalDuration}s`)
+              logAgent(streamId, "result", { subtype: message.subtype, turns: isSuccess ? message.num_turns : undefined, costUsd: message.total_cost_usd, durationS: +totalDuration, toolCalls: toolCallCount }, startedAt)
               console.log(`[sites-agent] Stream ${streamId}: USAGE in=${usage.input_tokens} out=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens} cache_create=${usage.cache_creation_input_tokens}`)
               if (isSuccess && message.permission_denials?.length > 0) {
                 console.log(`[sites-agent] Stream ${streamId}: permission denials:`, message.permission_denials)
@@ -764,7 +856,8 @@ Key patterns to follow:
             }
           }
 
-          console.log(`[sites-agent] Stream ${streamId}: loop ended normally, ${toolCallCount} tool calls`)
+          console.log(`[sites-agent] Stream ${streamId}: loop ended normally, ${toolCallCount} tool calls, ${((Date.now() - startedAt) / 1000).toFixed(1)}s total`)
+          logAgent(streamId, "loop_ended", { toolCalls: toolCallCount }, startedAt)
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err)
           const stack = err instanceof Error ? err.stack : undefined
@@ -796,9 +889,10 @@ type SSEEvent =
   | { type: "tool_use"; toolName: string; agentType?: string }
   | { type: "error"; result: { status: string; summary: string } }
 
-/** Log SDK messages for debugging. */
-function logSdkMessage(streamId: string, message: SDKMessage) {
-  const prefix = `[sites-agent] ${streamId.slice(0, 8)}`
+/** Log SDK messages for debugging with elapsed time from stream start. */
+function logSdkMessage(streamId: string, message: SDKMessage, startedAt?: number) {
+  const elapsed = startedAt ? `+${((Date.now() - startedAt) / 1000).toFixed(1)}s` : ""
+  const prefix = `[sites-agent] ${streamId.slice(0, 8)} ${elapsed}`
   const isSubagent = "parent_tool_use_id" in message && message.parent_tool_use_id
   const ctx = isSubagent ? " [sub]" : ""
 
@@ -811,9 +905,9 @@ function logSdkMessage(streamId: string, message: SDKMessage) {
         for (const tu of toolUses) {
           const name = "name" in tu ? tu.name : "?"
           const input = "input" in tu ? tu.input as Record<string, unknown> : undefined
-          // Log tool name + key parameters for debugging
           const paramSummary = input ? summarizeToolInput(name, input) : ""
           console.log(`${prefix}${ctx} tool_use: ${name}${paramSummary}`)
+          logAgent(streamId, "tool_use", { tool: name, agent: isSubagent ? "sub" : "main", params: paramSummary.slice(0, 200) }, startedAt)
         }
       }
       if (textBlocks.length > 0) {
