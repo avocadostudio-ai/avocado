@@ -5167,20 +5167,39 @@ textarea {
 
 .sites-agent-message-user {
   align-self: flex-end;
-  background: #0f766e;
-  color: #fff;
+  background: #1e293b;
+  color: #f1f5f9;
   border-radius: 18px 18px 4px 18px;
   padding: 10px 16px;
   max-width: 85%;
   word-break: break-word;
 }
 .sites-agent-message-user .sites-agent-message-content a {
+  color: #93c5fd;
+}
+
+.sites-agent-message-content-collapsed {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+}
+
+.sites-agent-show-more {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0 0;
+  font-family: inherit;
+}
+.sites-agent-show-more:hover {
   color: #fff;
 }
 
 .sites-agent-message-assistant {
   align-self: flex-start;
-  background: var(--hover, #f1f5f9);
+  background: var(--hover, #e8edf3);
   color: var(--text-primary, #1a1a2e);
   border-radius: 18px 18px 18px 4px;
   padding: 12px 16px;
@@ -5371,7 +5390,7 @@ textarea {
   transition: opacity 0.2s;
 }
 .sites-agent-phase.done {
-  opacity: 0.55;
+  opacity: 0.85;
 }
 
 .sites-agent-phase-header {
@@ -5391,14 +5410,15 @@ textarea {
   50% { opacity: 0.7; }
 }
 .sites-agent-phase.done .sites-agent-phase-header {
-  color: var(--text-muted, #64748b);
+  color: var(--text-primary, #334155);
 }
 
 .sites-agent-phase-outcome {
   margin-top: 2px;
   margin-left: 22px;
   font-size: 11px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-secondary, #475569);
+  opacity: 0.9;
 }
 
 /* ── Step tracker ── */
@@ -5415,17 +5435,16 @@ textarea {
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-secondary, #64748b);
   background: none;
   border: none;
   padding: 2px 0;
   cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.15s;
+  transition: color 0.15s;
 }
 .sites-agent-steps-toggle:hover {
   opacity: 1;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text-primary, #1a1a2e);
 }
 
 .sites-agent-step {
@@ -5440,8 +5459,8 @@ textarea {
   font-weight: 500;
 }
 .sites-agent-step.done {
-  color: var(--text-muted, #94a3b8);
-  opacity: 0.55;
+  color: var(--text-secondary, #64748b);
+  opacity: 0.85;
 }
 
 .sites-agent-step-spinner {
@@ -5461,10 +5480,9 @@ textarea {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--text-muted, #94a3b8);
+  background: var(--text-secondary, #64748b);
   flex-shrink: 0;
   margin: 0 4px;
-  opacity: 0.5;
 }
 
 .sites-agent-step-dot {
