@@ -219,6 +219,12 @@ export type ChatComposerCoreProps = {
   compact?: boolean
   className?: string
   style?: CSSProperties
+  canUndoServer?: boolean
+  canRedoServer?: boolean
+  onGlobalUndo?: () => void
+  onGlobalRedo?: () => void
+  undoTooltip?: string
+  redoTooltip?: string
 }
 
 export function ChatComposerCore({
@@ -237,9 +243,46 @@ export function ChatComposerCore({
   compact,
   className = "composer",
   style,
+  canUndoServer,
+  canRedoServer,
+  onGlobalUndo,
+  onGlobalRedo,
+  undoTooltip = "Undo (Ctrl+Z)",
+  redoTooltip = "Redo (Ctrl+Y)",
 }: ChatComposerCoreProps) {
+  const showToolbar = onGlobalUndo && onGlobalRedo
   return (
     <div className={className} style={style}>
+      {showToolbar ? (
+        <div className="undo-redo-toolbar">
+          <button
+            type="button"
+            className="undo-redo-btn"
+            disabled={!canUndoServer || isLoading}
+            onClick={onGlobalUndo}
+            title={undoTooltip}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path d="M9 7 4 12l5 5" />
+              <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
+            </svg>
+            <span>Undo</span>
+          </button>
+          <button
+            type="button"
+            className="undo-redo-btn"
+            disabled={!canRedoServer || isLoading}
+            onClick={onGlobalRedo}
+            title={redoTooltip}
+          >
+            <span>Redo</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path d="M15 7l5 5-5 5" />
+              <path d="M19 12h-7a4.5 4.5 0 0 0 0 9h2" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
       <ClaudeStyleChatInput
         message={message}
         isLoading={isLoading}
