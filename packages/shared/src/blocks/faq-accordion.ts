@@ -15,7 +15,7 @@ registerBlock("FAQAccordion", {
     listFields: {
       items: {
         label: "FAQ items",
-        itemFields: { q: f.text("Question"), a: f.longtext("Answer") }
+        itemFields: { q: f.text("Question"), a: f.richtext("Answer") }
       }
     }
   }

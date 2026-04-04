@@ -6,6 +6,7 @@ registerBlock("CardGrid", {
   schema: z.object({
     title: z.string().min(1),
     subtitle: z.string().optional(),
+    columns: z.enum(["2", "3", "4"]).default("3"),
     cards: z
       .array(
         z.object({
@@ -23,7 +24,12 @@ registerBlock("CardGrid", {
     displayName: "Card Grid",
     description: "Grid of cards, each with title, description, and CTA.",
     category: "content",
-    fields: { title: f.text("Section title"), subtitle: f.text("Subtitle"), headingLevel: f.headingLevel() },
+    fields: {
+      title: f.text("Section title"),
+      subtitle: f.text("Subtitle"),
+      columns: { kind: "enum", label: "Columns", options: ["2", "3", "4"], inlineEditable: false },
+      headingLevel: f.headingLevel(),
+    },
     listFields: {
       cards: {
         label: "Cards",
@@ -43,6 +49,7 @@ registerBlock("CardGrid", {
 export function cardGridDefaultProps(): Record<string, unknown> {
   return {
     title: "Explore more",
+    columns: "3",
     cards: [
       {
         title: "Fast setup",
