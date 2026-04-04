@@ -321,7 +321,7 @@ Write the final summary using the format from "Output Formatting" above. This is
   Pass the siteId to the block-coder: "Create a PricingTable block for site {siteId} with fields: ..."
   Custom blocks must be created BEFORE calling \`bootstrap_pages\` so they can be referenced.
 - **Never use default placeholder props** — "Learn more", "Click here", "Read more", "/" are default values from block templates, not real content. If you can't extract a CTA label or href from the source, omit the CTA entirely rather than use a placeholder. Same for imageUrl: use only real downloaded images, never placeholder URLs.
-- **Banner variant** must match the content: `"success"` for discounts/offers/positive news, `"warning"` for alerts/closures, `"info"` for neutral announcements. A discount or special price is always `"success"`.
+- **Banner variant** must match the content: \`"success"\` for discounts/offers/positive news, \`"warning"\` for alerts/closures, \`"info"\` for neutral announcements. A discount or special price is always \`"success"\`.
 - Do not mix default English placeholder text with migrated content.
 - Download important images (hero backgrounds, card thumbnails, logos) and use returned localUrl in props
 - Include \`meta\` on each page for SEO: \`{ "meta": { "title": "...", "description": "..." } }\` — extract from source \`<title>\` and \`<meta name="description">\`` : ""}${intent === "create" ? `
