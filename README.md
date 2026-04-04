@@ -116,9 +116,9 @@ packages/
 | Integrate into your website | [docs/integration/](docs/integration/README.md) |
 | Site SDK reference | [packages/site-sdk/](packages/site-sdk/README.md) |
 | Architecture overview | [docs/architecture/](docs/architecture/current-state.md) |
-| Deployment (Vercel) | [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md) |
+| Deploy to Vercel | [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md) |
+| Deploy to Netlify | [docs/operations/netlify-deployment.md](docs/operations/netlify-deployment.md) |
 | Dev server runbook | [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.md) |
-| AI coding agent guides | [docs/integration/ai-coding-agents.md](docs/integration/ai-coding-agents.md) |
 
 ## Development
 

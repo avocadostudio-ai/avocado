@@ -31,6 +31,7 @@ Start here if you want to add AI-powered editing to your website.
 | Doc | Description |
 |-----|-------------|
 | [Vercel Deployment](operations/vercel-deployment.md) | Deploy site and editor to Vercel |
+| [Netlify Deployment](operations/netlify-deployment.md) | Deploy site and editor to Netlify |
 | [Dev Server Runbook](operations/dev-server-runbook.md) | Local dev server setup and troubleshooting |
 | [Streaming Patch Checklist](operations/streaming-patch-checklist.md) | Optimistic patch streaming checklist |
 
