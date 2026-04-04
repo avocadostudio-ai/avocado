@@ -11,6 +11,8 @@ registerBlock("Hero", {
     imageUrl: z.string().min(1),
     imageAlt: z.string().min(1),
     imagePosition: z.enum(["left", "right", "full"]).default("right"),
+    textAlign: z.enum(["left", "center"]).default("left"),
+    eyebrow: z.string().optional(),
     secondaryCtaText: z.string().optional(),
     secondaryCtaHref: z.string().optional()
   }),
@@ -26,6 +28,8 @@ registerBlock("Hero", {
       imageUrl: f.image("Hero image", { aspectRatio: "landscape", width: 1536, height: 1024 }),
       imageAlt: f.imageAlt("Hero image alt text"),
       imagePosition: { kind: "enum", label: "Image position", options: ["left", "right", "full"], inlineEditable: false },
+      textAlign: { kind: "enum", label: "Text alignment", options: ["left", "center"], inlineEditable: false },
+      eyebrow: f.text("Eyebrow text"),
       secondaryCtaText: f.text("Secondary CTA text"),
       secondaryCtaHref: f.url("Secondary CTA link"),
       headingLevel: f.headingLevel(),

@@ -4,6 +4,7 @@ import { PrimaryButton, BlockImage } from "../_shared"
 
 export function CardGrid(props: Record<string, unknown>) {
   const cards = Array.isArray(props.cards) ? props.cards : []
+  const columns = String(props.columns ?? "3")
   const HeadingTag = resolveHeadingTag("CardGrid", props) as keyof JSX.IntrinsicElements
   const ItemHeadingTag = resolveItemHeadingTag("CardGrid", props) as keyof JSX.IntrinsicElements
   return (
@@ -12,7 +13,7 @@ export function CardGrid(props: Record<string, unknown>) {
         <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
           {String(props.title ?? "")}
         </HeadingTag>
-        <div className="card-grid">
+        <div className={`card-grid${columns !== "3" ? ` card-grid--${columns}-col` : ""}`}>
           {cards.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
             const imageUrl = typeof row.imageUrl === "string" ? row.imageUrl.trim() : ""

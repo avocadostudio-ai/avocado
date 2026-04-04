@@ -32,6 +32,29 @@
   background: var(--placeholder-img);
 }
 
+.hero__eyebrow {
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: 8px;
+}
+
+.hero__content--center {
+  text-align: center;
+  align-items: center;
+}
+
+.hero__content--center p {
+  max-width: 52ch;
+}
+
+.hero__content--center .hero__actions {
+  justify-content: center;
+}
+
 .hero__actions {
   display: flex;
   flex-wrap: wrap;
@@ -76,6 +99,10 @@
 
 .hero--full-width .hero__content {
   max-width: 720px;
+}
+
+.hero--full-width .hero__eyebrow {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .hero--full-width .hero__content h1,

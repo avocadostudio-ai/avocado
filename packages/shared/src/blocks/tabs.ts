@@ -4,6 +4,7 @@ import { f } from "./_helpers.ts"
 
 registerBlock("Tabs", {
   schema: z.object({
+    title: z.string().optional(),
     tabs: z.array(z.object({
       label: z.string().min(1),
       content: z.string().min(1),
@@ -13,7 +14,7 @@ registerBlock("Tabs", {
     displayName: "Tabs",
     description: "Switchable tabbed content panels with rich text in each tab.",
     category: "content",
-    fields: {},
+    fields: { title: f.text("Section title"), headingLevel: f.headingLevel() },
     listFields: {
       tabs: {
         label: "Tabs",
