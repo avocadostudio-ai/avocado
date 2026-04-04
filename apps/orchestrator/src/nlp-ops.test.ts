@@ -2357,6 +2357,9 @@ test("isBatchAddRequest treats multi-page create prompts as batch overrides", ()
 
 test("isBatchAddRequest treats explicit multi-block add prompts as batch overrides", () => {
   assert.equal(isBatchAddRequest("add 3 blocks: hero, cardgrid and CTA"), true)
+  // Typo tolerance: "blocka", "blockss" should still be detected as batch add
+  assert.equal(isBatchAddRequest("add 3 blocka and populate with sample content"), true)
+  assert.equal(isBatchAddRequest("add 3 blocka and popüulate with sampe content"), true)
   assert.equal(
     isBatchAddRequest(
       "add 3 blocks: hero, cardgrid and CTA [site context] Site purpose: Discover the Magic of Avocados. Site name: Avocado Magic [/site context]"
