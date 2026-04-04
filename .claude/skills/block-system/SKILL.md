@@ -12,9 +12,9 @@ All 20 block types are registered in `packages/shared/src/blocks/*.ts` via `regi
 - `getAllBlockMeta()` — get all registered metadata
 - `isFieldInlineEditable(type, fieldPath)` — check if a field supports inline editing
 - `validateBlockProps(type, props)` — Zod `safeParse` shorthand
-- `getImageFields(type)` — get Set of scalar image field keys
-- `getListImageFields(type)` — get Map of list key → Set of image field keys
-- `isChrome(type)` — check if block is structurally pinned (SiteHeader, Footer)
+- `getImageFields(blockType)` — get Set of image prop keys
+- `getListImageFields(blockType)` — get Map<listKey, Set<imageFieldKey>> for list items
+- `isChrome(type)` — check if block is chrome (pinned, non-removable)
 - `defaultPropsForType(type)` — get default props for a block type
 
 ## Block Types and Props
@@ -22,43 +22,41 @@ All 20 block types are registered in `packages/shared/src/blocks/*.ts` via `regi
 | Block | Required props | Optional props |
 |---|---|---|
 | **Hero** | `heading`, `subheading`, `ctaText`, `ctaHref`, `imageUrl`, `imageAlt` | `imagePosition` (enum: left/right/full, default right), `textAlign` (enum: left/center, default left), `eyebrow`, `secondaryCtaText`, `secondaryCtaHref` |
-| **FeatureGrid** | `title`, `features: [{title, description}]+` | `columns` (enum: 2/3/4, default 3), `features[].icon` (emoji or image URL) |
-| **Testimonials** | `title`, `items: [{quote, author}]+` | `items[].role`, `items[].imageUrl`, `items[].imageAlt` |
-| **FAQAccordion** | `title`, `items: [{q, a}]+` | — (answer `a` supports richtext: bold, italic, links, lists) |
+| **FeatureGrid** | `title`, `features: [{title, description, icon?}]+` | `columns` (enum: 2/3/4, default 3) |
+| **Testimonials** | `title`, `items: [{quote, author, role?, imageUrl?, imageAlt?}]+` | — |
+| **FAQAccordion** | `title`, `items: [{q, a}]+` | — (answer `a` supports richtext) |
 | **CTA** | `title`, `description`, `ctaText`, `ctaHref` | `secondaryCtaText`, `secondaryCtaHref` |
 | **Card** | `title`, `description`, `ctaText`, `ctaHref` | `imageUrl`, `imageAlt`, `variant` (enum: default/full-bleed) |
-| **CardGrid** | `title`, `cards: [{title, description, ctaText, ctaHref}]+` | `subtitle`, `columns` (enum: 2/3/4, default 3), `cardVariant` (enum: default/full-bleed), `cards[].imageUrl`, `cards[].imageAlt` |
+| **CardGrid** | `title`, `cards: [{title, description, ctaText, ctaHref, imageUrl?, imageAlt?}]+` | `subtitle`, `columns` (enum: 2/3/4, default 3), `cardVariant` (enum: default/full-bleed) |
 | **RichText** | `body` | `title` (empty string allowed) |
-| **Stats** | `stats: [{value, label}]+` | `title`, `stats[].icon` (emoji or image URL), `stats[].description` |
-| **TwoColumn** | `left: [child]+`, `right: [child]+` | `variant` (enum: default/accent) — children: `{type, text?, label?, href?, src?, alt?, items?, buttons?}` |
-| **Banner** | `text` | `variant` (enum: info/success/warning, default info), `ctaText`, `ctaHref`, `backgroundColor` (CSS color), `textColor` (CSS color) |
-| **Tabs** | `tabs: [{label, content}]+` | `title` (content supports richtext) |
+| **Stats** | `stats: [{value, label, icon?, description?}]+` | `title` |
+| **TwoColumn** | `left: [TwoColumnChild]+`, `right: [TwoColumnChild]+` | `variant` (enum: default/accent) |
+| **Footer** | `copyright`, `columns: [{title, links}]+` | — (chrome block) |
+| **SiteHeader** | `siteName`, `logoUrl`, `links: [{label, href?, children?}]+` | `activePath` (chrome block) |
+| **Embed** | `url` | `embedType` (enum: map/social/custom), `title`, `aspectRatio` (enum: 16:9/4:3/1:1) |
+| **Banner** | `text` | `variant` (enum: info/success/warning), `ctaText`, `ctaHref`, `backgroundColor`, `textColor` |
+| **Carousel** | `items: [{imageUrl, imageAlt?, heading?, description?, ctaText?, ctaHref?}]+` | `autoplay` (enum: true/false), `interval` |
+| **Gallery** | `images: [{imageUrl, alt?, caption?}]+` | `title`, `columns` (enum: 2/3/4, default 3) |
+| **Tabs** | `tabs: [{label, content}]+` | `title` |
 | **Table** | `headers: [string]+`, `rows: [[string]]+` | `title`, `striped` (enum: true/false) |
 | **Quote** | `quote` | `author`, `role`, `imageUrl`, `imageAlt` |
-| **Carousel** | `items: [{imageUrl}]+` | `autoplay` (enum: true/false), `interval`, `items[].imageAlt`, `items[].heading`, `items[].description`, `items[].ctaText`, `items[].ctaHref` |
-| **Gallery** | `images: [{imageUrl}]+` | `title`, `columns` (enum: 2/3/4, default 3), `images[].alt`, `images[].caption` |
-| **Embed** | `url` | `embedType` (enum: map/social/custom), `title`, `aspectRatio` (enum: 16:9/4:3/1:1) |
 | **Video** | `src` | `title`, `posterUrl`, `autoplay` (enum: true/false), `loop` (enum: true/false) |
-| **SiteHeader** *(chrome)* | `siteName`, `logoUrl`, `links: [{label}]+` | `links[].href`, `links[].children: [{label, href}]`, `activePath` |
-| **Footer** *(chrome)* | `copyright`, `columns: [{title, links}]+` | — (links format: `"Label\|URL"` per line) |
 
-All string fields use `.min(1)` except `RichText.title`, `Stats.title`, `Tabs.title`, and `Banner` custom color fields.
+All string fields use `.min(1)` except `RichText.title`, `Stats.title`, and `Tabs.title`.
 
-## Variant Notes
+All blocks support an optional `headingLevel` prop (h1–h6) via metadata.
 
-- **Hero `textAlign: "center"`** — centers text over the image; best combined with `imagePosition: "full"` for full-width background hero
-- **Hero `eyebrow`** — small uppercase label above the heading (e.g. "New", "Coming Soon")
-- **Card/CardGrid `full-bleed`** — background image fills the card with a dark gradient overlay, white text on top. Requires `imageUrl`.
-- **Banner `backgroundColor`/`textColor`** — CSS color values that override the variant preset colors. Use for brand-specific banner colors.
-- **FeatureGrid/CardGrid `columns`** — explicit column count; default `"3"` uses auto-fit responsive grid
-- **FAQAccordion answers** — support richtext: `**bold**`, `*italic*`, `[link](url)`, `- list items`, `\n\n` paragraph breaks
+## Chrome Blocks
+
+**Footer** and **SiteHeader** have `chrome: true`. They are structurally pinned — cannot be added, moved, or removed via the editor. They are always present (header first, footer last).
 
 ## Block Rendering
 
-**Renderers:** `packages/blocks/src/blocks/*/renderer.tsx` — one file per block type, all exported from `packages/blocks/src/blocks/index.ts`.
+**Renderers:** `packages/blocks/src/blocks/*/renderer.tsx` — each block has its own renderer file.
+
+**Dispatch:** `packages/blocks/src/blocks/index.ts` exports a `renderers` map. `SharedBlockRenderer` in `packages/blocks/src/renderer.tsx` looks up `block.type` and spreads props.
 
 ```typescript
-// Dispatch: looks up block.type in static map, spreads props
 export function SharedBlockRenderer({ block }: { block: BlockInstance }) {
   const Renderer = renderers[block.type]
   if (!Renderer) return null
@@ -85,31 +83,47 @@ Every renderable prop node carries:
 
 ```typescript
 type FieldKind = "text" | "richtext" | "url" | "image" | "imageAlt" | "enum" | "color" | "number" | "headingLevel"
-type FieldMeta = { kind: FieldKind; label?: string; inlineEditable?: boolean; options?: string[]; imageSpec?: ImageSpec }
+type FieldMeta = { kind: FieldKind; label?: string; inlineEditable?: boolean; options?: string[]; imageSpec?: ImageSpec; multiline?: boolean }
 type ListFieldMeta = { label?: string; itemFields: Record<string, FieldMeta> }
 type BlockMeta = {
   displayName: string; description?: string
   category?: "content" | "media" | "navigation" | "conversion" | "layout"
-  chrome?: boolean  // structurally pinned (SiteHeader, Footer)
+  chrome?: boolean
   fields: Record<string, FieldMeta>
   listFields?: Record<string, ListFieldMeta>
 }
 ```
 
-**Field helper shortcuts** (`packages/shared/src/blocks/_helpers.ts`):
-- `f.text(label)` — single-line text, inline-editable
-- `f.longtext(label)` — multiline text, inline-editable
-- `f.richtext(label)` — richtext with markdown support
-- `f.url(label)` — URL input, not inline-editable
-- `f.image(label, imageSpec?)` — image picker
-- `f.imageAlt(label)` — alt text
-- `f.headingLevel()` — h1–h6 selector
+**Field helper shortcuts** (`_helpers.ts`): `f.text()`, `f.longtext()`, `f.richtext()`, `f.url()`, `f.image()`, `f.imageAlt()`, `f.headingLevel()`.
 
 Inline editability: `text` and `richtext` fields are inline-editable by default; `url`, `image`, `enum`, `color` are not.
 
-## Chrome Blocks
+`isFieldInlineEditable` handles nested paths like `features[0].title` by splitting on bracket notation to look up `listFields.features.itemFields.title`.
 
-SiteHeader and Footer have `chrome: true` — they are structurally pinned, cannot be added/moved/removed via the editor. Only their props can be updated.
+## Variant Patterns
+
+Several blocks support visual variants:
+
+| Block | Prop | Values | Effect |
+|---|---|---|---|
+| Hero | `imagePosition` | left, right, full | Two-column split or full-width background image |
+| Hero | `textAlign` | left, center | Text alignment (center works best with imagePosition full) |
+| Card | `variant` | default, full-bleed | Standard card or background image with dark overlay |
+| CardGrid | `cardVariant` | default, full-bleed | Applied to all cards in the grid |
+| TwoColumn | `variant` | default, accent | Accent adds styling emphasis |
+| Banner | `variant` | info, success, warning | Preset color theme |
+| Banner | `backgroundColor`/`textColor` | CSS color strings | Custom colors override variant |
+| Gallery | `columns` | 2, 3, 4 | Grid column count |
+| FeatureGrid | `columns` | 2, 3, 4 | Grid column count |
+| CardGrid | `columns` | 2, 3, 4 | Grid column count |
+| Embed | `aspectRatio` | 16:9, 4:3, 1:1 | iframe aspect ratio |
+| Table | `striped` | true, false | Alternating row backgrounds |
+
+## Icon Fields
+
+FeatureGrid and Stats support an `icon` field per item. The value can be:
+- **Emoji** — rendered as `<span>` (e.g., `"⚡"`, `"🛡️"`)
+- **Image URL** — rendered as `<img>` when the value starts with `http://` or `https://`
 
 ## Zod Schemas
 
@@ -163,15 +177,15 @@ editPlanSchema = z.object({
 
 ## Key Files
 
-| Area | Files |
+| File | Purpose |
 |---|---|
-| Block schemas & meta | `packages/shared/src/blocks/*.ts` (one per block) |
-| Registry & types | `packages/shared/src/blocks/_registry.ts` |
-| Field helpers | `packages/shared/src/blocks/_helpers.ts` |
-| Barrel exports & defaults | `packages/shared/src/blocks/index.ts` |
-| Block renderers | `packages/blocks/src/blocks/*/renderer.tsx` |
-| Block styles | `packages/blocks/src/blocks/*/styles.css` |
-| Shared components | `packages/blocks/src/blocks/_shared.tsx` (buttons, renderInline, renderRichTextContent) |
-| Block image component | `packages/blocks/src/blocks/block-image.tsx` |
-| AI planner contracts | `apps/orchestrator/src/nlp/deterministic-planner-suggestions.ts` |
-| Page & op schemas | `packages/shared/src/schemas.ts` |
+| `packages/shared/src/blocks/_registry.ts` | Registry, types, core functions |
+| `packages/shared/src/blocks/_helpers.ts` | Field helper shortcuts (f), heading level resolution |
+| `packages/shared/src/blocks/index.ts` | Barrel imports, defaults map |
+| `packages/shared/src/blocks/*.ts` | Individual block definitions (20 files) |
+| `packages/shared/src/schemas.ts` | Page, operation, EditPlan schemas |
+| `packages/blocks/src/blocks/index.ts` | Renderer map & registration |
+| `packages/blocks/src/blocks/*/renderer.tsx` | Individual block React components |
+| `packages/blocks/src/blocks/*/styles.css` | Individual block styles |
+| `packages/blocks/src/blocks/_shared.tsx` | Shared components (PrimaryButton, SecondaryButton, BlockImage, renderInline, renderRichTextContent) |
+| `apps/orchestrator/src/nlp/deterministic-planner-suggestions.ts` | AI planner block contracts & notes |
