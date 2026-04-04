@@ -1,5 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { BlockImage } from "../_shared"
 
 export function Testimonials(props: Record<string, unknown>) {
   const items = Array.isArray(props.items) ? props.items : []
@@ -13,6 +14,9 @@ export function Testimonials(props: Record<string, unknown>) {
         <div className="testimonials-grid">
           {items.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
+            const imageUrl = typeof row.imageUrl === "string" ? row.imageUrl.trim() : ""
+            const imageAlt = typeof row.imageAlt === "string" ? row.imageAlt.trim() : ""
+            const role = typeof row.role === "string" ? row.role.trim() : ""
             return (
               <blockquote key={idx} className="testimonial-card">
                 <span className="testimonial-card__mark" aria-hidden="true">
@@ -26,13 +30,40 @@ export function Testimonials(props: Record<string, unknown>) {
                 >
                   {String(row.quote ?? "")}
                 </p>
-                <footer
-                  className="testimonial-card__author"
-                  data-editable-target={`items[${idx}].author`}
-                  data-editable-target-label={`items[${idx}].author`}
-                  data-editable-label={`items[${idx}].author`}
-                >
-                  &mdash; {String(row.author ?? "")}
+                <footer className="testimonial-card__footer">
+                  {imageUrl.length > 0 && (
+                    <BlockImage
+                      className="testimonial-card__avatar"
+                      src={imageUrl}
+                      alt={imageAlt.length > 0 ? imageAlt : String(row.author ?? "")}
+                      width={48}
+                      height={48}
+                      loading="lazy"
+                      data-editable-target={`items[${idx}].imageUrl`}
+                      data-editable-target-label={`items[${idx}].imageUrl`}
+                      data-editable-label={`items[${idx}].imageUrl`}
+                    />
+                  )}
+                  <div className="testimonial-card__attribution">
+                    <span
+                      className="testimonial-card__author"
+                      data-editable-target={`items[${idx}].author`}
+                      data-editable-target-label={`items[${idx}].author`}
+                      data-editable-label={`items[${idx}].author`}
+                    >
+                      &mdash; {String(row.author ?? "")}
+                    </span>
+                    {role.length > 0 && (
+                      <span
+                        className="testimonial-card__role"
+                        data-editable-target={`items[${idx}].role`}
+                        data-editable-target-label={`items[${idx}].role`}
+                        data-editable-label={`items[${idx}].role`}
+                      >
+                        {role}
+                      </span>
+                    )}
+                  </div>
                 </footer>
               </blockquote>
             )

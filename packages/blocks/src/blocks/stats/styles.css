@@ -20,6 +20,29 @@
   gap: 4px;
 }
 
+.stat-item__icon {
+  display: block;
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-bottom: 4px;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+img.stat-item__icon {
+  border-radius: 4px;
+}
+
+.stat-item__description {
+  font-size: 0.875rem;
+  color: var(--body-secondary);
+  max-width: 24ch;
+  text-align: center;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
 .stat-item__value {
   font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 800;

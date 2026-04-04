@@ -1,6 +1,10 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
 
+function isUrl(value: string) {
+  return /^https?:\/\//i.test(value)
+}
+
 export function Stats(props: Record<string, unknown>) {
   const title = String(props.title ?? "")
   const items = Array.isArray(props.stats) ? props.stats : []
@@ -16,8 +20,15 @@ export function Stats(props: Record<string, unknown>) {
         <div className="stats-grid">
           {items.map((item, idx) => {
             const row = (item ?? {}) as Record<string, unknown>
+            const icon = typeof row.icon === "string" ? row.icon.trim() : ""
+            const description = typeof row.description === "string" ? row.description.trim() : ""
             return (
               <div key={idx} className="stat-item">
+                {icon.length > 0 && (
+                  isUrl(icon)
+                    ? <img className="stat-item__icon" src={icon} alt="" width={32} height={32} loading="lazy" />
+                    : <span className="stat-item__icon" aria-hidden="true">{icon}</span>
+                )}
                 <span
                   className="stat-item__value"
                   data-editable-target={`stats[${idx}].value`}
@@ -34,6 +45,16 @@ export function Stats(props: Record<string, unknown>) {
                 >
                   {String(row.label ?? "")}
                 </span>
+                {description.length > 0 && (
+                  <span
+                    className="stat-item__description"
+                    data-editable-target={`stats[${idx}].description`}
+                    data-editable-target-label={`stats[${idx}].description`}
+                    data-editable-label={`stats[${idx}].description`}
+                  >
+                    {description}
+                  </span>
+                )}
               </div>
             )
           })}
