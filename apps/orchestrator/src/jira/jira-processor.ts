@@ -135,7 +135,8 @@ async function processAttachments(
       if (isImageAttachment(attachment)) {
         const buffer = await client.downloadAttachment(attachment.content)
         const ext = extensionOf(attachment.filename) || "png"
-        const fileName = `jira_${Date.now()}_${randomUUID().slice(0, 8)}.${ext}`
+        // Use full UUID for collision-free filenames, avoiding Date.now() collision risk under concurrency
+        const fileName = `jira_${randomUUID()}.${ext}`
         await mkdir(generatedImageDir, { recursive: true })
         await writeFile(resolve(generatedImageDir, fileName), buffer)
         const url = `${orchestratorPublicOrigin}/generated-images/${fileName}`
