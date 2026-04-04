@@ -1547,6 +1547,12 @@ function EditorPage({
           onAutoHeightChange={handleComposerAutoHeight}
           selectionModeEnabled={selectionModeEnabled}
           onToggleSelectionMode={() => toggleSelectionMode()}
+          canUndoServer={chatEngine.canUndoServer}
+          canRedoServer={chatEngine.canRedoServer}
+          onGlobalUndo={() => void chatEngine.applyGlobalUndo()}
+          onGlobalRedo={() => void chatEngine.applyGlobalRedo()}
+          undoTooltip={t("chat.undoTooltip")}
+          redoTooltip={t("chat.redoTooltip")}
         />
 
         <nav className="panel-tabs panel-tabs-main">
