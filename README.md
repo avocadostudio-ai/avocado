@@ -39,8 +39,8 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 
 - **Site SDK** — Add AI editing to any Next.js 15+ site with a few API routes
 - **CMS integrations** — Working examples for Sanity, Strapi, and Contentful
-- **Publishing pipeline** — Git-based publishing with Vercel deploy hook support
-- **i18n** — Multi-language editor UI and AI responses (English, German; extensible)
+- **Publishing pipeline** — Pluggable publish targets. Ships with Git + Vercel deploy hook support out of the box; implement the `PublishTarget` interface to connect your own deployment workflow
+- **i18n** — Multi-language editor UI and AI responses (currently English and German; extensible)
 - **Self-hosted** — Run the entire stack on your own infrastructure
 
 ## Quick Start
