@@ -10,28 +10,30 @@ import type {
 } from "../../lib/editor-types"
 
 /**
- * Shared dependencies passed from the parent useChatEngine hook
- * to each extracted sub-hook via a config object.
+ * Preview bridge functions that must be passed as deps because they
+ * hold a reference to the preview iframe.  These are the *only*
+ * remaining dependency-injected functions after the Zustand migration.
  */
-export type ChatEngineSharedDeps = {
-  session: string
-  siteId: string
-  activeSiteConfig: SiteConfig
-  slug: string
-  setSlug: (slug: string) => void
-  activeBlockIdRef: React.RefObject<string | undefined>
-  activeBlockTypeRef: React.RefObject<string | undefined>
-  activeEditablePathRef: React.RefObject<string | undefined>
-  setActiveBlockId: (id: string | undefined) => void
-  setActiveBlockType: (type: string | undefined) => void
-  setActiveEditablePath: (path: string | undefined) => void
+export type PreviewBridgeFns = {
   postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
+}
+
+/**
+ * Shared dependencies passed from the parent useChatEngine hook
+ * to each extracted sub-hook via a config object.
+ *
+ * After the Zustand migration most fields moved to the store or
+ * session singleton.  This type now holds only:
+ *  - preview bridge functions (iframe-bound, can't live in store)
+ *  - dynamic hook values (componentManifest, siteCapabilities, activeSiteConfig)
+ */
+export type ChatEngineSharedDeps = PreviewBridgeFns & {
+  activeSiteConfig: SiteConfig
   componentManifest?: BlockManifest | null
   siteCapabilities?: SiteCapabilities
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) => void
 }
 
 export type {

@@ -1,44 +1,39 @@
 import { useState } from "react"
-import type { AssistantResponse, ChatEntry, HistoryResponse } from "../../lib/editor-types"
+import type { HistoryResponse } from "../../lib/editor-types"
 import { orchestrator } from "../../lib/editor-utils"
+import { useEditorStore } from "../../store"
+import { getSessionId, getSiteId } from "../../store/session"
+import type { PreviewBridgeFns } from "./types"
 
-export type UndoHistoryDeps = {
-  session: string
-  siteId: string
-  slugRef: React.RefObject<string>
-  isLoading: boolean
-  activeEditablePathRef: React.RefObject<string | undefined>
-  setActiveEditablePath: (value: string | undefined) => void
-  setSlug: (slug: string) => void
-  postToSite: (type: "draftUpdated", payload: Record<string, unknown>) => void
-  setChatLog: React.Dispatch<React.SetStateAction<ChatEntry[]>>
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) => void
+export type UndoHistoryDeps = PreviewBridgeFns & {
   refreshRouteSlugs: () => Promise<string[]>
 }
 
 export function useUndoHistory(deps: UndoHistoryDeps) {
+  const store = useEditorStore
   const [undoInFlightEntryId, setUndoInFlightEntryId] = useState<string | null>(null)
 
   async function applyUndoHistory(entryId: string) {
-    if (deps.isLoading || undoInFlightEntryId) return
+    const { isLoading } = store.getState()
+    if (isLoading || undoInFlightEntryId) return
     setUndoInFlightEntryId(entryId)
     try {
       // Find the target entry to get its undoSlug (the slug that was affected)
-      let targetUndoSlug = deps.slugRef.current
-      deps.setChatLog((prev) => {
-        const target = prev.find((e) => e.id === entryId)
-        if (target?.undoSlug) targetUndoSlug = target.undoSlug
-        return prev
-      })
+      let targetUndoSlug = store.getState().slug
+      const chatLog = store.getState().chatLog
+      const target = chatLog.find((e) => e.id === entryId)
+      if (target?.undoSlug) targetUndoSlug = target.undoSlug
 
+      const session = getSessionId()
+      const siteId = getSiteId()
       const res = await fetch(`${orchestrator}/history/undo`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session: deps.session, siteId: deps.siteId, slug: targetUndoSlug })
+        body: JSON.stringify({ session, siteId, slug: targetUndoSlug })
       })
       const data = (await res.json()) as HistoryResponse
       if (!res.ok || data.status !== "applied") {
-        deps.pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? "Could not undo.",
           changes: []
@@ -46,17 +41,16 @@ export function useUndoHistory(deps: UndoHistoryDeps) {
         return
       }
 
-      deps.activeEditablePathRef.current = undefined
-      deps.setActiveEditablePath(undefined)
+      store.getState().setActiveEditablePath(undefined)
 
       // Navigate if the undo response signals a page change (e.g. after undoing create/delete)
       if (typeof data.navigateToSlug === "string" && data.navigateToSlug.length > 0) {
-        deps.setSlug(data.navigateToSlug)
+        store.getState().setSlug(data.navigateToSlug)
         void deps.refreshRouteSlugs()
       }
 
       deps.postToSite("draftUpdated", { focusBlockId: null })
-      deps.setChatLog((prev) => {
+      store.getState().setChatLog((prev) => {
         const targetIndex = prev.findIndex((entry) => entry.id === entryId)
         if (targetIndex < 0) return prev
 
@@ -73,7 +67,7 @@ export function useUndoHistory(deps: UndoHistoryDeps) {
         return next
       })
     } catch {
-      deps.pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not undo.",
         changes: []

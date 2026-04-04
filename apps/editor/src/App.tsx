@@ -11,6 +11,7 @@ import { ImagePickerModal } from "./components/ImagePickerModal"
 import { useSiteList } from "./hooks/useSiteList"
 import { usePreviewBridge, type PreviewBridgeCallbacks, type AnchorRect } from "./hooks/usePreviewBridge"
 import { useChatEngine } from "./hooks/useChatEngine"
+import { useEditorStore, initSession } from "./store"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
 import { useBlockProps } from "./hooks/useBlockProps"
@@ -78,18 +79,25 @@ export function App() {
   const isEditorPath = pathName === "/" || pathName === "/editor" || pathName === "/editor/"
   const isPuckPrototype = PUCK_ROUTE_PATHS.has(pathName) && isPuckRouteEnabled()
   const isSitesPage = pathName === "/sites" || pathName === "/sites/"
-  const [chatDarkMode, setChatDarkMode] = useState(() => resolveDefaultChatDarkMode())
-  const [session] = useState("dev")
-  const [siteId] = useState(() => resolveEditorSiteId())
-  const sites = useSiteList(siteId, session)
+  const chatDarkMode = useEditorStore((s) => s.chatDarkMode)
+  const setChatDarkMode = useEditorStore((s) => s.setChatDarkMode)
+  const session = "dev"
+  const siteId = useMemo(() => resolveEditorSiteId(), [])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const root = window.document.documentElement
-    root.classList.toggle("editor-dark", chatDarkMode)
-    window.sessionStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
-    window.localStorage.setItem(CHAT_THEME_STORAGE_KEY, chatDarkMode ? "dark" : "light")
-  }, [chatDarkMode])
+  // Initialize session singleton once
+  const sessionInitRef = useRef(false)
+  if (!sessionInitRef.current) {
+    sessionInitRef.current = true
+    const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
+    const agentApiKey = (import.meta.env.VITE_AGENT_API_KEY as string | undefined)?.trim() ?? ""
+    initSession({
+      siteId,
+      editorOrigin,
+      orchestratorUrl: orchestrator as string,
+      agentApiKey,
+    })
+  }
+  const sites = useSiteList(siteId, session)
 
   // Follow system dark mode preference changes
   useEffect(() => {
@@ -98,7 +106,7 @@ export function App() {
     const handler = (e: MediaQueryListEvent) => setChatDarkMode(e.matches)
     mq.addEventListener("change", handler)
     return () => mq.removeEventListener("change", handler)
-  }, [])
+  }, [setChatDarkMode])
 
   if (isPuckPrototype) {
     return (
@@ -286,7 +294,7 @@ function EditorPage({
     const now = Date.now()
     if (now - lastStructuralNoticeAtRef.current < 1200) return
     lastStructuralNoticeAtRef.current = now
-    chatEngine.pushAssistantFromResult({
+    chatEngineCompat.pushAssistantFromResult({
       status: "needs_clarification",
       summary: t("streamError.structuralDisabled"),
       changes: manifestUnavailableChanges(componentManifest.reason)
@@ -327,7 +335,7 @@ function EditorPage({
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
-      void chatEngine.reorderBlock(newSlug, blockId, afterBlockId)
+      void chatEngineCompat.reorderBlock(newSlug, blockId, afterBlockId)
     },
     onBlockDeleteRequested: (newSlug, blockId) => {
       if (!componentManifest.allowStructuralEdits) {
@@ -337,7 +345,7 @@ function EditorPage({
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
-      void chatEngine.deleteBlock(newSlug, blockId)
+      void chatEngineCompat.deleteBlock(newSlug, blockId)
     },
     onBlockAddRequested: (newSlug, args) => {
       if (!componentManifest.allowStructuralEdits) {
@@ -356,7 +364,7 @@ function EditorPage({
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
-      void chatEngine.addListItem(newSlug, blockId, blockType, listKey, afterIndex)
+      void chatEngineCompat.addListItem(newSlug, blockId, blockType, listKey, afterIndex)
     },
     onListItemRemoveRequested: (newSlug, blockId, blockType, listKey, index) => {
       if (!componentManifest.allowStructuralEdits) {
@@ -366,7 +374,7 @@ function EditorPage({
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
-      void chatEngine.removeListItem(newSlug, blockId, blockType, listKey, index)
+      void chatEngineCompat.removeListItem(newSlug, blockId, blockType, listKey, index)
     },
     onListItemMoveRequested: (newSlug, blockId, blockType, listKey, index, afterIndex) => {
       if (!componentManifest.allowStructuralEdits) {
@@ -376,7 +384,7 @@ function EditorPage({
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
-      void chatEngine.moveListItem(newSlug, blockId, blockType, listKey, index, afterIndex)
+      void chatEngineCompat.moveListItem(newSlug, blockId, blockType, listKey, index, afterIndex)
     },
     onOpenImagePicker: (newSlug, blockId, editablePath, currentUrl) => {
       setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl })
@@ -390,7 +398,7 @@ function EditorPage({
         activeEditablePathRef.current = editablePath
         setActiveEditablePath(editablePath)
       }
-      void chatEngine.inlineEditCommit(newSlug, blockId, editablePath, value)
+      void chatEngineCompat.inlineEditCommit(newSlug, blockId, editablePath, value)
     },
     onIframeScrolled: () => {
       setAnchorRect(null)
@@ -430,49 +438,80 @@ function EditorPage({
   }, [selectionModeEnabled, toggleSelectionMode])
 
   const chatEngine = useChatEngine({
-    session,
-    siteId,
     activeSiteConfig,
-    slug,
-    setSlug,
-    modelKey,
-    provider,
-    useStreaming,
-    activeBlockIdRef,
-    activeBlockTypeRef,
-    activeEditablePathRef,
-    setActiveBlockId,
-    setActiveBlockType,
-    setActiveEditablePath,
     postToSite: preview.postToSite,
     postPatchToSite: preview.postPatchToSite,
-    setAvailableSlugs,
-    setIsLoadingSlugs,
-    routeOptions,
     componentManifest: componentManifest.manifest,
     siteCapabilities: componentManifest.siteCapabilities,
     allowStructuralEdits: componentManifest.allowStructuralEdits,
     getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null,
     onApplied: () => { onAppliedRef.current?.() },
-    agentApiKey: agentApiKey || undefined
   })
+
+  // Bridge: read state that was previously on the chatEngine return value from the store.
+  // Components will migrate to direct store selectors over time.
+  const _chatLog = useEditorStore((s) => s.chatLog)
+  const _isLoading = useEditorStore((s) => s.isLoading)
+  const _streamStatus = useEditorStore((s) => s.streamStatus)
+  const _streamingText = useEditorStore((s) => s.streamingText)
+  const _streamingChanges = useEditorStore((s) => s.streamingChanges)
+  const _streamSteps = useEditorStore((s) => s.streamSteps)
+  const _streamTokenCount = useEditorStore((s) => s.streamTokenCount)
+  const _latestStreamFocusBlockId = useEditorStore((s) => s.latestStreamFocusBlockId)
+  const _imageProgress = useEditorStore((s) => s.imageProgress)
+  const _plannerBadgeState = useEditorStore((s) => s.plannerBadgeState)
+  const _pendingPlanId = useEditorStore((s) => s.pendingPlanId)
+  const _variationModal = useEditorStore((s) => s.variationModal)
+  const _isApplyingVariation = useEditorStore((s) => s.isApplyingVariation)
+  const _continuationChainId = useEditorStore((s) => s.continuationChainId)
+  const _fieldDraftDebugEnabled = useEditorStore((s) => s.fieldDraftDebugEnabled)
+  const _fieldDraftDebug = useEditorStore((s) => s.fieldDraftDebug)
+
+  // Expose store actions used directly by App.tsx
+  const _setPlannerBadgeState = useEditorStore((s) => s.setPlannerBadgeState)
+  const _setVariationModal = useEditorStore((s) => s.setVariationModal)
+  const _setFieldDraftDebugEnabled = useEditorStore((s) => s.setFieldDraftDebugEnabled)
+
+  // Shim: augment chatEngine with store-backed state for backward compat
+  const chatEngineCompat = {
+    ...chatEngine,
+    chatLog: _chatLog,
+    isLoading: _isLoading,
+    streamStatus: _streamStatus,
+    streamingText: _streamingText,
+    streamingChanges: _streamingChanges,
+    streamSteps: _streamSteps,
+    streamTokenCount: _streamTokenCount,
+    latestStreamFocusBlockId: _latestStreamFocusBlockId,
+    imageProgress: _imageProgress,
+    plannerBadgeState: _plannerBadgeState,
+    setPlannerBadgeState: _setPlannerBadgeState,
+    pendingPlanId: _pendingPlanId,
+    variationModal: _variationModal,
+    isApplyingVariation: _isApplyingVariation,
+    setVariationModal: _setVariationModal,
+    continuationChainId: _continuationChainId,
+    fieldDraftDebugEnabled: _fieldDraftDebugEnabled,
+    setFieldDraftDebugEnabled: _setFieldDraftDebugEnabled,
+    fieldDraftDebug: _fieldDraftDebug,
+  }
 
   // Non-preset (migrated) sites: default to fast model and start with clean chat
   useEffect(() => {
     if (!PRESET_SITE_IDS.has(siteId)) {
       setModelKey("fast")
-      chatEngine.clearChat()
+      chatEngineCompat.clearChat()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount per siteId
   }, [siteId])
 
-  const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin, () => {
+  const publish = usePublish(session, siteId, _isLoading, chatEngineCompat.pushAssistantFromResult, activeSiteOrigin, () => {
     preview.postToSite("draftUpdated", { focusBlockId: null })
   })
 
   const media = useMediaInput()
 
-  const propsEnabled = activeTab === "properties" && chatEngine.hasBootstrapped
+  const propsEnabled = activeTab === "properties" && chatEngineCompat.hasBootstrapped
   const blockProps = useBlockProps(session, siteId, slug, activeBlockId, propsEnabled)
   const pageMeta = usePageMeta(session, siteId, slug, propsEnabled)
   onAppliedRef.current = () => {
@@ -576,13 +615,13 @@ function EditorPage({
             if (!data.availableProviders.includes(provider)) setProvider(data.availableProviders[0])
           }
           if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "gemini" || data.plannerSource === "demo") {
-            chatEngine.setPlannerBadgeState(data.plannerSource)
+            chatEngineCompat.setPlannerBadgeState(data.plannerSource)
             return
           }
         }
-        if (active) chatEngine.setPlannerBadgeState("error")
+        if (active) chatEngineCompat.setPlannerBadgeState("error")
       } catch {
-        if (active) chatEngine.setPlannerBadgeState("error")
+        if (active) chatEngineCompat.setPlannerBadgeState("error")
       }
     }
     void checkPlannerStatus()
@@ -616,12 +655,12 @@ function EditorPage({
     if (activeTab !== "chat") return
     const thread = chatThreadRef.current
     if (!thread) return
-    const hasThreadContent = chatEngine.chatLog.length > 0 || Boolean(chatEngine.streamStatus) || Boolean(chatEngine.streamingText)
+    const hasThreadContent = chatEngineCompat.chatLog.length > 0 || Boolean(chatEngineCompat.streamStatus) || Boolean(chatEngineCompat.streamingText)
     if (!hasThreadContent) return
 
     const isInitialRender = !didInitialThreadScrollRef.current
-    const hasUserEntryInLog = chatEngine.chatLog.some((entry) => entry.role === "user")
-    if (isInitialRender && !hasUserEntryInLog && !chatEngine.streamStatus && !chatEngine.streamingText) {
+    const hasUserEntryInLog = chatEngineCompat.chatLog.some((entry) => entry.role === "user")
+    if (isInitialRender && !hasUserEntryInLog && !chatEngineCompat.streamStatus && !chatEngineCompat.streamingText) {
       didInitialThreadScrollRef.current = true
       shouldAutoScrollThreadRef.current = false
       return
@@ -638,11 +677,11 @@ function EditorPage({
     return () => window.cancelAnimationFrame(raf)
   }, [
     activeTab,
-    chatEngine.chatLog.length,
-    chatEngine.streamStatus,
-    chatEngine.streamingText,
-    chatEngine.streamSteps.length,
-    chatEngine.streamingChanges.length
+    chatEngineCompat.chatLog.length,
+    chatEngineCompat.streamStatus,
+    chatEngineCompat.streamingText,
+    chatEngineCompat.streamSteps.length,
+    chatEngineCompat.streamingChanges.length
   ])
 
   // Nested labels sync
@@ -655,7 +694,7 @@ function EditorPage({
   // then re-targets when the stream identifies the actual focus block.
   useEffect(() => {
     const postToSite = previewPostToSiteRef.current
-    if (!chatEngine.isLoading) {
+    if (!chatEngineCompat.isLoading) {
       if (shimmerActiveRef.current) {
         postToSite("aiFieldLoading", { blockId: "", active: false })
       }
@@ -664,17 +703,17 @@ function EditorPage({
       return
     }
 
-    const blockId = chatEngine.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? activeBlockId ?? ""
+    const blockId = chatEngineCompat.latestStreamFocusBlockId ?? activeBlockIdRef.current ?? activeBlockId ?? ""
     const activeTargetBlockId = activeBlockIdRef.current ?? activeBlockId ?? ""
     const editablePath = blockId && blockId === activeTargetBlockId ? (activeEditablePathRef.current ?? activeEditablePath ?? "") : ""
     postToSite("aiFieldLoading", { blockId, editablePath, active: true })
     shimmerTargetRef.current = { blockId, editablePath }
     shimmerActiveRef.current = true
-  }, [chatEngine.isLoading, chatEngine.latestStreamFocusBlockId, activeBlockId, activeEditablePath])
+  }, [chatEngineCompat.isLoading, chatEngineCompat.latestStreamFocusBlockId, activeBlockId, activeEditablePath])
 
   // Keep shimmer alive across async preview re-renders/remounts while loading.
   useEffect(() => {
-    if (!chatEngine.isLoading) return
+    if (!chatEngineCompat.isLoading) return
     const timer = window.setInterval(() => {
       const target = shimmerTargetRef.current
       if (!target) return
@@ -685,7 +724,7 @@ function EditorPage({
       })
     }, 1200)
     return () => window.clearInterval(timer)
-  }, [chatEngine.isLoading])
+  }, [chatEngineCompat.isLoading])
 
   // Re-sync selection mode after route changes (preview bridge re-mounts and loses the attribute)
   useEffect(() => {
@@ -705,7 +744,7 @@ function EditorPage({
   // NOTE: auto-switch to properties tab on selection is temporarily disabled
   useEffect(() => {
     // if (activeBlockId && !message.trim()) setActiveTab("properties")
-    chatEngine.clearFieldAiContext()
+    chatEngineCompat.clearFieldAiContext()
   }, [activeBlockId])
 
   // Clear anchor when activeBlockId is cleared
@@ -781,7 +820,7 @@ function EditorPage({
       suggestions
     }
 
-    chatEngine.setFieldAiContext(entry)
+    chatEngineCompat.setFieldAiContext(entry)
   }, [activeBlockId, activeBlockType])
 
   const handlePageAiAssist = useCallback((fieldLabel: string, fieldKind: string, currentValue: string) => {
@@ -796,7 +835,7 @@ function EditorPage({
       suggestions
     }
 
-    chatEngine.setFieldAiContext(entry)
+    chatEngineCompat.setFieldAiContext(entry)
   }, [])
 
   const handleFieldAiQuickAction = useCallback((fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => {
@@ -815,8 +854,8 @@ function EditorPage({
       text: `Editing: ${blockDisplayName} → ${fieldLabel}`,
       fieldAiContext: { blockId: activeBlockId, blockType: activeBlockType, fieldPath, fieldLabel, blockDisplayName }
     }
-    chatEngine.setFieldAiContext(entry)
-    void chatEngine.submitChat(actionText)
+    chatEngineCompat.setFieldAiContext(entry)
+    void chatEngineCompat.submitChat(actionText)
   }, [activeBlockId, activeBlockType])
 
   const handlePageAiQuickAction = useCallback((fieldLabel: string, fieldKind: string, currentValue: string, actionText: string) => {
@@ -828,12 +867,12 @@ function EditorPage({
       text: `Editing: Page → ${fieldLabel}`,
       fieldAiContext: { blockId: "__page__", blockType: "__page__", fieldPath: fieldLabel, fieldLabel, blockDisplayName: "Page" }
     }
-    chatEngine.setFieldAiContext(entry)
-    void chatEngine.submitChat(actionText)
+    chatEngineCompat.setFieldAiContext(entry)
+    void chatEngineCompat.submitChat(actionText)
   }, [])
 
   // Refresh slugs on session/site change
-  useEffect(() => { void chatEngine.refreshRouteSlugs() }, [session, siteId])
+  useEffect(() => { void chatEngineCompat.refreshRouteSlugs() }, [session, siteId])
 
   // Composer resize
   const clampComposerHeight = (value: number) => {
@@ -898,21 +937,21 @@ function EditorPage({
 
   // Variation modal escape
   useEffect(() => {
-    if (!chatEngine.variationModal) return
+    if (!chatEngineCompat.variationModal) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !chatEngine.isApplyingVariation) chatEngine.setVariationModal(null)
+      if (event.key === "Escape" && !chatEngineCompat.isApplyingVariation) chatEngineCompat.setVariationModal(null)
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [chatEngine.variationModal, chatEngine.isApplyingVariation])
+  }, [chatEngineCompat.variationModal, chatEngineCompat.isApplyingVariation])
 
   useEffect(() => {
-    if (chatEngine.variationModal?.options.length) {
-      setSelectedVariationId(chatEngine.variationModal.options[0].id)
+    if (chatEngineCompat.variationModal?.options.length) {
+      setSelectedVariationId(chatEngineCompat.variationModal.options[0].id)
     } else {
       setSelectedVariationId(null)
     }
-  }, [chatEngine.variationModal])
+  }, [chatEngineCompat.variationModal])
 
   useEffect(() => {
     if (!addBlockPicker) setAddBlockSearch("")
@@ -927,20 +966,20 @@ function EditorPage({
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [addBlockPicker, isAddingBlock])
 
-  const streamIsError = chatEngine.streamStatus ? /failed|error/i.test(chatEngine.streamStatus) : false
-  const streamLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? t("stream.shapingUpdate") : t("stream.gettingReady")))
-  const streamTextLabel = chatEngine.imageProgress ? chatEngine.imageProgress.stage : (chatEngine.streamStatus ?? (chatEngine.streamTokenCount > 0 ? t("stream.updating") : t("stream.thinking")))
-  const reconnectMatch = chatEngine.streamStatus?.match(/reconnecting(?:\s+agent\s+stream)?(?:\s+\((\d+)\/(\d+)\))?/i) ?? null
+  const streamIsError = chatEngineCompat.streamStatus ? /failed|error/i.test(chatEngineCompat.streamStatus) : false
+  const streamLabel = chatEngineCompat.imageProgress ? chatEngineCompat.imageProgress.stage : (chatEngineCompat.streamStatus ?? (chatEngineCompat.streamTokenCount > 0 ? t("stream.shapingUpdate") : t("stream.gettingReady")))
+  const streamTextLabel = chatEngineCompat.imageProgress ? chatEngineCompat.imageProgress.stage : (chatEngineCompat.streamStatus ?? (chatEngineCompat.streamTokenCount > 0 ? t("stream.updating") : t("stream.thinking")))
+  const reconnectMatch = chatEngineCompat.streamStatus?.match(/reconnecting(?:\s+agent\s+stream)?(?:\s+\((\d+)\/(\d+)\))?/i) ?? null
   const reconnectAttempt = reconnectMatch?.[1] ? Number(reconnectMatch[1]) : null
   const reconnectTotal = reconnectMatch?.[2] ? Number(reconnectMatch[2]) : null
   const reconnectBadgeLabel = reconnectMatch
     ? (reconnectAttempt && reconnectTotal ? `Reconnect ${reconnectAttempt}/${reconnectTotal}` : "Reconnecting")
     : null
-  const fieldDraftDebugLabel = `field_draft ${chatEngine.fieldDraftDebug.eventsPerSecond}/s · chars ${chatEngine.fieldDraftDebug.charsPerSecond}/s · lag ${chatEngine.fieldDraftDebug.typingLagChars}`
+  const fieldDraftDebugLabel = `field_draft ${chatEngineCompat.fieldDraftDebug.eventsPerSecond}/s · chars ${chatEngineCompat.fieldDraftDebug.charsPerSecond}/s · lag ${chatEngineCompat.fieldDraftDebug.typingLagChars}`
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
   const chatPanelClassName = `chat-panel ${activeTab === "properties" ? "chat-panel--properties" : "chat-panel--chat"}`
-  const hasUserEntry = chatEngine.chatLog.some((entry) => entry.role === "user")
-  const buildCopyPayload = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
+  const hasUserEntry = chatEngineCompat.chatLog.some((entry) => entry.role === "user")
+  const buildCopyPayload = useCallback((entry: (typeof chatEngineCompat.chatLog)[number]) => {
     const lines: string[] = []
     if (entry.text) lines.push(entry.text)
     if (entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready") lines.push(`status: ${entry.status}`)
@@ -987,7 +1026,7 @@ function EditorPage({
     return lines.join("\n")
   }, [])
 
-  const copyAssistantBubble = useCallback(async (entry: (typeof chatEngine.chatLog)[number]) => {
+  const copyAssistantBubble = useCallback(async (entry: (typeof chatEngineCompat.chatLog)[number]) => {
     const text = buildCopyPayload(entry)
     if (!text.trim()) return
     try {
@@ -1001,7 +1040,7 @@ function EditorPage({
     }
   }, [buildCopyPayload])
 
-  const buildDebugSummary = useCallback((entry: (typeof chatEngine.chatLog)[number]) => {
+  const buildDebugSummary = useCallback((entry: (typeof chatEngineCompat.chatLog)[number]) => {
     if (!entry.debug) return t("chat.expandDetails")
     const parts: string[] = []
     if (entry.debug.outcome) parts.push(entry.debug.outcome.replace(/_/g, " "))
@@ -1052,11 +1091,11 @@ function EditorPage({
                 className="chat-header-icon-btn"
                 aria-label={t("header.syncFromSite")}
                 title={t("header.syncFromSiteTitle")}
-                disabled={chatEngine.isLoading}
+                disabled={chatEngineCompat.isLoading}
                 onClick={async () => {
-                  const count = await chatEngine.syncFromSite()
+                  const count = await chatEngineCompat.syncFromSite()
                   if (count > 0) {
-                    chatEngine.pushAssistantFromResult({
+                    chatEngineCompat.pushAssistantFromResult({
                       status: "applied",
                       summary: count === 1 ? t("header.syncedPage") : t("header.syncedPages", { count }),
                       changes: []
@@ -1098,7 +1137,7 @@ function EditorPage({
                   {t("header.limited")}
                 </span>
               ) : null}
-              {chatEngine.plannerBadgeState === "demo" ? (
+              {chatEngineCompat.plannerBadgeState === "demo" ? (
                 <span className="planner-badge planner-badge-demo">{t("header.demoMode")}</span>
               ) : null}
               <button
@@ -1109,7 +1148,7 @@ function EditorPage({
               >
                 <Ellipsis size={14} aria-hidden="true" />
               </button>
-              <button type="button" className="publish-preview-btn" onClick={() => void publish.publishSite()} disabled={chatEngine.isLoading || publish.isPublishing}>
+              <button type="button" className="publish-preview-btn" onClick={() => void publish.publishSite()} disabled={chatEngineCompat.isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
                 {publish.publishInProgress ? t("header.publishing") : t("header.publish")}
               </button>
@@ -1151,16 +1190,16 @@ function EditorPage({
           ref={chatThreadRef}
           className="chat-thread"
           style={{ display: activeTab === "chat" ? "" : "none" }}
-          entries={chatEngine.chatLog}
-          isLoading={chatEngine.isLoading}
-          streamStatus={chatEngine.streamStatus}
+          entries={chatEngineCompat.chatLog}
+          isLoading={chatEngineCompat.isLoading}
+          streamStatus={chatEngineCompat.streamStatus}
           streamStatusLabel={streamTextLabel}
-          streamingText={chatEngine.streamingText}
-          streamSteps={chatEngine.streamSteps}
-          streamingChanges={chatEngine.streamingChanges}
-          undoInFlightEntryId={chatEngine.undoInFlightEntryId}
-          onSuggestionClick={(line) => void chatEngine.submitChat(line)}
-          onUndo={(entryId) => void chatEngine.applyUndoHistory(entryId)}
+          streamingText={chatEngineCompat.streamingText}
+          streamSteps={chatEngineCompat.streamSteps}
+          streamingChanges={chatEngineCompat.streamingChanges}
+          undoInFlightEntryId={chatEngineCompat.undoInFlightEntryId}
+          onSuggestionClick={(line) => void chatEngineCompat.submitChat(line)}
+          onUndo={(entryId) => void chatEngineCompat.applyUndoHistory(entryId)}
           undoLabel={t("chat.undo")}
           undoneLabel={t("chat.undone")}
           renderEntryExtras={(entry) => (
@@ -1172,7 +1211,7 @@ function EditorPage({
                       key={option.id ?? `${entry.id}-v-${idx}`}
                       type="button"
                       className="msg-variation-card"
-                      disabled={chatEngine.isLoading}
+                      disabled={chatEngineCompat.isLoading}
                       onClick={async () => {
                         const v = entry.variations!
                         try {
@@ -1187,7 +1226,7 @@ function EditorPage({
                           })
                           if (res.ok) {
                             preview.postToSite("draftUpdated", { focusBlockId: v.blockId })
-                            chatEngine.pushAssistantFromResult({
+                            chatEngineCompat.pushAssistantFromResult({
                               status: "applied",
                               summary: `Applied variation: ${option.title}`,
                               changes: [option.summary],
@@ -1219,13 +1258,13 @@ function EditorPage({
                 <div className="msg-plan-actions">
                   {(() => {
                     const currentPlanId = entry.pendingPlanId
-                    const disabled = chatEngine.isLoading || chatEngine.pendingPlanId !== currentPlanId
+                    const disabled = chatEngineCompat.isLoading || chatEngineCompat.pendingPlanId !== currentPlanId
                     return (
                       <>
                         <button
                           type="button"
                           className="primary-btn msg-plan-btn"
-                          onClick={() => void chatEngine.approvePendingPlan(currentPlanId)}
+                          onClick={() => void chatEngineCompat.approvePendingPlan(currentPlanId)}
                           disabled={disabled}
                         >
                           Approve plan
@@ -1233,7 +1272,7 @@ function EditorPage({
                         <button
                           type="button"
                           className="secondary-btn msg-plan-btn"
-                          onClick={() => void chatEngine.stopPendingPlan(currentPlanId)}
+                          onClick={() => void chatEngineCompat.stopPendingPlan(currentPlanId)}
                           disabled={disabled}
                         >
                           Stop
@@ -1248,8 +1287,8 @@ function EditorPage({
                   <button
                     type="button"
                     className="primary-btn msg-plan-btn"
-                    onClick={() => void chatEngine.continueChain(entry.continuation!.chainId)}
-                    disabled={chatEngine.isLoading || chatEngine.continuationChainId !== entry.continuation.chainId}
+                    onClick={() => void chatEngineCompat.continueChain(entry.continuation!.chainId)}
+                    disabled={chatEngineCompat.isLoading || chatEngineCompat.continuationChainId !== entry.continuation.chainId}
                   >
                     Continue: {entry.continuation.nextStepLabel} ({entry.continuation.currentStep} of {entry.continuation.totalSteps})
                   </button>
@@ -1268,7 +1307,7 @@ function EditorPage({
                         onClick={() => {
                           setSlug(route)
                         }}
-                        disabled={chatEngine.isLoading}
+                        disabled={chatEngineCompat.isLoading}
                       >
                         Open {route}
                       </button>
@@ -1347,7 +1386,7 @@ function EditorPage({
                     type="button"
                     className={`msg-feedback-btn ${entry.feedback?.rating === "up" ? "msg-feedback-btn--active" : ""}`}
                     onClick={() => {
-                      if (!entry.feedback) void chatEngine.submitFeedback(entry.id, "up")
+                      if (!entry.feedback) void chatEngineCompat.submitFeedback(entry.id, "up")
                     }}
                     disabled={!!entry.feedback}
                     title={t("chat.goodResponse")}
@@ -1379,7 +1418,7 @@ function EditorPage({
                       className="msg-feedback-note-form"
                       onSubmit={(e) => {
                         e.preventDefault()
-                        void chatEngine.submitFeedback(entry.id, "down", feedbackNoteText || undefined)
+                        void chatEngineCompat.submitFeedback(entry.id, "down", feedbackNoteText || undefined)
                         setFeedbackNoteEntryId(null)
                         setFeedbackNoteText("")
                       }}
@@ -1401,11 +1440,11 @@ function EditorPage({
           renderStreamingExtras={() => (
             <>
               {reconnectBadgeLabel ? (
-                <span className="stream-reconnect-badge stream-reconnect-badge-inline" title={chatEngine.streamStatus ?? undefined}>
+                <span className="stream-reconnect-badge stream-reconnect-badge-inline" title={chatEngineCompat.streamStatus ?? undefined}>
                   {reconnectBadgeLabel}
                 </span>
               ) : null}
-              {showDebugDetails && chatEngine.fieldDraftDebugEnabled ? (
+              {showDebugDetails && chatEngineCompat.fieldDraftDebugEnabled ? (
                 <div className="streaming-debug-inline">{fieldDraftDebugLabel}</div>
               ) : null}
             </>
@@ -1414,9 +1453,9 @@ function EditorPage({
             <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"} ${STREAMING_INDICATOR_STYLE === "text" ? "is-text" : "is-legacy"}`}>
               {STREAMING_INDICATOR_STYLE === "text" ? (
                 <>
-                  {chatEngine.streamSteps.filter((s) => s.done).length > 0 ? (
+                  {chatEngineCompat.streamSteps.filter((s) => s.done).length > 0 ? (
                     <ul className="stream-steps">
-                      {chatEngine.streamSteps.filter((s) => s.done).map((step, idx) => (
+                      {chatEngineCompat.streamSteps.filter((s) => s.done).map((step, idx) => (
                         <li key={idx} className="stream-step is-done">{step.label}</li>
                       ))}
                     </ul>
@@ -1439,22 +1478,22 @@ function EditorPage({
                 </>
               )}
               {reconnectBadgeLabel ? (
-                <span className="stream-reconnect-badge" title={chatEngine.streamStatus ?? undefined}>
+                <span className="stream-reconnect-badge" title={chatEngineCompat.streamStatus ?? undefined}>
                   {reconnectBadgeLabel}
                 </span>
               ) : null}
-              {chatEngine.imageProgress ? (
+              {chatEngineCompat.imageProgress ? (
                 <div className="image-gen-progress">
-                  <div className="image-gen-progress-fill" style={{ width: `${chatEngine.imageProgress.percent}%` }} />
+                  <div className="image-gen-progress-fill" style={{ width: `${chatEngineCompat.imageProgress.percent}%` }} />
                 </div>
               ) : null}
-              {chatEngine.latestStreamFocusBlockId ? (
+              {chatEngineCompat.latestStreamFocusBlockId ? (
                 <button
                   type="button"
                   className="streaming-jump-btn"
                   onClick={() =>
                     preview.postToSite("highlightBlock", {
-                      blockId: chatEngine.latestStreamFocusBlockId,
+                      blockId: chatEngineCompat.latestStreamFocusBlockId,
                       editablePath: null
                     })
                   }
@@ -1462,7 +1501,7 @@ function EditorPage({
                   Jump to latest change
                 </button>
               ) : null}
-              {showDebugDetails && chatEngine.fieldDraftDebugEnabled ? (
+              {showDebugDetails && chatEngineCompat.fieldDraftDebugEnabled ? (
                 <div className="streaming-debug-inline">{fieldDraftDebugLabel}</div>
               ) : null}
             </div>
@@ -1510,7 +1549,7 @@ function EditorPage({
             })()
           }}
           onFieldChange={async (path, value) => {
-            await chatEngine.inlineEditCommit(slug, activeBlockId!, path, value, { silent: true })
+            await chatEngineCompat.inlineEditCommit(slug, activeBlockId!, path, value, { silent: true })
             void blockProps.refetch()
           }}
           onImageClick={(fieldPath, currentUrl) => {
@@ -1521,11 +1560,11 @@ function EditorPage({
           onPageAiAssist={handlePageAiAssist}
           onAiQuickAction={handleFieldAiQuickAction}
           onPageAiQuickAction={handlePageAiQuickAction}
-          aiLoading={chatEngine.isLoading}
+          aiLoading={chatEngineCompat.isLoading}
           aiLoadingPath={activeEditablePath}
           highlightPath={activeEditablePath}
           onAddListItem={activeBlockId && activeBlockType ? (listKey) => {
-            void chatEngine.addListItem(slug, activeBlockId, activeBlockType, listKey)
+            void chatEngineCompat.addListItem(slug, activeBlockId, activeBlockType, listKey)
               .then(() => blockProps.refetch())
           } : undefined}
           manifestByType={componentManifest.byType}
@@ -1549,17 +1588,17 @@ function EditorPage({
           className="composer"
           style={{ display: activeTab === "chat" ? "" : "none" }}
           message={message}
-          isLoading={chatEngine.isLoading}
+          isLoading={chatEngineCompat.isLoading}
           hasUserEntry={hasUserEntry}
           onMessageChange={setMessage}
           onSubmit={(explicitMessage) => {
             setMessage("")
-            void chatEngine.submitChat(explicitMessage, message)
+            void chatEngineCompat.submitChat(explicitMessage, message)
           }}
           onTranscribeAudio={media.transcribeAudio}
           onInterpretImage={media.interpretPastedImage}
           onUploadImage={media.uploadPastedImage}
-          onCancel={chatEngine.cancelChat}
+          onCancel={chatEngineCompat.cancelChat}
           onAutoHeightChange={handleComposerAutoHeight}
           selectionModeEnabled={selectionModeEnabled}
           onToggleSelectionMode={() => toggleSelectionMode()}
@@ -1625,31 +1664,31 @@ function EditorPage({
         >
           <ClaudeStyleChatInput
             message={message}
-            isLoading={chatEngine.isLoading}
+            isLoading={chatEngineCompat.isLoading}
             hasUserEntry={hasUserEntry}
             onMessageChange={setMessage}
             onSubmit={(explicitMessage) => {
               setMessage("")
-              void chatEngine.submitChat(explicitMessage, message)
+              void chatEngineCompat.submitChat(explicitMessage, message)
             }}
             onTranscribeAudio={media.transcribeAudio}
             onInterpretImage={media.interpretPastedImage}
             onUploadImage={media.uploadPastedImage}
-            onCancel={chatEngine.cancelChat}
+            onCancel={chatEngineCompat.cancelChat}
             onAutoHeightChange={() => {}}
             compact
           />
         </div>
       ) : null}
 
-      {chatEngine.variationModal ? (() => {
-        const vm = chatEngine.variationModal
+      {chatEngineCompat.variationModal ? (() => {
+        const vm = chatEngineCompat.variationModal
         const selectedOption = vm.options.find((o) => o.id === selectedVariationId) ?? null
         return (
         <div
           className="variation-modal-backdrop"
           onClick={() => {
-            if (!chatEngine.isApplyingVariation) chatEngine.setVariationModal(null)
+            if (!chatEngineCompat.isApplyingVariation) chatEngineCompat.setVariationModal(null)
           }}
         >
           <div className="variation-modal" role="dialog" aria-modal="true" aria-label={t("variation.title")} onClick={(e) => e.stopPropagation()}>
@@ -1659,8 +1698,8 @@ function EditorPage({
                 type="button"
                 className="settings-close-btn"
                 aria-label={t("variation.close")}
-                onClick={() => chatEngine.setVariationModal(null)}
-                disabled={chatEngine.isApplyingVariation}
+                onClick={() => chatEngineCompat.setVariationModal(null)}
+                disabled={chatEngineCompat.isApplyingVariation}
               >
                 ×
               </button>
@@ -1692,10 +1731,10 @@ function EditorPage({
               <button
                 type="button"
                 className="publish-preview-btn variation-apply-btn"
-                onClick={() => { if (selectedOption) void chatEngine.applyVariation(selectedOption) }}
-                disabled={chatEngine.isApplyingVariation || !selectedOption}
+                onClick={() => { if (selectedOption) void chatEngineCompat.applyVariation(selectedOption) }}
+                disabled={chatEngineCompat.isApplyingVariation || !selectedOption}
               >
-                {chatEngine.isApplyingVariation ? t("variation.applying") : t("variation.apply", { title: selectedOption?.title ?? "" })}
+                {chatEngineCompat.isApplyingVariation ? t("variation.applying") : t("variation.apply", { title: selectedOption?.title ?? "" })}
               </button>
             </div>
           </div>
@@ -1752,7 +1791,7 @@ function EditorPage({
                         if (!addBlockPicker || isAddingBlock) return
                         setIsAddingBlock(true)
                         const defaultProps = componentManifest.byType.get(option.type)?.defaultProps
-                        const ok = await chatEngine.addBlockAfter(
+                        const ok = await chatEngineCompat.addBlockAfter(
                           addBlockPicker.slug,
                           addBlockPicker.afterBlockId,
                           option.type,
@@ -1787,13 +1826,13 @@ function EditorPage({
         onDarkModeChange={onSetChatDarkMode}
         showDebugDetails={showDebugDetails}
         onDebugDetailsChange={setShowDebugDetails}
-        fieldDraftDebugEnabled={chatEngine.fieldDraftDebugEnabled}
-        onFieldDraftDebugChange={chatEngine.setFieldDraftDebugEnabled}
+        fieldDraftDebugEnabled={chatEngineCompat.fieldDraftDebugEnabled}
+        onFieldDraftDebugChange={chatEngineCompat.setFieldDraftDebugEnabled}
         provider={provider}
         modelKey={modelKey}
         availableProviders={availableProviders}
         onModelChange={(p, m) => { setProvider(p); setModelKey(m) }}
-        onClearChat={chatEngine.clearChat}
+        onClearChat={chatEngineCompat.clearChat}
         agentApiKey={agentApiKey}
       />
 
@@ -2038,7 +2077,7 @@ function EditorPage({
               const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string; details?: unknown }
               if (res.ok && data.status === "applied") {
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
-                chatEngine.pushAssistantFromResult({ status: "applied", summary: t("ops.changedImage") }, { canUndo: true })
+                chatEngineCompat.pushAssistantFromResult({ status: "applied", summary: t("ops.changedImage") }, { canUndo: true })
                 void blockProps.refetch()
               } else {
                 console.error("[ImagePicker] ops failed:", res.status, data.error, data.details ?? "", "ops:", JSON.stringify(ops))
