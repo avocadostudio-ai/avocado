@@ -7,17 +7,21 @@ registerBlock("CTA", {
     title: z.string().min(1),
     description: z.string().min(1),
     ctaText: z.string().min(1),
-    ctaHref: z.string().min(1)
+    ctaHref: z.string().min(1),
+    secondaryCtaText: z.string().optional(),
+    secondaryCtaHref: z.string().optional()
   }),
   meta: {
     displayName: "Call to Action",
-    description: "Centered promotional section with a button.",
+    description: "Centered promotional section with primary and optional secondary button.",
     category: "conversion",
     fields: {
       title: f.text("Headline"),
       description: f.longtext("Description"),
       ctaText: f.text("Button text"),
       ctaHref: f.url("Button link"),
+      secondaryCtaText: f.text("Secondary button text"),
+      secondaryCtaHref: f.url("Secondary button link"),
       headingLevel: f.headingLevel(),
     }
   }

@@ -37,9 +37,22 @@
   text-wrap: pretty;
 }
 
-.cta-section .section__inner > .btn-primary {
+.cta__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
   margin-top: 4px;
+}
+
+.cta__buttons .btn-primary {
   min-width: 255px;
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.cta__buttons .btn-secondary {
   padding: 14px 32px;
   font-size: 1.1rem;
   line-height: 1;
@@ -85,8 +98,13 @@
     font-size: 1rem;
   }
 
-  .cta-section .section__inner > .btn-primary {
+  .cta__buttons .btn-primary {
     min-width: 220px;
+    font-size: 1rem;
+    padding: 12px 26px;
+  }
+
+  .cta__buttons .btn-secondary {
     font-size: 1rem;
     padding: 12px 26px;
   }

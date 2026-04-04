@@ -4,6 +4,14 @@
   gap: 14px;
 }
 
+.card-grid--2-col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.card-grid--4-col {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .card-grid-section h2 {
   margin-bottom: 16px;
 }
@@ -22,7 +30,9 @@
 }
 
 @media (max-width: 900px) {
-  .card-grid {
+  .card-grid,
+  .card-grid--2-col,
+  .card-grid--4-col {
     grid-template-columns: 1fr;
   }
 }
