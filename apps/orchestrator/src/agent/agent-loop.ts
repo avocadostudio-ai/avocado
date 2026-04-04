@@ -39,11 +39,23 @@ export type AgentLoopOptions = {
 
 /** Provider-agnostic entry point — dispatches to Anthropic or OpenAI loop. */
 export async function* runAgentLoop(options: AgentLoopOptions): AsyncGenerator<AgentEvent> {
+  if (_runAgentLoopOverride) {
+    yield* _runAgentLoopOverride(options)
+    return
+  }
   if (options.provider === "openai") {
     yield* runOpenAIAgentLoop(options)
     return
   }
   yield* runAnthropicAgentLoop(options)
+}
+
+// ---------------------------------------------------------------------------
+// Test injection point (follows setGeneratePlanWithOpenAIForTests pattern)
+// ---------------------------------------------------------------------------
+let _runAgentLoopOverride: ((options: AgentLoopOptions) => AsyncGenerator<AgentEvent>) | undefined
+export function setRunAgentLoopForTests(fn?: (options: AgentLoopOptions) => AsyncGenerator<AgentEvent>) {
+  _runAgentLoopOverride = fn
 }
 
 async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator<AgentEvent> {
