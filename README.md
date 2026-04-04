@@ -100,12 +100,6 @@ packages/
   preview-adapter/ PreviewBridge component, postMessage protocol, CSS overlay system
 ```
 
-## Built-in Blocks
-
-Hero | FeatureGrid | Testimonials | FAQAccordion | CTA | Card | CardGrid | RichText | Stats | TwoColumn | Footer | SiteHeader | Embed | Banner | Carousel | Gallery | Tabs | Table | Quote | Video
-
-You can also [register custom blocks](docs/integration/custom-blocks.md) from your own component library.
-
 ## Examples
 
 | Example | CMS | Path |
