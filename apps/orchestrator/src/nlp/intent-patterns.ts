@@ -90,7 +90,7 @@ export const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
 // ---------------------------------------------------------------------------
 
 export const COUNTED_MULTI_BLOCK_ADD_PATTERN =
-  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:\w+[-\s])*)(?:blocks?|components?|sections?|elements?|widgets?)\b/
+  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:\w+[-\s])*)(?:block\w*|component\w*|section\w*|element\w*|widget\w*)\b/
 
 // ---------------------------------------------------------------------------
 // Generic add-action verb

@@ -2500,13 +2500,20 @@ export async function runChatPipeline(
           })
           const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
           if (routedOutcome.done) {
-            // Success — abort the full planner (fire and forget)
-            fullPlannerAbort.abort("router_succeeded")
-            suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_success")
-            return routedOutcome.response
+            // For needs_clarification: only short-circuit for deterministic scenarios
+            // (page deletes, renames, etc.). Otherwise fall through to the full planner —
+            // the router may have refused a valid batch-add request like "populate this page".
+            if (routedPlan.intent === "needs_clarification" && !shouldReturnDeterministicClarification(plannerMessage)) {
+              // Fall through — wait for the full planner result below
+            } else {
+              // Success — abort the full planner (fire and forget)
+              fullPlannerAbort.abort("router_succeeded")
+              suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_success")
+              return routedOutcome.response
+            }
           }
         }
-        // Router plan failed validation — fall through to wait for full planner
+        // Router plan failed validation or was a non-deterministic clarification — fall through to wait for full planner
       }
 
       if (routerResult.source === "router") {
