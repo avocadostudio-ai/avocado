@@ -8,16 +8,20 @@ registerBlock("Banner", {
     variant: z.enum(["info", "success", "warning"]).default("info"),
     ctaText: z.string().optional(),
     ctaHref: z.string().optional(),
+    backgroundColor: z.string().optional(),
+    textColor: z.string().optional(),
   }),
   meta: {
     displayName: "Banner",
-    description: "Full-width announcement or alert bar with optional call-to-action button.",
+    description: "Full-width announcement or alert bar with optional call-to-action button. Use variant for preset themes, or backgroundColor/textColor for custom colors.",
     category: "content",
     fields: {
       text: f.text("Banner text"),
       variant: { kind: "enum", label: "Variant", options: ["info", "success", "warning"], inlineEditable: false },
       ctaText: f.text("Button label"),
       ctaHref: f.url("Button link"),
+      backgroundColor: { kind: "color", label: "Background color", inlineEditable: false },
+      textColor: { kind: "color", label: "Text color", inlineEditable: false },
     },
   }
 })

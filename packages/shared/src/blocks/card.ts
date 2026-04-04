@@ -9,11 +9,12 @@ registerBlock("Card", {
     ctaText: z.string().min(1),
     ctaHref: z.string().min(1),
     imageUrl: z.string().min(1).optional(),
-    imageAlt: z.string().min(1).optional()
+    imageAlt: z.string().min(1).optional(),
+    variant: z.enum(["default", "full-bleed"]).default("default"),
   }),
   meta: {
     displayName: "Card",
-    description: "Single prominent card with a CTA.",
+    description: "Single prominent card with a CTA. Use 'full-bleed' variant for background image with dark overlay and white text.",
     category: "content",
     fields: {
       title: f.text("Card title"),
@@ -22,6 +23,7 @@ registerBlock("Card", {
       ctaHref: f.url("Button link"),
       imageUrl: f.image("Card image", { aspectRatio: "landscape", width: 768, height: 512 }),
       imageAlt: f.imageAlt("Card image alt text"),
+      variant: { kind: "enum", label: "Variant", options: ["default", "full-bleed"], inlineEditable: false },
       headingLevel: f.headingLevel(),
     }
   }

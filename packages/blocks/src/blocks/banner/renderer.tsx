@@ -12,9 +12,18 @@ export function Banner(props: Record<string, unknown>): JSX.Element {
   const variant = String(props.variant ?? "info")
   const ctaText = String(props.ctaText ?? "")
   const ctaHref = String(props.ctaHref ?? "")
+  const backgroundColor = typeof props.backgroundColor === "string" ? props.backgroundColor.trim() : ""
+  const textColor = typeof props.textColor === "string" ? props.textColor.trim() : ""
+
+  const customStyle: Record<string, string> = {}
+  if (backgroundColor.length > 0) customStyle.backgroundColor = backgroundColor
+  if (textColor.length > 0) customStyle.color = textColor
 
   return (
-    <section className={`banner ${variantClass[variant] ?? variantClass.info}`}>
+    <section
+      className={`banner ${variantClass[variant] ?? variantClass.info}`}
+      style={Object.keys(customStyle).length > 0 ? customStyle : undefined}
+    >
       <div className="banner__inner section__inner">
         <p className="banner__text" data-editable-target="text" data-editable-target-label="text" data-editable-label="text">
           {renderInline(text)}
