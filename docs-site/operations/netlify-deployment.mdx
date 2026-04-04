@@ -1,16 +1,19 @@
-# Netlify Deployment
-
-This guide covers deploying AI Site Editor to Netlify.
+---
+title: "Deploy to Netlify"
+description: "Deploy the AI Site Editor site and editor to Netlify."
+---
 
 ## Architecture overview
 
 | Component | Netlify product | Notes |
 |-----------|----------------|-------|
-| **Site** (`apps/site`) | Netlify Sites | Next.js on Netlify via `@netlify/plugin-nextjs` |
+| **Site** (`apps/site`) | Netlify Sites | Next.js via `@netlify/plugin-nextjs` |
 | **Editor** (`apps/editor`) | Netlify Sites | Static Vite build |
 | **Orchestrator** (`apps/orchestrator`) | External host | Long-running Fastify server — deploy on Render, Fly, Railway, or any container host |
 
-> **Note:** The orchestrator is a long-running stateful server and cannot run as a Netlify Function. Deploy it on a platform that supports persistent processes.
+<Note>
+The orchestrator is a long-running stateful server and cannot run as a Netlify Function. Deploy it on a platform that supports persistent processes.
+</Note>
 
 ## Phase 1: Public site only (recommended start)
 
@@ -23,7 +26,7 @@ Deploy `apps/site` as a standalone Next.js site serving published content.
    - **Base directory:** `apps/site`
    - **Build command:** `cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @ai-site-editor/site build`
    - **Publish directory:** `apps/site/.next`
-3. Install the Next.js plugin: add `@netlify/plugin-nextjs` to your `netlify.toml` or install via the Netlify UI
+3. Install the Next.js plugin: add `@netlify/plugin-nextjs` via the Netlify UI or `netlify.toml`
 
 ### netlify.toml (in repo root)
 
@@ -66,7 +69,7 @@ Create a separate Netlify site for `apps/editor`:
 
 ### Deploy the orchestrator (external host)
 
-The orchestrator requires a long-running process. Deploy on Render, Fly.io, Railway, or any container platform. See [vercel-deployment.md](vercel-deployment.md#orchestrator-on-render) for Render-specific instructions.
+The orchestrator requires a long-running process. Deploy on Render, Fly.io, Railway, or any container platform. See the [Vercel deployment guide](/operations/vercel-deployment#orchestrator-on-render) for Render-specific instructions.
 
 ### Site environment variables (Phase 2)
 
@@ -85,8 +88,8 @@ Deployment guides for the following platforms are planned:
 - **Google Cloud Run** — Container-based deployment for all three services
 - **Docker Compose** — Self-hosted deployment on any server
 
-Contributions welcome! See [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Contributions welcome! See the [contributing guide](https://github.com/yu7321/avocado/blob/main/CONTRIBUTING.md).
 
 ## Troubleshooting
 
-See the [production troubleshooting](vercel-deployment.md#production-troubleshooting) section — the same postMessage, CORS, and draft mode issues apply regardless of hosting platform.
+See the [production troubleshooting](/operations/vercel-deployment#production-troubleshooting) section — the same postMessage, CORS, and draft mode issues apply regardless of hosting platform.
