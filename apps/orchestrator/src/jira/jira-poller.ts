@@ -14,6 +14,7 @@ import type { JiraConfig } from "./jira-types.js"
 
 const processedKeys = new Set<string>()
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let clearTimer: ReturnType<typeof setInterval> | null = null
 let isPolling = false
 
 export function startJiraPoller(options: {
@@ -81,11 +82,25 @@ export function startJiraPoller(options: {
   // Then on interval
   pollTimer = setInterval(() => void poll(), config.pollIntervalMs)
 
+  // Clear processed keys cache every 24 hours to prevent unbounded memory growth
+  // This is safe because if an issue reappears in the query results after this window,
+  // it's treated as a new/updated issue to be reprocessed
+  const CLEAR_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 hours
+  clearTimer = setInterval(() => {
+    const clearedCount = processedKeys.size
+    processedKeys.clear()
+    logger.debug({ clearedCount }, "JIRA: cleared processed keys cache")
+  }, CLEAR_INTERVAL_MS)
+
   // Graceful shutdown
   const shutdown = () => {
     if (pollTimer) {
       clearInterval(pollTimer)
       pollTimer = null
+    }
+    if (clearTimer) {
+      clearInterval(clearTimer)
+      clearTimer = null
     }
     logger.info("JIRA: poller stopped")
   }
@@ -97,6 +112,10 @@ export function stopJiraPoller(): void {
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
+  }
+  if (clearTimer) {
+    clearInterval(clearTimer)
+    clearTimer = null
   }
 }
 
