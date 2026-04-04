@@ -327,6 +327,8 @@ const en = {
   "sitesAgent.suggestion3": "Integrate using a GitHub project",
   "sitesAgent.suggestion3Desc": "Connect the editor to your existing Next.js app",
   "sitesAgent.stop": "Stop",
+  "sitesAgent.showMore": "Show more",
+  "sitesAgent.showLess": "Show less",
 } as const
 
 export type LocaleKeys = keyof typeof en

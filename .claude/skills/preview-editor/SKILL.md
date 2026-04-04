@@ -1,6 +1,9 @@
-# Preview Bridge & Editor Overlay
+---
+name: preview-editor
+description: Preview bridge postMessage protocol, editor overlay, block selection UI, and CSS overlay system. Use when working on selection UI, block highlight, inline editing, or iframe communication.
+---
 
-Activate this skill when working on selection UI, block highlight, editor overlay, postMessage protocol, inline editing, or CSS overlay system.
+# Preview Bridge & Editor Overlay
 
 ## PostMessage Protocol (`site-editor/v1`)
 

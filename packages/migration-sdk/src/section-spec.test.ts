@@ -211,8 +211,17 @@ describe("buildSectionSpec", () => {
     assert.ok(spec.suggestedConfidence <= 1, "should be at most 1")
   })
 
-  it("returns zero confidence when no block type suggested", () => {
-    const section = makeSection({ suggestedBlockType: undefined })
+  it("returns zero confidence when no block type suggested and no structural signals", () => {
+    const section = makeSection({
+      suggestedBlockType: undefined,
+      content: {
+        headings: [{ level: 3, text: "Small heading" }],
+        paragraphs: ["Short text"],
+        images: [],
+        links: [],
+        lists: [],
+      },
+    })
     const spec = buildSectionSpec(section)
 
     assert.equal(spec.suggestedBlockType, undefined)

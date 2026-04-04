@@ -16,6 +16,7 @@ import {
   buildPageSpecs,
   extractDesignTokens,
   mapToThemeVariables,
+  augmentThemeFromComputedStyles,
 } from "@ai-site-editor/migration-sdk"
 import { getCachedScrape, setCachedScrape } from "./scrape-cache.js"
 
@@ -75,8 +76,23 @@ Also returns designTokens (colors, fonts, radii) and themeVariables (CSS custom 
       const scrapeMs = Date.now() - t0
 
       const specs = buildPageSpecs(scrape)
-      const tokens = extractDesignTokens(scrape.content.css)
-      const theme = mapToThemeVariables(tokens)
+      const tokens = extractDesignTokens(scrape.content.css, scrape.resolvedCssVars)
+      let theme = mapToThemeVariables(tokens)
+
+      // Augment theme with actual computed CSS values from section specs.
+      // Computed styles (getComputedStyle) are far more reliable than CSS regex,
+      // especially for CMS sites using CSS variables, inline styles, or shadow DOM.
+      const sectionStyleData = specs
+        .filter(s => Object.keys(s.styles.container).length > 0)
+        .map(s => s.styles)
+      if (sectionStyleData.length > 0) {
+        // Collect hover states from interaction sweep for brand-hover extraction
+        const hoverStates = scrape.interactionStates
+          ?.flatMap(is => is.states)
+          .filter(s => s.trigger === "hover")
+          .map(s => ({ triggerTarget: s.triggerTarget, changedStyles: s.changedStyles }))
+        theme = augmentThemeFromComputedStyles(theme, sectionStyleData, hoverStates)
+      }
 
       // Override fonts with computed values (more reliable than CSS regex)
       if (scrape.computedFonts) {
@@ -120,6 +136,8 @@ Also returns designTokens (colors, fonts, radii) and themeVariables (CSS custom 
         themeVariables: theme,
         nav: scrape.nav,
         embeds: scrape.embeds,
+        videos: scrape.videos,
+        imageCompositions: scrape.imageCompositions?.length ? scrape.imageCompositions : undefined,
         computedFonts: scrape.computedFonts,
       }
 
@@ -142,12 +160,14 @@ Also returns designTokens (colors, fonts, radii) and themeVariables (CSS custom 
         nav: scrape.nav,
       }
 
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify(result, null, 2),
-        }],
-      }
+      const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: "image/jpeg" }> = [
+        { type: "text" as const, text: JSON.stringify(result, null, 2) },
+      ]
+      // Include screenshots so the LLM can visually analyze sections
+      if (scrape.screenshot) content.push({ type: "image" as const, data: scrape.screenshot.base64, mimeType: "image/jpeg" as const })
+      if (scrape.mobileScreenshot) content.push({ type: "image" as const, data: scrape.mobileScreenshot.base64, mimeType: "image/jpeg" as const })
+
+      return { content }
     } catch (e: unknown) {
       console.error(`[generate_page_specs] ERROR for ${url}:`, e instanceof Error ? e.message : String(e))
       return {
@@ -156,6 +176,7 @@ Also returns designTokens (colors, fonts, radii) and themeVariables (CSS custom 
       }
     }
   },
+  { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } }
 )
 
 /** Returns all migration tools for the sites-agent MCP server. */

@@ -53,7 +53,7 @@ server.tool("generate_page_specs", "Scrape a URL and generate section specs with
     setCachedScrape(url, scrape)
   }
   const specs = buildPageSpecs(scrape)
-  const tokens = extractDesignTokens(scrape.content.css)
+  const tokens = extractDesignTokens(scrape.content.css, scrape.resolvedCssVars)
   const theme = mapToThemeVariables(tokens)
   if (scrape.computedFonts) {
     if (scrape.computedFonts.heading) theme["--font-heading"] = scrape.computedFonts.heading + ", sans-serif"
@@ -77,7 +77,7 @@ server.tool("scrape_url", "Scrape a web page with Playwright, returns sections, 
     result = await scrapeFullPage(url)
     setCachedScrape(url, result)
   }
-  const tokens = extractDesignTokens(result.content.css)
+  const tokens = extractDesignTokens(result.content.css, result.resolvedCssVars)
   const themeVars = mapToThemeVariables(tokens)
   const textData = JSON.stringify({ title: result.content.title, navigation: result.nav, sectionCount: result.sections.length, designTokens: tokens, themeVariables: themeVars })
   const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [{ type: "text", text: textData }]

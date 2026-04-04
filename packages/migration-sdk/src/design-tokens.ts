@@ -204,11 +204,29 @@ function isHeadingSelector(selector: string): boolean {
 
 // ── extractDesignTokens ──
 
-export function extractDesignTokens(css: string): DesignTokens {
-  const colors = extractColors(css)
-  const fonts = extractFonts(css)
-  const radii = extractRadii(css)
+/**
+ * Extract design tokens from CSS text.
+ * When `resolvedCssVars` is provided (from Playwright getComputedStyle),
+ * var() references are resolved to actual values before normalization.
+ */
+export function extractDesignTokens(css: string, resolvedCssVars?: Record<string, string>): DesignTokens {
+  // Pre-process CSS: replace var() references with resolved values
+  const processedCss = resolvedCssVars ? resolveVarReferences(css, resolvedCssVars) : css
+  const colors = extractColors(processedCss)
+  const fonts = extractFonts(processedCss)
+  const radii = extractRadii(processedCss)
   return { colors, fonts, radii }
+}
+
+/** Replace var(--name) and var(--name, fallback) references with resolved computed values */
+function resolveVarReferences(css: string, vars: Record<string, string>): string {
+  // Match var(--name) or var(--name, fallback)
+  return css.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^)]+))?\)/gi, (_match, name: string, fallback?: string) => {
+    const resolved = vars[name]
+    if (resolved) return resolved
+    // Use fallback value if provided, otherwise keep original
+    return fallback?.trim() ?? _match
+  })
 }
 
 function classifyProperty(
@@ -590,6 +608,183 @@ export function mapToThemeVariables(tokens: DesignTokens): ThemeVariables {
   }
 
   return vars
+}
+
+// ── Computed style augmentation ──
+
+/**
+ * Override theme variables with actual computed CSS values from section specs.
+ * Computed styles (from getComputedStyle in the browser) are more reliable than
+ * CSS regex extraction, especially for CMS sites using CSS variables/inline styles.
+ */
+export function augmentThemeFromComputedStyles(
+  theme: ThemeVariables,
+  sectionStyles: Array<{
+    container: Record<string, string>
+    heading?: Record<string, string>
+    bodyText?: Record<string, string>
+    cta?: Record<string, string>
+  }>,
+  hoverStates?: Array<{ triggerTarget: string; changedStyles: Record<string, { before: string; after: string }> }>,
+): ThemeVariables {
+  const result = { ...theme }
+
+  // Collect actual computed colors from sections
+  const containerBgs: string[] = []
+  const headingColors: string[] = []
+  const headingFonts: string[] = []
+  const bodyColors: string[] = []
+  const bodyFonts: string[] = []
+  const ctaBgs: string[] = []
+  const ctaColors: string[] = []
+
+  for (const s of sectionStyles) {
+    // Container background — skip transparent
+    const bg = s.container.backgroundColor ?? ""
+    const bgNorm = normalizeColor(bg)
+    if (bgNorm && bgNorm !== "#000000") containerBgs.push(bgNorm)
+    // Also check shorthand background for solid colors
+    const bgFull = s.container.background ?? ""
+    if (bgFull && !bgFull.includes("gradient")) {
+      const bgFullNorm = normalizeColor(bgFull.split(/\s/)[0])
+      if (bgFullNorm) containerBgs.push(bgFullNorm)
+    }
+
+    // Heading
+    if (s.heading) {
+      const hColor = normalizeColor(s.heading.color ?? "")
+      if (hColor) headingColors.push(hColor)
+      const hFont = s.heading.fontFamily?.split(",")[0].trim().replace(/['"]/g, "")
+      if (hFont && hFont !== "inherit" && hFont !== "initial") headingFonts.push(hFont)
+    }
+
+    // Body text
+    if (s.bodyText) {
+      const bColor = normalizeColor(s.bodyText.color ?? "")
+      if (bColor) bodyColors.push(bColor)
+      const bFont = s.bodyText.fontFamily?.split(",")[0].trim().replace(/['"]/g, "")
+      if (bFont && bFont !== "inherit" && bFont !== "initial") bodyFonts.push(bFont)
+    }
+
+    // CTA
+    if (s.cta) {
+      const ctaBg = normalizeColor(s.cta.backgroundColor ?? "")
+      if (ctaBg) ctaBgs.push(ctaBg)
+      const ctaColor = normalizeColor(s.cta.color ?? "")
+      if (ctaColor) ctaColors.push(ctaColor)
+    }
+  }
+
+  // Detect dark theme from actual computed backgrounds
+  // Count dark vs light non-transparent section backgrounds
+  const darkBgs = containerBgs.filter(c => hexLightness(c) < 0.3)
+  const lightBgs = containerBgs.filter(c => hexLightness(c) > 0.6)
+  // Also check heading/body text — on dark themes, text is light
+  const lightTexts = [...headingColors, ...bodyColors].filter(c => hexLightness(c) > 0.7)
+  const darkTexts = [...headingColors, ...bodyColors].filter(c => hexLightness(c) < 0.3)
+
+  const isDark = (darkBgs.length > lightBgs.length) || (lightTexts.length > darkTexts.length && darkBgs.length > 0)
+
+  // If computed styles reveal a dark theme but the token pipeline didn't detect it,
+  // flip the key variables
+  if (isDark && hexLightness(result["--bg-0"] ?? "#ffffff") > 0.5) {
+    // The token pipeline thought it was light — override with computed data
+    const darkBg = mostFrequent(containerBgs.filter(c => hexLightness(c) < 0.3)) ?? "#181818"
+    result["--bg-0"] = darkBg
+    result["--bg-100"] = adjustLightness(darkBg, 0.04)
+    result["--bg-1"] = result["--bg-100"]
+    result["--surface"] = adjustLightness(darkBg, 0.04)
+    result["--surface-border"] = adjustLightness(darkBg, 0.12)
+    result["--border"] = result["--surface-border"]
+    result["--card-bg"] = result["--surface"]
+    result["--card-shadow"] = "0 1px 3px rgba(0,0,0,0.3)"
+    result["--placeholder-img"] = "#374151"
+    result["--hero-bg"] = `var(--bg-0)`
+    result["--cta-bg"] = `var(--bg-100)`
+  }
+
+  // Override text colors with computed values
+  if (headingColors.length > 0) {
+    const hColor = mostFrequent(headingColors)!
+    result["--heading"] = hColor
+    result["--text-100"] = hColor
+    // On dark theme, body should also be light
+    if (isDark) {
+      result["--body"] = mostFrequent(bodyColors) ?? hColor
+      result["--text-200"] = mostFrequent(bodyColors) ?? adjustLightness(hColor, -0.1)
+    }
+  }
+
+  if (bodyColors.length > 0 && !isDark) {
+    result["--body"] = mostFrequent(bodyColors)!
+  }
+
+  // Override brand with actual CTA color (most reliable source of brand color)
+  if (ctaBgs.length > 0) {
+    // Filter out near-transparent and near-black/white CTA backgrounds
+    const colorfulCtas = ctaBgs.filter(c => {
+      const l = hexLightness(c)
+      return l > 0.08 && l < 0.92
+    })
+    if (colorfulCtas.length > 0) {
+      const brand = mostFrequent(colorfulCtas)!
+      result["--brand"] = brand
+      result["--brand-hover"] = adjustLightness(brand, -0.08)
+      result["--brand-subtle"] = isDark
+        ? adjustLightness(brand, -0.15)
+        : adjustLightness(brand, 0.35)
+      result["--brand-fg"] = hexLightness(brand) > 0.5 ? "#000000" : "#ffffff"
+    }
+  }
+
+  // Override brand-hover with actual hover state color (from interaction sweep)
+  if (hoverStates && hoverStates.length > 0) {
+    for (const hs of hoverStates) {
+      const bgChange = hs.changedStyles.backgroundColor
+      if (bgChange) {
+        const hoverColor = normalizeColor(bgChange.after)
+        if (hoverColor && hexLightness(hoverColor) > 0.08 && hexLightness(hoverColor) < 0.92) {
+          result["--brand-hover"] = hoverColor
+          break // Use first valid hover color
+        }
+      }
+    }
+  }
+
+  // Override fonts with computed values
+  if (headingFonts.length > 0) {
+    result["--font-heading"] = mostFrequent(headingFonts)! + ", sans-serif"
+  }
+  if (bodyFonts.length > 0) {
+    result["--font-body"] = mostFrequent(bodyFonts)! + ", sans-serif"
+  }
+
+  // Fix footer colors for dark theme
+  if (isDark) {
+    result["--footer-bg"] = adjustLightness(result["--bg-0"] ?? "#181818", -0.03)
+    result["--footer-text"] = result["--heading"] ?? "#f0f0f0"
+    result["--footer-heading"] = result["--heading"] ?? "#f0f0f0"
+    result["--footer-link"] = result["--body"] ?? result["--heading"] ?? "#cfcfcf"
+    result["--footer-link-hover"] = "#ffffff"
+    result["--footer-border"] = adjustLightness(result["--footer-bg"]!, 0.06)
+  }
+
+  return result
+}
+
+/** Find the most frequent value in an array */
+function mostFrequent(arr: string[]): string | undefined {
+  if (arr.length === 0) return undefined
+  const counts = new Map<string, number>()
+  for (const v of arr) {
+    counts.set(v, (counts.get(v) ?? 0) + 1)
+  }
+  let best = arr[0]
+  let bestCount = 0
+  for (const [v, c] of counts) {
+    if (c > bestCount) { bestCount = c; best = v }
+  }
+  return best
 }
 
 // ── Lightness adjustment helper ──

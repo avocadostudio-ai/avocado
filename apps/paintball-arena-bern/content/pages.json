@@ -1,0 +1,259 @@
+[
+  {
+    "id": "p_home",
+    "slug": "/",
+    "title": "Paintball Arena Bern – Action & Fun Erlebnis",
+    "blocks": [
+      {
+        "id": "b_hero_1",
+        "type": "Hero",
+        "props": {
+          "heading": "Paintball Arena Bern",
+          "subheading": "In der Paintball Arena Tännlenenweg 3, 3152 Mamishaus bei Bern erlebst du mit deinem Team in unserer Indoor-Halle auf über 2000m² eine unvergessliche Paintball-Experience.",
+          "ctaText": "Jetzt buchen",
+          "ctaHref": "/events/",
+          "imageUrl": "/images/migrated_1775287339118_1pbeml.webp",
+          "imageAlt": "Paintball Arena Bern Indoor Halle",
+          "imagePosition": "right",
+          "secondaryCtaText": "Mehr Infos",
+          "secondaryCtaHref": "/paintball/"
+        }
+      },
+      {
+        "id": "b_twocolumn_2",
+        "type": "TwoColumn",
+        "props": {
+          "variant": "default",
+          "left": [
+            {
+              "type": "image",
+              "src": "/images/migrated_1775287339097_glweh2.jpg",
+              "alt": "Adventure Arena Bern – Freizeit Aktivität 2025"
+            }
+          ],
+          "right": [
+            {
+              "type": "heading",
+              "text": "Adventure Arena"
+            },
+            {
+              "type": "paragraph",
+              "text": "In der Adventure Arena Bern, Zürich und Luzern erlebst du mit bis zu 20 Abenteuer-Missionen eine reale Spielumgebung, welche das Beste aus mehreren Spielwelten miteinander verbindet. Reality Gaming auf einem neuen Level – mitten in Bern."
+            },
+            {
+              "type": "cta",
+              "label": "Mehr Infos",
+              "href": "/paintball/"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_video_3",
+        "type": "Video",
+        "props": {
+          "src": "https://www.youtube.com/watch?v=QO5_v4HNg1s",
+          "title": "Paintball Arena Bern – Experience Video",
+          "posterUrl": "",
+          "autoplay": "false",
+          "loop": "false"
+        }
+      },
+      {
+        "id": "b_cardgrid_4",
+        "type": "CardGrid",
+        "props": {
+          "title": "Dein Teamevent, Polterabend oder just for Fun",
+          "cards": [
+            {
+              "title": "Erlebnis Teamevent für Firmen & Vereine",
+              "description": "Unvergessliche Teamerlebnisse für Firmen und Vereine – Paintball verbindet, motiviert und sorgt für Action pur.",
+              "ctaText": "Mehr Infos >",
+              "ctaHref": "/events/"
+            },
+            {
+              "title": "Polterabend Battle mit den besten Freunden",
+              "description": "Der perfekte Polterabend – kämpft euch durch die Arena und macht den Abend unvergesslich.",
+              "ctaText": "Mehr Infos >",
+              "ctaHref": "/events/polterabend/"
+            },
+            {
+              "title": "Geburtstag mit Adrenalin & Blauen Flecken",
+              "description": "Feiere deinen Geburtstag mit echtem Adrenalin – Paintball ist das perfekte Geschenk für alle Abenteurer.",
+              "ctaText": "Mehr Infos >",
+              "ctaHref": "/events/geburtstag/"
+            },
+            {
+              "title": "für private Gruppen wie Freunde, Familie & Kinder",
+              "description": "Ob Freunde, Familie oder Kinder – unsere Arena bietet für jede Gruppe das perfekte Erlebnis.",
+              "ctaText": "Mehr Infos >",
+              "ctaHref": "/events/private-gruppen/"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_table_5",
+        "type": "Table",
+        "props": {
+          "title": "Preise für Paintball",
+          "headers": [
+            "",
+            "3h – PREIS",
+            "3h – SPEZIALPREIS",
+            "2h – PREIS",
+            "2h – SPEZIALPREIS"
+          ],
+          "rows": [
+            [
+              "Wochentage",
+              "Mo, Di, Do & Sa",
+              "Mi, Fr & So",
+              "Mo, Di, Do & Sa",
+              "Mi, Fr & So"
+            ],
+            [
+              "Preis / Person",
+              "CHF 79.-",
+              "CHF 69.-",
+              "CHF 59.-",
+              "CHF 49.-"
+            ],
+            [
+              "Spielzeit",
+              "Mind. 2 Stunden",
+              "Mind. 2 Stunden",
+              "Mind. 1 Stunde",
+              "Mind. 1 Stunde"
+            ],
+            [
+              "Paintballs",
+              "500 pro Person",
+              "500 pro Person",
+              "300 pro Person",
+              "300 pro Person"
+            ],
+            [
+              "Vorbereitung & Instruktion",
+              "1 Stunde",
+              "1 Stunde",
+              "1 Stunde",
+              "1 Stunde"
+            ],
+            [
+              "Ausrüstung",
+              "Komplett inklusive",
+              "Komplett inklusive",
+              "Komplett inklusive",
+              "Komplett inklusive"
+            ]
+          ],
+          "striped": true
+        }
+      },
+      {
+        "id": "b_banner_6",
+        "type": "Banner",
+        "props": {
+          "text": "Als Gruppe ab 10 Personen gelten für Studenten, Lehrlinge und Militär die Spezialpreise die ganze Woche!",
+          "variant": "success",
+          "ctaText": "Jetzt buchen",
+          "ctaHref": "/events/"
+        }
+      },
+      {
+        "id": "b_twocolumn_7",
+        "type": "TwoColumn",
+        "props": {
+          "variant": "default",
+          "left": [
+            {
+              "type": "image",
+              "src": "/images/migrated_1775287339364_2xcxif.jpg",
+              "alt": "Paintball & Adventure Arena Bern Teamevent"
+            }
+          ],
+          "right": [
+            {
+              "type": "heading",
+              "text": "Standort & Kontakt"
+            },
+            {
+              "type": "paragraph",
+              "text": "Erobere deine Spielarena – wir sind für dich da!"
+            },
+            {
+              "type": "paragraph",
+              "text": "Paintball Arena Bern\nTännlenenweg 3\n3152 Mamishaus (bei Bern)"
+            },
+            {
+              "type": "paragraph",
+              "text": "Öffnungszeiten: Täglich von 09:00 bis 22:00 Uhr"
+            },
+            {
+              "type": "paragraph",
+              "text": "Anfahrt: 5 Minuten von der Busstation. Gratis Parkplätze für PKW, Busse und Reisecars."
+            },
+            {
+              "type": "paragraph",
+              "text": "Kundendienst: 079 552 91 00\nArena: 031 544 97 55\n(Mi & Fr 13–19h, Sa 10–22h, So 10–19h)"
+            },
+            {
+              "type": "cta",
+              "label": "Kontakt aufnehmen",
+              "href": "/infos/"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_faqaccordion_8",
+        "type": "FAQAccordion",
+        "props": {
+          "title": "Alle Infos für dein Ausflug",
+          "items": [
+            {
+              "q": "Kontakt, Standort & Öffnungszeiten",
+              "a": "Die Paintball Arena Bern befindet sich an der Tännlenenweg 3, 3152 Mamishaus bei Bern. Täglich geöffnet von 09:00 bis 22:00 Uhr. Kundendienst: 079 552 91 00, Arena: 031 544 97 55."
+            },
+            {
+              "q": "Paintball Preise & Aktionen",
+              "a": "Unsere Preise starten ab CHF 49.- pro Person für 2 Stunden Spielzeit. Spezialpreise gelten Mi, Fr & So sowie für Gruppen ab 10 Personen (Studenten, Lehrlinge, Militär) die ganze Woche."
+            },
+            {
+              "q": "Gutscheine für die Paintball- & Adventure Arena",
+              "a": "Verschenke ein unvergessliches Erlebnis – unsere Gutscheine sind das perfekte Geschenk für jeden Anlass. Erhältlich direkt in der Arena oder online."
+            },
+            {
+              "q": "Menü & Verpflegung",
+              "a": "Wir bieten eine Verpflegungsmöglichkeit in der Arena. Schau dir unsere Menükarte an und plane deinen Ausflug mit kulinarischem Begleitprogramm."
+            },
+            {
+              "q": "Infoblätter & Downloads",
+              "a": "Hier findest du alle wichtigen Dokumente und Infoblätter für deinen Besuch in der Paintball Arena Bern zum Herunterladen."
+            },
+            {
+              "q": "Fragen & Antworten",
+              "a": "Hast du weitere Fragen? Schau in unsere FAQ-Sektion oder kontaktiere uns direkt unter 079 552 91 00."
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_9",
+        "type": "CTA",
+        "props": {
+          "title": "Buche jetzt dein Paintball-Erlebnis",
+          "description": "Sichere dir deinen Platz in der Paintball Arena Bern – für Teamevent, Polterabend, Geburtstag oder einfach just for Fun!",
+          "ctaText": "Jetzt buchen",
+          "ctaHref": "/events/"
+        }
+      }
+    ],
+    "meta": {
+      "title": "Action & Fun Erlebnis in der Paintball Arena Bern",
+      "description": "In der Paintball Arena in Mamishaus bei Bern erlebst du dein unvergesslichen Teamevent, Polterabend, Vereinsausflug oder just for Fun."
+    },
+    "updatedAt": "2026-04-04T07:23:37.891Z"
+  }
+]

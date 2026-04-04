@@ -18,6 +18,11 @@ import { getCachedScrape, setCachedScrape } from "../migration/scrape-cache.js"
 import { saveScreenshot } from "../migration/migration-tools.js"
 import { scopedSessionKey, setPage, bumpVersion, getSiteConfig, setSiteConfig } from "../state/session-state.js"
 import {
+  listImages as listGdriveImages, downloadImage as downloadGdriveImage,
+  isGdriveConfigured, resolveGdriveFolderId, fileNameToAlt,
+} from "../image/gdrive-client.js"
+import sharp from "sharp"
+import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
   validateAndCorrectProps, fixFooterLinks, normalizePageBlocks, scaffoldSiteProject,
   analyzeCodebase, cloneRepo, detectSitePort, startAndWaitForDevServer,
@@ -115,7 +120,8 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } }
   )
 
   // ── DISCOVER SITE STRUCTURE ──
@@ -145,7 +151,8 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error discovering site structure: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } }
   )
 
   // ── CREATE SITE ──
@@ -289,7 +296,8 @@ export function createSitesAgentMcpServer(options: {
         console.error(`[create_site] ERROR: ${e instanceof Error ? e.message : String(e)}`)
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: false } }
   )
 
   // ── SCRAPE URL (Playwright: rendered DOM + screenshot + sections) ──
@@ -312,8 +320,8 @@ export function createSitesAgentMcpServer(options: {
         const { content, screenshot, sections, outline, nav } = result
         console.log(`[scrape_url] ${cached ? "CACHED" : "SCRAPED"} ${args.url} in ${Date.now() - scrapeStart}ms — ${sections.length} sections, screenshot=${!!screenshot}, nav=${!!nav}`)
 
-        // Extract design tokens from CSS
-        const tokens = extractDesignTokens(content.css)
+        // Extract design tokens from CSS (with resolved CSS variables from Playwright)
+        const tokens = extractDesignTokens(content.css, result.resolvedCssVars)
         const themeVars = mapToThemeVariables(tokens)
 
         const textData = JSON.stringify({
@@ -385,7 +393,8 @@ export function createSitesAgentMcpServer(options: {
           return { content: [{ type: "text" as const, text: `Error scraping URL: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}` }], isError: true }
         }
       }
-    }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } }
   )
 
   // ── EXTRACT DESIGN TOKENS ──
@@ -411,7 +420,8 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } }
   )
 
   // ── BOOTSTRAP PAGES ──
@@ -630,7 +640,8 @@ export function createSitesAgentMcpServer(options: {
         console.error(`[bootstrap_pages] ERROR: ${e instanceof Error ? e.message : String(e)}`)
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: false } }
   )
 
   // ── DOWNLOAD REMOTE IMAGE ──
@@ -656,7 +667,8 @@ export function createSitesAgentMcpServer(options: {
         console.warn(`[download_image] FAILED ${args.url.slice(0, 100)} — ${e instanceof Error ? e.message : String(e)}`)
         return { content: [{ type: "text" as const, text: JSON.stringify({ localUrl: args.url, error: "Download failed, using original URL" }) }] }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: true } }
   )
 
   // ── BATCH DOWNLOAD IMAGES ──
@@ -695,7 +707,94 @@ export function createSitesAgentMcpServer(options: {
       console.log(`[sites-agent] Batch downloaded ${succeeded}/${results.length} images`)
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ results, succeeded, failed: results.length - succeeded }) }] }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: true } }
+  )
+
+  // ── BROWSE GOOGLE DRIVE IMAGES ──
+  const browseGdriveTool = tool(
+    "browse_gdrive_images",
+    "Browse images in a Google Drive folder. Downloads them to the site's public/images/ and returns thumbnails so you can see the images and decide where to place them. Use BEFORE bootstrap_pages when the user provides a Google Drive folder.",
+    {
+      siteId: z.string().describe("Site ID — images saved to apps/{siteId}/public/images/"),
+      folderId: z.string().optional().describe("Google Drive folder ID or URL. Falls back to the configured default folder."),
+      query: z.string().optional().describe("Optional search text to filter images by filename"),
+      limit: z.number().optional().describe("Max images to return (1-15, default 10)"),
+    },
+    async (args) => {
+      if (!isGdriveConfigured() && !args.folderId) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Google Drive not configured. Set GOOGLE_DRIVE_FOLDER_ID and GOOGLE_API_KEY in .env, or provide a folderId." }) }] }
+      }
+
+      const folderId = resolveGdriveFolderId(args.folderId)
+      if (!folderId) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "No folder ID provided or configured." }) }] }
+      }
+
+      const limit = Math.min(15, Math.max(1, Math.trunc(args.limit ?? 10)))
+      const files = await listGdriveImages(folderId, args.query, undefined, limit)
+      if (files.length === 0) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ images: [], message: "No images found in the specified folder." }) }] }
+      }
+
+      const root = monorepoRoot()
+      const outputDir = join(root, "apps", args.siteId, "public", "images")
+      await mkdir(outputDir, { recursive: true })
+
+      const THUMB_WIDTH = 256
+      const manifest: Array<{ name: string; localUrl: string; alt: string }> = []
+      const contentBlocks: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: "image/webp" }> = []
+
+      // Download and thumbnail 4 at a time
+      for (let i = 0; i < files.length; i += 4) {
+        const batch = files.slice(i, i + 4)
+        const batchResults = await Promise.all(batch.map(async (file) => {
+          try {
+            const result = await downloadGdriveImage(file.id)
+            if (!result) return null
+
+            // Copy to site's public/images/
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").toLowerCase()
+            const localName = `gdrive_${safeName.replace(/\.[^.]+$/, "")}.webp`
+            const localPath = join(outputDir, localName)
+            const fullImage = await readFile(result.filePath)
+            await writeFile(localPath, fullImage)
+
+            // Generate small thumbnail for vision
+            const thumb = await sharp(fullImage)
+              .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+              .webp({ quality: 60 })
+              .toBuffer()
+
+            return {
+              name: file.name,
+              localUrl: `/images/${localName}`,
+              alt: fileNameToAlt(file.name),
+              thumbBase64: thumb.toString("base64"),
+            }
+          } catch {
+            return null
+          }
+        }))
+
+        for (const r of batchResults) {
+          if (!r) continue
+          manifest.push({ name: r.name, localUrl: r.localUrl, alt: r.alt })
+          contentBlocks.push({ type: "image" as const, data: r.thumbBase64, mimeType: "image/webp" as const })
+          contentBlocks.push({ type: "text" as const, text: `↑ ${r.name} → ${r.localUrl}` })
+        }
+      }
+
+      console.log(`[sites-agent] Browsed GDrive: ${manifest.length}/${files.length} images downloaded`)
+
+      return {
+        content: [
+          { type: "text" as const, text: `Found ${manifest.length} images. Thumbnails below — use localUrl paths in block props.\n${JSON.stringify(manifest, null, 2)}` },
+          ...contentBlocks,
+        ],
+      }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } }
   )
 
   // ── APPLY THEME ──
@@ -727,7 +826,8 @@ export function createSitesAgentMcpServer(options: {
           text: JSON.stringify({ status: "applied", variableCount: Object.keys(args.variables).length, persistedToCss: true }),
         }],
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: false } }
   )
 
   // ── CLONE REPO ──
@@ -745,7 +845,8 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error cloning repo: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: true } }
   )
 
   // ── INTEGRATE SITE (composite — replaces 8-10 individual tool calls) ──
@@ -973,27 +1074,71 @@ export function createSitesAgentMcpServer(options: {
           await promisify(execFile)("pnpm", ["install", "--no-frozen-lockfile"], { cwd: root, timeout: 60_000 })
         }
 
-        // 11. Detect port for reference (dev server started separately via launch_site)
-        const port = await detectSitePort(projectDir)
+        // 11. Start dev server and register site in editor dashboard
+        // (Previously split into separate launch_site step — now self-contained like create_site)
+        let port = await detectSitePort(projectDir)
 
-        emitPhaseOutcome?.({ tool: "integrate_site", data: { siteId: args.siteId, port, name: siteName, filesCreated: filesCreated.length } })
+        // Check if port is in use — find a free one
+        try {
+          const { execSync } = await import("node:child_process")
+          const pids = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: "utf-8" }).trim()
+          if (pids) {
+            console.log(`[integrate_site] Port ${port} in use, finding free port...`)
+            port = await findAvailablePort(root)
+            const pkg = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
+            if (pkg.scripts?.dev) {
+              pkg.scripts.dev = pkg.scripts.dev.replace(/-p\s*\d+/, `-p ${port}`)
+              await writeFile(join(projectDir, "package.json"), JSON.stringify(pkg, null, 2) + "\n", "utf-8")
+            }
+          }
+        } catch { /* no process on port — good */ }
+
+        // Initialize orchestrator session
+        const sessionKey = scopedSessionKey(session, args.siteId)
+        setPage(sessionKey, {
+          id: "p_home", slug: "/", title: "Home", blocks: [], updatedAt: new Date().toISOString(),
+        })
+        bumpVersion(sessionKey)
+
+        // Start dev server and wait for ready
+        const previewUrl = `http://localhost:${port}`
+        const { serverReady } = await startAndWaitForDevServer({
+          siteId: args.siteId, port, cwd: projectDir,
+        })
+
+        // Register in editor dashboard (emits site_created SSE event)
+        const siteConfig = {
+          id: args.siteId,
+          name: siteName,
+          purpose: args.purpose ?? "",
+          tone: "",
+          hosting: "local",
+          previewUrl,
+          constraints: [],
+        }
+        emitSiteCreated(siteConfig)
+
+        emitPhaseOutcome?.({ tool: "integrate_site", data: { siteId: args.siteId, port, name: siteName, filesCreated: filesCreated.length, serverReady } })
 
         return {
           content: [{
             type: "text" as const,
             text: JSON.stringify({
-              status: "integrated",
+              status: serverReady ? "running" : "integrated",
               siteId: args.siteId,
               port,
+              previewUrl,
               name: siteName,
               filesCreated,
+              serverReady,
             }),
           }],
         }
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: false } }
   )
 
   // ── LAUNCH SITE ──
@@ -1068,7 +1213,8 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: false } }
   )
 
   // ── REGISTER SITE ──
@@ -1152,7 +1298,8 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { destructiveHint: false, openWorldHint: false } }
   )
 
   // ── ANALYZE CODEBASE ──
@@ -1170,13 +1317,64 @@ export function createSitesAgentMcpServer(options: {
       } catch (e: unknown) {
         return { content: [{ type: "text" as const, text: `Error analyzing codebase: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
       }
-    }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } }
+  )
+
+  // ── VISUAL QA DIFF ──
+  const visualQaDiffTool = tool(
+    "visual_qa_diff",
+    "Take screenshots of the generated site and compare with original source screenshots. Returns a list of visual discrepancies found by comparing the screenshots. Use this AFTER bootstrap_pages to verify migration fidelity.",
+    {
+      generatedSiteUrl: z.string().describe("URL of the generated site to screenshot (e.g. http://localhost:3000)"),
+      originalUrl: z.string().describe("URL of the original source site that was migrated"),
+    },
+    async (args) => {
+      try {
+        // Take screenshots of the generated site (scrapeFullPage gives us both desktop + mobile)
+        const genScrape = await scrapeFullPage(args.generatedSiteUrl)
+        const genDesktop = genScrape.screenshot
+        const genMobile = genScrape.mobileScreenshot
+
+        // Get original screenshots from cache (should be available from prior scrape_url call)
+        const cachedScrape = getCachedScrape(args.originalUrl)
+
+        const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = []
+        content.push({ type: "text", text: "Visual QA comparison. The following images are paired: ORIGINAL then GENERATED for each viewport. Identify all visual discrepancies (colors, spacing, layout, fonts, missing images, wrong block types) and suggest specific fixes." })
+
+        // Desktop comparison
+        if (cachedScrape?.screenshot) {
+          content.push({ type: "image", data: cachedScrape.screenshot.base64, mimeType: "image/jpeg" })
+          content.push({ type: "text", text: "^ ORIGINAL desktop (1440px)" })
+        }
+        if (genDesktop) {
+          content.push({ type: "image", data: genDesktop.base64, mimeType: "image/jpeg" })
+          content.push({ type: "text", text: "^ GENERATED desktop (1440px)" })
+        }
+
+        // Mobile comparison
+        if (cachedScrape?.mobileScreenshot && genMobile) {
+          content.push({ type: "image", data: cachedScrape.mobileScreenshot.base64, mimeType: "image/jpeg" })
+          content.push({ type: "text", text: "^ ORIGINAL mobile (390px)" })
+          content.push({ type: "image", data: genMobile.base64, mimeType: "image/jpeg" })
+          content.push({ type: "text", text: "^ GENERATED mobile (390px)" })
+        }
+
+        content.push({ type: "text", text: "List all discrepancies with severity (critical/major/minor) and suggest specific operations to fix them." })
+
+        emitPhaseOutcome?.({ tool: "visual_qa_diff", data: { hasOriginal: !!cachedScrape?.screenshot, hasMobile: !!genMobile } })
+        return { content }
+      } catch (e: unknown) {
+        return { content: [{ type: "text" as const, text: `Error during visual QA: ${e instanceof Error ? e.message : String(e)}` }], isError: true }
+      }
+    },
+    { annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } }
   )
 
   return createSdkMcpServer({
     name: "sites-agent",
     version: "1.0.0",
-    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, applyThemeTool, analyzeCodebaseTool, cloneRepoTool, integrateSiteTool, launchSiteTool, registerSiteTool, ...createMigrationTools()],
+    tools: [listSitesTool, discoverStructureTool, createSiteTool, scrapeUrlTool, extractTokensTool, bootstrapPagesTool, downloadImageTool, downloadImagesTool, browseGdriveTool, applyThemeTool, analyzeCodebaseTool, cloneRepoTool, integrateSiteTool, launchSiteTool, registerSiteTool, visualQaDiffTool, ...createMigrationTools()],
   })
 }
 

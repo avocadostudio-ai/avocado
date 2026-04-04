@@ -27,6 +27,7 @@ Start here if you want to add AI-powered editing to your website.
 | [Naming Conventions](architecture/naming-conventions.md) | Naming conventions across the codebase |
 | [Selector Anchored Prompt](architecture/selector-anchored-prompt.md) | Selector toggle + hybrid anchored prompt |
 | [OpenAI Pipeline Review](architecture/openai-pipeline-fix-review.md) | Architecture review of OpenAI pipeline fix |
+| [Site Agent Modes](architecture/site-agent-modes.md) | Create/migrate/integrate modes, triage, intent-adaptive prompts |
 
 ## Operations
 
