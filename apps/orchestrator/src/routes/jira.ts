@@ -209,7 +209,18 @@ export async function jiraRoutes(app: FastifyInstance, ctx: RouteContext) {
   // ---------------------------------------------------------------------------
   // GET /jira/status — monitoring endpoint
   // ---------------------------------------------------------------------------
-  app.get("/jira/status", async () => {
+  app.get("/jira/status", async (request, reply) => {
+    if (!config) {
+      return reply.code(503).send({ error: "JIRA integration not configured (JIRA_BASE_URL and JIRA_API_TOKEN required)" })
+    }
+
+    // Validate webhook secret (required for this endpoint)
+    const providedSecret = (request.headers["x-jira-webhook-secret"] as string)
+      ?? (request.query as Record<string, string>).secret
+    if (!validateWebhookSecret(providedSecret, config.webhookSecret)) {
+      return reply.code(401).send({ error: "Invalid webhook secret" })
+    }
+
     const processing = getProcessingStatus()
     const poller = getPollerStatus()
 
