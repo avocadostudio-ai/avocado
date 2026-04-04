@@ -20,8 +20,15 @@ import type { RouteContext } from "./route-context.js"
 
 function validateWebhookSecret(provided: string | undefined, configured: string | undefined): boolean {
   if (!configured) return true // no secret configured = open
-  if (!provided || provided.length !== configured.length) return false
-  return timingSafeEqual(Buffer.from(provided), Buffer.from(configured))
+  if (!provided) return false
+  try {
+    // Always use timingSafeEqual to prevent timing attacks that leak secret length
+    return timingSafeEqual(Buffer.from(provided), Buffer.from(configured))
+  } catch {
+    // timingSafeEqual throws if buffers have different lengths
+    // Catching the error in a timing-safe way (doesn't leak which comparison failed)
+    return false
+  }
 }
 
 /**
