@@ -145,9 +145,7 @@ function EditorPage({
   const [activeBlockType, setActiveBlockType] = useState<string | undefined>()
   const [activeEditablePath, setActiveEditablePath] = useState<string | undefined>()
   const [useStreaming, setUseStreaming] = useState(true)
-  const [agentApiKey, setAgentApiKey] = useState(() => {
-    try { return localStorage.getItem("editor-agent-api-key") ?? "" } catch { return "" }
-  })
+  const agentApiKey = useMemo(() => (import.meta.env.VITE_AGENT_API_KEY as string | undefined)?.trim() ?? "", [])
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showDebugDetails, setShowDebugDetails] = useState(() => resolveDefaultDebugMode())
@@ -1797,10 +1795,6 @@ function EditorPage({
         onModelChange={(p, m) => { setProvider(p); setModelKey(m) }}
         onClearChat={chatEngine.clearChat}
         agentApiKey={agentApiKey}
-        onAgentApiKeyChange={(key) => {
-          setAgentApiKey(key)
-          try { localStorage.setItem("editor-agent-api-key", key) } catch {}
-        }}
       />
 
       <Sheet open={!!sites.configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>
