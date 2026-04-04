@@ -25,6 +25,29 @@ function validateWebhookSecret(provided: string | undefined, configured: string 
 }
 
 /**
+ * Check if an ADF node or its descendants contain a mention with the given account ID.
+ * Traverses the ADF tree structure to find mention nodes specifically.
+ */
+function containsMentionByAccountId(node: unknown, accountId: string): boolean {
+  if (!node || typeof node !== "object") return false
+  
+  const obj = node as Record<string, unknown>
+  
+  // Check if this node is a mention node with the matching account ID
+  if (obj.type === "mention" && typeof obj.attrs === "object" && obj.attrs !== null) {
+    const attrs = obj.attrs as Record<string, unknown>
+    if (attrs.id === accountId) return true
+  }
+  
+  // Recursively check content array
+  if (Array.isArray(obj.content)) {
+    return obj.content.some((child) => containsMentionByAccountId(child, accountId))
+  }
+  
+  return false
+}
+
+/**
  * Check if a comment mentions the agent (by account ID or by display name pattern).
  */
 function commentMentionsAgent(comment: unknown, agentAccountId?: string): boolean {
@@ -33,8 +56,7 @@ function commentMentionsAgent(comment: unknown, agentAccountId?: string): boolea
 
   // Check for @mention by account ID in ADF mention nodes
   if (agentAccountId && typeof comment === "object" && comment !== null) {
-    const json = JSON.stringify(comment)
-    if (json.includes(agentAccountId)) return true
+    if (containsMentionByAccountId(comment, agentAccountId)) return true
   }
 
   // Fallback: check for common agent mention patterns in text
