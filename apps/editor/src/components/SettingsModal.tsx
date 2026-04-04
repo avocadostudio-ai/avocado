@@ -62,7 +62,6 @@ interface SettingsModalProps {
   onModelChange: (provider: AIProvider, model: ModelKey) => void
   onClearChat: () => void
   agentApiKey?: string
-  onAgentApiKeyChange?: (key: string) => void
 }
 
 export function SettingsModal({
@@ -84,7 +83,6 @@ export function SettingsModal({
   onModelChange,
   onClearChat,
   agentApiKey,
-  onAgentApiKeyChange,
 }: SettingsModalProps) {
   const { t, locale, setLocale } = useT()
   const currentValue = selectionValue(provider, modelKey)
@@ -163,23 +161,14 @@ export function SettingsModal({
             </Select>
           </div>
 
-          {onAgentApiKeyChange && (
-            <div className="grid gap-1.5 text-left">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Agent Mode (Your API Key)</span>
-              <input
-                type="password"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="sk-ant-... or sk-..."
-                value={agentApiKey ?? ""}
-                onChange={(e) => onAgentApiKeyChange(e.target.value)}
-              />
+          <div className="grid gap-1.5 text-left">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Agent Mode</span>
               <p className="text-[11px] text-muted-foreground">
                 {agentApiKey
                   ? `Agent mode: ${agentProviderLabel(agentApiKey)} — uses tools to edit your site directly.`
-                  : "Paste your Anthropic or OpenAI API key to enable agent mode. Key stays in your browser."}
+                  : "Set VITE_AGENT_API_KEY in .env to enable agent mode."}
               </p>
             </div>
-          )}
 
           <Button variant="destructive" size="sm" className="w-full" onClick={handleClearChat}>
             <Eraser className="size-4" />
