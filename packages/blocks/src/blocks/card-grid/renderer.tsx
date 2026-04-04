@@ -5,6 +5,7 @@ import { PrimaryButton, BlockImage } from "../_shared"
 export function CardGrid(props: Record<string, unknown>) {
   const cards = Array.isArray(props.cards) ? props.cards : []
   const columns = String(props.columns ?? "3")
+  const cardVariant = String(props.cardVariant ?? "default")
   const HeadingTag = resolveHeadingTag("CardGrid", props) as keyof JSX.IntrinsicElements
   const ItemHeadingTag = resolveItemHeadingTag("CardGrid", props) as keyof JSX.IntrinsicElements
   return (
@@ -18,48 +19,66 @@ export function CardGrid(props: Record<string, unknown>) {
             const row = (item ?? {}) as Record<string, unknown>
             const imageUrl = typeof row.imageUrl === "string" ? row.imageUrl.trim() : ""
             const imageAlt = typeof row.imageAlt === "string" ? row.imageAlt.trim() : ""
+            const isFullBleed = cardVariant === "full-bleed" && imageUrl.length > 0
             return (
-              <article className="card" key={idx} data-editable-target={`cards[${idx}]`} data-editable-target-label={`cards[${idx}]`} data-editable-label={`cards[${idx}]`}>
-                {imageUrl.length > 0 && (
-                  <div
-                    className="card__image-wrap"
+              <article className={`card${isFullBleed ? " card--full-bleed" : ""}`} key={idx} data-editable-target={`cards[${idx}]`} data-editable-target-label={`cards[${idx}]`} data-editable-label={`cards[${idx}]`}>
+                {isFullBleed ? (
+                  <BlockImage
+                    src={imageUrl}
+                    alt={imageAlt.length > 0 ? imageAlt : "Card image"}
+                    className="card__bg-image"
+                    width={768}
+                    height={512}
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    loading="lazy"
                     data-editable-target={`cards[${idx}].imageUrl`}
                     data-editable-target-label={`cards[${idx}].imageUrl`}
                     data-editable-label={`cards[${idx}].imageUrl`}
-                  >
-                    <BlockImage
-                      src={imageUrl}
-                      alt={imageAlt.length > 0 ? imageAlt : "Card image"}
-                      className="card__image"
-                      width={768}
-                      height={512}
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                      loading="lazy"
-                    />
-                  </div>
+                  />
+                ) : (
+                  imageUrl.length > 0 && (
+                    <div
+                      className="card__image-wrap"
+                      data-editable-target={`cards[${idx}].imageUrl`}
+                      data-editable-target-label={`cards[${idx}].imageUrl`}
+                      data-editable-label={`cards[${idx}].imageUrl`}
+                    >
+                      <BlockImage
+                        src={imageUrl}
+                        alt={imageAlt.length > 0 ? imageAlt : "Card image"}
+                        className="card__image"
+                        width={768}
+                        height={512}
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        loading="lazy"
+                      />
+                    </div>
+                  )
                 )}
-                <ItemHeadingTag
-                  data-editable-target={`cards[${idx}].title`}
-                  data-editable-target-label={`cards[${idx}].title`}
-                  data-editable-label={`cards[${idx}].title`}
-                >
-                  {String(row.title ?? "")}
-                </ItemHeadingTag>
-                <p
-                  data-editable-target={`cards[${idx}].description`}
-                  data-editable-target-label={`cards[${idx}].description`}
-                  data-editable-label={`cards[${idx}].description`}
-                >
-                  {String(row.description ?? "")}
-                </p>
-                <PrimaryButton
-                  href={String(row.ctaHref ?? "#")}
-                  data-editable-target={`cards[${idx}].ctaText`}
-                  data-editable-target-label={`cards[${idx}].ctaText`}
-                  data-editable-label={`cards[${idx}].ctaText`}
-                >
-                  {String(row.ctaText ?? "")}
-                </PrimaryButton>
+                <div className={isFullBleed ? "card__overlay-content" : undefined}>
+                  <ItemHeadingTag
+                    data-editable-target={`cards[${idx}].title`}
+                    data-editable-target-label={`cards[${idx}].title`}
+                    data-editable-label={`cards[${idx}].title`}
+                  >
+                    {String(row.title ?? "")}
+                  </ItemHeadingTag>
+                  <p
+                    data-editable-target={`cards[${idx}].description`}
+                    data-editable-target-label={`cards[${idx}].description`}
+                    data-editable-label={`cards[${idx}].description`}
+                  >
+                    {String(row.description ?? "")}
+                  </p>
+                  <PrimaryButton
+                    href={String(row.ctaHref ?? "#")}
+                    data-editable-target={`cards[${idx}].ctaText`}
+                    data-editable-target-label={`cards[${idx}].ctaText`}
+                    data-editable-label={`cards[${idx}].ctaText`}
+                  >
+                    {String(row.ctaText ?? "")}
+                  </PrimaryButton>
+                </div>
               </article>
             )
           })}
