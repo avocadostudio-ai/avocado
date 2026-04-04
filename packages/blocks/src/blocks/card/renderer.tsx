@@ -5,25 +5,45 @@ import { PrimaryButton, BlockImage } from "../_shared"
 export function Card(props: Record<string, unknown>) {
   const imageUrl = typeof props.imageUrl === "string" ? props.imageUrl.trim() : ""
   const imageAlt = typeof props.imageAlt === "string" ? props.imageAlt.trim() : ""
+  const variant = String(props.variant ?? "default")
+  const isFullBleed = variant === "full-bleed" && imageUrl.length > 0
   const HeadingTag = resolveHeadingTag("Card", props) as keyof JSX.IntrinsicElements
+
   return (
     <section>
       <div className="section__inner">
-        <article className="card">
-          {imageUrl.length > 0 && (
-            <div className="card__image-wrap" data-editable-target="imageUrl" data-editable-target-label="image">
-              <BlockImage src={imageUrl} alt={imageAlt.length > 0 ? imageAlt : "Card image"} className="card__image" width={768} height={512} sizes="(max-width: 768px) 100vw, 50vw" loading="lazy" />
-            </div>
+        <article className={`card${isFullBleed ? " card--full-bleed" : ""}`}>
+          {isFullBleed ? (
+            <BlockImage
+              src={imageUrl}
+              alt={imageAlt.length > 0 ? imageAlt : "Card image"}
+              className="card__bg-image"
+              width={768}
+              height={512}
+              sizes="(max-width: 768px) 100vw, 50vw"
+              loading="lazy"
+              data-editable-target="imageUrl"
+              data-editable-target-label="image"
+              data-editable-label="image"
+            />
+          ) : (
+            imageUrl.length > 0 && (
+              <div className="card__image-wrap" data-editable-target="imageUrl" data-editable-target-label="image">
+                <BlockImage src={imageUrl} alt={imageAlt.length > 0 ? imageAlt : "Card image"} className="card__image" width={768} height={512} sizes="(max-width: 768px) 100vw, 50vw" loading="lazy" />
+              </div>
+            )
           )}
-          <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
-            {String(props.title ?? "")}
-          </HeadingTag>
-          <p data-editable-target="description" data-editable-target-label="description" data-editable-label="description">
-            {String(props.description ?? "")}
-          </p>
-          <PrimaryButton href={String(props.ctaHref ?? "#")} data-editable-target="ctaText" data-editable-target-label="ctaText" data-editable-label="ctaText">
-            {String(props.ctaText ?? "")}
-          </PrimaryButton>
+          <div className={isFullBleed ? "card__overlay-content" : undefined}>
+            <HeadingTag data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+              {String(props.title ?? "")}
+            </HeadingTag>
+            <p data-editable-target="description" data-editable-target-label="description" data-editable-label="description">
+              {String(props.description ?? "")}
+            </p>
+            <PrimaryButton href={String(props.ctaHref ?? "#")} data-editable-target="ctaText" data-editable-target-label="ctaText" data-editable-label="ctaText">
+              {String(props.ctaText ?? "")}
+            </PrimaryButton>
+          </div>
         </article>
       </div>
     </section>

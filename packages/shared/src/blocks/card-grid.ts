@@ -7,6 +7,7 @@ registerBlock("CardGrid", {
     title: z.string().min(1),
     subtitle: z.string().optional(),
     columns: z.enum(["2", "3", "4"]).default("3"),
+    cardVariant: z.enum(["default", "full-bleed"]).default("default"),
     cards: z
       .array(
         z.object({
@@ -28,6 +29,7 @@ registerBlock("CardGrid", {
       title: f.text("Section title"),
       subtitle: f.text("Subtitle"),
       columns: { kind: "enum", label: "Columns", options: ["2", "3", "4"], inlineEditable: false },
+      cardVariant: { kind: "enum", label: "Card style", options: ["default", "full-bleed"], inlineEditable: false },
       headingLevel: f.headingLevel(),
     },
     listFields: {
