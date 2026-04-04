@@ -54,11 +54,11 @@ pnpm dev:setup           # copy .env.example → .env, prompt for API key
 pnpm dev:start           # start all 3 services (backgrounded)
 ```
 
-| Service      | URL                    |
-|--------------|------------------------|
-| Site         | http://localhost:3000   |
-| Editor       | http://localhost:4100   |
-| Orchestrator | http://localhost:4200   |
+| Service      | URL                    | Description                              |
+|--------------|------------------------|------------------------------------------|
+| Site         | http://localhost:3000   | Your website with live preview            |
+| Editor       | http://localhost:4100   | Chat UI where you describe content changes |
+| Orchestrator | http://localhost:4200   | Backend API that plans and executes edits  |
 
 Open the **Editor** at `http://localhost:4100` to start editing your site through chat.
 
