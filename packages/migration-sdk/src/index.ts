@@ -1,5 +1,5 @@
 export { fetchPageContent, takeScreenshot, downloadImage, discoverSitePages, scrapeFullPage } from "./scraper.ts"
-export { extractDesignTokens, mapToThemeVariables } from "./design-tokens.ts"
+export { extractDesignTokens, mapToThemeVariables, augmentThemeFromComputedStyles } from "./design-tokens.ts"
 export { generateBlock, regenerateManifest } from "./block-codegen.ts"
 export { extractSections, resolveLazyImages, extractNavigation, extractPageOutline, segmentByVisualGaps, detectRepeatedPatterns } from "./section-extractor.ts"
 export { buildSectionSpec, buildPageSpecs } from "./section-spec.ts"
@@ -29,4 +29,7 @@ export type {
   SectionStyles,
   SectionSpec,
   ExtractedEmbed,
+  ExtractedVideo,
+  InteractionState,
+  ImageComposition,
 } from "./types.ts"

@@ -1,6 +1,9 @@
-# Chat & AI Planning Pipeline
+---
+name: chat-pipeline
+description: Chat pipeline, AI planning, SSE streaming, intent detection, and planner system reference. Use when working on chat flow, streaming, intent detection, or the planning pipeline.
+---
 
-Activate this skill when working on chat, AI planning, SSE streaming, intent detection, operations, or the planner system.
+# Chat & AI Planning Pipeline
 
 ## Pipeline Overview
 

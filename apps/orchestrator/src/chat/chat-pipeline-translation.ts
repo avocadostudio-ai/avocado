@@ -18,6 +18,7 @@ export function sanitizeMessageForPlanning(message: string) {
     .replace(/\bheding\b/gi, "heading")
     .replace(/\bad a\b/gi, "add a")
     .replace(/\bupdte\b/gi, "update")
+    .replace(/\btras?n[asl]{1,3}[aet]{1,3}e?\b/gi, (m) => /translat/i.test(m) ? m : "translate")
   if (!hasDebugEcho) return canonicalized
 
   const promptEcho = canonicalized.match(/(^|\n)\s*prompt\s*:\s*(.+)$/im)?.[2]?.trim()

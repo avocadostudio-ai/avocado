@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import TextareaAutosize from "react-textarea-autosize"
 import { useT } from "@/i18n"
 import { renderStreamingMarkdown, renderFinalMarkdown } from "../lib/markdown-renderer"
 import { Bot, Trash2, Square, ArrowUp, Sparkles, ChevronDown, ChevronRight, Copy, Check } from "lucide-react"
 import type { UseSitesAgentReturn, SitesAgentMessage, PhaseStatus } from "../hooks/useSitesAgent"
+
+const USER_MSG_COLLAPSED_HEIGHT = 160
 
 type Props = {
   agent: UseSitesAgentReturn
@@ -110,6 +112,31 @@ export function SitesAgentChat({ agent }: Props) {
               {agent.streamSteps.length > 0 && (
                 <StepTracker steps={agent.streamSteps} phaseLabels={agent.streamPhases.flatMap(p => [p.activeLabel, p.doneLabel])} />
               )}
+            </div>
+          </div>
+        )}
+
+        {agent.pendingApproval && (
+          <div className="sites-agent-message sites-agent-message-assistant sites-agent-approval">
+            <div className="sites-agent-message-content">
+              {agent.pendingApproval.questions.map((q, qi) => (
+                <div key={qi}>
+                  <div className="sites-agent-approval-plan">{renderFinalMarkdown(q.question)}</div>
+                  <div className="sites-agent-approval-options">
+                    {q.options.map((opt, oi) => (
+                      <button
+                        key={oi}
+                        type="button"
+                        className={`sites-agent-approval-btn${oi === 0 ? " primary" : ""}`}
+                        title={opt.description}
+                        onClick={() => agent.respondToApproval({ [q.question]: opt.label })}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -241,17 +268,39 @@ function StepTracker({ steps, phaseLabels }: { steps: { label: string; done: boo
 }
 
 function MessageBubble({ message }: { message: SitesAgentMessage }) {
+  const { t } = useT()
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
+  const [needsCollapse, setNeedsCollapse] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    contentRef.current = el
+    if (el && isUser) setNeedsCollapse(el.scrollHeight > USER_MSG_COLLAPSED_HEIGHT + 40)
+  }, [isUser])
+
   const handleCopy = () => {
     navigator.clipboard.writeText(message.text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
+  const isCollapsed = isUser && needsCollapse && collapsed
   return (
     <div className={`sites-agent-message-wrap ${isUser ? "sites-agent-message-wrap-user" : ""}`}>
       <div className={`sites-agent-message ${isUser ? "sites-agent-message-user" : "sites-agent-message-assistant"}`}>
-        <div className="sites-agent-message-content">{renderFinalMarkdown(message.text)}</div>
+        <div
+          ref={measureRef}
+          className={`sites-agent-message-content ${isCollapsed ? "sites-agent-message-content-collapsed" : ""}`}
+          style={isCollapsed ? { maxHeight: USER_MSG_COLLAPSED_HEIGHT } : undefined}
+        >
+          {renderFinalMarkdown(message.text)}
+        </div>
+        {isUser && needsCollapse && (
+          <button type="button" className="sites-agent-show-more" onClick={() => setCollapsed(c => !c)}>
+            {collapsed ? t("sitesAgent.showMore") : t("sitesAgent.showLess")}
+          </button>
+        )}
       </div>
       {isUser && (
         <button type="button" className="sites-agent-copy-btn" onClick={handleCopy} title="Copy">

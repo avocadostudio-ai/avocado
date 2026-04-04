@@ -203,6 +203,42 @@ export type ExtractedEmbed = {
   height: number
 }
 
+/** Layered image composition — multiple positioned images forming one visual */
+export type ImageComposition = {
+  layers: Array<{
+    src: string
+    alt: string
+    zIndex: number
+    position: string
+    bounds: { x: number; y: number; w: number; h: number }
+  }>
+  compositeType: "stacked" | "overlay" | "single"
+}
+
+/** Extracted <video> element (background videos, hero videos, etc.) */
+export type ExtractedVideo = {
+  src: string
+  poster?: string
+  autoplay: boolean
+  loop: boolean
+  muted: boolean
+  /** Y position on the page (for correlating with visual sections) */
+  y: number
+  width: number
+  height: number
+}
+
+/** Captured interaction state — styles before and after a trigger (click, scroll, hover) */
+export type InteractionState = {
+  trigger: "click" | "scroll" | "hover"
+  /** Selector or description of the triggering element */
+  triggerTarget: string
+  /** Key style properties that changed */
+  changedStyles: Record<string, { before: string; after: string }>
+  /** Transition/animation duration if detected */
+  transitionDuration?: string
+}
+
 /** Combined result from scrapeFullPage — one Playwright session */
 export type FullPageScrape = {
   content: FetchResult
@@ -223,6 +259,29 @@ export type FullPageScrape = {
   computedFonts?: { heading: string | null; body: string | null; googleFontLinks: string[] }
   /** All <img> elements on the page with Y positions (for distributing to visual sections) */
   pageImages?: Array<{ src: string; alt: string; y: number; width: number; height: number }>
+  /** Fallback text content for visual sections where findElementForRange failed.
+   *  Extracted by Y-range scan — has text content but no computed style tree. */
+  sectionFallbackContent?: Array<{
+    sectionIndex: number
+    headings: Array<{ level: number; text: string }>
+    paragraphs: string[]
+    links: Array<{ href: string; text: string }>
+    lists: string[][]
+  }>
+  /** Resolved CSS custom properties from :root/html (var(--name) → actual value).
+   *  Used by design-tokens to resolve var() references to real colors/values. */
+  resolvedCssVars?: Record<string, string>
+  /** <video> elements found on the page (hero background videos, etc.) */
+  videos?: ExtractedVideo[]
+  /** Detected scroll behavior library (Lenis, Locomotive, native smooth, etc.) */
+  scrollBehavior?: {
+    library: "lenis" | "locomotive" | "native-smooth" | "none"
+    scrollContainer?: string
+  }
+  /** Interaction states captured during the interaction sweep (tabs, accordions, scroll triggers) */
+  interactionStates?: Array<{ sectionY: number; states: InteractionState[] }>
+  /** Detected layered image compositions (overlapping positioned images) */
+  imageCompositions?: ImageComposition[]
 }
 
 // ── Computed style extraction types ──
@@ -306,6 +365,9 @@ export type SectionSpec = {
     hasShadow: boolean
     borderRadius: string
   }
+
+  /** Interaction states captured by clicking tabs/accordions and scrolling */
+  interactionStates?: InteractionState[]
 
   /** Heuristic suggestion — NOT authoritative. LLM decides final block type. */
   suggestedBlockType?: string

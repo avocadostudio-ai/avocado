@@ -132,6 +132,18 @@ test("inferTranslationScopeFromMessage: defaults to 'page' for ambiguous transla
   assert.equal(inferTranslationScopeFromMessage("translate the heading to Spanish"), "page")
 })
 
+test("sanitizeMessageForPlanning: normalizes 'translate' typos before scope detection", () => {
+  // "trasnalate" is a common keyboard typo — sanitizer fixes it so translation scope detection works
+  const sanitized = sanitizeMessageForPlanning("trasnalate the whole page")
+  assert.equal(sanitized, "translate the whole page")
+  assert.equal(inferTranslationScopeFromMessage(sanitized), "page")
+
+  assert.equal(sanitizeMessageForPlanning("tranlsate to German"), "translate to German")
+  assert.equal(sanitizeMessageForPlanning("transalte this page"), "translate this page")
+  // Already-correct "translate" is preserved
+  assert.equal(sanitizeMessageForPlanning("translate the whole page"), "translate the whole page")
+})
+
 // ---------------------------------------------------------------------------
 // normalizeVariationTypos
 // ---------------------------------------------------------------------------

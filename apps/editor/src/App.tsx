@@ -113,6 +113,8 @@ export function App() {
   return <EditorPage siteId={siteId} session={session} sites={sites} chatDarkMode={chatDarkMode} onSetChatDarkMode={setChatDarkMode} />
 }
 
+const PRESET_SITE_IDS = new Set(["avocado-hub", "avocado-stories", "avocado-magic", "avocado-odyssey"])
+
 function EditorPage({
   siteId,
   session,
@@ -456,6 +458,15 @@ function EditorPage({
     onApplied: () => { onAppliedRef.current?.() },
     agentApiKey: agentApiKey || undefined
   })
+
+  // Non-preset (migrated) sites: default to fast model and start with clean chat
+  useEffect(() => {
+    if (!PRESET_SITE_IDS.has(siteId)) {
+      setModelKey("fast")
+      chatEngine.clearChat()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount per siteId
+  }, [siteId])
 
   const publish = usePublish(session, siteId, chatEngine.isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin, () => {
     preview.postToSite("draftUpdated", { focusBlockId: null })

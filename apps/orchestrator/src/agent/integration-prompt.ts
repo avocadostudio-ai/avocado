@@ -63,8 +63,11 @@ Call \`integrate_site\` with the siteId, name, and analysis results. Derive the 
 - If the site already has a catch-all \`[[...slug]]/page.tsx\`, creates a hybrid wrapper that checks editor content first, then falls through to the original rendering — existing pages are preserved
 - Adds block styles import and EditorOverlay to the existing layout
 - Installs dependencies
+- **Starts the dev server and registers the site in the editor dashboard**
 
 Pass \`layoutPath\` and \`useSrcDir\` from the analysis result.
+
+**After this tool completes, the site is live and visible in the editor.** No separate \`launch_site\` call is needed.
 
 ## Step 4: Register existing components as custom block renderers
 
@@ -97,11 +100,7 @@ For each page route discovered during analysis:
 
 **IMPORTANT**: Extract REAL content from the source code. Do NOT use placeholder text like "Get Started" or generic descriptions. All text must match the original site's language and content. All image URLs must use local paths (e.g., \`/images/...\` or \`/media/...\`).
 
-## Step 6: Launch the site
-
-Call \`launch_site\` with the siteId and name from the previous step. This starts the dev server, waits for it to be ready, and registers the site in the editor. **Only include the preview URL in your summary AFTER this tool confirms the server is running.**
-
-## Step 7: Add inline editing attributes — REQUIRED
+## Step 6: Add inline editing attributes — REQUIRED
 
 Search the project for ALL block/section components that render page content — including child/nested components. For each text element, add \`data-editable-target\` attributes so the editor can identify and highlight individual fields.
 
@@ -144,7 +143,7 @@ Search the project for ALL block/section components that render page content —
 
 **IMPORTANT:** Do NOT skip components that render arrays or nested children. CardGrid cards, TwoColumn left/right items, list items, and CTA buttons all need editable markers with indexed paths.
 
-## Step 8: Verify the build
+## Step 7: Verify the build
 
 Run \`pnpm run build\` (or equivalent). Fix any errors.
 

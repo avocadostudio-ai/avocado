@@ -17,7 +17,7 @@ import { pushMigrationTelemetry } from "../telemetry/migration-telemetry.js"
 import { describeToolUse, TOOL_PHASE_MAP, PHASES, INTEGRATION_PHASES, type PhaseId } from "./sites-agent.js"
 
 export type CliStreamEntry = {
-  body: { message?: string; session?: string; locale?: string; mode?: "migrate" | "integrate" }
+  body: { message?: string; session?: string; locale?: string; mode?: "create" | "migrate" | "integrate" }
   state: string
   abortController: AbortController
   siteCreatedConfigs: Record<string, unknown>[]
@@ -45,7 +45,7 @@ export async function runCliAgent(
     const isIntegrate = body.mode === "integrate"
     const systemPrompt = isIntegrate
       ? buildIntegrationSystemPrompt({ locale: body.locale })
-      : buildSitesAgentSystemPrompt({ locale: body.locale })
+      : buildSitesAgentSystemPrompt({ locale: body.locale, intent: body.mode === "create" ? "create" : "migrate" })
     const session = body.session ?? "dev"
 
     // Write system prompt to temp file (too long for CLI arg)

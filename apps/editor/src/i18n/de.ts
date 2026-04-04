@@ -329,6 +329,8 @@ const de: LocaleDict = {
   "sitesAgent.suggestion3": "Über ein GitHub-Projekt integrieren",
   "sitesAgent.suggestion3Desc": "Verbinde den Editor mit deiner bestehenden Next.js-App",
   "sitesAgent.stop": "Stopp",
+  "sitesAgent.showMore": "Mehr anzeigen",
+  "sitesAgent.showLess": "Weniger anzeigen",
 }
 
 export default de

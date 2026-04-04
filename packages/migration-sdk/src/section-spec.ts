@@ -14,6 +14,7 @@ import type {
   SectionSpec,
   FullPageScrape,
 } from "./types.ts"
+import { classifySection } from "./section-extractor.ts"
 
 // ── Structure analysis helpers ──
 
@@ -65,6 +66,34 @@ function detectRepeats(root: ComputedStyleNode): { count: number; signature?: st
   }
 
   return bestCount >= 2 ? { count: bestCount, signature: bestSig } : { count: 0 }
+}
+
+/** Detect repeated patterns from content (headings at same level) when no style tree available */
+function detectRepeatsFromContent(content: SectionSpec["content"]): { count: number; signature?: string } {
+  // Count headings by level — repeated same-level headings suggest repeated items
+  const levelCounts = new Map<number, number>()
+  for (const h of content.headings) {
+    levelCounts.set(h.level, (levelCounts.get(h.level) ?? 0) + 1)
+  }
+
+  // Find the level with most repetitions (minimum 2)
+  let bestLevel = 0
+  let bestCount = 0
+  for (const [level, count] of levelCounts) {
+    if (count > bestCount && count >= 2) {
+      bestCount = count
+      bestLevel = level
+    }
+  }
+
+  if (bestCount >= 2) {
+    // Check if there are also lists that correlate (e.g., pricing items with feature lists)
+    const hasLists = content.lists.length > 0
+    const signature = hasLists ? `h${bestLevel} + list` : `h${bestLevel}`
+    return { count: bestCount, signature }
+  }
+
+  return { count: 0 }
 }
 
 /** Infer layout pattern from computed styles */
@@ -255,8 +284,15 @@ export function buildSectionSpec(
   }
 
   // Structure analysis
-  const repeats = root ? detectRepeats(root) : { count: 0 }
-  const pattern = root ? inferPattern(root, repeats) : "unknown"
+  let repeats = root ? detectRepeats(root) : { count: 0 }
+
+  // Content-based repeat detection fallback — when no style tree,
+  // detect repeated patterns from headings at the same level
+  if (repeats.count < 2 && !root && content.headings.length >= 2) {
+    repeats = detectRepeatsFromContent(content)
+  }
+
+  const pattern = root ? inferPattern(root, repeats) : (repeats.count >= 2 ? `${repeats.count} repeated items` : "unknown")
   const interactionModel = inferInteractionModel(section, root, repeats)
   const elementCount = root ? countElements(root) : 0
 
@@ -277,8 +313,24 @@ export function buildSectionSpec(
   const designNotes = buildDesignNotes(roleStyles)
 
   // Heuristic suggestion — carried from section extractor, not authoritative
-  const suggestedBlockType = section.suggestedBlockType
+  let suggestedBlockType = section.suggestedBlockType
   let suggestedConfidence = suggestedBlockType ? 0.5 : 0
+
+  // Structural override: repeated items with headings should be CardGrid/FeatureGrid, not RichText
+  if (repeats.count >= 2 && content.headings.length >= 2) {
+    if (!suggestedBlockType || suggestedBlockType === "RichText") {
+      const hasImages = content.images.length > 0 || content.links.length > 0
+      suggestedBlockType = hasImages ? "CardGrid" : "FeatureGrid"
+      suggestedConfidence = Math.max(suggestedConfidence, 0.6)
+    }
+  }
+
+  // Structural override: h1 + image → Hero (overrides RichText since h1+image is hero-like)
+  if (content.headings.some(h => h.level === 1) && content.images.length > 0 &&
+      (!suggestedBlockType || suggestedBlockType === "RichText")) {
+    suggestedBlockType = "Hero"
+    suggestedConfidence = Math.max(suggestedConfidence, 0.7)
+  }
 
   // Boost confidence if outline data corroborates
   if (outlineSection && suggestedBlockType) {
@@ -328,6 +380,14 @@ export function buildPageSpecs(scrape: FullPageScrape): SectionSpec[] {
     s.content.images.map((img) => ({ ...img, sectionIndex: s.index }))
   )
 
+  // Build fallback content map for sections where findElementForRange failed
+  const fallbackMap = new Map<number, NonNullable<FullPageScrape["sectionFallbackContent"]>[number]>()
+  if (scrape.sectionFallbackContent) {
+    for (const fb of scrape.sectionFallbackContent) {
+      fallbackMap.set(fb.sectionIndex, fb)
+    }
+  }
+
   // If we have visual sections AND computed styles from them, use those as primary
   if (scrape.visualSections && scrape.visualSections.length > 0 && scrape.sectionStyles && scrape.sectionStyles.length > 0) {
     return scrape.visualSections.map((vs, i) => {
@@ -346,8 +406,11 @@ export function buildPageSpecs(scrape: FullPageScrape): SectionSpec[] {
 
       // Build content: start with matched section's content (best images from regex parser),
       // then enrich with style tree data and page-level image data for anything missing
-      const styleContent = extractContentFromStyleTree(styles?.root, scrape.embeds, vs)
+      const styleContent = extractContentFromStyleTree(styles?.root, scrape.embeds, vs, scrape.videos)
       const baseContent = matchedSection?.content ?? { headings: [], paragraphs: [], images: [], links: [], lists: [] }
+
+      // Fallback content from Y-range text scan (for sections where findElementForRange failed)
+      const fallback = fallbackMap.get(i)
 
       // Collect page images that fall within this visual section's Y range
       const sectionPageImages: Array<{ src: string; alt: string; isLazy: boolean }> = []
@@ -359,25 +422,59 @@ export function buildPageSpecs(scrape: FullPageScrape): SectionSpec[] {
         }
       }
 
-      // Merge all image sources: regex-extracted > page-level by Y > style tree
+      // Merge content from all sources: regex-extracted > style tree > fallback Y-scan
       const mergedContent: ExtractedSection["content"] = {
-        headings: baseContent.headings.length > 0 ? baseContent.headings : styleContent.headings,
-        paragraphs: baseContent.paragraphs.length > 0 ? baseContent.paragraphs : styleContent.paragraphs,
+        headings: pickFirst(baseContent.headings, styleContent.headings, fallback?.headings ?? []),
+        paragraphs: pickFirst(baseContent.paragraphs, styleContent.paragraphs, fallback?.paragraphs ?? []),
         images: mergeImages(mergeImages(baseContent.images, sectionPageImages), styleContent.images),
-        links: baseContent.links.length > 0 ? baseContent.links : styleContent.links,
-        lists: baseContent.lists.length > 0 ? baseContent.lists : styleContent.lists,
+        links: pickFirst(baseContent.links, styleContent.links, fallback?.links ?? []),
+        lists: pickFirst(baseContent.lists, styleContent.lists, fallback?.lists ?? []),
+      }
+
+      // Classify if no type inherited from matched regex section
+      let suggestedBlockType = matchedSection?.suggestedBlockType
+      let classHints = matchedSection?.classHints ?? []
+      if (!suggestedBlockType && matchedSection?.rawHtml) {
+        const classified = classifySection(
+          `<${matchedSection.tag}>`,
+          matchedSection.rawHtml,
+          { headings: mergedContent.headings },
+        )
+        suggestedBlockType = classified.suggestedBlockType
+        if (classified.classHints.length > 0) classHints = classified.classHints
+      }
+      // Also classify from style tree content if still unclassified
+      if (!suggestedBlockType && styles?.root) {
+        const treeHtml = reconstructHtmlFromStyleTree(styles.root)
+        if (treeHtml.length > 20) {
+          const classified = classifySection("<div>", treeHtml, { headings: mergedContent.headings })
+          suggestedBlockType = classified.suggestedBlockType
+          if (classified.classHints.length > 0) classHints = classified.classHints
+        }
       }
 
       const section: ExtractedSection = {
         index: i,
         tag: matchedSection?.tag ?? "div",
-        classHints: matchedSection?.classHints ?? [],
-        suggestedBlockType: matchedSection?.suggestedBlockType,
+        classHints,
+        suggestedBlockType,
         content: mergedContent,
         rawHtml: matchedSection?.rawHtml ?? "",
       }
 
-      return buildSectionSpec(section, styles, outlineSection)
+      const spec = buildSectionSpec(section, styles, outlineSection)
+
+      // Attach interaction states captured during interaction sweep
+      if (scrape.interactionStates) {
+        const sectionInteractions = scrape.interactionStates
+          .filter(is => is.sectionY >= vs.y && is.sectionY < vs.y + vs.height)
+          .flatMap(is => is.states)
+        if (sectionInteractions.length > 0) {
+          spec.interactionStates = sectionInteractions
+        }
+      }
+
+      return spec
     })
   }
 
@@ -387,6 +484,30 @@ export function buildPageSpecs(scrape: FullPageScrape): SectionSpec[] {
     const outlineSection = scrape.outline.sections[i]
     return buildSectionSpec(section, styles, outlineSection)
   })
+}
+
+/** Reconstruct approximate HTML from a computed style tree for classification heuristics. */
+function reconstructHtmlFromStyleTree(node: ComputedStyleNode): string {
+  const parts: string[] = []
+  if (node.text) {
+    const tag = HEADING_TAGS.has(node.tag) ? node.tag : "p"
+    parts.push(`<${tag}>${node.text}</${tag}>`)
+  }
+  if (node.image) {
+    parts.push(`<img src="${node.image}" alt="">`)
+  }
+  for (const child of node.children) {
+    parts.push(reconstructHtmlFromStyleTree(child))
+  }
+  return parts.join("")
+}
+
+/** Return the first non-empty array from the candidates. */
+function pickFirst<T>(...candidates: T[][]): T[] {
+  for (const c of candidates) {
+    if (c.length > 0) return c
+  }
+  return []
 }
 
 /** Merge images from two sources, deduplicating by src. */
@@ -419,6 +540,7 @@ function extractContentFromStyleTree(
   root: ComputedStyleNode | undefined,
   embeds: FullPageScrape["embeds"],
   vs: import("./types.ts").VisualSection,
+  videos?: FullPageScrape["videos"],
 ): ExtractedSection["content"] {
   const headings: Array<{ level: number; text: string }> = []
   const paragraphs: string[] = []
@@ -434,6 +556,18 @@ function extractContentFromStyleTree(
     for (const embed of embeds) {
       if (embed.y >= vs.y && embed.y < vs.y + vs.height) {
         links.push({ href: embed.src, text: `[${embed.type} embed]` })
+      }
+    }
+  }
+
+  // Add <video> elements that fall within this visual section's Y range
+  if (videos) {
+    for (const video of videos) {
+      if (video.y >= vs.y && video.y < vs.y + vs.height) {
+        links.push({ href: video.src, text: `[video${video.autoplay ? " autoplay" : ""}${video.loop ? " loop" : ""}]` })
+        if (video.poster) {
+          images.push({ src: video.poster, alt: "Video poster", isLazy: false })
+        }
       }
     }
   }
