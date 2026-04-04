@@ -278,7 +278,7 @@ function findSectionBoundaries(html: string): Array<{ tag: string; openTag: stri
 }
 
 /** Classify a section by its CSS classes and content */
-function classifySection(openTag: string, innerHTML: string, preExtracted?: { headings: Array<{ level: number; text: string }> }): { classHints: string[]; suggestedBlockType?: string } {
+export function classifySection(openTag: string, innerHTML: string, preExtracted?: { headings: Array<{ level: number; text: string }> }): { classHints: string[]; suggestedBlockType?: string } {
   const classAttr = getAttr(openTag, "class") ?? ""
   const idAttr = getAttr(openTag, "id") ?? ""
   const combined = `${classAttr} ${idAttr}`.toLowerCase()
@@ -784,27 +784,46 @@ export function extractNavigation(html: string, baseUrl: string): NavExtraction 
   const origin = new URL(baseUrl).origin
 
   // Find logo image in header/nav area
-  const headerMatch = html.match(/<(?:header|nav)[^>]*>([\s\S]*?)<\/(?:header|nav)>/i)
+  // Try greedy match first (captures full header), then non-greedy, then full HTML fallback
+  const headerMatch = html.match(/<header[^>]*>([\s\S]*)<\/header>/i)
+    ?? html.match(/<nav[^>]*>([\s\S]*?)<\/nav>/i)
   const headerHtml = headerMatch?.[1] ?? ""
   let logoUrl: string | undefined
   let siteName: string | undefined
 
   // Look for logo: img inside a link to "/" or brand/logo class
-  const logoImgMatch = headerHtml.match(/<a[^>]*href\s*=\s*["']\/["'][^>]*>[\s\S]*?<img[^>]*src\s*=\s*["']([^"']+)["']/i)
-    ?? headerHtml.match(/<img[^>]*class\s*=\s*["'][^"']*logo[^"']*["'][^>]*src\s*=\s*["']([^"']+)["']/i)
-    ?? headerHtml.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*["'][^"']*logo[^"']*["']/i)
-  if (logoImgMatch?.[1]) {
-    logoUrl = logoImgMatch[1]
-    if (logoUrl && !logoUrl.startsWith("http") && !logoUrl.startsWith("data:")) {
-      try { logoUrl = new URL(logoUrl, baseUrl).href } catch { /* keep */ }
+  // Search header first, then full page (for CMS sites without semantic header tags)
+  const searchAreas = headerHtml ? [headerHtml, html] : [html]
+  for (const area of searchAreas) {
+    if (logoUrl) break
+    const logoImgMatch = area.match(/<a[^>]*href\s*=\s*["']\/["'][^>]*>[\s\S]*?<img[^>]*src\s*=\s*["']([^"']+)["']/i)
+      ?? area.match(/<img[^>]*class\s*=\s*["'][^"']*logo[^"']*["'][^>]*src\s*=\s*["']([^"']+)["']/i)
+      ?? area.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*["'][^"']*logo[^"']*["']/i)
+      // Elementor: widget-type="site-logo" or widget_type="theme-site-logo"
+      ?? area.match(/widget[_-]type\s*=\s*["'][^"']*logo[^"']*["'][^>]*>[\s\S]*?<img[^>]*src\s*=\s*["']([^"']+)["']/i)
+    if (logoImgMatch?.[1]) {
+      logoUrl = logoImgMatch[1]
+      if (logoUrl && !logoUrl.startsWith("http") && !logoUrl.startsWith("data:")) {
+        try { logoUrl = new URL(logoUrl, baseUrl).href } catch { /* keep */ }
+      }
     }
   }
 
-  // Look for site name in header brand text
+  // Look for site name in header brand text or page title
   const brandMatch = headerHtml.match(/<a[^>]*href\s*=\s*["']\/["'][^>]*>([\s\S]*?)<\/a>/i)
+    ?? html.match(/<a[^>]*href\s*=\s*["']\/["'][^>]*class\s*=\s*["'][^"']*(?:brand|logo|site)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i)
   if (brandMatch) {
     const brandText = stripTags(brandMatch[1]).trim()
     if (brandText && brandText.length < 60) siteName = brandText
+  }
+  // Fallback: extract from <title> tag
+  if (!siteName) {
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
+    if (titleMatch) {
+      // Take first part before separator (e.g., "Paintball Arena Bern - Homepage" → "Paintball Arena Bern")
+      const title = titleMatch[1].trim().split(/\s*[-–|»]\s*/)[0].trim()
+      if (title && title.length < 60) siteName = title
+    }
   }
 
   // Extract nav links — handle both flat and nested (dropdown) structures

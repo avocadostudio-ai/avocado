@@ -28,6 +28,18 @@ export type PhaseStatus = {
   outcome?: string
 }
 
+export type ApprovalQuestion = {
+  question: string
+  header: string
+  options: { label: string; description: string }[]
+  multiSelect: boolean
+}
+
+export type PendingApproval = {
+  streamId: string
+  questions: ApprovalQuestion[]
+}
+
 export type UseSitesAgentReturn = {
   messages: SitesAgentMessage[]
   isStreaming: boolean
@@ -36,7 +48,9 @@ export type UseSitesAgentReturn = {
   streamPhases: PhaseStatus[]
   streamingText: string | null
   followUpSuggestions: string[]
+  pendingApproval: PendingApproval | null
   sendMessage: (text: string) => void
+  respondToApproval: (answers: Record<string, string>) => void
   cancelStream: () => void
   clearMessages: () => void
 }
@@ -121,6 +135,7 @@ export function useSitesAgent(options: {
   const [streamPhases, setStreamPhases] = useState<PhaseStatus[]>([])
   const [streamingText, setStreamingText] = useState<string | null>(null)
   const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([])
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null)
 
   const activeStreamId = useRef<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -203,6 +218,11 @@ export function useSitesAgent(options: {
         setStreamPhases(prev =>
           prev.map(p => p.id === phaseId && p.status === "active" ? { ...p, status: "done" as const } : p)
         )
+      } else if (type === "approval_required") {
+        const input = d.input as Record<string, unknown>
+        const questions = (input?.questions ?? []) as ApprovalQuestion[]
+        setPendingApproval({ streamId, questions })
+        setStreamStatus("Waiting for your approval...")
       } else if (type === "site_created") {
         const config = d.config as SiteConfig
         if (config && onSiteCreatedRef.current) onSiteCreatedRef.current(config)
@@ -348,9 +368,25 @@ export function useSitesAgent(options: {
     connectToStream(streamId, 0)
   }, [session, locale, connectToStream])
 
+  const respondToApproval = useCallback(async (answers: Record<string, string>) => {
+    if (!pendingApproval) return
+    setPendingApproval(null)
+    setStreamStatus("Executing migration plan...")
+    try {
+      await fetch(`${orchestrator}/sites-agent/respond`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ streamId: pendingApproval.streamId, answers }),
+      })
+    } catch (err) {
+      console.error("[sites-agent] Failed to respond to approval:", err)
+    }
+  }, [pendingApproval])
+
   const clearMessages = useCallback(() => {
     cancelStream()
     setMessages([])
+    setPendingApproval(null)
     try { sessionStorage.removeItem(STORAGE_KEY) } catch { /* */ }
   }, [cancelStream])
 
@@ -362,7 +398,9 @@ export function useSitesAgent(options: {
     streamPhases,
     streamingText,
     followUpSuggestions,
+    pendingApproval,
     sendMessage,
+    respondToApproval,
     cancelStream,
     clearMessages,
   }

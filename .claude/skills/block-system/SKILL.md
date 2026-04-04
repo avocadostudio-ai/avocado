@@ -1,6 +1,9 @@
-# Block System
+---
+name: block-system
+description: Block type schemas, props, field metadata, rendering, and validation reference. Use when adding or modifying blocks, editing block props, or working with block rendering.
+---
 
-Activate this skill when adding or modifying blocks, editing block props, or working with block rendering and validation.
+# Block System
 
 ## Block Registry
 

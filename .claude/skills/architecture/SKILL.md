@@ -1,6 +1,9 @@
-# Monorepo Architecture
+---
+name: architecture
+description: Monorepo architecture reference — app boundaries, data flow, session state, route plugins. Use when working on cross-app features, debugging data flow, or understanding system connections.
+---
 
-Activate this skill when working on cross-app features, debugging data flow between apps, or understanding how the system connects.
+# Monorepo Architecture
 
 ## System Overview
 

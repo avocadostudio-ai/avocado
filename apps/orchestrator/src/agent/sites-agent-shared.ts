@@ -60,16 +60,161 @@ function isPortFree(createServer: typeof import("node:net").createServer, port: 
   })
 }
 
+// ── Theme presets ──
+
+export interface ThemePreset {
+  name: string
+  description: string
+  googleFontsUrl?: string
+  overrides: Record<string, string>
+}
+
+export const THEME_PRESETS: ThemePreset[] = [
+  {
+    name: "ocean",
+    description: "Clean and professional — tech, SaaS, corporate. Cool blue tones with crisp white.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+    overrides: {
+      "--bg-0": "#ffffff", "--bg-100": "#f0f4f8", "--section-bg": "#f0f4f8",
+      "--heading": "#0f172a", "--body": "#334155", "--body-secondary": "#64748b", "--caption": "#94a3b8",
+      "--brand": "#2563eb", "--brand-hover": "#1d4ed8", "--brand-subtle": "#dbeafe", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#e2e8f0", "--card-bg": "#f8fafc", "--card-shadow": "0 1px 3px rgba(0,0,0,0.08)",
+      "--footer-bg": "#0f172a", "--footer-text": "#94a3b8", "--footer-heading": "#f1f5f9", "--footer-link": "#64748b", "--footer-link-hover": "#e2e8f0", "--footer-border": "#1e293b",
+      "--font-heading": "'Inter', sans-serif", "--font-body": "'Inter', sans-serif",
+      "--radius-btn": "8px", "--radius-card": "12px", "--radius-feature": "12px",
+    },
+  },
+  {
+    name: "forest",
+    description: "Warm and grounded — nature, wellness, eco, organic. Earthy greens with warm neutrals.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap",
+    overrides: {
+      "--bg-0": "#fafaf8", "--bg-100": "#f2f0eb", "--section-bg": "#f2f0eb",
+      "--heading": "#1a2e1a", "--body": "#3d4a3d", "--body-secondary": "#6b7b6b", "--caption": "#8a9a8a",
+      "--brand": "#16a34a", "--brand-hover": "#15803d", "--brand-subtle": "#dcfce7", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#d4d8cd", "--card-bg": "#f7f7f3", "--card-shadow": "0 1px 3px rgba(0,0,0,0.06)",
+      "--footer-bg": "#1a2e1a", "--footer-text": "#a3b8a3", "--footer-heading": "#e8f0e8", "--footer-link": "#7a9a7a", "--footer-link-hover": "#d4e8d4", "--footer-border": "#2d4a2d",
+      "--font-heading": "'DM Sans', sans-serif", "--font-body": "'DM Sans', sans-serif",
+      "--radius-btn": "8px", "--radius-card": "10px", "--radius-feature": "10px",
+    },
+  },
+  {
+    name: "luxury",
+    description: "Refined and elegant — real estate, hospitality, high-end brands. Warm gold on cream with serif headings.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap",
+    overrides: {
+      "--bg-0": "#faf8f5", "--bg-100": "#f2ede6", "--section-bg": "#f2ede6",
+      "--heading": "#2c1810", "--body": "#4a3728", "--body-secondary": "#7a6a5a", "--caption": "#9a8a7a",
+      "--brand": "#b8860b", "--brand-hover": "#9a7209", "--brand-subtle": "#fdf3e0", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#e8ddd0", "--card-bg": "#faf7f2", "--card-shadow": "0 2px 8px rgba(44,24,16,0.06)",
+      "--footer-bg": "#2c1810", "--footer-text": "#b8a898", "--footer-heading": "#f0e8e0", "--footer-link": "#9a8a7a", "--footer-link-hover": "#e0d0c0", "--footer-border": "#4a3728",
+      "--font-heading": "'Cormorant Garamond', serif", "--font-body": "'Jost', sans-serif",
+      "--radius-btn": "4px", "--radius-card": "6px", "--radius-feature": "6px",
+    },
+  },
+  {
+    name: "coral",
+    description: "Vibrant and warm — creative agencies, food, lifestyle, events. Energetic coral with clean whites.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap",
+    overrides: {
+      "--bg-0": "#ffffff", "--bg-100": "#fef7f4", "--section-bg": "#fef7f4",
+      "--heading": "#1a1a1a", "--body": "#3a3a3a", "--body-secondary": "#6b6b6b", "--caption": "#8a8a8a",
+      "--brand": "#e76f51", "--brand-hover": "#d4603f", "--brand-subtle": "#fde8e0", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#f0e0d8", "--card-bg": "#fefaf8", "--card-shadow": "0 1px 4px rgba(0,0,0,0.06)",
+      "--footer-bg": "#1a1a1a", "--footer-text": "#b0b0b0", "--footer-heading": "#f0f0f0", "--footer-link": "#8a8a8a", "--footer-link-hover": "#e0e0e0", "--footer-border": "#333333",
+      "--font-heading": "'Outfit', sans-serif", "--font-body": "'Outfit', sans-serif",
+      "--radius-btn": "10px", "--radius-card": "14px", "--radius-feature": "14px",
+    },
+  },
+  {
+    name: "midnight",
+    description: "Dark and premium — fintech, gaming, developer tools, SaaS dashboards. Deep navy with muted blue accents.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap",
+    overrides: {
+      "--bg-0": "#0f172a", "--bg-100": "#1e293b", "--section-bg": "#1e293b",
+      "--heading": "#f1f5f9", "--body": "#cbd5e1", "--body-secondary": "#94a3b8", "--caption": "#64748b",
+      "--brand": "#38bdf8", "--brand-hover": "#7dd3fc", "--brand-subtle": "#0c4a6e", "--brand-fg": "#0f172a",
+      "--surface": "#1e293b", "--border": "#334155", "--card-bg": "#1e293b", "--card-shadow": "0 1px 4px rgba(0,0,0,0.3)",
+      "--footer-bg": "#020617", "--footer-text": "#64748b", "--footer-heading": "#e2e8f0", "--footer-link": "#475569", "--footer-link-hover": "#94a3b8", "--footer-border": "#1e293b",
+      "--font-heading": "'Space Grotesk', sans-serif", "--font-body": "'Space Grotesk', sans-serif",
+      "--radius-btn": "8px", "--radius-card": "12px", "--radius-feature": "12px",
+    },
+  },
+  {
+    name: "rose",
+    description: "Soft and feminine — beauty, health, fashion, wellness. Rose accents on blush backgrounds with elegant serif headings.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap",
+    overrides: {
+      "--bg-0": "#fffbfc", "--bg-100": "#fdf2f4", "--section-bg": "#fdf2f4",
+      "--heading": "#1a1a2e", "--body": "#3a3a4a", "--body-secondary": "#6b6b7b", "--caption": "#8a8a9a",
+      "--brand": "#e11d48", "--brand-hover": "#be123c", "--brand-subtle": "#ffe4e6", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#f0d4da", "--card-bg": "#fef8f9", "--card-shadow": "0 1px 4px rgba(225,29,72,0.06)",
+      "--footer-bg": "#1a1a2e", "--footer-text": "#b0a0b0", "--footer-heading": "#f0e8f0", "--footer-link": "#8a7a8a", "--footer-link-hover": "#e0d0e0", "--footer-border": "#2d2d4a",
+      "--font-heading": "'Playfair Display', serif", "--font-body": "'Lato', sans-serif",
+      "--radius-btn": "6px", "--radius-card": "10px", "--radius-feature": "10px",
+    },
+  },
+  {
+    name: "slate",
+    description: "Minimal and editorial — portfolios, magazines, studios, photography. Monochrome with strong typography.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Source+Sans+3:wght@400;500;600;700&display=swap",
+    overrides: {
+      "--bg-0": "#ffffff", "--bg-100": "#f5f5f5", "--section-bg": "#f5f5f5",
+      "--heading": "#111111", "--body": "#333333", "--body-secondary": "#666666", "--caption": "#999999",
+      "--brand": "#111111", "--brand-hover": "#333333", "--brand-subtle": "#f0f0f0", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#e0e0e0", "--card-bg": "#fafafa", "--card-shadow": "0 1px 2px rgba(0,0,0,0.05)",
+      "--footer-bg": "#111111", "--footer-text": "#999999", "--footer-heading": "#f0f0f0", "--footer-link": "#777777", "--footer-link-hover": "#cccccc", "--footer-border": "#333333",
+      "--font-heading": "'Libre Baskerville', serif", "--font-body": "'Source Sans 3', sans-serif",
+      "--radius-btn": "2px", "--radius-card": "4px", "--radius-feature": "4px",
+    },
+  },
+  {
+    name: "sunset",
+    description: "Bold and energetic — startups, sports, fitness, youth brands. Vibrant orange with punchy sans-serif.",
+    googleFontsUrl: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap",
+    overrides: {
+      "--bg-0": "#ffffff", "--bg-100": "#fff8f3", "--section-bg": "#fff8f3",
+      "--heading": "#1a1a1a", "--body": "#333333", "--body-secondary": "#666666", "--caption": "#888888",
+      "--brand": "#ea580c", "--brand-hover": "#c2410c", "--brand-subtle": "#ffedd5", "--brand-fg": "#ffffff",
+      "--surface": "#ffffff", "--border": "#f0ddd0", "--card-bg": "#fffbf7", "--card-shadow": "0 1px 4px rgba(234,88,12,0.08)",
+      "--footer-bg": "#1a1a1a", "--footer-text": "#aaaaaa", "--footer-heading": "#f0f0f0", "--footer-link": "#888888", "--footer-link-hover": "#dddddd", "--footer-border": "#333333",
+      "--font-heading": "'Montserrat', sans-serif", "--font-body": "'Montserrat', sans-serif",
+      "--radius-btn": "8px", "--radius-card": "12px", "--radius-feature": "12px",
+    },
+  },
+]
+
+/**
+ * Format theme presets as a catalog for the system prompt.
+ * Shows name, description, and the full CSS variable overrides so the LLM
+ * can copy them into themeOverrides.
+ */
+export function buildThemePresetsCatalog(): string {
+  const lines: string[] = ["### Theme Presets\nPick the preset that best matches the site's purpose and tone. Pass its `overrides` as `themeOverrides` in `bootstrap_pages`. You may tweak individual values (e.g. swap brand color) while keeping the rest of the palette.\n"]
+  for (const preset of THEME_PRESETS) {
+    const overridesJson = JSON.stringify(preset.overrides, null, 2)
+    lines.push(`#### ${preset.name}\n${preset.description}\n\`\`\`json\n${overridesJson}\n\`\`\``)
+    if (preset.googleFontsUrl) {
+      lines.push(`Google Fonts: \`${preset.googleFontsUrl}\`\n`)
+    }
+  }
+  lines.push(`\n**Custom tweaks are encouraged.** If the user says "nature site but teal", start from \`forest\` and swap \`--brand\` to teal. Always keep hover/subtle/fg consistent with the brand hue.`)
+  return lines.join("\n")
+}
+
 // ── Sites agent model tiers ──
 
 /** Model tiers for the sites agent pipeline. */
 export const SITES_AGENT_MODELS = {
-  /** Haiku — triage, intent detection, simple Q&A ($0.001/call) */
+  /** Haiku — triage, intent detection, simple Q&A ($0.001/call).
+   *  Full model ID for direct Anthropic API calls (not Agent SDK). */
   fast: process.env.SITES_AGENT_MODEL_FAST ?? "claude-haiku-4-5-20251001",
-  /** Sonnet — main agent, subagents, standard migrations */
-  balanced: process.env.SITES_AGENT_MODEL_BALANCED ?? "claude-sonnet-4-6",
-  /** Opus — complex migrations, multi-page sites, custom block design */
-  powerful: process.env.SITES_AGENT_MODEL_POWERFUL ?? "claude-opus-4-6",
+  /** Sonnet — main agent, subagents, standard migrations.
+   *  Agent SDK enum value (SDK resolves to latest Sonnet). */
+  balanced: "sonnet" as const,
+  /** Opus — complex migrations, multi-page sites, custom block design.
+   *  Agent SDK enum value (SDK resolves to latest Opus). */
+  powerful: "opus" as const,
 }
 
 export type TriageResult = {
@@ -111,7 +256,14 @@ Intent definitions:
 
 Available block types: Hero, FeatureGrid, CardGrid, CTA, FAQAccordion, Stats, RichText, Testimonials, TwoColumn, Table, Gallery, Quote, Banner, Tabs, Carousel, Video, Embed, Card. Custom blocks can also be created during migration.
 
-If intent is "migrate" but no URL is provided, or "integrate" but no repo/project is mentioned, set intent to "question" and write a friendly follow-up in "answer" asking for the missing info.
+If intent is "migrate" but no URL is provided, or "integrate" but no repo/project is mentioned, set intent to "question" and ask for the missing info in "answer".
+
+Keep your "answer" short and well-formatted using markdown:
+- Use **bold** for emphasis
+- Use bullet points or numbered lists (not inline "1) ... 2) ...")
+- Max 2-3 sentences
+- Be specific about what you need (e.g. "Please share the URL of the website you'd like to migrate.")
+- Do NOT be overly enthusiastic or verbose
 
 Extract URLs, site names, and scope constraints from the message. If not present, omit the field.`,
   })
@@ -142,7 +294,23 @@ export async function patchGlobalsCssVars(cssPath: string, vars: Record<string, 
   css = css.replace(/\.dark\s*\{[^}]*\}/g, "")
   css = css.replace(/\n{3,}/g, "\n\n") // collapse leftover blank lines
 
+  // Handle Google Fonts import — inject @import url(...) after @import "tailwindcss"
+  const googleFontsUrl = vars["--google-fonts-import"]
+  if (googleFontsUrl) {
+    // Remove existing Google Fonts imports to avoid duplicates
+    css = css.replace(/@import\s+url\(["']https:\/\/fonts\.googleapis\.com[^)]*\);\s*\n?/g, "")
+    // Insert after the last @import line
+    const lastImportIdx = css.lastIndexOf("@import")
+    if (lastImportIdx >= 0) {
+      const lineEnd = css.indexOf("\n", lastImportIdx)
+      css = css.slice(0, lineEnd + 1) + `@import url("${googleFontsUrl}");\n` + css.slice(lineEnd + 1)
+    } else {
+      css = `@import url("${googleFontsUrl}");\n` + css
+    }
+  }
+
   for (const [prop, value] of Object.entries(vars)) {
+    if (prop === "--google-fonts-import") continue // handled above
     const escaped = prop.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     const varRegex = new RegExp(`(${escaped}):\\s*[^;]+;`, "g")
     if (varRegex.test(css)) {

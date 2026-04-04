@@ -359,6 +359,94 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       return results;
     })()`) as Array<{ src: string; alt: string; y: number; width: number; height: number }>
 
+    // Detect smooth scroll libraries (Lenis, Locomotive, native smooth-scroll)
+    const scrollBehavior = await page.evaluate(`(() => {
+      // Lenis
+      if (document.querySelector('.lenis') || document.querySelector('[data-lenis-prevent]') || window.__lenis) {
+        return { library: 'lenis', scrollContainer: '.lenis' };
+      }
+      // Locomotive Scroll
+      if (document.querySelector('[data-scroll-container]') || document.querySelector('[data-scroll-section]')) {
+        const container = document.querySelector('[data-scroll-container]');
+        return { library: 'locomotive', scrollContainer: container ? container.tagName.toLowerCase() + (container.className ? '.' + container.className.split(' ')[0] : '') : '[data-scroll-container]' };
+      }
+      // Native smooth scroll
+      const htmlStyle = getComputedStyle(document.documentElement).scrollBehavior;
+      if (htmlStyle === 'smooth') {
+        return { library: 'native-smooth' };
+      }
+      return { library: 'none' };
+    })()`) as NonNullable<FullPageScrape["scrollBehavior"]>
+
+    // Detect layered image compositions (multiple positioned/z-indexed images overlapping)
+    const imageCompositions = await page.evaluate(`(() => {
+      const allImgs = [...document.querySelectorAll('img')].map(img => {
+        const rect = img.getBoundingClientRect();
+        if (rect.width < 30 || rect.height < 30) return null;
+        const cs = getComputedStyle(img);
+        const parentCs = img.parentElement ? getComputedStyle(img.parentElement) : null;
+        const scrollY = window.scrollY;
+        return {
+          src: img.src || img.currentSrc || '',
+          alt: img.alt || '',
+          zIndex: parseInt(cs.zIndex) || parseInt(parentCs?.zIndex || '0') || 0,
+          position: cs.position || 'static',
+          bounds: { x: Math.round(rect.x), y: Math.round(rect.y + scrollY), w: Math.round(rect.width), h: Math.round(rect.height) }
+        };
+      }).filter(Boolean);
+
+      // Also include elements with background images
+      const bgEls = [...document.querySelectorAll('*')].map(el => {
+        const cs = getComputedStyle(el);
+        const bg = cs.backgroundImage;
+        if (!bg || bg === 'none' || !bg.includes('url(')) return null;
+        const match = bg.match(/url\\(["']?([^"')]+)["']?\\)/);
+        if (!match || !match[1] || match[1].startsWith('data:')) return null;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 50 || rect.height < 50) return null;
+        const scrollY = window.scrollY;
+        return {
+          src: match[1],
+          alt: '',
+          zIndex: parseInt(cs.zIndex) || 0,
+          position: cs.position || 'static',
+          bounds: { x: Math.round(rect.x), y: Math.round(rect.y + scrollY), w: Math.round(rect.width), h: Math.round(rect.height) }
+        };
+      }).filter(Boolean);
+
+      const all = [...allImgs, ...bgEls];
+
+      // Find overlapping groups
+      function overlaps(a, b) {
+        return !(a.bounds.x + a.bounds.w < b.bounds.x || b.bounds.x + b.bounds.w < a.bounds.x ||
+                 a.bounds.y + a.bounds.h < b.bounds.y || b.bounds.y + b.bounds.h < a.bounds.y);
+      }
+
+      const compositions = [];
+      const used = new Set();
+      for (let i = 0; i < all.length; i++) {
+        if (used.has(i)) continue;
+        const group = [all[i]];
+        used.add(i);
+        for (let j = i + 1; j < all.length; j++) {
+          if (used.has(j)) continue;
+          if (group.some(g => overlaps(g, all[j]))) {
+            group.push(all[j]);
+            used.add(j);
+          }
+        }
+        if (group.length >= 2) {
+          // Multiple overlapping images = composition
+          const hasZDiff = new Set(group.map(g => g.zIndex)).size > 1;
+          compositions.push({
+            layers: group.sort((a, b) => a.zIndex - b.zIndex),
+            compositeType: hasZDiff ? 'overlay' : 'stacked'
+          });
+        }
+      }
+      return compositions;
+    })()`) as import("./types.ts").ImageComposition[]
+
     // Extract actual rendered fonts via getComputedStyle (more reliable than CSS regex)
     const computedFonts = await page.evaluate(`(() => {
       const fonts = { heading: null, body: null };
@@ -381,6 +469,59 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       return { ...fonts, googleFontLinks: googleFonts };
     })()`) as { heading: string | null; body: string | null; googleFontLinks: string[] }
 
+    // Extract <video> elements (background videos, hero videos, inline video players)
+    const videos = await page.evaluate(`(() => {
+      const results = [];
+      const seen = new Set();
+      document.querySelectorAll('video').forEach(vid => {
+        // Get src from <video src=""> or <source src="">
+        let src = vid.src || '';
+        if (!src) {
+          const source = vid.querySelector('source[src]');
+          if (source) src = source.src || source.getAttribute('src') || '';
+        }
+        if (!src || src.startsWith('data:') || seen.has(src)) return;
+        seen.add(src);
+        const rect = vid.getBoundingClientRect();
+        if (rect.width < 30 || rect.height < 30) return;
+        const scrollY = window.scrollY;
+        results.push({
+          src,
+          poster: vid.poster || undefined,
+          autoplay: vid.autoplay,
+          loop: vid.loop,
+          muted: vid.muted,
+          y: Math.round(rect.y + scrollY),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        });
+      });
+      return results;
+    })()`) as import("./types.ts").ExtractedVideo[]
+
+    // Resolve CSS custom properties to actual computed values (fixes var() references in design tokens)
+    const resolvedCssVars = await page.evaluate(`(() => {
+      const vars = {};
+      const root = document.documentElement;
+      const rootStyles = getComputedStyle(root);
+      // Collect all CSS custom properties declared on :root / html
+      for (const sheet of document.styleSheets) {
+        try {
+          for (const rule of sheet.cssRules) {
+            if (rule.selectorText && /^(:root|html)$/i.test(rule.selectorText.trim())) {
+              for (const prop of rule.style) {
+                if (prop.startsWith('--')) {
+                  const resolved = rootStyles.getPropertyValue(prop).trim();
+                  if (resolved) vars[prop] = resolved;
+                }
+              }
+            }
+          }
+        } catch(e) {}
+      }
+      return vars;
+    })()`) as Record<string, string>
+
     // Compute visual section boundaries from layout nodes (CMS-agnostic)
     const visualSections = segmentByVisualGaps(layoutNodes)
 
@@ -388,7 +529,7 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
     // Pass Y-ranges from visual gap analysis so the browser finds elements by position, not by tag
     const sectionYRanges = visualSections.map(vs => ({ y: vs.y, h: vs.height }))
 
-    const sectionStyles = await page.evaluate(`((yRanges) => {
+    const sectionStylesRaw = await page.evaluate(`((yRanges) => {
       const PROPS = [
         'fontSize','fontWeight','fontFamily','lineHeight','letterSpacing','color',
         'textTransform','textDecoration','textAlign',
@@ -404,8 +545,8 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
         'objectFit','objectPosition'
       ];
       const DEFAULTS = new Set(['none','normal','auto','0px','0','rgba(0, 0, 0, 0)','','0px 0px','0px 0px 0px 0px','start','stretch','visible','static']);
-      const MAX_NODES = 200;
-      const MAX_DEPTH = 4;
+      const MAX_NODES = 500;
+      const MAX_DEPTH = 8;
 
       function extractStyles(el) {
         const cs = getComputedStyle(el);
@@ -441,7 +582,8 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
         const selector = parentSelector ? parentSelector + ' > ' + seg : seg;
 
         const isLeaf = el.children.length === 0;
-        const text = isLeaf && el.textContent ? el.textContent.trim().slice(0, 200) : null;
+        const isTextElement = ['h1','h2','h3','h4','h5','h6','p','span','a','li','label','strong','em','b','i','blockquote','figcaption','dt','dd'].includes(tag);
+        const text = (isLeaf || isTextElement) && el.textContent ? el.textContent.trim().slice(0, 200) : null;
         const image = tag === 'img' ? {
           src: el.src || el.currentSrc || '',
           alt: el.alt || '',
@@ -464,7 +606,6 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       // CMS-agnostic — works on any site regardless of HTML structure.
       function findElementForRange(y, h) {
         const scrollY = window.scrollY;
-        // Collect candidate elements at various depths
         const allEls = document.querySelectorAll('body *');
         let best = null;
         let bestScore = Infinity;
@@ -475,13 +616,14 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
           const absY = rect.y + scrollY;
           const absH = rect.height;
           if (absH < 40 || rect.width < 100) continue;
-          // Check if this element overlaps the target Y range
           const overlapStart = Math.max(absY, y);
           const overlapEnd = Math.min(absY + absH, y + h);
           if (overlapEnd <= overlapStart) continue;
           const overlap = overlapEnd - overlapStart;
-          const coverage = overlap / h; // how much of the target range is covered
+          const coverage = overlap / h;
           if (coverage < 0.5) continue;
+          // Skip elements > 3x target height — page containers
+          if (absH / h > 3) continue;
           // Score: prefer elements whose height is closest to the target
           const heightDiff = Math.abs(absH - h) / h;
           if (heightDiff < bestScore) {
@@ -494,12 +636,78 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
 
       return yRanges.slice(0, 20).map((range, i) => {
         const el = findElementForRange(range.y, range.h);
-        if (!el) return null;
+        if (!el) return { sectionIndex: i, root: null, matched: false };
         nodeCount = 0;
         const root = walk(el, 0, '');
-        return root ? { sectionIndex: i, root } : null;
-      }).filter(Boolean);
-    })(${JSON.stringify(sectionYRanges)})`) as import("./types.ts").SectionStyles[]
+        return root ? { sectionIndex: i, root, matched: true } : { sectionIndex: i, root: null, matched: false };
+      });
+    })(${JSON.stringify(sectionYRanges)})`) as Array<{ sectionIndex: number; root: import("./types.ts").ComputedStyleNode | null; matched: boolean }>
+
+    // Identify unmatched visual sections (no DOM element found for Y-range)
+    const unmatchedIndices = sectionStylesRaw
+      .filter(s => !s.matched)
+      .map(s => s.sectionIndex)
+
+    // Extract the actual SectionStyles (filtering out unmatched)
+    const sectionStyles: import("./types.ts").SectionStyles[] = sectionStylesRaw
+      .filter(s => s.matched && s.root)
+      .map(s => ({ sectionIndex: s.sectionIndex, root: s.root! }))
+
+    // Fallback content extraction for unmatched visual sections.
+    // When findElementForRange fails, collect all text-bearing elements within the Y-range.
+    let sectionFallbackContent: FullPageScrape["sectionFallbackContent"]
+    if (unmatchedIndices.length > 0) {
+      const unmatchedRanges = unmatchedIndices.map(i => ({
+        sectionIndex: i,
+        ...sectionYRanges[i],
+      }))
+      sectionFallbackContent = await page.evaluate(`((ranges) => {
+        const scrollY = window.scrollY;
+        return ranges.map(({ sectionIndex, y, h }) => {
+          const headings = [];
+          const paragraphs = [];
+          const links = [];
+          const listItems = [];
+          const seen = new Set();
+
+          // Scan all relevant elements by Y position
+          const allEls = document.querySelectorAll('h1,h2,h3,h4,h5,h6,p,a,li,span,div,td,th,dt,dd,label,figcaption,blockquote');
+          for (const el of allEls) {
+            const rect = el.getBoundingClientRect();
+            const absY = rect.y + scrollY;
+            if (rect.height < 5 || rect.width < 50) continue;
+            // Element must be within section Y-range
+            if (absY < y - 20 || absY > y + h + 20) continue;
+
+            const tag = el.tagName.toLowerCase();
+            const text = el.textContent ? el.textContent.trim().slice(0, 300) : '';
+            if (!text || text.length < 2) continue;
+
+            // Deduplicate by text content (Elementor often has nested wrappers with same text)
+            const key = tag + ':' + text.slice(0, 80);
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            if (['h1','h2','h3','h4','h5','h6'].includes(tag)) {
+              const level = parseInt(tag[1]);
+              headings.push({ level, text });
+            } else if (tag === 'a' && el.href) {
+              links.push({ href: el.href, text });
+            } else if (tag === 'li') {
+              listItems.push(text);
+            } else if (tag === 'p' || (tag === 'div' && el.children.length === 0 && text.length > 20)) {
+              // Include leaf div text as paragraphs (Elementor uses divs for text)
+              paragraphs.push(text);
+            }
+          }
+
+          // Group list items into lists (each contiguous group = one list)
+          const lists = listItems.length > 0 ? [listItems] : [];
+
+          return { sectionIndex, headings, paragraphs, links, lists };
+        });
+      })(${JSON.stringify(unmatchedRanges)})`) as NonNullable<FullPageScrape["sectionFallbackContent"]>
+    }
 
     // Take full-page screenshots at desktop and mobile viewports
     let screenshot: ScreenshotResult | null = null
@@ -519,6 +727,180 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       // Restore desktop viewport
       await page.setViewportSize({ width, height })
     } catch { /* non-fatal */ }
+
+    // ── Interaction sweep: click tabs/accordions, detect scroll triggers ──
+    // Captures style changes from dynamic interactions for better block classification.
+    let interactionStates: FullPageScrape["interactionStates"]
+    try {
+      interactionStates = await page.evaluate(`(async () => {
+        const delay = ms => new Promise(r => setTimeout(r, ms));
+        const STYLE_PROPS = ['display','visibility','opacity','height','maxHeight','transform','backgroundColor','color','overflow'];
+        const results = [];
+
+        function getStyles(el) {
+          const cs = getComputedStyle(el);
+          const s = {};
+          for (const p of STYLE_PROPS) { s[p] = cs[p]; }
+          return s;
+        }
+
+        function diffStyles(before, after) {
+          const changed = {};
+          for (const p of STYLE_PROPS) {
+            if (before[p] !== after[p]) changed[p] = { before: before[p], after: after[p] };
+          }
+          return Object.keys(changed).length > 0 ? changed : null;
+        }
+
+        // 1. Tab clicks: find [role=tab] or elements with tab-like classes
+        const tabTriggers = [...document.querySelectorAll('[role="tab"], [data-toggle="tab"], .tab-link, .tabs__tab, .e-n-tab-title')].slice(0, 10);
+        for (const trigger of tabTriggers) {
+          const rect = trigger.getBoundingClientRect();
+          const scrollY = window.scrollY;
+          const sectionY = Math.round(rect.y + scrollY);
+          // Find the associated panel
+          const panelId = trigger.getAttribute('aria-controls') || trigger.getAttribute('data-target');
+          const panel = panelId ? document.getElementById(panelId) || document.querySelector(panelId) : trigger.closest('[role="tablist"]')?.parentElement?.querySelector('[role="tabpanel"]');
+          if (!panel) continue;
+
+          const beforeStyles = getStyles(panel);
+          trigger.click();
+          await delay(350);
+          const afterStyles = getStyles(panel);
+          const changed = diffStyles(beforeStyles, afterStyles);
+          if (changed) {
+            const transition = getComputedStyle(panel).transition || '';
+            results.push({
+              sectionY,
+              states: [{ trigger: 'click', triggerTarget: 'tab: ' + (trigger.textContent || '').trim().slice(0, 50), changedStyles: changed, transitionDuration: transition.includes('0s') ? undefined : transition.split(',')[0]?.trim() }]
+            });
+          }
+        }
+
+        // 2. Accordion clicks: find <details>, [data-toggle="collapse"], accordion triggers
+        const accordionTriggers = [...document.querySelectorAll('details > summary, [data-toggle="collapse"], .accordion-header, .accordion-trigger, .e-n-accordion-item-title')].slice(0, 10);
+        for (const trigger of accordionTriggers) {
+          const rect = trigger.getBoundingClientRect();
+          const scrollY = window.scrollY;
+          const sectionY = Math.round(rect.y + scrollY);
+          const parent = trigger.closest('details') || trigger.parentElement;
+          if (!parent) continue;
+          const content = parent.querySelector('.accordion-content, .accordion-body, .collapse, [role="region"], details > :not(summary)') || (trigger.tagName === 'SUMMARY' ? trigger.parentElement : null);
+          if (!content) continue;
+
+          const beforeStyles = getStyles(content);
+          trigger.click();
+          await delay(350);
+          const afterStyles = getStyles(content);
+          const changed = diffStyles(beforeStyles, afterStyles);
+          if (changed) {
+            const transition = getComputedStyle(content).transition || '';
+            results.push({
+              sectionY,
+              states: [{ trigger: 'click', triggerTarget: 'accordion: ' + (trigger.textContent || '').trim().slice(0, 50), changedStyles: changed, transitionDuration: transition.includes('0s') ? undefined : transition.split(',')[0]?.trim() }]
+            });
+          }
+        }
+
+        // 3. Scroll-triggered elements: check for elements that change on scroll
+        const stickyEls = [...document.querySelectorAll('header, nav, [class*="sticky"], [class*="fixed"]')].slice(0, 5);
+        if (stickyEls.length > 0) {
+          window.scrollTo(0, 0);
+          await delay(200);
+          const beforeMap = stickyEls.map(el => ({ el, styles: getStyles(el) }));
+          window.scrollTo(0, 500);
+          await delay(400);
+          for (const { el, styles: before } of beforeMap) {
+            const after = getStyles(el);
+            const changed = diffStyles(before, after);
+            if (changed) {
+              const rect = el.getBoundingClientRect();
+              results.push({
+                sectionY: 0, // scroll triggers are typically at page top
+                states: [{ trigger: 'scroll', triggerTarget: el.tagName.toLowerCase() + (el.className ? '.' + el.className.toString().split(' ')[0] : ''), changedStyles: changed }]
+              });
+            }
+          }
+          window.scrollTo(0, 0);
+          await delay(200);
+        }
+
+        return results;
+      })()`) as NonNullable<FullPageScrape["interactionStates"]>
+
+      // 4. Hover state capture for buttons and links (uses Playwright hover API)
+      const hoverTargets = await page.evaluate(`(() => {
+        const targets = [];
+        const els = document.querySelectorAll('a, button, [role="button"]');
+        for (const el of [...els].slice(0, 15)) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width < 20 || rect.height < 20) continue;
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+          // Only capture elements that have non-transparent backgrounds (likely CTA/buttons)
+          const bg = cs.backgroundColor;
+          const hasBg = bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+          const hasBoxShadow = cs.boxShadow && cs.boxShadow !== 'none';
+          if (!hasBg && !hasBoxShadow && el.tagName !== 'BUTTON') continue;
+          const scrollY = window.scrollY;
+          targets.push({
+            selector: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className ? '.' + el.className.toString().split(' ').filter(Boolean).join('.') : ''),
+            y: Math.round(rect.y + scrollY),
+            beforeStyles: {
+              backgroundColor: cs.backgroundColor,
+              color: cs.color,
+              transform: cs.transform,
+              boxShadow: cs.boxShadow,
+              borderColor: cs.borderColor,
+              opacity: cs.opacity,
+              transition: cs.transition,
+            }
+          });
+        }
+        return targets;
+      })()`) as Array<{ selector: string; y: number; beforeStyles: Record<string, string> }>
+
+      for (const target of hoverTargets.slice(0, 8)) {
+        try {
+          const el = page.locator(target.selector).first()
+          if (!await el.isVisible().catch(() => false)) continue
+          await el.hover({ timeout: 1000 })
+          await page.waitForTimeout(200)
+          const afterStyles = await el.evaluate(`(el) => {
+            const cs = getComputedStyle(el);
+            return {
+              backgroundColor: cs.backgroundColor,
+              color: cs.color,
+              transform: cs.transform,
+              boxShadow: cs.boxShadow,
+              borderColor: cs.borderColor,
+              opacity: cs.opacity,
+            };
+          }`) as Record<string, string>
+
+          const changed: Record<string, { before: string; after: string }> = {}
+          for (const [prop, before] of Object.entries(target.beforeStyles)) {
+            if (prop === "transition") continue
+            const after = afterStyles[prop] ?? before
+            if (before !== after) changed[prop] = { before, after }
+          }
+          if (Object.keys(changed).length > 0) {
+            if (!interactionStates) interactionStates = []
+            interactionStates.push({
+              sectionY: target.y,
+              states: [{
+                trigger: "hover" as const,
+                triggerTarget: target.selector,
+                changedStyles: changed,
+                transitionDuration: target.beforeStyles.transition?.includes("0s") ? undefined : target.beforeStyles.transition?.split(",")[0]?.trim(),
+              }],
+            })
+          }
+        } catch { /* non-fatal */ }
+      }
+    } catch {
+      // Non-fatal — interaction sweep failure shouldn't block scraping
+    }
 
     // Process the rendered HTML
     const resolvedHtml = resolveLazyImages(renderedHtml)
@@ -558,7 +940,7 @@ export async function scrapeFullPage(url: string): Promise<FullPageScrape> {
       }
     }
 
-    return { content, screenshot, mobileScreenshot, sections, outline, nav, sectionStyles, visualSections, embeds, computedFonts, pageImages }
+    return { content, screenshot, mobileScreenshot, sections, outline, nav, sectionStyles, visualSections, embeds, videos, scrollBehavior, computedFonts, pageImages, imageCompositions, sectionFallbackContent, resolvedCssVars, interactionStates }
   } finally {
     await browser.close()
   }
@@ -613,8 +995,8 @@ export async function discoverSitePages(url: string): Promise<SiteStructure> {
     }
   }
 
-  // 3. Fall back to link crawling from homepage
-  const linkPages = await extractLinksFromPage(url, origin)
+  // 3. Fall back to BFS link crawling (depth 2, max 50 pages)
+  const linkPages = await bfsCrawlLinks(url, origin, 2, 50)
   if (linkPages.length > 0) {
     return { origin, pages: linkPages, source: "links", totalFound: linkPages.length }
   }
@@ -675,6 +1057,35 @@ async function fetchRobotsSitemaps(origin: string): Promise<string[]> {
   } catch {
     return []
   }
+}
+
+/** BFS crawl: discover pages by following internal links up to maxDepth levels, capped at maxPages */
+async function bfsCrawlLinks(startUrl: string, origin: string, maxDepth: number, maxPages: number): Promise<DiscoveredPage[]> {
+  const seen = new Set<string>()
+  const pages: DiscoveredPage[] = []
+  const queue: Array<{ url: string; depth: number }> = [{ url: startUrl, depth: 0 }]
+
+  while (queue.length > 0 && pages.length < maxPages) {
+    const { url, depth } = queue.shift()!
+    if (depth > maxDepth) continue
+
+    const slug = urlToSlug(url)
+    if (seen.has(slug)) continue
+    seen.add(slug)
+    pages.push({ url, slug, title: slugToTitle(slug) })
+
+    // Only crawl deeper if below max depth
+    if (depth < maxDepth) {
+      const childPages = await extractLinksFromPage(url, origin)
+      for (const child of childPages) {
+        if (!seen.has(child.slug) && pages.length + queue.length < maxPages * 2) {
+          queue.push({ url: child.url, depth: depth + 1 })
+        }
+      }
+    }
+  }
+
+  return pages
 }
 
 async function extractLinksFromPage(url: string, origin: string): Promise<DiscoveredPage[]> {

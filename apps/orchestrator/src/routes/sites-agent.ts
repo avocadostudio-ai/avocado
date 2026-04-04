@@ -11,7 +11,7 @@ import { resolve } from "node:path"
 import { homedir } from "node:os"
 import type { FastifyInstance, FastifyReply } from "fastify"
 import type { RouteContext } from "./route-context.js"
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk"
+import { query, type SDKMessage, type Query } from "@anthropic-ai/claude-agent-sdk"
 import { createSitesAgentMcpServer } from "../agent/sites-agent-tools.js"
 import { buildSitesAgentSystemPrompt } from "../agent/sites-agent-context.js"
 import { buildIntegrationSystemPrompt } from "../agent/integration-prompt.js"
@@ -28,7 +28,7 @@ type SitesAgentRequestBody = {
   /** Use Claude CLI (subscription-based, $0 cost) instead of Agent SDK (pay-per-token) */
   useCliAgent?: boolean
   /** Agent mode: "migrate" scrapes a URL, "integrate" adds SDK to an existing codebase */
-  mode?: "migrate" | "integrate"
+  mode?: "create" | "migrate" | "integrate"
 }
 
 type StreamEntry = {
@@ -41,6 +41,8 @@ type StreamEntry = {
   lastSeq: number
   subscribers: Set<FastifyReply>
   abortController: AbortController
+  /** SDK Query handle — set once the agent loop starts, used for interrupt(). */
+  queryHandle: Query | null
   siteCreatedConfigs: Record<string, unknown>[]
   currentPhase: PhaseId | null
   emittedPhases: Set<PhaseId>
@@ -168,6 +170,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
       lastSeq: 0,
       subscribers: new Set(),
       abortController: new AbortController(),
+      queryHandle: null,
       siteCreatedConfigs: [],
       currentPhase: null,
       emittedPhases: new Set(),
@@ -187,6 +190,10 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
     if (!entry) return reply.code(410).send({ error: "Stream not found or expired" })
 
     if (entry.state === "active" || entry.state === "pending") {
+      // Prefer SDK interrupt() for graceful shutdown; fall back to abort signal
+      if (entry.queryHandle) {
+        entry.queryHandle.interrupt().catch(() => { /* already closed */ })
+      }
       entry.abortController.abort()
       entry.state = "done"
       emitEvent(streamId, { type: "error", result: { status: "error", summary: "Canceled by user" } })
@@ -299,7 +306,8 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
 
           // Override mode from triage (more accurate than client-side regex)
           if (triage.intent === "integrate") body.mode = "integrate"
-          else if (triage.intent === "create" || triage.intent === "migrate") body.mode = "migrate"
+          else if (triage.intent === "create") body.mode = "create"
+          else if (triage.intent === "migrate") body.mode = "migrate"
         } catch (err: unknown) {
           console.log(`[sites-agent] Triage failed, continuing without: ${err instanceof Error ? err.message : String(err)}`)
         }
@@ -351,7 +359,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
       const isIntegrate = body.mode === "integrate"
       const systemPrompt = isIntegrate
         ? buildIntegrationSystemPrompt({ locale: body.locale })
-        : buildSitesAgentSystemPrompt({ locale: body.locale })
+        : buildSitesAgentSystemPrompt({ locale: body.locale, intent: body.mode === "create" ? "create" : "migrate" })
 
       // Phase config depends on mode
       const activePhases = isIntegrate ? INTEGRATION_PHASES : PHASES
@@ -436,7 +444,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
             enrichedPrompt = parts.join("")
           }
 
-          const result = query({
+          const result: Query = query({
             prompt: enrichedPrompt,
             options: {
               abortController: entry.abortController,
@@ -451,6 +459,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
                   tools: orchestratorTools,
                   skills: isIntegrate ? ["site-integration"] : ["site-scaffolding", "image-migration"],
                   model: SITES_AGENT_MODELS.balanced,
+                  maxTurns: 60,
                 },
                 // Subagents only used in migrate mode
                 ...(!isIntegrate ? { "structure-analyzer": {
@@ -507,6 +516,7 @@ For each section spec, include:
                   tools: analyzerTools,
                   skills: ["site-structure-analysis"],
                   model: SITES_AGENT_MODELS.balanced,
+                  maxTurns: 20,
                 },
                 "block-coder": {
                   description: "Creates custom block types. Tell it: 'Create a {BlockName} block for site {siteId} with fields: {list}'. It writes schema, renderer, styles, and manifest files.",
@@ -660,6 +670,7 @@ Key patterns to follow:
                   tools: ["Write", "Edit", "Bash"],
                   skills: ["custom-block-creation"],
                   model: SITES_AGENT_MODELS.powerful,
+                  maxTurns: 30,
                 } } : {}),
               },
               // In integrate mode, main agent needs file tools directly.
@@ -674,12 +685,14 @@ Key patterns to follow:
               mcpServers: { "sites-agent": mcpServer },
               env: { ...process.env, ANTHROPIC_API_KEY: entry.apiKey },
               permissionMode: "bypassPermissions",
+              allowDangerouslySkipPermissions: true,
+              maxTurns: 80,
               persistSession: false,
-              canUseTool: async (toolName: string, input: Record<string, unknown>) => {
+              canUseTool: async (toolName: string, input: Record<string, unknown>, { agentID }: { agentID?: string } = {}) => {
                 if (toolName === "AskUserQuestion") {
                   // Emit questions to frontend via SSE
                   emitEvent(streamId, { type: "approval_required", input })
-                  console.log(`[sites-agent] Stream ${streamId}: AskUserQuestion — waiting for user response`)
+                  console.log(`[sites-agent] Stream ${streamId}: AskUserQuestion from ${agentID ?? "main"} — waiting for user response`)
 
                   // Wait for user response via POST /sites-agent/respond
                   const answers = await new Promise<Record<string, string>>((resolve) => {
@@ -706,6 +719,8 @@ Key patterns to follow:
               },
             },
           })
+
+          entry.queryHandle = result
 
           let summaryText = ""
           let toolCallCount = 0

@@ -1,6 +1,9 @@
-# Adding a New Block Type (E2E Guide)
+---
+name: add-block
+description: End-to-end guide for adding a new block type — schema, renderer, styling, editor UI, AI planner, and preview overlay integration. Use when adding a new block type to the site editor.
+---
 
-Activate this skill when adding a new block type to the site editor. This covers schema definition, rendering, styling, and full integration with the editor UI, AI planner, and preview overlay.
+# Adding a New Block Type (E2E Guide)
 
 ## How It Works (Auto-Wiring)
 
