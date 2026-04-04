@@ -40,7 +40,7 @@ function basePlannerArgs(message: string) {
   return { currentPage, contextPack }
 }
 
-test("parseIntentWithOpenAI maps op-shaped output to ParsedIntent", async () => {
+test("parseIntentWithOpenAI maps intent-shaped output to ParsedIntent", async () => {
   const currentPage = demoPublishedPages()[0]
   const parsed = await parseIntentWithOpenAI({
     message: "add cta below hero",
@@ -49,13 +49,11 @@ test("parseIntentWithOpenAI maps op-shaped output to ParsedIntent", async () => 
     model: "gpt-4o",
     client: fakePlannerClientWithContent(
       JSON.stringify({
-        ops: [
-          {
-            op: "add_block",
-            afterBlockId: "b_hero_home",
-            block: { type: "CTA", props: { title: "Try now" } }
-          }
-        ]
+        action: "add",
+        new_block_type: "CTA",
+        position: "after",
+        anchor_block_ref: "b_hero_home",
+        summary: "Add CTA below Hero"
       })
     )
   })
@@ -77,7 +75,7 @@ test("parseIntentWithOpenAI rejects malformed non-JSON output", async () => {
         model: "gpt-4o",
         client: fakePlannerClientWithContent("not-json-response")
       }),
-    /did not return JSON/i
+    /not valid JSON|did not return JSON/i
   )
 })
 
@@ -618,56 +616,52 @@ test("buildPlannerSchemaContext includes pageMetaContract for description/char-l
   }
 })
 
-test("generatePlanWithOpenAI uses strict response_format when CHAT_STRICT_JSON_RESPONSE is enabled", async () => {
-  const previous = process.env.CHAT_STRICT_JSON_RESPONSE
-  process.env.CHAT_STRICT_JSON_RESPONSE = "1"
-  try {
-    const { currentPage, contextPack } = basePlannerArgs("change heading")
-    let strictValue: unknown
-    const client: PlannerOpenAIClient = {
-      chat: {
-        completions: {
-          create: async (request: unknown) => {
-            const typed = request as {
-              response_format?: { type?: string; json_schema?: { strict?: unknown } }
-            }
-            strictValue = typed.response_format?.json_schema?.strict
-            return {
-              choices: [
-                {
-                  message: {
-                    content: JSON.stringify({
-                      intent: "edit_plan",
-                      summary_for_user: "Will update the heading.",
-                      change_log: ["Will update hero heading."],
-                      ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: "Hi" } }]
-                    })
-                  }
-                }
-              ]
-            } as unknown
+// Note: CHAT_STRICT_JSON_RESPONSE no longer applies json_schema strict mode in
+// generatePlanWithOpenAI — the planner always uses json_object response_format.
+// Strict json_schema mode is now only used in parseIntentWithOpenAI.
+test("generatePlanWithOpenAI uses json_object response_format (non-streaming)", async () => {
+  const { currentPage, contextPack } = basePlannerArgs("change heading")
+  let responseFormatType: unknown
+  const client: PlannerOpenAIClient = {
+    chat: {
+      completions: {
+        create: async (request: unknown) => {
+          const typed = request as {
+            response_format?: { type?: string }
           }
+          responseFormatType = typed.response_format?.type
+          return {
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    intent: "edit_plan",
+                    summary_for_user: "Will update the heading.",
+                    change_log: ["Will update hero heading."],
+                    ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: "Hi" } }]
+                  })
+                }
+              }
+            ]
+          } as unknown
         }
-      },
-      responses: {
-        create: async () => ({ output_text: "" }) as unknown
       }
+    },
+    responses: {
+      create: async () => ({ output_text: "" }) as unknown
     }
-
-    await generatePlanWithOpenAI({
-      message: "change heading",
-      slug: "/",
-      currentPage,
-      contextPack,
-      model: "gpt-4o",
-      client
-    })
-
-    assert.equal(strictValue, true)
-  } finally {
-    if (previous === undefined) delete process.env.CHAT_STRICT_JSON_RESPONSE
-    else process.env.CHAT_STRICT_JSON_RESPONSE = previous
   }
+
+  await generatePlanWithOpenAI({
+    message: "change heading",
+    slug: "/",
+    currentPage,
+    contextPack,
+    model: "gpt-4o",
+    client
+  })
+
+  assert.equal(responseFormatType, "json_object")
 })
 
 // ---------------------------------------------------------------------------
