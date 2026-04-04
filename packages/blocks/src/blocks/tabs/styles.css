@@ -3,6 +3,10 @@
   background: var(--section-bg);
 }
 
+.tabs-block__title {
+  margin: 0 0 20px;
+}
+
 /* Tab bar wrapper — provides fade gradient overflow hints */
 .tabs-block__bar-wrap {
   position: relative;

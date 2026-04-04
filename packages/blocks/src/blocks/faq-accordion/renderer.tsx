@@ -1,5 +1,6 @@
 import type { JSX } from "react"
 import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { renderRichTextContent } from "../_shared"
 
 export function FAQAccordion(props: Record<string, unknown>) {
   const items = Array.isArray(props.items) ? props.items : []
@@ -21,13 +22,14 @@ export function FAQAccordion(props: Record<string, unknown>) {
               >
                 {String(row.q ?? "")}
               </summary>
-              <p
+              <div
+                className="faq-item__answer"
                 data-editable-target={`items[${idx}].a`}
                 data-editable-target-label={`items[${idx}].a`}
                 data-editable-label={`items[${idx}].a`}
               >
-                {String(row.a ?? "")}
-              </p>
+                {renderRichTextContent(String(row.a ?? ""))}
+              </div>
             </details>
           )
         })}
