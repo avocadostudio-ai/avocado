@@ -26,7 +26,7 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 
 ### Multi-Model AI
 
-- **Claude, GPT-4o, Gemini** — Choose your provider per request. Switch models without changing code
+- **Anthropic, OpenAI, Google Gemini** — Choose your AI provider per request. Switch models without changing code
 - **Tiered model selection** — Fast models for simple edits, reasoning models for complex restructuring
 
 ### Blocks & Type Safety
