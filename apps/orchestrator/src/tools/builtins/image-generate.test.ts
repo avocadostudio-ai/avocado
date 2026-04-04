@@ -70,7 +70,7 @@ test("image.generate calls onStatusUpdate", async (t) => {
     { message: "Image generation failed — no image was returned" }
   )
 
-  assert.deepEqual(statusMessages, ["Generating AI image..."])
+  assert.deepEqual(statusMessages, ["Generating AI image\u2026"])
 })
 
 test("image.generate aspectRatio maps to correct dimensions in output schema", () => {
