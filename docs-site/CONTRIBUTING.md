@@ -2,7 +2,9 @@
 
 Thank you for your interest in improving the documentation.
 
-## How to contribute
+For general contribution guidelines (code, tests, PRs), see the [root CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Editing documentation
 
 ### Option 1: Edit directly on GitHub
 
@@ -33,4 +35,5 @@ Thank you for your interest in improving the documentation.
 - Fixes for outdated instructions or broken examples
 - Clearer explanations of integration steps
 - Additional framework adapter guides (Remix, SvelteKit, Astro, etc.)
+- Deployment guides for new platforms (AWS Amplify, Google Cloud Run, Docker, etc.)
 - Troubleshooting entries based on real integration experience

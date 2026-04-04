@@ -1,37 +1,50 @@
 ---
-title: "AI Site Editor Docs"
-description: "Integration, operations, and technical references for the AI Site Editor platform."
+title: "AI Site Editor"
+description: "AI-powered content operations for websites — natural language editing with live preview, type-safe operations, and multi-model AI support."
 ---
 
 ## What is AI Site Editor?
 
-AI Site Editor is a chat-driven website editing platform. Site owners and content teams describe changes in natural language — the system applies them as validated, schema-checked operations with live preview, undo/redo, and plan approval.
+AI Site Editor is an open-source, AI-powered content operations platform for websites. Describe content changes in natural language — the system plans and applies them as validated, schema-checked operations with live preview, undo/redo, and one-click publishing.
 
-**How it works**: a split-pane experience where your live website renders on the left and a chat interface on the right. Users type requests like _"add a testimonials section below the hero"_ or _"change the hero heading to Welcome"_, and the system plans and applies structured edits.
+**How it works**: a split-pane experience where your live website renders on the left and a chat interface on the right. Users type requests like _"add a testimonials section below the hero"_ or _"change the hero heading to Welcome"_, and the system plans and applies structured edits in real time.
 
-**For site owners**: connect the editor to your existing site by implementing a small API contract (block manifest + draft mode endpoints). No changes to your existing pages required.
+**For developers and agencies**: integrate AI editing into any Next.js site with the Site SDK, or use the framework-agnostic REST API. Self-hosted, multi-model AI (Anthropic, OpenAI, Google Gemini), and a pluggable publishing pipeline.
+
+**For site owners**: manage your website content through conversation — no code changes required. Review every change before it ships.
 
 ## Start Here
 
 <CardGroup cols={2}>
-  <Card title="Integration quickstart" icon="rocket" href="/integration/editor-quickstart">
+  <Card title="Quick start" icon="rocket" href="/integration/editor-quickstart">
     Connect the editor to a Next.js site in ~30 minutes using embedded draft mode.
   </Card>
-  <Card title="Operations runbook" icon="server" href="/operations/dev-server-runbook">
+  <Card title="Integration overview" icon="puzzle-piece" href="/integration">
+    Prerequisites, tiers, adoption checklist, and the Site SDK.
+  </Card>
+  <Card title="Local development" icon="terminal" href="/operations/dev-server-runbook">
     Start, restart, and diagnose the local multi-service dev environment.
   </Card>
-  <Card title="Product + architecture spec" icon="diagram-project" href="/specs/ai-website-editor-poc-spec">
-    Review product goals, architecture, domain model, and APIs.
-  </Card>
-  <Card title="Advanced references" icon="book-open-cover" href="/observability/chat-troubleshooting">
-    Deep dives for observability, guardrails, and advanced integration contracts.
+  <Card title="Deploy to production" icon="cloud-arrow-up" href="/operations/vercel-deployment">
+    Deploy to Vercel, Netlify, or your own infrastructure.
   </Card>
 </CardGroup>
+
+## Key Capabilities
+
+- **Natural language editing** — Describe changes in plain English. The AI generates structured, schema-validated operations
+- **Multi-model AI** — Anthropic, OpenAI, and Google Gemini. Most battle-tested with Anthropic models (Haiku, Sonnet, Opus)
+- **20 built-in block types** — Hero, CTA, FAQ, Testimonials, Gallery, Stats, Carousel, Table, and more
+- **Type-safe operations** — Zod schemas validate every edit. Malformed edits are rejected before they touch your content
+- **Live preview + streaming** — See edits applied progressively as the AI generates the plan
+- **Undo/redo + plan approval** — Full operation history. Review and approve every change
+- **Pluggable publishing** — Ships with Git + Vercel deploy hooks. Implement the `PublishTarget` interface for your own workflow
+- **Self-hosted** — Run the entire stack on your own infrastructure. No vendor lock-in
 
 ## Suggested Reading Path
 
 1. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
 2. [Next.js embedded onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
 3. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally
-4. [Product + architecture spec](/specs/ai-website-editor-poc-spec) — full domain model and API surface
+4. [Architecture spec](/specs/ai-website-editor-poc-spec) — full domain model and API surface
 5. [Site Provider SPI](/site-provider-spi) — advanced framework-agnostic REST contract
