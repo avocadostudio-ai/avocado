@@ -1,0 +1,409 @@
+/* ── Image Generate Chat (assistant-ui powered) ── */
+
+.aui-image-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ── Choice cards ── */
+.aui-image-chat-choices {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  justify-content: center;
+}
+.aui-image-chat-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  background: #0d182d;
+  border: 1px solid #304a6b;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #e0ecff;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+  flex: 1;
+}
+.aui-image-chat-choice:hover {
+  border-color: #5f90da;
+  background: #11203a;
+}
+.aui-image-chat-choice-img {
+  max-width: 80px;
+  max-height: 56px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.aui-image-chat-choice-icon {
+  width: 80px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a2d4a;
+  border-radius: 8px;
+  color: #6fa8f2;
+}
+.aui-image-chat-choice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2f7ff;
+}
+.aui-image-chat-choice-desc {
+  font-size: 12px;
+  color: #8fa6c9;
+  line-height: 1.35;
+}
+
+/* ── Edit context (reference image) ── */
+.aui-image-chat-edit-ctx {
+  position: relative;
+  display: inline-block;
+  margin: 16px;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  align-self: flex-start;
+  background: #0d182d;
+  border: 1px solid #304a6b;
+  padding: 8px;
+}
+.aui-image-chat-edit-ctx-img {
+  max-width: 280px;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+.aui-image-chat-zoom-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: white;
+}
+.aui-image-chat-edit-ctx:hover .aui-image-chat-zoom-icon {
+  opacity: 1;
+}
+
+/* ── Thread (assistant-ui) ── */
+.aui-image-thread-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.aui-image-thread-viewport {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.aui-image-thread-viewport > :first-child {
+  margin-top: auto;
+}
+
+/* ── Messages ── */
+.aui-image-msg {
+  max-width: 85%;
+  border-radius: 12px;
+  padding: 8px 12px;
+  word-break: break-word;
+}
+.aui-image-msg-user {
+  align-self: flex-end;
+  max-width: 80%;
+  background: #2a4a75;
+  border-radius: 12px 12px 4px 12px;
+}
+.aui-image-msg-user-img {
+  width: 100%;
+  max-width: 200px;
+  border-radius: 8px;
+  display: block;
+  margin-bottom: 4px;
+}
+.aui-image-msg-assistant {
+  align-self: flex-start;
+  background: #0d182d;
+  border-radius: 12px 12px 12px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aui-image-msg-text {
+  line-height: 1.45;
+  font-size: 14px;
+  color: #e0ecff;
+}
+.aui-image-msg-text p { margin: 0 0 6px; }
+.aui-image-msg-text p:last-child { margin-bottom: 0; }
+.aui-image-msg-text ul,
+.aui-image-msg-text ol { margin: 4px 0; padding-left: 20px; }
+.aui-image-msg-text ul { list-style-type: disc; }
+.aui-image-msg-text ol { list-style-type: decimal; }
+.aui-image-msg-text li { margin: 2px 0; display: list-item; }
+.aui-image-msg-text strong { font-weight: 600; color: #f2f7ff; }
+.aui-image-msg-text code { background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+
+/* ── Generated image in message ── */
+.aui-image-msg-image-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+.aui-image-msg-zoom-wrap {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.aui-image-msg-image {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 8px;
+  display: block;
+}
+.aui-image-msg-zoom-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: white;
+}
+.aui-image-msg-zoom-wrap:hover .aui-image-msg-zoom-icon {
+  opacity: 1;
+}
+.aui-image-msg-use-btn {
+  background: #346ec2;
+  color: white;
+  border: 1px solid #5f90da;
+  border-radius: 10px;
+  padding: 9px 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.aui-image-msg-use-btn:hover {
+  background: #3e82e0;
+}
+
+/* ── Generating indicator ── */
+.aui-image-msg-generating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.aui-image-generating-label {
+  font-size: 13px;
+  color: #9cb2d0;
+  font-style: italic;
+}
+
+/* Typing dots */
+.aui-image-typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 0;
+}
+.aui-image-typing-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6fa8f2;
+  animation: auiImgDotBounce 1.2s ease-in-out infinite;
+}
+.aui-image-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.aui-image-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes auiImgDotBounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Composer area ── */
+.aui-image-composer-area {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 12px;
+}
+
+/* Reference images strip */
+.aui-image-ref-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.aui-image-ref-thumb {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.aui-image-ref-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.aui-image-ref-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 10px;
+}
+.aui-image-ref-uploading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+}
+.aui-image-ref-add {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px dashed #3f5f88;
+  background: none;
+  color: #6fa8f2;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.aui-image-ref-count {
+  font-size: 11px;
+  color: #7389aa;
+  white-space: nowrap;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+/* Composer root — pill-shaped, matching Sites Agent input */
+.aui-image-composer-root {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0a0f1a;
+  border: 1px solid #2e4462;
+  border-radius: 999px;
+  padding: 4px 4px 4px 6px;
+  transition: border-color 200ms ease;
+}
+.aui-image-composer-root:focus-within {
+  border-color: #4a6d9a;
+}
+.aui-image-composer-input,
+.aui-image-composer-input textarea {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  font-size: 14px;
+  line-height: 20px;
+  resize: none;
+  outline: none !important;
+  color: #edf4ff;
+  font-family: inherit;
+  padding: 0;
+  margin: 6px 0;
+  box-sizing: border-box;
+  min-height: 20px;
+  box-shadow: none !important;
+}
+.aui-image-composer-input::placeholder {
+  color: #6a849e;
+}
+.aui-image-composer-attach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  color: #a0b4cc;
+  cursor: pointer;
+  padding: 0;
+}
+.aui-image-composer-attach:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.aui-image-composer-attach:not(:disabled):hover {
+  color: #d0e0f0;
+}
+.aui-image-composer-send,
+.aui-image-composer-stop {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+.aui-image-composer-send {
+  background: #2f79dc;
+  color: #fff;
+}
+.aui-image-composer-send:disabled {
+  background: #1a2d4a;
+  color: #3a5578;
+  cursor: default;
+}
+.aui-image-composer-send:not(:disabled):hover {
+  background: #3e88ef;
+}
+.aui-image-composer-stop {
+  background: #ef4444;
+  color: #fff;
+}
+.aui-image-composer-stop:hover {
+  background: #dc2626;
+}
