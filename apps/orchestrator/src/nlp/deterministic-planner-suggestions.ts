@@ -410,11 +410,15 @@ export function pageMetaContractSummary() {
  * metadata can auto-generate (list-field shapes are derived automatically).
  */
 const _blockNotes: Record<string, string> = {
-  Hero: "Use heading for the main headline; never invent prop names. imagePosition controls layout and must be 'left' or 'right' (default 'right'). For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it.",
-  CTA: "Keep existing props unless the user asks to change them.",
+  Hero: "Use heading for the main headline; never invent prop names. imagePosition controls layout and must be 'left', 'right', or 'full' (default 'right'). textAlign can be 'left' or 'center' (default 'left') — use 'center' for centered hero layouts especially with imagePosition 'full'. eyebrow is optional short text above the heading (e.g. 'New', 'Coming Soon'). For imageUrl: use any placeholder value (the system resolves images separately); if the user provides an explicit URL, use that. Update imageAlt to describe the intended image. Do NOT mention a specific image source in summary_for_user. secondaryCtaText/secondaryCtaHref are optional: set them to add a ghost/outline secondary button beside the primary CTA; omit or set to empty string to hide it.",
+  CTA: "Keep existing props unless the user asks to change them. secondaryCtaText/secondaryCtaHref are optional: set both to show a secondary button next to the primary CTA.",
   Card: "A standalone card with one CTA.",
   RichText: "body is a string; use \\n\\n to separate paragraphs. Supported inline syntax: **word** for bold, *word* for italic, [text](url) for links, '# Heading' lines become h3 headings. title is an optional section heading. Never invent prop names.",
-  Stats: "stats must be a non-empty array of {value, label}. value is a short string like '10K+' or '99.9%'. title is an optional section heading.",
+  Stats: "stats must be a non-empty array of {value, label, icon?, description?}. value is a short string like '10K+' or '99.9%'. icon is optional (emoji or image URL). description is optional explanatory text below the label. title is an optional section heading.",
+  FeatureGrid: "features is a non-empty array of {icon?, title, description}. icon is optional (emoji or image URL). columns controls the grid layout: '2', '3' (default), or '4'.",
+  Testimonials: "items is a non-empty array of {quote, author, role?, imageUrl?, imageAlt?}. role is the author's job title or company. imageUrl/imageAlt are for an optional circular author avatar photo.",
+  CardGrid: "cards is a non-empty array of {title, description, ctaText, ctaHref, imageUrl?, imageAlt?}. columns controls the grid layout: '2', '3' (default), or '4'. subtitle is optional.",
+  Tabs: "tabs is a non-empty array of {label, content}. content supports richtext markdown. title is an optional section heading above the tab bar.",
   TwoColumn: "Image + text side-by-side layout. imagePosition is 'left' or 'right' (default 'right'). body supports inline markdown (**bold**, *italic*, [link](url)). ctaText/ctaHref are optional: set both to show a CTA button. For imageUrl: use any placeholder value (the system resolves images separately).",
   Footer: "columns must be a non-empty array of {title, links}. links is a string with one 'Label|URL' per line (use \\n to separate). Example: 'Home|/\\nAbout|/about\\nBlog|/blog'."
 }

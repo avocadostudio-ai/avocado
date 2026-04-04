@@ -37,10 +37,32 @@
   transform: translateY(-30%) rotate(225deg);
 }
 
-.faq-item > p {
+.faq-item__answer {
   padding: 4px 0 16px;
-  margin: 0;
   color: var(--body-secondary);
   line-height: 1.65;
+}
+
+.faq-item__answer p {
+  margin: 0 0 8px;
+}
+
+.faq-item__answer p:last-child {
+  margin-bottom: 0;
+}
+
+.faq-item__answer ul,
+.faq-item__answer ol {
+  margin: 0 0 8px;
+  padding-left: 24px;
+}
+
+.faq-item__answer li {
+  margin-bottom: 2px;
+}
+
+.faq-item__answer a {
+  color: var(--brand);
+  text-decoration: underline;
 }
 

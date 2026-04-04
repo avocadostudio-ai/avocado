@@ -5,7 +5,12 @@ import { f } from "./_helpers.ts"
 registerBlock("Stats", {
   schema: z.object({
     title: z.string().optional(),
-    stats: z.array(z.object({ value: z.string().min(1), label: z.string().min(1) })).min(1)
+    stats: z.array(z.object({
+      icon: z.string().optional(),
+      value: z.string().min(1),
+      label: z.string().min(1),
+      description: z.string().optional()
+    })).min(1)
   }),
   meta: {
     displayName: "Stats",
@@ -15,7 +20,12 @@ registerBlock("Stats", {
     listFields: {
       stats: {
         label: "Stats",
-        itemFields: { value: f.text("Value"), label: f.text("Label") }
+        itemFields: {
+          icon: f.text("Icon (emoji or image URL)"),
+          value: f.text("Value"),
+          label: f.text("Label"),
+          description: f.text("Description"),
+        }
       }
     }
   }

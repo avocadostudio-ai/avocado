@@ -1,13 +1,21 @@
 import { useId, type JSX } from "react"
+import { resolveHeadingTag } from "@ai-site-editor/shared"
 import { renderRichTextContent } from "../_shared"
 
 export function Tabs(props: Record<string, unknown>): JSX.Element {
+  const title = String(props.title ?? "")
   const tabs = Array.isArray(props.tabs) ? props.tabs : []
   const uid = useId()
+  const HeadingTag = resolveHeadingTag("Tabs", props) as keyof JSX.IntrinsicElements
 
   return (
     <section className="tabs-block">
       <div className="section__inner">
+        {title.length > 0 && (
+          <HeadingTag className="tabs-block__title" data-editable-target="title" data-editable-target-label="title" data-editable-label="title">
+            {title}
+          </HeadingTag>
+        )}
         <div className="tabs-block__bar-wrap">
         <div className="tabs-block__bar" role="tablist">
           {tabs.map((raw, idx) => {

@@ -6,10 +6,18 @@ export function Hero(props: Record<string, unknown>) {
   const rawPosition = String(props.imagePosition ?? "right")
   const isFullWidth = rawPosition === "full"
   const imagePosition = rawPosition === "left" ? "left" : "right"
+  const textAlign = String(props.textAlign ?? "left")
+  const eyebrow = typeof props.eyebrow === "string" ? props.eyebrow.trim() : ""
   const HeadingTag = resolveHeadingTag("Hero", props) as keyof JSX.IntrinsicElements
+  const contentCenterClass = textAlign === "center" ? " hero__content--center" : ""
 
   const content = (
-    <div className="hero__content layout-grid__col">
+    <div className={`hero__content layout-grid__col${contentCenterClass}`}>
+      {eyebrow.length > 0 && (
+        <span className="hero__eyebrow" data-editable-target="eyebrow" data-editable-target-label="eyebrow" data-editable-label="eyebrow">
+          {eyebrow}
+        </span>
+      )}
       <HeadingTag data-editable-target="heading" data-editable-target-label="heading" data-editable-label="heading">
         {String(props.heading ?? "")}
       </HeadingTag>

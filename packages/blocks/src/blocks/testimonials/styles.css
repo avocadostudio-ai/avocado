@@ -32,11 +32,37 @@
   line-height: 1.62;
 }
 
+.testimonial-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.testimonial-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.testimonial-card__attribution {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .testimonial-card__author {
   font-size: 0.9375rem;
   font-weight: 700;
   letter-spacing: 0.005em;
   color: var(--caption);
+}
+
+.testimonial-card__role {
+  font-size: 0.8125rem;
+  color: var(--body-secondary);
+  font-weight: 400;
 }
 
 /* Dark */
