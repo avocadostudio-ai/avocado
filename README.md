@@ -31,8 +31,8 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 
 ### Blocks & Type Safety
 
-- **20 built-in block types** — Hero, CTA, FAQ, Testimonials, Gallery, Stats, Carousel, Table, Tabs, and more
-- **Custom blocks** — Register your own React components alongside built-in blocks
+- **20 built-in block types** — Production-ready content blocks that cover the most common website patterns: Hero banners, CTAs, FAQ accordions, Testimonials, Feature grids, Image galleries, Stats counters, Carousels, Data tables, Tabbed content, Video embeds, and more. Each block has a typed schema, responsive rendering, and AI-ready field metadata so the planner knows exactly what it can edit
+- **Custom blocks** — Register your own React components alongside built-in blocks. The AI planner automatically picks up their schemas and can operate on them like any built-in block
 - **Zod-validated operations** — Every edit operation is type-checked at runtime. Malformed edits are rejected before they touch your content
 
 ### Integration & Deployment
