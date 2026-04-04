@@ -69,8 +69,6 @@ Open the **Editor** at `http://localhost:4100` to start editing your site throug
 - `ANTHROPIC_API_KEY` — for Claude models
 - `OPENAI_API_KEY` — for OpenAI models
 
-Omit both to run in **demo mode** (pre-recorded plans, no LLM calls, zero cost).
-
 <details>
 <summary><strong>Dev server management commands</strong></summary>
 

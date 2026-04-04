@@ -26,7 +26,6 @@ pnpm dev:start
 
 The editor opens at `http://localhost:4100`, the site at `http://localhost:3000`, and the orchestrator API at `http://localhost:4200`.
 
-You can also omit API keys to run in **demo mode** (pre-recorded plans, no LLM calls).
 
 See [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.md) for advanced dev server management.
 
