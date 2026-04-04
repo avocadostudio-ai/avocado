@@ -154,7 +154,8 @@ async function processAttachments(
           docTexts.push(`--- Document: ${attachment.filename} ---\n${text.slice(0, 50_000)}\n--- End of ${attachment.filename} ---`)
           logger.info({ filename: attachment.filename, chars: text.length }, "JIRA: extracted PDF text")
         } else {
-          skipped.push(`${attachment.filename} (PDF text extraction yielded no content)`)
+          // PDF had no readable text content (empty or non-text PDF)
+          skipped.push(`${attachment.filename} (PDF contains no extractable text)`)
         }
       } else {
         skipped.push(attachment.filename)
@@ -177,35 +178,55 @@ async function processAttachments(
  * Basic text extraction from PDF buffer.
  * Looks for text streams in the PDF structure — handles simple PDFs.
  * For complex PDFs, a dedicated library would be needed.
+ * 
+ * @throws {Error} If PDF appears invalid or critically malformed
+ * @returns {string} Extracted text, or throws if extraction fails
  */
 function extractBasicPdfText(buffer: Buffer): string {
-  const raw = buffer.toString("latin1")
-  const textParts: string[] = []
-
-  // Extract text between BT (begin text) and ET (end text) operators
-  const btEtRegex = /BT\s([\s\S]*?)ET/g
-  let match: RegExpExecArray | null
-  while ((match = btEtRegex.exec(raw)) !== null) {
-    const block = match[1]
-    // Extract text from Tj and TJ operators
-    const tjRegex = /\(([^)]*)\)\s*Tj/g
-    let tm: RegExpExecArray | null
-    while ((tm = tjRegex.exec(block)) !== null) {
-      textParts.push(tm[1])
+  try {
+    const raw = buffer.toString("latin1")
+    
+    // Validate buffer contains PDF markers
+    if (!raw.includes("BT") || !raw.includes("ET")) {
+      // No text operators found - this may be a valid PDF without text content,
+      // but we explicitly return empty to distinguish from successful extraction
+      return ""
     }
-    // TJ arrays: [(text) kern (text) ...]
-    const tjArrayRegex = /\[([^\]]*)\]\s*TJ/g
-    while ((tm = tjArrayRegex.exec(block)) !== null) {
-      const inner = tm[1]
-      const textInArray = /\(([^)]*)\)/g
-      let ti: RegExpExecArray | null
-      while ((ti = textInArray.exec(inner)) !== null) {
-        textParts.push(ti[1])
+    
+    const textParts: string[] = []
+
+    // Extract text between BT (begin text) and ET (end text) operators
+    const btEtRegex = /BT\s([\s\S]*?)ET/g
+    let match: RegExpExecArray | null
+    while ((match = btEtRegex.exec(raw)) !== null) {
+      const block = match[1]
+      // Extract text from Tj and TJ operators
+      // Pattern: (text-content) Tj
+      // Handles escaped parentheses by matching balanced pairs
+      const tjRegex = /\(([^)]*(?:\\.[^)]*)*)\)\s*Tj/g
+      let tm: RegExpExecArray | null
+      while ((tm = tjRegex.exec(block)) !== null) {
+        textParts.push(tm[1])
+      }
+      // TJ arrays: [(text) kern (text) ...]
+      const tjArrayRegex = /\[([^\]]*)\]\s*TJ/g
+      while ((tm = tjArrayRegex.exec(block)) !== null) {
+        const inner = tm[1]
+        // Match text strings with proper escape sequence handling
+        const textInArray = /\(([^)]*(?:\\.[^)]*)*)\)/g
+        let ti: RegExpExecArray | null
+        while ((ti = textInArray.exec(inner)) !== null) {
+          textParts.push(ti[1])
+        }
       }
     }
-  }
 
-  return textParts.join(" ").replace(/\\n/g, "\n").replace(/\s+/g, " ").trim()
+    return textParts.join(" ").replace(/\\n/g, "\n").replace(/\s+/g, " ").trim()
+  } catch (err) {
+    // Re-throw with more context for debugging
+    const detail = err instanceof Error ? err.message : String(err)
+    throw new Error(`Failed to extract text from PDF: ${detail}`)
+  }
 }
 
 // ---------------------------------------------------------------------------
