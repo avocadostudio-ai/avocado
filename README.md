@@ -1,36 +1,67 @@
 # AI Site Editor
 
-Chat-driven website editor with live preview. Users describe changes in natural language — the system plans and applies structured, schema-validated edits with undo/redo and plan approval.
+**AI-powered content operations for websites.** Manage site content through natural language — the system plans, validates, and applies structured edits with live preview, undo/redo, and one-click publishing.
 
-**How it works**: split-pane UI with your live site on the left and a chat interface on the right. Type requests like _"add a testimonials section below the hero"_ or _"change the heading to Welcome"_ and see changes applied in real time.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-## Quickstart
+<!-- TODO: Add screenshot or demo GIF of the split-pane editor UI -->
 
-**Prerequisites**: Node.js 22+ and [corepack](https://nodejs.org/api/corepack.html) enabled.
+## Why AI Site Editor?
+
+Teams spend too much time on routine content updates — tweaking copy, adding sections, rearranging blocks. AI Site Editor turns these into simple conversations. Type what you want, review the plan, approve the changes.
+
+Built for **developers** integrating AI editing into client sites, and **agencies** looking for a self-hosted content ops platform they fully control. No vendor lock-in, no per-seat pricing, no black-box content pipelines.
+
+## Key Features
+
+### Content Operations
+
+- **Natural language editing** — Describe changes in plain English. The AI generates structured, schema-validated operations — not raw HTML guesses
+- **Plan review + approval** — Every change is presented as a reviewable plan before it's applied. Nothing ships without your sign-off
+- **Undo/redo** — Full operation history. Roll back any change instantly
+- **Live preview** — Split-pane UI with your site on the left and chat on the right. See edits applied in real time
+- **Streaming UX** — Progressive updates as the AI generates the plan, not a loading spinner followed by a wall of changes
+
+### Multi-Model AI
+
+- **Claude, GPT-4o, Gemini** — Choose your provider per request. Switch models without changing code
+- **Tiered model selection** — Fast models for simple edits, reasoning models for complex restructuring
+- **Demo mode** — Run the full editor with pre-recorded plans, zero API cost. Perfect for evaluations and demos
+
+### Blocks & Type Safety
+
+- **20 built-in block types** — Hero, CTA, FAQ, Testimonials, Gallery, Stats, Carousel, Table, Tabs, and more
+- **Custom blocks** — Register your own React components alongside built-in blocks
+- **Zod-validated operations** — Every edit operation is type-checked at runtime. Malformed edits are rejected before they touch your content
+
+### Integration & Deployment
+
+- **Site SDK** — Add AI editing to any Next.js 15+ site with a few API routes
+- **CMS integrations** — Working examples for Sanity, Strapi, and Contentful
+- **Publishing pipeline** — Git-based publishing with Vercel deploy hook support
+- **i18n** — Multi-language editor UI and AI responses (English, German; extensible)
+- **Self-hosted** — Run the entire stack on your own infrastructure
+
+## Quick Start
+
+**Prerequisites:** Node.js 22+ and [corepack](https://nodejs.org/api/corepack.html) enabled.
 
 ```bash
-# 1. Enable corepack (provides pnpm at the pinned version)
-corepack enable
-
-# 2. Install dependencies
-pnpm install
-
-# 3. Set up environment
-pnpm dev:setup
-
-# 4. Start all services
-pnpm dev:start
+corepack enable          # provides pnpm at the pinned version
+pnpm install             # install dependencies
+pnpm dev:setup           # copy .env.example → .env, prompt for API key
+pnpm dev:start           # start all 3 services (backgrounded)
 ```
 
-Then open:
+| Service      | URL                    |
+|--------------|------------------------|
+| Site         | http://localhost:3000   |
+| Editor       | http://localhost:4100   |
+| Orchestrator | http://localhost:4200   |
 
-| Service       | URL                      |
-|---------------|--------------------------|
-| Site          | http://localhost:3000     |
-| Editor        | http://localhost:4100     |
-| Orchestrator  | http://localhost:4200     |
-
-Open the **Editor** at `http://localhost:4100` to start chatting with your site.
+Open the **Editor** at `http://localhost:4100` to start editing your site through chat.
 
 ### Environment
 
@@ -39,9 +70,10 @@ Open the **Editor** at `http://localhost:4100` to start chatting with your site.
 - `ANTHROPIC_API_KEY` — for Claude models
 - `OPENAI_API_KEY` — for OpenAI models
 
-Omit both to run in **demo mode** (pre-recorded plans, no LLM calls).
+Omit both to run in **demo mode** (pre-recorded plans, no LLM calls, zero cost).
 
-### Managed dev servers
+<details>
+<summary><strong>Dev server management commands</strong></summary>
 
 ```bash
 pnpm dev:start    # Start all 3 services (backgrounded)
@@ -54,42 +86,65 @@ pnpm dev:doctor   # Diagnose port/process issues
 
 Or run in the foreground: `pnpm dev`
 
+</details>
+
 ## Architecture
 
 pnpm monorepo with 3 apps and 3 packages:
 
 ```
 apps/
-  orchestrator/  — Fastify API (:4200) — sessions, AI planning, ops engine, publishing
-  editor/        — Vite + React (:4100) — chat UI, model picker, iframe bridge
-  site/          — Next.js (:3000) — renders pages from BlockInstance data
+  orchestrator/    Fastify API (:4200) — sessions, AI planning, ops engine, publishing
+  editor/          Vite + React (:4100) — chat UI, model picker, iframe bridge
+  site/            Next.js (:3000) — renders pages from BlockInstance data
 packages/
-  shared/        — Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
-  blocks/        — Block renderers (Hero, FeatureGrid, Testimonials, FAQ, CTA, Card, RichText)
-  preview-adapter/ — PreviewBridge component, postMessage protocol, CSS overlay system
+  shared/          Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
+  blocks/          Block renderers (Hero, FeatureGrid, Testimonials, FAQ, CTA, and 15 more)
+  preview-adapter/ PreviewBridge component, postMessage protocol, CSS overlay system
 ```
+
+## Built-in Blocks
+
+Hero | FeatureGrid | Testimonials | FAQAccordion | CTA | Card | CardGrid | RichText | Stats | TwoColumn | Footer | SiteHeader | Embed | Banner | Carousel | Gallery | Tabs | Table | Quote | Video
+
+You can also [register custom blocks](docs/integration/custom-blocks.md) from your own component library.
+
+## Examples
+
+| Example | CMS | Path |
+|---------|-----|------|
+| Sample Site | JSON files | `examples/sample-site/` |
+| Contentful | Contentful CMS | `examples/contentful-site/` |
+| Sanity | Sanity + Studio | `examples/sanity-site/` |
+| Strapi | Strapi (self-hosted) | `examples/strapi-site/` |
+
+## Documentation
+
+| Topic | Link |
+|-------|------|
+| Integration guide | [docs/integration/](docs/integration/README.md) |
+| Site SDK reference | [packages/site-sdk/](packages/site-sdk/README.md) |
+| Architecture overview | [docs/architecture/](docs/architecture/current-state.md) |
+| Deployment (Vercel) | [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md) |
+| Dev server runbook | [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.md) |
+| AI coding agent guides | [docs/integration/ai-coding-agents.md](docs/integration/ai-coding-agents.md) |
 
 ## Development
 
 ```bash
-# TypeScript type checking across all workspaces
-pnpm typecheck
-
-# Run all tests
-pnpm test
-
-# Fast unit tests only (~2s)
-pnpm test:unit
-
-# E2E tests (requires API keys, ~30s)
-pnpm test:e2e
-
-# Local Anthropic prompt stability sweep (ops intent, no CI)
-pnpm -C apps/orchestrator benchmark:ops:stability:anthropic
-
-# Build all workspaces
-pnpm build
+pnpm typecheck    # TypeScript type checking across all workspaces
+pnpm test         # Run all tests
+pnpm test:unit    # Fast unit tests only (~2s)
+pnpm test:e2e     # E2E tests (requires API keys, ~30s)
+pnpm build        # Build all workspaces
 ```
 
 See [CLAUDE.md](CLAUDE.md) for the full command reference and environment variable documentation.
-Detailed runbook: [docs/testing/local-prompt-stability.md](docs/testing/local-prompt-stability.md).
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding standards, and PR guidelines.
+
+## License
+
+[MIT](LICENSE)
