@@ -25,6 +25,7 @@ import { authRoutes } from "./routes/auth.js"
 import { gdriveRoutes } from "./routes/gdrive.js"
 import { registerAgentRoutes } from "./routes/agent.js"
 import { registerSitesAgentRoutes } from "./routes/sites-agent.js"
+import { jiraRoutes } from "./routes/jira.js"
 import { createToolRuntime } from "./tools/runtime.js"
 
 const app = Fastify({ logger: true })
@@ -126,6 +127,7 @@ await app.register((instance) => authRoutes(instance))
 await app.register((instance) => gdriveRoutes(instance, ctx))
 await app.register((instance) => registerAgentRoutes(instance))
 await app.register((instance) => registerSitesAgentRoutes(instance, ctx))
+await app.register((instance) => jiraRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)
@@ -184,6 +186,18 @@ async function startServer() {
   await chatTelemetry.loadFromDisk()
   await app.listen({ port, host: "0.0.0.0" })
   app.log.info(`Orchestrator listening on ${port}`)
+
+  // Start JIRA poller if configured
+  if (process.env.JIRA_POLL_ENABLED === "1") {
+    const { loadJiraConfig } = await import("./jira/jira-types.js")
+    const { startJiraPoller } = await import("./jira/jira-poller.js")
+    const jiraConfig = loadJiraConfig()
+    if (jiraConfig) {
+      startJiraPoller({ config: jiraConfig, generatedImageDir, orchestratorPublicOrigin, logger: app.log })
+    } else {
+      app.log.warn("JIRA_POLL_ENABLED=1 but JIRA_BASE_URL or JIRA_API_TOKEN not set — poller not started")
+    }
+  }
 }
 
 if (process.env.NODE_ENV !== "test") {
