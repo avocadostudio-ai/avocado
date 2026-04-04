@@ -12,7 +12,7 @@
 
 Teams spend too much time on routine content updates — tweaking copy, adding sections, rearranging blocks. AI Site Editor turns these into simple conversations. Type what you want, review the plan, approve the changes.
 
-Built for **developers** integrating AI editing into client sites, and **agencies** looking for a self-hosted content ops platform they fully control. No vendor lock-in, no per-seat pricing, no black-box content pipelines.
+Built for **developers** and **agencies** integrating AI editing into client sites, and **site owners** who want to manage content without touching code. Self-hosted, no vendor lock-in, no per-seat pricing.
 
 ## Key Features
 
@@ -28,7 +28,6 @@ Built for **developers** integrating AI editing into client sites, and **agencie
 
 - **Claude, GPT-4o, Gemini** — Choose your provider per request. Switch models without changing code
 - **Tiered model selection** — Fast models for simple edits, reasoning models for complex restructuring
-- **Demo mode** — Run the full editor with pre-recorded plans, zero API cost. Perfect for evaluations and demos
 
 ### Blocks & Type Safety
 
