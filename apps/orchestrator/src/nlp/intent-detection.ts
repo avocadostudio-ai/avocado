@@ -242,7 +242,8 @@ export function isAdviceQuery(message: string) {
   // Exclude structural action requests that happen to contain "should we/I"
   if (/\b(reorder|reorganize|restructure|rearrange|sort|move)\b/.test(m) && /\bpages?\b/.test(m)) return false
   // Exclude explicit edit verbs — "review copy for clarity" is an edit, not advice
-  if (/\b(?:add|create|remove|delete|update|change|replace|move|rewrite|translate|rename)\b/.test(m)) return false
+  // But allow "should we/I add X?" phrasing — those are advice, not commands
+  if (!/\bshould\s+(we|i)\b/.test(m) && /\b(?:add|create|remove|delete|update|change|replace|move|rewrite|translate|rename)\b/.test(m)) return false
   return (
     /\b(is it good|is this good|should (we|i)|do you recommend|would you recommend)\b/.test(m) ||
     /\bwhat do you think\b/.test(m) ||
