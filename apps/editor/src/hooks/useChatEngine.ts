@@ -217,6 +217,9 @@ export function useChatEngine(config: ChatEngineConfig) {
       setActiveEditablePath(undefined)
       void refreshRouteSlugs()
       onApplied?.()
+      // After ops are applied, undo is available and redo stack is cleared
+      undoHistory.setCanUndoServer(true)
+      undoHistory.setCanRedoServer(false)
     }
   }
 
@@ -1324,6 +1327,8 @@ export function useChatEngine(config: ChatEngineConfig) {
     stopPendingPlan: planApproval.stopPendingPlan,
     continueChain,
     applyUndoHistory: undoHistory.applyUndoHistory,
+    applyGlobalUndo: undoHistory.applyGlobalUndo,
+    applyGlobalRedo: undoHistory.applyGlobalRedo,
     refreshRouteSlugs,
     syncFromSite,
     addBlockAfter: structuralOps.addBlockAfter,

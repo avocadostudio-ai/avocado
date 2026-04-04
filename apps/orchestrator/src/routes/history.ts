@@ -13,6 +13,15 @@ import {
 import type { RouteContext } from "./route-context.js"
 
 export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
+  app.get("/history/status", async (request, reply) => {
+    const query = request.query as { session?: string; siteId?: string; slug?: string }
+    if (!query.session || !query.slug) return reply.code(400).send({ error: "session and slug are required" })
+    const session = scopedSessionKey(query.session, query.siteId)
+    const undoList = getHistoryMap(historyUndo, session).get(query.slug) ?? []
+    const redoList = getHistoryMap(historyRedo, session).get(query.slug) ?? []
+    return { canUndo: undoList.length > 0, canRedo: redoList.length > 0 }
+  })
+
   app.post("/history/undo", async (request, reply) => {
     const body = request.body as { session?: string; siteId?: string; slug?: string }
     if (!body.session || !body.slug) return reply.code(400).send({ error: "session and slug are required" })
@@ -40,7 +49,7 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
       removePage(session, body.slug)
       const previewVersion = bumpVersion(session)
       schedulePersistState(app.log)
-      return { status: "applied", previewVersion, navigateToSlug: "/" }
+      return { status: "applied", previewVersion, navigateToSlug: "/", canUndo: list.length > 0, canRedo: true }
     }
 
     setPage(session, structuredClone(prev))
@@ -50,7 +59,7 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     // If the current page doesn't exist (was deleted), navigate to the restored page
     const currentPageExists = current !== null
     const navigateToSlug = !currentPageExists ? prev.slug : undefined
-    return { status: "applied", previewVersion, ...(navigateToSlug ? { navigateToSlug } : {}) }
+    return { status: "applied", previewVersion, canUndo: list.length > 0, canRedo: true, ...(navigateToSlug ? { navigateToSlug } : {}) }
   })
 
   app.post("/history/redo", async (request, reply) => {
@@ -79,7 +88,7 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
       removePage(session, body.slug)
       const previewVersion = bumpVersion(session)
       schedulePersistState(app.log)
-      return { status: "applied", previewVersion, navigateToSlug: "/" }
+      return { status: "applied", previewVersion, navigateToSlug: "/", canUndo: true, canRedo: list.length > 0 }
     }
 
     setPage(session, structuredClone(next))
@@ -89,6 +98,6 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     // If the current page doesn't exist (was deleted), navigate to the restored page
     const currentPageExists = current !== null
     const navigateToSlug = !currentPageExists ? next.slug : undefined
-    return { status: "applied", previewVersion, ...(navigateToSlug ? { navigateToSlug } : {}) }
+    return { status: "applied", previewVersion, canUndo: true, canRedo: list.length > 0, ...(navigateToSlug ? { navigateToSlug } : {}) }
   })
 }
