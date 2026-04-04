@@ -113,7 +113,7 @@ packages/
 
 | Topic | Link |
 |-------|------|
-| Integration guide | [docs/integration/](docs/integration/README.md) |
+| Integrate into your website | [docs/integration/](docs/integration/README.md) |
 | Site SDK reference | [packages/site-sdk/](packages/site-sdk/README.md) |
 | Architecture overview | [docs/architecture/](docs/architecture/current-state.md) |
 | Deployment (Vercel) | [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md) |
