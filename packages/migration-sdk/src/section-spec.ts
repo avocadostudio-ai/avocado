@@ -266,12 +266,31 @@ export function buildSectionSpec(
     isBackground: false,
   }))
 
-  // Inject background images from computed styles
+  // Inject background images from computed styles — root level and per-item children.
+  // Elementor event/service cards use CSS background-image on each card div, not <img> tags.
   if (root) {
     const bgImg = root.styles.backgroundImage ?? root.styles.background ?? ""
     const urlMatch = bgImg.match(/url\(["']?([^"')]+)["']?\)/)
     if (urlMatch?.[1] && !urlMatch[1].startsWith("data:")) {
       images.push({ src: urlMatch[1], alt: "", isBackground: true })
+    }
+
+    // Walk direct children (and one level deeper for wrapper divs) to collect
+    // per-item background images from card/event grids.
+    const existingSrcs = new Set(images.map((i) => i.src))
+    const collectChildBgImages = (nodes: ComputedStyleNode[]) => {
+      for (const node of nodes) {
+        const childBg = node.styles.backgroundImage ?? node.styles.background ?? ""
+        const childMatch = childBg.match(/url\(["']?([^"')]+)["']?\)/)
+        if (childMatch?.[1] && !childMatch[1].startsWith("data:") && !existingSrcs.has(childMatch[1])) {
+          images.push({ src: childMatch[1], alt: "", isBackground: true })
+          existingSrcs.add(childMatch[1])
+        }
+      }
+    }
+    collectChildBgImages(root.children)
+    for (const child of root.children) {
+      collectChildBgImages(child.children)
     }
   }
 
