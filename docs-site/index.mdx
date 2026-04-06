@@ -16,17 +16,17 @@ AI Site Editor is an open-source, AI-powered content operations platform for web
 ## Start Here
 
 <CardGroup cols={2}>
+  <Card title="Core concepts" icon="lightbulb" href="/concepts">
+    Pages, blocks, operations, draft mode — the mental model behind AI Site Editor.
+  </Card>
+  <Card title="How it works" icon="diagram-project" href="/how-it-works">
+    Step-by-step walkthrough of the editing pipeline, from chat to live preview.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    How the three services, packages, and data flow fit together.
+  </Card>
   <Card title="Quick start" icon="rocket" href="/integration/editor-quickstart">
-    Connect the editor to a Next.js site in ~30 minutes using embedded draft mode.
-  </Card>
-  <Card title="Integration overview" icon="puzzle-piece" href="/integration">
-    Prerequisites, tiers, adoption checklist, and the Site SDK.
-  </Card>
-  <Card title="Local development" icon="terminal" href="/operations/dev-server-runbook">
-    Start, restart, and diagnose the local multi-service dev environment.
-  </Card>
-  <Card title="Deploy to production" icon="cloud-arrow-up" href="/operations/vercel-deployment">
-    Deploy to Vercel, Netlify, or your own infrastructure.
+    Connect the editor to a Next.js site in ~30 minutes.
   </Card>
 </CardGroup>
 
@@ -43,8 +43,9 @@ AI Site Editor is an open-source, AI-powered content operations platform for web
 
 ## Suggested Reading Path
 
-1. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
-2. [Next.js embedded onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
-3. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally
-4. [Architecture spec](/specs/ai-website-editor-poc-spec) — full domain model and API surface
-5. [Site Provider SPI](/site-provider-spi) — advanced framework-agnostic REST contract
+1. [Core concepts](/concepts) — pages, blocks, operations, draft mode
+2. [How it works](/how-it-works) — the editing pipeline from chat to preview
+3. [Architecture](/architecture) — services, packages, data flow
+4. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
+5. [Next.js onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
+6. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally

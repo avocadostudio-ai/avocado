@@ -1,16 +1,15 @@
-# Vercel Deployment Plan (Self-Hosted)
+# Deploy to Vercel
 
-This document summarizes the changes needed to publish this project on Vercel.
+This guide covers deploying AI Site Editor to Vercel.
 
-## Current state (Mar 2026)
+## Overview
 
-Full demo deployment is live: site + editor on Vercel, orchestrator on Render.
+The recommended deployment splits across two platforms:
 
-- Site: `https://avocado-site.vercel.app`
-- Editor: `https://avocado-editor.vercel.app`
-- Orchestrator: Render (long-running Node process via `tsx`)
+- **Site + Editor** on Vercel (static/serverless hosting)
+- **Orchestrator** on a long-running host (Render, Fly.io, Railway, or any container platform)
 
-Phase 1 (public site only) and Phase 2 (full stack) are both supported.
+Two deployment phases are supported: public site only (Phase 1) or full editing stack (Phase 2).
 
 ### Required now (Phase 1)
 
