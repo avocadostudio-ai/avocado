@@ -1,0 +1,117 @@
+---
+title: "Core Concepts"
+description: "Key terms and mental model for understanding AI Site Editor."
+---
+
+## Pages, Blocks, and Props
+
+AI Site Editor manages website content as structured data, not raw HTML.
+
+- **Page** (`PageDoc`) — A single page on your website (e.g., `/about`, `/pricing`). Contains metadata (title, slug) and an ordered list of blocks.
+- **Block** (`BlockInstance`) — A content section on a page. Each block has a **type** (e.g., `Hero`, `CTA`, `FAQAccordion`) and **props** — the structured data that controls what it renders.
+- **Props** — The fields that make up a block's content. A Hero block might have `heading`, `subheading`, `backgroundImage`, and `ctaLabel`. Every prop is defined by a Zod schema, so the system knows exactly what values are valid.
+
+```
+PageDoc
+├── slug: "/about"
+├── title: "About Us"
+└── blocks:
+    ├── BlockInstance { type: "Hero", props: { heading: "About Us", ... } }
+    ├── BlockInstance { type: "FeatureGrid", props: { items: [...] } }
+    └── BlockInstance { type: "CTA", props: { label: "Get Started", ... } }
+```
+
+## Operations
+
+An **operation** is a structured, schema-validated edit action. When a user says _"change the hero heading to Welcome"_, the AI doesn't modify HTML — it generates an operation like:
+
+```json
+{
+  "op": "update_block",
+  "blockId": "hero-1",
+  "props": { "heading": "Welcome" }
+}
+```
+
+Operations are the unit of change in AI Site Editor. They can be:
+
+| Operation | What it does |
+|-----------|-------------|
+| `add_block` | Insert a new block at a specific position |
+| `update_block` | Change one or more props on an existing block |
+| `remove_block` | Delete a block from the page |
+| `move_block` | Reorder a block within the page |
+| `add_page` | Create a new page |
+| `duplicate_page` | Copy an existing page |
+| `delete_page` | Remove a page |
+
+Every operation is validated against the block's Zod schema before it's applied. If the AI generates an invalid edit (e.g., setting a `heading` to a number), it's rejected automatically.
+
+## Plans and Approval
+
+When a user sends a chat message, the AI generates an **edit plan** — a list of one or more operations. The plan is presented to the user for review before it's applied.
+
+```
+User: "Add a testimonials section below the hero with 3 customer quotes"
+
+→ Edit Plan:
+  1. add_block { type: "Testimonials", position: after "hero-1", props: { items: [...] } }
+
+→ User approves → Operations applied → Live preview updates
+```
+
+Plans can be **approved**, **rejected**, or **modified**. The user always has the final say.
+
+## Draft Mode
+
+**Draft mode** is how the editor shows unpublished changes on your live site. When the editor is active, the site switches into draft mode — it fetches the latest draft content from the orchestrator instead of the published content.
+
+- **Published content** — What your visitors see. Stored in your CMS, database, or static files.
+- **Draft content** — What you see in the editor. Stored in the orchestrator's session state. Not visible to site visitors.
+- **Publishing** — Promoting draft content to published. Triggered by the user after reviewing changes.
+
+Draft mode uses Next.js cookies under the hood. The editor iframe sets the cookie automatically — your site just needs to check for it and fetch from the orchestrator when present.
+
+## The Three Services
+
+AI Site Editor runs as three services that communicate via HTTP and postMessage:
+
+| Service | Role | Tech |
+|---------|------|------|
+| **Orchestrator** | The brain. Handles AI planning, operation validation, session state, undo/redo, and publishing. | Fastify API |
+| **Editor** | The UI. Chat interface, model picker, plan review, and settings. Embeds the site in an iframe. | Vite + React |
+| **Site** | Your website. Renders pages from block data. In draft mode, fetches content from the orchestrator. | Next.js |
+
+The editor embeds your site in an iframe. When the user clicks a block, the site sends a `postMessage` to the editor identifying which block was selected. When an operation is applied, the orchestrator notifies the site to re-fetch and re-render.
+
+## Block Manifest
+
+When the editor connects to your site, it fetches the **block manifest** from `/api/editor/blocks`. This tells the editor what block types are available and what props each one accepts.
+
+```json
+{
+  "version": 1,
+  "blocks": [
+    {
+      "type": "Hero",
+      "fields": {
+        "heading": { "type": "string", "label": "Heading" },
+        "subheading": { "type": "string", "label": "Subheading" },
+        "backgroundImage": { "type": "image", "label": "Background" }
+      }
+    }
+  ]
+}
+```
+
+The AI planner uses the manifest to understand what blocks exist and what edits are possible. This is why every block needs a complete schema — it's not just for validation, it's the AI's instruction manual.
+
+## Multi-Model AI
+
+The orchestrator supports three AI providers:
+
+- **Anthropic** — Claude Haiku (fast), Sonnet (balanced), Opus (complex reasoning). Most battle-tested.
+- **OpenAI** — GPT-4o-mini (fast), GPT-4o (balanced), o1/o3 (reasoning).
+- **Google Gemini** — Gemini Flash (fast), Gemini Pro (reasoning).
+
+Users select the provider and model tier in the editor's settings panel. The orchestrator routes the request to the appropriate provider. You can also override model names via environment variables for each tier.

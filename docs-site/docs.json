@@ -15,15 +15,34 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Getting Started",
+        "tab": "Overview",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Introduction",
             "pages": [
               "index",
+              "concepts",
+              "how-it-works",
+              "architecture"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integration",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
               "integration/index",
               "integration/editor-quickstart",
-              "integration/nextjs-mvp-embedded",
+              "integration/nextjs-mvp-embedded"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "site-provider-spi",
               "integration/tools-mvp"
             ]
           }
@@ -35,9 +54,9 @@
           {
             "group": "Deploy",
             "pages": [
+              "operations/dev-server-runbook",
               "operations/vercel-deployment",
-              "operations/netlify-deployment",
-              "operations/dev-server-runbook"
+              "operations/netlify-deployment"
             ]
           }
         ]
@@ -46,24 +65,11 @@
         "tab": "Reference",
         "groups": [
           {
-            "group": "Architecture",
+            "group": "Specifications",
             "pages": [
-              "specs/ai-website-editor-poc-spec",
-              "site-provider-spi"
+              "specs/ai-website-editor-poc-spec"
             ]
           },
-          {
-            "group": "Testing",
-            "pages": [
-              "testing/e2e-editing-prompts",
-              "testing/avocado-transformation-demo-runbook"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Advanced",
-        "groups": [
           {
             "group": "Observability",
             "pages": [
@@ -79,6 +85,13 @@
               "guardrails/guardrail-schema-concept",
               "guardrails/guardrail-schema-v1-spec",
               "guardrails/guardrail-schema-v1-implementation-checklist"
+            ]
+          },
+          {
+            "group": "Testing",
+            "pages": [
+              "testing/e2e-editing-prompts",
+              "testing/avocado-transformation-demo-runbook"
             ]
           },
           {
