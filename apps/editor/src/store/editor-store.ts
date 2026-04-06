@@ -81,7 +81,7 @@ export type EditorState = {
   // ── ui ──────────────────────────────────────────────────────────
   composerHeight: number
   chatWidth: number | null
-  activeTab: "chat" | "properties"
+  activeTab: "chat" | "properties" | "history"
   showSettingsModal: boolean
   showDebugDetails: boolean
   addBlockPicker: { slug: string; afterBlockId?: string; beforeBlockId?: string } | null
@@ -162,7 +162,7 @@ export type EditorActions = {
   // ui
   setComposerHeight: (value: number | ((prev: number) => number)) => void
   setChatWidth: (value: number | null | ((prev: number | null) => number | null)) => void
-  setActiveTab: (tab: "chat" | "properties") => void
+  setActiveTab: (tab: "chat" | "properties" | "history") => void
   setShowSettingsModal: (show: boolean) => void
   setShowDebugDetails: (show: boolean) => void
   setAddBlockPicker: (picker: EditorState["addBlockPicker"]) => void

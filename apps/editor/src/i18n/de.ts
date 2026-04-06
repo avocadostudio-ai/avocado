@@ -41,6 +41,14 @@ const de: LocaleDict = {
   "chat.redo": "Wiederherstellen",
   "chat.undoTooltip": "Rückgängig (Strg+Z)",
   "chat.redoTooltip": "Wiederherstellen (Strg+Y)",
+
+  // -- Version history --
+  "history.title": "Versionshistorie",
+  "history.loading": "Historie wird geladen...",
+  "history.empty": "Noch keine Änderungen.",
+  "history.operation": "Operation",
+  "history.operations": "Operationen",
+  "history.tooltip": "Versionshistorie",
   "chat.goodResponse": "Gute Antwort",
   "chat.badResponse": "Schlechte Antwort",
   "chat.feedbackThanks": "Danke!",
