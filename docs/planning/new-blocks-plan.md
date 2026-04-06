@@ -1,6 +1,6 @@
 # New Blocks Plan
 
-10 new blocks to add, based on AEM EDS gap analysis. Implementing one at a time.
+10 new blocks to add, based on gap analysis. Implementing one at a time.
 
 ## Blocks
 
