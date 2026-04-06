@@ -1,4 +1,5 @@
 import React, { forwardRef, type CSSProperties, type ReactNode } from "react"
+import { Undo2, Redo2 } from "lucide-react"
 import type { ChatEntry } from "../lib/editor-types"
 import { renderFinalMarkdown, renderStreamingMarkdown } from "../lib/markdown-renderer"
 import { isRedundantChangeLine } from "../lib/editor-utils"
@@ -262,11 +263,8 @@ export function ChatComposerCore({
             onClick={onGlobalUndo}
             title={undoTooltip}
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-              <path d="M9 7 4 12l5 5" />
-              <path d="M5 12h7a4.5 4.5 0 0 1 0 9H10" />
-            </svg>
-            <span>Undo</span>
+            <Undo2 size={14} aria-hidden="true" />
+            <span>{undoTooltip?.replace(/\s*\(.*\)/, "") ?? "Undo"}</span>
           </button>
           <button
             type="button"
@@ -275,11 +273,8 @@ export function ChatComposerCore({
             onClick={onGlobalRedo}
             title={redoTooltip}
           >
-            <span>Redo</span>
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-              <path d="M15 7l5 5-5 5" />
-              <path d="M19 12h-7a4.5 4.5 0 0 0 0 9h2" />
-            </svg>
+            <span>{redoTooltip?.replace(/\s*\(.*\)/, "") ?? "Redo"}</span>
+            <Redo2 size={14} aria-hidden="true" />
           </button>
         </div>
       ) : null}

@@ -53,6 +53,7 @@ import {
   pushUndo,
   bumpVersion,
   pushRecentEdit,
+  pushVersionEntry,
   pushChatHistory,
   schedulePersistState,
   removePage
@@ -1754,6 +1755,14 @@ export async function runChatPipeline(
       pushRecentEdit(body.session!, { slug: updatedSlug ?? effectiveSlug, summary: futureToPastTense(resolvedPlan.summary_for_user), ops: resolvedPlan.ops })
       if (body.message) pushChatHistory(body.session!, body.message, futureToPastTense(resolvedPlan.summary_for_user))
       const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
+      pushVersionEntry(body.session!, {
+        version: previewVersion,
+        slug: updatedSlug ?? effectiveSlug,
+        summary: futureToPastTense(resolvedPlan.summary_for_user),
+        opTypes: resolvedPlan.ops.map((op) => op.op),
+        opCount: resolvedPlan.ops.length,
+        source: "chat"
+      })
       schedulePersistState(ctx.log)
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
