@@ -118,6 +118,7 @@ export type PersistedState = {
   recentEdits: Record<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>
   chatHistory: Record<string, Array<{ role: "user" | "assistant"; content: string }>>
   siteConfigs?: Record<string, SiteConfig>
+  versionLog?: Record<string, VersionEntry[]>
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +132,17 @@ export const historyUndo = new Map<string, Map<string, (PageDoc | null)[]>>()
 export const historyRedo = new Map<string, Map<string, (PageDoc | null)[]>>()
 export const versions = new Map<string, number>()
 export const recentEdits = new Map<string, Array<{ slug: string; summary: string; ops: Operation[]; at: string }>>()
+
+export type VersionEntry = {
+  version: number
+  slug: string
+  summary: string
+  opTypes: string[]
+  opCount: number
+  at: string
+  source: "chat" | "direct" | "undo" | "redo" | "bootstrap" | "restore"
+}
+export const versionLog = new Map<string, VersionEntry[]>()
 export const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()
 export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
@@ -370,6 +382,20 @@ export function pushRecentEdit(session: string, entry: { slug: string; summary: 
   recentEdits.set(session, list.slice(-10))
 }
 
+const VERSION_LOG_MAX = 100
+
+export function pushVersionEntry(session: string, entry: Omit<VersionEntry, "at">) {
+  const list = versionLog.get(session) ?? []
+  list.push({ ...entry, at: new Date().toISOString() })
+  versionLog.set(session, list.slice(-VERSION_LOG_MAX))
+}
+
+export function getVersionLog(session: string, slug?: string, limit = 50): VersionEntry[] {
+  const list = versionLog.get(session) ?? []
+  const filtered = slug ? list.filter((e) => e.slug === slug) : list
+  return filtered.slice(-limit)
+}
+
 export const CHAT_HISTORY_MAX_TURNS = 6
 
 export function pushChatHistory(session: string, userMessage: string, assistantSummary: string) {
@@ -522,6 +548,17 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
       }
     }
   }
+
+  versionLog.clear()
+  if (parsed.versionLog && typeof parsed.versionLog === "object") {
+    for (const [session, listRaw] of Object.entries(parsed.versionLog)) {
+      if (!Array.isArray(listRaw)) continue
+      const list = listRaw
+        .filter((entry) => entry && typeof entry === "object" && typeof entry.version === "number")
+        .map((entry) => entry as VersionEntry)
+      versionLog.set(session, list.slice(-VERSION_LOG_MAX))
+    }
+  }
 }
 
 async function rotateStateBackups(logger: FastifyBaseLogger) {
@@ -596,7 +633,8 @@ export async function persistStateNow(logger: FastifyBaseLogger) {
     versions: Object.fromEntries(versions.entries()),
     recentEdits: Object.fromEntries(recentEdits.entries()),
     chatHistory: Object.fromEntries(chatHistoryBySession.entries()),
-    siteConfigs: Object.fromEntries(siteConfigs.entries())
+    siteConfigs: Object.fromEntries(siteConfigs.entries()),
+    versionLog: Object.fromEntries(versionLog.entries())
   }
   await mkdir(resolve(stateFilePath, ".."), { recursive: true })
   const tempPath = `${stateFilePath}.tmp-${process.pid}`

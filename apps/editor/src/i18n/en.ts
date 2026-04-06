@@ -39,6 +39,14 @@ const en = {
   "chat.redo": "Redo",
   "chat.undoTooltip": "Undo (Ctrl+Z)",
   "chat.redoTooltip": "Redo (Ctrl+Y)",
+
+  // -- Version history --
+  "history.title": "Version History",
+  "history.loading": "Loading history...",
+  "history.empty": "No changes yet.",
+  "history.operation": "operation",
+  "history.operations": "operations",
+  "history.tooltip": "Version history",
   "chat.goodResponse": "Good response",
   "chat.badResponse": "Bad response",
   "chat.feedbackThanks": "Thanks!",
