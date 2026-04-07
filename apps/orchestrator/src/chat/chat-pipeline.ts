@@ -769,7 +769,7 @@ export async function runChatPipeline(
         translationScope
       })
     : ("standard" as const)
-  const isLightweightEdit = intentComplexity === "simple"
+  let isLightweightEdit = intentComplexity === "simple"
   const basePlannerContext =
     (compactContextExperimentEnabled || isLightweightEdit)
       ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
@@ -780,7 +780,7 @@ export async function runChatPipeline(
     activeBlockId: planningActiveBlockId,
     activeEditablePath: planningActiveEditablePath
   })
-  const plannerContext =
+  let plannerContext =
     useMinimalPlannerContext
       ? minimalPlannerContextPack({ contextPack: basePlannerContext })
       : basePlannerContext
@@ -2235,7 +2235,6 @@ export async function runChatPipeline(
 
   const llmIntentRouterEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_LLM_INTENT_ROUTER ?? "1").trim())
   const shouldTryLlmIntentRouter =
-    !contentQuery &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")
@@ -2254,6 +2253,7 @@ export async function runChatPipeline(
   const generatePlanImpl = isAnthropicPlanner ? generatePlanWithAnthropicImpl : isGeminiPlanner ? generatePlanWithGeminiImpl : generatePlanWithOpenAIImpl
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
+  let routerDetectedInfo = false
   const planningErrors: string[] = []
 
   if (shouldTryLlmIntentRouter && parallelPlannerEnabled) {
@@ -2319,6 +2319,9 @@ export async function runChatPipeline(
       })
 
       routerComplexity = routedIntent.complexity ?? null
+      if (routedIntent.action === "info") {
+        routerDetectedInfo = true
+      }
 
       if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
         return { plan: routedPlan, outcome: "llm_router_plan_ready" as const }
@@ -2517,13 +2520,20 @@ export async function runChatPipeline(
       }
 
       if (routerResult.source === "router") {
-        // Router returned null or failed validation — await the full planner
-        try {
-          const plannerResult = await fullPlannerPromise
-          consumeFullPlannerResult(plannerResult)
-        } catch (plannerFallbackError) {
-          if (isCancelError(plannerFallbackError)) throw plannerFallbackError
-          // Full planner also failed — fall through to retry loop
+        if (routerDetectedInfo) {
+          // Info query — abort the in-flight planner (it has wrong context)
+          fullPlannerAbort.abort("router_info_rebuild")
+          suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_info")
+          // Fall through to post-race context rebuild below
+        } else {
+          // Router returned null or failed validation — await the full planner
+          try {
+            const plannerResult = await fullPlannerPromise
+            consumeFullPlannerResult(plannerResult)
+          } catch (plannerFallbackError) {
+            if (isCancelError(plannerFallbackError)) throw plannerFallbackError
+            // Full planner also failed — fall through to retry loop
+          }
         }
       } else {
         // Full planner won the race — use its result
@@ -2593,6 +2603,10 @@ export async function runChatPipeline(
         locale: body.locale
       })
 
+      if (routedIntent.action === "info") {
+        routerDetectedInfo = true
+      }
+
       if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
         markPlanningFinish()
         ctx.chatTelemetry.push({
@@ -2647,6 +2661,22 @@ export async function runChatPipeline(
     } catch {
       // If router fails, fall back to the full planner.
     }
+  }
+
+  // Router detected a content query the regex missed — rebuild context with full props
+  // so the full planner retry loop has the page content it needs for content_answer.
+  if (routerDetectedInfo && !initialPlan && !contentQuery) {
+    plannerContext = plannerContextPack({
+      session: body.session,
+      slug: effectiveSlug,
+      message: plannerMessage,
+      currentPage: current,
+      activeBlockId: planningActiveBlockId,
+      activeBlockType: body.activeBlockType,
+      activeEditablePath: planningActiveEditablePath,
+      includeFullProps: true
+    })
+    isLightweightEdit = false
   }
 
   // --- Continuation chain decomposition ---
