@@ -452,6 +452,14 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
                     onChange={(event) => sites.updateConfigSite({ previewUrl: event.target.value })}
                   />
                 </label>
+                <label className="sites-form-field sites-form-field-inline">
+                  <input
+                    type="checkbox"
+                    checked={sites.configSite.enablePuck ?? false}
+                    onChange={(event) => sites.updateConfigSite({ enablePuck: event.target.checked })}
+                  />
+                  <span>{t("sites.enablePuck")}</span>
+                </label>
                 <p className="sites-form-section-title">{t("sites.editorialBrief")}</p>
                 <div className="sites-form-field sites-form-field-wide">
                   <div className="sites-ai-tabs" role="tablist" aria-label={t("sites.editorialBrief")}>

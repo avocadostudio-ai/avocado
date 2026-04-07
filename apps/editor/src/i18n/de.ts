@@ -105,6 +105,7 @@ const de: LocaleDict = {
   "sites.siteNamePlaceholder": "Adventure Arena",
   "sites.previewUrl": "Vorschau-URL",
   "sites.previewUrlPlaceholder": "http://localhost:3000",
+  "sites.enablePuck": "Visuellen Editor (Puck) verwenden",
   "sites.editorialBrief": "Redaktionelles Briefing",
   "sites.overview": "Übersicht",
   "sites.tone": "Tonalität",
