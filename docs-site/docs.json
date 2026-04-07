@@ -36,6 +36,7 @@
             "pages": [
               "integration/index",
               "integration/editor-quickstart",
+              "integration/puck-mode",
               "integration/nextjs-mvp-embedded",
               "integration/custom-blocks"
             ]
