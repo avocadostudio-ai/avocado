@@ -1150,13 +1150,7 @@ function EditorPage({
           ref={chatThreadRef}
           className="chat-thread"
           style={{ display: activeTab === "chat" ? "" : "none" }}
-          entries={chatLog}
-          isLoading={isLoading}
-          streamStatus={streamStatus}
           streamStatusLabel={streamTextLabel}
-          streamingText={streamingText}
-          streamSteps={streamSteps}
-          streamingChanges={streamingChanges}
           undoInFlightEntryId={chatEngine.undoInFlightEntryId}
           onSuggestionClick={(line) => void chatEngine.submitChat(line)}
           onUndo={(entryId) => void chatEngine.applyUndoHistory(entryId)}
@@ -1470,11 +1464,8 @@ function EditorPage({
 
         <PropertyPanel
           style={{ display: activeTab === "properties" ? "" : "none" }}
-          blockId={activeBlockId}
-          blockType={activeBlockType}
           props={blockProps.props}
           status={blockProps.status}
-          slug={slug}
           pageName={slugLabel(slug)}
           onDeselectBlock={() => { setActiveBlockId(undefined); setActiveBlockType(undefined) }}
           navLabel={sites.headerConfig.navLabels?.[slug] ?? ""}
@@ -1520,9 +1511,6 @@ function EditorPage({
           onPageAiAssist={handlePageAiAssist}
           onAiQuickAction={handleFieldAiQuickAction}
           onPageAiQuickAction={handlePageAiQuickAction}
-          aiLoading={isLoading}
-          aiLoadingPath={activeEditablePath}
-          highlightPath={activeEditablePath}
           onAddListItem={activeBlockId && activeBlockType ? (listKey) => {
             void chatEngine.addListItem(slug, activeBlockId, activeBlockType, listKey)
               .then(() => blockProps.refetch())
