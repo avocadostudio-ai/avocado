@@ -5,9 +5,20 @@ description: "AI-powered content operations for websites — natural language ed
 
 ## What is AI Site Editor?
 
-AI Site Editor is an open-source, AI-powered content operations platform for websites. Describe content changes in natural language — the system plans and applies them as validated, schema-checked operations with live preview, undo/redo, and one-click publishing.
+AI Site Editor is an open-source, AI-powered content operations platform for websites. Describe content changes in natural language or use the visual drag-and-drop editor — the system plans and applies them as validated, schema-checked operations with live preview, undo/redo, and one-click publishing.
 
-**How it works**: a split-pane experience where your live website renders on the left and a chat interface on the right. Users type requests like _"add a testimonials section below the hero"_ or _"change the hero heading to Welcome"_, and the system plans and applies structured edits in real time.
+### Two editing modes
+
+<CardGroup cols={2}>
+  <Card title="Chat Editor" icon="message-bot">
+    The default experience — a split-pane interface where your live site renders on the left and a chat interface on the right. Type requests like _"add a testimonials section below the hero"_ and the AI plans and applies structured edits.
+  </Card>
+  <Card title="Puck Mode" icon="hand-pointer" href="/integration/puck-mode">
+    A visual drag-and-drop editor powered by Puck. Reorder blocks, edit fields directly, and use the AI chat sidebar for natural-language edits — all in one canvas. Enabled per-site via settings.
+  </Card>
+</CardGroup>
+
+Both modes share the same block system, operation pipeline, and orchestrator backend. The editing mode is a per-site setting — each site can independently opt into Puck mode.
 
 **For developers and agencies**: integrate AI editing into any Next.js site with the Site SDK, or use the framework-agnostic REST API. Self-hosted, multi-model AI (Anthropic, OpenAI, Google Gemini), and a pluggable publishing pipeline.
 
@@ -27,6 +38,9 @@ AI Site Editor is an open-source, AI-powered content operations platform for web
   </Card>
   <Card title="Quick start" icon="rocket" href="/integration/editor-quickstart">
     Connect the editor to a Next.js site in ~30 minutes.
+  </Card>
+  <Card title="Puck mode" icon="hand-pointer" href="/integration/puck-mode">
+    Enable the visual drag-and-drop editor for a site.
   </Card>
 </CardGroup>
 
@@ -48,4 +62,5 @@ AI Site Editor is an open-source, AI-powered content operations platform for web
 3. [Architecture](/architecture) — services, packages, data flow
 4. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
 5. [Next.js onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
-6. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally
+6. [Puck mode](/integration/puck-mode) — visual drag-and-drop editing with AI chat
+7. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally
