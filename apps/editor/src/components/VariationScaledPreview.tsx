@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react"
+import React, { useEffect, useRef, useState, type CSSProperties } from "react"
 import { SharedBlockRenderer } from "@ai-site-editor/blocks"
 import type { BlockInstance } from "@ai-site-editor/shared"
 
-export function VariationScaledPreview(args: { block: BlockInstance; virtualWidth: number }) {
+export const VariationScaledPreview = React.memo(function VariationScaledPreview(args: { block: BlockInstance; virtualWidth: number }) {
   const shellRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [shellWidth, setShellWidth] = useState(0)
@@ -50,4 +50,4 @@ export function VariationScaledPreview(args: { block: BlockInstance; virtualWidt
       </div>
     </div>
   )
-}
+})
