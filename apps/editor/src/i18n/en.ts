@@ -103,6 +103,7 @@ const en = {
   "sites.siteNamePlaceholder": "Adventure Arena",
   "sites.previewUrl": "Preview URL",
   "sites.previewUrlPlaceholder": "http://localhost:3000",
+  "sites.enablePuck": "Use visual editor (Puck)",
   "sites.editorialBrief": "Editorial brief",
   "sites.overview": "Overview",
   "sites.tone": "Tone",
