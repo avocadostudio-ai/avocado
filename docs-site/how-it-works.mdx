@@ -100,10 +100,87 @@ The history is operation-level, not plan-level — if a plan contains 3 operatio
 
 ## Publishing
 
-When the user is satisfied with their edits, they can publish:
+When the user is satisfied with their edits, they click **Publish** in the editor. The orchestrator snapshots the current draft pages and pushes them through a **publish target** — a pluggable interface that connects to your deployment workflow.
 
-1. Click **Publish** in the editor
-2. The orchestrator snapshots the current draft state
-3. The snapshot is pushed through the configured `PublishTarget` (Git + Vercel by default)
-4. The production site rebuilds with the new content
-5. Deployment status is tracked and reported back to the editor
+### The `PublishTarget` Interface
+
+Publishing is defined by a single TypeScript interface:
+
+```typescript
+interface PublishTarget {
+  publish(session: string, pages: PageDoc[], config: SiteConfig): Promise<PublishResult>
+  getStatus?(session: string): Promise<PublishStatus | null>
+}
+```
+
+- `publish()` — Takes the session ID, all draft pages, and the site config. Returns whether the publish succeeded and which page slugs were published.
+- `getStatus()` — Optional. Lets the editor poll for deployment progress (e.g., "building", "ready", "failed").
+
+### Built-in: Git + Vercel Deploy Hook
+
+The default publish target (`GitVercelPublishTarget`) works in two modes:
+
+**Git mode** (`PUBLISH_MODE=git`, the default):
+1. Serializes all draft pages to `apps/site/lib/published-content.json`
+2. Copies any generated images to `apps/site/public/generated-images/`
+3. Rewrites localhost image URLs to relative paths
+4. Commits and pushes to the configured branch (`PUBLISH_GIT_BRANCH`, defaults to `main`)
+5. If a Vercel deploy hook is configured, the push triggers a rebuild automatically
+
+**Deploy hook mode** (`PUBLISH_MODE=deploy_hook`):
+1. Calls the `VERCEL_DEPLOY_HOOK_URL` endpoint to trigger a Vercel rebuild
+2. Tracks deployment status by polling the Vercel API (`VERCEL_TOKEN`)
+3. Reports back to the editor: triggered → building → ready (or failed)
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PUBLISH_MODE` | `git` | `git` or `deploy_hook` |
+| `PUBLISH_GIT_BRANCH` | `main` | Branch to push published content to |
+| `PUBLISH_GIT_STRICT` | `0` | If `1`, abort publish when working tree has unrelated changes |
+| `PUBLISH_TOKEN` | _(none)_ | Require this token in `x-publish-token` header to authorize publishes |
+| `VERCEL_DEPLOY_HOOK_URL` | _(none)_ | Vercel deploy hook URL (for deploy_hook mode) |
+| `VERCEL_TOKEN` | _(none)_ | Vercel API token for polling deployment status |
+
+### Implementing a Custom Publish Target
+
+To publish to a different platform (Netlify, AWS, a CMS, or your own CI/CD pipeline), implement the `PublishTarget` interface:
+
+```typescript
+import type { PublishTarget, PublishResult } from "./publish-target.js"
+import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+
+export class MyPublishTarget implements PublishTarget {
+  async publish(session: string, pages: PageDoc[], config: SiteConfig): Promise<PublishResult> {
+    // pages is the full array of PageDoc objects (JSON)
+    // Each page has: slug, title, blocks (array of BlockInstance)
+    
+    // Example: POST to your CMS API
+    const res = await fetch("https://your-cms.example.com/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pages })
+    })
+
+    return {
+      ok: res.ok,
+      slugs: pages.map(p => p.slug),
+      error: res.ok ? undefined : `CMS returned ${res.status}`
+    }
+  }
+}
+```
+
+The orchestrator passes full `PageDoc` objects — your publish target receives structured JSON, not HTML. Your target decides how to store, transform, or deploy that content.
+
+### CMS Publishing (via Site SDK)
+
+For CMS-backed sites (Contentful, Sanity, Strapi), the Site SDK provides publish utilities that handle the common workflow:
+
+1. Resolve image URLs (rewrite localhost references, upload to CMS)
+2. SSRF validation on external image URLs
+3. Deduplicate image uploads within a single publish
+4. Push page content to the CMS API
+
+See the working examples in `examples/contentful-site/`, `examples/sanity-site/`, and `examples/strapi-site/` for complete CMS publish implementations.
