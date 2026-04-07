@@ -208,7 +208,7 @@ export const CONTENT_QUERY_PATTERNS: RegExp[] = [
   /\bwhat\s+(?:blocks?|sections?)\s+(?:are|is)\s+(?:on|in)\s+(?:this|the)\s+page\b/,
   /\b(?:list|show|tell me)\b.*\b(?:all|every)\b.*\b(?:blocks?|sections?|components?)\b.*\b(?:on|in)\b/,
   /\b(?:audit|review|check|inspect|analyze)\s+(?:the\s+)?(?:page|content|copy|text|links?|images?|buttons?)\b/,
-  /\bdescribe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration)\b/,
+  /\bdescribe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration|page|site|content|section)\b/,
 ]
 
 // ---------------------------------------------------------------------------
