@@ -38,7 +38,7 @@ Every operation in the plan is validated against the block's Zod schema:
 - Does the target block exist (for updates/removes)?
 - Is the position valid (for adds/moves)?
 
-If validation fails, the orchestrator attempts **auto-repair** — re-prompting the AI with the specific error. If repair also fails, the user sees a clear error message explaining what went wrong.
+If validation fails, the orchestrator attempts **auto-repair** — re-prompting the AI with the specific error. If repair also fails, the user sees a clear error message explaining what went wrong. See [Chat Troubleshooting](/observability/chat-troubleshooting) for debugging failed plans.
 
 ### Step 4: Apply Operations
 
