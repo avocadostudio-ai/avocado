@@ -111,11 +111,16 @@ packages/
 
 ## Documentation
 
+The full documentation site is in [`docs-site/`](docs-site/) (built with [Mintlify](https://mintlify.com)). Run `mintlify dev` from that directory to preview locally.
+
 | Topic | Link |
 |-------|------|
+| Core concepts | [docs-site/concepts.mdx](docs-site/concepts.mdx) |
+| How it works | [docs-site/how-it-works.mdx](docs-site/how-it-works.mdx) |
+| Architecture | [docs-site/architecture.mdx](docs-site/architecture.mdx) |
 | Integrate into your website | [docs/integration/](docs/integration/README.md) |
+| Custom blocks | [docs/integration/custom-blocks.md](docs/integration/custom-blocks.md) |
 | Site SDK reference | [packages/site-sdk/](packages/site-sdk/README.md) |
-| Architecture overview | [docs/architecture/](docs/architecture/current-state.md) |
 | Deploy to Vercel | [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md) |
 | Deploy to Netlify | [docs/operations/netlify-deployment.md](docs/operations/netlify-deployment.md) |
 | Dev server runbook | [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.md) |
