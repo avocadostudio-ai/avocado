@@ -3,17 +3,18 @@ import type { ChatEntry } from "../lib/editor-types"
 import { renderFinalMarkdown, renderStreamingMarkdown } from "../lib/markdown-renderer"
 import { isRedundantChangeLine } from "../lib/editor-utils"
 import ClaudeStyleChatInput from "./claude-style-chat-input"
+import { useEditorStore } from "../store"
 
 type MediaHandler = (blob: Blob, mimeType: string) => Promise<string>
 
 export type ChatThreadCoreProps = {
-  entries: ChatEntry[]
-  isLoading: boolean
-  streamStatus: string | null
+  entries?: ChatEntry[]
+  isLoading?: boolean
+  streamStatus?: string | null
   streamStatusLabel?: string | null
-  streamingText: string | null
-  streamSteps: { label: string; done: boolean }[]
-  streamingChanges: string[]
+  streamingText?: string | null
+  streamSteps?: { label: string; done: boolean }[]
+  streamingChanges?: string[]
   undoInFlightEntryId: string | null
   className?: string
   style?: CSSProperties
@@ -26,14 +27,14 @@ export type ChatThreadCoreProps = {
   undoneLabel?: string
 }
 
-export const ChatThreadCore = forwardRef<HTMLDivElement, ChatThreadCoreProps>(function ChatThreadCore({
-  entries,
-  isLoading,
-  streamStatus,
+export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCoreProps>(function ChatThreadCore({
+  entries: entriesProp,
+  isLoading: isLoadingProp,
+  streamStatus: streamStatusProp,
   streamStatusLabel,
-  streamingText,
-  streamSteps,
-  streamingChanges,
+  streamingText: streamingTextProp,
+  streamSteps: streamStepsProp,
+  streamingChanges: streamingChangesProp,
   undoInFlightEntryId,
   className = "chat-thread",
   style,
@@ -45,6 +46,19 @@ export const ChatThreadCore = forwardRef<HTMLDivElement, ChatThreadCoreProps>(fu
   undoLabel = "Undo",
   undoneLabel = "Undone",
 }, ref) {
+  // Read from store — props take precedence when provided
+  const storeChatLog = useEditorStore((s) => s.chatLog)
+  const storeIsLoading = useEditorStore((s) => s.isLoading)
+  const storeStreamStatus = useEditorStore((s) => s.streamStatus)
+  const storeStreamingText = useEditorStore((s) => s.streamingText)
+  const storeStreamSteps = useEditorStore((s) => s.streamSteps)
+  const storeStreamingChanges = useEditorStore((s) => s.streamingChanges)
+  const entries = entriesProp ?? storeChatLog
+  const isLoading = isLoadingProp ?? storeIsLoading
+  const streamStatus = streamStatusProp ?? storeStreamStatus
+  const streamingText = streamingTextProp ?? storeStreamingText
+  const streamSteps = streamStepsProp ?? storeStreamSteps
+  const streamingChanges = streamingChangesProp ?? storeStreamingChanges
   const doneStreamSteps = streamSteps.filter((s) => s.done)
   const fallbackStatusLabel = streamStatusLabel ?? streamStatus
   const hasRenderableEntry = entries.some((entry) => {
@@ -187,7 +201,7 @@ export const ChatThreadCore = forwardRef<HTMLDivElement, ChatThreadCoreProps>(fu
       <div />
     </div>
   )
-})
+}))
 
 export type ChatComposerCoreProps = {
   message: string
