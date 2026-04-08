@@ -1348,6 +1348,8 @@ export function useChatEngine(config: ChatEngineConfig) {
     // Legacy pass-through — components migrating to store selectors
     // can still read these until fully migrated.
     undoInFlightEntryId: undoHistory.undoInFlightEntryId,
+    canUndoServer: undoHistory.canUndoServer,
+    canRedoServer: undoHistory.canRedoServer,
     pushAssistantFromResult,
   }
 }
