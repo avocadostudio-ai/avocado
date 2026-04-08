@@ -5,19 +5,37 @@ description: "Quick guide to integrating the editor with an existing Next.js sit
 
 # Editor Integration Quickstart (Embedded Draft Mode)
 
-Use this when integrating the editor with any existing Next.js site.
+Use this when integrating the editor with any existing Next.js site. For background on core concepts, see [Core Concepts](/concepts).
 
-Start here first:
-- `docs/integration/README.md`
+## Expose your components via the Block Manifest
 
-MVP requirement:
-- Expose `GET /api/editor/blocks` so the editor/orchestrator knows which components are safely editable.
-- Without this manifest, run in degraded mode (read-only preview or text-only edits).
+The editor needs to know which components on your site are editable and what props they accept. You do this by exposing a **block manifest** at `GET /api/editor/blocks`.
 
-Recommended:
-- keep a local component registry in site code and generate manifest from it.
+**Using the built-in blocks** (quickest start):
 
-The `@ai-site-editor/site-sdk` package provides handler factories for all required API routes — see [nextjs-mvp-embedded](/integration/nextjs-mvp-embedded).
+```ts
+// app/api/editor/[...path]/route.ts
+import { createEditorApiHandler } from "@ai-site-editor/site-sdk/routes"
+
+export const { GET, POST, OPTIONS } = createEditorApiHandler({
+  getPages: () => fetchYourPages(),
+})
+```
+
+`createEditorApiHandler()` automatically builds the manifest from the 20 built-in block types. The editor and AI planner read this manifest to understand what blocks exist, what fields they have, and what values are valid.
+
+**Using your own custom components**:
+
+If your site has its own component library, you define a custom manifest describing your block types and their props schemas. See [Custom Blocks](/integration/custom-blocks) for the full guide, including:
+
+- How to define a `BlockManifest` with JSON Schema-based `propsSchema` for each component
+- How to wire it into the editor API route via `getManifest()`
+- How to mix your custom blocks with the built-in ones
+- How field types (image, text, list, enum) are inferred from your schema
+
+Without a manifest, the editor runs in **degraded mode** (read-only preview or text-only edits).
+
+For the full Next.js integration walkthrough, see [Next.js Embedded MVP](/integration/nextjs-mvp-embedded).
 
 ## Required env vars
 
