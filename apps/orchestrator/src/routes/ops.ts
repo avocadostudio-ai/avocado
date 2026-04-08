@@ -7,6 +7,7 @@ import {
   pushUndo,
   bumpVersion,
   pushRecentEdit,
+  pushVersionEntry,
   schedulePersistState
 } from "../state/session-state.js"
 import {
@@ -104,6 +105,14 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
         pushRecentEdit(session, { slug: updatedSlug ?? firstSlugOp.pageSlug, summary: "Applied operations.", ops: parsedOps.data })
       }
       const previewVersion = bumpVersion(session)
+      pushVersionEntry(session, {
+        version: previewVersion,
+        slug: updatedSlug ?? (firstSlugOp && "pageSlug" in firstSlugOp ? firstSlugOp.pageSlug as string : "/"),
+        summary: "Applied operations.",
+        opTypes: parsedOps.data.map((op) => op.op),
+        opCount: parsedOps.data.length,
+        source: "direct"
+      })
       schedulePersistState(app.log)
       const focusBlockId = pickFocusBlockId(parsedOps.data)
       return {
