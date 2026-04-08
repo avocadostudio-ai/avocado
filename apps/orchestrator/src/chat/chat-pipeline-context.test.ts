@@ -86,6 +86,14 @@ test("shouldUseLlmIntentRouter: false for page operations", () => {
   assert.ok(!shouldUseLlmIntentRouter("create a new page"))
 })
 
+test("shouldUseLlmIntentRouter: true for content queries (router classifies as info)", () => {
+  assert.ok(shouldUseLlmIntentRouter("describe this page"))
+  assert.ok(shouldUseLlmIntentRouter("what is on this page"))
+  assert.ok(shouldUseLlmIntentRouter("summarize the content"))
+  assert.ok(shouldUseLlmIntentRouter("how many sections are there"))
+  assert.ok(shouldUseLlmIntentRouter("tell me about this site"))
+})
+
 // ---------------------------------------------------------------------------
 // compactPlannerContextPack
 // ---------------------------------------------------------------------------
