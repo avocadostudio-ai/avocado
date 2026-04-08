@@ -187,6 +187,8 @@ export type HistoryResponse = {
   status?: string
   previewVersion?: number
   navigateToSlug?: string
+  canUndo?: boolean
+  canRedo?: boolean
   error?: string
 }
 
