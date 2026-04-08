@@ -1,4 +1,5 @@
 import React, { forwardRef, type CSSProperties, type ReactNode } from "react"
+import { Undo2, Redo2 } from "lucide-react"
 import type { ChatEntry } from "../lib/editor-types"
 import { renderFinalMarkdown, renderStreamingMarkdown } from "../lib/markdown-renderer"
 import { isRedundantChangeLine } from "../lib/editor-utils"
@@ -219,6 +220,12 @@ export type ChatComposerCoreProps = {
   compact?: boolean
   className?: string
   style?: CSSProperties
+  canUndoServer?: boolean
+  canRedoServer?: boolean
+  onGlobalUndo?: () => void
+  onGlobalRedo?: () => void
+  undoTooltip?: string
+  redoTooltip?: string
 }
 
 export function ChatComposerCore({
@@ -237,9 +244,40 @@ export function ChatComposerCore({
   compact,
   className = "composer",
   style,
+  canUndoServer,
+  canRedoServer,
+  onGlobalUndo,
+  onGlobalRedo,
+  undoTooltip = "Undo (Ctrl+Z)",
+  redoTooltip = "Redo (Ctrl+Y)",
 }: ChatComposerCoreProps) {
+  const showToolbar = onGlobalUndo && onGlobalRedo
   return (
     <div className={className} style={style}>
+      {showToolbar ? (
+        <div className="undo-redo-toolbar">
+          <button
+            type="button"
+            className="undo-redo-btn"
+            disabled={!canUndoServer || isLoading}
+            onClick={onGlobalUndo}
+            title={undoTooltip}
+          >
+            <Undo2 size={14} aria-hidden="true" />
+            <span>{undoTooltip?.replace(/\s*\(.*\)/, "") ?? "Undo"}</span>
+          </button>
+          <button
+            type="button"
+            className="undo-redo-btn"
+            disabled={!canRedoServer || isLoading}
+            onClick={onGlobalRedo}
+            title={redoTooltip}
+          >
+            <span>{redoTooltip?.replace(/\s*\(.*\)/, "") ?? "Redo"}</span>
+            <Redo2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <ClaudeStyleChatInput
         message={message}
         isLoading={isLoading}

@@ -1,7 +1,8 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Bot, Check, ChevronDown, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Bot, Check, ChevronDown, Clock, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import { ChatComposerCore, ChatThreadCore } from "./components/ChatSurface"
+import { VersionHistoryPanel } from "./components/VersionHistoryPanel"
 import Settings2Icon from "./components/settings2-icon"
 import { SettingsModal } from "./components/SettingsModal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -934,7 +935,7 @@ function EditorPage({
     : null
   const fieldDraftDebugLabel = `field_draft ${fieldDraftDebug.eventsPerSecond}/s · chars ${fieldDraftDebug.charsPerSecond}/s · lag ${fieldDraftDebug.typingLagChars}`
   const chatPanelStyle = { "--composer-height": `${composerHeight}px` } as CSSProperties
-  const chatPanelClassName = `chat-panel ${activeTab === "properties" ? "chat-panel--properties" : "chat-panel--chat"}`
+  const chatPanelClassName = `chat-panel ${activeTab === "chat" ? "chat-panel--chat" : activeTab === "properties" ? "chat-panel--properties" : "chat-panel--history"}`
   const hasUserEntry = chatLog.some((entry) => entry.role === "user")
   const buildCopyPayload = useCallback((entry: (typeof chatLog)[number]) => {
     const lines: string[] = []
@@ -1516,6 +1517,15 @@ function EditorPage({
           siteOrigin={activeSiteOrigin}
         />
 
+        <div style={{ display: activeTab === "history" ? "" : "none", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          <VersionHistoryPanel
+            session={session}
+            siteId={siteId}
+            slug={slug}
+            visible={activeTab === "history"}
+          />
+        </div>
+
         <div
           ref={splitHandleRef}
           className="composer-splitter"
@@ -1547,6 +1557,12 @@ function EditorPage({
           onAutoHeightChange={handleComposerAutoHeight}
           selectionModeEnabled={selectionModeEnabled}
           onToggleSelectionMode={() => toggleSelectionMode()}
+          canUndoServer={chatEngine.canUndoServer}
+          canRedoServer={chatEngine.canRedoServer}
+          onGlobalUndo={() => void chatEngine.applyGlobalUndo()}
+          onGlobalRedo={() => void chatEngine.applyGlobalRedo()}
+          undoTooltip={t("chat.undoTooltip")}
+          redoTooltip={t("chat.redoTooltip")}
         />
 
         <nav className="panel-tabs panel-tabs-main">
@@ -1568,6 +1584,15 @@ function EditorPage({
           >
             <SlidersHorizontal size={22} />
             {activeBlockId ? <span className="panel-tab-dot" /> : null}
+          </button>
+          <button
+            type="button"
+            className={`panel-tab panel-tab-main ${activeTab === "history" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("history")}
+            aria-label={t("history.tooltip")}
+            title={t("history.tooltip")}
+          >
+            <Clock size={22} />
           </button>
         </nav>
       </aside>
