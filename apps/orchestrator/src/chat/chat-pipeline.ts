@@ -2913,6 +2913,37 @@ export async function runChatPipeline(
     } catch (error) {
       if (isCancelError(error)) throw error
       const reason = toErrorDetail(error)
+
+      // API-level errors (rate limits, auth, quota) — surface immediately, don't retry
+      const errorMsg = error instanceof Error ? error.message : ""
+      const isApiError = /usage limit|rate limit|quota|unauthorized|billing/i.test(errorMsg) || /\b40[0-13]\b/.test(errorMsg)
+      if (isApiError) {
+        markPlanningFinish()
+        const providerLabel = plannerSource === "anthropic" ? "Anthropic" : plannerSource === "openai" ? "OpenAI" : plannerSource === "gemini" ? "Google Gemini" : "The AI provider"
+        const consoleUrl = plannerSource === "anthropic" ? "https://console.anthropic.com/settings/billing" : plannerSource === "openai" ? "https://platform.openai.com/usage" : plannerSource === "gemini" ? "https://console.cloud.google.com/billing" : ""
+        const consoleLink = consoleUrl ? ` [Check your ${providerLabel} console](${consoleUrl}).` : ""
+        const userSummary = /usage limit/i.test(errorMsg)
+          ? `${providerLabel} API usage limit has been reached.${consoleLink} You can also switch to a different provider.`
+          : /rate limit/i.test(errorMsg)
+            ? `${providerLabel} is rate-limiting requests. Please wait a moment and try again.`
+            : /unauthorized|api.key|authentication/i.test(errorMsg)
+              ? `${providerLabel} API key is invalid or expired.${consoleLink} Please check your API key configuration.`
+              : `${providerLabel} error: ${errorMsg.slice(0, 200)}`
+        ctx.log.error({ event: "api_error", model: modelUsed, error: errorMsg.slice(0, 300) }, userSummary)
+        return {
+          code: 503,
+          payload: withDebugPayload({
+            status: "error",
+            summary: userSummary,
+            changes: [],
+            previewVersion: versions.get(body.session!) ?? 0,
+            plannerSource,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult, { outcome: "api_error", reason: errorMsg.slice(0, 300) })
+        }
+      }
+
       const reasonCategory = isPlannerOutputError(error) ? error.reasonCategory : classifyGuardrailError(reason)
       ctx.log.warn({ event: "plan_attempt_failed", attempt, model: modelUsed, reason: reason.slice(0, 300) },
         `Planning attempt ${attempt} failed`)
