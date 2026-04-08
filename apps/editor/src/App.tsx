@@ -159,7 +159,7 @@ function EditorPage({
     const s = useEditorStore.getState()
     s.setActiveBlock(s.activeBlockId, type)
   }
-  const setActiveBlockId_Type = (id: string | undefined, type: string | undefined) => useEditorStore.getState().setActiveBlock(id, type)
+  const setActiveBlockAndType = (id: string | undefined, type: string | undefined) => useEditorStore.getState().setActiveBlock(id, type)
   const setActiveEditablePath = useEditorStore((s) => s.setActiveEditablePath)
   const useStreaming = useEditorStore((s) => s.useStreaming)
   const setUseStreaming = useEditorStore((s) => s.setUseStreaming)
@@ -336,7 +336,7 @@ function EditorPage({
   const previewCallbacks = useMemo<PreviewBridgeCallbacks>(() => ({
     onBlockClicked: (newSlug, blockId, blockType, editablePath, editableValue, rect) => {
       setSlugFromPreview(newSlug)
-      setActiveBlockId_Type(blockId, blockType)
+      setActiveBlockAndType(blockId, blockType)
       setActiveEditablePath(editablePath)
       setAnchorRect(blockId ? rect : null)
       if (blockId) preview.postToSite("highlightBlock", { blockId, editablePath: editablePath ?? null })
@@ -410,7 +410,6 @@ function EditorPage({
       if (newSlug !== slug) setSlugFromPreview(newSlug)
       if (editablePath) {
         setActiveEditablePath(editablePath)
-        setActiveEditablePath(editablePath)
       }
       void chatEngine.inlineEditCommit(newSlug, blockId, editablePath, value)
     },
@@ -433,8 +432,6 @@ function EditorPage({
     if (!next) {
       setActiveBlockId(undefined)
       setActiveBlockType(undefined)
-      setActiveEditablePath(undefined)
-      setActiveBlockId(undefined)
       setActiveEditablePath(undefined)
       setAnchorRect(null)
     }
@@ -663,9 +660,9 @@ function EditorPage({
       return
     }
 
-    const blockId = latestStreamFocusBlockId ?? useEditorStore.getState().activeBlockId ?? activeBlockId ?? ""
-    const activeTargetBlockId = useEditorStore.getState().activeBlockId ?? activeBlockId ?? ""
-    const editablePath = blockId && blockId === activeTargetBlockId ? (useEditorStore.getState().activeEditablePath ?? activeEditablePath ?? "") : ""
+    const blockId = latestStreamFocusBlockId ?? activeBlockId ?? ""
+    const activeTargetBlockId = activeBlockId ?? ""
+    const editablePath = blockId && blockId === activeTargetBlockId ? (activeEditablePath ?? "") : ""
     postToSite("aiFieldLoading", { blockId, editablePath, active: true })
     shimmerTargetRef.current = { blockId, editablePath }
     shimmerActiveRef.current = true
