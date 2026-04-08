@@ -160,8 +160,8 @@ export type EditorActions = {
   setIsApplyingVariation: (applying: boolean) => void
 
   // ui
-  setComposerHeight: (height: number) => void
-  setChatWidth: (width: number | null) => void
+  setComposerHeight: (value: number | ((prev: number) => number)) => void
+  setChatWidth: (value: number | null | ((prev: number | null) => number | null)) => void
   setActiveTab: (tab: "chat" | "properties") => void
   setShowSettingsModal: (show: boolean) => void
   setShowDebugDetails: (show: boolean) => void
@@ -334,9 +334,16 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     setIsApplyingVariation: (applying) => set({ isApplyingVariation: applying }),
 
     // ── ui actions ────────────────────────────────────────────────
-    setComposerHeight: (height) =>
-      set((prev) => (prev.composerHeight === height ? prev : { ...prev, composerHeight: height })),
-    setChatWidth: (width) => set({ chatWidth: width }),
+    setComposerHeight: (value) =>
+      set((prev) => {
+        const next = typeof value === "function" ? value(prev.composerHeight) : value
+        return prev.composerHeight === next ? prev : { ...prev, composerHeight: next }
+      }),
+    setChatWidth: (value) =>
+      set((prev) => {
+        const next = typeof value === "function" ? value(prev.chatWidth) : value
+        return prev.chatWidth === next ? prev : { ...prev, chatWidth: next }
+      }),
     setActiveTab: (tab) =>
       set((prev) => (prev.activeTab === tab ? prev : { ...prev, activeTab: tab })),
     setShowSettingsModal: (show) => set({ showSettingsModal: show }),
