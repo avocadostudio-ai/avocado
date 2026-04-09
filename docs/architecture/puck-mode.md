@@ -83,7 +83,7 @@ User edits block in Puck canvas
 Agent mode is enabled server-side via `AGENT_API_KEY` in orchestrator `.env`. The editor detects availability from `/status/planner`:
 
 ```
-GET /status/planner -> { features: { agentMode: true } }
+GET /status/planner -> { ..., agentMode: true }
 ```
 
 The API key never reaches the browser. The editor passes `agentModeEnabled: boolean` to `useChatEngine`, which routes to `/agent/start` + `/agent/stream` SSE when enabled.
