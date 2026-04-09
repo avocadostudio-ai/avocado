@@ -44,6 +44,11 @@ const E2E_API_KEY: string | undefined =
     ? process.env.ANTHROPIC_API_KEY?.trim()
     : process.env.OPENAI_API_KEY?.trim()
 
+// Agent routes now read the key from process.env.AGENT_API_KEY (server-side)
+if (E2E_API_KEY && !process.env.AGENT_API_KEY) {
+  process.env.AGENT_API_KEY = E2E_API_KEY
+}
+
 const E2E_AVAILABLE = Boolean(E2E_API_KEY)
 const E2E_OPTS = { timeout: 180_000, skip: !E2E_AVAILABLE }
 
@@ -212,7 +217,7 @@ async function agentChat(session: string, slug: string, message: string): Promis
   const res = await app.inject({
     method: "POST",
     url: "/agent/chat",
-    headers: { "x-agent-api-key": E2E_API_KEY! },
+    headers: { "content-type": "application/json" },
     payload: {
       session,
       siteId: SITE_ID,

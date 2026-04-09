@@ -16,7 +16,6 @@ const SESSION = {
   siteId: "",
   editorOrigin: "",
   orchestratorUrl: "",
-  agentApiKey: "",
 }
 
 // ── Getters ─────────────────────────────────────────────────────────
@@ -36,10 +35,6 @@ export function getOrchestratorUrl(): string {
   return SESSION.orchestratorUrl
 }
 
-export function getAgentApiKey(): string {
-  return SESSION.agentApiKey
-}
-
 // ── Setters ─────────────────────────────────────────────────────────
 export function setSessionId(id: string): void {
   SESSION.sessionId = id
@@ -57,19 +52,13 @@ export function setOrchestratorUrl(url: string): void {
   SESSION.orchestratorUrl = url
 }
 
-export function setAgentApiKey(key: string): void {
-  SESSION.agentApiKey = key
-}
-
 // ── Bootstrap ───────────────────────────────────────────────────────
 export function initSession(opts: {
   siteId: string
   editorOrigin: string
   orchestratorUrl: string
-  agentApiKey: string
 }): void {
   SESSION.siteId = opts.siteId
   SESSION.editorOrigin = opts.editorOrigin
   SESSION.orchestratorUrl = opts.orchestratorUrl
-  SESSION.agentApiKey = opts.agentApiKey
 }

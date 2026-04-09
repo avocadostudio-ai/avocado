@@ -5,13 +5,18 @@
  * Uses setRunAgentLoopForTests() to mock the LLM loop for streaming tests.
  */
 
-import { describe, it, afterEach } from "node:test"
+import { describe, it, before, afterEach } from "node:test"
 import assert from "node:assert/strict"
 import { app } from "../index.js"
 import { setRunAgentLoopForTests, type AgentEvent, type AgentLoopOptions } from "../agent/agent-loop.js"
 import { createSessionFactory, seedSession, makeHomePage, parseSseData } from "../test/fixtures.js"
 
 const newSession = createSessionFactory("agent-route-test")
+
+// Set a valid agent API key for all tests (server-side key)
+before(() => {
+  process.env.AGENT_API_KEY = "sk-ant-test-key-for-routes"
+})
 
 afterEach(() => {
   setRunAgentLoopForTests() // reset mock
@@ -31,35 +36,47 @@ function mockAgentLoop(events: AgentEvent[]) {
 // ---------------------------------------------------------------------------
 
 describe("POST /agent/start", () => {
-  it("returns 401 when no API key header", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/agent/start",
-      headers: { "content-type": "application/json" },
-      payload: { message: "hello", siteId: "test-site" },
-    })
-    assert.equal(res.statusCode, 401)
-    const body = res.json() as { error: string }
-    assert.ok(body.error.includes("api-key"))
+  it("returns 501 when AGENT_API_KEY is not set", async () => {
+    const saved = process.env.AGENT_API_KEY
+    delete process.env.AGENT_API_KEY
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/agent/start",
+        headers: { "content-type": "application/json" },
+        payload: { message: "hello", siteId: "test-site" },
+      })
+      assert.equal(res.statusCode, 501)
+      const body = res.json() as { error: string }
+      assert.ok(body.error.includes("AGENT_API_KEY"))
+    } finally {
+      process.env.AGENT_API_KEY = saved
+    }
   })
 
-  it("returns 401 when key format is unrecognized", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "bad-key-format" },
-      payload: { message: "hello", siteId: "test-site" },
-    })
-    assert.equal(res.statusCode, 401)
-    const body = res.json() as { error: string }
-    assert.ok(body.error.includes("Unrecognized"))
+  it("returns 500 when AGENT_API_KEY format is unrecognized", async () => {
+    const saved = process.env.AGENT_API_KEY
+    process.env.AGENT_API_KEY = "bad-key-format"
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/agent/start",
+        headers: { "content-type": "application/json" },
+        payload: { message: "hello", siteId: "test-site" },
+      })
+      assert.equal(res.statusCode, 500)
+      const body = res.json() as { error: string }
+      assert.ok(body.error.includes("AGENT_API_KEY"))
+    } finally {
+      process.env.AGENT_API_KEY = saved
+    }
   })
 
   it("returns 400 when message is empty", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-test-key-123" },
+      headers: { "content-type": "application/json" },
       payload: { message: "", siteId: "test-site" },
     })
     assert.equal(res.statusCode, 400)
@@ -71,7 +88,7 @@ describe("POST /agent/start", () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-test-key-123" },
+      headers: { "content-type": "application/json" },
       payload: { message: "hello" },
     })
     assert.equal(res.statusCode, 400)
@@ -79,29 +96,17 @@ describe("POST /agent/start", () => {
     assert.ok(body.error.includes("siteId"))
   })
 
-  it("returns 200 with streamId for valid Anthropic key", async () => {
+  it("returns 200 with streamId when AGENT_API_KEY is valid", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-valid-key-123" },
+      headers: { "content-type": "application/json" },
       payload: { message: "change heading", siteId: "test-site", session: newSession() },
     })
     assert.equal(res.statusCode, 200)
     const body = res.json() as { streamId: string }
     assert.ok(typeof body.streamId === "string")
     assert.ok(body.streamId.length > 10)
-  })
-
-  it("returns 200 with streamId for valid OpenAI key", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-proj-openai-key-123" },
-      payload: { message: "change heading", siteId: "test-site", session: newSession() },
-    })
-    assert.equal(res.statusCode, 200)
-    const body = res.json() as { streamId: string }
-    assert.ok(typeof body.streamId === "string")
   })
 })
 
@@ -135,7 +140,7 @@ describe("POST /agent/cancel", () => {
     const startRes = await app.inject({
       method: "POST",
       url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-cancel-test-key" },
+      headers: { "content-type": "application/json" },
       payload: { message: "do something", siteId: "test-site", session: newSession() },
     })
     const { streamId } = startRes.json() as { streamId: string }
@@ -190,7 +195,7 @@ describe("GET /agent/stream", () => {
     const startRes = await app.inject({
       method: "POST",
       url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-stream-test-key" },
+      headers: { "content-type": "application/json" },
       payload: { message: "change heading to Hello", siteId: "test-site", session },
     })
     const { streamId } = startRes.json() as { streamId: string }
@@ -232,7 +237,7 @@ describe("GET /agent/stream", () => {
     const startRes = await app.inject({
       method: "POST",
       url: "/agent/start",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-error-test-key" },
+      headers: { "content-type": "application/json" },
       payload: { message: "change heading", siteId: "test-site", session },
     })
     const { streamId } = startRes.json() as { streamId: string }
@@ -257,21 +262,27 @@ describe("GET /agent/stream", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /agent/chat", () => {
-  it("returns 401 when no API key", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/agent/chat",
-      headers: { "content-type": "application/json" },
-      payload: { message: "hello", siteId: "test-site" },
-    })
-    assert.equal(res.statusCode, 401)
+  it("returns 501 when AGENT_API_KEY is not set", async () => {
+    const saved = process.env.AGENT_API_KEY
+    delete process.env.AGENT_API_KEY
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/agent/chat",
+        headers: { "content-type": "application/json" },
+        payload: { message: "hello", siteId: "test-site" },
+      })
+      assert.equal(res.statusCode, 501)
+    } finally {
+      process.env.AGENT_API_KEY = saved
+    }
   })
 
   it("returns 400 when message is missing", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/chat",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-chat-test-key" },
+      headers: { "content-type": "application/json" },
       payload: { siteId: "test-site" },
     })
     assert.equal(res.statusCode, 400)
@@ -281,7 +292,7 @@ describe("POST /agent/chat", () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/chat",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-chat-test-key" },
+      headers: { "content-type": "application/json" },
       payload: { message: "hello" },
     })
     assert.equal(res.statusCode, 400)
@@ -301,7 +312,7 @@ describe("POST /agent/chat", () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/chat",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-blocking-test-key" },
+      headers: { "content-type": "application/json" },
       payload: { message: "change heading to Hello", siteId: "test-site", session },
     })
     assert.equal(res.statusCode, 200)
@@ -324,7 +335,7 @@ describe("POST /agent/chat", () => {
     const res = await app.inject({
       method: "POST",
       url: "/agent/chat",
-      headers: { "content-type": "application/json", "x-agent-api-key": "sk-ant-error-blocking-key" },
+      headers: { "content-type": "application/json" },
       payload: { message: "change heading", siteId: "test-site", session },
     })
     assert.equal(res.statusCode, 500)

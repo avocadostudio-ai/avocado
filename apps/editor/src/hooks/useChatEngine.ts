@@ -30,7 +30,7 @@ import { useUndoHistory } from "./chat-engine/useUndoHistory"
 import { useVariations } from "./chat-engine/useVariations"
 import { submitAgentStream } from "./chat-engine/agent-transport"
 import { useEditorStore } from "../store"
-import { getSessionId, getSiteId, getAgentApiKey } from "../store/session"
+import { getSessionId, getSiteId } from "../store/session"
 import type { PreviewBridgeFns } from "./chat-engine/types"
 
 export type ChatEngineConfig = PreviewBridgeFns & {
@@ -40,6 +40,7 @@ export type ChatEngineConfig = PreviewBridgeFns & {
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
   onApplied?: () => void
+  agentModeEnabled?: boolean
 }
 
 function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
@@ -1239,13 +1240,11 @@ export function useChatEngine(config: ChatEngineConfig) {
         await variations.submitVariations(finalMessage)
         return
       }
-      // Agent mode: when user has provided their own Anthropic API key
-      const agentApiKey = getAgentApiKey()
-      if (agentApiKey?.trim()) {
+      // Agent mode: when server has AGENT_API_KEY configured
+      if (config.agentModeEnabled) {
         const { slug: agentSlug, activeBlockId: agentBlockId, activeBlockType: agentBlockType, activeEditablePath: agentEditablePath } = store.getState()
         const handle = submitAgentStream({
           orchestrator,
-          agentApiKey: agentApiKey.trim(),
           session,
           siteId,
           slug: agentSlug,
@@ -1269,7 +1268,7 @@ export function useChatEngine(config: ChatEngineConfig) {
         const ok = await handle.promise
         agentCancelRef.current = null
         if (!ok) {
-          pushAssistantFromResult({ status: "error", summary: "Agent failed. Check your API key in settings.", changes: [] })
+          pushAssistantFromResult({ status: "error", summary: "Agent failed. Check AGENT_API_KEY in the orchestrator .env.", changes: [] })
         }
         return
       }
