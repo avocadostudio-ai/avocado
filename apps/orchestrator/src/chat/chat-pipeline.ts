@@ -2243,7 +2243,13 @@ export async function runChatPipeline(
   }
 
   const llmIntentRouterEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_LLM_INTENT_ROUTER ?? "1").trim())
+  // Skip the intent router for batch-add requests — the router's deterministic
+  // compile can't generate meaningful content for "add 3 blocks" without specific
+  // block types, so go straight to the full planner which can handle it.
+  const batchAddSkipsRouter = isBatchAddRequest(plannerMessage)
   const shouldTryLlmIntentRouter =
+    !contentQuery &&
+    !batchAddSkipsRouter &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")

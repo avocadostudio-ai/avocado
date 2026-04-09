@@ -6,10 +6,8 @@ export {
   getSiteId,
   getEditorOrigin,
   getOrchestratorUrl,
-  getAgentApiKey,
   setSiteId,
   setEditorOrigin,
   setOrchestratorUrl,
-  setAgentApiKey,
   initSession,
 } from "./session"
