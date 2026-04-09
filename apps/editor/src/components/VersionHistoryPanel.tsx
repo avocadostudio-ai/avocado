@@ -25,8 +25,8 @@ type VersionHistoryPanelProps = {
 const SOURCE_LABELS: Record<string, string> = {
   chat: "AI",
   direct: "Edit",
-  undo: "Undo",
-  redo: "Redo",
+  undo: "Revert",
+  redo: "Revert",
   bootstrap: "Sync",
   restore: "Restore"
 }
