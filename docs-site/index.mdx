@@ -5,20 +5,20 @@ description: "AI-powered content operations for websites — natural language ed
 
 ## What is Avocado Studio?
 
-Avocado Studio is an open-source, AI-powered content operations platform for websites. Describe content changes in natural language or use the visual drag-and-drop editor — the system plans and applies them as validated, schema-checked operations with live preview, undo/redo, and one-click publishing.
+Avocado Studio is an open-source content operations platform for websites. Describe content changes in natural language or use the visual drag-and-drop editor — the system generates schema-validated operations, lets you review the plan, and applies approved changes to draft content with live preview, undo/redo, and publishing controls.
 
 ### Two editing modes
 
-<CardGroup cols={2}>
+  <CardGroup cols={2}>
   <Card title="Chat Editor" icon="message-bot">
-    The default experience — a split-pane interface where your live site renders on the left and a chat interface on the right. Type requests like _"add a testimonials section below the hero"_ and the AI plans and applies structured edits.
+    Default mode for AI-assisted edits. In a split pane (site preview + chat), describe a change, review the generated operation plan, and apply it to draft content.
   </Card>
   <Card title="Puck Mode" icon="hand-pointer" href="/integration/puck-mode">
-    A visual drag-and-drop editor powered by Puck. Reorder blocks, edit fields directly, and use the AI chat sidebar for natural-language edits — all in one canvas. Enabled per-site via settings.
+    Visual drag-and-drop mode powered by Puck. Reorder blocks and edit fields directly, with optional AI chat in the sidebar for natural-language edits. Currently draft-only (no publish flow). Enabled per site in settings.
   </Card>
 </CardGroup>
 
-Both modes share the same block system, operation pipeline, and orchestrator backend. The editing mode is a per-site setting — each site can independently opt into Puck mode.
+Both modes use the same block schemas, operation pipeline, and orchestrator backend. Editing mode is configured per site, so each site can opt into Puck mode independently.
 
 **For developers and agencies**: integrate AI editing into any Next.js site with the Site SDK, or use the framework-agnostic REST API. Self-hosted, multi-model AI (Anthropic, OpenAI, Google Gemini), and a pluggable publishing pipeline.
 
