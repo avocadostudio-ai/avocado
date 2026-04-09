@@ -46,7 +46,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
   const persistTimerRef = useRef<number | null>(null)
   const persistInFlightRef = useRef(false)
 
-  const envAgentApiKey = useMemo(() => (hostApi.agentApiKey?.trim() ?? ""), [hostApi.agentApiKey])
+  const agentModeEnabled = hostApi.agentModeEnabled ?? false
 
   const activeSiteConfig = useMemo(() => {
     const list = hostApi.loadSiteListFromStorage(siteId)
@@ -156,7 +156,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     onApplied: () => {
       void syncDraftPage(slugRef.current).catch(() => undefined)
     },
-    agentApiKey: envAgentApiKey || undefined,
+    agentModeEnabled,
   })
 
   const onSelectionChange = useCallback((selection?: SelectionContext) => {

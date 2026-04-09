@@ -21,11 +21,6 @@ import { cn } from "@/lib/utils"
 import type { AIProvider, ModelKey } from "@/lib/editor-types"
 import { useT, LOCALE_LABELS, type Locale } from "@/i18n"
 
-function agentProviderLabel(key: string): string {
-  if (key.startsWith("sk-ant-")) return "Claude"
-  if (key.startsWith("sk-")) return "GPT-4o"
-  return "Unknown provider"
-}
 
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
@@ -61,7 +56,7 @@ interface SettingsModalProps {
   availableProviders: AIProvider[]
   onModelChange: (provider: AIProvider, model: ModelKey) => void
   onClearChat: () => void
-  agentApiKey?: string
+  agentModeEnabled?: boolean
 }
 
 export function SettingsModal({
@@ -82,7 +77,7 @@ export function SettingsModal({
   availableProviders,
   onModelChange,
   onClearChat,
-  agentApiKey,
+  agentModeEnabled,
 }: SettingsModalProps) {
   const { t, locale, setLocale } = useT()
   const currentValue = selectionValue(provider, modelKey)
@@ -164,9 +159,9 @@ export function SettingsModal({
           <div className="grid gap-1.5 text-left">
               <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Agent Mode</span>
               <p className="text-[11px] text-muted-foreground">
-                {agentApiKey
-                  ? `Agent mode: ${agentProviderLabel(agentApiKey)} — uses tools to edit your site directly.`
-                  : "Set VITE_AGENT_API_KEY in .env to enable agent mode."}
+                {agentModeEnabled
+                  ? "Agent mode enabled — uses tools to edit your site directly."
+                  : "Set AGENT_API_KEY in the orchestrator .env to enable agent mode."}
               </p>
             </div>
 

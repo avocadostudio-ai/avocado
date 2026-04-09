@@ -1,7 +1,6 @@
 /**
  * Agent transport: sends chat through /agent/start + /agent/stream SSE
- * instead of the regular /chat pipeline. Used when the user provides
- * their own Anthropic API key.
+ * instead of the regular /chat pipeline. The API key is stored server-side.
  */
 
 import { withAccessTokenQuery } from "../../lib/access-auth"
@@ -10,7 +9,6 @@ import { toPastTense } from "../../lib/utils"
 
 type AgentTransportArgs = {
   orchestrator: string
-  agentApiKey: string
   session: string
   siteId: string
   slug: string
@@ -38,7 +36,7 @@ export type AgentStreamHandle = {
 
 export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   const {
-    orchestrator, agentApiKey, session, siteId, slug, message,
+    orchestrator, session, siteId, slug, message,
     activeBlockId, activeBlockType, activeEditablePath, locale, sitePurpose,
     setStreamStatus, setStreamSteps, setStreamingText, setStreamingChanges, setLatestStreamFocusBlockId,
     applyChatResult, pushAssistantFromResult, postToSite, setActiveBlockId,
@@ -88,7 +86,6 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-agent-api-key": agentApiKey,
       },
       body: JSON.stringify({
         session, siteId, slug, message,
