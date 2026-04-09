@@ -12,7 +12,7 @@ import { ImagePickerModal } from "./components/ImagePickerModal"
 import { useSiteList } from "./hooks/useSiteList"
 import { usePreviewBridge, type PreviewBridgeCallbacks, type AnchorRect } from "./hooks/usePreviewBridge"
 import { useChatEngine } from "./hooks/useChatEngine"
-import { useEditorStore, initSession, getSessionId, getSiteId, getAgentApiKey } from "./store"
+import { useEditorStore, initSession, getSessionId, getSiteId } from "./store"
 import { usePublish } from "./hooks/usePublish"
 import { useMediaInput } from "./hooks/useMediaInput"
 import { useBlockProps } from "./hooks/useBlockProps"
@@ -90,12 +90,10 @@ export function App() {
   if (!sessionInitRef.current) {
     sessionInitRef.current = true
     const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
-    const agentApiKey = (import.meta.env.VITE_AGENT_API_KEY as string | undefined)?.trim() ?? ""
     initSession({
       siteId,
       editorOrigin,
       orchestratorUrl: orchestrator as string,
-      agentApiKey,
     })
   }
   const sites = useSiteList(siteId, session)
@@ -458,6 +456,7 @@ function EditorPage({
     allowStructuralEdits: componentManifest.allowStructuralEdits,
     getBlockDefaultProps: (blockType) => componentManifest.byType.get(blockType)?.defaultProps ?? null,
     onApplied: () => { onAppliedRef.current?.() },
+    agentModeEnabled: backendFeatures.agentMode ?? false,
   })
 
   // ── Store-backed chat/streaming state ─────────────────────────────
@@ -563,7 +562,7 @@ function EditorPage({
         for (const url of urls) {
           const res = await fetch(url)
           if (!res.ok) continue
-          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[]; features?: { googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean; imageGenerateChat?: boolean } }
+          const data = (await res.json()) as { plannerSource?: PlannerSource; availableProviders?: AIProvider[]; features?: { googleDrive?: boolean; unsplash?: boolean; imageGenerate?: boolean; imageGenerateChat?: boolean; agentMode?: boolean } }
           if (!active) return
           if (data.features) {
             setBackendFeatures(data.features!)
@@ -1803,7 +1802,7 @@ function EditorPage({
         availableProviders={availableProviders}
         onModelChange={(p, m) => { setProvider(p); setModelKey(m) }}
         onClearChat={chatEngine.clearChat}
-        agentApiKey={getAgentApiKey()}
+        agentModeEnabled={backendFeatures.agentMode ?? false}
       />
 
       <Sheet open={!!sites.configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>
