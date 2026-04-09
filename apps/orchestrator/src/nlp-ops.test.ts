@@ -3371,6 +3371,20 @@ test("isContentQuery detects 'describe this page' as content query", () => {
   assert.equal(isContentQuery("update the heading"), false)
 })
 
+test("isContentQuery detects review/audit of block types as content query", () => {
+  assert.equal(isContentQuery("review the hero"), true)
+  assert.equal(isContentQuery("audit the cta"), true)
+  assert.equal(isContentQuery("check the testimonials"), true)
+  assert.equal(isContentQuery("inspect the feature grid"), true)
+  assert.equal(isContentQuery("analyze the stats"), true)
+  assert.equal(isContentQuery("review the section"), true)
+  assert.equal(isContentQuery("review the block"), true)
+  // Edit verbs should NOT match
+  assert.equal(isContentQuery("rewrite the hero"), false)
+  // Should not match isAdviceQuery (we want LLM content_answer, not canned advice)
+  assert.equal(isAdviceQuery("review the hero"), false)
+})
+
 test("shouldPreferFastModelForMessage prefers fast for simple prop edits", () => {
   // Simple targeted removals → fast model
   assert.equal(shouldPreferFastModelForMessage("remove emojis from tab labels"), true)
