@@ -96,7 +96,9 @@ export function VersionHistoryPanel({ session, siteId, slug, visible, onRestore,
                   </span>
                   <span className="version-history-time">{formatTime(entry.at)}</span>
                 </div>
-                <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
+                {entry.source !== "undo" && entry.source !== "redo" ? (
+                  <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
+                ) : null}
                 <div className="version-history-item-footer">
                   {entry.opCount > 0 ? (
                     <span className="version-history-meta">
