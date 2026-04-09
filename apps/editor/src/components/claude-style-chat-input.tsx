@@ -77,11 +77,20 @@ export default function ClaudeStyleChatInput(props: Props) {
 
     const composerWrapper = shell.closest(".composer")
     let wrapperPaddingV = 18
+    let wrapperExtraHeight = 0
     if (composerWrapper) {
       const ws = getComputedStyle(composerWrapper)
       wrapperPaddingV = (parseFloat(ws.paddingTop) || 0) + (parseFloat(ws.paddingBottom) || 0)
+      for (const child of composerWrapper.children) {
+        if (child === shell) continue
+        const el = child as HTMLElement
+        const childStyle = getComputedStyle(el)
+        const marginTop = parseFloat(childStyle.marginTop) || 0
+        const marginBottom = parseFloat(childStyle.marginBottom) || 0
+        wrapperExtraHeight += el.offsetHeight + marginTop + marginBottom
+      }
     }
-    const idealHeight = shellPaddingTop + shellPaddingBottom + shellBorderV + target + notesHeight + shellGap + actionsHeight + wrapperPaddingV
+    const idealHeight = shellPaddingTop + shellPaddingBottom + shellBorderV + target + notesHeight + shellGap + actionsHeight + wrapperPaddingV + wrapperExtraHeight
     onAutoHeightChange(idealHeight)
   }
 
