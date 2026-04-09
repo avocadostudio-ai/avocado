@@ -1,6 +1,6 @@
 ---
 title: "Integration Overview"
-description: "Entry point for onboarding any Next.js site with the editor integration."
+description: "Entry point for onboarding any Next.js site with the Content Studio integration."
 ---
 
 # Integration Overview
@@ -14,7 +14,7 @@ Related docs:
 
 ## Recommended reading order
 
-1. [Editor Quickstart](/integration/editor-quickstart) — expose your components and connect the editor
+1. [Content Studio Quickstart](/integration/editor-quickstart) — expose your components and connect the Content Studio
 2. [Next.js Embedded MVP](/integration/nextjs-mvp-embedded) — full Next.js integration walkthrough
 3. [Custom Blocks](/integration/custom-blocks) — define your own block types
 
@@ -23,12 +23,12 @@ Related docs:
 - Source of truth: adopter-owned component registry in code.
 - Transport contract: `GET /api/editor/blocks` manifest JSON generated from that registry.
 - Preview bootstrap: Next.js Draft Mode (`/api/draft`, `/api/draft/disable`).
-- Fallback behavior: if manifest is missing/invalid, editor runs in degraded mode (no structural edits).
+- Fallback behavior: if manifest is missing/invalid, the Content Studio runs in degraded mode (no structural edits).
 
 ## Required endpoints
 
 - `GET /api/editor/blocks` — block manifest for structural edits
-- `GET /api/editor/pages` — returns `{ pages: PageDoc[] }` of published content; the editor calls this to seed the orchestrator with initial draft content when a session has no pages yet
+- `GET /api/editor/pages` — returns `{ pages: PageDoc[] }` of published content; the Content Studio calls this to seed the orchestrator with initial draft content when a session has no pages yet
 - `GET /api/draft?secret=...&redirect=...` — enables Next.js draft mode and redirects
 - `GET /api/draft/disable?redirect=...` — disables draft mode and redirects
 
@@ -45,8 +45,8 @@ Related docs:
 1. Add local component registry in site code.
 2. Generate manifest from registry and expose `/api/editor/blocks`.
 3. Add draft mode routes and secret validation.
-4. Verify CORS for editor origin on `/api/editor/blocks` in local/dev.
-5. Confirm editor header shows `Manifest` (not `Degraded`).
+4. Verify CORS for Content Studio origin on `/api/editor/blocks` in local/dev.
+5. Confirm Content Studio header shows `Manifest` (not `Degraded`).
 
 ## Quick validation script
 

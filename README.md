@@ -6,7 +6,7 @@
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<!-- TODO: Add screenshot or demo GIF of the split-pane editor UI -->
+<!-- TODO: Add screenshot or demo GIF of the split-pane Content Studio UI -->
 
 ## Why AI Site Editor?
 
@@ -16,13 +16,13 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 
 ## Key Features
 
-### Content Operations
+### AI Content Studio
 
-- **Natural language editing** — Describe changes in plain English. The AI generates structured, schema-validated operations — not raw HTML guesses
+- **Visual AI workspace** — Split-pane UI with your live site on the left and a chat interface on the right. Describe changes in natural language, see them applied in real time
 - **Plan review + approval** — Every change is presented as a reviewable plan before it's applied. Nothing ships without your sign-off
 - **Undo/redo** — Full operation history. Roll back any change instantly
-- **Live preview** — Split-pane UI with your site on the left and chat on the right. See edits applied in real time
 - **Streaming UX** — Progressive updates as the AI generates the plan, not a loading spinner followed by a wall of changes
+- **AI image handling** — Generate images with DALL-E, search Unsplash, or browse Google Drive — all from within the content studio
 
 ### Multi-Model AI
 
@@ -40,7 +40,7 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 - **Site SDK** — Add AI editing to any Next.js 15+ site with a few API routes
 - **CMS integrations** — Working examples for Sanity, Strapi, and Contentful
 - **Publishing pipeline** — Pluggable publish targets. Ships with Git + Vercel deploy hook support out of the box; implement the `PublishTarget` interface to connect your own deployment workflow
-- **i18n** — Multi-language editor UI and AI responses (currently English and German; extensible)
+- **i18n** — Multi-language Content Studio UI and AI responses (currently English and German; extensible)
 - **Self-hosted** — Run the entire stack on your own infrastructure
 
 ## Quick Start
@@ -54,13 +54,13 @@ pnpm dev:setup           # copy .env.example → .env, prompt for API key
 pnpm dev:start           # start all 3 services (backgrounded)
 ```
 
-| Service      | URL                    | Description                              |
-|--------------|------------------------|------------------------------------------|
-| Site         | http://localhost:3000   | Your website with live preview            |
-| Editor       | http://localhost:4100   | Chat UI where you describe content changes |
-| Orchestrator | http://localhost:4200   | Backend API that plans and executes edits  |
+| Service          | URL                    | Description                                        |
+|------------------|------------------------|----------------------------------------------------|
+| Site             | http://localhost:3000   | Your website with live preview                     |
+| Content Studio   | http://localhost:4100   | AI-powered visual workspace for editing content    |
+| Orchestrator     | http://localhost:4200   | Backend API that plans and executes edits          |
 
-Open the **Editor** at `http://localhost:4100` to start editing your site through chat.
+Open the **Content Studio** at `http://localhost:4100` to start editing your site through chat.
 
 ### Environment
 
@@ -92,7 +92,7 @@ pnpm monorepo with 3 apps and 3 packages:
 ```
 apps/
   orchestrator/    Fastify API (:4200) — sessions, AI planning, ops engine, publishing
-  editor/          Vite + React (:4100) — chat UI, model picker, iframe bridge
+  editor/          Vite + React (:4100) — AI Content Studio UI, chat, model picker, iframe bridge
   site/            Next.js (:3000) — renders pages from BlockInstance data
 packages/
   shared/          Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
