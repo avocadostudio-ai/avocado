@@ -1,27 +1,34 @@
-# Integration Docs (Start Here)
+---
+title: "Integration Overview"
+description: "Entry point for onboarding any Next.js site with the Content Studio integration."
+---
 
-Use this page as the entry point for onboarding any Next.js site.
+# Integration Overview
+
+Use this page as the entry point for adding AI editing to your website. New to the project? Start with [Core Concepts](/concepts) first.
 
 Related docs:
-- [/site-provider-spi](/site-provider-spi) — advanced provider/SPI mode for enterprise-style integrations.
-- [/integration/tools-mvp](/integration/tools-mvp) — Anthropic-first native tool contract, runtime policy, and adopter onboarding.
+- [Custom Blocks](/integration/custom-blocks) — register your own block types with custom schemas and renderers
+- [Site Provider SPI](/site-provider-spi) — advanced REST API contract for non-Next.js integrations
+- [Native Tools](/integration/tools-mvp) — tool contract for connecting PIM, DAM, or other external services
 
 ## Recommended reading order
 
-1. [/integration/nextjs-mvp-embedded](/integration/nextjs-mvp-embedded)
-2. [/integration/editor-quickstart](/integration/editor-quickstart)
+1. [Content Studio Quickstart](/integration/editor-quickstart) — expose your components and connect the Content Studio
+2. [Next.js Embedded MVP](/integration/nextjs-mvp-embedded) — full Next.js integration walkthrough
+3. [Custom Blocks](/integration/custom-blocks) — define your own block types
 
 ## MVP integration model
 
 - Source of truth: adopter-owned component registry in code.
 - Transport contract: `GET /api/editor/blocks` manifest JSON generated from that registry.
 - Preview bootstrap: Next.js Draft Mode (`/api/draft`, `/api/draft/disable`).
-- Fallback behavior: if manifest is missing/invalid, editor runs in degraded mode (no structural edits).
+- Fallback behavior: if manifest is missing/invalid, the Content Studio runs in degraded mode (no structural edits).
 
 ## Required endpoints
 
 - `GET /api/editor/blocks` — block manifest for structural edits
-- `GET /api/editor/pages` — returns `{ pages: PageDoc[] }` of published content; the editor calls this to seed the orchestrator with initial draft content when a session has no pages yet
+- `GET /api/editor/pages` — returns `{ pages: PageDoc[] }` of published content; the Content Studio calls this to seed the orchestrator with initial draft content when a session has no pages yet
 - `GET /api/draft?secret=...&redirect=...` — enables Next.js draft mode and redirects
 - `GET /api/draft/disable?redirect=...` — disables draft mode and redirects
 
@@ -29,7 +36,7 @@ Related docs:
 
 - Site:
   - `DRAFT_MODE_SECRET`
-- Editor:
+- Content Studio:
   - `VITE_SITE_ORIGIN`
   - `VITE_SITE_DRAFT_SECRET`
 
@@ -38,8 +45,8 @@ Related docs:
 1. Add local component registry in site code.
 2. Generate manifest from registry and expose `/api/editor/blocks`.
 3. Add draft mode routes and secret validation.
-4. Verify CORS for editor origin on `/api/editor/blocks` in local/dev.
-5. Confirm editor header shows `Manifest` (not `Degraded`).
+4. Verify CORS for Content Studio origin on `/api/editor/blocks` in local/dev.
+5. Confirm Content Studio header shows `Manifest` (not `Degraded`).
 
 ## Quick validation script
 

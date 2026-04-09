@@ -1,0 +1,122 @@
+---
+title: "Architecture"
+description: "How the three services, packages, and data flow fit together."
+---
+
+## System Overview
+
+Avocado Studio is a pnpm monorepo with three apps and four packages:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  AI Content Studio (:4100)               │
+│                    Vite + React                         │
+│          Chat UI, model picker, plan review             │
+│                                                         │
+│   ┌───────────────────┐    ┌──────────────────────┐     │
+│   │    Chat Panel      │    │   Site iframe         │    │
+│   │                    │    │                       │    │
+│   │  User types        │    │  Live preview of      │    │
+│   │  "add a hero"      │    │  your website         │    │
+│   │                    │    │                       │    │
+│   └────────┬───────────┘    └───────────▲───────────┘    │
+│            │                            │                │
+└────────────┼────────────────────────────┼────────────────┘
+             │ HTTP (REST + SSE)          │ postMessage
+             ▼                            │
+┌────────────────────────────┐    ┌───────┴──────────────────┐
+│   Orchestrator (:4200)     │    │     Site (:3000)          │
+│      Fastify API           │    │      Next.js              │
+│                            │    │                           │
+│  • AI planning (LLM)       │◄──►│  • Renders BlockInstance  │
+│  • Operation validation    │    │    pages                  │
+│  • Session state           │    │  • Draft mode             │
+│  • Undo/redo history       │    │  • Published mode         │
+│  • Publishing pipeline     │    │    (visitors)             │
+│                            │    │  • Block manifest API     │
+└────────────────────────────┘    └───────────────────────────┘
+```
+
+## Data Flow: From Chat to Preview
+
+When a user sends a message in the Content Studio, here's what happens:
+
+```
+1. Content Studio → Orchestrator  POST /chat/stream (user message + page context)
+2. Orchestrator → LLM             Sends prompt with block schemas + page state
+3. LLM → Orchestrator             Returns structured edit plan (JSON)
+4. Orchestrator                   Validates operations against Zod schemas
+5. Orchestrator → Content Studio  Streams plan + results via SSE
+6. Orchestrator → Site            Notifies draft content updated
+7. Site                           Re-fetches draft, re-renders blocks
+8. Site → Content Studio          postMessage confirms preview updated
+```
+
+## Packages
+
+The monorepo includes four shared packages:
+
+| Package | Purpose |
+|---------|---------|
+| `@ai-site-editor/shared` | Zod schemas for PageDoc, BlockInstance, Operation, EditPlan. Block registry. Shared types across all apps. |
+| `@ai-site-editor/blocks` | 20 built-in block renderers (Hero, CTA, FAQ, Gallery, etc.). Each block is a React component with a typed Zod schema. |
+| `@ai-site-editor/preview-adapter` | PreviewBridge component that runs inside the site iframe. Handles postMessage communication with the Content Studio, block selection overlays, and CSS highlights. |
+| `@ai-site-editor/site-sdk` | SDK for integrating AI editing into any Next.js 15+ site. Provides route handlers, draft mode utilities, and content resolution for the Content Studio. |
+
+## Communication Protocols
+
+### Content Studio ↔ Orchestrator: HTTP + SSE
+
+The Content Studio communicates with the orchestrator via REST API and Server-Sent Events:
+
+- `POST /chat/stream` — Send a user message, receive streamed edit plan
+- `GET /draft/pages` — Fetch current draft page state
+- `POST /ops/undo`, `/ops/redo` — Undo/redo operations
+- `POST /publish/content` — Publish draft to production
+
+### Content Studio ↔ Site: postMessage
+
+The Content Studio embeds the site in an iframe. They communicate via the `site-editor/v1` postMessage protocol:
+
+- **Content Studio → Site**: Request block highlight, navigate to page, refresh preview
+- **Site → Content Studio**: Report selected block, confirm preview updated, send block manifest
+
+### Orchestrator ↔ Site: HTTP
+
+The site fetches draft content from the orchestrator when in draft mode:
+
+- `GET /draft/pages` — All draft pages for the current session
+- `GET /draft/slugs` — Available page slugs
+
+## Session State
+
+The orchestrator maintains **in-memory session state** for each editing session:
+
+- **Draft pages** — Current page content with all pending edits
+- **Operation history** — Full undo/redo stack
+- **Edit plans** — Generated plans awaiting approval
+- **Session config** — Selected AI provider, model tier, locale
+
+Session state is scoped per session ID. Multiple users editing different sessions don't interfere with each other. State is persisted to disk (`.data/orchestrator-state.json`) for crash recovery.
+
+<Note>
+For production deployment, session state should be moved to durable storage (Redis, Postgres, etc.). The default file-based persistence is designed for local development.
+</Note>
+
+## Publishing Pipeline
+
+Publishing promotes draft content to production:
+
+```
+Draft (orchestrator) → PublishTarget → Production (your site)
+```
+
+The `PublishTarget` interface is pluggable. The built-in `GitVercelPublishTarget`:
+
+1. Serializes all draft pages to JSON
+2. Commits to a Git branch
+3. Pushes to the remote repository
+4. Triggers a Vercel deploy hook (optional)
+5. Tracks deployment status
+
+Implement your own `PublishTarget` to integrate with any deployment workflow — CI/CD pipelines, CMS APIs, static hosting, etc.

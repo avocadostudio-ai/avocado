@@ -187,6 +187,8 @@ export type HistoryResponse = {
   status?: string
   previewVersion?: number
   navigateToSlug?: string
+  canUndo?: boolean
+  canRedo?: boolean
   error?: string
 }
 
@@ -257,6 +259,7 @@ export type SiteConfig = {
   previewUrl?: string
   gdriveFolderId?: string
   cmsMedia?: CmsMediaConfig
+  enablePuck?: boolean
 }
 
 export type RestoreSnapshot = {

@@ -1,7 +1,18 @@
 {
-  "name": "ai-site-editor-poc",
+  "name": "ai-site-editor",
   "private": true,
   "version": "0.0.1",
+  "description": "AI-powered content operations for websites — natural language editing with live preview, type-safe operations, and multi-model AI support",
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "website-editor",
+    "content-ops",
+    "chat",
+    "nextjs",
+    "cms",
+    "blocks"
+  ],
   "packageManager": "pnpm@10.10.0",
   "engines": {
     "node": ">=22"

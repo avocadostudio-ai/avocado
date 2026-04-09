@@ -1,0 +1,186 @@
+---
+title: "How It Works"
+description: "Step-by-step walkthrough of the editing pipeline — from user message to live preview update."
+---
+
+## The Editing Pipeline
+
+When a user types a message like _"Add a testimonials section with 3 customer quotes below the hero"_, the system goes through a structured pipeline to turn that natural language request into validated, type-safe content changes.
+
+### Step 1: Intent Detection
+
+The orchestrator first determines what the user wants to do. A fast model (e.g., Claude Haiku) classifies the message:
+
+- **Structural edit** — Add, remove, move, or update blocks
+- **Page operation** — Create, duplicate, or delete a page
+- **Clarification needed** — The request is ambiguous ("make it better" → which block?)
+- **Off-topic** — Not a content editing request
+
+If the fast model can handle the request directly (e.g., a simple text change), it returns a plan immediately — skipping the full planner and saving time and cost.
+
+### Step 2: AI Planning
+
+For complex requests, the orchestrator sends the full context to a planning model:
+
+- **System prompt** — Instructions for generating structured edit operations
+- **Block schemas** — Zod schemas for all available block types, so the AI knows what fields exist and what values are valid
+- **Current page state** — The full PageDoc with all existing blocks
+- **User message** — The natural language request
+- **Conversation history** — Previous messages for context
+
+The AI responds with a structured **edit plan** — a JSON object containing one or more operations.
+
+### Step 3: Validation
+
+Every operation in the plan is validated against the block's Zod schema:
+
+- Are the props valid for this block type?
+- Does the target block exist (for updates/removes)?
+- Is the position valid (for adds/moves)?
+
+If validation fails, the orchestrator attempts **auto-repair** — re-prompting the AI with the specific error. If repair also fails, the user sees a clear error message explaining what went wrong. See [Chat Troubleshooting](/observability/chat-troubleshooting) for debugging failed plans.
+
+### Step 4: Apply Operations
+
+Validated operations are applied to the draft page state in order. Each operation:
+
+1. Updates the in-memory draft PageDoc
+2. Records itself in the undo/redo history
+3. Bumps the preview version number
+
+### Step 5: Stream to Content Studio
+
+The orchestrator streams results back to the Content Studio via Server-Sent Events (SSE):
+
+```
+event: plan_generated     → Content Studio shows the proposed changes
+event: op_applied         → Each operation applied (progressive UI updates)
+event: preview_updated    → Site iframe refreshes with new content
+event: images_resolved    → Background images patched in (if deferred)
+```
+
+The user sees changes appearing progressively — not a loading spinner followed by a wall of changes.
+
+### Step 6: Live Preview Update
+
+The site (in the iframe) detects the draft content update and re-renders:
+
+1. Orchestrator notifies via draft version bump
+2. Site re-fetches draft pages from orchestrator
+3. React re-renders only the changed blocks
+4. Site sends `postMessage` to Content Studio confirming the update
+
+The user sees the live site update in real time, exactly as visitors would see it.
+
+### Step 7: User Review
+
+The user can now:
+
+- **Approve** — Keep the changes in the draft
+- **Undo** — Roll back the last operation (or the entire plan)
+- **Continue editing** — Send another message to refine the changes
+- **Publish** — Push the draft to production
+
+## Streaming & Progressive Updates
+
+Avocado Studio is optimized to minimize perceived latency:
+
+| Optimization | What it does |
+|-------------|-------------|
+| **Parallel planning** | Fast intent router and full planner run concurrently. If the router succeeds, the planner is aborted. |
+| **Streamed op apply** | Operations are validated and applied as they stream from the LLM, not after the full response. |
+| **Deferred image resolution** | Text and structural changes apply immediately. Image lookups (Unsplash, DALL-E) resolve in the background. |
+| **Incremental preview** | Each operation triggers a preview update, so the user sees changes at ~800ms intervals. |
+
+## Undo / Redo
+
+Every operation is recorded in a per-session history stack. Undo reverses the last operation by restoring the previous page state. Redo re-applies it.
+
+The history is operation-level, not plan-level — if a plan contains 3 operations, you can undo them one at a time.
+
+## Publishing
+
+When the user is satisfied with their edits, they click **Publish** in the Content Studio. The orchestrator snapshots the current draft pages and pushes them through a **publish target** — a pluggable interface that connects to your deployment workflow.
+
+### The `PublishTarget` Interface
+
+Publishing is defined by a single TypeScript interface:
+
+```typescript
+interface PublishTarget {
+  publish(session: string, pages: PageDoc[], config: SiteConfig): Promise<PublishResult>
+  getStatus?(session: string): Promise<PublishStatus | null>
+}
+```
+
+- `publish()` — Takes the session ID, all draft pages, and the site config. Returns whether the publish succeeded and which page slugs were published.
+- `getStatus()` — Optional. Lets the Content Studio poll for deployment progress (e.g., "building", "ready", "failed").
+
+### Built-in: Git + Vercel Deploy Hook
+
+The default publish target (`GitVercelPublishTarget`) works in two modes:
+
+**Git mode** (`PUBLISH_MODE=git`, the default):
+1. Serializes all draft pages to `apps/site/lib/published-content.json`
+2. Copies any generated images to `apps/site/public/generated-images/`
+3. Rewrites localhost image URLs to relative paths
+4. Commits and pushes to the configured branch (`PUBLISH_GIT_BRANCH`, defaults to `main`)
+5. If a Vercel deploy hook is configured, the push triggers a rebuild automatically
+
+**Deploy hook mode** (`PUBLISH_MODE=deploy_hook`):
+1. Calls the `VERCEL_DEPLOY_HOOK_URL` endpoint to trigger a Vercel rebuild
+2. Tracks deployment status by polling the Vercel API (`VERCEL_TOKEN`)
+3. Reports back to the Content Studio: triggered → building → ready (or failed)
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PUBLISH_MODE` | `git` | `git` or `deploy_hook` |
+| `PUBLISH_GIT_BRANCH` | `main` | Branch to push published content to |
+| `PUBLISH_GIT_STRICT` | `0` | If `1`, abort publish when working tree has unrelated changes |
+| `PUBLISH_TOKEN` | _(none)_ | Require this token in `x-publish-token` header to authorize publishes |
+| `VERCEL_DEPLOY_HOOK_URL` | _(none)_ | Vercel deploy hook URL (for deploy_hook mode) |
+| `VERCEL_TOKEN` | _(none)_ | Vercel API token for polling deployment status |
+
+### Implementing a Custom Publish Target
+
+To publish to a different platform (Netlify, AWS, a CMS, or your own CI/CD pipeline), implement the `PublishTarget` interface:
+
+```typescript
+import type { PublishTarget, PublishResult } from "./publish-target.js"
+import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+
+export class MyPublishTarget implements PublishTarget {
+  async publish(session: string, pages: PageDoc[], config: SiteConfig): Promise<PublishResult> {
+    // pages is the full array of PageDoc objects (JSON)
+    // Each page has: slug, title, blocks (array of BlockInstance)
+    
+    // Example: POST to your CMS API
+    const res = await fetch("https://your-cms.example.com/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pages })
+    })
+
+    return {
+      ok: res.ok,
+      slugs: pages.map(p => p.slug),
+      error: res.ok ? undefined : `CMS returned ${res.status}`
+    }
+  }
+}
+```
+
+The orchestrator passes full `PageDoc` objects — your publish target receives structured JSON, not HTML. Your target decides how to store, transform, or deploy that content.
+
+### CMS Publishing (via Site SDK)
+
+For CMS-backed sites (Contentful, Sanity, Strapi), the Site SDK provides publish utilities that handle the common workflow:
+
+1. Resolve image URLs (rewrite localhost references, upload to CMS)
+2. SSRF validation on external image URLs
+3. Deduplicate image uploads within a single publish
+4. Push page content to the CMS API
+
+See the working examples in `examples/contentful-site/`, `examples/sanity-site/`, and `examples/strapi-site/` for complete CMS publish implementations.

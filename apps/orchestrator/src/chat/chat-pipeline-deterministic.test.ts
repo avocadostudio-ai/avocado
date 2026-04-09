@@ -278,6 +278,14 @@ test("shouldReturnDeterministicClarification: rejects non-page ops", () => {
   assert.ok(!shouldReturnDeterministicClarification("add a features section"))
 })
 
+test("shouldReturnDeterministicClarification: rejects batch-add requests like 'populate this page'", () => {
+  // These should NOT short-circuit to clarification — the full planner should handle them
+  assert.ok(!shouldReturnDeterministicClarification("populate this page with 3 blocks and sample content"))
+  assert.ok(!shouldReturnDeterministicClarification("populate this page with content"))
+  assert.ok(!shouldReturnDeterministicClarification("fill out the page with hero, cardgrid and CTA"))
+  assert.ok(!shouldReturnDeterministicClarification("add 3 blocks with sample content"))
+})
+
 // ---------------------------------------------------------------------------
 // deterministicCreatePagePlan — template deferral
 // ---------------------------------------------------------------------------

@@ -143,7 +143,8 @@ app.get("/status/planner", async () => ({
     unsplash: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
     imageGenerate: Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim()),
     imageGenerateChat: Boolean(process.env.GOOGLE_GENAI_API_KEY?.trim()),
-    contentful: Boolean(process.env.CONTENTFUL_SPACE_ID?.trim() && process.env.CONTENTFUL_DELIVERY_TOKEN?.trim())
+    contentful: Boolean(process.env.CONTENTFUL_SPACE_ID?.trim() && process.env.CONTENTFUL_DELIVERY_TOKEN?.trim()),
+    agentMode: Boolean(process.env.AGENT_API_KEY?.trim()),
   }
 }))
 app.get("/telemetry/chat", async (request) => {

@@ -1,14 +1,20 @@
+---
+title: "Site Provider SPI"
+description: "OpenAPI integration contract for site provider service provider interface."
+---
+
 # Site Provider SPI — OpenAPI Integration Contract
 
 Related docs:
-- `docs/integration/README.md` — default fast onboarding path (Next.js embedded mode).
-- `docs/planning/reduce-nextjs-coupling.md` — rationale for default vs advanced integration tiers.
+- [Integration Overview](/integration) — default fast onboarding path (Next.js embedded mode)
+- [Core Concepts](/concepts) — pages, blocks, operations, and draft mode explained
+- [Architecture](/architecture) — how the orchestrator, Content Studio, and site communicate
 
 ## Context
 
-External developers who want our AI editor to manage their site need to implement a standard API. The orchestrator is the brain (AI planning, operation execution, undo/redo); the provider is the storage backend (pages, media, deployment). This spec defines the contract adopters must implement.
+External developers who want our AI Content Studio to manage their site need to implement a standard API. The orchestrator is the brain (AI planning, operation execution, undo/redo); the provider is the storage backend (pages, media, deployment). This spec defines the contract adopters must implement.
 
-Inspired by Adobe AEM's OpenAPI-based APIs: separate page properties from content, HEAD for freshness checks, content definition endpoint for discovering block types.
+Designed around OpenAPI conventions: separate page properties from content, HEAD for freshness checks, content definition endpoint for discovering block types.
 
 **Design principle**: Push full `PageDoc` objects, not operations. Adopters store/retrieve JSON — no ops engine on their side. Undo/redo and session isolation stay in the orchestrator.
 

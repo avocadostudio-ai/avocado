@@ -15,7 +15,7 @@ export function buildIntentParserSystemPrompt(): string {
     "Return ONLY one JSON object. No markdown.",
     "Never return operations.",
     "Map request to action: add | move | update | remove | info | clarify.",
-    "If the user asks what is editable/available, use action=info.",
+    "If the user asks about page content, requests a description or summary of the page, or asks what is editable/available, use action=info.",
     "Use explicit block references when present (id/type words like hero/faq/cta).",
     "For move/add with placement words, set position to top/bottom/before/after and anchor_block_ref when relevant.",
     "For update, include patch with only requested fields.",
