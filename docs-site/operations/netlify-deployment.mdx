@@ -1,6 +1,6 @@
 ---
 title: "Deploy to Netlify"
-description: "Deploy the AI Site Editor site and editor to Netlify."
+description: "Deploy the AI Site Editor site and Content Studio to Netlify."
 ---
 
 ## Architecture overview
@@ -8,7 +8,7 @@ description: "Deploy the AI Site Editor site and editor to Netlify."
 | Component | Netlify product | Notes |
 |-----------|----------------|-------|
 | **Site** (`apps/site`) | Netlify Sites | Next.js via `@netlify/plugin-nextjs` |
-| **Editor** (`apps/editor`) | Netlify Sites | Static Vite build |
+| **Content Studio** (`apps/editor`) | Netlify Sites | Static Vite build |
 | **Orchestrator** (`apps/orchestrator`) | External host | Long-running Fastify server — deploy on Render, Fly, Railway, or any container host |
 
 <Note>
@@ -51,7 +51,7 @@ In Phase 1, the site renders from published content only — no orchestrator nee
 
 ## Phase 2: Full editing stack
 
-### Deploy the editor
+### Deploy the Content Studio
 
 Create a separate Netlify site for `apps/editor`:
 
@@ -59,7 +59,7 @@ Create a separate Netlify site for `apps/editor`:
 - **Build command:** `cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @ai-site-editor/editor build`
 - **Publish directory:** `apps/editor/dist`
 
-### Editor environment variables
+### Content Studio environment variables
 
 | Variable | Value |
 |----------|-------|
@@ -78,7 +78,7 @@ The orchestrator requires a long-running process. Deploy on Render, Fly.io, Rail
 | `ORCHESTRATOR_URL` | `https://<your-orchestrator-host>` |
 | `NEXT_PUBLIC_ENABLE_EDITOR` | `1` |
 | `NEXT_PUBLIC_EDITOR_ORIGIN` | `https://<your-editor>.netlify.app` (no trailing slash) |
-| `DRAFT_MODE_SECRET` | Shared secret (must match editor's `VITE_SITE_DRAFT_SECRET`) |
+| `DRAFT_MODE_SECRET` | Shared secret (must match Content Studio's `VITE_SITE_DRAFT_SECRET`) |
 
 ## Other platforms
 
