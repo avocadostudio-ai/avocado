@@ -48,12 +48,12 @@ Validated operations are applied to the draft page state in order. Each operatio
 2. Records itself in the undo/redo history
 3. Bumps the preview version number
 
-### Step 5: Stream to Editor
+### Step 5: Stream to Content Studio
 
-The orchestrator streams results back to the editor via Server-Sent Events (SSE):
+The orchestrator streams results back to the Content Studio via Server-Sent Events (SSE):
 
 ```
-event: plan_generated     → Editor shows the proposed changes
+event: plan_generated     → Content Studio shows the proposed changes
 event: op_applied         → Each operation applied (progressive UI updates)
 event: preview_updated    → Site iframe refreshes with new content
 event: images_resolved    → Background images patched in (if deferred)
@@ -68,7 +68,7 @@ The site (in the iframe) detects the draft content update and re-renders:
 1. Orchestrator notifies via draft version bump
 2. Site re-fetches draft pages from orchestrator
 3. React re-renders only the changed blocks
-4. Site sends `postMessage` to editor confirming the update
+4. Site sends `postMessage` to Content Studio confirming the update
 
 The user sees the live site update in real time, exactly as visitors would see it.
 
@@ -100,7 +100,7 @@ The history is operation-level, not plan-level — if a plan contains 3 operatio
 
 ## Publishing
 
-When the user is satisfied with their edits, they click **Publish** in the editor. The orchestrator snapshots the current draft pages and pushes them through a **publish target** — a pluggable interface that connects to your deployment workflow.
+When the user is satisfied with their edits, they click **Publish** in the Content Studio. The orchestrator snapshots the current draft pages and pushes them through a **publish target** — a pluggable interface that connects to your deployment workflow.
 
 ### The `PublishTarget` Interface
 
@@ -114,7 +114,7 @@ interface PublishTarget {
 ```
 
 - `publish()` — Takes the session ID, all draft pages, and the site config. Returns whether the publish succeeded and which page slugs were published.
-- `getStatus()` — Optional. Lets the editor poll for deployment progress (e.g., "building", "ready", "failed").
+- `getStatus()` — Optional. Lets the Content Studio poll for deployment progress (e.g., "building", "ready", "failed").
 
 ### Built-in: Git + Vercel Deploy Hook
 
@@ -130,7 +130,7 @@ The default publish target (`GitVercelPublishTarget`) works in two modes:
 **Deploy hook mode** (`PUBLISH_MODE=deploy_hook`):
 1. Calls the `VERCEL_DEPLOY_HOOK_URL` endpoint to trigger a Vercel rebuild
 2. Tracks deployment status by polling the Vercel API (`VERCEL_TOKEN`)
-3. Reports back to the editor: triggered → building → ready (or failed)
+3. Reports back to the Content Studio: triggered → building → ready (or failed)
 
 ### Environment Variables
 

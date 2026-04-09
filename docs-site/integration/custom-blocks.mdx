@@ -12,8 +12,8 @@ Use custom blocks when your site has its own component library and you don't wan
 ## How it works
 
 1. You define a **block manifest** — an array of `BlockDefinition` objects describing your block types
-2. You pass it to the editor API handler via `getManifest()`
-3. The AI planner, property panel, and block picker all derive their behavior from your manifest
+2. You pass it to the Content Studio API handler via `getManifest()`
+3. The AI planner, property panel, and block picker in the Content Studio all derive their behavior from your manifest
 4. Your site renders blocks with your own React components
 
 ## Minimal example
@@ -109,14 +109,14 @@ Start your dev server and check:
 curl http://localhost:3000/api/editor/blocks | jq '.blocks[].type'
 ```
 
-Should print your block types. The editor header should show **Manifest** (not **Degraded**).
+Should print your block types. The Content Studio header should show **Manifest** (not **Degraded**).
 
 ## BlockDefinition reference
 
 ```ts
 type BlockDefinition = {
   type: string                          // Block identifier (PascalCase recommended)
-  displayName?: string                  // Human-readable name in editor UI
+  displayName?: string                  // Human-readable name in Content Studio UI
   editablePaths?: string[]              // Fields the AI can edit (optional hint)
   propsSchema: Record<string, unknown>  // JSON Schema describing block props
   defaultProps?: Record<string, unknown> // Defaults when adding a new block
@@ -224,7 +224,7 @@ const manifest: BlockManifest = {
 - [ ] Create `lib/manifest.ts` with your `BlockDefinition[]`
 - [ ] Pass `getManifest` to `createEditorApiHandler()`
 - [ ] Verify `/api/editor/blocks` returns your blocks
-- [ ] Editor header shows **Manifest** (not **Degraded**)
+- [ ] Content Studio header shows **Manifest** (not **Degraded**)
 - [ ] Add block picker shows your block types
 - [ ] AI can create, edit, and remove your blocks
 - [ ] Image fields are detected (check publish resolves images)

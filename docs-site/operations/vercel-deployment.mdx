@@ -11,10 +11,10 @@ This guide covers deploying AI Site Editor to Vercel.
 
 The recommended deployment splits across two platforms:
 
-- **Site + Editor** on Vercel (static/serverless hosting)
+- **Site + Content Studio** on Vercel (static/serverless hosting)
 - **Orchestrator** on a long-running host (Render, Fly.io, Railway, or any container platform)
 
-Two deployment phases are supported: public site only (Phase 1) or full editing stack (Phase 2).
+Two deployment phases are supported: public site only (Phase 1) or full Content Studio stack (Phase 2).
 
 ### Required now (Phase 1)
 
@@ -35,7 +35,7 @@ Two deployment phases are supported: public site only (Phase 1) or full editing 
 Pick one deployment target:
 
 1. Public website only (recommended for launch)
-2. Full editor + orchestration stack on Vercel
+2. Full Content Studio + orchestration stack on Vercel
 
 ---
 
@@ -76,9 +76,9 @@ Create one Vercel project for `apps/site`:
 
 ---
 
-## 2) Full editor stack on Vercel (site + orchestrator + optional editor)
+## 2) Full Content Studio stack on Vercel (site + orchestrator + Content Studio)
 
-Use this only if you want production editing workflows.
+Use this only if you want production Content Studio workflows.
 
 ### Required code changes
 
@@ -104,7 +104,7 @@ Use this only if you want production editing workflows.
 
 5. Tighten CORS in orchestrator.
 - Current CORS is `origin: true` (too open for production).
-- Restrict to known site/editor origins via env-based allowlist.
+- Restrict to known site/Content Studio origins via env-based allowlist.
 
 6. Review streaming endpoint behavior (`/chat/stream`).
 - Ensure it fits your Vercel function execution limits and plan.
@@ -122,7 +122,7 @@ Set up separate projects:
 - Root: `apps/orchestrator`
 - Env: `OPENAI_API_KEY`, model env vars, storage connection env vars, CORS allowlist
 
-3. `editor` project (optional)
+3. Content Studio project (optional)
 - Root: `apps/editor`
 - Env: `VITE_EDITOR_ORIGIN`, `VITE_SITE_ORIGIN`, `VITE_ORCHESTRATOR_URL`
 
@@ -133,10 +133,10 @@ Set up separate projects:
 If the goal is to publish quickly, do these first:
 
 1. Implement published rendering path in `apps/site` that does not require orchestrator.
-2. Disable/protect production editor mode.
+2. Disable/protect production Content Studio mode.
 3. Deploy `apps/site` only on Vercel.
 
-Then add orchestrator/editor deployment as phase 2.
+Then add orchestrator/Content Studio deployment as phase 2.
 
 ## Deferred (Phase 2, later)
 
