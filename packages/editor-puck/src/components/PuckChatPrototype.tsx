@@ -159,6 +159,8 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     agentModeEnabled,
   })
 
+  const publish = hostApi.usePublish(session, siteId, chatEngine.isLoading)
+
   const onSelectionChange = useCallback((selection?: SelectionContext) => {
     const nextBlockId = selection?.activeBlockId
     const nextBlockType = selection?.activeBlockType
@@ -252,7 +254,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     queuePersist(nextData)
   }, [puckData, queuePersist, setPuckData])
 
-  const onPuckPublish = useCallback((nextDataRaw: unknown) => {
+  const onPuckPublish = useCallback(async (nextDataRaw: unknown) => {
     if (!persistedPuckDataRef.current && puckData) {
       persistedPuckDataRef.current = puckData
     }
@@ -264,8 +266,9 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
       window.clearTimeout(persistTimerRef.current)
       persistTimerRef.current = null
     }
-    void flushPendingPersist()
-  }, [flushPendingPersist, puckData, setPuckData])
+    await flushPendingPersist()
+    await publish.publishSite()
+  }, [flushPendingPersist, puckData, setPuckData, publish])
 
   useEffect(() => {
     latestPuckDataRef.current = puckData ?? null
@@ -299,10 +302,15 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
             ))}
           </select>
         </label>
+        {publish.publishStatus?.inspectUrl ? (
+          <a className="puck-publish-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
+            View deploy
+          </a>
+        ) : null}
         {children}
       </>
     )
-  }), [availableSlugs, headerBusy, slug])
+  }), [availableSlugs, headerBusy, slug, publish.publishStatus])
 
   const chatPlugin = useMemo(() => ({
     name: "ai-site-editor-chat",

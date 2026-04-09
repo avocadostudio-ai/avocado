@@ -2,6 +2,7 @@ import { PuckChatPrototype, type PuckHostApi } from "@ai-site-editor/editor-puck
 import { ChatComposerCore } from "./ChatSurface"
 import { ImagePickerModal } from "./ImagePickerModal"
 import { useChatEngine } from "../hooks/useChatEngine"
+import { usePublish } from "../hooks/usePublish"
 import { useEditorStore } from "../store"
 import { useMediaInput } from "../hooks/useMediaInput"
 import { renderFinalMarkdown, renderSimpleMarkdown } from "../lib/markdown-renderer"
@@ -31,6 +32,10 @@ const puckHostApi: PuckHostApi = {
   resolveEditorSiteId,
   sanitizeSiteId,
   orchestrator,
+  usePublish: (session: string, siteId: string, isLoading: boolean) => {
+    const pushAssistantFromResult = useEditorStore((s) => s.pushAssistantFromResult)
+    return usePublish(session, siteId, isLoading, pushAssistantFromResult, siteOrigin)
+  },
   useChatEngine: (args: any) => {
     const actions = useChatEngine(args)
     const chatLog = useEditorStore((s) => s.chatLog)
