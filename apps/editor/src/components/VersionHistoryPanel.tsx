@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { orchestrator } from "../lib/editor-utils"
+import { renderFinalMarkdown } from "../lib/markdown-renderer"
 import { useT } from "../i18n"
 
 type VersionEntry = {
@@ -93,7 +94,7 @@ export function VersionHistoryPanel({ session, siteId, slug, visible }: VersionH
                   </span>
                   <span className="version-history-time">{formatTime(entry.at)}</span>
                 </div>
-                <div className="version-history-summary">{entry.summary}</div>
+                <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
                 {entry.opCount > 0 ? (
                   <div className="version-history-meta">
                     {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
