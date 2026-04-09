@@ -262,9 +262,9 @@ export function ChatComposerCore({
             disabled={!canUndoServer || isLoading}
             onClick={onGlobalUndo}
             title={undoTooltip}
+            aria-label={undoTooltip}
           >
-            <Undo2 size={14} aria-hidden="true" />
-            <span>{undoTooltip?.replace(/\s*\(.*\)/, "") ?? "Undo"}</span>
+            <Undo2 size={15} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -272,9 +272,9 @@ export function ChatComposerCore({
             disabled={!canRedoServer || isLoading}
             onClick={onGlobalRedo}
             title={redoTooltip}
+            aria-label={redoTooltip}
           >
-            <span>{redoTooltip?.replace(/\s*\(.*\)/, "") ?? "Redo"}</span>
-            <Redo2 size={14} aria-hidden="true" />
+            <Redo2 size={15} aria-hidden="true" />
           </button>
         </div>
       ) : null}

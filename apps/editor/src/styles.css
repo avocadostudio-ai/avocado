@@ -2146,10 +2146,10 @@ textarea {
   color: #475569;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 12px;
-  font-weight: 500;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   cursor: pointer;
   border-radius: 6px;
   transition: background 0.15s, color 0.15s;
