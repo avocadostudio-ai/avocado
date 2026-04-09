@@ -2,7 +2,7 @@
 
 ## About this project
 
-- This is the public documentation site for **AI Site Editor**, built on [Mintlify](https://mintlify.com)
+- This is the public documentation site for **Avocado Studio**, built on [Mintlify](https://mintlify.com)
 - Pages are MDX files with YAML frontmatter
 - Configuration lives in `docs.json`
 - Run `mint dev` to preview locally

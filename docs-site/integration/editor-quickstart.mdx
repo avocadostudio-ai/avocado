@@ -1,24 +1,47 @@
-# Editor Integration Quickstart (Embedded Draft Mode)
+---
+title: "Content Studio Quickstart"
+description: "Quick guide to integrating the Content Studio with an existing Next.js site in embedded draft mode."
+---
 
-Use this when integrating the editor with any existing Next.js site.
+# Content Studio Integration Quickstart (Embedded Draft Mode)
 
-Start here first:
-- `docs/integration/README.md`
+Use this when integrating the Content Studio with any existing Next.js site. For background on core concepts, see [Core Concepts](/concepts).
 
-MVP requirement:
-- Expose `GET /api/editor/blocks` so the editor/orchestrator knows which components are safely editable.
-- Without this manifest, run in degraded mode (read-only preview or text-only edits).
+## Expose your components via the Block Manifest
 
-Recommended:
-- keep a local component registry in site code and generate manifest from it.
+The Content Studio needs to know which components on your site are editable and what props they accept. You do this by exposing a **block manifest** at `GET /api/editor/blocks`.
 
-The `@ai-site-editor/site-sdk` package provides handler factories for all required API routes — see [nextjs-mvp-embedded](/integration/nextjs-mvp-embedded).
+**Using the built-in blocks** (quickest start):
+
+```ts
+// app/api/editor/[...path]/route.ts
+import { createEditorApiHandler } from "@ai-site-editor/site-sdk/routes"
+
+export const { GET, POST, OPTIONS } = createEditorApiHandler({
+  getPages: () => fetchYourPages(),
+})
+```
+
+`createEditorApiHandler()` automatically builds the manifest from the 20 built-in block types. The Content Studio and AI planner read this manifest to understand what blocks exist, what fields they have, and what values are valid.
+
+**Using your own custom components**:
+
+If your site has its own component library, you define a custom manifest describing your block types and their props schemas. See [Custom Blocks](/integration/custom-blocks) for the full guide, including:
+
+- How to define a `BlockManifest` with JSON Schema-based `propsSchema` for each component
+- How to wire it into the editor API route via `getManifest()`
+- How to mix your custom blocks with the built-in ones
+- How field types (image, text, list, enum) are inferred from your schema
+
+Without a manifest, the Content Studio runs in **degraded mode** (read-only preview or text-only edits).
+
+For the full Next.js integration walkthrough, see [Next.js Embedded MVP](/integration/nextjs-mvp-embedded).
 
 ## Required env vars
 
 - Site:
   - `DRAFT_MODE_SECRET`
-- Editor:
+- Content Studio:
   - `VITE_SITE_ORIGIN`
   - `VITE_SITE_DRAFT_SECRET` (same value as site `DRAFT_MODE_SECRET`)
 
@@ -77,4 +100,4 @@ curl -s http://localhost:3000/api/editor/blocks | jq '.version, (.blocks | lengt
 
 Expected:
 - manifest route returns `version` and non-zero block count
-- editor header shows `Manifest` (not `Degraded`)
+- Content Studio header shows `Manifest` (not `Degraded`)

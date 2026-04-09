@@ -1,11 +1,11 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "AI Site Editor Docs",
+  "name": "Avocado Studio",
   "colors": {
-    "primary": "#FF5A36",
-    "light": "#FF8A6B",
-    "dark": "#E04A2B"
+    "primary": "#1F7A3A",
+    "light": "#7ED957",
+    "dark": "#14532D"
   },
   "favicon": "/favicon.svg",
   "logo": {
@@ -15,29 +15,50 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Getting Started",
+        "tab": "Overview",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Introduction",
             "pages": [
               "index",
+              "concepts",
+              "how-it-works",
+              "architecture"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integration",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
               "integration/index",
               "integration/editor-quickstart",
+              "integration/puck-mode",
               "integration/nextjs-mvp-embedded",
+              "integration/custom-blocks"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "site-provider-spi",
               "integration/tools-mvp"
             ]
           }
         ]
       },
       {
-        "tab": "Operations",
+        "tab": "Deployment",
         "groups": [
           {
-            "group": "Runbooks",
+            "group": "Deploy",
             "pages": [
               "operations/dev-server-runbook",
               "operations/vercel-deployment",
-              "operations/streaming-patch-checklist"
+              "operations/netlify-deployment"
             ]
           }
         ]
@@ -46,19 +67,11 @@
         "tab": "Reference",
         "groups": [
           {
-            "group": "Core",
+            "group": "Specifications",
             "pages": [
-              "specs/ai-website-editor-poc-spec",
-              "site-provider-spi",
-              "testing/e2e-editing-prompts",
-              "testing/avocado-transformation-demo-runbook"
+              "specs/ai-website-editor-poc-spec"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Advanced",
-        "groups": [
+          },
           {
             "group": "Observability",
             "pages": [
@@ -75,6 +88,19 @@
               "guardrails/guardrail-schema-v1-spec",
               "guardrails/guardrail-schema-v1-implementation-checklist"
             ]
+          },
+          {
+            "group": "Testing",
+            "pages": [
+              "testing/e2e-editing-prompts",
+              "testing/avocado-transformation-demo-runbook"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/streaming-patch-checklist"
+            ]
           }
         ]
       }
@@ -83,7 +109,7 @@
   "navbar": {
     "links": [
       {
-        "label": "Repository",
+        "label": "GitHub",
         "href": "https://github.com/yu7321/avocado"
       }
     ]

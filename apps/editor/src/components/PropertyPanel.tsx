@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
 import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, type BlockDefinition, type BlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
 import { WandSparkles, Sparkles, Pencil, Replace, Trash2, ImagePlus } from "lucide-react"
 import { useT } from "@/i18n"
+import { useEditorStore } from "../store"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
 const noop = () => {}
@@ -35,14 +36,16 @@ function useFieldHighlight(fieldPath: string | undefined, highlightPath: string 
 
 type Props = {
   style?: CSSProperties
-  blockId: string | undefined
-  blockType: string | undefined
+  /** Override — defaults to store `activeBlockId`. */
+  blockId?: string | undefined
+  /** Override — defaults to store `activeBlockType`. */
+  blockType?: string | undefined
   props: Record<string, unknown> | null
   status: "idle" | "loading" | "ready" | "error"
   onFieldChange: (fieldPath: string, value: string) => void
   onImageClick?: (fieldPath: string, currentUrl: string) => void
   onAiAssist?: (fieldPath: string, fieldLabel: string, fieldKind: string, currentValue: string) => void
-  /** Current page slug for page-level settings. */
+  /** Override — defaults to store `slug`. */
   slug?: string
   /** Display name for the current page (e.g. "Home (/)"). */
   pageName?: string
@@ -76,7 +79,19 @@ type Props = {
   siteOrigin?: string
 }
 
-export function PropertyPanel({ style, blockId, blockType, props, status, onFieldChange, onImageClick, onAiAssist, slug, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading, aiLoadingPath, onAddListItem, highlightPath, manifestByType, siteOrigin }: Props) {
+export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId: blockIdProp, blockType: blockTypeProp, props, status, onFieldChange, onImageClick, onAiAssist, slug: slugProp, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading: aiLoadingProp, aiLoadingPath: aiLoadingPathProp, onAddListItem, highlightPath: highlightPathProp, manifestByType, siteOrigin }: Props) {
+  // Read from store — props take precedence when provided
+  const storeBlockId = useEditorStore((s) => s.activeBlockId)
+  const storeBlockType = useEditorStore((s) => s.activeBlockType)
+  const storeSlug = useEditorStore((s) => s.slug)
+  const storeIsLoading = useEditorStore((s) => s.isLoading)
+  const storeEditablePath = useEditorStore((s) => s.activeEditablePath)
+  const blockId = blockIdProp ?? storeBlockId
+  const blockType = blockTypeProp ?? storeBlockType
+  const slug = slugProp ?? storeSlug
+  const aiLoading = aiLoadingProp ?? storeIsLoading
+  const aiLoadingPath = aiLoadingPathProp ?? storeEditablePath
+  const highlightPath = highlightPathProp ?? storeEditablePath
   const { t } = useT()
   if (!blockId || !blockType) {
     return (
@@ -203,7 +218,7 @@ export function PropertyPanel({ style, blockId, blockType, props, status, onFiel
       ) : null}
     </div>
   )
-}
+})
 
 /** Detect if `altKey` is the companion imageAlt for `imageKey` (e.g. imageUrl → imageAlt). */
 function isAltFor(imageKey: string, altKey: string): boolean {

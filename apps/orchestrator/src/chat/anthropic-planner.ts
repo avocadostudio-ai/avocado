@@ -48,6 +48,23 @@ export type { DeferredNativeImageCall }
 // content (rather than discarding it in favor of the hardcoded fallback).
 const MIN_MEANINGFUL_RESPONSE_LENGTH = 20
 
+/** Detect API-level errors (rate limits, auth failures, quota exhaustion) that
+ *  should NOT be treated as recoverable stream parse errors. */
+function isApiLevelError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  return (
+    msg.includes("usage limit") ||
+    msg.includes("rate limit") ||
+    msg.includes("quota") ||
+    msg.includes("authentication") ||
+    msg.includes("unauthorized") ||
+    msg.includes("invalid.*api.*key") ||
+    msg.includes("billing") ||
+    /\b40[0-13]\b/.test(err.message)
+  )
+}
+
 /**
  * Try JSON.parse, then repairAndParseJson. Returns parsed object or null.
  */
@@ -448,6 +465,9 @@ export async function generatePlanWithAnthropic(args: {
             emitProgressFromToolJson(nextBuf)
           }
         } catch (err) {
+          // Re-throw API-level errors (rate limits, auth failures, quota exhaustion)
+          // instead of treating them as recoverable stream parse errors.
+          if (isApiLevelError(err)) throw err
           path1StreamError = err
         }
 
@@ -701,6 +721,7 @@ export async function generatePlanWithAnthropic(args: {
           }
         }
       } catch (err) {
+        if (isApiLevelError(err)) throw err
         streamLoopError = err
         args.log?.warn({
           event: "anthropic_path2_stream_loop_error",

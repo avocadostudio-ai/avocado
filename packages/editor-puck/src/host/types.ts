@@ -77,6 +77,13 @@ export type SiteConfigLike = {
   cmsMedia?: unknown
 }
 
+export type UsePublishResult = {
+  publishSite: () => Promise<void>
+  isPublishing: boolean
+  publishInProgress: boolean
+  publishStatus: { inspectUrl?: string } | null
+}
+
 export type PuckHostApi = {
   LEGACY_AVOCADO_SITE_ID: string
   LEGACY_AVOCADO_SITE_NAME: string
@@ -90,10 +97,11 @@ export type PuckHostApi = {
   sanitizeSiteId: (raw: string) => string
   orchestrator: string
   useChatEngine: (args: any) => UseChatEngineResult
+  usePublish: (session: string, siteId: string, isLoading: boolean) => UsePublishResult
   ImagePickerModal: (props: any) => ReactNode
   ChatComposerCore: (props: any) => ReactNode
   useMediaInput: () => MediaInputHandlers
   renderFinalMarkdown: (text: string) => ReactNode
   renderSimpleMarkdown: (text: string) => ReactNode
-  agentApiKey?: string
+  agentModeEnabled?: boolean
 }

@@ -90,7 +90,7 @@ export const BATCH_PAGE_CREATE_PATTERNS: RegExp[] = [
 // ---------------------------------------------------------------------------
 
 export const COUNTED_MULTI_BLOCK_ADD_PATTERN =
-  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:\w+[-\s])*)(?:blocks?|components?|sections?|elements?|widgets?)\b/
+  /\b(?:add|insert|include|create|generate|build)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:\w+[-\s])*)(?:block\w*|component\w*|section\w*|element\w*|widget\w*)\b/
 
 // ---------------------------------------------------------------------------
 // Generic add-action verb
@@ -207,8 +207,8 @@ export const CONTENT_QUERY_PATTERNS: RegExp[] = [
   /\bsummarize\s+(?:this|the)\s+(?:page|content)\b/,
   /\bwhat\s+(?:blocks?|sections?)\s+(?:are|is)\s+(?:on|in)\s+(?:this|the)\s+page\b/,
   /\b(?:list|show|tell me)\b.*\b(?:all|every)\b.*\b(?:blocks?|sections?|components?)\b.*\b(?:on|in)\b/,
-  /\b(?:audit|review|check|inspect|analyze)\s+(?:the\s+)?(?:page|content|copy|text|links?|images?|buttons?)\b/,
-  /\bdescribe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration)\b/,
+  /\b(?:audit|review|check|inspect|analyze)\s+(?:the\s+)?(?:page|content|copy|text|links?|images?|buttons?|hero|cta|testimonials?|faq|feature\s*grid|card\s*grid|stats?|footer|contact\s*form|rich\s*text|two\s*column|carousel|gallery|tabs?|table|quote|video|embed|banner|section|block)\b/,
+  /\bdescribe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration|page|site|content|section)\b/,
 ]
 
 // ---------------------------------------------------------------------------

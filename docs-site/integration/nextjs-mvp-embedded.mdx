@@ -1,18 +1,18 @@
+---
+title: "Next.js Embedded MVP"
+description: "Default onboarding path for integrating any Next.js site in embedded mode."
+---
+
 # Next.js MVP Onboarding (Embedded Mode)
 
-This is the default onboarding path for any Next.js site.
+This is the default onboarding path for any Next.js site. For background, see [Core Concepts](/concepts) and the [Integration Overview](/integration).
 
-Central entry:
-- `docs/integration/README.md`
-
-Goal:
-- Keep existing site routes.
-- Do not require a `/preview` route.
-- Enable editor preview through Next.js Draft Mode cookies.
+**Goal**: keep your existing site routes, enable AI editing through Next.js [Draft Mode](/concepts#draft-mode) cookies — no `/preview` route required.
 
 Related:
-- `docs/integration/editor-quickstart.md` for editor iframe/bootstrap URL templates.
-- `docs/integration/nextjs-mvp-adoption-example.md` for a full page wiring example.
+- [Content Studio Quickstart](/integration/editor-quickstart) — iframe bootstrap URL templates and behavior checks
+- [Custom Blocks](/integration/custom-blocks) — register your own component types instead of (or alongside) built-in blocks
+- [Architecture](/architecture) — how the three services communicate
 
 ## Required contract
 
@@ -23,7 +23,7 @@ Related:
 
 The SDK's `createBlocksHandler()` generates this automatically from the block registry.
 
-2. Add Draft Mode entry and exit endpoints:
+2. Add Draft Mode entry and exit endpoints (used by the Content Studio):
 - `GET /api/draft?secret=...&redirect=/target-path`
 - `GET /api/draft/disable?redirect=/target-path`
 
@@ -35,7 +35,7 @@ The SDK's `createBlocksHandler()` generates this automatically from the block re
 - when Draft Mode is disabled, read published data only
 - when Draft Mode is enabled, read draft source via `fetchEditorPage()` / `fetchEditorSlugs()` from the SDK
 
-5. Editor iframe/bootstrap URL pattern:
+5. Content Studio iframe/bootstrap URL pattern:
 - `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>?<context>`
 
 ## Block manifest shape (MVP)
@@ -58,12 +58,12 @@ Example response:
 ```
 
 Behavior:
-- manifest present: enable structural operations (add/remove/reorder/update props)
+- manifest present: Content Studio enables structural operations (add/remove/reorder/update props)
 - manifest missing: degraded mode only (read-only preview or text-only edits)
 
 ## How Component Matching Works
 
-The editor does not infer components from DOM class names.
+The Content Studio does not infer components from DOM class names.
 It matches by stable component `type` IDs.
 
 Contract:
@@ -102,14 +102,14 @@ const rendererRegistry = {
 
 If a block type exists in content but not in manifest:
 - block can still render on site
-- editor must not run structural ops for that type (degraded mode for that block/type)
+- Content Studio must not run structural ops for that type (degraded mode for that block/type)
 
 ## Environment variables
 
 - Site:
   - `DRAFT_MODE_SECRET`
   - `ORCHESTRATOR_URL` (or your draft backend origin)
-- Editor:
+- Content Studio:
   - `VITE_SITE_ORIGIN`
   - `VITE_SITE_DRAFT_SECRET` (must match `DRAFT_MODE_SECRET`)
 
@@ -120,7 +120,7 @@ If a block type exists in content but not in manifest:
 3. Verify `/api/draft?secret=wrong` returns `401`.
 4. Verify `/api/draft?secret=valid&redirect=/` returns redirect + draft cookie.
 5. Verify public route (no draft cookie) does not call draft backend.
-6. Point editor iframe to draft entry URL.
+6. Point Content Studio iframe to draft entry URL.
 
 ## Optional later upgrade
 

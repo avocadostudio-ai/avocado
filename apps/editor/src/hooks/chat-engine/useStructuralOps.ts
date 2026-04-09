@@ -5,35 +5,29 @@ import {
   defaultPropsForType,
   type Operation
 } from "@ai-site-editor/shared"
-import type { ApplyOpsResponse, AssistantResponse } from "../../lib/editor-types"
+import type { ApplyOpsResponse } from "../../lib/editor-types"
 import {
   enablePatchTransport,
   orchestrator
 } from "../../lib/editor-utils"
 import { manifestUnavailableChanges, withIntegrationContext } from "../../lib/integration-context"
+import { useEditorStore } from "../../store"
+import { getSessionId, getSiteId } from "../../store/session"
 import type { ChatEngineSharedDeps } from "./types"
 
 export type StructuralOpsConfig = ChatEngineSharedDeps
 
 export function useStructuralOps(config: StructuralOpsConfig) {
   const {
-    session,
-    siteId,
-    activeBlockIdRef,
-    activeBlockTypeRef,
-    activeEditablePathRef,
-    setActiveBlockId,
-    setActiveBlockType,
-    setActiveEditablePath,
     postToSite,
     postPatchToSite,
     componentManifest,
     siteCapabilities,
     allowStructuralEdits,
     getBlockDefaultProps,
-    pushAssistantFromResult
   } = config
 
+  const store = useEditorStore
   const { t } = useT()
   const lastStructuralNoticeRef = useRef<number>(0)
 
@@ -42,7 +36,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
     if (now - lastStructuralNoticeRef.current < 1200) return
     lastStructuralNoticeRef.current = now
     const reason = siteCapabilities?.reason?.trim()
-    pushAssistantFromResult({
+    store.getState().pushAssistantFromResult({
       status: "needs_clarification",
       summary: `Cannot ${action} because structural editing is currently disabled.`,
       changes: manifestUnavailableChanges(reason)
@@ -62,6 +56,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
     }
     if (!blockType) return false
 
+    const session = getSessionId()
+    const siteId = getSiteId()
     const normalizedType = blockType.trim()
     const safeType = normalizedType.toLowerCase().replace(/[^a-z0-9]+/g, "_")
     const block = {
@@ -84,7 +80,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not add block.",
           changes: data.changes ?? []
@@ -93,12 +89,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? block.id
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = normalizedType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(normalizedType)
-      setActiveEditablePath(undefined)
+      store.getState().setActiveBlock(focusBlockId, normalizedType)
+      store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number" && !isInsertAtTop) {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -107,10 +99,10 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      pushAssistantFromResult({ status: "applied", summary: `Added ${normalizedType} block.` }, { canUndo: true })
+      store.getState().pushAssistantFromResult({ status: "applied", summary: `Added ${normalizedType} block.` }, { canUndo: true })
       return true
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not add block.",
         changes: []
@@ -125,6 +117,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       return
     }
     if (!blockId) return
+    const session = getSessionId()
+    const siteId = getSiteId()
     const op: Record<string, unknown> = { op: "move_block", pageSlug: slugForOp, blockId }
     if (afterBlockId) op.afterBlockId = afterBlockId
 
@@ -136,7 +130,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not reorder blocks.",
           changes: data.changes ?? []
@@ -145,9 +139,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
+      store.getState().setActiveBlock(focusBlockId)
+      store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -156,9 +149,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      pushAssistantFromResult({ status: "applied", summary: "Moved block." }, { canUndo: true })
+      store.getState().pushAssistantFromResult({ status: "applied", summary: "Moved block." }, { canUndo: true })
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not reorder blocks.",
         changes: []
@@ -172,6 +165,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       return
     }
     if (!blockId || !blockType || !listKey) return
+    const session = getSessionId()
+    const siteId = getSiteId()
     const fallbackItem = { title: "New item", description: "Describe this item." }
     const item = defaultListItemForBlock(blockType, listKey) ?? fallbackItem
     const op: Record<string, unknown> = { op: "add_item", pageSlug: slugForOp, blockId, listKey, item }
@@ -185,7 +180,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not add item.",
           changes: data.changes ?? []
@@ -194,12 +189,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = blockType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(blockType)
-      setActiveEditablePath(undefined)
+      store.getState().setActiveBlock(focusBlockId, blockType)
+      store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -215,9 +206,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      pushAssistantFromResult({ status: "applied", summary: t("ops.addedItem") }, { canUndo: true })
+      store.getState().pushAssistantFromResult({ status: "applied", summary: t("ops.addedItem") }, { canUndo: true })
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not add item.",
         changes: []
@@ -231,6 +222,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       return
     }
     if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
+    const session = getSessionId()
+    const siteId = getSiteId()
     const op = { op: "remove_item", pageSlug: slugForOp, blockId, listKey, index }
 
     try {
@@ -241,7 +234,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not remove item.",
           changes: data.changes ?? []
@@ -250,12 +243,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = blockType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(blockType)
-      setActiveEditablePath(undefined)
+      store.getState().setActiveBlock(focusBlockId, blockType)
+      store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -264,9 +253,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      pushAssistantFromResult({ status: "applied", summary: "Removed list item." }, { canUndo: true })
+      store.getState().pushAssistantFromResult({ status: "applied", summary: "Removed list item." }, { canUndo: true })
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not remove item.",
         changes: []
@@ -280,6 +269,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       return
     }
     if (!blockId || !blockType || !listKey || !Number.isInteger(index) || index < 0) return
+    const session = getSessionId()
+    const siteId = getSiteId()
     const op: Record<string, unknown> = { op: "move_item", pageSlug: slugForOp, blockId, listKey, index }
     if (typeof afterIndex === "number" && Number.isInteger(afterIndex) && afterIndex >= 0) op.afterIndex = afterIndex
 
@@ -291,7 +282,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not reorder items.",
           changes: data.changes ?? []
@@ -300,12 +291,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeBlockTypeRef.current = blockType
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(focusBlockId)
-      setActiveBlockType(blockType)
-      setActiveEditablePath(undefined)
+      store.getState().setActiveBlock(focusBlockId, blockType)
+      store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -321,9 +308,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId })
       }
-      pushAssistantFromResult({ status: "applied", summary: "Moved list item." }, { canUndo: true })
+      store.getState().pushAssistantFromResult({ status: "applied", summary: "Moved list item." }, { canUndo: true })
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not reorder items.",
         changes: []
@@ -337,6 +324,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       return
     }
     if (!blockId) return
+    const session = getSessionId()
+    const siteId = getSiteId()
     const op = { op: "remove_block", pageSlug: slugForOp, blockId }
 
     try {
@@ -347,7 +336,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not delete block.",
           changes: data.changes ?? []
@@ -355,12 +344,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
         return
       }
 
-      activeBlockIdRef.current = undefined
-      activeBlockTypeRef.current = undefined
-      activeEditablePathRef.current = undefined
-      setActiveBlockId(undefined)
-      setActiveBlockType(undefined)
-      setActiveEditablePath(undefined)
+      store.getState().setActiveBlock(undefined, undefined)
+      store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -369,9 +354,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       } else {
         postToSite("draftUpdated", { focusBlockId: null })
       }
-      pushAssistantFromResult({ status: "applied", summary: t("ops.deletedBlock") }, { canUndo: true })
+      store.getState().pushAssistantFromResult({ status: "applied", summary: t("ops.deletedBlock") }, { canUndo: true })
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not delete block.",
         changes: []
@@ -381,6 +366,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
 
   async function inlineEditCommit(slugForOp: string, blockId: string, editablePath: string, value: string, options?: { silent?: boolean }) {
     if (!blockId || !editablePath) return
+    const session = getSessionId()
+    const siteId = getSiteId()
 
     const indexedPath = /^([A-Za-z_][A-Za-z0-9_]*)\[([0-9]+)\]\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(editablePath)
     let op: Record<string, unknown> | null = null
@@ -407,7 +394,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
     }
 
     if (!op) {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: `Inline edit is not supported for "${editablePath}".`,
         changes: []
@@ -423,7 +410,7 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       })
       const data = (await res.json()) as ApplyOpsResponse
       if (!res.ok || data.status !== "applied") {
-        pushAssistantFromResult({
+        store.getState().pushAssistantFromResult({
           status: "error",
           summary: data.error ?? data.summary ?? "Could not apply inline edit.",
           changes: data.changes ?? []
@@ -432,10 +419,8 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      activeBlockIdRef.current = focusBlockId
-      activeEditablePathRef.current = editablePath
-      setActiveBlockId(focusBlockId)
-      setActiveEditablePath(editablePath)
+      store.getState().setActiveBlock(focusBlockId)
+      store.getState().setActiveEditablePath(editablePath)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
         const fromVersion = toVersion - 1
@@ -454,10 +439,10 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
       if (!options?.silent) {
         const fieldLabel = editablePath.replace(/.*\./, "").replace(/([A-Z])/g, " $1").toLowerCase().trim()
-        pushAssistantFromResult({ status: "applied", summary: `Edited ${fieldLabel}.` }, { canUndo: true })
+        store.getState().pushAssistantFromResult({ status: "applied", summary: `Edited ${fieldLabel}.` }, { canUndo: true })
       }
     } catch {
-      pushAssistantFromResult({
+      store.getState().pushAssistantFromResult({
         status: "error",
         summary: "Could not apply inline edit.",
         changes: []

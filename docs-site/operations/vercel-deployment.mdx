@@ -1,16 +1,20 @@
-# Vercel Deployment Plan (Self-Hosted)
+---
+title: "Vercel Deployment"
+description: "Guide for deploying Avocado Studio to Vercel."
+---
 
-This document summarizes the changes needed to publish this project on Vercel.
+# Deploy to Vercel
 
-## Current state (Mar 2026)
+This guide covers deploying Avocado Studio to Vercel.
 
-Full demo deployment is live: site + editor on Vercel, orchestrator on Render.
+## Overview
 
-- Site: `https://avocado-site.vercel.app`
-- Editor: `https://avocado-editor.vercel.app`
-- Orchestrator: Render (long-running Node process via `tsx`)
+The recommended deployment splits across two platforms:
 
-Phase 1 (public site only) and Phase 2 (full stack) are both supported.
+- **Site + Content Studio** on Vercel (static/serverless hosting)
+- **Orchestrator** on a long-running host (Render, Fly.io, Railway, or any container platform)
+
+Two deployment phases are supported: public site only (Phase 1) or full Content Studio stack (Phase 2).
 
 ### Required now (Phase 1)
 
@@ -31,7 +35,7 @@ Phase 1 (public site only) and Phase 2 (full stack) are both supported.
 Pick one deployment target:
 
 1. Public website only (recommended for launch)
-2. Full editor + orchestration stack on Vercel
+2. Full Content Studio + orchestration stack on Vercel
 
 ---
 
@@ -72,9 +76,9 @@ Create one Vercel project for `apps/site`:
 
 ---
 
-## 2) Full editor stack on Vercel (site + orchestrator + optional editor)
+## 2) Full Content Studio stack on Vercel (site + orchestrator + Content Studio)
 
-Use this only if you want production editing workflows.
+Use this only if you want production Content Studio workflows.
 
 ### Required code changes
 
@@ -100,7 +104,7 @@ Use this only if you want production editing workflows.
 
 5. Tighten CORS in orchestrator.
 - Current CORS is `origin: true` (too open for production).
-- Restrict to known site/editor origins via env-based allowlist.
+- Restrict to known site/Content Studio origins via env-based allowlist.
 
 6. Review streaming endpoint behavior (`/chat/stream`).
 - Ensure it fits your Vercel function execution limits and plan.
@@ -118,7 +122,7 @@ Set up separate projects:
 - Root: `apps/orchestrator`
 - Env: `OPENAI_API_KEY`, model env vars, storage connection env vars, CORS allowlist
 
-3. `editor` project (optional)
+3. Content Studio project (optional)
 - Root: `apps/editor`
 - Env: `VITE_EDITOR_ORIGIN`, `VITE_SITE_ORIGIN`, `VITE_ORCHESTRATOR_URL`
 
@@ -129,16 +133,16 @@ Set up separate projects:
 If the goal is to publish quickly, do these first:
 
 1. Implement published rendering path in `apps/site` that does not require orchestrator.
-2. Disable/protect production editor mode.
+2. Disable/protect production Content Studio mode.
 3. Deploy `apps/site` only on Vercel.
 
-Then add orchestrator/editor deployment as phase 2.
+Then add orchestrator/Content Studio deployment as phase 2.
 
 ## Deferred (Phase 2, later)
 
 - Deploy `apps/orchestrator` on Vercel-compatible runtime.
 - Move orchestrator state to durable external storage.
-- Migrate editor/site/orchestrator origins to env-only configuration.
+- Migrate Content Studio/site/orchestrator origins to env-only configuration.
 - Lock CORS to explicit allowlist.
 - Deploy `apps/editor` (if production editing is required).
 
@@ -148,13 +152,13 @@ Then add orchestrator/editor deployment as phase 2.
 
 1. Phase 1: Public site only on Vercel (stable, low risk)
 2. Phase 2: Externalize orchestrator state storage
-3. Phase 3: Deploy orchestrator + editor with locked CORS and env-driven origins
+3. Phase 3: Deploy orchestrator + Content Studio with locked CORS and env-driven origins
 
 ---
 
 ## Recommended Beta Split (Avoid Production Overwrite)
 
-Use separate URLs/environments for production and editor demo.
+Use separate URLs/environments for production and Content Studio demo.
 
 ### Production site (stable)
 
@@ -166,7 +170,7 @@ Use separate URLs/environments for production and editor demo.
 
 Behavior: serves committed `apps/site/lib/published-content.json` only.
 
-### Staging/demo site (editor preview target)
+### Staging/demo site (Content Studio preview target)
 
 - Vercel project or branch: `beta-editor` (recommended separate project URL)
 - URL: staging/demo URL
@@ -177,7 +181,7 @@ Behavior: serves committed `apps/site/lib/published-content.json` only.
 
 Behavior: can read live draft content from orchestrator for demo/editing.
 
-### Editor app
+### Content Studio app
 
 - Vercel project root: `apps/editor`
 - Env:
@@ -200,17 +204,17 @@ Behavior: publish writes to beta branch, preventing accidental updates to produc
 
 ### Block selector / overlay not working
 
-The block selector requires a working postMessage channel between editor iframe and site. Check these in order:
+The block selector requires a working postMessage channel between Content Studio iframe and site. Check these in order:
 
-1. **Draft mode not enabled** — without `VITE_SITE_DRAFT_SECRET` on the editor, the iframe URL uses `__editor=1` which is ignored in production. Set `VITE_SITE_DRAFT_SECRET` on editor and `DRAFT_MODE_SECRET` on site (matching values).
+1. **Draft mode not enabled** — without `VITE_SITE_DRAFT_SECRET` on the Content Studio, the iframe URL uses `__editor=1` which is ignored in production. Set `VITE_SITE_DRAFT_SECRET` on the Content Studio and `DRAFT_MODE_SECRET` on site (matching values).
 
 2. **`NEXT_PUBLIC_ENABLE_EDITOR` not set** — the site's `editorMode` is `false` in production unless `NEXT_PUBLIC_ENABLE_EDITOR=1` is set. Without it, `PreviewBridge` never mounts and blocks have no click handlers.
 
 3. **Origin mismatch in postMessage** — `event.origin` never has a trailing slash. If `NEXT_PUBLIC_EDITOR_ORIGIN` or `VITE_SITE_ORIGIN` has a trailing slash, all messages are silently dropped. Always omit trailing slashes.
 
-4. **Missing `/api/editor/pages`** — the editor calls this on the site to seed the orchestrator with initial content. Without it, the orchestrator has no draft pages and the site shows "Draft unavailable".
+4. **Missing `/api/editor/pages`** — the Content Studio calls this on the site to seed the orchestrator with initial content. Without it, the orchestrator has no draft pages and the site shows "Draft unavailable".
 
-5. **CORS on orchestrator** — `ORCHESTRATOR_CORS_ORIGINS` must include both the editor and site origins.
+5. **CORS on orchestrator** — `ORCHESTRATOR_CORS_ORIGINS` must include both the Content Studio and site origins.
 
 ### Required env vars (full demo)
 
@@ -218,12 +222,12 @@ The block selector requires a working postMessage channel between editor iframe 
 |-----------|----------|-------|
 | **Orchestrator** | `OPENAI_API_KEY` | or `ANTHROPIC_API_KEY` |
 | | `ORCHESTRATOR_PUBLIC_ORIGIN` | its own public URL |
-| | `ORCHESTRATOR_CORS_ORIGINS` | comma-separated editor + site origins |
+| | `ORCHESTRATOR_CORS_ORIGINS` | comma-separated Content Studio + site origins |
 | **Site** | `ORCHESTRATOR_URL` | orchestrator public URL |
 | | `NEXT_PUBLIC_ENABLE_EDITOR=1` | enables editor mode |
-| | `NEXT_PUBLIC_EDITOR_ORIGIN` | editor URL, **no trailing slash** |
-| | `DRAFT_MODE_SECRET` | shared secret with editor |
-| **Editor** | `VITE_SITE_ORIGIN` | site URL, **no trailing slash** |
+| | `NEXT_PUBLIC_EDITOR_ORIGIN` | Content Studio URL, **no trailing slash** |
+| | `DRAFT_MODE_SECRET` | shared secret with Content Studio |
+| **Content Studio** | `VITE_SITE_ORIGIN` | site URL, **no trailing slash** |
 | | `VITE_SITE_DRAFT_SECRET` | must match site `DRAFT_MODE_SECRET` |
 | | `VITE_ORCHESTRATOR_URL` | orchestrator public URL |
 

@@ -2,6 +2,8 @@ import { PuckChatPrototype, type PuckHostApi } from "@ai-site-editor/editor-puck
 import { ChatComposerCore } from "./ChatSurface"
 import { ImagePickerModal } from "./ImagePickerModal"
 import { useChatEngine } from "../hooks/useChatEngine"
+import { usePublish } from "../hooks/usePublish"
+import { useEditorStore } from "../store"
 import { useMediaInput } from "../hooks/useMediaInput"
 import { renderFinalMarkdown, renderSimpleMarkdown } from "../lib/markdown-renderer"
 import {
@@ -30,13 +32,26 @@ const puckHostApi: PuckHostApi = {
   resolveEditorSiteId,
   sanitizeSiteId,
   orchestrator,
-  useChatEngine,
+  usePublish: (session: string, siteId: string, isLoading: boolean) => {
+    const pushAssistantFromResult = useEditorStore((s) => s.pushAssistantFromResult)
+    return usePublish(session, siteId, isLoading, pushAssistantFromResult, siteOrigin)
+  },
+  useChatEngine: (args: any) => {
+    const actions = useChatEngine(args)
+    const chatLog = useEditorStore((s) => s.chatLog)
+    const isLoading = useEditorStore((s) => s.isLoading)
+    const streamStatus = useEditorStore((s) => s.streamStatus)
+    const streamingText = useEditorStore((s) => s.streamingText)
+    const streamSteps = useEditorStore((s) => s.streamSteps)
+    const streamingChanges = useEditorStore((s) => s.streamingChanges)
+    return { ...actions, chatLog, isLoading, streamStatus, streamingText, streamSteps, streamingChanges }
+  },
   ImagePickerModal,
   ChatComposerCore,
   useMediaInput,
   renderFinalMarkdown,
   renderSimpleMarkdown,
-  agentApiKey: ((import.meta.env.VITE_AGENT_API_KEY as string | undefined)?.trim() ?? ""),
+  agentModeEnabled: false, // Detected from /status/planner at runtime
 }
 
 export function PuckPrototypeRoute() {

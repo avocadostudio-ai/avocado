@@ -10,7 +10,7 @@ Related docs:
 
 External developers who want the AI editor to manage their site implement a standard REST API. The orchestrator is the brain (AI planning, operation execution, undo/redo); the provider is your storage backend (pages, media, deployment). This spec defines the contract you implement on your side.
 
-Inspired by Adobe AEM's OpenAPI-based APIs: separate page properties from content, HEAD for freshness checks, content definition endpoint for discovering block types.
+Designed around OpenAPI conventions: separate page properties from content, HEAD for freshness checks, content definition endpoint for discovering block types.
 
 **Design principle**: Push full `PageDoc` objects, not operations. Adopters store/retrieve JSON — no ops engine on their side. Undo/redo and session isolation stay in the orchestrator.
 

@@ -53,6 +53,7 @@ import {
   pushUndo,
   bumpVersion,
   pushRecentEdit,
+  pushVersionEntry,
   pushChatHistory,
   schedulePersistState,
   removePage
@@ -769,7 +770,7 @@ export async function runChatPipeline(
         translationScope
       })
     : ("standard" as const)
-  const isLightweightEdit = intentComplexity === "simple"
+  let isLightweightEdit = intentComplexity === "simple"
   const basePlannerContext =
     (compactContextExperimentEnabled || isLightweightEdit)
       ? compactPlannerContextPack({ contextPack, message: plannerMessage, translationScope })
@@ -780,7 +781,7 @@ export async function runChatPipeline(
     activeBlockId: planningActiveBlockId,
     activeEditablePath: planningActiveEditablePath
   })
-  const plannerContext =
+  let plannerContext =
     useMinimalPlannerContext
       ? minimalPlannerContextPack({ contextPack: basePlannerContext })
       : basePlannerContext
@@ -1754,6 +1755,14 @@ export async function runChatPipeline(
       pushRecentEdit(body.session!, { slug: updatedSlug ?? effectiveSlug, summary: futureToPastTense(resolvedPlan.summary_for_user), ops: resolvedPlan.ops })
       if (body.message) pushChatHistory(body.session!, body.message, futureToPastTense(resolvedPlan.summary_for_user))
       const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
+      pushVersionEntry(body.session!, {
+        version: previewVersion,
+        slug: updatedSlug ?? effectiveSlug,
+        summary: futureToPastTense(resolvedPlan.summary_for_user),
+        opTypes: resolvedPlan.ops.map((op) => op.op),
+        opCount: resolvedPlan.ops.length,
+        source: "chat"
+      })
       schedulePersistState(ctx.log)
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
       const aiInsightChanges = buildAiInsightChanges({ plan: resolvedPlan, message: plannerMessage })
@@ -2234,8 +2243,13 @@ export async function runChatPipeline(
   }
 
   const llmIntentRouterEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_LLM_INTENT_ROUTER ?? "1").trim())
+  // Skip the intent router for batch-add requests — the router's deterministic
+  // compile can't generate meaningful content for "add 3 blocks" without specific
+  // block types, so go straight to the full planner which can handle it.
+  const batchAddSkipsRouter = isBatchAddRequest(plannerMessage)
   const shouldTryLlmIntentRouter =
     !contentQuery &&
+    !batchAddSkipsRouter &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")
@@ -2254,6 +2268,7 @@ export async function runChatPipeline(
   const generatePlanImpl = isAnthropicPlanner ? generatePlanWithAnthropicImpl : isGeminiPlanner ? generatePlanWithGeminiImpl : generatePlanWithOpenAIImpl
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
+  let routerDetectedInfo = false
   const planningErrors: string[] = []
 
   if (shouldTryLlmIntentRouter && parallelPlannerEnabled) {
@@ -2319,6 +2334,9 @@ export async function runChatPipeline(
       })
 
       routerComplexity = routedIntent.complexity ?? null
+      if (routedIntent.action === "info") {
+        routerDetectedInfo = true
+      }
 
       if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
         return { plan: routedPlan, outcome: "llm_router_plan_ready" as const }
@@ -2500,23 +2518,37 @@ export async function runChatPipeline(
           })
           const routedOutcome = await respondFromPlan(routedPlan, plannerSource, applyMode, undefined, "llm_intent_router")
           if (routedOutcome.done) {
-            // Success — abort the full planner (fire and forget)
-            fullPlannerAbort.abort("router_succeeded")
-            suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_success")
-            return routedOutcome.response
+            // For needs_clarification: only short-circuit for deterministic scenarios
+            // (page deletes, renames, etc.). Otherwise fall through to the full planner —
+            // the router may have refused a valid batch-add request like "populate this page".
+            if (routedPlan.intent === "needs_clarification" && !shouldReturnDeterministicClarification(plannerMessage)) {
+              // Fall through — wait for the full planner result below
+            } else {
+              // Success — abort the full planner (fire and forget)
+              fullPlannerAbort.abort("router_succeeded")
+              suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_success")
+              return routedOutcome.response
+            }
           }
         }
-        // Router plan failed validation — fall through to wait for full planner
+        // Router plan failed validation or was a non-deterministic clarification — fall through to wait for full planner
       }
 
       if (routerResult.source === "router") {
-        // Router returned null or failed validation — await the full planner
-        try {
-          const plannerResult = await fullPlannerPromise
-          consumeFullPlannerResult(plannerResult)
-        } catch (plannerFallbackError) {
-          if (isCancelError(plannerFallbackError)) throw plannerFallbackError
-          // Full planner also failed — fall through to retry loop
+        if (routerDetectedInfo) {
+          // Info query — abort the in-flight planner (it has wrong context)
+          fullPlannerAbort.abort("router_info_rebuild")
+          suppressCancelOnly(fullPlannerPromise, ctx.log, "planner_after_router_info")
+          // Fall through to post-race context rebuild below
+        } else {
+          // Router returned null or failed validation — await the full planner
+          try {
+            const plannerResult = await fullPlannerPromise
+            consumeFullPlannerResult(plannerResult)
+          } catch (plannerFallbackError) {
+            if (isCancelError(plannerFallbackError)) throw plannerFallbackError
+            // Full planner also failed — fall through to retry loop
+          }
         }
       } else {
         // Full planner won the race — use its result
@@ -2586,6 +2618,10 @@ export async function runChatPipeline(
         locale: body.locale
       })
 
+      if (routedIntent.action === "info") {
+        routerDetectedInfo = true
+      }
+
       if (routedPlan?.intent === "edit_plan" && routedPlan.ops.length > 0) {
         markPlanningFinish()
         ctx.chatTelemetry.push({
@@ -2640,6 +2676,22 @@ export async function runChatPipeline(
     } catch {
       // If router fails, fall back to the full planner.
     }
+  }
+
+  // Router detected a content query the regex missed — rebuild context with full props
+  // so the full planner retry loop has the page content it needs for content_answer.
+  if (routerDetectedInfo && !initialPlan && !contentQuery) {
+    plannerContext = plannerContextPack({
+      session: body.session,
+      slug: effectiveSlug,
+      message: plannerMessage,
+      currentPage: current,
+      activeBlockId: planningActiveBlockId,
+      activeBlockType: body.activeBlockType,
+      activeEditablePath: planningActiveEditablePath,
+      includeFullProps: true
+    })
+    isLightweightEdit = false
   }
 
   // --- Continuation chain decomposition ---
@@ -2876,6 +2928,37 @@ export async function runChatPipeline(
     } catch (error) {
       if (isCancelError(error)) throw error
       const reason = toErrorDetail(error)
+
+      // API-level errors (rate limits, auth, quota) — surface immediately, don't retry
+      const errorMsg = error instanceof Error ? error.message : ""
+      const isApiError = /usage limit|rate limit|quota|unauthorized|billing/i.test(errorMsg) || /\b40[0-13]\b/.test(errorMsg)
+      if (isApiError) {
+        markPlanningFinish()
+        const providerLabel = plannerSource === "anthropic" ? "Anthropic" : plannerSource === "openai" ? "OpenAI" : plannerSource === "gemini" ? "Google Gemini" : "The AI provider"
+        const consoleUrl = plannerSource === "anthropic" ? "https://console.anthropic.com/settings/billing" : plannerSource === "openai" ? "https://platform.openai.com/usage" : plannerSource === "gemini" ? "https://console.cloud.google.com/billing" : ""
+        const consoleLink = consoleUrl ? ` [Check your ${providerLabel} console](${consoleUrl}).` : ""
+        const userSummary = /usage limit/i.test(errorMsg)
+          ? `${providerLabel} API usage limit has been reached.${consoleLink} You can also switch to a different provider.`
+          : /rate limit/i.test(errorMsg)
+            ? `${providerLabel} is rate-limiting requests. Please wait a moment and try again.`
+            : /unauthorized|api.key|authentication/i.test(errorMsg)
+              ? `${providerLabel} API key is invalid or expired.${consoleLink} Please check your API key configuration.`
+              : `${providerLabel} error: ${errorMsg.slice(0, 200)}`
+        ctx.log.error({ event: "api_error", model: modelUsed, error: errorMsg.slice(0, 300) }, userSummary)
+        return {
+          code: 503,
+          payload: withDebugPayload({
+            status: "error",
+            summary: userSummary,
+            changes: [],
+            previewVersion: versions.get(body.session!) ?? 0,
+            plannerSource,
+            modelUsed,
+            modelKey
+          } satisfies ChatResult, { outcome: "api_error", reason: errorMsg.slice(0, 300) })
+        }
+      }
+
       const reasonCategory = isPlannerOutputError(error) ? error.reasonCategory : classifyGuardrailError(reason)
       ctx.log.warn({ event: "plan_attempt_failed", attempt, model: modelUsed, reason: reason.slice(0, 300) },
         `Planning attempt ${attempt} failed`)

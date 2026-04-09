@@ -354,3 +354,14 @@
     max-height: 280px;
   }
 }
+
+/* Publish deploy link in Puck header */
+.puck-publish-link {
+  font-size: 12px;
+  color: var(--puck-color-azure-06, #0066cc);
+  text-decoration: none;
+  margin-right: 8px;
+}
+.puck-publish-link:hover {
+  text-decoration: underline;
+}
