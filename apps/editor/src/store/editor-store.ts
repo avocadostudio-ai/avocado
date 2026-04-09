@@ -112,6 +112,7 @@ export type EditorState = {
     unsplash?: boolean
     imageGenerate?: boolean
     imageGenerateChat?: boolean
+    agentMode?: boolean
   }
 
   // ── debug (from useChatEngine) ──────────────────────────────────

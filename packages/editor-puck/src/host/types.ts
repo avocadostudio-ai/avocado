@@ -95,5 +95,5 @@ export type PuckHostApi = {
   useMediaInput: () => MediaInputHandlers
   renderFinalMarkdown: (text: string) => ReactNode
   renderSimpleMarkdown: (text: string) => ReactNode
-  agentApiKey?: string
+  agentModeEnabled?: boolean
 }
