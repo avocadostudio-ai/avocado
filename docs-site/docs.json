@@ -3,14 +3,14 @@
   "theme": "mint",
   "name": "Avocado Studio",
   "colors": {
-    "primary": "#4CAF50",
-    "light": "#81C784",
-    "dark": "#2E7D32"
+    "primary": "#1F7A3A",
+    "light": "#7ED957",
+    "dark": "#14532D"
   },
-  "favicon": "/favicon.png",
+  "favicon": "/favicon.svg",
   "logo": {
-    "light": "/logo/light.png",
-    "dark": "/logo/dark.png"
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
   },
   "navigation": {
     "tabs": [
