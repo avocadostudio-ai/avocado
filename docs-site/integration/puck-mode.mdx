@@ -76,7 +76,18 @@ If `AGENT_API_KEY` is set in the orchestrator `.env`, the editor detects agent m
 | Chat location | Left sidebar | Right sidebar (plugin) |
 | Block editing | Custom property panel | Puck's native field sidebar |
 | Drag-and-drop | Custom handler | Puck's native DnD |
-| Publishing | Full publish flow | Draft-only |
+| Publishing | Full publish flow | Full publish flow |
+
+## Publishing
+
+Puck's built-in "Publish" button triggers the full publish workflow:
+
+1. Pending draft edits are flushed immediately
+2. `POST /publish` is called on the orchestrator (same endpoint as the chat editor)
+3. The Puck button shows a loading state while the publish is in progress
+4. A **"View deploy"** link appears in the header after a successful deployment
+
+Publishing uses the same `usePublish` hook as the main editor — it supports Git-based deploy, Vercel deploy hooks, and site contract publishing.
 
 ## Current limitations
 
@@ -84,7 +95,6 @@ If `AGENT_API_KEY` is set in the orchestrator `.env`, the editor detects agent m
   Puck mode is experimental. The following features are not yet available:
 </Warning>
 
-- **No publish workflow** — changes are saved to draft only, not published to production
 - **No live site preview** — blocks render in the Puck canvas, not inside the Next.js site iframe
 - **No nested zones** — only flat `content` arrays; nested layout zones are not yet supported
 - **Image upload** — basic URL picker only, no upload progress or validation
