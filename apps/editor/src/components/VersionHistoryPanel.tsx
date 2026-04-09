@@ -18,6 +18,8 @@ type VersionHistoryPanelProps = {
   siteId: string
   slug: string
   visible: boolean
+  onRestore?: (targetVersion: number) => void
+  isRestoring?: boolean
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -40,7 +42,7 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-export function VersionHistoryPanel({ session, siteId, slug, visible }: VersionHistoryPanelProps) {
+export function VersionHistoryPanel({ session, siteId, slug, visible, onRestore, isRestoring }: VersionHistoryPanelProps) {
   const { t } = useT()
   const [entries, setEntries] = useState<VersionEntry[]>([])
   const [currentVersion, setCurrentVersion] = useState(0)
@@ -95,12 +97,26 @@ export function VersionHistoryPanel({ session, siteId, slug, visible }: VersionH
                   <span className="version-history-time">{formatTime(entry.at)}</span>
                 </div>
                 <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
-                {entry.opCount > 0 ? (
-                  <div className="version-history-meta">
-                    {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
-                    {entry.slug !== "/" ? ` \u00b7 ${entry.slug}` : ""}
-                  </div>
-                ) : null}
+                <div className="version-history-item-footer">
+                  {entry.opCount > 0 ? (
+                    <span className="version-history-meta">
+                      {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
+                      {entry.slug !== "/" ? ` \u00b7 ${entry.slug}` : ""}
+                    </span>
+                  ) : <span />}
+                  {entry.version === currentVersion ? (
+                    <span className="version-history-current-label">{t("history.current")}</span>
+                  ) : onRestore ? (
+                    <button
+                      type="button"
+                      className="version-history-restore-btn"
+                      disabled={isRestoring}
+                      onClick={() => onRestore(entry.version)}
+                    >
+                      {isRestoring ? t("history.restoring") : t("history.restore")}
+                    </button>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
