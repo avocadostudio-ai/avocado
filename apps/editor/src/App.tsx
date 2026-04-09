@@ -198,6 +198,26 @@ function EditorPage({
   const [driveValidation, setDriveValidation] = useState<{ status: "loading" | "ok" | "error"; message?: string } | null>(null)
   useEffect(() => { if (!sites.configSiteId) { setDriveValidation(null); setSiteConfigTab("overview") } }, [sites.configSiteId, setSiteConfigTab])
 
+  const [isRestoring, setIsRestoring] = useState(false)
+  async function restoreToVersion(targetVersion: number) {
+    setIsRestoring(true)
+    try {
+      const res = await fetch(`${orchestrator}/history/restore`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, slug, targetVersion })
+      })
+      const data = (await res.json()) as { status?: string; previewVersion?: number; canUndo?: boolean; canRedo?: boolean }
+      if (data.status === "applied") {
+        preview.postToSite("draftUpdated", { focusBlockId: null })
+      }
+    } catch {
+      // Best-effort
+    } finally {
+      setIsRestoring(false)
+    }
+  }
+
   const [showSiteSwitcher, setShowSiteSwitcher] = useState(false)
   const siteSwitcherRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -1517,6 +1537,8 @@ function EditorPage({
             siteId={siteId}
             slug={slug}
             visible={activeTab === "history"}
+            onRestore={restoreToVersion}
+            isRestoring={isRestoring}
           />
         </div>
 
