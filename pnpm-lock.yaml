@@ -139,6 +139,49 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  apps/paintball-bern:
+    dependencies:
+      '@ai-site-editor/blocks':
+        specifier: workspace:*
+        version: link:../../packages/blocks
+      '@ai-site-editor/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@ai-site-editor/site-sdk':
+        specifier: workspace:*
+        version: link:../../packages/site-sdk
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.2.1
+      next:
+        specifier: 15.2.8
+        version: 15.2.8(@babel/core@7.29.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.2.2
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.10
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19.0.10
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.4
+        version: 19.2.3(@types/react@19.2.14)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   apps/site:
     dependencies:
       '@ai-site-editor/blocks':
