@@ -14,9 +14,9 @@ import { runAgentLoop, type AgentEvent, type AgentTokenUsage } from "../agent/ag
 import { type AgentProvider, detectProviderFromKey, resolveAgentModel } from "../agent/agent-provider.js"
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 
-/** Extract API key from request headers (new generic header, with backward compat). */
-function extractAgentApiKey(headers: Record<string, unknown>): string | undefined {
-  return ((headers["x-agent-api-key"] as string) ?? (headers["x-anthropic-api-key"] as string))?.trim() || undefined
+/** Read agent API key from server environment (no longer sent by the browser). */
+function getServerAgentApiKey(): string | undefined {
+  return process.env.AGENT_API_KEY?.trim() || undefined
 }
 
 type AgentRequestBody = {
@@ -102,11 +102,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   app.post("/agent/start", async (request, reply) => {
     cleanExpired()
-    const apiKey = extractAgentApiKey(request.headers as Record<string, unknown>)
-    if (!apiKey) return reply.code(401).send({ error: "x-agent-api-key header required" })
+    const apiKey = getServerAgentApiKey()
+    if (!apiKey) return reply.code(501).send({ error: "Agent mode not configured. Set AGENT_API_KEY in the orchestrator .env." })
 
     const provider = detectProviderFromKey(apiKey)
-    if (!provider) return reply.code(401).send({ error: "Unrecognized API key format. Provide an Anthropic (sk-ant-...) or OpenAI (sk-...) key." })
+    if (!provider) return reply.code(500).send({ error: "AGENT_API_KEY format not recognized. Use an Anthropic (sk-ant-...) or OpenAI (sk-...) key." })
 
     const body = request.body as AgentRequestBody
     if (!body.message?.trim()) return reply.code(400).send({ error: "message is required" })
@@ -314,11 +314,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
   // POST /agent/chat — blocking (non-SSE) for testing
   // ---------------------------------------------------------------------------
   app.post("/agent/chat", async (request, reply) => {
-    const apiKey = extractAgentApiKey(request.headers as Record<string, unknown>)
-    if (!apiKey) return reply.code(401).send({ error: "x-agent-api-key header required" })
+    const apiKey = getServerAgentApiKey()
+    if (!apiKey) return reply.code(501).send({ error: "Agent mode not configured. Set AGENT_API_KEY in the orchestrator .env." })
 
     const provider = detectProviderFromKey(apiKey)
-    if (!provider) return reply.code(401).send({ error: "Unrecognized API key format. Provide an Anthropic (sk-ant-...) or OpenAI (sk-...) key." })
+    if (!provider) return reply.code(500).send({ error: "AGENT_API_KEY format not recognized. Use an Anthropic (sk-ant-...) or OpenAI (sk-...) key." })
 
     const body = request.body as AgentRequestBody
     if (!body.message?.trim()) return reply.code(400).send({ error: "message is required" })

@@ -46,7 +46,7 @@ const puckHostApi: PuckHostApi = {
   useMediaInput,
   renderFinalMarkdown,
   renderSimpleMarkdown,
-  agentApiKey: ((import.meta.env.VITE_AGENT_API_KEY as string | undefined)?.trim() ?? ""),
+  agentModeEnabled: false, // Detected from /status/planner at runtime
 }
 
 export function PuckPrototypeRoute() {
