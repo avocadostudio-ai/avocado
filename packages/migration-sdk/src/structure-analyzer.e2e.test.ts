@@ -89,7 +89,7 @@ describe("structure-analyzer e2e: paintballarena-bern.ch", { timeout: 60_000 }, 
         const dumpTree = (node: typeof root, depth = 0): void => {
           const indent = "  ".repeat(depth + 1)
           const text = node.text ? ` "${node.text.slice(0, 60)}"` : ""
-          const img = node.image ? ` img=${typeof node.image === "string" ? node.image.slice(0, 50) : JSON.stringify(node.image).slice(0, 50)}` : ""
+          const img = node.image ? ` img=${JSON.stringify(node.image).slice(0, 50)}` : ""
           const kids = node.children.length ? ` (${node.children.length} children)` : ""
           console.log(`${indent}${node.tag}${text}${img}${kids} display=${node.styles.display ?? "?"}`)
           if (depth < 5) for (const child of node.children) dumpTree(child, depth + 1)
