@@ -9,7 +9,7 @@ Start here if you want to add AI-powered editing to your website.
 | [Integration Overview](integration/README.md) | Entry point — tiers, checklist, SDK overview |
 | [Next.js Onboarding](integration/nextjs-mvp-embedded.md) | 30-minute setup with `@ai-site-editor/site-sdk` |
 | [Adoption Example](integration/nextjs-mvp-adoption-example.md) | Full code example for `app/[[...slug]]/page.tsx` |
-| [Editor Quickstart](integration/editor-quickstart.md) | Draft mode URLs, behavior checks, self-check commands |
+| [Content Studio Quickstart](integration/editor-quickstart.md) | Draft mode URLs, behavior checks, self-check commands |
 | [Framework-Agnostic SPI](integration/site-provider-spi.md) | REST API contract for non-Next.js integrations |
 | [Custom Tools](integration/tools-mvp.md) | Configure PIM, DAM, or other tools for the AI planner |
 | [Adoption guide for AI agents](integration/ai-coding-agents-adoption.md) | Paste into your agent to integrate AI Site Editor into your site |
@@ -30,8 +30,8 @@ Start here if you want to add AI-powered editing to your website.
 
 | Doc | Description |
 |-----|-------------|
-| [Vercel Deployment](operations/vercel-deployment.md) | Deploy site and editor to Vercel |
-| [Netlify Deployment](operations/netlify-deployment.md) | Deploy site and editor to Netlify |
+| [Vercel Deployment](operations/vercel-deployment.md) | Deploy site and Content Studio to Vercel |
+| [Netlify Deployment](operations/netlify-deployment.md) | Deploy site and Content Studio to Netlify |
 | [Dev Server Runbook](operations/dev-server-runbook.md) | Local dev server setup and troubleshooting |
 | [Streaming Patch Checklist](operations/streaming-patch-checklist.md) | Optimistic patch streaming checklist |
 

@@ -10,7 +10,7 @@ description: "Runbook for running and troubleshooting the three local developmen
 This project runs 3 local services:
 
 - Site: `http://localhost:3000`
-- Editor: `http://localhost:4100`
+- Content Studio: `http://localhost:4100`
 - Orchestrator: `http://localhost:4200`
 
 Use the managed workflow commands from repo root.
@@ -69,7 +69,7 @@ Healthy responses:
 
 ## Troubleshooting
 
-1. If site/editor/orchestrator is unreachable:
+1. If site/Content Studio/orchestrator is unreachable:
    - Run `pnpm dev:status`
    - If `stopped`, run `pnpm dev:start`
 2. If status says `running` but UI fails:

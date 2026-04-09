@@ -10,7 +10,7 @@ This is the default onboarding path for any Next.js site. For background, see [C
 **Goal**: keep your existing site routes, enable AI editing through Next.js [Draft Mode](/concepts#draft-mode) cookies — no `/preview` route required.
 
 Related:
-- [Editor Quickstart](/integration/editor-quickstart) — iframe bootstrap URL templates and behavior checks
+- [Content Studio Quickstart](/integration/editor-quickstart) — iframe bootstrap URL templates and behavior checks
 - [Custom Blocks](/integration/custom-blocks) — register your own component types instead of (or alongside) built-in blocks
 - [Architecture](/architecture) — how the three services communicate
 
@@ -23,7 +23,7 @@ Related:
 
 The SDK's `createBlocksHandler()` generates this automatically from the block registry.
 
-2. Add Draft Mode entry and exit endpoints:
+2. Add Draft Mode entry and exit endpoints (used by the Content Studio):
 - `GET /api/draft?secret=...&redirect=/target-path`
 - `GET /api/draft/disable?redirect=/target-path`
 
@@ -35,7 +35,7 @@ The SDK's `createBlocksHandler()` generates this automatically from the block re
 - when Draft Mode is disabled, read published data only
 - when Draft Mode is enabled, read draft source via `fetchEditorPage()` / `fetchEditorSlugs()` from the SDK
 
-5. Editor iframe/bootstrap URL pattern:
+5. Content Studio iframe/bootstrap URL pattern:
 - `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>?<context>`
 
 ## Block manifest shape (MVP)
@@ -58,12 +58,12 @@ Example response:
 ```
 
 Behavior:
-- manifest present: enable structural operations (add/remove/reorder/update props)
+- manifest present: Content Studio enables structural operations (add/remove/reorder/update props)
 - manifest missing: degraded mode only (read-only preview or text-only edits)
 
 ## How Component Matching Works
 
-The editor does not infer components from DOM class names.
+The Content Studio does not infer components from DOM class names.
 It matches by stable component `type` IDs.
 
 Contract:
@@ -102,7 +102,7 @@ const rendererRegistry = {
 
 If a block type exists in content but not in manifest:
 - block can still render on site
-- editor must not run structural ops for that type (degraded mode for that block/type)
+- Content Studio must not run structural ops for that type (degraded mode for that block/type)
 
 ## Environment variables
 
@@ -120,7 +120,7 @@ If a block type exists in content but not in manifest:
 3. Verify `/api/draft?secret=wrong` returns `401`.
 4. Verify `/api/draft?secret=valid&redirect=/` returns redirect + draft cookie.
 5. Verify public route (no draft cookie) does not call draft backend.
-6. Point editor iframe to draft entry URL.
+6. Point Content Studio iframe to draft entry URL.
 
 ## Optional later upgrade
 

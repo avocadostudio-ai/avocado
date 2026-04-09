@@ -1,15 +1,15 @@
 ---
-title: "Editor Quickstart"
-description: "Quick guide to integrating the editor with an existing Next.js site in embedded draft mode."
+title: "Content Studio Quickstart"
+description: "Quick guide to integrating the Content Studio with an existing Next.js site in embedded draft mode."
 ---
 
-# Editor Integration Quickstart (Embedded Draft Mode)
+# Content Studio Integration Quickstart (Embedded Draft Mode)
 
-Use this when integrating the editor with any existing Next.js site. For background on core concepts, see [Core Concepts](/concepts).
+Use this when integrating the Content Studio with any existing Next.js site. For background on core concepts, see [Core Concepts](/concepts).
 
 ## Expose your components via the Block Manifest
 
-The editor needs to know which components on your site are editable and what props they accept. You do this by exposing a **block manifest** at `GET /api/editor/blocks`.
+The Content Studio needs to know which components on your site are editable and what props they accept. You do this by exposing a **block manifest** at `GET /api/editor/blocks`.
 
 **Using the built-in blocks** (quickest start):
 
@@ -22,7 +22,7 @@ export const { GET, POST, OPTIONS } = createEditorApiHandler({
 })
 ```
 
-`createEditorApiHandler()` automatically builds the manifest from the 20 built-in block types. The editor and AI planner read this manifest to understand what blocks exist, what fields they have, and what values are valid.
+`createEditorApiHandler()` automatically builds the manifest from the 20 built-in block types. The Content Studio and AI planner read this manifest to understand what blocks exist, what fields they have, and what values are valid.
 
 **Using your own custom components**:
 
@@ -33,7 +33,7 @@ If your site has its own component library, you define a custom manifest describ
 - How to mix your custom blocks with the built-in ones
 - How field types (image, text, list, enum) are inferred from your schema
 
-Without a manifest, the editor runs in **degraded mode** (read-only preview or text-only edits).
+Without a manifest, the Content Studio runs in **degraded mode** (read-only preview or text-only edits).
 
 For the full Next.js integration walkthrough, see [Next.js Embedded MVP](/integration/nextjs-mvp-embedded).
 
@@ -100,4 +100,4 @@ curl -s http://localhost:3000/api/editor/blocks | jq '.version, (.blocks | lengt
 
 Expected:
 - manifest route returns `version` and non-zero block count
-- editor header shows `Manifest` (not `Degraded`)
+- Content Studio header shows `Manifest` (not `Degraded`)

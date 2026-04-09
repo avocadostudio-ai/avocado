@@ -64,13 +64,13 @@ Plans can be **approved**, **rejected**, or **modified**. The user always has th
 
 ## Draft Mode
 
-**Draft mode** is how the editor shows unpublished changes on your live site. When the editor is active, the site switches into draft mode — it fetches the latest draft content from the orchestrator instead of the published content.
+**Draft mode** is how the Content Studio shows unpublished changes on your live site. When the Content Studio is active, the site switches into draft mode — it fetches the latest draft content from the orchestrator instead of the published content.
 
 - **Published content** — What your visitors see. Stored in your CMS, database, or static files.
-- **Draft content** — What you see in the editor. Stored in the orchestrator's session state. Not visible to site visitors.
+- **Draft content** — What you see in the Content Studio. Stored in the orchestrator's session state. Not visible to site visitors.
 - **Publishing** — Promoting draft content to published. Triggered by the user after reviewing changes.
 
-Draft mode uses Next.js cookies under the hood. The editor iframe sets the cookie automatically — your site just needs to check for it and fetch from the orchestrator when present.
+Draft mode uses Next.js cookies under the hood. The Content Studio iframe sets the cookie automatically — your site just needs to check for it and fetch from the orchestrator when present.
 
 ## The Three Services
 
@@ -79,14 +79,14 @@ AI Site Editor runs as three services that communicate via HTTP and postMessage:
 | Service | Role | Tech |
 |---------|------|------|
 | **Orchestrator** | The brain. Handles AI planning, operation validation, session state, undo/redo, and publishing. | Fastify API |
-| **Editor** | The UI. Chat interface, model picker, plan review, and settings. Embeds the site in an iframe. | Vite + React |
+| **Content Studio** | The UI. Chat interface, model picker, plan review, and settings. Embeds the site in an iframe. | Vite + React |
 | **Site** | Your website. Renders pages from block data. In draft mode, fetches content from the orchestrator. | Next.js |
 
-The editor embeds your site in an iframe. When the user clicks a block, the site sends a `postMessage` to the editor identifying which block was selected. When an operation is applied, the orchestrator notifies the site to re-fetch and re-render.
+The Content Studio embeds your site in an iframe. When the user clicks a block, the site sends a `postMessage` to the Content Studio identifying which block was selected. When an operation is applied, the orchestrator notifies the site to re-fetch and re-render.
 
 ## Block Manifest
 
-When the editor connects to your site, it fetches the **block manifest** from `/api/editor/blocks`. This tells the editor what block types are available and what props each one accepts.
+When the Content Studio connects to your site, it fetches the **block manifest** from `/api/editor/blocks`. This tells the Content Studio what block types are available and what props each one accepts.
 
 ```json
 {
@@ -114,4 +114,4 @@ The orchestrator supports three AI providers:
 - **OpenAI** — GPT-4o-mini (fast), GPT-4o (balanced), o1/o3 (reasoning).
 - **Google Gemini** — Gemini Flash (fast), Gemini Pro (reasoning).
 
-Users select the provider and model tier in the editor's settings panel. The orchestrator routes the request to the appropriate provider. You can also override model names via environment variables for each tier.
+Users select the provider and model tier in the Content Studio's settings panel. The orchestrator routes the request to the appropriate provider. You can also override model names via environment variables for each tier.

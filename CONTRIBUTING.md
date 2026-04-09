@@ -24,7 +24,7 @@ pnpm dev:setup
 pnpm dev:start
 ```
 
-The editor opens at `http://localhost:4100`, the site at `http://localhost:3000`, and the orchestrator API at `http://localhost:4200`.
+The Content Studio opens at `http://localhost:4100`, the site at `http://localhost:3000`, and the orchestrator API at `http://localhost:4200`.
 
 
 See [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.md) for advanced dev server management.
@@ -34,7 +34,7 @@ See [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.m
 ```
 apps/
   orchestrator/    Fastify API — sessions, AI planning, operations engine, publishing
-  editor/          Vite + React — chat UI, model picker, iframe preview bridge
+  editor/          Vite + React — AI Content Studio UI, chat, model picker, iframe preview bridge
   site/            Next.js — renders pages from BlockInstance data
 packages/
   shared/          Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
