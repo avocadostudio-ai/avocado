@@ -105,6 +105,10 @@ body.panel-resizing iframe {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.chat-panel--history {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .chat-header {
   padding: 18px 20px 14px;
   border-bottom: 0;
@@ -2267,6 +2271,10 @@ textarea {
   font-size: 13px;
   color: var(--fg);
   line-height: 1.4;
+}
+
+.version-history-summary p {
+  margin: 0;
 }
 
 .version-history-meta {
