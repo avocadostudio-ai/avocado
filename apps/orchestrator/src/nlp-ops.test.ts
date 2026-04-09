@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery, isContentQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath, tryCompoundDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage, isRewriteLikeMessage } from "./chat/chat-pipeline.js"
@@ -2357,6 +2357,9 @@ test("isBatchAddRequest treats multi-page create prompts as batch overrides", ()
 
 test("isBatchAddRequest treats explicit multi-block add prompts as batch overrides", () => {
   assert.equal(isBatchAddRequest("add 3 blocks: hero, cardgrid and CTA"), true)
+  // Typo tolerance: "blocka", "blockss" should still be detected as batch add
+  assert.equal(isBatchAddRequest("add 3 blocka and populate with sample content"), true)
+  assert.equal(isBatchAddRequest("add 3 blocka and popüulate with sampe content"), true)
   assert.equal(
     isBatchAddRequest(
       "add 3 blocks: hero, cardgrid and CTA [site context] Site purpose: Discover the Magic of Avocados. Site name: Avocado Magic [/site context]"
@@ -3353,6 +3356,33 @@ test("isInfoQuery detects 'what tabs do we have' as info query", () => {
   // Edit requests should NOT match
   assert.equal(isInfoQuery("add a new tab"), false)
   assert.equal(isInfoQuery("rewrite the hero heading"), false)
+})
+
+test("isContentQuery detects 'describe this page' as content query", () => {
+  assert.equal(isContentQuery("describe this page"), true)
+  assert.equal(isContentQuery("describe the page"), true)
+  assert.equal(isContentQuery("describe this site"), true)
+  assert.equal(isContentQuery("describe the content"), true)
+  assert.equal(isContentQuery("describe this section"), true)
+  assert.equal(isContentQuery("summarize this page"), true)
+  assert.equal(isContentQuery("what does this page contain"), true)
+  // Edit requests should NOT match
+  assert.equal(isContentQuery("add a hero block"), false)
+  assert.equal(isContentQuery("update the heading"), false)
+})
+
+test("isContentQuery detects review/audit of block types as content query", () => {
+  assert.equal(isContentQuery("review the hero"), true)
+  assert.equal(isContentQuery("audit the cta"), true)
+  assert.equal(isContentQuery("check the testimonials"), true)
+  assert.equal(isContentQuery("inspect the feature grid"), true)
+  assert.equal(isContentQuery("analyze the stats"), true)
+  assert.equal(isContentQuery("review the section"), true)
+  assert.equal(isContentQuery("review the block"), true)
+  // Edit verbs should NOT match
+  assert.equal(isContentQuery("rewrite the hero"), false)
+  // Should not match isAdviceQuery (we want LLM content_answer, not canned advice)
+  assert.equal(isAdviceQuery("review the hero"), false)
 })
 
 test("shouldPreferFastModelForMessage prefers fast for simple prop edits", () => {

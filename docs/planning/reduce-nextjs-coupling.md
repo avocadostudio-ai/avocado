@@ -20,7 +20,7 @@ Use a two-tier integration model:
 
 1. Keep **Next.js Embedded Onboarding** as the default path (fastest for current target users).
 2. Add a **Framework-Agnostic Site Adapter Contract** as the stable core.
-3. Position an AEM-like provider/SPI as an advanced enterprise mode, not the default onboarding requirement.
+3. Position a provider/SPI as an advanced enterprise mode, not the default onboarding requirement.
 
 This avoids over-engineering for early adopters while still giving a credible path to multi-framework and enterprise integrations.
 
@@ -110,7 +110,7 @@ Add a reusable test suite that every adapter must pass:
 
 ### 6) Keep Provider SPI as Advanced Mode
 
-Keep AEM-inspired SPI, but position it as:
+Keep the SPI, but position it as:
 
 - optional advanced integration
 - recommended for enterprise CMS/platform teams

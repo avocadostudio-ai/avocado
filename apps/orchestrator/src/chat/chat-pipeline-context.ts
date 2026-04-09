@@ -44,10 +44,7 @@ export function shouldUseLlmIntentRouter(message: string) {
   if (isClarificationFollowUp(message)) return false
   const normalized = message.trim()
   if (normalized.length === 0 || normalized.length > 260) return false
-  return (
-    isRewriteLikeMessage(normalized) ||
-    /\b(replace|change|update|set|edit|remove|delete|move|reorder|add)\b/.test(normalized.toLowerCase())
-  )
+  return true
 }
 
 export function compactPlannerContextPack(args: {

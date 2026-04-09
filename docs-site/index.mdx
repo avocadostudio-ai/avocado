@@ -1,37 +1,66 @@
 ---
-title: "AI Site Editor Docs"
-description: "Integration, operations, and technical references for the AI Site Editor platform."
+title: "Avocado Studio"
+description: "AI-powered content operations for websites — natural language editing with live preview, type-safe operations, and multi-model AI support."
 ---
 
-## What is AI Site Editor?
+## What is Avocado Studio?
 
-AI Site Editor is a chat-driven website editing platform. Site owners and content teams describe changes in natural language — the system applies them as validated, schema-checked operations with live preview, undo/redo, and plan approval.
+Avocado Studio is an open-source content operations platform for websites. Describe content changes in natural language or use the visual drag-and-drop editor — the system generates schema-validated operations, lets you review the plan, and applies approved changes to draft content with live preview, undo/redo, and publishing controls.
 
-**How it works**: a split-pane experience where your live website renders on the left and a chat interface on the right. Users type requests like _"add a testimonials section below the hero"_ or _"change the hero heading to Welcome"_, and the system plans and applies structured edits.
+### Two editing modes
 
-**For site owners**: connect the editor to your existing site by implementing a small API contract (block manifest + draft mode endpoints). No changes to your existing pages required.
+  <CardGroup cols={2}>
+  <Card title="Chat Editor" icon="message-bot">
+    Default mode for AI-assisted edits. In a split pane (site preview + chat), describe a change, review the generated operation plan, and apply it to draft content.
+  </Card>
+  <Card title="Puck Mode" icon="hand-pointer" href="/integration/puck-mode">
+    Visual drag-and-drop mode powered by Puck. Reorder blocks and edit fields directly, with optional AI chat in the sidebar for natural-language edits. Currently draft-only (no publish flow). Enabled per site in settings.
+  </Card>
+</CardGroup>
+
+Both modes use the same block schemas, operation pipeline, and orchestrator backend. Editing mode is configured per site, so each site can opt into Puck mode independently.
+
+**For developers and agencies**: integrate AI editing into any Next.js site with the Site SDK, or use the framework-agnostic REST API. Self-hosted, multi-model AI (Anthropic, OpenAI, Google Gemini), and a pluggable publishing pipeline.
+
+**For site owners**: manage your website content through conversation — no code changes required. Review every change before it ships.
 
 ## Start Here
 
 <CardGroup cols={2}>
-  <Card title="Integration quickstart" icon="rocket" href="/integration/editor-quickstart">
-    Connect the editor to a Next.js site in ~30 minutes using embedded draft mode.
+  <Card title="Core concepts" icon="lightbulb" href="/concepts">
+    Pages, blocks, operations, draft mode — the mental model behind Avocado Studio.
   </Card>
-  <Card title="Operations runbook" icon="server" href="/operations/dev-server-runbook">
-    Start, restart, and diagnose the local multi-service dev environment.
+  <Card title="How it works" icon="diagram-project" href="/how-it-works">
+    Step-by-step walkthrough of the editing pipeline, from chat to live preview.
   </Card>
-  <Card title="Product + architecture spec" icon="diagram-project" href="/specs/ai-website-editor-poc-spec">
-    Review product goals, architecture, domain model, and APIs.
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    How the three services, packages, and data flow fit together.
   </Card>
-  <Card title="Advanced references" icon="book-open-cover" href="/observability/chat-troubleshooting">
-    Deep dives for observability, guardrails, and advanced integration contracts.
+  <Card title="Quick start" icon="rocket" href="/integration/editor-quickstart">
+    Connect the Content Studio to a Next.js site in ~30 minutes.
+  </Card>
+  <Card title="Puck mode" icon="hand-pointer" href="/integration/puck-mode">
+    Enable the visual drag-and-drop editor for a site.
   </Card>
 </CardGroup>
 
+## Key Capabilities
+
+- **Natural language editing** — Describe changes in plain English. The AI generates structured, schema-validated operations
+- **Multi-model AI** — Anthropic, OpenAI, and Google Gemini. Most battle-tested with Anthropic models (Haiku, Sonnet, Opus)
+- **20 built-in block types** — Hero, CTA, FAQ, Testimonials, Gallery, Stats, Carousel, Table, and more
+- **Type-safe operations** — Zod schemas validate every edit. Malformed edits are rejected before they touch your content
+- **Live preview + streaming** — See edits applied progressively as the AI generates the plan
+- **Undo/redo + plan approval** — Full operation history. Review and approve every change
+- **Pluggable publishing** — Ships with Git + Vercel deploy hooks. Implement the [`PublishTarget` interface](/how-it-works#the-publishtarget-interface) for your own workflow
+- **Self-hosted** — Run the entire stack on your own infrastructure. No vendor lock-in
+
 ## Suggested Reading Path
 
-1. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
-2. [Next.js embedded onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
-3. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally
-4. [Product + architecture spec](/specs/ai-website-editor-poc-spec) — full domain model and API surface
-5. [Site Provider SPI](/site-provider-spi) — advanced framework-agnostic REST contract
+1. [Core concepts](/concepts) — pages, blocks, operations, draft mode
+2. [How it works](/how-it-works) — the editing pipeline from chat to preview
+3. [Architecture](/architecture) — services, packages, data flow
+4. [Integration overview](/integration) — prerequisites, tiers, and adoption checklist
+5. [Next.js onboarding](/integration/nextjs-mvp-embedded) — default path for Next.js sites
+6. [Puck mode](/integration/puck-mode) — visual drag-and-drop editing with AI chat
+7. [Dev server runbook](/operations/dev-server-runbook) — running the stack locally

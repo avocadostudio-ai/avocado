@@ -5,11 +5,9 @@ import {
   type Operation
 } from "@ai-site-editor/shared"
 import type {
-  AIProvider,
   AssistantResponse,
   ChatEntry,
   ChatExecutionMode,
-  ModelKey,
   SiteCapabilities,
   SiteConfig
 } from "../lib/editor-types"
@@ -31,33 +29,18 @@ import { useStructuralOps } from "./chat-engine/useStructuralOps"
 import { useUndoHistory } from "./chat-engine/useUndoHistory"
 import { useVariations } from "./chat-engine/useVariations"
 import { submitAgentStream } from "./chat-engine/agent-transport"
+import { useEditorStore } from "../store"
+import { getSessionId, getSiteId } from "../store/session"
+import type { PreviewBridgeFns } from "./chat-engine/types"
 
-export type ChatEngineConfig = {
-  session: string
-  siteId: string
+export type ChatEngineConfig = PreviewBridgeFns & {
   activeSiteConfig: SiteConfig
-  slug: string
-  setSlug: (slug: string) => void
-  modelKey: ModelKey
-  provider: AIProvider
-  useStreaming: boolean
-  activeBlockIdRef: React.RefObject<string | undefined>
-  activeBlockTypeRef: React.RefObject<string | undefined>
-  activeEditablePathRef: React.RefObject<string | undefined>
-  setActiveBlockId: (id: string | undefined) => void
-  setActiveBlockType: (type: string | undefined) => void
-  setActiveEditablePath: (path: string | undefined) => void
-  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
-  postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
-  setAvailableSlugs: (slugs: string[]) => void
-  setIsLoadingSlugs: (loading: boolean) => void
-  routeOptions: string[]
   componentManifest?: BlockManifest | null
   siteCapabilities?: SiteCapabilities
   allowStructuralEdits: boolean
   getBlockDefaultProps?: (blockType: string) => Record<string, unknown> | null
   onApplied?: () => void
-  agentApiKey?: string
+  agentModeEnabled?: boolean
 }
 
 function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
@@ -70,25 +53,9 @@ function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
 
 export function useChatEngine(config: ChatEngineConfig) {
   const {
-    session,
-    siteId,
     activeSiteConfig,
-    slug,
-    setSlug,
-    modelKey,
-    provider,
-    useStreaming,
-    activeBlockIdRef,
-    activeBlockTypeRef,
-    activeEditablePathRef,
-    setActiveBlockId,
-    setActiveBlockType,
-    setActiveEditablePath,
     postToSite,
     postPatchToSite,
-    setAvailableSlugs,
-    setIsLoadingSlugs,
-    routeOptions,
     componentManifest,
     siteCapabilities,
     allowStructuralEdits,
@@ -96,7 +63,10 @@ export function useChatEngine(config: ChatEngineConfig) {
     onApplied
   } = config
 
+  const store = useEditorStore
   const { t, locale } = useT()
+  const session = getSessionId()
+  const siteId = getSiteId()
   const activeSiteOrigin = resolveSiteOrigin(activeSiteConfig)
   const chatLogStorageKey = `editor-chat-log-v1:${session}:${siteId}`
 
@@ -115,7 +85,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     pageBlocks?: Array<{ type: string }>
   ): string[] {
     const suggestions: string[] = []
-    const supported = new Set(manifest?.blocks?.map(b => b.type) ?? [])
+    const supported = new Set(manifest?.blocks?.map((b: { type: string }) => b.type) ?? [])
 
     if (pageBlocks && pageBlocks.length > 0) {
       const onPage = new Set(pageBlocks.map(b => b.type))
@@ -148,109 +118,73 @@ export function useChatEngine(config: ChatEngineConfig) {
     ? t("welcome.greeting", { name: activeSiteConfig.name })
     : t("welcome.greetingFallback")
 
-  const welcomeEntry: ChatEntry = {
+  const buildWelcomeEntry = (slugs?: string[], blocks?: Array<{ type: string }>): ChatEntry => ({
     id: "welcome",
     role: "assistant",
     text: welcomeText,
-    suggestions: buildWelcomeSuggestions(activeSiteConfig, routeOptions, componentManifest)
-  }
+    suggestions: buildWelcomeSuggestions(activeSiteConfig, slugs ?? store.getState().availableSlugs, componentManifest, blocks)
+  })
 
-  const [chatLog, setChatLog] = useState<ChatEntry[]>(() => {
+  // Initialize chatLog from localStorage on first mount
+  const chatLogInitializedRef = useRef(false)
+  if (!chatLogInitializedRef.current) {
+    chatLogInitializedRef.current = true
+    let initial: ChatEntry[] | null = null
     try {
       const stored = localStorage.getItem(chatLogStorageKey)
       if (stored) {
         const parsed = JSON.parse(stored) as ChatEntry[]
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) initial = parsed
       }
     } catch { /* ignore corrupt data */ }
-    return [welcomeEntry]
-  })
+    store.getState().setChatLog(initial ?? [buildWelcomeEntry()])
+  }
 
+  // Persist chatLog to localStorage
+  const chatLog = useEditorStore((s) => s.chatLog)
   useEffect(() => {
     try {
       const toStore = chatLog.slice(-50).map(({ status, ...rest }) => rest)
       localStorage.setItem(chatLogStorageKey, JSON.stringify(toStore))
     } catch { /* ignore quota errors */ }
   }, [chatLog, chatLogStorageKey])
-  const [isLoading, setIsLoading] = useState(false)
-  const [streamStatus, setStreamStatus] = useState<string | null>(null)
-  const [streamTokenCount, setStreamTokenCount] = useState(0)
-  const [imageProgress, setImageProgress] = useState<{ percent: number; stage: string } | null>(null)
-  const [latestStreamFocusBlockId, setLatestStreamFocusBlockId] = useState<string | null>(null)
-  const [continuationChainId, setContinuationChainId] = useState<string | null>(null)
-  const [streamingText, setStreamingText] = useState<string | null>(null)
-  const [streamingChanges, setStreamingChanges] = useState<string[]>([])
-  const [streamSteps, setStreamSteps] = useState<{ label: string; done: boolean }[]>([])
-  const [fieldDraftDebugEnabled, setFieldDraftDebugEnabled] = useState(false)
-  const [fieldDraftDebug, setFieldDraftDebug] = useState<{
-    eventsPerSecond: number
-    charsPerSecond: number
-    totalEvents: number
-    totalChars: number
-    typingLagChars: number
-    activeTarget: string | null
-  }>({
-    eventsPerSecond: 0,
-    charsPerSecond: 0,
-    totalEvents: 0,
-    totalChars: 0,
-    typingLagChars: 0,
-    activeTarget: null
-  })
+
+  // Convenience aliases for store actions used frequently in streaming
+  const setChatLog = store.getState().setChatLog
+  const setIsLoading = store.getState().setIsLoading
+  const setStreamStatus = store.getState().setStreamStatus
+  const setStreamTokenCount = store.getState().setStreamTokenCount
+  const setImageProgress = store.getState().setImageProgress
+  const setLatestStreamFocusBlockId = store.getState().setLatestStreamFocusBlockId
+  const setStreamingText = store.getState().setStreamingText
+  const setStreamingChanges = store.getState().setStreamingChanges
+  const setStreamSteps = store.getState().setStreamSteps
+  const setFieldDraftDebug = store.getState().setFieldDraftDebug
+  const setActiveBlockId = (id: string | undefined) => store.getState().setActiveBlock(id)
+  const setActiveBlockType = (_type: string | undefined) => { /* absorbed into setActiveBlock */ }
+  const setActiveEditablePath = store.getState().setActiveEditablePath
+  const setSlug = store.getState().setSlug
+  const setAvailableSlugs = store.getState().setAvailableSlugs
+  const setIsLoadingSlugs = store.getState().setIsLoadingSlugs
+  const pushAssistantFromResult = store.getState().pushAssistantFromResult
+  const setContinuationChainId = store.getState().setContinuationChainId
 
   // Track last sent message so server-forced plan_only can populate pendingPlanMessage
   const lastSentMessageRef = useRef<string | null>(null)
   const activeStreamIdRef = useRef<string | null>(null)
   const agentCancelRef = useRef<(() => void) | null>(null)
 
-  // Use refs for values accessed in closures to avoid stale captures
-  const slugRef = useRef(slug)
-  slugRef.current = slug
-  const routeOptionsRef = useRef(routeOptions)
-  routeOptionsRef.current = routeOptions
-
-  function pushAssistantFromResult(data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) {
-    const errors = normalizeValidationErrors(data.validationErrors)
-    const parsedChanges = splitAiInsightChanges(data.changes)
-    const entry: ChatEntry = {
-      id: createId(),
-      role: "assistant",
-      text: data.summary ?? data.error ?? "Request failed.",
-      status: data.status,
-      canUndo: options?.canUndo ?? false,
-      wasUndone: false,
-      undoSlug: options?.undoSlug,
-      changes: parsedChanges.changes,
-      mentionedSlugs: Array.isArray(data.mentionedSlugs) ? data.mentionedSlugs.filter((s): s is string => typeof s === "string") : [],
-      suggestions: data.suggestions ?? [],
-      variations: data.variations,
-      errors,
-      meta: data.modelUsed ? `${data.modelUsed}${data.modelKey ? ` (${data.modelKey})` : ""}` : undefined,
-      debug: data.debug,
-      aiJustification: parsedChanges.aiJustification,
-      aiPerformanceNote: parsedChanges.aiPerformanceNote,
-      pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined,
-      continuation: data.continuation ?? undefined
-    }
-
-    setChatLog((prev) => {
-      if (!entry.canUndo) return [...prev, entry]
-      const withoutUndo = prev.map((row) => (row.canUndo ? { ...row, canUndo: false, wasUndone: false } : row))
-      return [...withoutUndo, entry]
-    })
-  }
-
   function applyChatResult(data: AssistantResponse) {
     if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "gemini" || data.plannerSource === "demo") {
-      planApproval.setPlannerBadgeState(data.plannerSource)
+      store.getState().setPlannerBadgeState(data.plannerSource)
     }
     if (data.status === "plan_ready" && typeof data.pendingPlanId === "string" && data.pendingPlanId.length > 0) {
-      planApproval.setPendingPlanId(data.pendingPlanId)
+      store.getState().setPendingPlanId(data.pendingPlanId)
       // Server may force plan_only (e.g. for image generation) on a non-complex message.
       // Ensure pendingPlanMessage is populated so approval sends the original text.
       planApproval.setPendingPlanMessage((prev) => prev ?? lastSentMessageRef.current)
     } else if (data.status === "applied" || data.status === "canceled") {
-      planApproval.setPendingPlanId(null)
+      store.getState().setPendingPlanId(null)
       planApproval.setPendingPlanMessage(null)
     }
     if (data.status === "applied") {
@@ -263,32 +197,30 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
     // undoSlug tells the editor which slug's undo stack to pop.
     // Server sends it explicitly; fall back to current slug for older responses.
+    const currentSlugNow = store.getState().slug
     const undoSlug = typeof data.undoSlug === "string" && data.undoSlug.length > 0
       ? data.undoSlug
-      : slugRef.current
+      : currentSlugNow
     pushAssistantFromResult(data, { canUndo: data.status === "applied", undoSlug })
     if (data.status === "applied") {
-      const currentSlug = slugRef.current
+      const currentSlug = store.getState().slug
       const nextSlug = parseString(data.updatedSlug, currentSlug)
       if (nextSlug !== currentSlug) {
         setSlug(nextSlug)
-        activeBlockIdRef.current = undefined
-        activeBlockTypeRef.current = undefined
-        activeEditablePathRef.current = undefined
-        setActiveBlockId(undefined)
-        setActiveBlockType(undefined)
+        store.getState().setActiveBlock(undefined, undefined)
         setActiveEditablePath(undefined)
       }
       const navigateTo = nextSlug !== currentSlug ? nextSlug : undefined
       postToSite("draftUpdated", { focusBlockId: data.focusBlockId ?? null, navigateTo })
       if (data.focusBlockId) {
-        activeBlockIdRef.current = data.focusBlockId
-        setActiveBlockId(data.focusBlockId)
+        store.getState().setActiveBlock(data.focusBlockId)
       }
-      activeEditablePathRef.current = undefined
       setActiveEditablePath(undefined)
       void refreshRouteSlugs()
       onApplied?.()
+      // After ops are applied, undo is available and redo stack is cleared
+      undoHistory.setCanUndoServer(true)
+      undoHistory.setCanRedoServer(false)
     }
   }
 
@@ -343,13 +275,13 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   async function updateWelcomeSuggestions(slugs: string[]) {
     try {
-      const pageUrl = `${orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(slugRef.current)}`
+      const pageUrl = `${orchestrator}/draft/pages?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}&slug=${encodeURIComponent(store.getState().slug)}`
       const pageRes = await fetch(pageUrl)
       if (!pageRes.ok) return
       const pageDoc = (await pageRes.json()) as { blocks?: Array<{ type: string }> }
       const blocks = Array.isArray(pageDoc.blocks) ? pageDoc.blocks : undefined
       const updated = buildWelcomeSuggestions(activeSiteConfig, slugs, componentManifest, blocks)
-      setChatLog(prev => prev.map(entry =>
+      store.getState().setChatLog(prev => prev.map(entry =>
         entry.id === "welcome" ? { ...entry, suggestions: updated } : entry
       ))
     } catch { /* non-critical — keep initial suggestions */ }
@@ -360,7 +292,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     try {
       const slugsUrl = `${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`
       const res = await fetch(slugsUrl)
-      if (!res.ok) return routeOptionsRef.current
+      if (!res.ok) return store.getState().availableSlugs
       const data = (await res.json()) as { slugs?: unknown }
       const list = Array.isArray(data.slugs)
         ? data.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
@@ -385,15 +317,16 @@ export function useChatEngine(config: ChatEngineConfig) {
         return list
       }
 
-      return routeOptionsRef.current
+      return store.getState().availableSlugs
     } catch {
-      return routeOptionsRef.current
+      return store.getState().availableSlugs
     } finally {
       setIsLoadingSlugs(false)
     }
   }
 
   async function submitChatHttp(finalMessage: string, options?: { executionMode?: ChatExecutionMode; pendingPlanId?: string; continuationChainId?: string }) {
+    const { slug: currentSlug, activeBlockId, activeBlockType, activeEditablePath, modelKey, provider } = store.getState()
     const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
     const res = await fetch(`${orchestrator}/chat`, {
       method: "POST",
@@ -403,13 +336,13 @@ export function useChatEngine(config: ChatEngineConfig) {
         siteId,
         ...contextPayload,
         locale,
-        slug: slugRef.current,
+        slug: currentSlug,
         message: finalMessage,
         modelKey,
         provider,
-        activeBlockId: activeBlockIdRef.current,
-        activeBlockType: activeBlockTypeRef.current,
-        activeEditablePath: activeEditablePathRef.current,
+        activeBlockId,
+        activeBlockType,
+        activeEditablePath,
         executionMode: options?.executionMode ?? "auto",
         pendingPlanId: options?.pendingPlanId,
         ...(options?.continuationChainId ? { continuationChainId: options.continuationChainId } : {})
@@ -421,19 +354,20 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
+    const { slug: currentSlug, activeBlockId, activeBlockType, activeEditablePath, modelKey, provider } = store.getState()
     const contextPayload = buildSiteContextPayload(siteId, activeSiteConfig)
     const payload = withIntegrationContext({
       session,
       siteId,
       ...contextPayload,
       locale,
-      slug: slugRef.current,
+      slug: currentSlug,
       message: finalMessage,
       modelKey,
       provider,
-      activeBlockId: activeBlockIdRef.current,
-      activeBlockType: activeBlockTypeRef.current,
-      activeEditablePath: activeEditablePathRef.current,
+      activeBlockId,
+      activeBlockType,
+      activeEditablePath,
       ...(extraParams ?? {})
     }, componentManifest, siteCapabilities)
 
@@ -482,7 +416,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       let lastOpTotal = 0
       let appliedOpCount = 0
       let skippedOpCount = 0
-      let liveDraftBlockId: string | null = activeBlockIdRef.current ?? null
+      let liveDraftBlockId: string | null = store.getState().activeBlockId ?? null
       let liveDraftText = ""
       let liveDraftFlushTimer: number | null = null
       let liveDraftTypingTimer: number | null = null
@@ -495,7 +429,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftFields: Record<string, string> | null = null
       let sawFieldDraftThisRun = false
       let currentStepLabel: string | null = null
-      const debugDraftEnabled = fieldDraftDebugEnabled
+      const debugDraftEnabled = store.getState().fieldDraftDebugEnabled
       let debugFlushTimer: number | null = null
       const debugFieldEventAtMs: number[] = []
       const debugFieldCharAt: Array<{ at: number; chars: number }> = []
@@ -755,11 +689,9 @@ export function useChatEngine(config: ChatEngineConfig) {
         const focusId = pendingFocusBlockId
         postToSite("draftUpdated", { focusBlockId: focusId })
         if (focusId) {
-          activeBlockIdRef.current = focusId
-          setActiveBlockId(focusId)
+          store.getState().setActiveBlock(focusId)
         }
-        activeEditablePathRef.current = undefined
-        setActiveEditablePath(undefined)
+        store.getState().setActiveEditablePath(undefined)
         pendingFocusBlockId = null
       }
 
@@ -985,15 +917,11 @@ export function useChatEngine(config: ChatEngineConfig) {
           // Navigate to a newly created page when the server signals updatedSlug
           if (typeof payload.updatedSlug === "string" && payload.updatedSlug.length > 0) {
             const nextSlug = payload.updatedSlug as string
-            const slugChanged = nextSlug !== slugRef.current
+            const slugChanged = nextSlug !== store.getState().slug
             if (slugChanged) {
               setSlug(nextSlug)
-              activeBlockIdRef.current = undefined
-              activeBlockTypeRef.current = undefined
-              activeEditablePathRef.current = undefined
-              setActiveBlockId(undefined)
-              setActiveBlockType(undefined)
-              setActiveEditablePath(undefined)
+              store.getState().setActiveBlock(undefined, undefined)
+              store.getState().setActiveEditablePath(undefined)
             }
             postToSite("draftUpdated", { focusBlockId: pendingFocusBlockId, navigateTo: slugChanged ? nextSlug : undefined })
             void refreshRouteSlugs()
@@ -1226,85 +1154,42 @@ export function useChatEngine(config: ChatEngineConfig) {
     }
   }
 
-  // --- Compose sub-hooks ---
+  // --- Compose sub-hooks (slim deps — most state from store/singleton) ---
 
   const structuralOps = useStructuralOps({
-    session,
-    siteId,
-    activeSiteConfig,
-    slug,
-    setSlug,
-    activeBlockIdRef,
-    activeBlockTypeRef,
-    activeEditablePathRef,
-    setActiveBlockId,
-    setActiveBlockType,
-    setActiveEditablePath,
     postToSite,
     postPatchToSite,
+    activeSiteConfig,
     componentManifest,
     siteCapabilities,
     allowStructuralEdits,
     getBlockDefaultProps,
-    pushAssistantFromResult
   })
 
   const variations = useVariations({
-    session,
-    siteId,
-    activeSiteConfig,
-    slug,
-    setSlug,
-    activeBlockIdRef,
-    activeBlockTypeRef,
-    activeEditablePathRef,
-    setActiveBlockId,
-    setActiveBlockType,
-    setActiveEditablePath,
     postToSite,
     postPatchToSite,
+    activeSiteConfig,
     componentManifest,
     siteCapabilities,
     allowStructuralEdits,
     getBlockDefaultProps,
-    pushAssistantFromResult,
-    slugRef,
-    modelKey,
-    provider
   })
 
   const planApproval = usePlanApproval({
-    isLoading,
-    setIsLoading,
-    useStreaming,
-    setChatLog,
-    setLatestStreamFocusBlockId,
-    setStreamStatus,
-    setStreamingText,
-    setStreamingChanges,
-    setStreamSteps,
-    pushAssistantFromResult,
     submitChatStream,
     submitChatHttp
   })
 
   const undoHistory = useUndoHistory({
-    session,
-    siteId,
-    slugRef,
-    isLoading,
-    activeEditablePathRef,
-    setActiveEditablePath,
-    setSlug,
     postToSite,
-    setChatLog,
-    pushAssistantFromResult,
+    postPatchToSite,
     refreshRouteSlugs
   })
 
   async function continueChain(chainId: string) {
-    if (!chainId || isLoading) return
-    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: t("ops.continueNext") }])
+    if (!chainId || store.getState().isLoading) return
+    store.getState().appendChatEntry({ id: createId(), role: "user", text: t("ops.continueNext") })
     setIsLoading(true)
     try {
       await submitChatHttp("Continue to next step", {
@@ -1326,17 +1211,18 @@ export function useChatEngine(config: ChatEngineConfig) {
 
   async function submitChat(explicitMessage?: string, currentMessage?: string) {
     const finalMessage = (explicitMessage ?? currentMessage ?? "").trim()
-    if (!finalMessage || isLoading) return
+    if (!finalMessage || store.getState().isLoading) return
 
     // If there's a pending plan and the user types an approval-like message,
     // route through the plan approval flow instead of treating as a new request.
-    if (planApproval.pendingPlanId && /\b(approve|execute|go\s+ahead|yes|do\s+it|apply|confirm)\b/i.test(finalMessage)) {
-      await planApproval.approvePendingPlan(planApproval.pendingPlanId)
+    const { pendingPlanId, useStreaming } = store.getState()
+    if (pendingPlanId && /\b(approve|execute|go\s+ahead|yes|do\s+it|apply|confirm)\b/i.test(finalMessage)) {
+      await planApproval.approvePendingPlan(pendingPlanId)
       return
     }
 
     lastSentMessageRef.current = finalMessage
-    setChatLog((prev) => [...prev, { id: createId(), role: "user", text: finalMessage }])
+    store.getState().appendChatEntry({ id: createId(), role: "user", text: finalMessage })
     setIsLoading(true)
     setStreamStatus(useStreaming ? "Thinking..." : null)
     setStreamTokenCount(0)
@@ -1354,20 +1240,20 @@ export function useChatEngine(config: ChatEngineConfig) {
         await variations.submitVariations(finalMessage)
         return
       }
-      // Agent mode: when user has provided their own Anthropic API key
-      if (config.agentApiKey?.trim()) {
+      // Agent mode: when server has AGENT_API_KEY configured
+      if (config.agentModeEnabled) {
+        const { slug: agentSlug, activeBlockId: agentBlockId, activeBlockType: agentBlockType, activeEditablePath: agentEditablePath } = store.getState()
         const handle = submitAgentStream({
           orchestrator,
-          agentApiKey: config.agentApiKey.trim(),
-          session: config.session,
-          siteId: config.siteId,
-          slug: config.slug,
+          session,
+          siteId,
+          slug: agentSlug,
           message: finalMessage,
-          activeBlockId: config.activeBlockIdRef.current,
-          activeBlockType: config.activeBlockTypeRef.current,
-          activeEditablePath: config.activeEditablePathRef.current,
+          activeBlockId: agentBlockId,
+          activeBlockType: agentBlockType,
+          activeEditablePath: agentEditablePath,
           locale,
-          sitePurpose: config.activeSiteConfig.purpose,
+          sitePurpose: activeSiteConfig.purpose,
           setStreamStatus,
           setStreamSteps,
           setStreamingText,
@@ -1375,14 +1261,14 @@ export function useChatEngine(config: ChatEngineConfig) {
           setLatestStreamFocusBlockId,
           applyChatResult,
           pushAssistantFromResult,
-          postToSite: config.postToSite,
-          setActiveBlockId: config.setActiveBlockId,
+          postToSite,
+          setActiveBlockId: (id: string | undefined) => store.getState().setActiveBlock(id),
         })
         agentCancelRef.current = handle.cancel
         const ok = await handle.promise
         agentCancelRef.current = null
         if (!ok) {
-          pushAssistantFromResult({ status: "error", summary: "Agent failed. Check your API key in settings.", changes: [] })
+          pushAssistantFromResult({ status: "error", summary: "Agent failed. Check AGENT_API_KEY in the orchestrator .env.", changes: [] })
         }
         return
       }
@@ -1415,7 +1301,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   async function submitFeedback(entryId: string, rating: "up" | "down", note?: string) {
-    const entry = chatLog.find((e) => e.id === entryId)
+    const entry = store.getState().chatLog.find((e) => e.id === entryId)
     if (!entry?.debug?.traceId) return
     try {
       await fetch(`${orchestrator}/telemetry/chat/feedback`, {
@@ -1424,40 +1310,24 @@ export function useChatEngine(config: ChatEngineConfig) {
         body: JSON.stringify({ traceId: entry.debug.traceId, session, rating, note })
       })
     } catch { /* best-effort */ }
-    setChatLog((prev) =>
+    store.getState().setChatLog((prev) =>
       prev.map((e) => e.id === entryId ? { ...e, feedback: { rating, note, at: new Date().toISOString() } } : e)
     )
   }
 
+  // State is now read from the store via selectors in components.
+  // This hook returns only action functions + the few remaining local values.
   return {
-    chatLog,
-    isLoading,
-    streamStatus,
-    streamTokenCount,
-    fieldDraftDebugEnabled,
-    setFieldDraftDebugEnabled,
-    fieldDraftDebug,
-    imageProgress,
-    streamingText,
-    streamingChanges,
-    streamSteps,
-    latestStreamFocusBlockId,
-    plannerBadgeState: planApproval.plannerBadgeState,
-    setPlannerBadgeState: planApproval.setPlannerBadgeState,
-    pendingPlanId: planApproval.pendingPlanId,
-    variationModal: variations.variationModal,
-    setVariationModal: variations.setVariationModal,
-    isApplyingVariation: variations.isApplyingVariation,
-    undoInFlightEntryId: undoHistory.undoInFlightEntryId,
-    pushAssistantFromResult,
+    // Actions (the primary API for components)
     submitChat,
     cancelChat,
     applyVariation: variations.applyVariation,
     approvePendingPlan: planApproval.approvePendingPlan,
     stopPendingPlan: planApproval.stopPendingPlan,
     continueChain,
-    continuationChainId,
     applyUndoHistory: undoHistory.applyUndoHistory,
+    applyGlobalUndo: undoHistory.applyGlobalUndo,
+    applyGlobalRedo: undoHistory.applyGlobalRedo,
     refreshRouteSlugs,
     syncFromSite,
     addBlockAfter: structuralOps.addBlockAfter,
@@ -1467,10 +1337,18 @@ export function useChatEngine(config: ChatEngineConfig) {
     reorderBlock: structuralOps.reorderBlock,
     deleteBlock: structuralOps.deleteBlock,
     inlineEditCommit: structuralOps.inlineEditCommit,
-    clearFieldAiContext: () => setChatLog((prev) => prev.filter((e) => !e.fieldAiContext)),
-    setFieldAiContext: (entry: ChatEntry) => setChatLog((prev) => [...prev.filter((e) => !e.fieldAiContext), entry]),
-    clearChat: () => setChatLog([welcomeEntry]),
+    clearFieldAiContext: () => store.getState().setChatLog((prev) => prev.filter((e) => !e.fieldAiContext)),
+    setFieldAiContext: (entry: ChatEntry) => store.getState().setChatLog((prev) => [...prev.filter((e) => !e.fieldAiContext), entry]),
+    clearChat: () => store.getState().setChatLog([buildWelcomeEntry()]),
     submitFeedback,
-    hasBootstrapped
+    submitVariations: variations.submitVariations,
+    hasBootstrapped,
+
+    // Legacy pass-through — components migrating to store selectors
+    // can still read these until fully migrated.
+    undoInFlightEntryId: undoHistory.undoInFlightEntryId,
+    canUndoServer: undoHistory.canUndoServer,
+    canRedoServer: undoHistory.canRedoServer,
+    pushAssistantFromResult,
   }
 }

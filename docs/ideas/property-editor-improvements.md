@@ -30,7 +30,7 @@ Content tree
 
 ## 3. CMS-style component detail panel
 
-A dedicated detail panel for the selected block, inspired by headless CMS editors (e.g. Adobe AEM). Shows:
+A dedicated detail panel for the selected block, inspired by headless CMS editors. Shows:
 
 ```
 Main > Section >

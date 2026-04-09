@@ -179,7 +179,9 @@ export function useSiteList(siteId: string, session: string) {
   }, [siteId, siteList, queryPreviewUrl])
 
   const openEditorForSite = (targetSiteId: string) => {
-    const url = new URL("/editor", window.location.origin)
+    const targetSite = siteList.find((s) => s.id === targetSiteId)
+    const editorPath = targetSite?.enablePuck ? "/editor/puck" : "/editor"
+    const url = new URL(editorPath, window.location.origin)
     url.searchParams.set("siteId", targetSiteId)
     url.searchParams.delete("poc")
     window.location.href = url.toString()
@@ -313,7 +315,7 @@ export function useSiteList(siteId: string, session: string) {
     patch: Partial<
       Pick<
         SiteConfig,
-        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "pageTemplates" | "gdriveFolderId" | "cmsMedia"
+        "name" | "purpose" | "hosting" | "previewUrl" | "vercelProjectId" | "vercelTeamId" | "vercelProductionUrl" | "vercelDeployHookUrl" | "tone" | "constraints" | "pageTemplates" | "gdriveFolderId" | "cmsMedia" | "enablePuck"
       >
     >
   ) => {

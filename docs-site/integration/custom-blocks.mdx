@@ -1,0 +1,230 @@
+---
+title: "Custom Blocks"
+description: "Register your own block types with custom schemas, renderers, and props — the AI planner picks them up automatically."
+---
+
+# Custom Block Registration
+
+Use custom blocks when your site has its own component library and you don't want the product's default block set (Hero, CTA, FeatureGrid, etc.).
+
+**Default blocks** are a starter kit — convenient for new sites but not required. The product is content-model-agnostic: it works with any blocks you register.
+
+## How it works
+
+1. You define a **block manifest** — an array of `BlockDefinition` objects describing your block types
+2. You pass it to the Content Studio API handler via `getManifest()`
+3. The AI planner, property panel, and block picker in the Content Studio all derive their behavior from your manifest
+4. Your site renders blocks with your own React components
+
+## Minimal example
+
+### 1. Define your manifest
+
+```ts
+// lib/manifest.ts
+import type { BlockManifest } from "@ai-site-editor/shared"
+import { getManifestImageFields } from "@ai-site-editor/site-sdk/routes"
+
+const manifest: BlockManifest = {
+  version: 1,
+  blocks: [
+    {
+      type: "Hero",
+      displayName: "Hero Banner",
+      propsSchema: {
+        type: "object",
+        properties: {
+          heading:  { type: "string" },
+          subtitle: { type: "string" },
+          imageUrl: { type: "string" },
+          ctaText:  { type: "string" },
+          ctaHref:  { type: "string" },
+        },
+        required: ["heading"],
+      },
+      defaultProps: {
+        heading: "Welcome",
+        subtitle: "Your tagline here",
+        imageUrl: "",
+        ctaText: "Get started",
+        ctaHref: "#",
+      },
+    },
+    {
+      type: "FeatureGrid",
+      displayName: "Feature Grid",
+      propsSchema: {
+        type: "object",
+        properties: {
+          heading: { type: "string" },
+          features: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title:       { type: "string" },
+                description: { type: "string" },
+                imageUrl:    { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      defaultProps: {
+        heading: "Features",
+        features: [
+          { title: "Fast", description: "Built for speed", imageUrl: "" },
+          { title: "Simple", description: "Easy to use", imageUrl: "" },
+        ],
+      },
+    },
+  ],
+}
+
+export function getManifest() { return manifest }
+
+// Derive image field metadata for CMS adapters (publish/fetch image resolution)
+export const { imageFields, listImageFields, listFieldNames } = getManifestImageFields(manifest)
+```
+
+### 2. Wire into the editor API route
+
+```ts
+// app/api/editor/[...path]/route.ts
+import { createEditorApiHandler } from "@ai-site-editor/site-sdk/routes"
+import { getManifest } from "../../../../lib/manifest"
+
+export const { GET, POST, OPTIONS } = createEditorApiHandler({
+  getPages: () => fetchYourPages(),
+  getManifest,
+  onPublish: yourPublishHandler(),
+})
+```
+
+### 3. Verify
+
+Start your dev server and check:
+
+```bash
+curl http://localhost:3000/api/editor/blocks | jq '.blocks[].type'
+```
+
+Should print your block types. The Content Studio header should show **Manifest** (not **Degraded**).
+
+## BlockDefinition reference
+
+```ts
+type BlockDefinition = {
+  type: string                          // Block identifier (PascalCase recommended)
+  displayName?: string                  // Human-readable name in Content Studio UI
+  editablePaths?: string[]              // Fields the AI can edit (optional hint)
+  propsSchema: Record<string, unknown>  // JSON Schema describing block props
+  defaultProps?: Record<string, unknown> // Defaults when adding a new block
+}
+```
+
+### `propsSchema`
+
+Uses a JSON Schema subset. The product infers field types from schema + field name conventions:
+
+| Field name pattern | Inferred type | Content Studio behavior |
+|---|---|---|
+| `*imageUrl`, `*Image`, `*logo` | Image | Image picker, AI generation, upload |
+| `*Alt` | Image alt text | Text input |
+| Field with `enum: [...]` | Enum | Dropdown selector |
+| `type: "number"` | Number | Number input |
+| Everything else (`type: "string"`) | Text | Text input, inline editable |
+| `type: "array"` with `items.type: "object"` | List | Repeatable item list |
+
+You don't need to explicitly declare field kinds — the product derives them from your schema. Name image fields `*imageUrl` or `*Image` and they'll be detected automatically.
+
+### `defaultProps`
+
+Provide sensible defaults for every field. When a user asks the AI to "add a Hero block", these defaults are used as the starting point. The AI then modifies them based on the user's request.
+
+### `editablePaths` (optional)
+
+JSONPath-style strings hinting which fields the AI should focus on. Not required — the AI infers editability from the schema. Useful for complex blocks where you want to limit AI scope.
+
+## Image handling
+
+If your blocks have image fields, the manifest-driven image detection handles them automatically:
+
+```ts
+import { imageFields } from "./manifest"
+
+// In your CMS fetch adapter:
+const imgs = imageFields.get("Hero") // Set<"imageUrl">
+for (const [key, value] of Object.entries(blockProps)) {
+  if (imgs.has(key)) {
+    // Resolve CMS image reference to URL
+    props[key] = resolveImageUrl(value)
+  }
+}
+```
+
+The `getManifestImageFields()` utility derives this from your `propsSchema` — fields matching the image name pattern are included automatically.
+
+## Rendering blocks
+
+The product doesn't render your custom blocks — your site does. Map `block.type` to your React components:
+
+```tsx
+// components/BlockRenderer.tsx
+import type { BlockInstance } from "@ai-site-editor/shared"
+import { Hero } from "./blocks/Hero"
+import { FeatureGrid } from "./blocks/FeatureGrid"
+
+const RENDERERS: Record<string, React.ComponentType<any>> = {
+  Hero,
+  FeatureGrid,
+}
+
+export function BlockRenderer({ block }: { block: BlockInstance }) {
+  const Component = RENDERERS[block.type]
+  if (!Component) return null
+  return <Component {...block.props} />
+}
+```
+
+Or use the SDK's `renderBlocks()` if you register renderers with the block system.
+
+## Using with a CMS
+
+Custom blocks work with any CMS adapter. The pattern is the same as default blocks:
+
+1. **Fetch**: Query your CMS → convert to `PageDoc` with `BlockInstance[]`
+2. **Publish**: Receive `PageDoc[]` → write back to your CMS
+3. **Image fields**: Use `imageFields` from your manifest (not `getImageFields()` from the shared registry)
+
+The `create-ai-site-editor` scaffold supports custom blocks — choose "Custom blocks" when prompted and it generates a stub manifest for you to fill in.
+
+## Mixing default and custom blocks
+
+You can use both default blocks and custom ones. Import `buildBlockManifest()` for the defaults and merge:
+
+```ts
+import { buildBlockManifest } from "@ai-site-editor/site-sdk/editor-manifest"
+import type { BlockManifest } from "@ai-site-editor/shared"
+
+const defaults = buildBlockManifest()
+
+const manifest: BlockManifest = {
+  version: 1,
+  blocks: [
+    ...defaults.blocks,
+    // Your custom blocks:
+    { type: "PricingTable", displayName: "Pricing", propsSchema: { ... }, defaultProps: { ... } },
+  ],
+}
+```
+
+## Checklist
+
+- [ ] Create `lib/manifest.ts` with your `BlockDefinition[]`
+- [ ] Pass `getManifest` to `createEditorApiHandler()`
+- [ ] Verify `/api/editor/blocks` returns your blocks
+- [ ] Content Studio header shows **Manifest** (not **Degraded**)
+- [ ] Add block picker shows your block types
+- [ ] AI can create, edit, and remove your blocks
+- [ ] Image fields are detected (check publish resolves images)

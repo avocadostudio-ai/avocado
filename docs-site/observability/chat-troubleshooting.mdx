@@ -1,6 +1,11 @@
+---
+title: "Chat Troubleshooting"
+description: "Playbook for investigating prompt failures, wrong operations, and regressions in the chat assistant."
+---
+
 # Chat Behavior Troubleshooting Playbook
 
-This playbook is for investigating prompt failures, wrong operations, and regressions in the site editor assistant.
+This playbook is for investigating prompt failures, wrong operations, and regressions in the site editor assistant. For background on the editing pipeline, see [How It Works](/how-it-works). For the full telemetry event reference, see [Chat Telemetry Events](/observability/chat-telemetry-events).
 
 ## What telemetry is captured
 
@@ -87,7 +92,7 @@ curl -s "http://127.0.0.1:4200/telemetry/chat/review?session=dev&limit=500" | jq
 
 Enable debug metadata directly in assistant response cards:
 
-1. Open editor settings (gear icon).
+1. Open Content Studio settings (gear icon).
 2. Enable `Debug mode`.
 3. Run the prompt and capture screenshot.
 
