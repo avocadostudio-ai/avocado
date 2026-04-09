@@ -54,11 +54,6 @@ const PuckChatPrototype = lazy(
 )
 const PUCK_ROUTE_PATHS = new Set(["/editor/puck", "/editor/puck/"])
 
-function isPuckRouteEnabled() {
-  const raw = (import.meta.env.VITE_ENABLE_PUCK as string | undefined)?.trim().toLowerCase() ?? ""
-  return raw === "1" || raw === "true" || raw === "yes" || raw === "on"
-}
-
 const MODEL_LABELS: Record<AIProvider, Record<ModelKey, string>> = {
   openai: { fast: "gpt-4o-mini", balanced: "gpt-4o", reasoning: "o1", codex: "o3" },
   anthropic: { fast: "Haiku", balanced: "Sonnet", reasoning: "Sonnet+Thinking", codex: "Opus" },
@@ -78,7 +73,7 @@ function selectionValue(provider: AIProvider, model: ModelKey) {
 export function App() {
   const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
   const isEditorPath = pathName === "/" || pathName === "/editor" || pathName === "/editor/"
-  const isPuckPrototype = PUCK_ROUTE_PATHS.has(pathName) && isPuckRouteEnabled()
+  const isPuckPrototype = PUCK_ROUTE_PATHS.has(pathName)
   const isSitesPage = pathName === "/sites" || pathName === "/sites/"
   const chatDarkMode = useEditorStore((s) => s.chatDarkMode)
   const setChatDarkMode = useEditorStore((s) => s.setChatDarkMode)

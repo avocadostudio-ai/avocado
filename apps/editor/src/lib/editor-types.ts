@@ -259,6 +259,7 @@ export type SiteConfig = {
   previewUrl?: string
   gdriveFolderId?: string
   cmsMedia?: CmsMediaConfig
+  enablePuck?: boolean
 }
 
 export type RestoreSnapshot = {
