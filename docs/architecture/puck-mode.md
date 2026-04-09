@@ -97,7 +97,7 @@ The API key never reaches the browser. The editor passes `agentModeEnabled: bool
 | Chat location | Left sidebar | Puck plugin, right sidebar |
 | Block editing | Custom form panel | Puck's native field sidebar |
 | Drag-and-drop | Custom drag handler | Puck's native DnD |
-| Publishing | Full publish flow | Draft-only |
+| Publishing | Full publish flow | Full publish flow (via usePublish hook) |
 | Route | `/editor` | `/editor/puck` (per-site flag) |
 
 ## Key API Endpoints
@@ -108,13 +108,14 @@ The API key never reaches the browser. The editor passes `agentModeEnabled: bool
 | `GET /draft/slugs` | List available pages |
 | `GET /draft/pages` | Fetch page by slug |
 | `POST /ops` | Apply operations |
+| `POST /publish` | Publish draft to production |
+| `GET /publish/status` | Poll deployment progress |
 | `GET /status/planner` | Check capabilities (incl. agentMode) |
 | `GET /api/editor/blocks` (site) | Block manifest |
 
 ## Known Gaps
 
-1. **No publish workflow** — `onPuckPublish()` only flushes to draft, no production publish
-2. **No live site preview** — renders in Puck canvas, not in the Next.js site iframe
-3. **No nested zones** — flat `content` array only, zone types hinted but unused
-4. **Image handling** — basic URL picker, no upload progress or validation
-5. **Drag state leak** — defensive code clears `panel-resizing` class on mount (workaround)
+1. **No live site preview** — renders in Puck canvas, not in the Next.js site iframe
+2. **No nested zones** — flat `content` array only, zone types hinted but unused
+3. **Image handling** — basic URL picker, no upload progress or validation
+4. **Drag state leak** — defensive code clears `panel-resizing` class on mount (workaround)
