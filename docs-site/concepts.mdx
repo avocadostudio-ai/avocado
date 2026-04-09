@@ -1,11 +1,11 @@
 ---
 title: "Core Concepts"
-description: "Key terms and mental model for understanding AI Site Editor."
+description: "Key terms and mental model for understanding Avocado Studio."
 ---
 
 ## Pages, Blocks, and Props
 
-AI Site Editor manages website content as structured data, not raw HTML.
+Avocado Studio manages website content as structured data, not raw HTML.
 
 - **Page** (`PageDoc`) — A single page on your website (e.g., `/about`, `/pricing`). Contains metadata (title, slug) and an ordered list of blocks.
 - **Block** (`BlockInstance`) — A content section on a page. Each block has a **type** (e.g., `Hero`, `CTA`, `FAQAccordion`) and **props** — the structured data that controls what it renders.
@@ -33,7 +33,7 @@ An **operation** is a structured, schema-validated edit action. When a user says
 }
 ```
 
-Operations are the unit of change in AI Site Editor. They can be:
+Operations are the unit of change in Avocado Studio. They can be:
 
 | Operation | What it does |
 |-----------|-------------|
@@ -74,7 +74,7 @@ Draft mode uses Next.js cookies under the hood. The Content Studio iframe sets t
 
 ## The Three Services
 
-AI Site Editor runs as three services that communicate via HTTP and postMessage:
+Avocado Studio runs as three services that communicate via HTTP and postMessage:
 
 | Service | Role | Tech |
 |---------|------|------|
