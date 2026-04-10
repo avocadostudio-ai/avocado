@@ -26,6 +26,12 @@
               "how-it-works",
               "architecture"
             ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/asset-picker"
+            ]
           }
         ]
       },
@@ -46,8 +52,7 @@
             "group": "Advanced",
             "pages": [
               "site-provider-spi",
-              "integration/tools-mvp",
-              "integration/asset-picker"
+              "integration/tools-mvp"
             ]
           }
         ]
