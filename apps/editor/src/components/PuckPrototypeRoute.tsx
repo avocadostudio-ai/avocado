@@ -66,6 +66,14 @@ const puckHostApi: PuckHostApi = {
   useMediaInput,
   renderFinalMarkdown,
   renderSimpleMarkdown,
+  setGlobalSelection: (selection) => {
+    // Puck mode tracks selection locally, but useChatEngine reads activeBlockId
+    // from the global Zustand store. Bridge Puck selection events into the store
+    // so referential prompts ("rewrite this") resolve to the selected block.
+    const state = useEditorStore.getState()
+    state.setActiveBlock(selection?.activeBlockId, selection?.activeBlockType)
+    state.setActiveEditablePath(selection?.activeEditablePath)
+  },
   agentModeEnabled: false, // Detected from /status/planner at runtime
 }
 
