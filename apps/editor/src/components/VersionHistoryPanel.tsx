@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
+import { ChevronDown } from "lucide-react"
 import { orchestrator } from "../lib/editor-utils"
 import { renderFinalMarkdown } from "../lib/markdown-renderer"
 import { useT } from "../i18n"
@@ -31,6 +32,10 @@ const SOURCE_LABELS: Record<string, string> = {
   restore: "Restore"
 }
 
+function formatOpType(opType: string): string {
+  return opType.replace(/_/g, " ")
+}
+
 function formatTime(iso: string): string {
   const d = new Date(iso)
   const now = new Date()
@@ -47,6 +52,16 @@ export function VersionHistoryPanel({ session, siteId, slug, visible, onRestore,
   const [entries, setEntries] = useState<VersionEntry[]>([])
   const [currentVersion, setCurrentVersion] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+
+  const toggleExpanded = useCallback((version: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(version)) next.delete(version)
+      else next.add(version)
+      return next
+    })
+  }, [])
 
   const fetchLog = useCallback(async () => {
     setIsLoading(true)
@@ -85,40 +100,74 @@ export function VersionHistoryPanel({ session, siteId, slug, visible, onRestore,
           <div className="version-history-empty">{t("history.empty")}</div>
         ) : (
           <ul className="version-history-list">
-            {[...entries].reverse().map((entry, idx) => (
-              <li
-                key={`${entry.version}-${idx}`}
-                className={`version-history-item ${entry.version === currentVersion ? "is-current" : ""}`}
-              >
-                <div className="version-history-item-header">
-                  <span className={`version-history-source version-history-source--${entry.source}`}>
-                    {SOURCE_LABELS[entry.source] ?? entry.source}
-                  </span>
-                  <span className="version-history-time">{formatTime(entry.at)}</span>
-                  {entry.version === currentVersion ? (
-                    <span className="version-history-current-label">{t("history.current")}</span>
-                  ) : onRestore ? (
-                    <button
-                      type="button"
-                      className="version-history-restore-btn"
-                      disabled={isRestoring}
-                      onClick={() => onRestore(entry.version)}
-                    >
-                      {isRestoring ? t("history.restoring") : t("history.restore")}
-                    </button>
-                  ) : null}
-                </div>
-                {entry.source !== "undo" && entry.source !== "redo" ? (
-                  <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
-                ) : null}
-                {entry.opCount > 0 ? (
-                  <div className="version-history-meta">
-                    {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
-                    {entry.slug !== "/" ? ` \u00b7 ${entry.slug}` : ""}
+            {[...entries].reverse().map((entry, idx) => {
+              const hasDetails = entry.opTypes.length > 0
+              const isExpanded = expanded.has(entry.version)
+              return (
+                <li
+                  key={`${entry.version}-${idx}`}
+                  className={`version-history-item ${entry.version === currentVersion ? "is-current" : ""}`}
+                >
+                  <div className="version-history-item-header">
+                    <span className={`version-history-source version-history-source--${entry.source}`}>
+                      {SOURCE_LABELS[entry.source] ?? entry.source}
+                    </span>
+                    <span className="version-history-time">{formatTime(entry.at)}</span>
+                    {entry.version === currentVersion ? (
+                      <span className="version-history-current-label">{t("history.current")}</span>
+                    ) : onRestore ? (
+                      <button
+                        type="button"
+                        className="version-history-restore-btn"
+                        disabled={isRestoring}
+                        onClick={() => onRestore(entry.version)}
+                      >
+                        {isRestoring ? t("history.restoring") : t("history.restore")}
+                      </button>
+                    ) : null}
                   </div>
-                ) : null}
-              </li>
-            ))}
+                  {entry.source !== "undo" && entry.source !== "redo" ? (
+                    <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
+                  ) : null}
+                  {entry.opCount > 0 ? (
+                    <div className="version-history-meta-row">
+                      <span className="version-history-meta">
+                        {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
+                        {entry.slug !== "/" ? ` \u00b7 ${entry.slug}` : ""}
+                      </span>
+                      {hasDetails ? (
+                        <button
+                          type="button"
+                          className={`version-history-expand-btn ${isExpanded ? "is-open" : ""}`}
+                          onClick={() => toggleExpanded(entry.version)}
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? t("history.hideDetails") : t("history.showDetails")}
+                          title={isExpanded ? t("history.hideDetails") : t("history.showDetails")}
+                        >
+                          <ChevronDown size={14} aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {hasDetails && isExpanded ? (
+                    <dl className="version-history-details">
+                      <dt>{t("history.version")}</dt>
+                      <dd>v{entry.version}</dd>
+                      <dt>{t("history.page")}</dt>
+                      <dd>{entry.slug}</dd>
+                      <dt>{t("history.changes")}</dt>
+                      <dd>
+                        <ul className="version-history-op-list">
+                          {entry.opTypes.map((opType, i) => (
+                            <li key={`${opType}-${i}`}>{formatOpType(opType)}</li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </dl>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
