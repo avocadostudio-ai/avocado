@@ -97,6 +97,12 @@ export type UsePublishResult = {
   publishStatus: { inspectUrl?: string } | null
 }
 
+export type PuckHostSelection = {
+  activeBlockId?: string
+  activeBlockType?: string
+  activeEditablePath?: string
+}
+
 export type PuckHostApi = {
   LEGACY_AVOCADO_SITE_ID: string
   LEGACY_AVOCADO_SITE_NAME: string
@@ -118,5 +124,6 @@ export type PuckHostApi = {
   useMediaInput: () => MediaInputHandlers
   renderFinalMarkdown: (text: string) => ReactNode
   renderSimpleMarkdown: (text: string) => ReactNode
+  setGlobalSelection: (selection?: PuckHostSelection) => void
   agentModeEnabled?: boolean
 }
