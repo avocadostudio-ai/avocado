@@ -2224,7 +2224,12 @@ textarea {
 .version-history-item {
   padding: 10px 16px;
   border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--line);
   transition: background 0.12s;
+}
+
+.version-history-item:last-child {
+  border-bottom: 0;
 }
 
 .version-history-item:hover {
