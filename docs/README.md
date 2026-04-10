@@ -30,6 +30,7 @@ Start here if you want to add AI-powered editing to your website.
 
 | Doc | Description |
 |-----|-------------|
+| [Docker Deployment](operations/docker-deployment.md) | Deploy the orchestrator as a Docker image |
 | [Vercel Deployment](operations/vercel-deployment.md) | Deploy site and Content Studio to Vercel |
 | [Netlify Deployment](operations/netlify-deployment.md) | Deploy site and Content Studio to Netlify |
 | [Dev Server Runbook](operations/dev-server-runbook.md) | Local dev server setup and troubleshooting |
