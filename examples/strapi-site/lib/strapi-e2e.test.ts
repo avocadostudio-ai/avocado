@@ -13,6 +13,7 @@
 import test, { describe, before, after } from "node:test"
 import assert from "node:assert/strict"
 import type { PageDoc } from "@ai-site-editor/shared"
+import type { PublishContext } from "@ai-site-editor/site-sdk/routes"
 
 // ---------------------------------------------------------------------------
 // Env / skip guard
@@ -79,7 +80,11 @@ async function deleteStrapiPage(slug: string) {
 // ---------------------------------------------------------------------------
 
 // Dynamically import to avoid top-level STRAPI_URL throw when env is missing
-let publish: (pages: PageDoc[], config: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>
+let publish: (
+  pages: PageDoc[],
+  config: Record<string, unknown>,
+  context?: PublishContext,
+) => Promise<{ ok: boolean; error?: string }>
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -299,7 +304,8 @@ describe("strapi-e2e: publish round-trip", { timeout: 30_000 }, () => {
     // Verify the image was uploaded to Strapi media and linked to the block
     const cms = await findStrapiPage(TEST_SLUG_IMAGE)
     assert.ok(cms, "page not found in Strapi after publish")
-    const hero = cms.blocks?.[0] as Record<string, unknown> | undefined
+    const cmsBlocks = cms.blocks as Array<Record<string, unknown>> | undefined
+    const hero = cmsBlocks?.[0]
     assert.ok(hero, "hero block missing")
     assert.equal(hero.__component, "blocks.hero")
 
@@ -343,7 +349,8 @@ describe("strapi-e2e: publish round-trip", { timeout: 30_000 }, () => {
 
     // Capture the media URL
     const cms1 = await findStrapiPage(TEST_SLUG_IMAGE)
-    const media1 = cms1?.blocks?.[0]?.imageUrl as { url?: string } | null
+    const cms1Blocks = cms1?.blocks as Array<Record<string, unknown>> | undefined
+    const media1 = cms1Blocks?.[0]?.imageUrl as { url?: string } | null
     assert.ok(media1?.url, "initial publish should have created media")
 
     // Re-publish with an unresolvable image (placeholder SVG) — media should be preserved
@@ -363,7 +370,8 @@ describe("strapi-e2e: publish round-trip", { timeout: 30_000 }, () => {
     assert.ok(r2.ok, `re-publish failed: ${r2.error}`)
 
     const cms2 = await findStrapiPage(TEST_SLUG_IMAGE)
-    const media2 = cms2?.blocks?.[0]?.imageUrl as { url?: string } | null
+    const cms2Blocks = cms2?.blocks as Array<Record<string, unknown>> | undefined
+    const media2 = cms2Blocks?.[0]?.imageUrl as { url?: string } | null
     assert.ok(media2?.url, "existing media should be preserved, not voided")
     assert.equal(media2!.url, media1!.url, "media URL should be unchanged after re-publish")
   })
