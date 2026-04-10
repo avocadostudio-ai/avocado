@@ -1,9 +1,9 @@
-const STRAPI_URL = process.env.STRAPI_URL?.trim().replace(/\/+$/, "")
-if (!STRAPI_URL) throw new Error("STRAPI_URL is required")
+const rawStrapiUrl = process.env.STRAPI_URL?.trim().replace(/\/+$/, "")
+if (!rawStrapiUrl) throw new Error("STRAPI_URL is required")
+/** Base URL for the Strapi instance, guaranteed non-empty at module load. */
+export const STRAPI_URL: string = rawStrapiUrl
 
 const STRAPI_TOKEN = process.env.STRAPI_API_TOKEN?.trim()
-
-export { STRAPI_URL }
 
 /** Fetch from Strapi REST API with auth header */
 export async function strapiFetch<T = unknown>(
