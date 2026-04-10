@@ -58,6 +58,7 @@
             "group": "Deploy",
             "pages": [
               "operations/dev-server-runbook",
+              "operations/docker-deployment",
               "operations/vercel-deployment",
               "operations/netlify-deployment"
             ]

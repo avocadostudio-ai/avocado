@@ -121,6 +121,7 @@ The full documentation site is in [`docs-site/`](docs-site/) (built with [Mintli
 | Integrate into your website | [docs/integration/](docs/integration/README.md) |
 | Custom blocks | [docs/integration/custom-blocks.md](docs/integration/custom-blocks.md) |
 | Site SDK reference | [packages/site-sdk/](packages/site-sdk/README.md) |
+| Deploy the orchestrator with Docker | [docs/operations/docker-deployment.md](docs/operations/docker-deployment.md) |
 | Deploy to Vercel | [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md) |
 | Deploy to Netlify | [docs/operations/netlify-deployment.md](docs/operations/netlify-deployment.md) |
 | Dev server runbook | [docs/operations/dev-server-runbook.md](docs/operations/dev-server-runbook.md) |
