@@ -88,6 +88,13 @@ The planner loop supports:
 
 ### Option A: Runtime registration endpoint
 
+<Note>
+**Status: Future roadmap — not yet implemented.** The `GET /tools` and
+`POST /tools/register` endpoints described below are not wired up in the
+orchestrator today. Use Option B (bootstrap config file via
+`ORCHESTRATOR_TOOL_MANIFEST_PATH`) for now.
+</Note>
+
 - `GET /tools` to view enabled tools
 - `POST /tools/register` to register a remote tool
 

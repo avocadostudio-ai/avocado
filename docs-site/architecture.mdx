@@ -5,7 +5,7 @@ description: "How the three services, packages, and data flow fit together."
 
 ## System Overview
 
-Avocado Studio is a pnpm monorepo with three apps and four packages:
+Avocado Studio is a pnpm monorepo with four apps and eight packages:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -42,19 +42,21 @@ Avocado Studio is a pnpm monorepo with three apps and four packages:
 When a user sends a message in the Content Studio, here's what happens:
 
 ```
-1. Content Studio → Orchestrator  POST /chat/stream (user message + page context)
-2. Orchestrator → LLM             Sends prompt with block schemas + page state
-3. LLM → Orchestrator             Returns structured edit plan (JSON)
-4. Orchestrator                   Validates operations against Zod schemas
-5. Orchestrator → Content Studio  Streams plan + results via SSE
-6. Orchestrator → Site            Notifies draft content updated
-7. Site                           Re-fetches draft, re-renders blocks
-8. Site → Content Studio          postMessage confirms preview updated
+1. Content Studio → Orchestrator  POST /chat/start (user message + page context)
+                                   → returns streamId
+2. Content Studio → Orchestrator  GET /chat/stream?streamId=… (SSE subscribe)
+3. Orchestrator → LLM             Sends prompt with block schemas + page state
+4. LLM → Orchestrator             Returns structured edit plan (JSON)
+5. Orchestrator                   Validates operations against Zod schemas
+6. Orchestrator → Content Studio  Streams plan + results via SSE
+7. Orchestrator → Site            Bumps draft version
+8. Site                           Re-fetches draft, re-renders blocks
+9. Site → Content Studio          postMessage confirms preview updated
 ```
 
 ## Packages
 
-The monorepo includes four shared packages:
+The monorepo includes eight shared packages:
 
 | Package | Purpose |
 |---------|---------|
@@ -62,6 +64,10 @@ The monorepo includes four shared packages:
 | `@ai-site-editor/blocks` | 20 built-in block renderers (Hero, CTA, FAQ, Gallery, etc.). Each block is a React component with a typed Zod schema. |
 | `@ai-site-editor/preview-adapter` | PreviewBridge component that runs inside the site iframe. Handles postMessage communication with the Content Studio, block selection overlays, and CSS highlights. |
 | `@ai-site-editor/site-sdk` | SDK for integrating AI editing into any Next.js 15+ site. Provides route handlers, draft mode utilities, and content resolution for the Content Studio. |
+| `@ai-site-editor/editor-puck` | Puck-based visual drag-and-drop editor, including the chat sidebar prototype. Generates the same ops as chat mode and publishes via the orchestrator. |
+| `create-ai-site-editor` | CLI scaffolder that generates a Next.js site wired to the orchestrator (editor API routes, block manifest, draft mode, optional CMS template). |
+| `@ai-site-editor/migration-sdk` | Utilities for migrating existing content into the PageDoc / BlockInstance shape. |
+| `@ai-site-editor/immersive-widget` | Embeddable widget used for immersive / full-bleed block experiences. |
 
 ## Communication Protocols
 
@@ -69,10 +75,13 @@ The monorepo includes four shared packages:
 
 The Content Studio communicates with the orchestrator via REST API and Server-Sent Events:
 
-- `POST /chat/stream` — Send a user message, receive streamed edit plan
+- `POST /chat/start` — Start a streamed run, returns a `streamId`
+- `GET /chat/stream?streamId=…` — Subscribe to the stream via SSE
+- `POST /chat` — Non-streaming variant (immediate response)
 - `GET /draft/pages` — Fetch current draft page state
-- `POST /ops/undo`, `/ops/redo` — Undo/redo operations
-- `POST /publish/content` — Publish draft to production
+- `POST /ops` — Apply hand-authored operations (bypassing the planner)
+- `POST /history/undo`, `POST /history/redo` — Undo/redo operations
+- `POST /publish` — Publish draft to production
 
 ### Content Studio ↔ Site: postMessage
 
