@@ -50,14 +50,22 @@ Validated operations are applied to the draft page state in order. Each operatio
 
 ### Step 5: Stream to Content Studio
 
-The orchestrator streams results back to the Content Studio via Server-Sent Events (SSE):
+The orchestrator streams results back to the Content Studio via Server-Sent Events (SSE). The main events are:
 
 ```
-event: plan_generated     → Content Studio shows the proposed changes
-event: op_applied         → Each operation applied (progressive UI updates)
-event: preview_updated    → Site iframe refreshes with new content
-event: images_resolved    → Background images patched in (if deferred)
+event: op_candidate    → An operation parsed from the LLM's streaming response
+event: plan_meta       → Plan metadata (status, intent, opCount)
+event: op_applied      → Each operation successfully applied (progressive UI updates)
+event: image_progress  → Image resolution updates (when image lookup is deferred)
+event: final           → Final result, including summary_for_user and change log
 ```
+
+Other events emitted on the same stream include `field_draft`, `summary_token`,
+`changelog_entry`, `op_skipped`, `rollback_started` / `rollback_done`, `status`,
+`heartbeat`, `error`, and `canceled`.
+
+There is no dedicated `preview_updated` event — preview refresh is driven by the
+draft version bump described in Step 6.
 
 The user sees changes appearing progressively — not a loading spinner followed by a wall of changes.
 
