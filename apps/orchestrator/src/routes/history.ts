@@ -7,10 +7,12 @@ import {
   getPage,
   setPage,
   removePage,
+  pushUndo,
   bumpVersion,
   pushVersionEntry,
   getVersionLog,
   versions,
+  versionLog,
   schedulePersistState
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
@@ -30,7 +32,8 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     if (!query.session) return reply.code(400).send({ error: "session is required" })
     const session = scopedSessionKey(query.session, query.siteId)
     const limit = query.limit ? Math.min(parseInt(query.limit, 10) || 50, 100) : 50
-    const entries = getVersionLog(session, query.slug, limit)
+    // Strip snapshots from the response to keep payloads small.
+    const entries = getVersionLog(session, query.slug, limit).map(({ snapshot: _snapshot, ...rest }) => rest)
     const currentVersion = versions.get(session) ?? 0
     return { entries, currentVersion }
   })
@@ -61,14 +64,14 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     if (prev === null) {
       removePage(session, body.slug)
       const previewVersion = bumpVersion(session)
-      pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Undo", opTypes: [], opCount: 0, source: "undo" })
+      pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Undo", opTypes: [], opCount: 0, source: "undo", snapshot: null })
       schedulePersistState(app.log)
       return { status: "applied", previewVersion, navigateToSlug: "/", canUndo: list.length > 0, canRedo: true }
     }
 
     setPage(session, structuredClone(prev))
     const previewVersion = bumpVersion(session)
-    pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Undo", opTypes: [], opCount: 0, source: "undo" })
+    pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Undo", opTypes: [], opCount: 0, source: "undo", snapshot: structuredClone(prev) })
     schedulePersistState(app.log)
 
     // If the current page doesn't exist (was deleted), navigate to the restored page
@@ -102,14 +105,14 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     if (next === null) {
       removePage(session, body.slug)
       const previewVersion = bumpVersion(session)
-      pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Redo", opTypes: [], opCount: 0, source: "redo" })
+      pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Redo", opTypes: [], opCount: 0, source: "redo", snapshot: null })
       schedulePersistState(app.log)
       return { status: "applied", previewVersion, navigateToSlug: "/", canUndo: true, canRedo: list.length > 0 }
     }
 
     setPage(session, structuredClone(next))
     const previewVersion = bumpVersion(session)
-    pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Redo", opTypes: [], opCount: 0, source: "redo" })
+    pushVersionEntry(session, { version: previewVersion, slug: body.slug, summary: "Redo", opTypes: [], opCount: 0, source: "redo", snapshot: structuredClone(next) })
     schedulePersistState(app.log)
 
     // If the current page doesn't exist (was deleted), navigate to the restored page
@@ -118,65 +121,63 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     return { status: "applied", previewVersion, canUndo: true, canRedo: list.length > 0, ...(navigateToSlug ? { navigateToSlug } : {}) }
   })
 
+  /**
+   * Restore the live state to any prior version by directly applying the
+   * snapshot stored on the target VersionEntry. Independent of undo/redo
+   * stacks — this enables true back-and-forth navigation: every entry in
+   * the log remains restorable even after jumping to another entry.
+   *
+   * The restore is itself an edit: the current state is pushed onto the
+   * undo stack (so Ctrl+Z undoes the restore), and a new `restore` entry
+   * is appended to the version log with its own snapshot.
+   */
   app.post("/history/restore", async (request, reply) => {
-    const body = request.body as { session?: string; siteId?: string; slug?: string; targetVersion: number }
-    if (!body.session || !body.slug || typeof body.targetVersion !== "number") {
-      return reply.code(400).send({ error: "session, slug, and targetVersion are required" })
+    const body = request.body as { session?: string; siteId?: string; targetVersion?: number }
+    if (!body.session || typeof body.targetVersion !== "number") {
+      return reply.code(400).send({ error: "session and targetVersion are required" })
     }
     const session = scopedSessionKey(body.session, body.siteId)
-    const currentVersion = versions.get(session) ?? 0
-    if (body.targetVersion >= currentVersion) {
-      return reply.code(400).send({ error: "targetVersion must be less than current version" })
+
+    const log = versionLog.get(session) ?? []
+    const target = log.find((e) => e.version === body.targetVersion)
+    if (!target) {
+      return reply.code(404).send({ error: "target version not found" })
+    }
+    if (target.snapshot === undefined) {
+      return reply.code(400).send({ error: "target version has no restorable snapshot (legacy entry)" })
     }
 
-    const undoMap = getHistoryMap(historyUndo, session)
-    const redoMap = getHistoryMap(historyRedo, session)
-    let stepsRestored = 0
+    // Save current state to the target slug's undo stack so Ctrl+Z undoes the
+    // restore. pushUndo also clears the redo stack — that's fine, since a
+    // restore is effectively a new branch.
+    const current = getPage(session, target.slug)
+    pushUndo(session, target.slug, current)
 
-    // Replay undo operations until we reach the target version
-    while ((versions.get(session) ?? 0) > body.targetVersion) {
-      const list = undoMap.get(body.slug) ?? []
-      if (list.length === 0) break
-
-      const current = getPage(session, body.slug)
-      const prev = list.pop()
-      undoMap.set(body.slug, list)
-      if (prev === undefined) break
-
-      const redoList = redoMap.get(body.slug) ?? []
-      redoList.push(current ? structuredClone(current) : null as any)
-      redoMap.set(body.slug, redoList)
-
-      if (prev === null) {
-        removePage(session, body.slug)
-      } else {
-        setPage(session, structuredClone(prev))
-      }
-      bumpVersion(session)
-      stepsRestored++
+    // Directly apply the target snapshot.
+    if (target.snapshot === null) {
+      removePage(session, target.slug)
+    } else {
+      setPage(session, structuredClone(target.snapshot))
     }
 
-    if (stepsRestored === 0) {
-      return reply.code(400).send({ error: "could not restore to target version" })
-    }
-
-    const previewVersion = versions.get(session) ?? 0
+    const previewVersion = bumpVersion(session)
     pushVersionEntry(session, {
       version: previewVersion,
-      slug: body.slug,
+      slug: target.slug,
       summary: `Restored to v${body.targetVersion}`,
       opTypes: [],
       opCount: 0,
-      source: "restore"
+      source: "restore",
+      snapshot: target.snapshot === null ? null : structuredClone(target.snapshot)
     })
     schedulePersistState(app.log)
 
-    const undoList = undoMap.get(body.slug) ?? []
-    const redoList = redoMap.get(body.slug) ?? []
+    const undoList = getHistoryMap(historyUndo, session).get(target.slug) ?? []
+    const redoList = getHistoryMap(historyRedo, session).get(target.slug) ?? []
     return {
       status: "applied",
       previewVersion,
-      stepsRestored,
+      navigateToSlug: target.slug,
       canUndo: undoList.length > 0,
       canRedo: redoList.length > 0
     }

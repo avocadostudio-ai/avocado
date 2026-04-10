@@ -105,13 +105,16 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
         pushRecentEdit(session, { slug: updatedSlug ?? firstSlugOp.pageSlug, summary: "Applied operations.", ops: parsedOps.data })
       }
       const previewVersion = bumpVersion(session)
+      const versionEntrySlug = updatedSlug ?? (firstSlugOp && "pageSlug" in firstSlugOp ? firstSlugOp.pageSlug as string : "/")
+      const versionSnapshot = getPage(session, versionEntrySlug)
       pushVersionEntry(session, {
         version: previewVersion,
-        slug: updatedSlug ?? (firstSlugOp && "pageSlug" in firstSlugOp ? firstSlugOp.pageSlug as string : "/"),
+        slug: versionEntrySlug,
         summary: "Applied operations.",
         opTypes: parsedOps.data.map((op) => op.op),
         opCount: parsedOps.data.length,
-        source: "direct"
+        source: "direct",
+        snapshot: versionSnapshot ? structuredClone(versionSnapshot) : null
       })
       schedulePersistState(app.log)
       const focusBlockId = pickFocusBlockId(parsedOps.data)
