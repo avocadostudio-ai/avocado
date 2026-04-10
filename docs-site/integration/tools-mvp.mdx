@@ -11,7 +11,9 @@ This document defines the tool contract and onboarding flow for connecting exter
 
 - MVP provider path: Anthropic tool use only.
 - Runtime is provider-neutral internally so OpenAI Responses tools can be added later.
-- Built-in tool shipped in MVP: `unsplash.search`.
+- Built-in tools shipped in MVP:
+  - `unsplash.search` — licensed photo search (see schema below).
+  - `image.generate` — AI image generation via OpenAI (`gpt-image-1`) or Google Gemini (`gemini-2.5-flash-image`, nicknamed "nano-banana"). Full reference: [Asset Picker & AI Images](/integration/asset-picker#imagegenerate-tool-chat-pipeline-path).
 
 ## Internal Tool Contract
 
