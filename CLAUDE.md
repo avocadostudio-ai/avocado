@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code when working with code in this repository.
 
+## Documentation conventions
+
+- **Diagrams in docs**: use Mermaid (```mermaid code blocks). The Mintlify
+  docs site at `docs-site/` renders Mermaid natively. Do not use ASCII art
+  for diagrams.
+
 ## Commands
 
 ```bash
