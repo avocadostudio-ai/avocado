@@ -118,10 +118,16 @@ export async function getStrapiSiteConfig(): Promise<SiteConfig> {
   try {
     const res = await strapiFetch<StrapiResponse<StrapiItem>>("/site-config?populate=*")
     if (!res.data) return {}
+    const rawConstraints = res.data.constraints
     return {
       name: (res.data.name as string) || undefined,
       logo: (res.data.logo as string) || undefined,
+      purpose: (res.data.purpose as string) || undefined,
+      tone: (res.data.tone as string) || undefined,
+      constraints: Array.isArray(rawConstraints) ? (rawConstraints as string[]) : undefined,
       navLabels: (res.data.navLabels as Record<string, string>) || undefined,
+      navGroups: (res.data.navGroups as Record<string, string[]>) || undefined,
+      themeOverrides: (res.data.themeOverrides as Record<string, string>) || undefined,
     }
   } catch {
     return {}

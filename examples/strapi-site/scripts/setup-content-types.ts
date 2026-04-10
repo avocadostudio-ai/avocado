@@ -154,7 +154,12 @@ writeFileSync(resolve(configDir, "schema.json"), JSON.stringify({
   attributes: {
     name: { type: "string" },
     logo: { type: "string" },
+    purpose: { type: "text" },
+    tone: { type: "text" },
+    constraints: { type: "json" },
     navLabels: { type: "json" },
+    navGroups: { type: "json" },
+    themeOverrides: { type: "json" },
   },
 }, null, 2) + "\n")
 console.log("  Created: site-config")
