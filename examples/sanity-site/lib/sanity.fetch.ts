@@ -21,9 +21,9 @@ function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {
     if (value === null || value === undefined) continue // skip nulls (Sanity returns null for absent fields)
     if (imgFields.has(key)) {
       props[key] = sanityImageUrl(value)
-    } else if (listImageFields.has(key) && Array.isArray(value)) {
-      // Resolve image refs within list items (Gallery.images, Carousel.items, etc.)
-      const itemImageKeys = listImageFields.get(key)!
+    } else if (listImgFields.has(key) && Array.isArray(value)) {
+      // Resolve image refs within list items (Gallery.items, Carousel.items, Testimonials.items, etc.)
+      const itemImageKeys = listImgFields.get(key)!
       props[key] = value.map((item: Record<string, unknown>) => {
         const resolved: Record<string, unknown> = {}
         for (const [ik, iv] of Object.entries(item)) {
@@ -91,15 +91,41 @@ export async function getSanityPages(): Promise<PageDoc[]> {
 export async function getSanitySiteConfig(): Promise<SiteConfig> {
   const doc = await client.fetch<Record<string, unknown> | null>(siteConfigQuery)
   if (!doc) return {}
-  // Transform navLabels from Sanity array [{slug, label}] to Record<string, string>
+
+  // Sanity stores records-of-strings as arrays of key/value objects so Studio can edit them.
+  // Transform back to Record<string, X> at the read boundary.
   const rawLabels = doc.navLabels as Array<{ slug?: string; label?: string }> | undefined
   const navLabels = Array.isArray(rawLabels) && rawLabels.length > 0
     ? Object.fromEntries(rawLabels.filter((l) => l.slug && l.label).map((l) => [l.slug!, l.label!]))
     : undefined
 
+  const rawGroups = doc.navGroups as Array<{ label?: string; slugs?: string[] }> | undefined
+  const navGroups = Array.isArray(rawGroups) && rawGroups.length > 0
+    ? Object.fromEntries(
+        rawGroups
+          .filter((g) => g.label && Array.isArray(g.slugs) && g.slugs.length > 0)
+          .map((g) => [g.label!, g.slugs!]),
+      )
+    : undefined
+
+  const rawTheme = doc.themeOverrides as Array<{ key?: string; value?: string }> | undefined
+  const themeOverrides = Array.isArray(rawTheme) && rawTheme.length > 0
+    ? Object.fromEntries(rawTheme.filter((t) => t.key && t.value).map((t) => [t.key!, t.value!]))
+    : undefined
+
+  const rawConstraints = doc.constraints
+  const constraints = Array.isArray(rawConstraints) && rawConstraints.length > 0
+    ? (rawConstraints as string[]).filter((c) => typeof c === "string")
+    : undefined
+
   return {
     name: (doc.name as string) || undefined,
     logo: (doc.logo as string) || undefined,
+    purpose: (doc.purpose as string) || undefined,
+    tone: (doc.tone as string) || undefined,
+    constraints,
     navLabels,
+    navGroups,
+    themeOverrides,
   }
 }
