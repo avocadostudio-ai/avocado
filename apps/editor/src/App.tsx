@@ -193,24 +193,6 @@ function EditorPage({
   const setActiveTab = useEditorStore((s) => s.setActiveTab)
 
   const [isRestoring, setIsRestoring] = useState(false)
-  async function restoreToVersion(targetVersion: number) {
-    setIsRestoring(true)
-    try {
-      const res = await fetch(`${orchestrator}/history/restore`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session, siteId, slug, targetVersion })
-      })
-      const data = (await res.json()) as { status?: string; previewVersion?: number; canUndo?: boolean; canRedo?: boolean }
-      if (data.status === "applied") {
-        preview.postToSite("draftUpdated", { focusBlockId: null })
-      }
-    } catch {
-      // Best-effort
-    } finally {
-      setIsRestoring(false)
-    }
-  }
 
   const [showSiteSwitcher, setShowSiteSwitcher] = useState(false)
   const siteSwitcherRef = useRef<HTMLDivElement>(null)
@@ -497,6 +479,32 @@ function EditorPage({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount per siteId
   }, [siteId])
+
+  async function restoreToVersion(targetVersion: number) {
+    setIsRestoring(true)
+    try {
+      const res = await fetch(`${orchestrator}/history/restore`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, targetVersion })
+      })
+      const data = (await res.json()) as { status?: string; previewVersion?: number; navigateToSlug?: string; canUndo?: boolean; canRedo?: boolean }
+      if (data.status === "applied") {
+        // Navigate to the target slug if it's different from the current page
+        if (typeof data.navigateToSlug === "string" && data.navigateToSlug.length > 0 && data.navigateToSlug !== slug) {
+          setSlug(data.navigateToSlug)
+        }
+        // Refresh undo/redo state to reflect the post-restore stack
+        if (typeof data.canUndo === "boolean") chatEngine.setCanUndoServer?.(data.canUndo)
+        if (typeof data.canRedo === "boolean") chatEngine.setCanRedoServer?.(data.canRedo)
+        preview.postToSite("draftUpdated", { focusBlockId: null })
+      }
+    } catch {
+      // Best-effort
+    } finally {
+      setIsRestoring(false)
+    }
+  }
 
   const publish = usePublish(session, siteId, isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin, () => {
     preview.postToSite("draftUpdated", { focusBlockId: null })
