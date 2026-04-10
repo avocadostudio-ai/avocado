@@ -1,6 +1,7 @@
 import { PuckChatPrototype, type PuckHostApi } from "@ai-site-editor/editor-puck"
 import { ChatComposerCore } from "./ChatSurface"
 import { ImagePickerModal } from "./ImagePickerModal"
+import { VersionHistoryPanel } from "./VersionHistoryPanel"
 import { useChatEngine } from "../hooks/useChatEngine"
 import { usePublish } from "../hooks/usePublish"
 import { useEditorStore } from "../store"
@@ -45,6 +46,20 @@ const puckHostApi: PuckHostApi = {
     const streamSteps = useEditorStore((s) => s.streamSteps)
     const streamingChanges = useEditorStore((s) => s.streamingChanges)
     return { ...actions, chatLog, isLoading, streamStatus, streamingText, streamSteps, streamingChanges }
+  },
+  VersionHistoryPanel,
+  restoreToVersion: async (session: string, siteId: string, slug: string, targetVersion: number) => {
+    try {
+      const res = await fetch(`${orchestrator}/history/restore`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ session, siteId, slug, targetVersion })
+      })
+      const data = (await res.json()) as { status?: string }
+      return data.status === "applied"
+    } catch {
+      return false
+    }
   },
   ImagePickerModal,
   ChatComposerCore,

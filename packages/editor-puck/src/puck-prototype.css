@@ -365,3 +365,24 @@
 .puck-publish-link:hover {
   text-decoration: underline;
 }
+
+/* Undo/redo buttons in Puck header */
+.puck-poc-header-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--puck-color-grey-04, #555);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+.puck-poc-header-btn:hover:not(:disabled) {
+  background: var(--puck-color-grey-11, #f5f5f5);
+}
+.puck-poc-header-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

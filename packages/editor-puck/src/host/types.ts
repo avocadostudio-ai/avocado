@@ -20,6 +20,19 @@ export type UseChatEngineResult = {
   submitChat: (prompt: string) => Promise<void>
   cancelChat: () => Promise<void> | void
   applyUndoHistory: (entryId: string) => Promise<void>
+  canUndoServer: boolean
+  canRedoServer: boolean
+  applyGlobalUndo: () => Promise<void>
+  applyGlobalRedo: () => Promise<void>
+}
+
+export type VersionHistoryPanelProps = {
+  session: string
+  siteId: string
+  slug: string
+  visible: boolean
+  onRestore?: (targetVersion: number) => void
+  isRestoring?: boolean
 }
 
 export type MediaInputHandlers = {
@@ -98,6 +111,8 @@ export type PuckHostApi = {
   orchestrator: string
   useChatEngine: (args: any) => UseChatEngineResult
   usePublish: (session: string, siteId: string, isLoading: boolean) => UsePublishResult
+  VersionHistoryPanel: (props: VersionHistoryPanelProps) => ReactNode
+  restoreToVersion: (session: string, siteId: string, slug: string, targetVersion: number) => Promise<boolean>
   ImagePickerModal: (props: any) => ReactNode
   ChatComposerCore: (props: any) => ReactNode
   useMediaInput: () => MediaInputHandlers
