@@ -3,7 +3,7 @@ import { Puck, blocksPlugin, fieldsPlugin, outlinePlugin } from "@puckeditor/cor
 import "@puckeditor/core/puck.css"
 import "@ai-site-editor/blocks/styles.css"
 import "../puck-prototype.css"
-import { BotMessageSquare } from "lucide-react"
+import { BotMessageSquare, History, Redo2, Undo2 } from "lucide-react"
 import { FALLBACK_SESSION, FALLBACK_SLUG } from "./puck/constants"
 import { createPuckConfig } from "./puck/createPuckConfig"
 import { PuckChatContextProvider } from "./puck/PuckChatContext"
@@ -270,6 +270,18 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     await publish.publishSite()
   }, [flushPendingPersist, puckData, setPuckData, publish])
 
+  const flushThenHistory = useCallback(async (direction: "undo" | "redo") => {
+    // Cancel pending debounce and flush pending ops before applying server-side history action.
+    if (typeof window !== "undefined" && persistTimerRef.current !== null) {
+      window.clearTimeout(persistTimerRef.current)
+      persistTimerRef.current = null
+    }
+    await flushPendingPersist()
+    if (direction === "undo") await chatEngine.applyGlobalUndo()
+    else await chatEngine.applyGlobalRedo()
+    // useUndoHistory calls postToSite("draftUpdated") which triggers syncDraftPage via usePuckSiteSync.
+  }, [flushPendingPersist, chatEngine])
+
   useEffect(() => {
     latestPuckDataRef.current = puckData ?? null
   }, [puckData])
@@ -302,6 +314,26 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          className="puck-poc-header-btn"
+          disabled={!chatEngine.canUndoServer || headerBusy}
+          onClick={() => void flushThenHistory("undo")}
+          title="Undo (Ctrl+Z)"
+          aria-label="Undo"
+        >
+          <Undo2 size={16} />
+        </button>
+        <button
+          type="button"
+          className="puck-poc-header-btn"
+          disabled={!chatEngine.canRedoServer || headerBusy}
+          onClick={() => void flushThenHistory("redo")}
+          title="Redo (Ctrl+Y)"
+          aria-label="Redo"
+        >
+          <Redo2 size={16} />
+        </button>
         {publish.publishStatus?.inspectUrl ? (
           <a className="puck-publish-link" href={publish.publishStatus.inspectUrl} target="_blank" rel="noreferrer">
             View deploy
@@ -310,7 +342,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
         {children}
       </>
     )
-  }), [availableSlugs, headerBusy, slug, publish.publishStatus])
+  }), [availableSlugs, headerBusy, slug, publish.publishStatus, chatEngine.canUndoServer, chatEngine.canRedoServer, flushThenHistory])
 
   const chatPlugin = useMemo(() => ({
     name: "ai-site-editor-chat",
@@ -319,12 +351,48 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     render: () => <PuckChatPluginPanelFromContext />
   }), [])
 
+  const [isRestoring, setIsRestoring] = useState(false)
+  const onRestoreVersion = useCallback(async (targetVersion: number) => {
+    setIsRestoring(true)
+    try {
+      // Flush any pending ops before restore so we don't race with autosave.
+      if (typeof window !== "undefined" && persistTimerRef.current !== null) {
+        window.clearTimeout(persistTimerRef.current)
+        persistTimerRef.current = null
+      }
+      await flushPendingPersist()
+      const ok = await hostApi.restoreToVersion(session, siteId, slugRef.current, targetVersion)
+      if (ok) {
+        await syncDraftPage(slugRef.current)
+      }
+    } finally {
+      setIsRestoring(false)
+    }
+  }, [flushPendingPersist, hostApi, session, siteId, syncDraftPage])
+
+  const historyPlugin = useMemo(() => ({
+    name: "ai-site-editor-history",
+    label: "History",
+    icon: <History size={24} />,
+    render: () => (
+      <hostApi.VersionHistoryPanel
+        session={session}
+        siteId={siteId}
+        slug={slug}
+        visible={true}
+        onRestore={onRestoreVersion}
+        isRestoring={isRestoring}
+      />
+    )
+  }), [hostApi, session, siteId, slug, onRestoreVersion, isRestoring])
+
   const puckPlugins = useMemo(() => ([
     chatPlugin,
+    historyPlugin,
     blocksPlugin(),
     outlinePlugin(),
     fieldsPlugin({ desktopSideBar: "right" }),
-  ]), [chatPlugin])
+  ]), [chatPlugin, historyPlugin])
 
   const chatContextValue = useMemo<ChatPanelProps>(() => ({
     session,
