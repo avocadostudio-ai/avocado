@@ -328,6 +328,7 @@ export function useSiteList(siteId: string, session: string) {
               ...(patch.name !== undefined ? { name: patch.name } : {}),
               ...(patch.purpose !== undefined ? { purpose: patch.purpose } : {}),
               ...(patch.hosting !== undefined ? { hosting: patch.hosting } : {}),
+              ...(patch.previewUrl !== undefined ? { previewUrl: patch.previewUrl } : {}),
               ...(patch.vercelProjectId !== undefined ? { vercelProjectId: patch.vercelProjectId } : {}),
               ...(patch.vercelTeamId !== undefined ? { vercelTeamId: patch.vercelTeamId } : {}),
               ...(patch.vercelProductionUrl !== undefined ? { vercelProductionUrl: patch.vercelProductionUrl } : {}),
@@ -336,7 +337,8 @@ export function useSiteList(siteId: string, session: string) {
               ...(patch.constraints !== undefined ? { constraints: patch.constraints } : {}),
               ...(patch.pageTemplates !== undefined ? { pageTemplates: patch.pageTemplates } : {}),
               ...(patch.gdriveFolderId !== undefined ? { gdriveFolderId: patch.gdriveFolderId } : {}),
-              ...(patch.cmsMedia !== undefined ? { cmsMedia: patch.cmsMedia } : {})
+              ...(patch.cmsMedia !== undefined ? { cmsMedia: patch.cmsMedia } : {}),
+              ...(patch.enablePuck !== undefined ? { enablePuck: patch.enablePuck } : {})
             }
           : site
       )
