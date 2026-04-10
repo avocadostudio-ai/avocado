@@ -7,7 +7,7 @@
     "dev": "next dev -p 3003",
     "build": "next build",
     "start": "next start -p 3003",
-    "contentful:setup": "tsx scripts/setup-content-types.ts"
+    "contentful:setup": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/setup-content-types.ts"
   },
   "dependencies": {
     "@ai-site-editor/blocks": "workspace:*",
