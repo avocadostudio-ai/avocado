@@ -3,7 +3,7 @@ import { Puck, blocksPlugin, fieldsPlugin, outlinePlugin } from "@puckeditor/cor
 import "@puckeditor/core/puck.css"
 import "@ai-site-editor/blocks/styles.css"
 import "../puck-prototype.css"
-import { BotMessageSquare, History, Redo2, Undo2 } from "lucide-react"
+import { ArrowLeft, BotMessageSquare, History, Redo2, Undo2 } from "lucide-react"
 import { FALLBACK_SESSION, FALLBACK_SLUG } from "./puck/constants"
 import { createPuckConfig } from "./puck/createPuckConfig"
 import { PuckChatContextProvider } from "./puck/PuckChatContext"
@@ -307,6 +307,15 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     headerActions: ({ children }: { children: ReactNode }) => (
       <>
         <PuckDispatchBridge dispatchRef={puckDispatchRef} />
+        <a
+          href="/sites"
+          className="puck-poc-header-btn puck-poc-header-back"
+          title="Back to sites"
+          aria-label="Back to sites"
+        >
+          <ArrowLeft size={16} />
+          <span>Sites</span>
+        </a>
         <label className="puck-poc-header-page-select" title="Select page">
           <select value={slug} onChange={(e) => setSlug(e.target.value)} disabled={headerBusy}>
               {availableSlugs.map((candidate) => (
