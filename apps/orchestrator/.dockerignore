@@ -1,0 +1,56 @@
+# Docker build context ignore list for the orchestrator image.
+# This file is consumed when building from repo root.
+
+# Dependency and build artifacts
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+**/build
+
+# Test and development files
+**/*.test.ts
+**/*.spec.ts
+**/__tests__
+apps/orchestrator/src/scripts
+
+# Local data and logs
+.data
+**/.data
+**/*.log
+**/.DS_Store
+
+# Editor / IDE
+.vscode
+.idea
+*.swp
+
+# Git metadata
+.git
+.gitignore
+.gitattributes
+
+# Docs (not needed for orchestrator runtime)
+docs
+docs-site
+README.md
+CONTRIBUTING.md
+LICENSE
+CLAUDE.md
+
+# Other apps and packages not needed
+apps/editor
+apps/site
+apps/paintball-bern
+apps/portfolio
+packages/blocks
+packages/preview-adapter
+packages/site-sdk
+packages/editor-puck
+packages/immersive-widget
+examples
+
+# Environment files — inject at runtime instead
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,47 @@
+# Local Docker Compose for the orchestrator.
+#
+# The site and editor apps remain open-source and run via `pnpm dev` on the host.
+# Only the orchestrator runs in a container — this matches the intended
+# production topology where the orchestrator is distributed as a Docker image.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f orchestrator
+#   docker compose down
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    image: avocado-orchestrator:latest
+    container_name: avocado-orchestrator
+    ports:
+      - "4200:4200"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "4200"
+      ORCHESTRATOR_STATE_FILE: /app/.data/orchestrator-state.json
+      CHAT_TELEMETRY_FILE: /app/.data/chat-telemetry.ndjson
+      ORCHESTRATOR_GENERATED_IMAGE_DIR: /app/.data/generated-images
+      # Override CORS to allow the host's editor and site during local dev.
+      ORCHESTRATOR_CORS_ORIGINS: "http://localhost:3000,http://localhost:4100"
+    volumes:
+      - orchestrator-data:/app/.data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4200/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  orchestrator-data:
+    driver: local
