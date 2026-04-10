@@ -105,8 +105,8 @@ export function createSanityPublishHandler(): OnPublishFn {
             )
             doc[key] = cardRefs
 
-          } else if (listImageFields.has(key) && Array.isArray(value)) {
-            const itemImageKeys = listImageFields.get(key)!
+          } else if (listImgFields.has(key) && Array.isArray(value)) {
+            const itemImageKeys = listImgFields.get(key)!
             const existingItems = existingDoc?.[key] as Record<string, unknown>[] | undefined
             doc[key] = await Promise.all(
               (value as Record<string, unknown>[]).map(async (item, idx) => ({
@@ -136,13 +136,50 @@ export function createSanityPublishHandler(): OnPublishFn {
       })
     }
 
-    if (config.name || config.logo || config.navLabels) {
+    const hasConfig =
+      config.name ||
+      config.logo ||
+      config.purpose ||
+      config.tone ||
+      (config.constraints && config.constraints.length > 0) ||
+      (config.navLabels && Object.keys(config.navLabels).length > 0) ||
+      (config.navGroups && Object.keys(config.navGroups).length > 0) ||
+      (config.themeOverrides && Object.keys(config.themeOverrides).length > 0)
+    if (hasConfig) {
+      // Sanity arrays of objects need stable _key values per item.
+      const navLabelsArray = config.navLabels
+        ? Object.entries(config.navLabels).map(([slug, label], i) => ({
+            _key: `nl-${i}`,
+            slug,
+            label,
+          }))
+        : []
+      const navGroupsArray = config.navGroups
+        ? Object.entries(config.navGroups).map(([label, slugs], i) => ({
+            _key: `ng-${i}`,
+            label,
+            slugs,
+          }))
+        : []
+      const themeOverridesArray = config.themeOverrides
+        ? Object.entries(config.themeOverrides).map(([key, value], i) => ({
+            _key: `to-${i}`,
+            key,
+            value,
+          }))
+        : []
+
       tx.createOrReplace({
         _id: "siteConfig",
         _type: "siteConfig",
         name: config.name ?? "",
         logo: config.logo ?? "",
-        navLabels: config.navLabels ?? {},
+        purpose: config.purpose ?? "",
+        tone: config.tone ?? "",
+        constraints: config.constraints ?? [],
+        navLabels: navLabelsArray,
+        navGroups: navGroupsArray,
+        themeOverrides: themeOverridesArray,
       })
     }
 
