@@ -46,6 +46,11 @@ export const siteConfigQuery = groq`
   *[_type == "siteConfig"][0] {
     name,
     logo,
-    navLabels
+    purpose,
+    tone,
+    constraints,
+    navLabels,
+    navGroups,
+    themeOverrides
   }
 `
