@@ -34,8 +34,12 @@ export function PuckImageFieldControl({
         )}
       </div>
       <div className="puck-poc-image-field__actions">
-        <button type="button" onClick={onChoose} disabled={readOnly}>Choose image</button>
-        <button type="button" onClick={onClear} disabled={readOnly || !hasValue}>Clear</button>
+        <button type="button" onClick={onChoose} disabled={readOnly}>
+          {hasValue ? "Replace image" : "Choose image"}
+        </button>
+        {hasValue ? (
+          <button type="button" onClick={onClear} disabled={readOnly}>Remove</button>
+        ) : null}
       </div>
     </div>
   )
