@@ -94,7 +94,8 @@ async function deleteTestPage(slug: string) {
   const page = await findPageEntry(slug)
   if (!page) return
   // Delete block entries referenced by the page
-  const blocks = page.fields.blocks?.["en-US"] as Array<{ sys: { id: string } }> | undefined
+  const blocksField = page.fields.blocks as Record<string, Array<{ sys: { id: string } }>> | undefined
+  const blocks = blocksField?.["en-US"]
   if (Array.isArray(blocks)) {
     for (const ref of blocks) {
       if (ref?.sys?.id) await deleteEntry(ref.sys.id).catch(() => {})
@@ -170,7 +171,8 @@ describe("contentful-e2e: image publish round-trip", { timeout: 60_000 }, () => 
 
     const entry = await findPageEntry(TEST_SLUG)
     assert.ok(entry, "page not found in Contentful after publish")
-    assert.equal(entry.fields.slug?.["en-US"], TEST_SLUG)
+    const slugField = entry.fields.slug as Record<string, string> | undefined
+    assert.equal(slugField?.["en-US"], TEST_SLUG)
   })
 
   // -----------------------------------------------------------------------

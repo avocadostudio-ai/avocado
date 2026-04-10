@@ -43,8 +43,9 @@ function entryToBlockInstance(entry: Entry, includes?: { Asset?: Asset[] }): Blo
     if (imgFields.has(key)) {
       // Asset link → resolve to URL
       const linked = value as { sys?: { id?: string } } | undefined
-      if (linked?.sys?.id && includes?.Asset) {
-        const asset = includes.Asset.find((a) => a.sys.id === linked.sys.id)
+      const linkedId = linked?.sys?.id
+      if (linkedId && includes?.Asset) {
+        const asset = includes.Asset.find((a) => a.sys.id === linkedId)
         props[key] = assetToUrl(asset as Asset)
       } else if (linked && typeof linked === "object" && "fields" in linked) {
         // Already resolved inline
@@ -157,10 +158,16 @@ export async function getContentfulSiteConfig(): Promise<SiteConfig> {
     })
     if (entries.items.length === 0) return {}
     const fields = entries.items[0].fields as Record<string, unknown>
+    const rawConstraints = fields.constraints
     return {
       name: (fields.name as string) || undefined,
       logo: (fields.logo as string) || undefined,
+      purpose: (fields.purpose as string) || undefined,
+      tone: (fields.tone as string) || undefined,
+      constraints: Array.isArray(rawConstraints) ? (rawConstraints as string[]) : undefined,
       navLabels: (fields.navLabels as Record<string, string>) || undefined,
+      navGroups: (fields.navGroups as Record<string, string[]>) || undefined,
+      themeOverrides: (fields.themeOverrides as Record<string, string>) || undefined,
     }
   } catch {
     return {}

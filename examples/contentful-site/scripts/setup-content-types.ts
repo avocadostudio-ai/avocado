@@ -231,7 +231,12 @@ async function main() {
     { id: "configKey", name: "Config Key", type: "Symbol", required: true, validations: [{ unique: true }] },
     { id: "name", name: "Site Name", type: "Symbol", required: false },
     { id: "logo", name: "Logo URL", type: "Symbol", required: false },
+    { id: "purpose", name: "Purpose", type: "Text", required: false },
+    { id: "tone", name: "Tone", type: "Text", required: false },
+    { id: "constraints", name: "Constraints", type: "Object", required: false },
     { id: "navLabels", name: "Nav Labels", type: "Object", required: false },
+    { id: "navGroups", name: "Nav Groups", type: "Object", required: false },
+    { id: "themeOverrides", name: "Theme Overrides", type: "Object", required: false },
   ])
 
   console.log(`\nDone! ${blockTypeIds.length + 2} content types ready.`)

@@ -1,6 +1,9 @@
 import type { OnPublishFn, InlineAsset } from "@ai-site-editor/site-sdk/routes"
 import { isSafeImageUrl } from "@ai-site-editor/site-sdk/routes"
-import { imageFields, listFieldNames } from "./manifest"
+import { imageFields, listImageFields, listFieldNames } from "./manifest"
+
+/** Uploaded Contentful asset: id for scalar links, url for embedding in JSON list items. */
+type AssetResult = { id: string; url: string }
 
 export interface ContentfulPublishOptions {
   spaceId: string
@@ -50,14 +53,23 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
 
   type CfEnv = Awaited<ReturnType<typeof loadEnvironment>>
   type CfEntry = Awaited<ReturnType<CfEnv["getEntries"]>>["items"][0]
+  type CfAsset = Awaited<ReturnType<CfEnv["createAsset"]>>
 
-  // Upload an image URL as a Contentful Asset, return the asset ID (or null on failure)
+  /** Extract the public URL from a processed Contentful asset (falls back to empty string). */
+  function assetUrlFromPublished(asset: CfAsset): string {
+    const file = (asset.fields.file as Record<string, unknown> | undefined)?.[locale] as { url?: string } | undefined
+    const url = file?.url
+    if (!url) return ""
+    return url.startsWith("//") ? `https:${url}` : url
+  }
+
+  // Upload an image URL as a Contentful Asset, return { id, url } or null on failure
   async function ensureAsset(
     env: CfEnv,
     imageUrl: string,
     alt: string,
     assets?: Record<string, InlineAsset>
-  ): Promise<string | null> {
+  ): Promise<AssetResult | null> {
     // Check for inline asset (generated/modified images with localhost URLs)
     const inlineAsset = assets?.[imageUrl]
     if (inlineAsset) {
@@ -79,7 +91,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
         })
         const processed = await asset.processForAllLocales()
         const published = await processed.publish()
-        return published.sys.id
+        return { id: published.sys.id, url: assetUrlFromPublished(published) }
       } catch (err) {
         console.warn(`[contentful-publish] inline asset upload failed for ${imageUrl}: ${err instanceof Error ? err.message : err}`)
         return null
@@ -104,7 +116,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
         })
         const processed = await asset.processForAllLocales()
         const published = await processed.publish()
-        return published.sys.id
+        return { id: published.sys.id, url: assetUrlFromPublished(published) }
       } catch {
         return null
       }
@@ -113,7 +125,10 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     // Check if asset already exists by source URL stored in description
     try {
       const existing = await env.getAssets({ "fields.description": imageUrl, limit: 1 })
-      if (existing.items.length > 0) return existing.items[0].sys.id
+      if (existing.items.length > 0) {
+        const hit = existing.items[0]
+        return { id: hit.sys.id, url: assetUrlFromPublished(hit as CfAsset) }
+      }
     } catch { /* continue to upload */ }
 
     try {
@@ -132,7 +147,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
       })
       const processed = await asset.processForAllLocales()
       const published = await processed.publish()
-      return published.sys.id
+      return { id: published.sys.id, url: assetUrlFromPublished(published) }
     } catch (err) {
       console.warn(`[contentful-publish] asset upload failed for ${imageUrl}: ${err instanceof Error ? err.message : err}`)
       return null
@@ -167,30 +182,42 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     return sys?.linkType === "Asset" && sys.id ? sys.id : null
   }
 
-  // Build Contentful fields for a block entry, converting images to Asset links.
+  /** Extract previously published list items from a Contentful JSON field value. */
+  function existingListItems(fieldValue: unknown): Record<string, unknown>[] | undefined {
+    if (!fieldValue || typeof fieldValue !== "object") return undefined
+    const localeVal = (fieldValue as Record<string, unknown>)[locale]
+    return Array.isArray(localeVal) ? (localeVal as Record<string, unknown>[]) : undefined
+  }
+
+  /** Derive the alt-text key for an image key (e.g. `imageUrl` → `imageAlt`). */
+  function altKeyFor(imageKey: string): string {
+    return imageKey.replace(/Url$/, "Alt").replace(/^image$/, "imageAlt")
+  }
+
+  // Build Contentful fields for a block entry, converting images to Asset links
+  // (scalar) or embedded asset URLs (list items).
   // existingFields is the previous entry's fields (for fallback when image upload fails).
   async function buildBlockFields(
     env: CfEnv,
     blockType: string,
     props: Record<string, unknown>,
-    resolveAsset: (url: string, alt: string) => Promise<string | null>,
+    resolveAsset: (url: string, alt: string) => Promise<AssetResult | null>,
     existingFields?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const imgFields = imageFields.get(blockType) ?? new Set<string>()
+    const listItemImgFields = listImageFields.get(blockType) ?? new Map<string, Set<string>>()
     const listFieldsForType = listFieldNames.get(blockType) ?? new Set<string>()
     const fields: Record<string, unknown> = {}
 
-    // Scalar fields
     for (const [key, value] of Object.entries(props)) {
       if (key === "headingLevel") continue
 
       if (imgFields.has(key) && typeof value === "string" && value) {
-        // Convert image URL to Asset reference
-        const altKey = key.replace(/Url$/, "Alt").replace(/^image$/, "imageAlt")
-        const alt = typeof props[altKey] === "string" ? (props[altKey] as string) : ""
-        const assetId = await resolveAsset(value, alt)
-        if (assetId) {
-          fields[key] = assetLink(assetId)
+        // Scalar image — store as Contentful Asset link
+        const alt = typeof props[altKeyFor(key)] === "string" ? (props[altKeyFor(key)] as string) : ""
+        const asset = await resolveAsset(value, alt)
+        if (asset) {
+          fields[key] = assetLink(asset.id)
         } else {
           // Fallback: preserve existing asset from previous publish
           const prevAssetId = existingAssetId(existingFields?.[key])
@@ -199,12 +226,38 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
           }
         }
       } else if (listFieldsForType.has(key)) {
-        // Handled separately for reference lists (card entries use deterministic IDs)
-        if (!isReferenceList(blockType, key)) {
-          // JSON field for non-reference lists
+        // Reference lists are built in the main handler (deterministic card entries)
+        if (isReferenceList(blockType, key)) continue
+
+        const itemImgKeys = listItemImgFields.get(key)
+        if (itemImgKeys && itemImgKeys.size > 0 && Array.isArray(value)) {
+          // Non-reference list with images (Gallery.items, Carousel.items, Testimonials.items):
+          // upload each item image, embed resulting public URL back into the JSON.
+          const prevItems = existingListItems(existingFields?.[key])
+          const resolvedItems = await Promise.all(
+            (value as Record<string, unknown>[]).map(async (item, i) => {
+              const out: Record<string, unknown> = { ...item }
+              for (const imgKey of itemImgKeys) {
+                const imgUrl = item[imgKey]
+                if (typeof imgUrl !== "string" || !imgUrl) continue
+                const alt = typeof item[altKeyFor(imgKey)] === "string" ? (item[altKeyFor(imgKey)] as string) : ""
+                const asset = await resolveAsset(imgUrl, alt)
+                if (asset?.url) {
+                  out[imgKey] = asset.url
+                } else {
+                  // Fallback to the previously published URL at the same index
+                  const prevUrl = prevItems?.[i]?.[imgKey]
+                  if (typeof prevUrl === "string") out[imgKey] = prevUrl
+                }
+              }
+              return out
+            })
+          )
+          fields[key] = { [locale]: resolvedItems }
+        } else {
+          // List without images — dump raw JSON
           fields[key] = { [locale]: value }
         }
-        // Reference lists are built in the main handler with deterministic IDs
       } else {
         fields[key] = { [locale]: value }
       }
@@ -217,7 +270,7 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
     const env = await getEnvironment()
 
     // Cache asset lookups within a single publish to avoid duplicate uploads
-    const assetCache = new Map<string, Promise<string | null>>()
+    const assetCache = new Map<string, Promise<AssetResult | null>>()
     const cachedEnsureAsset = (imageUrl: string, alt: string) => {
       const cached = assetCache.get(imageUrl)
       if (cached) return cached
@@ -335,12 +388,26 @@ export function createContentfulPublishHandler(opts: ContentfulPublishOptions): 
       .map((r, i) => `${pages[i]?.slug ?? "?"}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`)
 
     // Upsert site config
-    if (config.name || config.logo || config.navLabels) {
+    const hasConfig =
+      config.name ||
+      config.logo ||
+      config.purpose ||
+      config.tone ||
+      (config.constraints && config.constraints.length > 0) ||
+      config.navLabels ||
+      config.navGroups ||
+      config.themeOverrides
+    if (hasConfig) {
       const configFields = {
         configKey: { [locale]: "default" },
         name: { [locale]: config.name ?? "" },
         logo: { [locale]: config.logo ?? "" },
+        purpose: { [locale]: config.purpose ?? "" },
+        tone: { [locale]: config.tone ?? "" },
+        constraints: { [locale]: config.constraints ?? [] },
         navLabels: { [locale]: config.navLabels ?? {} },
+        navGroups: { [locale]: config.navGroups ?? {} },
+        themeOverrides: { [locale]: config.themeOverrides ?? {} },
       }
 
       const existingConfig = await env.getEntries({
