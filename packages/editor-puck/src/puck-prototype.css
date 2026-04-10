@@ -386,3 +386,16 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* "Back to sites" link styled as a header button with label */
+.puck-poc-header-back {
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  margin-right: 8px;
+}
+.puck-poc-header-back span {
+  line-height: 1;
+}
