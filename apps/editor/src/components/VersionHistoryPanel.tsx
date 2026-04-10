@@ -95,17 +95,6 @@ export function VersionHistoryPanel({ session, siteId, slug, visible, onRestore,
                     {SOURCE_LABELS[entry.source] ?? entry.source}
                   </span>
                   <span className="version-history-time">{formatTime(entry.at)}</span>
-                </div>
-                {entry.source !== "undo" && entry.source !== "redo" ? (
-                  <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
-                ) : null}
-                <div className="version-history-item-footer">
-                  {entry.opCount > 0 ? (
-                    <span className="version-history-meta">
-                      {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
-                      {entry.slug !== "/" ? ` \u00b7 ${entry.slug}` : ""}
-                    </span>
-                  ) : <span />}
                   {entry.version === currentVersion ? (
                     <span className="version-history-current-label">{t("history.current")}</span>
                   ) : onRestore ? (
@@ -119,6 +108,15 @@ export function VersionHistoryPanel({ session, siteId, slug, visible, onRestore,
                     </button>
                   ) : null}
                 </div>
+                {entry.source !== "undo" && entry.source !== "redo" ? (
+                  <div className="version-history-summary">{renderFinalMarkdown(entry.summary)}</div>
+                ) : null}
+                {entry.opCount > 0 ? (
+                  <div className="version-history-meta">
+                    {entry.opCount} {entry.opCount === 1 ? t("history.operation") : t("history.operations")}
+                    {entry.slug !== "/" ? ` \u00b7 ${entry.slug}` : ""}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
