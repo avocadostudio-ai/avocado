@@ -1349,6 +1349,9 @@ export function useChatEngine(config: ChatEngineConfig) {
     undoInFlightEntryId: undoHistory.undoInFlightEntryId,
     canUndoServer: undoHistory.canUndoServer,
     canRedoServer: undoHistory.canRedoServer,
+    setCanUndoServer: undoHistory.setCanUndoServer,
+    setCanRedoServer: undoHistory.setCanRedoServer,
+    refreshHistoryStatus: undoHistory.refreshHistoryStatus,
     pushAssistantFromResult,
   }
 }

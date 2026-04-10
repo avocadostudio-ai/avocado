@@ -141,6 +141,14 @@ export type VersionEntry = {
   opCount: number
   at: string
   source: "chat" | "direct" | "undo" | "redo" | "bootstrap" | "restore"
+  /**
+   * Full snapshot of the page state at this version. Enables the version
+   * history panel to jump back and forth between any two versions directly,
+   * independent of the undo/redo stacks. `null` means the page did not exist
+   * at this version (e.g. before it was created, or after it was removed).
+   * Omit the field when capturing a snapshot is impossible (legacy entries).
+   */
+  snapshot?: PageDoc | null
 }
 export const versionLog = new Map<string, VersionEntry[]>()
 export const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()

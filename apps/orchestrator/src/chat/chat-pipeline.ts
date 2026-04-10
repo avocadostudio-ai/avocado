@@ -1755,13 +1755,16 @@ export async function runChatPipeline(
       pushRecentEdit(body.session!, { slug: updatedSlug ?? effectiveSlug, summary: futureToPastTense(resolvedPlan.summary_for_user), ops: resolvedPlan.ops })
       if (body.message) pushChatHistory(body.session!, body.message, futureToPastTense(resolvedPlan.summary_for_user))
       const previewVersion = options?.onOpApplied ? (versions.get(body.session!) ?? 0) : bumpVersion(body.session!)
+      const versionEntrySlug = updatedSlug ?? effectiveSlug
+      const versionSnapshot = getPage(body.session!, versionEntrySlug)
       pushVersionEntry(body.session!, {
         version: previewVersion,
-        slug: updatedSlug ?? effectiveSlug,
+        slug: versionEntrySlug,
         summary: futureToPastTense(resolvedPlan.summary_for_user),
         opTypes: resolvedPlan.ops.map((op) => op.op),
         opCount: resolvedPlan.ops.length,
-        source: "chat"
+        source: "chat",
+        snapshot: versionSnapshot ? structuredClone(versionSnapshot) : null
       })
       schedulePersistState(ctx.log)
       const focusBlockId = pickFocusBlockId(resolvedPlan.ops)
