@@ -10,25 +10,28 @@ the editor, and the **`image.generate` tool** that the chat planner can call
 during natural-language edits. Both paths share the same providers and the
 same on-disk storage.
 
-```
-Editor image field click
-        │
-        ▼
-┌───────────────────────────────────┐
-│       Asset Picker modal          │
-│  Generate │ Drive │ Unsplash │    │
-│  CMS      │ Upload                │
-└──────┬────────────────────────────┘
-       │
-       ▼                            ┌────────────────────────┐
-┌────────────┐  ┌────────────┐      │ Chat: "generate a hero │
-│  OpenAI    │  │  Google    │◄─────│  image of…"            │
-│  DALL-E    │  │  Gemini    │      └──────────┬─────────────┘
-│ gpt-image-1│  │ 2.5 Flash  │                 │
-└────────────┘  │  Image     │                 ▼
-                │ (nano-     │      ┌──────────────────────┐
-                │  banana)   │      │  image.generate tool │
-                └────────────┘      └──────────────────────┘
+```mermaid
+flowchart TD
+    editor["Editor image field click"]
+    chat["Chat message:<br/>'generate a hero image…'"]
+
+    editor --> modal["Asset Picker modal"]
+    chat --> tool["image.generate tool"]
+
+    modal --> generate["Generate tab"]
+    modal --> drive["Drive tab"]
+    modal --> unsplash["Unsplash tab"]
+    modal --> cms["CMS libraries"]
+    modal --> upload["Upload tab"]
+
+    generate --> openai["OpenAI<br/>gpt-image-1"]
+    generate --> gemini["Google Gemini<br/>gemini-2.5-flash-image<br/>(nano-banana)"]
+    tool --> openai
+    tool --> gemini
+
+    openai --> storage[("Generated-images store")]
+    gemini --> storage
+    upload --> storage
 ```
 
 The modal is defined in `apps/editor/src/components/ImagePickerModal.tsx`.
