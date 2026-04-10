@@ -185,24 +185,14 @@ export function createStrapiPublishHandler(): OnPublishFn {
       }
     }
 
-    // Delete pages that exist in Strapi but not in the published set
-    const publishedSlugs = new Set(pages.map((p) => p.slug))
-    try {
-      const allCmsPages = await strapiFetch<{ data: Array<{ documentId: string; slug: string }> }>(
-        "/pages?fields[0]=slug&fields[1]=documentId&pagination[pageSize]=100"
-      )
-      for (const cmsPage of allCmsPages.data) {
-        if (!publishedSlugs.has(cmsPage.slug)) {
-          try {
-            await strapiFetch(`/pages/${cmsPage.documentId}`, { method: "DELETE" })
-          } catch (err) {
-            errors.push(`delete ${cmsPage.slug}: ${err instanceof Error ? err.message : String(err)}`)
-          }
-        }
-      }
-    } catch {
-      // Non-fatal — stale pages remain but published pages are correct
-    }
+    // NOTE: publish is intentionally additive only.
+    //
+    // A delete-sync loop here would wipe any Strapi page whose slug isn't in
+    // the current publish payload, which is catastrophic when the orchestrator
+    // draft is partial — e.g. bootstrap ran before Strapi was reachable, or a
+    // prior `/draft/bootstrap` call overwrote with fewer slugs. Contentful and
+    // Sanity handlers also leave orphans in place; if a page needs to be
+    // deleted, do it from the CMS admin (or add an explicit delete op).
 
     // Upsert site config
     const hasConfig =
