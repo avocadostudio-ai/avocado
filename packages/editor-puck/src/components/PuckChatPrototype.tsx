@@ -178,7 +178,13 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
       activeEditablePathRef.current = nextPath
       setActiveEditablePath(nextPath)
     }
-  }, [])
+
+    // useChatEngine reads activeBlockId/Type/EditablePath from the global
+    // Zustand store in the host app — not from the refs passed in its args.
+    // Push Puck's selection into that store so chat requests include the
+    // selected block id.
+    hostApi.setGlobalSelection(selection)
+  }, [hostApi])
 
   const onSendPrompt = useCallback(async (prompt: string) => {
     await chatEngine.submitChat(prompt)
