@@ -5,6 +5,14 @@ description: "Task checklist for implementing optimistic streaming patch transpo
 
 # Streaming/Optimistic Patch Transport Checklist
 
+<Note>
+**Status:** Preview adapter and shared types are complete — see
+`packages/preview-adapter/src/preview-bridge-core.tsx` (the `applyPatch` and
+`resetToServer` message handlers and `emitPatchAck`). Editor-side integration
+(wiring `postPatchToSite` into the chat, inline-edit, reorder, delete, and
+variation handlers) is still pending.
+</Note>
+
 ## Editor Tasks
 File: `apps/editor/src/App.tsx`
 

@@ -9,7 +9,7 @@ Avocado Studio manages website content as structured data, not raw HTML.
 
 - **Page** (`PageDoc`) — A single page on your website (e.g., `/about`, `/pricing`). Contains metadata (title, slug) and an ordered list of blocks.
 - **Block** (`BlockInstance`) — A content section on a page. Each block has a **type** (e.g., `Hero`, `CTA`, `FAQAccordion`) and **props** — the structured data that controls what it renders.
-- **Props** — The fields that make up a block's content. A Hero block might have `heading`, `subheading`, `backgroundImage`, and `ctaLabel`. Every prop is defined by a Zod schema, so the system knows exactly what values are valid.
+- **Props** — The fields that make up a block's content. A Hero block has `heading`, `subheading`, `imageUrl`, `imageAlt`, `ctaText`, and `ctaHref` (plus a few optional fields). Every prop is defined by a Zod schema, so the system knows exactly what values are valid.
 
 ```
 PageDoc
@@ -97,7 +97,9 @@ When the Content Studio connects to your site, it fetches the **block manifest**
       "fields": {
         "heading": { "type": "string", "label": "Heading" },
         "subheading": { "type": "string", "label": "Subheading" },
-        "backgroundImage": { "type": "image", "label": "Background" }
+        "imageUrl": { "type": "image", "label": "Hero image" },
+        "ctaText": { "type": "string", "label": "CTA button text" },
+        "ctaHref": { "type": "string", "label": "CTA link" }
       }
     }
   ]
