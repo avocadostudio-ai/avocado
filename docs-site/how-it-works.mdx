@@ -97,7 +97,7 @@ Avocado Studio is optimized to minimize perceived latency:
 |-------------|-------------|
 | **Parallel planning** | Fast intent router and full planner run concurrently. If the router succeeds, the planner is aborted. |
 | **Streamed op apply** | Operations are validated and applied as they stream from the LLM, not after the full response. |
-| **Deferred image resolution** | Text and structural changes apply immediately. Image lookups (Unsplash, DALL-E) resolve in the background. |
+| **Deferred image resolution** | Text and structural changes apply immediately. Image lookups and generation (Unsplash, OpenAI `gpt-image-1`, and Google Gemini `gemini-2.5-flash-image`) resolve in the background. See [Asset Picker & AI Images](/integration/asset-picker). |
 | **Incremental preview** | Each operation triggers a preview update, so the user sees changes at ~800ms intervals. |
 
 ## Undo / Redo

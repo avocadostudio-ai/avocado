@@ -129,7 +129,7 @@ Uses a JSON Schema subset. The product infers field types from schema + field na
 
 | Field name pattern | Inferred type | Content Studio behavior |
 |---|---|---|
-| `*imageUrl`, `*Image`, `*logo` | Image | Image picker, AI generation, upload |
+| `*imageUrl`, `*Image`, `*logo` | Image | Asset Picker modal with Unsplash, Google Drive, CMS libraries, AI generation (OpenAI or Gemini), and local upload. See [Asset Picker & AI Images](/integration/asset-picker). |
 | `*Alt` | Image alt text | Text input |
 | Field with `enum: [...]` | Enum | Dropdown selector |
 | `type: "number"` | Number | Number input |

@@ -46,7 +46,8 @@
             "group": "Advanced",
             "pages": [
               "site-provider-spi",
-              "integration/tools-mvp"
+              "integration/tools-mvp",
+              "integration/asset-picker"
             ]
           }
         ]
