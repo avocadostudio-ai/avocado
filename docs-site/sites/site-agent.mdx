@@ -1,0 +1,203 @@
+---
+title: "Site Assistant"
+sidebarTitle: "Site Assistant"
+description: "The AI agent built into the editor that brings sites into Avocado Studio. How to use it, what you need before you start, and how it runs under the hood."
+---
+
+The **Site Assistant** is an AI agent built into the editor's *Sites* page. You describe what you want — *"migrate https&#x3A;//example.com"*, *"integrate the repo at ~/code/marketing-site"*, *"create a landing page for my coffee roastery"* — and it executes the full workflow end-to-end: scraping, analysis, scaffolding, image downloads, theme extraction, SDK wiring, and registration with the orchestrator.
+
+Three modes (Migrate / Integrate / Create), one chat UI, two execution backends (your Claude subscription via the CLI, or pay-per-token via API key). Same end state regardless of which combination you pick.
+
+## Prerequisites
+
+Before you can run the Site Assistant for the first time, you need three layers of prerequisites: **base stack**, **mode-specific**, and **backend-specific**.
+
+### Base stack (always required)
+
+These apply to every run, regardless of mode or backend.
+
+| | Requirement | How to verify |
+|---|---|---|
+| Runtime | **Node.js 20+** and **pnpm** | `node -v`, `pnpm -v` |
+| Repo | Avocado checkout with deps installed | `pnpm install` from the repo root |
+| Orchestrator | Running on port `4200` | `pnpm dev:orchestrator`, then `curl http://localhost:4200/health` |
+| Editor | Running on port `4100` | `pnpm dev:editor`, open `http://localhost:4100` |
+| MCP server | `tsx` resolvable from the orchestrator's `node_modules` | Already a workspace dep — `pnpm install` is enough |
+| Disk | A few hundred MB free for downloaded images and scaffolded site output | — |
+
+If you only ever ran `pnpm dev`, you already have all of this.
+
+### Mode-specific prerequisites
+
+| Mode | Extra requirements |
+|---|---|
+| **Migrate** (URL → site) | Internet access from the orchestrator host. The target URL must be publicly reachable (no auth wall). Sites with heavy client-side JS render the worst — server-rendered HTML works best. |
+| **Integrate** (existing repo → SDK wired in) | `git` on `PATH` if cloning. Read/write access to the target directory. The project should be **Next.js 15 App Router**; other frameworks fall back to the [Site Provider SPI](/site-provider-spi) and may need manual finishing. |
+| **Create** (idea → scaffolded site) | Nothing extra beyond the base stack. |
+
+### Backend-specific prerequisites
+
+The Site Assistant runs through one of two backends. Pick **one** and configure it before you start.
+
+<Tabs>
+  <Tab title="CLI backend (subscription, $0/token)">
+    Best when running locally on your laptop. Uses the `claude` CLI authenticated to your Claude subscription via OAuth — **zero per-token cost**.
+
+    **You need:**
+
+    - The `claude` CLI installed and on `PATH`:
+      ```bash
+      npm i -g @anthropic-ai/claude-code
+      which claude   # should print a path
+      ```
+    - Logged in via OAuth (one-time):
+      ```bash
+      claude login
+      ```
+    - The orchestrator process must inherit a `PATH` that contains the CLI. If you start the orchestrator from a shell where `which claude` works, you're fine. If you run it under systemd / launchd / Docker, make sure the unit's `PATH` includes the CLI's install directory.
+    - **The flag** in `apps/editor/.env`:
+      ```bash
+      VITE_AGENT_USE_CLI=true
+      ```
+      Then **restart the editor** (`pnpm dev:editor`) — Vite reads `VITE_*` vars at startup and doesn't pick up changes via HMR.
+
+    **Note:** the CLI runner deliberately strips `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` from its child process environment, so the CLI can't accidentally fall back to API-key billing.
+  </Tab>
+
+  <Tab title="SDK backend (API key, pay-per-token)">
+    Best for hosted / headless deployments where OAuth tokens aren't practical, and for runs where you want enforced spend caps and the multi-agent execution pattern.
+
+    **You need:**
+
+    - `ANTHROPIC_API_KEY` in the orchestrator's environment (`.env` at the repo root):
+      ```bash
+      ANTHROPIC_API_KEY=sk-ant-...
+      ```
+    - *(Optional but recommended)* a per-run budget cap:
+      ```bash
+      SITES_AGENT_MAX_BUDGET_USD=2   # default; aborts the run when exceeded
+      ```
+    - **The flag** in `apps/editor/.env` set to `false` (or omitted — `false` is the default):
+      ```bash
+      VITE_AGENT_USE_CLI=false
+      ```
+      Then restart the editor.
+
+    Restart the orchestrator after changing root `.env`. The editor flag only needs an editor restart; the orchestrator picks up the backend choice per request from the `useCliAgent` field on the request body.
+  </Tab>
+</Tabs>
+
+If neither backend is configured, the Site Assistant will still appear in the editor UI but every run will fail immediately. The error message tells you which one is missing.
+
+## How to use it
+
+Once the prerequisites are in place, the actual usage flow is short.
+
+<Steps>
+  <Step title="Open the editor">
+    Visit `http://localhost:4100`. You should land on the **Sites** page (the editor's home screen).
+  </Step>
+
+  <Step title="Open the Site Assistant">
+    Click the **floating action button** in the bottom-right corner of the Sites page. The chat panel slides open and shows three suggestion cards:
+
+    - **Create a new site from scratch** — describe your site's purpose
+    - **Migrate a website from URL** — paste a URL
+    - **Integrate using a GitHub project** — connect an existing Next.js app
+
+    You can click a suggestion to prefill the prompt, or just type your own message in the box at the bottom.
+  </Step>
+
+  <Step title="Describe what you want">
+    Be specific. The agent picks its mode from the wording of your first message:
+
+    | Goal | Example message |
+    |---|---|
+    | Migrate from URL | *"Migrate https&#x3A;//example.com — keep the same page structure"* |
+    | Integrate existing repo | *"Integrate the existing Next.js project at ~/code/marketing-site"* |
+    | Create from scratch | *"Create a landing page for my coffee roastery, three sections: hero, story, locations"* |
+
+    The agent will confirm what it understood before doing any destructive work.
+  </Step>
+
+  <Step title="Watch the progress">
+    The chat panel streams tool calls as they happen — *"Discovering site structure"*, *"Generating page specs"*, *"Downloading image (12 of 38)"*, etc. You can:
+
+    - **Scroll** through the activity timeline
+    - **Click Stop** at any time to abort the run
+    - Leave the page — the orchestrator buffers events and you can reconnect after a reload (the stream survives a browser refresh)
+  </Step>
+
+  <Step title="Approve any prompts">
+    For some operations (e.g. overwriting an existing site, picking between similar pages), the agent asks for your confirmation through an inline approval card. Pick an option to continue.
+  </Step>
+
+  <Step title="Open the new site">
+    When the run finishes, the agent posts a summary and the new site appears in the Sites grid. Click its tile to open the editor and start making AI edits.
+  </Step>
+</Steps>
+
+## The three modes
+
+The mode is selected from your first message via [`detectAgentMode`](https://github.com/yu7321/avocado/blob/main/apps/editor/src/hooks/useSitesAgent.ts) and [orchestrator triage](https://github.com/yu7321/avocado/blob/main/apps/orchestrator/src/routes/sites-agent.ts). You don't pick a mode through a dropdown — the wording does it.
+
+### Migrate
+
+**Trigger words**: a URL, or any message that doesn't match the integrate / create heuristics.
+**Input**: a public URL.
+**What it does**: scrapes the site, discovers structure, generates page specs as `BlockInstance[]`, extracts design tokens, downloads remote images, creates a new site in the orchestrator, applies the theme.
+**Tools used**: `scrape_url`, `discover_site_structure`, `generate_page_specs`, `extract_design_tokens`, `download_remote_image(s)`, `create_site`, `bootstrap_pages`, `apply_theme`.
+**Multi-agent**: in SDK backend only — a `sites-agent` orchestrator delegates structure discovery to a `structure-analyzer` subagent, which delegates per-block coding to a `block-coder` subagent. CLI backend runs as a single agent.
+
+### Integrate
+
+**Trigger words**: `integrate`, `add the SDK`, `existing site/project/codebase/repo`, `connect to the editor`.
+**Input**: a local path or git URL pointing at a Next.js project.
+**What it does**: clones the repo (if remote), analyzes the codebase, wires `@ai-site-editor/site-sdk`, registers the site with the orchestrator, optionally launches the dev server.
+**Tools used**: `clone_repo`, `analyze_codebase`, `integrate_site`, `launch_site`, `register_site`, `bootstrap_pages`, `apply_theme`, plus full file tools (`Read`, `Write`, `Edit`, `Bash`, `Glob`, `Grep`).
+**Multi-agent**: no — runs as a single agent in both backends because the work is largely deterministic file editing.
+
+### Create
+
+**Trigger**: set by the orchestrator's triage step when your message asks for a fresh site (no URL, no repo).
+**Input**: a natural-language description.
+**What it does**: scaffolds blocks, theme, and starter pages from your description. Same tool surface as Migrate, minus the URL-scraping tools.
+
+## Execution backends compared
+
+| | CLI backend | SDK backend |
+|---|---|---|
+| Cost | $0 (your Claude subscription) | Pay-per-token against `ANTHROPIC_API_KEY` |
+| Setup | `claude login` | `ANTHROPIC_API_KEY` env var |
+| Budget enforcement | None | `SITES_AGENT_MAX_BUDGET_USD` (default `$2`) |
+| Multi-agent (Migrate mode) | No (single agent) | Yes (orchestrator + analyzer + block-coder) |
+| Works headless / hosted | Needs OAuth tokens persisted on host | Yes |
+| Toggle | `VITE_AGENT_USE_CLI=true` in `apps/editor/.env` | `VITE_AGENT_USE_CLI=false` (default) |
+
+You can switch backends between runs without restarting anything except the editor (`pnpm dev:editor`). The orchestrator picks the backend per request from the `useCliAgent` field the editor sends.
+
+## Troubleshooting
+
+**`claude: command not found`** *(CLI backend)*
+The orchestrator process can't find the CLI on its `PATH`. Install with `npm i -g @anthropic-ai/claude-code` and verify with `which claude`. If your shell can find it but the orchestrator can't, your launcher (systemd / launchd / Docker) is probably stripping `PATH`.
+
+**Agent stops with "not authenticated"** *(CLI backend)*
+Run `claude login` from the same user account that runs the orchestrator. The OAuth tokens are stored under `~/.config/claude/`. The CLI runner deliberately strips `ANTHROPIC_API_KEY`, so falling back to API key billing isn't an option here — you must complete the OAuth flow.
+
+**Budget exhausted: $X / $Y** *(SDK backend)*
+The agent hit `SITES_AGENT_MAX_BUDGET_USD`. Either raise the cap in the root `.env` and restart the orchestrator, or switch to the CLI backend for the next run.
+
+**Migrate mode produces shallow / incomplete results** *(CLI backend)*
+CLI mode runs the migrate flow as a single agent, skipping the structure-analyzer / block-coder split. For sites with many pages or complex layouts, switch to the SDK backend (`VITE_AGENT_USE_CLI=false`) and re-run.
+
+**MCP stdio server fails to start** *(both backends)*
+The orchestrator launches `npx tsx <orchestrator>/src/migration/mcp-server-stdio.ts`. Make sure `tsx` resolves and the orchestrator's `node_modules` is intact (`pnpm install` from the repo root).
+
+**Vite env change isn't picked up**
+Restart `pnpm dev:editor`. Vite snapshots `import.meta.env.*` at startup; HMR doesn't re-evaluate `.env`.
+
+**The Site Assistant button isn't there**
+You might be in a non-default editor route. Make sure you're on the **Sites** page (the editor's home, `http://localhost:4100`). The FAB only appears there.
+
+**The agent says "I need a URL" but I gave it one**
+The agent extracts URLs from your message via regex. If your URL is wrapped in markdown link syntax or quotes, try pasting it bare: `https://example.com` instead of `[example](https://example.com)`.

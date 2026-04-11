@@ -36,6 +36,20 @@
         ]
       },
       {
+        "tab": "Add a Site",
+        "groups": [
+          {
+            "group": "Bring Your Site",
+            "pages": [
+              "sites/index",
+              "sites/site-agent",
+              "sites/manual",
+              "sites/coding-agent"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Integration",
         "groups": [
           {
