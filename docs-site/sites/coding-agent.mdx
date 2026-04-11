@@ -1,0 +1,121 @@
+---
+title: "Bring Your Own Coding Agent"
+description: "Hand the integration to your own coding agent — Codex, Claude Code, Cursor, Aider, or anything that can read files and run commands. We provide the prompt, the agent does the work."
+---
+
+If you're already using a coding agent in your IDE (Codex, Claude Code, Cursor, Aider, Continue, etc.), you don't need to switch to ours. Hand it the prompt below, point it at the Avocado docs, and let it execute the integration in your existing workflow.
+
+**Why you might prefer this over our [Site Agent](/sites/site-agent)**:
+
+- The agent already has full context on your codebase, conventions, and history
+- You want changes to flow through your existing review process (PRs, commit conventions, CI)
+- Your project has unusual structure (monorepo, custom build, non-standard routing) where our agent would struggle to land changes in the right place
+- Compliance / data residency reasons — the work happens in your environment, not ours
+
+**Why you might *not*** — see [Site Agent](/sites/site-agent) instead if you want:
+
+- A single-click experience inside the editor with a live progress UI
+- Multi-agent execution (orchestrator + structure-analyzer + block-coder) for thorough URL migration
+- Automatic image downloading and theme extraction from a live URL
+
+## The prompt
+
+Copy this into your coding agent's chat. Replace the bracketed placeholders with your project's specifics.
+
+````markdown
+You are integrating my Next.js project at [PROJECT_PATH] with Avocado Studio,
+an open-source AI content operations platform. The full docs are at https://docs.avocado.studio (or run locally — see below).
+
+## Goal
+Add the @ai-site-editor/site-sdk to my project so the Avocado Content Studio
+can edit my content via Draft Mode. Same end state as if I had followed
+the manual integration guide myself.
+
+## Required reading (in order)
+1. https://docs.avocado.studio/concepts — page model, blocks, operations, draft mode
+2. https://docs.avocado.studio/integration/nextjs-mvp-embedded — the canonical contract
+3. https://docs.avocado.studio/integration/custom-blocks — only if my project has custom React components I want editable
+4. https://docs.avocado.studio/site-provider-spi — only if I'm not on Next.js
+
+Read these pages BEFORE writing any code. Do not skim. The contract is exact.
+
+## What to do
+
+1. Inspect my project structure. Confirm it's Next.js 15 App Router. If it isn't, stop and ask me how to proceed.
+2. Add `@ai-site-editor/site-sdk` to package.json and install it.
+3. Add the five required contract endpoints from the nextjs-mvp-embedded doc:
+   - `GET /api/editor/blocks` (use `createBlocksHandler()` from the SDK)
+   - `GET /api/draft` (Draft Mode entry, validates `?secret=` and only allows internal redirects)
+   - `GET /api/draft/disable` (Draft Mode exit)
+   - Update my page data loaders to call `fetchEditorPage()` / `fetchEditorSlugs()` from the SDK when Draft Mode is enabled
+   - Confirm the iframe URL pattern works: `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>`
+4. Add the `DRAFT_MODE_SECRET` env var to `.env.local` (generate a random one) and document it in `.env.example`.
+5. If my project has custom React components for hero / cta / faq / etc that aren't in the built-in block library, register them with the SDK following the custom-blocks doc.
+6. Run my dev server and verify:
+   - `GET /api/editor/blocks` returns a non-empty `blocks` array
+   - `GET /api/draft?secret=<my-secret>&redirect=/` sets the draft cookie and redirects
+   - The site still renders normally without Draft Mode
+
+## What NOT to do
+
+- Do not invent endpoint paths or schemas. The contract is exact — if a doc says `GET /api/editor/blocks`, that's the path.
+- Do not skip the secret validation or the internal-redirect check on `/api/draft`. These are security-critical.
+- Do not modify my existing route handlers' published-data path. Draft Mode is additive.
+- Do not commit `DRAFT_MODE_SECRET` to git. It goes in `.env.local` only.
+- Do not refactor my existing components unless they need to be wrapped to expose props for AI editing.
+
+## Verification checklist (run this at the end)
+
+- [ ] `pnpm typecheck` (or my project's equivalent) passes
+- [ ] My existing pages still render at their existing routes without Draft Mode
+- [ ] `curl http://localhost:3000/api/editor/blocks` returns valid JSON with `blocks: [...]`
+- [ ] `curl -i 'http://localhost:3000/api/draft?secret=<secret>&redirect=/'` returns a 307 with the draft cookie set
+- [ ] `curl -i 'http://localhost:3000/api/draft?secret=wrong&redirect=/'` returns 401 or 403
+- [ ] `curl -i 'http://localhost:3000/api/draft?secret=<secret>&redirect=https://evil.com'` is rejected
+- [ ] No `DRAFT_MODE_SECRET` value appears in any committed file
+
+## Reporting
+
+When you're done, tell me:
+1. Which files you created or modified, with one-sentence reasons
+2. The verification checklist results (one line each)
+3. What I need to do next: add the orchestrator URL to the editor, register the site, generate my first edit
+````
+
+## Reading the docs offline
+
+If you'd rather have your agent read the docs from your local checkout instead of fetching them from the internet, point it at the `docs-site/` directory of the [Avocado repo](https://github.com/yu7321/avocado):
+
+```bash
+git clone https://github.com/yu7321/avocado.git /tmp/avocado
+# then in your prompt:
+# "Required reading: read these files in order:
+#   /tmp/avocado/docs-site/concepts.mdx
+#   /tmp/avocado/docs-site/integration/nextjs-mvp-embedded.mdx
+#   /tmp/avocado/docs-site/integration/custom-blocks.mdx"
+```
+
+This is also useful if you're behind a corporate proxy or firewall.
+
+## When the agent gets stuck
+
+If your agent reports it can't proceed, the most common reasons:
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Can't find SDK package | Not yet published to a registry your agent can reach | Use `file:` or `link:` install pointing at a local clone of the Avocado repo |
+| Doesn't know what `BlockInstance` looks like | Skipped the concepts page | Force it to read `docs-site/concepts.mdx` first |
+| Generates a `/preview` route | Confused embedded mode with old preview-route mode | Re-emphasize: **embedded mode, no `/preview` route**, Draft Mode cookies only |
+| Refactors your components into a Puck-style layout | Read too far ahead | Tell it to ignore Puck mode for this pass — that's a separate opt-in |
+
+If you're still stuck after that, fall back to the **[Site Agent](/sites/site-agent)** (which has Avocado-specific MCP tools and won't get confused by docs ambiguity) or the **[manual path](/sites/manual)**.
+
+## After the agent finishes
+
+The integration is code-level. To finish bringing the site online you still need to:
+
+1. Start the orchestrator (`pnpm dev:orchestrator` or your hosted instance)
+2. Open the editor and **register the site** — give it your dev URL, the `DRAFT_MODE_SECRET`, and pick a publishing target
+3. Generate your first edit from the chat panel to confirm the round trip works
+
+Steps 2 and 3 are UI-driven and aren't something a coding agent can do for you.
