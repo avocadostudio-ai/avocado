@@ -1,7 +1,10 @@
-<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g>
+<svg width="980" height="160" viewBox="0 0 980 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(16, 16)">
     <path d="M64 8C88 8 112 40 112 72C112 104 88 120 64 120C40 120 16 104 16 72C16 40 40 8 64 8Z" fill="#14532D"/>
     <path d="M64 18C82 18 100 44 100 72C100 100 82 110 64 110C46 110 28 100 28 72C28 44 46 18 64 18Z" fill="#84CC16"/>
     <circle cx="64" cy="72" r="20" fill="#6B3E2E"/>
   </g>
+  <text x="160" y="118" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="96" font-weight="700" letter-spacing="-3">
+    <tspan fill="#65A30D">Avocado</tspan><tspan fill="#14532D"> Studio</tspan>
+  </text>
 </svg>
