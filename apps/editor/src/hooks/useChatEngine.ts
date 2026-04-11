@@ -443,7 +443,22 @@ export function useChatEngine(config: ChatEngineConfig) {
       /** Advance the progress stepper: mark previous step done, add new active step */
       const normalizeStepLabel = (s: string) =>
         s.replace(/[\u2026.]+$/, "").replace(/\s*\([\d/,\s]+\)$/, "").trim()
-      const advanceStep = (label: string) => {
+      // Collapse the orchestrator's 10 pre-op status tones (analyzing,
+      // understanding, breaking_down, thinking, planning, generating_plan,
+      // validating, repairing, …) — each with 3 rotating variants — into a
+      // single stable label. Without this, a one-op rewrite shows 4+ noisy
+      // bullets before the first change lands. plan_meta ("Plan ready (N)"),
+      // op_applied ("Applying changes (n/m)"), and image-resolution tones are
+      // preserved because they're actual user-visible state transitions.
+      const collapseServerStatusLabel = (raw: string): string => {
+        const lower = raw.toLowerCase()
+        if (/resolving image|collecting image|preparing image/.test(lower)) return "Resolving images…"
+        if (/^plan ready/.test(lower)) return raw
+        if (/^applying/.test(lower) || /updating draft/.test(lower)) return raw
+        return "Planning…"
+      }
+      const advanceStep = (rawLabel: string) => {
+        const label = collapseServerStatusLabel(rawLabel)
         const baseLabel = normalizeStepLabel(label)
         const prevBase = currentStepLabel ? normalizeStepLabel(currentStepLabel) : null
         if (baseLabel === prevBase) {
