@@ -33,6 +33,7 @@
     "dev:site": "pnpm --filter @ai-site-editor/site dev",
     "dev:editor": "pnpm --filter @ai-site-editor/editor dev",
     "dev:orchestrator": "pnpm --filter @ai-site-editor/orchestrator dev",
+    "dev:contentful-marketing": "pnpm --filter contentful-marketing-site dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --if-present test",
