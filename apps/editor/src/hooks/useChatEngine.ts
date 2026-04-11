@@ -467,14 +467,15 @@ export function useChatEngine(config: ChatEngineConfig) {
         })
       }
 
-      const sendLiveDraft = (force = false) => {
+      const sendLiveDraft = (force = false, commit = false) => {
         if (!liveDraftBlockId) return
         if (!force && !liveDraftActive) return
         postToSite("liveDraft", {
           blockId: liveDraftBlockId,
           text: liveDraftText.slice(0, 2400),
           active: liveDraftActive,
-          ...(liveDraftFields ? { fields: liveDraftFields } : {})
+          ...(liveDraftFields ? { fields: liveDraftFields } : {}),
+          ...(commit ? { commit: true } : {})
         })
       }
 
@@ -583,7 +584,7 @@ export function useChatEngine(config: ChatEngineConfig) {
               if (!liveDraftEndDeferred) return
               if (liveDraftTypingRendered !== liveDraftTypingDesired) return
               liveDraftEndDeferred = false
-              endLiveDraft()
+              endLiveDraft(true)
             }, 64)
           }
           return
@@ -675,12 +676,16 @@ export function useChatEngine(config: ChatEngineConfig) {
         runLiveDraftTypingTick()
       }
 
-      const endLiveDraft = () => {
+      // commit=true means the optimistic DOM already matches the committed
+      // server state, so the iframe should discard saved originals instead of
+      // restoring them. Use after op_applied; leave false for rollback/cancel
+      // paths where we genuinely need to revert the live-draft DOM hack.
+      const endLiveDraft = (commit = false) => {
         clearLiveDraftTimer()
         resetLiveDraftTyping()
         if (!liveDraftBlockId && !liveDraftActive) return
         liveDraftActive = false
-        sendLiveDraft(true)
+        sendLiveDraft(true, commit)
         liveDraftText = ""
         liveDraftFields = null
       }
@@ -884,7 +889,7 @@ export function useChatEngine(config: ChatEngineConfig) {
             if (sawFieldDraftThisRun && typingInProgress) {
               deferEndLiveDraftUntilTypingSettles()
             } else {
-              endLiveDraft()
+              endLiveDraft(true)
             }
           }
           postToSite("removeSkeleton", {})
