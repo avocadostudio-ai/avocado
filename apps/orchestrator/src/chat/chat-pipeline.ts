@@ -1644,6 +1644,43 @@ export async function runChatPipeline(
       // unsplash.search during planning, but we returned placeholders to unblock
       // text streaming. Now execute the real tools and patch results into the preview.
       if (deferredNativeImageCalls.length > 0 && options?.onOpApplied) {
+        // Helper: clear shimmer placeholders left behind by a failed deferred
+        // tool call so the UI doesn't get stuck on "Generating image…".
+        const emitPlaceholderClearPatches = async (reason: string) => {
+          for (const op of resolvedPlan.ops) {
+            if (op.op !== "update_props") continue
+            const patch = op.patch as Record<string, unknown>
+            const props = (typeof patch.props === "object" && patch.props !== null && !Array.isArray(patch.props))
+              ? patch.props as Record<string, unknown>
+              : patch
+            if (!isGeneratingPlaceholder(String(props.imageUrl ?? ""))) continue
+            const clearOp: Operation = {
+              op: "update_props",
+              pageSlug: op.pageSlug,
+              blockId: op.blockId,
+              patch: { props: { imageUrl: "" } }
+            }
+            try {
+              await applyOpsAtomically(body.session!, [clearOp], { componentsManifest })
+              const clearVersion = bumpVersion(body.session!)
+              options.onOpApplied!({
+                index: 1,
+                total: 1,
+                op: clearOp,
+                previewVersion: clearVersion,
+                focusBlockId: op.blockId
+              })
+            } catch (clearErr) {
+              ctx.log.warn(
+                { event: "deferred_native_image_clear_failed", reason, chatRequestId, error: toErrorDetail(clearErr) },
+                "Failed to clear shimmer placeholder after deferred image tool failure"
+              )
+            }
+          }
+          // Also clear any stray placeholders still in session state (e.g. nested in arrays)
+          cleanupImagePlaceholders(body.session!)
+        }
+
         try {
           const imageResolutionStartMs = Date.now()
           emitStatusTone("resolving_assets")
@@ -1665,14 +1702,29 @@ export async function runChatPipeline(
                 policy: ctx.toolRuntime?.defaultPolicy
               }), options?.signal)
 
-              if (!result.ok) continue
+              if (!result.ok) {
+                ctx.log.warn(
+                  { event: "deferred_native_image_tool_error", toolName: deferred.toolName, chatRequestId, errorCode: result.error?.code, errorMessage: result.error?.message },
+                  `Deferred ${deferred.toolName} returned error — clearing placeholder`
+                )
+                options?.onStatusUpdate?.("Image generation failed — you can try again or set images manually.")
+                await emitPlaceholderClearPatches("tool_error")
+                continue
+              }
 
               // Extract the real imageUrl from the tool result
               const data = result.data as Record<string, unknown>
               const realImageUrl = deferred.toolName === "image.generate"
                 ? (data.imageUrl as string | undefined)
                 : ((data.items as Array<{ imageUrl?: string }> | undefined)?.[0]?.imageUrl)
-              if (!realImageUrl) continue
+              if (!realImageUrl) {
+                ctx.log.warn(
+                  { event: "deferred_native_image_empty_result", toolName: deferred.toolName, chatRequestId },
+                  `Deferred ${deferred.toolName} returned no imageUrl — clearing placeholder`
+                )
+                await emitPlaceholderClearPatches("empty_result")
+                continue
+              }
 
               const realAlt = deferred.toolName === "image.generate"
                 ? (data.alt as string | undefined)
@@ -1713,8 +1765,10 @@ export async function runChatPipeline(
               if (isCancelError(singleErr)) throw singleErr
               ctx.log.warn(
                 { event: "deferred_native_image_failed", toolName: deferred.toolName, chatRequestId, error: toErrorDetail(singleErr) },
-                `Deferred ${deferred.toolName} failed — preview remains with placeholder`
+                `Deferred ${deferred.toolName} failed — clearing placeholder`
               )
+              options?.onStatusUpdate?.("Image generation failed — you can try again or set images manually.")
+              await emitPlaceholderClearPatches("exception")
             }
           }
           imageResolutionDurationMs += Date.now() - imageResolutionStartMs
@@ -1725,6 +1779,7 @@ export async function runChatPipeline(
             "Deferred native image resolution failed"
           )
           options?.onStatusUpdate?.("Image generation failed — you can try again or set images manually.")
+          await emitPlaceholderClearPatches("outer_exception")
         }
       }
 

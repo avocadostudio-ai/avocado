@@ -110,7 +110,15 @@ export class ToolExecutor {
         const combinedSignal = args.signal
           ? AbortSignal.any([args.signal, AbortSignal.timeout(tool.manifest.timeoutMs)])
           : AbortSignal.timeout(tool.manifest.timeoutMs)
-        const output = await tool.handler({ input: args.input, context: args.context, manifest: tool.manifest, signal: combinedSignal })
+        // Defense-in-depth: race the handler against a hard timeout Promise.
+        // `combinedSignal` is passed to the handler so well-behaved tools can
+        // abort their underlying I/O, but handlers that forget to wire the
+        // signal through (or underlying SDKs that ignore it) would otherwise
+        // hang forever. The race guarantees we always reject after timeoutMs.
+        const output = await Promise.race([
+          tool.handler({ input: args.input, context: args.context, manifest: tool.manifest, signal: combinedSignal }),
+          timeoutPromise(tool.manifest.timeoutMs)
+        ])
 
         const outputValidation = validateAgainstSchema(output, tool.manifest.outputSchema)
         if (!outputValidation.ok) {
