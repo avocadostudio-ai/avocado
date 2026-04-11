@@ -10,28 +10,28 @@ function isBrowser() {
 
 export function getStoredAccessToken() {
   if (!isBrowser()) return ""
-  return sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? ""
+  return localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? ""
 }
 
 export function setStoredAccessToken(token: string) {
   if (!isBrowser()) return
   const normalized = token.trim()
   if (!normalized) {
-    sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
     return
   }
-  sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, normalized)
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, normalized)
 }
 
 export function clearStoredAccessToken() {
   if (!isBrowser()) return
-  sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
 }
 
 export function clearStoredAccessGrant() {
   if (!isBrowser()) return
-  sessionStorage.removeItem(ACCESS_GRANTED_STORAGE_KEY)
-  sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
+  localStorage.removeItem(ACCESS_GRANTED_STORAGE_KEY)
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
 }
 
 function isOrchestratorRequestUrl(value: string) {

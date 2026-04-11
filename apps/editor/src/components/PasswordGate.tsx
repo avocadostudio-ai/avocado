@@ -24,7 +24,7 @@ export function PasswordGate({ children }: { children: ReactNode }) {
           clearStoredAccessToken()
           setAuthorized(true)
         } else {
-          const hasGrant = Boolean(sessionStorage.getItem(ACCESS_GRANTED_STORAGE_KEY))
+          const hasGrant = Boolean(localStorage.getItem(ACCESS_GRANTED_STORAGE_KEY))
           const hasToken = getStoredAccessToken().length > 0
           setAuthorized(hasGrant && hasToken)
         }
@@ -47,7 +47,7 @@ export function PasswordGate({ children }: { children: ReactNode }) {
       })
       const data = (await res.json().catch(() => ({}))) as { accessToken?: string }
       if (res.ok) {
-        sessionStorage.setItem(ACCESS_GRANTED_STORAGE_KEY, "1")
+        localStorage.setItem(ACCESS_GRANTED_STORAGE_KEY, "1")
         setStoredAccessToken(data.accessToken ?? "")
         setAuthorized(true)
       } else {
