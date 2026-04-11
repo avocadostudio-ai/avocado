@@ -874,5 +874,62 @@
         }
       }
     ]
+  },
+  {
+    "id": "p_test",
+    "slug": "/test",
+    "title": "Test",
+    "updatedAt": "2026-04-11T12:47:26.458Z",
+    "blocks": [
+      {
+        "id": "b_hero_test",
+        "type": "Hero",
+        "props": {
+          "heading": "Test",
+          "subheading": "Use this page to introduce Test.",
+          "ctaText": "Explore Now",
+          "ctaHref": "/",
+          "imageUrl": "/generated-images/gen_1775911643389_vr20uh.jpg",
+          "imageAlt": "vibrant healthy lifestyle scene with fresh vegetables, fruits, and a person enjoying a nutritious meal in a bright, modern kitchen",
+          "imagePosition": "right",
+          "textAlign": "left"
+        }
+      },
+      {
+        "id": "b_stats_1775908492035",
+        "type": "Stats",
+        "props": {
+          "title": "Key Metrics",
+          "stats": [
+            {
+              "value": "2.5M",
+              "label": "Users Active"
+            },
+            {
+              "value": "94%",
+              "label": "Daily Engagement"
+            },
+            {
+              "value": "1,200+",
+              "label": "Content Articles"
+            },
+            {
+              "value": "45K",
+              "label": "Community Members"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b_cta_1775908492035",
+        "type": "CTA",
+        "props": {
+          "title": "Ready to Get Started?",
+          "description": "Join thousands of users already experiencing the benefits. Sign up today and unlock full access to all features.",
+          "ctaText": "Start Free Trial",
+          "ctaHref": "/signup"
+        }
+      }
+    ]
   }
 ]
