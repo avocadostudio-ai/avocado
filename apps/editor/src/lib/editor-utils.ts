@@ -47,6 +47,7 @@ export {
   MODEL_KEY_STORAGE_KEY,
   PROVIDER_STORAGE_KEY,
   CHAT_THEME_STORAGE_KEY,
+  DEV_OPTIONS_STORAGE_KEY,
   previewPresetWidths,
   createId,
   resolveDefaultDebugMode,
@@ -54,6 +55,7 @@ export {
   resolveDefaultProvider,
   resolveDefaultChatDarkMode,
   resolveAnchoredComposerEnabled,
+  resolveDevOptionsEnabled,
   mergedVariationProps,
   splitAiInsightChanges
 } from "./defaults"

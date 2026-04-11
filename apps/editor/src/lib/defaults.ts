@@ -6,6 +6,39 @@ export const DEBUG_MODE_STORAGE_KEY = "editor-debug-mode-v1"
 export const MODEL_KEY_STORAGE_KEY = "editor-model-key-v1"
 export const PROVIDER_STORAGE_KEY = "editor-provider-v1"
 export const CHAT_THEME_STORAGE_KEY = "editor-chat-theme-v1"
+export const DEV_OPTIONS_STORAGE_KEY = "editor-dev-options-v1"
+
+/**
+ * Resolves whether developer-only settings (Streaming, Nested labels, Field
+ * draft telemetry, Debug mode) should be shown in the Settings panel.
+ *
+ * Precedence (highest wins):
+ *   1. ?dev=1 / ?dev=0 URL param — persisted to localStorage so it sticks
+ *      across navigations. Useful as a runtime escape hatch on any build.
+ *   2. localStorage value set by a prior ?dev= param.
+ *   3. VITE_SHOW_DEV_OPTIONS env var (build-time default).
+ */
+export function resolveDevOptionsEnabled(): boolean {
+  const envEnabled = /^(1|true|yes|on)$/i.test((import.meta.env.VITE_SHOW_DEV_OPTIONS as string | undefined) ?? "")
+  if (typeof window === "undefined") return envEnabled
+
+  const params = new URLSearchParams(window.location.search)
+  const devParam = params.get("dev")
+  if (devParam !== null) {
+    const enabled = /^(1|true|yes|on)$/i.test(devParam)
+    try {
+      window.localStorage.setItem(DEV_OPTIONS_STORAGE_KEY, enabled ? "1" : "0")
+    } catch {
+      // ignore storage failures (private mode, etc.)
+    }
+    return enabled
+  }
+
+  const stored = window.localStorage.getItem(DEV_OPTIONS_STORAGE_KEY)
+  if (stored === "1") return true
+  if (stored === "0") return false
+  return envEnabled
+}
 
 export const previewPresetWidths: Record<PreviewWidthPreset, number> = {
   desktop: 1200,
