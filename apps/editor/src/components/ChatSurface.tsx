@@ -76,6 +76,11 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
     )
   })
   const isEmpty = !hasRenderableEntry && !streamingText && !streamStatus
+  // K + D: once the user has posted at least one message, collapse the
+  // permanent welcome bubble. If a field AI context entry is open, suppress
+  // the welcome's suggestion strip so we don't render two competing rows.
+  const hasUserTurn = entries.some((e) => e.role === "user")
+  const hasFieldContext = entries.some((e) => e.fieldAiContext)
 
   return (
     <div className={className} style={style} ref={ref}>
@@ -88,6 +93,19 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
         (() => {
           const rawText = typeof entry.text === "string" ? entry.text : ""
           const safeText = rawText.trim().length > 0 ? rawText : (entry.role === "assistant" ? "…" : "")
+          const isWelcome = entry.id === "welcome"
+          const collapseWelcome = isWelcome && hasUserTurn
+          const suppressWelcomeSuggestions = isWelcome && hasFieldContext
+          if (collapseWelcome) {
+            return (
+              <article key={entry.id} className="msg msg-assistant msg-welcome-collapsed">
+                <details>
+                  <summary>Welcome</summary>
+                  <div className="msg-main">{renderFinalMarkdown(safeText)}</div>
+                </details>
+              </article>
+            )
+          }
           return (
         <article
           key={entry.id}
@@ -117,7 +135,7 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
               </ul>
             )
           })()}
-          {!entry.variations && (entry.suggestions ?? []).length > 0 ? (
+          {!entry.variations && !suppressWelcomeSuggestions && (entry.suggestions ?? []).length > 0 ? (
             <div className="msg-suggestions">
               {entry.suggestions?.map((line, idx) => (
                 <button
