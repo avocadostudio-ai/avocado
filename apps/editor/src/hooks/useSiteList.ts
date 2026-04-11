@@ -9,6 +9,7 @@ import {
   siteNameFromId,
   resolveEditorPreviewUrl
 } from "../lib/editor-utils"
+import { isPresetId, markPresetDeleted, unmarkPresetDeleted } from "../lib/site-presets"
 
 /** Orchestrator-side site header config (name, logo, navLabels). */
 export interface HeaderConfig {
@@ -102,6 +103,51 @@ export function useSiteList(siteId: string, session: string) {
       // Ignore storage failures.
     }
   }, [siteList])
+
+  // On mount, fetch the orchestrator's site registry and merge any sites we
+  // don't already know about into the local list. This is how sites registered
+  // out-of-band (e.g. via the `@ai-site-editor/site-sdk register` bin script
+  // or an external coding agent calling POST /sites/register) auto-appear in
+  // the dashboard without forcing the user to click "Add Site".
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`${orchestrator}/sites?session=${encodeURIComponent(session)}`)
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as { sites?: Array<Partial<SiteConfig> & { id?: string }> }
+        if (!Array.isArray(data.sites) || data.sites.length === 0) return
+        setSiteList((prev) => {
+          const known = new Set(prev.map((s) => s.id))
+          const additions: SiteConfig[] = []
+          for (const incoming of data.sites!) {
+            if (!incoming.id || known.has(incoming.id)) continue
+            // Coerce partial orchestrator-side config into the editor's SiteConfig shape
+            additions.push({
+              id: incoming.id,
+              name: incoming.name ?? siteNameFromId(incoming.id) ?? "Site",
+              purpose: incoming.purpose ?? "",
+              hosting: incoming.hosting ?? DEFAULT_SITE_HOSTING,
+              previewUrl: incoming.previewUrl,
+              tone: incoming.tone,
+              constraints: incoming.constraints,
+              vercelProjectId: incoming.vercelProjectId,
+              vercelTeamId: incoming.vercelTeamId,
+              vercelProductionUrl: incoming.vercelProductionUrl,
+              vercelDeployHookUrl: incoming.vercelDeployHookUrl,
+              gdriveFolderId: incoming.gdriveFolderId,
+              cmsMedia: incoming.cmsMedia,
+              enablePuck: incoming.enablePuck,
+              pageTemplates: incoming.pageTemplates,
+            })
+          }
+          if (additions.length === 0) return prev
+          return [...prev, ...additions]
+        })
+      } catch { /* offline / orchestrator down — fall back to localStorage */ }
+    })()
+    return () => { cancelled = true }
+  }, [session])
 
   // Fetch orchestrator-side header config on mount and when config modal opens
   const fetchHeaderConfig = useCallback(async (targetSiteId: string) => {
@@ -286,6 +332,9 @@ export function useSiteList(siteId: string, session: string) {
       .map((item) => item.trim())
       .filter(Boolean)
     const previewUrl = newSiteForm.previewUrl.trim()
+    // If the user is re-adding a preset they previously deleted, clear
+    // the tombstone so mergePresets stops filtering it.
+    if (isPresetId(nextId)) unmarkPresetDeleted(nextId)
     setSiteList((prev) => [
       ...prev,
       {
@@ -372,6 +421,7 @@ export function useSiteList(siteId: string, session: string) {
     siteTileRefreshToken,
     addSiteFromName,
     addSiteFromConfig: (config: SiteConfig) => {
+      if (isPresetId(config.id)) unmarkPresetDeleted(config.id)
       setSiteList((prev) => {
         const existing = prev.find((s) => s.id === config.id)
         if (existing) {
@@ -384,6 +434,9 @@ export function useSiteList(siteId: string, session: string) {
     removeSite: (id: string) => {
       setSiteList((prev) => prev.filter((s) => s.id !== id))
       if (configSiteId === id) setConfigSiteId(null)
+      // Remember the deletion so the preset isn't re-added on the next
+      // page load by mergePresets in loadSiteListFromStorage.
+      if (isPresetId(id)) markPresetDeleted(id)
     },
     openEditorForSite,
     openRestoreModal,
