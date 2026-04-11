@@ -1004,7 +1004,7 @@ export function createBridgeFunctions(
       window.setTimeout(() => {
         match.classList.remove("editor-flash")
         match.classList.remove("editor-enter")
-      }, 280)
+      }, 620)
     }
 
     const toolbar = document.createElement("div")

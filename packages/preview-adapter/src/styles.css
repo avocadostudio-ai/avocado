@@ -909,7 +909,7 @@
 }
 
 .editor-flash {
-  animation: flash 260ms ease-out;
+  animation: flash 600ms ease-out;
 }
 
 .aifx-updated {
@@ -931,9 +931,9 @@
   background: linear-gradient(
     108deg,
     transparent 22%,
-    rgba(var(--editor-selected-rgb), 0.03) 34%,
-    rgba(var(--editor-selected-rgb), 0.24) 49%,
-    rgba(var(--editor-selected-rgb), 0.03) 64%,
+    rgba(var(--editor-selected-rgb), 0.05) 34%,
+    rgba(var(--editor-selected-rgb), 0.45) 49%,
+    rgba(var(--editor-selected-rgb), 0.05) 64%,
     transparent 78%
   );
   transform: translateX(-128%);
@@ -951,10 +951,20 @@
 
 @keyframes flash {
   0% {
-    border-color: rgba(var(--editor-accent-rgb), 0.55);
+    border-color: rgba(var(--editor-accent-rgb), 0.95);
+    box-shadow:
+      0 0 0 3px rgba(var(--editor-accent-rgb), 0.45),
+      0 10px 40px rgba(var(--editor-accent-rgb), 0.30);
+  }
+  40% {
+    border-color: rgba(var(--editor-accent-rgb), 0.75);
+    box-shadow:
+      0 0 0 2px rgba(var(--editor-accent-rgb), 0.28),
+      0 6px 24px rgba(var(--editor-accent-rgb), 0.18);
   }
   100% {
     border-color: transparent;
+    box-shadow: 0 0 0 0 rgba(var(--editor-accent-rgb), 0);
   }
 }
 
@@ -1093,6 +1103,9 @@
 @media (prefers-reduced-motion: reduce) {
   .aifx-updated::before,
   .aifx-updated::after {
+    animation: none !important;
+  }
+  .editor-flash {
     animation: none !important;
   }
   .aifx-shimmer-overlay,
