@@ -457,8 +457,23 @@ export function useChatEngine(config: ChatEngineConfig) {
         if (/^applying/.test(lower) || /updating draft/.test(lower)) return raw
         return "Planning…"
       }
+      // Monotonic phase rank. Once the stepper has reached a later phase, a
+      // trailing pre-op status event (e.g. the server emitting one more
+      // "Planning…" tone after op_applied already fired) must not create a
+      // stale bullet below the applying row. Reject any incoming label that
+      // ranks strictly below the current step.
+      const getStepRank = (label: string): number => {
+        const lower = label.toLowerCase()
+        if (/^resolving/.test(lower)) return 4
+        if (/^applying/.test(lower)) return 3
+        if (/^plan ready/.test(lower)) return 2
+        return 1
+      }
       const advanceStep = (rawLabel: string) => {
         const label = collapseServerStatusLabel(rawLabel)
+        const incomingRank = getStepRank(label)
+        const prevRank = currentStepLabel ? getStepRank(currentStepLabel) : 0
+        if (incomingRank < prevRank) return
         const baseLabel = normalizeStepLabel(label)
         const prevBase = currentStepLabel ? normalizeStepLabel(currentStepLabel) : null
         if (baseLabel === prevBase) {
