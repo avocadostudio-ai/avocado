@@ -13,6 +13,14 @@ const de: LocaleDict = {
   "header.viewAllSites": "Alle Websites anzeigen",
   "header.limited": "Eingeschränkt",
   "header.demoMode": "Demomodus",
+
+  // -- Demo mode banner --
+  "demo.bannerTitle": "Du bist im Demomodus",
+  "demo.bannerBody": "Das ist ein Live-Playground. Du kannst die Hero-Sektion per Klartext bearbeiten — alles andere ist vorerst gesperrt.",
+  "demo.tryExample1": "Ändere die Hero-Überschrift zu \"Willkommen auf meiner neuen Seite\"",
+  "demo.tryExample2": "Lass die Hero-Unterzeile verspielter klingen",
+  "demo.tryExample3": "Aktualisiere den Hero-CTA zu \"Jetzt starten\"",
+  "demo.placeholder": "Versuch: ändere die Hero-Überschrift zu \u2026",
   "header.moreOptions": "Weitere Optionen",
   "header.publish": "Veröffentlichen",
   "header.publishing": "Wird veröffentlicht",

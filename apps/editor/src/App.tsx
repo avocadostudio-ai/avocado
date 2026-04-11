@@ -49,6 +49,7 @@ import {
 } from "./lib/editor-utils"
 
 const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
 const PuckChatPrototype = lazy(
   () => import("./components/PuckPrototypeRoute").then((mod) => ({ default: mod.PuckPrototypeRoute }))
 )
@@ -1159,6 +1160,39 @@ function EditorPage({
             </select>
           </label>
         </header>
+
+        {IS_DEMO_MODE && activeTab === "chat" ? (
+          <div className="demo-banner" role="note" aria-label="Demo mode notice">
+            <div className="demo-banner-title">{t("demo.bannerTitle")}</div>
+            <div className="demo-banner-body">{t("demo.bannerBody")}</div>
+            <div className="demo-banner-examples">
+              <button
+                type="button"
+                className="demo-banner-example"
+                disabled={isLoading}
+                onClick={() => void chatEngine.submitChat(t("demo.tryExample1"))}
+              >
+                {t("demo.tryExample1")}
+              </button>
+              <button
+                type="button"
+                className="demo-banner-example"
+                disabled={isLoading}
+                onClick={() => void chatEngine.submitChat(t("demo.tryExample2"))}
+              >
+                {t("demo.tryExample2")}
+              </button>
+              <button
+                type="button"
+                className="demo-banner-example"
+                disabled={isLoading}
+                onClick={() => void chatEngine.submitChat(t("demo.tryExample3"))}
+              >
+                {t("demo.tryExample3")}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <ChatThreadCore
           ref={chatThreadRef}

@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { ArrowUp, Check, Mic, MousePointerClick, Plus, Square, X } from "lucide-react"
 import { useT } from "@/i18n"
 
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
+
 type Props = {
   message: string
   isLoading: boolean
@@ -277,7 +279,7 @@ export default function ClaudeStyleChatInput(props: Props) {
       <div className="composer-input-area">
         <textarea
           ref={textareaRef}
-          placeholder={t("chatInput.placeholder")}
+          placeholder={IS_DEMO_MODE ? t("demo.placeholder") : t("chatInput.placeholder")}
           value={message}
           onChange={(e) => {
             onMessageChange(e.target.value)

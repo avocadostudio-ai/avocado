@@ -83,6 +83,7 @@ import {
   tryCompoundDeterministicPlan
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI, type PlannerSchemaContextMeta } from "./planner.js"
+import { isDemoModeEnabled, splitDemoOps, getDemoAllowedBlockTypes } from "../demo-mode.js"
 import { isCancelError as _isCancelError } from "../errors.js"
 // `isCancelError` is used directly (without underscore) in runChatPipeline
 const isCancelError = _isCancelError
@@ -1373,6 +1374,41 @@ export async function runChatPipeline(
             modelUsed,
             modelKey
           } satisfies ChatResult, { outcome: "blocked_structural_capability" })
+        }
+      }
+    }
+
+    // Demo-mode guard: returns a friendly "needs_clarification" before we
+    // hit the ops-engine hard gate. The engine gate still runs as a safety
+    // net (`enforceDemoOps` in ops-engine.ts) — this one exists purely for
+    // UX so the user sees an example prompt instead of a generic error.
+    if (isDemoModeEnabled()) {
+      const stagedForDemo = new Map<string, PageDoc>()
+      for (const [slug, page] of getSessionDraft(body.session!)) {
+        stagedForDemo.set(slug, page)
+      }
+      const demoSplit = splitDemoOps(resolvedPlan.ops, stagedForDemo)
+      if (demoSplit.rejected.length > 0) {
+        const allowedBlockLabel = getDemoAllowedBlockTypes().join(" / ")
+        return {
+          done: true as const,
+          response: {
+            code: 200,
+            payload: withDebugPayload({
+              status: "needs_clarification",
+              summary: `This demo only supports editing the ${allowedBlockLabel} section. Try a hero-focused request — everything else is locked for now.`,
+              changes: [
+                "Try: \"change the hero headline to Welcome to my new site\"",
+                "Try: \"make the hero subheading sound more playful\"",
+                "Try: \"update the hero CTA to Get Started\""
+              ],
+              mentionedSlugs: [effectiveSlug],
+              previewVersion: versions.get(body.session!) ?? 0,
+              plannerSource: source,
+              modelUsed,
+              modelKey
+            } satisfies ChatResult, { outcome: "blocked_demo_mode" })
+          }
         }
       }
     }
