@@ -287,6 +287,7 @@ export async function generateVariationImageWithOpenAI(args: {
   background?: "transparent" | "opaque" | "auto"
   outputFormat?: "png" | "webp" | "jpeg"
   log?: ImageLogger
+  signal?: AbortSignal
 }): Promise<UnsplashImage | null> {
   if (!process.env.OPENAI_API_KEY) {
     args.log?.warn({ event: "openai_image_skip", reason: "no_api_key" }, "Skipping OpenAI image generation: OPENAI_API_KEY not set")
@@ -305,13 +306,17 @@ export async function generateVariationImageWithOpenAI(args: {
 
   const genStartMs = Date.now()
   try {
+    // Forward AbortSignal to the OpenAI SDK so the HTTP request is cancelled
+    // when the tool executor's timeout (or the upstream chat request) aborts.
+    // Without this, a hung OpenAI API call would wedge the deferred image
+    // resolution loop indefinitely and leave the preview on "Generating image…".
     const result = await client.images.generate({
       model,
       prompt: args.prompt,
       size: size as "1536x1024",
       background,
       output_format: outputFormat,
-    })
+    }, args.signal ? { signal: args.signal } : undefined)
     const durationMs = Date.now() - genStartMs
 
     const image = result.data?.[0]
@@ -320,7 +325,7 @@ export async function generateVariationImageWithOpenAI(args: {
     if (typeof image?.b64_json === "string" && image.b64_json.length > 0) {
       bytes = Buffer.from(image.b64_json, "base64")
     } else if (typeof image?.url === "string" && image.url.length > 0) {
-      const fetched = await fetch(image.url)
+      const fetched = await fetch(image.url, args.signal ? { signal: args.signal } : undefined)
       if (fetched.ok) {
         const arrayBuffer = await fetched.arrayBuffer()
         bytes = Buffer.from(arrayBuffer)
@@ -420,6 +425,7 @@ export async function generateVariationImageWithGemini(args: {
   background?: "transparent" | "opaque" | "auto"
   model?: string
   log?: ImageLogger
+  signal?: AbortSignal
 }): Promise<UnsplashImage | null> {
   if (!process.env.GOOGLE_GENAI_API_KEY?.trim()) {
     args.log?.warn({ event: "gemini_image_skip", reason: "no_api_key" }, "Skipping Gemini image generation: GOOGLE_GENAI_API_KEY not set")
@@ -440,7 +446,10 @@ export async function generateVariationImageWithGemini(args: {
 
   const genStartMs = Date.now()
   try {
-    const response = await ai.models.generateContent({
+    // The @google/genai SDK does not expose an AbortSignal option, so we
+    // race the request against the signal manually. The executor enforces
+    // a hard timeout on top of this as a last line of defense.
+    const requestPromise = ai.models.generateContent({
       model,
       contents: effectivePrompt,
       config: {
@@ -448,6 +457,18 @@ export async function generateVariationImageWithGemini(args: {
         imageConfig: { aspectRatio: geminiAspectRatio, imageSize }
       }
     })
+    const response = args.signal
+      ? await Promise.race([
+          requestPromise,
+          new Promise<never>((_resolve, reject) => {
+            if (args.signal!.aborted) {
+              reject(new Error("Gemini image request aborted"))
+              return
+            }
+            args.signal!.addEventListener("abort", () => reject(new Error("Gemini image request aborted")), { once: true })
+          })
+        ])
+      : await requestPromise
     const durationMs = Date.now() - genStartMs
     const parts = response.candidates?.[0]?.content?.parts
     if (!parts) return null

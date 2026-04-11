@@ -141,7 +141,7 @@ export const imageGenerateManifest: ToolManifest = {
   }
 }
 
-export const imageGenerateHandler: ToolHandler = async ({ input, context }) => {
+export const imageGenerateHandler: ToolHandler = async ({ input, context, signal }) => {
   const typed = (input ?? {}) as ImageGenerateInput
   const prompt = typeof typed.prompt === "string" ? typed.prompt.trim() : ""
   if (!prompt) {
@@ -204,24 +204,30 @@ export const imageGenerateHandler: ToolHandler = async ({ input, context }) => {
   const provider = (process.env.IMAGE_GEN_PROVIDER?.trim().toLowerCase()) || "openai"
 
   const genStart = Date.now()
-  const result = provider === "gemini"
-    ? await generateVariationImageWithGemini({
-        prompt: enrichedPrompt,
-        altText: prompt,
-        aspectRatio,
-        quality,
-        background,
-      })
-    : await generateVariationImageWithOpenAI({
-        prompt: enrichedPrompt,
-        altText: prompt,
-        size,
-        model,
-        background,
-        outputFormat,
-      })
-  recordImageGenDuration(Date.now() - genStart)
-  if (progressTimer) clearInterval(progressTimer)
+  let result: Awaited<ReturnType<typeof generateVariationImageWithOpenAI>> = null
+  try {
+    result = provider === "gemini"
+      ? await generateVariationImageWithGemini({
+          prompt: enrichedPrompt,
+          altText: prompt,
+          aspectRatio,
+          quality,
+          background,
+          signal,
+        })
+      : await generateVariationImageWithOpenAI({
+          prompt: enrichedPrompt,
+          altText: prompt,
+          size,
+          model,
+          background,
+          outputFormat,
+          signal,
+        })
+  } finally {
+    recordImageGenDuration(Date.now() - genStart)
+    if (progressTimer) clearInterval(progressTimer)
+  }
   onProgress?.({ percent: 100, stage: "Done" })
 
   if (!result) {
