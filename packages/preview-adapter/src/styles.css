@@ -910,6 +910,7 @@
 
 .editor-flash {
   animation: flash 600ms ease-out;
+  will-change: box-shadow, border-color;
 }
 
 .aifx-updated {
