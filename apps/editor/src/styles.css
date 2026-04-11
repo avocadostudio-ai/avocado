@@ -1283,6 +1283,40 @@ textarea {
   max-width: 94%;
 }
 
+.msg-welcome-collapsed {
+  background: transparent;
+  padding: 4px 8px;
+  opacity: 0.7;
+}
+
+.msg-welcome-collapsed summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #6b7280;
+  list-style: none;
+  user-select: none;
+}
+
+.msg-welcome-collapsed summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.msg-welcome-collapsed details[open] summary::before {
+  content: "▾ ";
+}
+
+.msg-welcome-collapsed details[open] {
+  margin-top: 6px;
+}
+
+.msg-welcome-collapsed details[open] .msg-main {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
 .msg-has-undo {
   width: 100%;
   max-width: 100%;
@@ -2757,6 +2791,14 @@ textarea {
 .composer-send-btn .icon-stop {
   opacity: 0;
   transform: scale(0.6);
+}
+
+.composer-send-btn.is-stop {
+  background: #dc2626;
+}
+
+.composer-send-btn.is-stop:hover {
+  background: #b91c1c;
 }
 
 .composer-send-btn.is-stop .icon-send {
