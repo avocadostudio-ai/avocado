@@ -192,6 +192,7 @@ export function loadSiteListFromStorage(siteId: string) {
         constraints?: unknown
         pageTemplates?: unknown
         previewUrl?: string
+        enablePuck?: unknown
       } => {
         return Boolean(
           site &&
@@ -214,7 +215,8 @@ export function loadSiteListFromStorage(siteId: string) {
         ...((pts) => pts.length > 0 ? { pageTemplates: pts } : {})(parsePageTemplates(site.pageTemplates)),
         ...(parseString(site.previewUrl, "") ? { previewUrl: parseString(site.previewUrl, "") } : {}),
         ...(parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") ? { gdriveFolderId: parseString((site as { gdriveFolderId?: unknown }).gdriveFolderId, "") } : {}),
-        ...(parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia) ? { cmsMedia: parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia)! } : {})
+        ...(parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia) ? { cmsMedia: parseCmsMedia((site as { cmsMedia?: unknown }).cmsMedia)! } : {}),
+        ...(site.enablePuck === true ? { enablePuck: true } : {})
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
       .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))
