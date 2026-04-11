@@ -91,7 +91,8 @@ const en = {
   "preview.title": "Live preview",
 
   // -- Settings modal --
-  "settings.title": "Developer mode",
+  "settings.title": "Settings",
+  "settings.devTitle": "Developer mode",
   "settings.streaming": "Streaming",
   "settings.nestedLabels": "Nested labels",
   "settings.fieldDraftTelemetry": "Field draft telemetry",
