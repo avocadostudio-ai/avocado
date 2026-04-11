@@ -19,6 +19,45 @@ function parseCmsMedia(raw: unknown): CmsMediaConfig | null {
 }
 
 export const SITE_LIST_STORAGE_KEY = "editor-site-list-v1"
+export const DELETED_PRESETS_STORAGE_KEY = "editor-site-list-deleted-v1"
+
+function loadDeletedPresetIds(): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = window.localStorage.getItem(DELETED_PRESETS_STORAGE_KEY)
+    if (!raw) return new Set()
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((id): id is string => typeof id === "string"))
+  } catch {
+    return new Set()
+  }
+}
+
+function saveDeletedPresetIds(ids: Set<string>): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(DELETED_PRESETS_STORAGE_KEY, JSON.stringify([...ids]))
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function markPresetDeleted(id: string): void {
+  const ids = loadDeletedPresetIds()
+  ids.add(id)
+  saveDeletedPresetIds(ids)
+}
+
+export function unmarkPresetDeleted(id: string): void {
+  const ids = loadDeletedPresetIds()
+  if (!ids.delete(id)) return
+  saveDeletedPresetIds(ids)
+}
+
+export function isPresetId(id: string): boolean {
+  return DEFAULT_SITE_PRESETS.some((p) => p.id === id)
+}
 export const DEFAULT_SITE_HOSTING = "Vercel production site (single shared project)"
 export const LEGACY_AVOCADO_SITE_ID = "avocado-stories"
 export const LEGACY_AVOCADO_SITE_NAME = "Avocado Stories"
@@ -56,66 +95,13 @@ function parsePageTemplates(raw: unknown): PageTemplate[] {
     .filter((t) => t.name.length > 0 && t.description.length > 0)
 }
 
-function parseConfiguredSitePresets(raw: string | undefined): SiteConfig[] {
-  const trimmed = raw?.trim()
-  if (!trimmed) return []
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((site): site is Record<string, unknown> => Boolean(site && typeof site === "object"))
-      .map((site) => {
-        const id = sanitizeSiteId(typeof site.id === "string" ? site.id : "")
-        const name = parseString(site.name, "")
-        const purpose = parseString(site.purpose, "")
-        const hosting = parseString(site.hosting, DEFAULT_SITE_HOSTING)
-        const vercelProjectId = parseString(site.vercelProjectId, "")
-        const vercelTeamId = parseString(site.vercelTeamId, "")
-        const vercelProductionUrl = parseString(site.vercelProductionUrl, "")
-        const vercelDeployHookUrl = parseString(site.vercelDeployHookUrl, "")
-        const tone = parseString(site.tone, "")
-        const constraints = parseArrayOfStrings(site.constraints)
-        const pageTemplates = parsePageTemplates(site.pageTemplates)
-        const previewUrl = parseString(site.previewUrl, "")
-        const cmsMedia = parseCmsMedia(site.cmsMedia)
-        return {
-          id,
-          name,
-          purpose,
-          hosting,
-          vercelProjectId,
-          vercelTeamId,
-          vercelProductionUrl,
-          vercelDeployHookUrl,
-          tone,
-          constraints,
-          ...(pageTemplates.length > 0 ? { pageTemplates } : {}),
-          ...(previewUrl ? { previewUrl } : {}),
-          ...(cmsMedia ? { cmsMedia } : {})
-        } satisfies SiteConfig
-      })
-      .filter((site) => site.id.length > 0 && site.name.length > 0)
-  } catch {
-    return []
-  }
-}
-
-const CONFIGURED_SITE_PRESETS = parseConfiguredSitePresets(import.meta.env.VITE_SITE_PRESETS_JSON as string | undefined)
-
-// Builtin presets are fallbacks when no VITE_SITE_PRESETS_JSON is configured
-const BUILTIN_SITE_PRESETS: SiteConfig[] = [
+const DEFAULT_SITE_PRESETS: SiteConfig[] = [
   {
     id: DEFAULT_AVOCADO_SITE_ID,
     name: DEFAULT_AVOCADO_SITE_NAME,
     purpose: DEFAULT_AVOCADO_SITE_PURPOSE,
     hosting: DEFAULT_SITE_HOSTING,
   },
-]
-
-const DEFAULT_SITE_PRESETS: SiteConfig[] = [
-  ...CONFIGURED_SITE_PRESETS,
-  ...(CONFIGURED_SITE_PRESETS.length > 0 ? [] : BUILTIN_SITE_PRESETS),
   ...AUTO_SITE_PRESETS,
 ]
 
@@ -220,6 +206,7 @@ export function loadSiteListFromStorage(siteId: string) {
       }))
       .filter((site) => site.id.length > 0 && site.name.length > 0)
       .filter((site) => ENABLE_AUTO_SITE_PRESETS || !AUTO_SITE_PRESET_IDS.has(site.id))
+    const deletedPresetIds = loadDeletedPresetIds()
     const mergePresets = (list: SiteConfig[]) => {
       if (DEFAULT_SITE_PRESETS.length === 0) return list
       const presetById = new Map(DEFAULT_SITE_PRESETS.map((p) => [p.id, p]))
@@ -227,21 +214,25 @@ export function loadSiteListFromStorage(siteId: string) {
       const merged = list.map((site) => {
         const preset = presetById.get(site.id)
         if (!preset) return site
+        // Fill-if-empty: do NOT clobber values the user has edited
+        // locally. Presets are defaults, not authoritative.
         return {
           ...site,
-          ...(preset.previewUrl ? { previewUrl: preset.previewUrl } : {}),
+          ...(!site.previewUrl && preset.previewUrl ? { previewUrl: preset.previewUrl } : {}),
           ...(!site.cmsMedia && preset.cmsMedia ? { cmsMedia: preset.cmsMedia } : {}),
         }
       })
       for (const preset of DEFAULT_SITE_PRESETS) {
         if (existingIds.has(preset.id)) continue
+        // User explicitly removed this preset — respect that across reloads.
+        if (deletedPresetIds.has(preset.id)) continue
         merged.push(preset)
       }
       return merged
     }
 
     if (cleaned.length > 0) return mergePresets(cleaned)
-    return mergePresets(defaultSiteList(siteId))
+    return mergePresets(defaultSiteList(siteId).filter((site) => !deletedPresetIds.has(site.id)))
   } catch {
     return defaultSiteList(siteId)
   }
