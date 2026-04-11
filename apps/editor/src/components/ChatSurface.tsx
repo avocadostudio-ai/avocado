@@ -101,7 +101,7 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
               <article key={entry.id} className="msg msg-assistant msg-welcome-collapsed">
                 <details>
                   <summary>Welcome</summary>
-                  <div className="msg-main">{renderFinalMarkdown(safeText)}</div>
+                  {renderFinalMarkdown(safeText)}
                 </details>
               </article>
             )
