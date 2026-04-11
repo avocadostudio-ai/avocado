@@ -27,6 +27,15 @@ import { registerAgentRoutes } from "./routes/agent.js"
 import { registerSitesAgentRoutes } from "./routes/sites-agent.js"
 import { jiraRoutes } from "./routes/jira.js"
 import { createToolRuntime } from "./tools/runtime.js"
+import {
+  isDemoModeEnabled,
+  getDemoAllowedOpTypes,
+  getDemoAllowedBlockTypes,
+  getDemoRateLimitPerHour,
+  demoSessionKeyForIp,
+  extractClientIp,
+  consumeDemoRateToken
+} from "./demo-mode.js"
 
 const app = Fastify({ logger: true })
 
@@ -130,23 +139,96 @@ await app.register((instance) => registerSitesAgentRoutes(instance, ctx))
 await app.register((instance) => jiraRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------
+// Demo mode gate — runs once at startup, no-op when DEMO_MODE is off.
+// See apps/orchestrator/src/demo-mode.ts for the rationale.
+// ---------------------------------------------------------------------------
+if (isDemoModeEnabled()) {
+  app.log.info({
+    allowedOps: getDemoAllowedOpTypes(),
+    allowedBlockTypes: getDemoAllowedBlockTypes(),
+    rateLimitPerHour: getDemoRateLimitPerHour()
+  }, "[demo-mode] enabled — all sessions will be gated")
+
+  // Paths that require rate limiting + per-IP session rewriting. /health,
+  // /status/*, /draft/* and /favicon stay open so the site preview and the
+  // editor's status poller keep working.
+  const GATED_PREFIXES = ["/chat", "/ops"]
+  // Agent routes are hard-blocked in demo mode — they bypass the op gate and
+  // would let a visitor run arbitrary multi-turn agent loops on your key.
+  const BLOCKED_PREFIXES = ["/agent", "/sites-agent", "/jira"]
+
+  app.addHook("preHandler", async (request, reply) => {
+    const url = request.url.split("?")[0] ?? ""
+
+    if (BLOCKED_PREFIXES.some((p) => url.startsWith(p))) {
+      reply.code(403).send({ error: "This endpoint is disabled in demo mode." })
+      return reply
+    }
+
+    if (!GATED_PREFIXES.some((p) => url.startsWith(p))) return
+
+    const ip = extractClientIp(request)
+    const rate = consumeDemoRateToken(ip)
+    if (!rate.ok) {
+      reply
+        .header("retry-after", String(rate.retryAfterSeconds))
+        .code(429)
+        .send({
+          error: "Demo rate limit reached — try again later.",
+          retryAfterSeconds: rate.retryAfterSeconds
+        })
+      return reply
+    }
+
+    // Rewrite session + siteId on the request body so downstream handlers
+    // transparently operate on this visitor's ephemeral session. We target
+    // the default legacy site id so `scopedSessionKey` returns the bare
+    // session name, which routes through the auto-seeded default path in
+    // `getSessionDraft`.
+    const body = request.body as
+      | { session?: string; siteId?: string }
+      | undefined
+    if (body && typeof body === "object") {
+      body.session = demoSessionKeyForIp(ip)
+      body.siteId = "avocado-stories"
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Inline routes (health, status, telemetry, favicon)
 // ---------------------------------------------------------------------------
 
 app.get("/health", async () => ({ ok: true }))
-app.get("/status/planner", async () => ({
-  plannerSource: availableProviders.length > 0 ? availableProviders[0] : "demo",
-  availableProviders,
-  enabledTools: ctx.toolRuntime.registry.listManifests().map((tool) => tool.name),
-  features: {
-    googleDrive: Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON?.trim() || process.env.GOOGLE_API_KEY?.trim()),
-    unsplash: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
-    imageGenerate: Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim()),
-    imageGenerateChat: Boolean(process.env.GOOGLE_GENAI_API_KEY?.trim()),
-    contentful: Boolean(process.env.CONTENTFUL_SPACE_ID?.trim() && process.env.CONTENTFUL_DELIVERY_TOKEN?.trim()),
-    agentMode: Boolean(process.env.AGENT_API_KEY?.trim()),
+app.get("/status/planner", async () => {
+  const demoMode = isDemoModeEnabled()
+  return {
+    // In demo mode we always report "demo" as the planner source so the
+    // editor shows the demo badge, even though real providers are wired up
+    // under the hood via your shared key.
+    plannerSource: demoMode ? "demo" : (availableProviders.length > 0 ? availableProviders[0] : "demo"),
+    availableProviders,
+    demoMode,
+    demo: demoMode
+      ? {
+          allowedOps: getDemoAllowedOpTypes(),
+          allowedBlockTypes: getDemoAllowedBlockTypes(),
+          rateLimitPerHour: getDemoRateLimitPerHour()
+        }
+      : undefined,
+    enabledTools: ctx.toolRuntime.registry.listManifests().map((tool) => tool.name),
+    features: {
+      googleDrive: Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() || process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON?.trim() || process.env.GOOGLE_API_KEY?.trim()),
+      unsplash: Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim()),
+      // In demo mode image gen is off even if a key is present, so the UI
+      // shouldn't advertise it.
+      imageGenerate: demoMode ? false : Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim()),
+      imageGenerateChat: demoMode ? false : Boolean(process.env.GOOGLE_GENAI_API_KEY?.trim()),
+      contentful: Boolean(process.env.CONTENTFUL_SPACE_ID?.trim() && process.env.CONTENTFUL_DELIVERY_TOKEN?.trim()),
+      agentMode: demoMode ? false : Boolean(process.env.AGENT_API_KEY?.trim()),
+    }
   }
-}))
+})
 app.get("/telemetry/chat", async (request) => {
   const raw = request.query as { limit?: string; outcome?: string; phase?: string; session?: string }
   return chatTelemetry.list({
