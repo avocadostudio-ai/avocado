@@ -1311,7 +1311,7 @@ textarea {
   margin-top: 6px;
 }
 
-.msg-welcome-collapsed details[open] .msg-main {
+.msg-welcome-collapsed details[open] > *:not(summary) {
   margin-top: 8px;
   font-size: 13px;
   color: #4b5563;

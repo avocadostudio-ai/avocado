@@ -429,6 +429,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftFields: Record<string, string> | null = null
       let sawFieldDraftThisRun = false
       let currentStepLabel: string | null = null
+      let currentStepRank = 0
       const debugDraftEnabled = store.getState().fieldDraftDebugEnabled
       let debugFlushTimer: number | null = null
       const debugFieldEventAtMs: number[] = []
@@ -443,58 +444,49 @@ export function useChatEngine(config: ChatEngineConfig) {
       /** Advance the progress stepper: mark previous step done, add new active step */
       const normalizeStepLabel = (s: string) =>
         s.replace(/[\u2026.]+$/, "").replace(/\s*\([\d/,\s]+\)$/, "").trim()
-      // Collapse the orchestrator's 10 pre-op status tones (analyzing,
-      // understanding, breaking_down, thinking, planning, generating_plan,
-      // validating, repairing, …) — each with 3 rotating variants — into a
-      // single stable label. Without this, a one-op rewrite shows 4+ noisy
-      // bullets before the first change lands. plan_meta ("Plan ready (N)"),
-      // op_applied ("Applying changes (n/m)"), and image-resolution tones are
-      // preserved because they're actual user-visible state transitions.
-      const collapseServerStatusLabel = (raw: string): string => {
+      // Classify a raw orchestrator status tone into a user-facing phase.
+      // The rank is monotonic — a trailing server tone that would move the
+      // stepper backwards (e.g. a late "Planning…" after op_applied already
+      // fired) is rejected by advanceStep. The label collapses the 10 pre-op
+      // tones (analyzing, understanding, thinking, validating, repairing, …)
+      // into one stable string; plan_meta and op_applied labels pass through
+      // unchanged because they carry user-visible counts.
+      const classifyServerStep = (raw: string): { label: string; rank: number } => {
         const lower = raw.toLowerCase()
-        if (/resolving image|collecting image|preparing image/.test(lower)) return "Resolving images…"
-        if (/^plan ready/.test(lower)) return raw
-        if (/^applying/.test(lower) || /updating draft/.test(lower)) return raw
-        return "Planning…"
+        if (/resolving image|collecting image|preparing image/.test(lower)) return { label: "Resolving images…", rank: 4 }
+        if (/^applying/.test(lower) || /updating draft/.test(lower)) return { label: raw, rank: 3 }
+        if (/^plan ready/.test(lower)) return { label: raw, rank: 2 }
+        return { label: "Planning…", rank: 1 }
       }
-      // Monotonic phase rank. Once the stepper has reached a later phase, a
-      // trailing pre-op status event (e.g. the server emitting one more
-      // "Planning…" tone after op_applied already fired) must not create a
-      // stale bullet below the applying row. Reject any incoming label that
-      // ranks strictly below the current step.
-      const getStepRank = (label: string): number => {
-        const lower = label.toLowerCase()
-        if (/^resolving/.test(lower)) return 4
-        if (/^applying/.test(lower)) return 3
-        if (/^plan ready/.test(lower)) return 2
-        return 1
-      }
-      const advanceStep = (rawLabel: string) => {
-        const label = collapseServerStatusLabel(rawLabel)
-        const incomingRank = getStepRank(label)
-        const prevRank = currentStepLabel ? getStepRank(currentStepLabel) : 0
-        if (incomingRank < prevRank) return
+      // Returns the accepted (possibly collapsed) label, or null when the
+      // event was rejected because it would regress the phase. Callers that
+      // also update streamStatus should only do so on a non-null return,
+      // otherwise the single-line status pill will flip backwards behind
+      // the stepper's back.
+      const advanceStep = (rawLabel: string): string | null => {
+        const { label, rank } = classifyServerStep(rawLabel)
+        if (rank < currentStepRank) return null
         const baseLabel = normalizeStepLabel(label)
         const prevBase = currentStepLabel ? normalizeStepLabel(currentStepLabel) : null
+        currentStepLabel = label
+        currentStepRank = rank
+        const display = label.replace(/[\u2026.]+$/, "").trim()
         if (baseLabel === prevBase) {
           // Same phase — update the display label in-place (e.g. "Applying changes (3/8)")
-          currentStepLabel = label
-          const display = label.replace(/[\u2026.]+$/, "").trim()
           setStreamSteps((prev) => {
             if (prev.length === 0) return prev
             const last = prev[prev.length - 1]
             if (last.done || last.label === display) return prev
             return [...prev.slice(0, -1), { ...last, label: display }]
           })
-          return
+          return label
         }
-        currentStepLabel = label
-        const display = label.replace(/[\u2026.]+$/, "").trim()
         setStreamSteps((prev) => {
           const next = prev.map((s) => (s.done ? s : { ...s, done: true }))
           next.push({ label: display, done: false })
           return next
         })
+        return label
       }
 
       const sendLiveDraft = (force = false, commit = false) => {
@@ -786,8 +778,8 @@ export function useChatEngine(config: ChatEngineConfig) {
 
         if (payload.type === "status") {
           const msg = payload.message ?? "Working..."
-          setStreamStatus(msg)
-          advanceStep(msg)
+          const accepted = advanceStep(msg)
+          if (accepted !== null) setStreamStatus(accepted)
         }
 
         if (payload.type === "image_progress") {
