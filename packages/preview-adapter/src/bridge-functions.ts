@@ -481,9 +481,15 @@ export function createBridgeFunctions(
     state.liveDraftActiveBlockId = null
   }
 
-  const renderLiveDraft = (blockId: string, text: string, active: boolean, fields?: Record<string, string>) => {
+  // commit=true means the server has already applied the op, so the
+  // optimistic DOM (written via innerHTML during field_draft streaming) now
+  // matches the committed state. Discarding originals keeps the new content
+  // on screen while the router.refresh() reconciles — without this branch
+  // we flash back to the old text for ~200ms and cause a visible flicker.
+  const renderLiveDraft = (blockId: string, text: string, active: boolean, fields?: Record<string, string>, commit?: boolean) => {
     if (!active) {
-      restoreLiveDraftOriginals()
+      if (commit) discardLiveDraftOriginals()
+      else restoreLiveDraftOriginals()
       clearLiveDraft()
       return
     }

@@ -245,10 +245,11 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
         const blockId = String(msg.payload.blockId ?? "")
         const text = String(msg.payload.text ?? "")
         const active = Boolean(msg.payload.active)
+        const commit = Boolean(msg.payload.commit)
         const fields = (msg.payload.fields && typeof msg.payload.fields === "object")
           ? msg.payload.fields as Record<string, string>
           : undefined
-        bridge.renderLiveDraft(blockId, text, active, fields)
+        bridge.renderLiveDraft(blockId, text, active, fields, commit)
       }
 
       if (msg.type === "showSkeleton") {
