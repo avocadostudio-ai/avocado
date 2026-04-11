@@ -7,34 +7,29 @@ description: "How the three services, packages, and data flow fit together."
 
 Avocado Studio is a pnpm monorepo with four apps and eight packages:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                  AI Content Studio (:4100)               │
-│                    Vite + React                         │
-│          Chat UI, model picker, plan review             │
-│                                                         │
-│   ┌───────────────────┐    ┌──────────────────────┐     │
-│   │    Chat Panel      │    │   Site iframe         │    │
-│   │                    │    │                       │    │
-│   │  User types        │    │  Live preview of      │    │
-│   │  "add a hero"      │    │  your website         │    │
-│   │                    │    │                       │    │
-│   └────────┬───────────┘    └───────────▲───────────┘    │
-│            │                            │                │
-└────────────┼────────────────────────────┼────────────────┘
-             │ HTTP (REST + SSE)          │ postMessage
-             ▼                            │
-┌────────────────────────────┐    ┌───────┴──────────────────┐
-│   Orchestrator (:4200)     │    │     Site (:3000)          │
-│      Fastify API           │    │      Next.js              │
-│                            │    │                           │
-│  • AI planning (LLM)       │◄──►│  • Renders BlockInstance  │
-│  • Operation validation    │    │    pages                  │
-│  • Session state           │    │  • Draft mode             │
-│  • Undo/redo history       │    │  • Published mode         │
-│  • Publishing pipeline     │    │    (visitors)             │
-│                            │    │  • Block manifest API     │
-└────────────────────────────┘    └───────────────────────────┘
+```mermaid
+graph TD
+    subgraph Editor["Content Studio (:4100) — Vite + React"]
+        Chat["Chat Panel<br/>User types 'add a hero'"]
+        Preview["Site iframe<br/>Live preview of your website"]
+    end
+
+    subgraph Orchestrator["Orchestrator (:4200) — Fastify API"]
+        O1["AI planning (LLM)"]
+        O2["Operation validation"]
+        O3["Session state + undo/redo"]
+        O4["Publishing pipeline"]
+    end
+
+    subgraph Site["Site (:3000) — Next.js"]
+        S1["Renders BlockInstance pages"]
+        S2["Draft mode / Published mode"]
+        S3["Block manifest API"]
+    end
+
+    Chat -->|"HTTP (REST + SSE)"| Orchestrator
+    Preview <-->|"postMessage"| Site
+    Orchestrator <-->|"HTTP"| Site
 ```
 
 ## Data Flow: From Chat to Preview
@@ -116,8 +111,9 @@ For production deployment, session state should be moved to durable storage (Red
 
 Publishing promotes draft content to production:
 
-```
-Draft (orchestrator) → PublishTarget → Production (your site)
+```mermaid
+flowchart LR
+    Draft["Draft (orchestrator)"] --> PT["PublishTarget"] --> Prod["Production (your site)"]
 ```
 
 The `PublishTarget` interface is pluggable. The built-in `GitVercelPublishTarget`:
