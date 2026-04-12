@@ -987,7 +987,7 @@ export function createBridgeFunctions(
       match.classList.remove("aifx-updated")
       void match.offsetWidth
       match.classList.add("aifx-updated")
-      window.setTimeout(() => { match.classList.remove("aifx-updated") }, 980)
+      window.setTimeout(() => { match.classList.remove("aifx-updated") }, 2500)
     }
     if (options?.scrollIntoView !== false) {
       const anchorY = state.pendingScrollAnchorY

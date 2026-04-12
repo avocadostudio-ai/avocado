@@ -143,6 +143,24 @@ export function arrayPropLengths(props: Record<string, unknown>) {
 }
 
 // ---------------------------------------------------------------------------
+// Text hints — lightweight prop snapshot for brand/theme context
+// ---------------------------------------------------------------------------
+
+const TEXT_HINT_KEYS = ["heading", "subheading", "title", "body", "ctaText", "label", "sectionTitle"]
+
+function extractTextHints(props: Record<string, unknown>): Record<string, unknown> {
+  const hints: Record<string, unknown> = {}
+  for (const key of TEXT_HINT_KEYS) {
+    const value = props[key]
+    if (typeof value === "string" && value.trim().length > 0) {
+      // Truncate long body text to save tokens
+      hints[key] = value.length > 120 ? value.slice(0, 120) + "…" : value
+    }
+  }
+  return hints
+}
+
+// ---------------------------------------------------------------------------
 // Page intent summary
 // ---------------------------------------------------------------------------
 
@@ -214,9 +232,10 @@ export function plannerContextPack(args: {
       if (b.id === activeBlockId || args.includeFullProps) {
         return { id: b.id, type: b.type, props: structuredClone(bProps), arrayProps: arrProps }
       }
-      // Other blocks: type + array metadata only — keeps token count low.
+      // Other blocks: key text props for brand/theme context + array metadata.
       // Full scalar props are available via includeFullProps for content queries/translations.
-      return { id: b.id, type: b.type, props: {}, arrayProps: arrProps }
+      const textHints = extractTextHints(bProps)
+      return { id: b.id, type: b.type, props: textHints, arrayProps: arrProps }
     }),
     pageMeta: currentPage.meta ?? null,
     pageIntent: pageIntentSummary({ slug, currentPage }),

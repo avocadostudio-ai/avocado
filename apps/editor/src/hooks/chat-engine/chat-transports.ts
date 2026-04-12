@@ -43,6 +43,8 @@ type CreateChatTransportsArgs = {
   setActiveEditablePath: (value: string | undefined) => void
   setStreamStatus: (value: string | null) => void
   setStreamSteps: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
+  setOpChecklist: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
+  labelFromOperation: (op: unknown) => string
   setStreamTokenCount: (value: number | ((prev: number) => number)) => void
   setLatestStreamFocusBlockId: (value: string | null) => void
   enablePatchTransport: boolean
@@ -429,6 +431,8 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           }
 
           args.setStreamStatus(idx > 0 ? `Drafting operation ${idx}...` : "Drafting operations...")
+          const opLabel = args.labelFromOperation(payload.op)
+          args.setOpChecklist((prev) => [...prev, { label: opLabel, done: false }])
         }
 
         if (payload.type === "heartbeat") {
@@ -443,6 +447,12 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           appliedOpCount += 1
+          args.setOpChecklist((prev) => {
+            const next = [...prev]
+            const pending = next.findIndex((item) => !item.done)
+            if (pending >= 0) next[pending] = { ...next[pending]!, done: true }
+            return next
+          })
           advanceStep(total > 0 ? `Applying changes (${appliedOpCount}/${total})` : "Applying changes")
           if (total > 0 && index > 0) {
             const suffix = skippedOpCount > 0 ? `, skipped ${skippedOpCount}` : ""
@@ -493,6 +503,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
             settled = true
             args.setStreamStatus(null)
             args.setStreamSteps([])
+            args.setOpChecklist([])
             args.setStreamTokenCount(0)
             clearOpRefreshTimer()
             endLiveDraft()
@@ -524,6 +535,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           settled = true
           args.setStreamStatus(null)
           args.setStreamSteps([])
+          args.setOpChecklist([])
           args.setStreamTokenCount(0)
           clearOpRefreshTimer()
           endLiveDraft()
@@ -542,6 +554,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         if (settled || gotAnyEvent) {
           args.setStreamStatus(null)
           args.setStreamSteps([])
+          args.setOpChecklist([])
           args.setStreamTokenCount(0)
           clearOpRefreshTimer()
           endLiveDraft()

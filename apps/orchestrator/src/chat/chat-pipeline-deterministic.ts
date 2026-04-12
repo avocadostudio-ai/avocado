@@ -117,6 +117,134 @@ export function buildAiInsightChanges(args: { plan: EditPlan; message: string })
 }
 
 // ---------------------------------------------------------------------------
+// Deterministic operation change log — factual descriptions of what each op did
+// ---------------------------------------------------------------------------
+
+function isImageField(key: string) {
+  return /image(Url|Src)?$|^image$|^src$|^url$/i.test(key)
+}
+
+function describeUpdatePropsFields(patch: Record<string, unknown>): { hasImage: boolean; textFields: string[] } {
+  let hasImage = false
+  const textFields: string[] = []
+  // Handle nested { props: { ... } } wrapper
+  const fields = (typeof patch.props === "object" && patch.props !== null && !Array.isArray(patch.props))
+    ? patch.props as Record<string, unknown>
+    : patch
+  for (const [key, value] of Object.entries(fields)) {
+    if (isImageField(key)) { hasImage = true; continue }
+    if (typeof value === "string" && value.trim().length > 0 && isLikelyTextField(key)) {
+      textFields.push(key)
+    }
+  }
+  return { hasImage, textFields }
+}
+
+export function buildOpChangeLogEntries(
+  ops: Operation[],
+  ctx: { getBlockType: (slug: string, blockId: string) => string | undefined }
+): string[] {
+  const lines: string[] = []
+  for (const op of ops) {
+    switch (op.op) {
+      case "create_page": {
+        const title = op.page.title ?? op.page.slug
+        lines.push(`Created page "${title}" (/${op.page.slug})`)
+        break
+      }
+      case "add_block": {
+        const bt = op.block.type
+        lines.push(`Added ${bt} block to /${op.pageSlug}`)
+        break
+      }
+      case "remove_block": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "unknown"
+        lines.push(`Removed ${bt} block from /${op.pageSlug}`)
+        break
+      }
+      case "move_block": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        lines.push(`Moved ${bt} block on /${op.pageSlug}`)
+        break
+      }
+      case "duplicate_block": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        lines.push(`Duplicated ${bt} block on /${op.pageSlug}`)
+        break
+      }
+      case "update_props": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        const { hasImage, textFields } = describeUpdatePropsFields(op.patch as Record<string, unknown>)
+        if (hasImage && textFields.length > 0) {
+          lines.push(`Updated ${bt} image and ${textFields.join(", ")} on /${op.pageSlug}`)
+        } else if (hasImage) {
+          lines.push(`Updated ${bt} image on /${op.pageSlug}`)
+        } else if (textFields.length > 0) {
+          lines.push(`Updated ${bt} ${textFields.join(", ")} on /${op.pageSlug}`)
+        } else {
+          lines.push(`Updated ${bt} on /${op.pageSlug}`)
+        }
+        break
+      }
+      case "add_item": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        lines.push(`Added item to ${bt} ${op.listKey} on /${op.pageSlug}`)
+        break
+      }
+      case "update_item": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        const patch = op.patch as Record<string, unknown>
+        const hasImg = Object.keys(patch).some(isImageField)
+        if (hasImg) {
+          lines.push(`Updated item image in ${bt} ${op.listKey} on /${op.pageSlug}`)
+        } else {
+          lines.push(`Updated item in ${bt} ${op.listKey} on /${op.pageSlug}`)
+        }
+        break
+      }
+      case "remove_item": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        lines.push(`Removed item from ${bt} ${op.listKey} on /${op.pageSlug}`)
+        break
+      }
+      case "move_item": {
+        const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
+        lines.push(`Reordered item in ${bt} ${op.listKey} on /${op.pageSlug}`)
+        break
+      }
+      case "rename_page": {
+        const label = op.newTitle ? `"${op.newTitle}" (/${op.newPageSlug})` : `/${op.newPageSlug}`
+        lines.push(`Renamed page /${op.pageSlug} → ${label}`)
+        break
+      }
+      case "remove_page":
+        lines.push(`Removed page /${op.pageSlug}`)
+        break
+      case "duplicate_page": {
+        const target = op.newPageSlug ?? "copy"
+        lines.push(`Duplicated page /${op.pageSlug} → /${target}`)
+        break
+      }
+      case "move_page":
+        lines.push(`Reordered page /${op.pageSlug}`)
+        break
+      case "update_page_meta":
+        // Handled by buildMetaChangeLogEntries — skip to avoid duplication
+        break
+      case "update_site_config": {
+        const patch = op.patch as Record<string, unknown>
+        if (typeof patch.name === "string") lines.push(`Site name → "${patch.name}"`)
+        if (typeof patch.logo === "string") lines.push(`Site logo updated`)
+        if (patch.navLabels) lines.push(`Navigation labels updated`)
+        if (patch.navGroups) lines.push(`Navigation groups updated`)
+        break
+      }
+    }
+  }
+  return lines
+}
+
+// ---------------------------------------------------------------------------
 // Deterministic create page shortcut
 // ---------------------------------------------------------------------------
 
@@ -215,6 +343,7 @@ export function deterministicSelectedTextRewritePlan(args: {
 
 export function shouldReturnDeterministicClarification(message: string) {
   const lower = message.toLowerCase()
+  if (/\b(populate|fill)\b/.test(lower)) return false
   return (
     isStandalonePageOperation(message) ||
     /\b(delete|remove)\b.*\b(page|home)\b/.test(lower) ||

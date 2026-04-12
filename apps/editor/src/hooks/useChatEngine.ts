@@ -78,6 +78,30 @@ export function useChatEngine(config: ChatEngineConfig) {
     return null
   }
 
+  const labelFromOperation = (op: unknown): string => {
+    if (!op || typeof op !== "object") return "Processing"
+    const rec = op as Record<string, unknown>
+    const opType = String(rec.op ?? rec.type ?? "")
+    const blockType =
+      (rec.block && typeof rec.block === "object" ? (rec.block as Record<string, unknown>).type : null) ??
+      rec.blockType ?? null
+    const verb: Record<string, string> = {
+      add_block: "Add",
+      remove_block: "Remove",
+      update_props: "Update",
+      update_item: "Update item in",
+      add_item: "Add item to",
+      remove_item: "Remove item from",
+      move_block: "Move",
+      duplicate_block: "Duplicate",
+      update_page_meta: "Update page metadata",
+    }
+    const action = verb[opType] ?? opType.replace(/_/g, " ")
+    if (opType === "update_page_meta") return action
+    if (typeof blockType === "string") return `${action} ${blockType}`
+    return action
+  }
+
   function buildWelcomeSuggestions(
     cfg: SiteConfig,
     slugs: string[],
@@ -159,6 +183,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const setStreamingText = store.getState().setStreamingText
   const setStreamingChanges = store.getState().setStreamingChanges
   const setStreamSteps = store.getState().setStreamSteps
+  const setOpChecklist = store.getState().setOpChecklist
   const setFieldDraftDebug = store.getState().setFieldDraftDebug
   const setActiveBlockId = (id: string | undefined) => store.getState().setActiveBlock(id)
   const setActiveBlockType = (_type: string | undefined) => { /* absorbed into setActiveBlock */ }
@@ -881,6 +906,8 @@ export function useChatEngine(config: ChatEngineConfig) {
           }
 
           setStreamStatus(idx > 0 ? `Drafting operation ${idx}...` : "Drafting operations...")
+          const opLabel = labelFromOperation(payload.op)
+          setOpChecklist((prev) => [...prev, { label: opLabel, done: false }])
         }
 
         if (payload.type === "heartbeat") {
@@ -918,6 +945,12 @@ export function useChatEngine(config: ChatEngineConfig) {
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           appliedOpCount += 1
+          setOpChecklist((prev) => {
+            const next = [...prev]
+            const pending = next.findIndex((item) => !item.done)
+            if (pending >= 0) next[pending] = { ...next[pending]!, done: true }
+            return next
+          })
           advanceStep(total > 0 ? `Applying changes (${appliedOpCount}/${total})` : "Applying changes")
           if (total > 0 && index > 0) {
             const suffix = skippedOpCount > 0 ? `, skipped ${skippedOpCount}` : ""
@@ -957,6 +990,12 @@ export function useChatEngine(config: ChatEngineConfig) {
 
         if (payload.type === "op_skipped") {
           skippedOpCount += 1
+          setOpChecklist((prev) => {
+            const next = [...prev]
+            const pending = next.findIndex((item) => !item.done)
+            if (pending >= 0) next[pending] = { ...next[pending]!, done: true }
+            return next
+          })
           const total = Number(payload.total ?? 0)
           const index = Number(payload.index ?? 0)
           if (total > 0 && index > 0) {
@@ -986,6 +1025,7 @@ export function useChatEngine(config: ChatEngineConfig) {
             setStreamingText(null)
             setStreamingChanges([])
             setStreamSteps([])
+            setOpChecklist([])
             flushFieldDraftDebug()
             clearDebugFlushTimer()
             clearOpRefreshTimer()
@@ -1044,6 +1084,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           setStreamSteps([])
+          setOpChecklist([])
           flushFieldDraftDebug()
           clearDebugFlushTimer()
           clearOpRefreshTimer()
@@ -1065,6 +1106,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           setStreamSteps([])
+          setOpChecklist([])
           flushFieldDraftDebug()
           clearDebugFlushTimer()
           clearOpRefreshTimer()
@@ -1102,6 +1144,7 @@ export function useChatEngine(config: ChatEngineConfig) {
             setStreamingText(null)
             setStreamingChanges([])
             setStreamSteps([])
+            setOpChecklist([])
             flushFieldDraftDebug()
             clearDebugFlushTimer()
             clearOpRefreshTimer()
@@ -1122,6 +1165,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setStreamingText(null)
           setStreamingChanges([])
           setStreamSteps([])
+          setOpChecklist([])
           flushFieldDraftDebug()
           clearDebugFlushTimer()
           clearOpRefreshTimer()
@@ -1157,6 +1201,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       setIsLoading(false)
       setStreamStatus(null)
       setStreamSteps([])
+      setOpChecklist([])
       return
     }
 
@@ -1252,6 +1297,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     store.getState().appendChatEntry({ id: createId(), role: "user", text: finalMessage })
     setIsLoading(true)
     setStreamStatus(useStreaming ? "Thinking..." : null)
+    setOpChecklist([])
     setStreamTokenCount(0)
     setFieldDraftDebug({
       eventsPerSecond: 0,
@@ -1283,6 +1329,8 @@ export function useChatEngine(config: ChatEngineConfig) {
           sitePurpose: activeSiteConfig.purpose,
           setStreamStatus,
           setStreamSteps,
+          setOpChecklist,
+          labelFromOperation,
           setStreamingText,
           setStreamingChanges,
           setLatestStreamFocusBlockId,
@@ -1323,6 +1371,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       setStreamingText(null)
       setStreamingChanges([])
       setStreamSteps([])
+      setOpChecklist([])
       setIsLoading(false)
     }
   }

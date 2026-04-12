@@ -1,4 +1,4 @@
-import React, { forwardRef, type CSSProperties, type ReactNode } from "react"
+import React, { forwardRef, useState, useCallback, type CSSProperties, type ReactNode } from "react"
 import { Undo2, Redo2 } from "lucide-react"
 import type { ChatEntry } from "../lib/editor-types"
 import { renderFinalMarkdown, renderStreamingMarkdown } from "../lib/markdown-renderer"
@@ -60,8 +60,14 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
   const streamingText = streamingTextProp ?? storeStreamingText
   const streamSteps = streamStepsProp ?? storeStreamSteps
   const streamingChanges = streamingChangesProp ?? storeStreamingChanges
+  const opChecklist = useEditorStore((s) => s.opChecklist)
   const doneStreamSteps = streamSteps.filter((s) => s.done)
   const fallbackStatusLabel = streamStatusLabel ?? streamStatus
+  const [clickedSuggestion, setClickedSuggestion] = useState<{ entryId: string; idx: number } | null>(null)
+  const handleSuggestionClick = useCallback((entryId: string, idx: number, line: string) => {
+    setClickedSuggestion({ entryId, idx })
+    onSuggestionClick(line)
+  }, [onSuggestionClick])
   const hasRenderableEntry = entries.some((entry) => {
     const text = typeof entry.text === "string" ? entry.text.trim() : ""
     return (
@@ -115,17 +121,23 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
           {(() => {
             const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(rawText, line))
             if (changeLines.length === 0) return null
-            if (changeLines.length > 8) {
+            if (changeLines.length > 5) {
               const summaryLabel = /translat/i.test(rawText)
                 ? `${changeLines.length} fields translated`
                 : `${changeLines.length} changes applied`
+              const previewCount = 3
               return (
-                <details className="msg-list-details">
-                  <summary>{summaryLabel}</summary>
+                <>
                   <ul className="msg-list">
-                    {changeLines.map((line, idx) => <li key={idx}>{line}</li>)}
+                    {changeLines.slice(0, previewCount).map((line, idx) => <li key={idx}>{line}</li>)}
                   </ul>
-                </details>
+                  <details className="msg-list-details">
+                    <summary>{changeLines.length - previewCount} more changes</summary>
+                    <ul className="msg-list">
+                      {changeLines.slice(previewCount).map((line, idx) => <li key={idx}>{line}</li>)}
+                    </ul>
+                  </details>
+                </>
               )
             }
             return (
@@ -135,18 +147,22 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
             )
           })()}
           {!entry.variations && !suppressWelcomeSuggestions && (entry.suggestions ?? []).length > 0 ? (
-            <div className="msg-suggestions">
-              {entry.suggestions?.map((line, idx) => (
-                <button
-                  key={`${entry.id}-${idx}`}
-                  type="button"
-                  className="msg-suggestion"
-                  onClick={() => onSuggestionClick(line)}
-                  disabled={isLoading}
-                >
-                  {line}
-                </button>
-              ))}
+            <div className={`msg-suggestions${clickedSuggestion?.entryId === entry.id ? " msg-suggestions--chosen" : ""}`}>
+              {entry.suggestions?.map((line, idx) => {
+                const isChosen = clickedSuggestion?.entryId === entry.id && clickedSuggestion.idx === idx
+                const isDimmed = clickedSuggestion?.entryId === entry.id && clickedSuggestion.idx !== idx
+                return (
+                  <button
+                    key={`${entry.id}-${idx}`}
+                    type="button"
+                    className={`msg-suggestion${isChosen ? " msg-suggestion--chosen" : ""}${isDimmed ? " msg-suggestion--dimmed" : ""}`}
+                    onClick={() => handleSuggestionClick(entry.id, idx, line)}
+                    disabled={isLoading}
+                  >
+                    {line}
+                  </button>
+                )
+              })}
             </div>
           ) : null}
           {renderEntryExtras ? renderEntryExtras(entry) : null}
@@ -205,6 +221,16 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
                 <ul className="stream-steps stream-steps-in-bubble">
                   {doneStreamSteps.map((step, idx) => (
                     <li key={idx} className="stream-step is-done">{step.label}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {opChecklist.length > 0 ? (
+                <ul className="op-checklist">
+                  {opChecklist.map((item, idx) => (
+                    <li key={idx} className={`op-checklist-item${item.done ? " is-done" : ""}`}>
+                      <span className="op-checklist-icon">{item.done ? "✓" : "·"}</span>
+                      {item.label}
+                    </li>
                   ))}
                 </ul>
               ) : null}
