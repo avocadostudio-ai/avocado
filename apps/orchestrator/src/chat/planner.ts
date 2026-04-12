@@ -10,6 +10,7 @@ import {
   type PageDoc
 } from "@ai-site-editor/shared"
 import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./prompts.js"
+import { isDemoModeEnabled } from "../demo-mode.js"
 
 // ---------------------------------------------------------------------------
 // Singleton OpenAI client — reuses connection pool across requests.
@@ -879,6 +880,7 @@ export async function generatePlanWithOpenAI(args: {
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
     locale: args.locale,
+    demoMode: isDemoModeEnabled(),
   })
 
   const lowerMsg = args.message.toLowerCase()

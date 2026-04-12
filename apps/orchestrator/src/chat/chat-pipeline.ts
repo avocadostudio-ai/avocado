@@ -525,13 +525,17 @@ export async function runChatPipeline(
     planningStartedAtMs !== null && planningFinishedAtMs !== null
       ? Math.max(0, planningFinishedAtMs - planningStartedAtMs)
       : undefined
+  const _demoModeActive = isDemoModeEnabled()
   const timingFields = () => ({
     totalDurationMs: Date.now() - pipelineStartedAtMs,
     planningDurationMs: planningDurationMs(),
     firstPlanningTokenMs: firstPlanningTokenMs ?? undefined,
     applyDurationMs,
     imageResolutionDurationMs: imageResolutionDurationMs > 0 ? imageResolutionDurationMs : undefined,
-    planningAttempts: planningAttempts > 0 ? planningAttempts : undefined
+    planningAttempts: planningAttempts > 0 ? planningAttempts : undefined,
+    // Tag every telemetry event when demo mode is active so dashboards can
+    // filter demo traffic from prod traffic with a single field check.
+    ...(_demoModeActive ? { demoMode: true as const } : {})
   })
   const incrementalApplyEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_INCREMENTAL_APPLY ?? "1").trim())
   const streamedApplyMinStepMsRaw = Number(process.env.CHAT_STREAM_APPLY_MIN_STEP_MS ?? 260)
@@ -1390,6 +1394,29 @@ export async function runChatPipeline(
       const demoSplit = splitDemoOps(resolvedPlan.ops, stagedForDemo)
       if (demoSplit.rejected.length > 0) {
         const allowedBlockLabel = getDemoAllowedBlockTypes().join(" / ")
+        ctx.chatTelemetry.push({
+          id: chatRequestId,
+          at: new Date().toISOString(),
+          phase: "result",
+          session: body.session!,
+          requestedSlug,
+          effectiveSlug,
+          plannerSource: source,
+          modelKey,
+          modelUsed,
+          promptHash,
+          promptExcerpt,
+          promptLength: plannerMessage.length,
+          outcome: "demo_rejected",
+          intent: resolvedPlan.intent,
+          opCount: resolvedPlan.ops.length,
+          opTypes: resolvedPlan.ops.map((op) => op.op),
+          demoMode: true,
+          demoRejectedOps: demoSplit.rejected.length,
+          demoRejectedReasons: demoSplit.rejected.map((r) => r.reason),
+          plannerTier: plannerTier as "forced_deterministic" | "deterministic" | "llm_intent_router" | "full_llm" | "demo" | undefined,
+          ...timingFields()
+        })
         return {
           done: true as const,
           response: {

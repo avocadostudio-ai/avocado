@@ -98,6 +98,7 @@ export interface PlannerPromptOptions {
   editablePath?: string | null | undefined
   blockId?: string | null | undefined
   locale?: string
+  demoMode?: boolean
 }
 
 const LOCALE_NAMES: Record<string, string> = {
@@ -117,6 +118,29 @@ function localeInstruction(locale?: string): string[] {
   const lang = LOCALE_NAMES[locale] ?? locale
   return [
     `The user's interface is in ${lang}. Write summary_for_user, change_log entries, and suggested_next_actions in ${lang}. Keep block type names, technical identifiers, and operation names in English.`
+  ]
+}
+
+/**
+ * Demo-mode instruction — when active, tells the LLM to ONLY generate
+ * update_props ops on the allowed block types. This prevents the planner
+ * from wasting tokens on plans that the server-side gate would reject
+ * anyway, and avoids showing users a "rejected" message after a 3-5s wait.
+ */
+function demoModeInstruction(demoMode?: boolean): string[] {
+  if (!demoMode) return []
+  // Import dynamically would create a circular dep; instead we inline
+  // the allowed block types. They default to ["Hero"] and can be overridden
+  // via DEMO_ALLOWED_BLOCK_TYPES env var, but the prompt must stay fixed
+  // at build-time for the system prompt. The server gate is the real
+  // enforcement; this prompt is an optimization.
+  return [
+    "IMPORTANT — DEMO MODE RULES (override other instructions when in conflict):",
+    "This is a limited demo session. You may ONLY generate update_props operations that target Hero blocks.",
+    "Do NOT generate add_block, remove_block, move_block, duplicate_block, create_page, rename_page, remove_page, move_page, duplicate_page, update_page_meta, update_site_config, add_item, remove_item, move_item, or update_item operations.",
+    "Do NOT target any block type other than Hero (no CTA, FeatureGrid, Testimonials, CardGrid, RichText, FAQAccordion, etc.).",
+    "If the user asks for something outside these limits, return intent=needs_clarification with summary_for_user explaining that this demo only supports editing the Hero section, and suggest hero-focused alternatives in suggested_next_actions (e.g. 'Change the hero headline', 'Rewrite the hero subheading', 'Update the hero CTA text').",
+    "Do NOT mention 'demo mode' by name — just say 'I can help you edit the hero section' and offer suggestions.",
   ]
 }
 
@@ -146,6 +170,7 @@ function buildLightweightPlannerPrompt(opts: PlannerPromptOptions): string {
     opts.selectedBlockId.length > 0
       ? `Selected block is ${opts.selectedBlockId}. Target only this block in ops.`
       : "Respect explicit user target references when present.",
+    ...demoModeInstruction(opts.demoMode),
     ...localeInstruction(opts.locale)
   ].join("\n")
 }
@@ -277,6 +302,8 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
           `Return an update_props operation setting the "${opts.editablePath}" field on block "${opts.blockId}" to your generated alt text description. This is an edit_plan, not needs_clarification.`
         ]
       : []),
+    // Demo-mode constraint — tells the LLM to only generate hero edits
+    ...demoModeInstruction(opts.demoMode),
     // Locale-aware output
     ...localeInstruction(opts.locale)
   ].join("\n")

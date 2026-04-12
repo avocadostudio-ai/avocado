@@ -243,6 +243,22 @@ if (isDemoModeEnabled()) {
     const ip = extractClientIp(request)
     const rate = consumeDemoRateToken(ip)
     if (!rate.ok) {
+      chatTelemetry.push({
+        id: `demo-rl-${Date.now()}`,
+        at: new Date().toISOString(),
+        phase: "result",
+        session: demoSessionKeyForIp(ip),
+        requestedSlug: "",
+        effectiveSlug: "",
+        plannerSource: "demo",
+        modelKey: "demo",
+        modelUsed: "demo",
+        promptHash: "",
+        promptExcerpt: "",
+        promptLength: 0,
+        outcome: "demo_rate_limited",
+        demoMode: true,
+      })
       reply
         .header("retry-after", String(rate.retryAfterSeconds))
         .code(429)

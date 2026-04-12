@@ -8,6 +8,7 @@ import {
   type PageDoc
 } from "@ai-site-editor/shared"
 import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./prompts.js"
+import { isDemoModeEnabled } from "../demo-mode.js"
 import { GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER } from "./chat-pipeline.js"
 import {
   type ParsedIntent,
@@ -282,6 +283,7 @@ export async function generatePlanWithAnthropic(args: {
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
     locale: args.locale,
+    demoMode: isDemoModeEnabled(),
   })
 
   const lowerMsg = args.message.toLowerCase()

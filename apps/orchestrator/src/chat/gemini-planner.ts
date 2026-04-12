@@ -8,6 +8,7 @@ import {
   type PageDoc
 } from "@ai-site-editor/shared"
 import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./prompts.js"
+import { isDemoModeEnabled } from "../demo-mode.js"
 import {
   type ParsedIntent,
   extractAudienceTarget,
@@ -229,6 +230,7 @@ export async function generatePlanWithGemini(args: {
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
     locale: args.locale,
+    demoMode: isDemoModeEnabled(),
   })
 
   const includeContracts =

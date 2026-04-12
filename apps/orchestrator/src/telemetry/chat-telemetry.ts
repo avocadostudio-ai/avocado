@@ -67,6 +67,10 @@ export type ChatTelemetryEntry = {
   toolAttempts?: number
   toolErrorCode?: string
   correlationId?: string
+  // Demo-mode telemetry fields
+  demoMode?: boolean
+  demoRejectedOps?: number
+  demoRejectedReasons?: string[]
 }
 
 type Logger = {
