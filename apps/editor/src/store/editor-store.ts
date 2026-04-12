@@ -65,6 +65,7 @@ export type EditorState = {
   streamingText: string | null
   streamingChanges: string[]
   streamSteps: { label: string; done: boolean }[]
+  opChecklist: { label: string; done: boolean }[]
   streamTokenCount: number
   latestStreamFocusBlockId: string | null
   imageProgress: { percent: number; stage: string } | null
@@ -147,6 +148,7 @@ export type EditorActions = {
   setStreamingText: (value: string | null | ((prev: string | null) => string | null)) => void
   setStreamingChanges: (value: string[] | ((prev: string[]) => string[])) => void
   setStreamSteps: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
+  setOpChecklist: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
   setStreamTokenCount: (value: number | ((prev: number) => number)) => void
   setLatestStreamFocusBlockId: (id: string | null) => void
   setImageProgress: (progress: { percent: number; stage: string } | null) => void
@@ -220,6 +222,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     streamingText: null,
     streamingChanges: [],
     streamSteps: [],
+    opChecklist: [],
     streamTokenCount: 0,
     latestStreamFocusBlockId: null,
     imageProgress: null,
@@ -316,6 +319,11 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       set((prev) => ({
         ...prev,
         streamSteps: typeof value === "function" ? value(prev.streamSteps) : value,
+      })),
+    setOpChecklist: (value) =>
+      set((prev) => ({
+        ...prev,
+        opChecklist: typeof value === "function" ? value(prev.opChecklist) : value,
       })),
     setStreamTokenCount: (value) =>
       set((prev) => ({

@@ -215,7 +215,7 @@ function patchContainsResolvedImageUrl(patch: Record<string, unknown>) {
   return false
 }
 
-export function imageQueryFromItem(item: Record<string, unknown>) {
+export function imageQueryFromItem(item: Record<string, unknown>, sectionContext?: string) {
   const candidate = [
     item.imageAlt,
     item.title,
@@ -230,7 +230,16 @@ export function imageQueryFromItem(item: Record<string, unknown>) {
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .join(" ")
   const terms = imageKeywordsFromQuery(candidate, 4)
-  return terms.length > 0 ? terms.join(" ") : ""
+  if (terms.length > 0) {
+    // Enrich short queries with section context for more specific results
+    if (terms.length <= 2 && sectionContext) {
+      const contextTerms = imageKeywordsFromQuery(sectionContext, 2)
+      const unique = contextTerms.filter((t) => !terms.includes(t))
+      return [...terms, ...unique.slice(0, 1)].join(" ")
+    }
+    return terms.join(" ")
+  }
+  return ""
 }
 
 export function shouldPopulateAllChildImages(message: string) {
@@ -268,6 +277,12 @@ export function findImageTargets(args: {
     }
   }
 
+  // Build section-level context for enriching item queries
+  const blockProps = (args.targetBlock.props as Record<string, unknown>) ?? {}
+  const sectionContext = [blockProps.heading, blockProps.subheading, blockProps.title, blockProps.sectionTitle]
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    .join(" ")
+
   const targets: Array<{ path: string; altPath: string; query: string }> = []
   for (const path of imagePaths) {
     const itemMatch = path.match(/^(.*\[(\d+)\])\.imageUrl$/)
@@ -286,7 +301,7 @@ export function findImageTargets(args: {
     let query = indexed ?? ""
     if (!query && itemPath) {
       const item = getValueAtPath(mergedProps, itemPath)
-      if (item && typeof item === "object" && !Array.isArray(item)) query = imageQueryFromItem(item as Record<string, unknown>)
+      if (item && typeof item === "object" && !Array.isArray(item)) query = imageQueryFromItem(item as Record<string, unknown>, sectionContext)
     }
     if (!query) query = defaultQuery
     targets.push({ path, altPath: path.replace(/imageUrl$/, "imageAlt"), query })
