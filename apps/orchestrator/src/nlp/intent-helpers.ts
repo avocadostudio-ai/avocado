@@ -60,7 +60,7 @@ export function isLikelyClarificationFollowUp(message: string) {
 
 export function isStandalonePageOperation(message: string) {
   const normalized = message.toLowerCase().trim().replace(/\s+/g, " ")
-  if (/\b(create|generate|add|make|build|remove|delete|rename|move|translate|redesign|refocus|overhaul|rebuild)\b.*\bpage\b/.test(normalized)) return true
+  if (/\b(create|generate|add|make|build|populate|fill|remove|delete|rename|move|translate|redesign|refocus|overhaul|rebuild)\b.*\bpage\b/.test(normalized)) return true
   // "rename to Olive oil" — implicit page rename even without "page" keyword
   if (/\brename\b.*\bto\s+[a-z]/i.test(normalized) && !/\bto\s+(first|last|top|bottom|start|end|beginning)\b/i.test(normalized)) return true
   return false

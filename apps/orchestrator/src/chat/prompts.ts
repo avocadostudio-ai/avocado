@@ -263,7 +263,7 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     // Block name privacy — provider-specific
     opts.provider !== "openai" ? BLOCK_NAME_PRIVACY_ANTHROPIC : BLOCK_NAME_PRIVACY_OPENAI,
     // Selected block targeting
-    opts.selectedBlockId.length > 0 && !opts.explicitOtherReference
+    opts.selectedBlockId.length > 0 && !opts.explicitOtherReference && !opts.pageWideRewrite
       ? `Selected block is ${opts.selectedBlockId}. You MUST target only this block in ops unless the user explicitly names a different section.`
       : "Respect explicit user target references when present.",
     // Allowed block types

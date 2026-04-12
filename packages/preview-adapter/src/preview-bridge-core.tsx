@@ -158,7 +158,8 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
         state.serverVersion = msg.toVersion
         if (msg.focusBlockId) {
           state.pendingFocusId = msg.focusBlockId
-          state.pendingScrollIntoView = state.pendingScrollIntoView && msg.op?.op === "move_block"
+          const isStructural = msg.op?.op === "add_block" || msg.op?.op === "move_block"
+          state.pendingScrollIntoView = isStructural || state.pendingScrollIntoView
         }
         if (msg.op?.op === "move_item") {
           state.skipParentAnimationOnce = true
@@ -234,7 +235,8 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
             bridge.setChildSelectionLock(null)
           }
         }
-        bridge.applyBlockFocus(blockId, false, editablePath)
+        const wantsScroll = msg.payload.scrollIntoView === true
+        bridge.applyBlockFocus(blockId, false, editablePath, { scrollIntoView: wantsScroll })
       }
 
       if (msg.type === "setNestedLabelsVisibility") {

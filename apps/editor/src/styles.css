@@ -1651,6 +1651,21 @@ textarea {
   margin-bottom: 0.4em;
 }
 
+.msg-list-details {
+  margin-top: 2px;
+  font-size: 13.5px;
+}
+.msg-list-details summary {
+  cursor: pointer;
+  color: var(--accent-200);
+  font-size: 13px;
+  padding: 2px 0;
+  user-select: none;
+}
+.msg-list-details summary:hover {
+  text-decoration: underline;
+}
+
 .msg-errors {
   color: #9b1230;
 }
@@ -2071,6 +2086,37 @@ textarea {
 
 .stream-steps-in-bubble {
   margin-bottom: 6px;
+}
+
+.op-checklist {
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.op-checklist-item {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+.op-checklist-item.is-done {
+  color: #374151;
+}
+.op-checklist-icon {
+  font-size: 12px;
+  font-weight: 600;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.op-checklist-item.is-done .op-checklist-icon {
+  color: var(--accent-200);
 }
 
 .stream-status-inline {
@@ -3016,6 +3062,22 @@ textarea {
 .publish-review-changes {
   max-height: min(40vh, 360px);
   overflow-y: auto;
+}
+
+.publish-review-page-group {
+  margin-bottom: 8px;
+}
+
+.publish-review-page-group:last-child {
+  margin-bottom: 0;
+}
+
+.publish-review-page-slug {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  margin-bottom: 2px;
 }
 
 .publish-review-overflow {
@@ -4675,6 +4737,16 @@ textarea {
 }
 
 .editor-dark .stream-step::before {
+  color: #22c55e;
+}
+
+.editor-dark .op-checklist-item {
+  color: #6b7280;
+}
+.editor-dark .op-checklist-item.is-done {
+  color: #94a3b8;
+}
+.editor-dark .op-checklist-item.is-done .op-checklist-icon {
   color: #22c55e;
 }
 

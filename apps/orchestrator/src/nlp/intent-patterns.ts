@@ -163,6 +163,8 @@ export const PAGE_WIDE_REWRITE_PATTERNS: RegExp[] = [
   /\brewrite\s+(?:all|the|this)\s+(?:page|content)\b/,
   /\bredo\s+(?:this|the)\s+(?:whole\s+|entire\s+)?page\b/,
   /\b(?:update|change)\s+(?:this|the)\s+(?:whole|entire)\s+page\b/,
+  /\b(?:populate|fill)\s+(?:this\s+|the\s+)?page\b/,
+  /\b(?:populate|fill)\b.*\b(?:with|using)\b.*\bcontent\b/,
   // Structural audit requests — "review heading hierarchy", "fix heading structure", "review Grapefruits page heading tag hierarchy"
   /\b(?:review|audit|fix|check)\b[\s\w]*\bheadings?\s*(?:tags?\s*)?(?:hierarchy|structure|levels?|order)\b/,
 ]

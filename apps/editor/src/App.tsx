@@ -1500,7 +1500,8 @@ function EditorPage({
                   onClick={() =>
                     preview.postToSite("highlightBlock", {
                       blockId: latestStreamFocusBlockId,
-                      editablePath: null
+                      editablePath: null,
+                      scrollIntoView: true
                     })
                   }
                 >

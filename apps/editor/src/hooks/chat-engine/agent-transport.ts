@@ -20,6 +20,8 @@ type AgentTransportArgs = {
   sitePurpose?: string
   setStreamStatus: (value: string | null) => void
   setStreamSteps: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
+  setOpChecklist: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
+  labelFromOperation: (op: unknown) => string
   setStreamingText: (value: string | null | ((prev: string | null) => string | null)) => void
   setStreamingChanges: (value: string[] | ((prev: string[]) => string[])) => void
   setLatestStreamFocusBlockId: (value: string | null) => void
@@ -38,7 +40,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   const {
     orchestrator, session, siteId, slug, message,
     activeBlockId, activeBlockType, activeEditablePath, locale, sitePurpose,
-    setStreamStatus, setStreamSteps, setStreamingText, setStreamingChanges, setLatestStreamFocusBlockId,
+    setStreamStatus, setStreamSteps, setOpChecklist, labelFromOperation, setStreamingText, setStreamingChanges, setLatestStreamFocusBlockId,
     applyChatResult, pushAssistantFromResult, postToSite, setActiveBlockId,
   } = args
 
@@ -56,6 +58,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
     eventSource?.close()
     setStreamStatus(null)
     setStreamSteps([])
+    setOpChecklist([])
     setStreamingText(null)
     setStreamingChanges([])
     setLatestStreamFocusBlockId(null)
@@ -73,6 +76,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
   const promise = (async (): Promise<boolean> => {
   setStreamStatus("Agent thinking...")
   setStreamSteps([])
+  setOpChecklist([])
 
   // Activate shimmer immediately on the active block while agent thinks
   if (activeBlockId) {
@@ -124,6 +128,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
     const clearStreamUi = () => {
       setStreamStatus(null)
       setStreamSteps([])
+      setOpChecklist([])
       setStreamingText(null)
       setStreamingChanges([])
       setLatestStreamFocusBlockId(null)
@@ -262,6 +267,12 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
           lastFocusBlockId = focusBlockId
           setLatestStreamFocusBlockId(focusBlockId)
         }
+        setOpChecklist((prev) => {
+          const next = [...prev]
+          const pending = next.findIndex((item) => !item.done)
+          if (pending >= 0) next[pending] = { ...next[pending]!, done: true }
+          return next
+        })
         setStreamSteps((prev) => {
           const done = prev.map((s) => ({ ...s, done: true }))
           return [...done, { label: `Applied ${d.toolName}`, done: true }]
