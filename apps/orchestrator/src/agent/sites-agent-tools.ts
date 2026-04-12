@@ -26,6 +26,7 @@ import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
   validateAndCorrectProps, fixFooterLinks, normalizePageBlocks, scaffoldSiteProject,
   analyzeCodebase, cloneRepo, detectSitePort, startAndWaitForDevServer,
+  getDraftModeSecret,
   packageJson, nextConfigTs, tsconfigJson, postcssConfig, layoutTsx,
   globalsCss, defaultsTs, editorApiRoute, pageTsx, hybridPageTsx, blocksRegisterTsx,
   samplePagesJson, defaultLogoSvg, faviconSvg,
@@ -234,7 +235,7 @@ export function createSitesAgentMcpServer(options: {
         await writeFile(join(projectDir, "public/logo.svg"), defaultLogoSvg(args.name), "utf-8")
         await writeFile(join(projectDir, "public/favicon.svg"), faviconSvg(args.name), "utf-8")
 
-        const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=top-secret\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${args.name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
+        const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=${getDraftModeSecret()}\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${args.name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
         await writeFile(join(projectDir, ".env.local"), envContent, "utf-8")
         console.log(`[create_site] Wrote 13 project files to apps/${siteId}/`)
 
@@ -979,7 +980,7 @@ export function createSitesAgentMcpServer(options: {
         const envPath = join(projectDir, ".env.local")
         const envVars: Record<string, string> = {
           ORCHESTRATOR_URL: "http://localhost:4200",
-          DRAFT_MODE_SECRET: "top-secret",
+          DRAFT_MODE_SECRET: getDraftModeSecret(),
           NEXT_PUBLIC_DEFAULT_SITE_ID: args.siteId,
           NEXT_PUBLIC_SITE_NAME: siteName,
           NEXT_PUBLIC_EDITOR_ORIGIN: "http://localhost:4100",

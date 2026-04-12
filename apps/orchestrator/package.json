@@ -23,7 +23,8 @@
     "benchmark:ops": "tsx src/scripts/benchmark-models.ts --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
     "benchmark:ops:multi": "tsx src/scripts/benchmark-models.ts --eval-mode ops-json --ops-cardinality multi --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
     "benchmark:ops:sonnet": "tsx src/scripts/benchmark-models.ts --provider anthropic --model claude-sonnet-4-20250514 --eval-mode ops-json --prompts src/scripts/test-sets/all-commands.json --runs 1 --variants 5",
-    "benchmark:ops:stability:anthropic": "tsx src/scripts/benchmark-models.ts --provider anthropic --eval-mode ops-json --ops-cardinality single --prompts src/scripts/test-sets/prompt-examples.json --runs 20 --variants 3 --min-pass-rate 0.9 --fail-on-threshold true --group-variants-by-base-id true --out ../../.data/evals/ops-stability-anthropic.json"
+    "benchmark:ops:stability:anthropic": "tsx src/scripts/benchmark-models.ts --provider anthropic --eval-mode ops-json --ops-cardinality single --prompts src/scripts/test-sets/prompt-examples.json --runs 20 --variants 3 --min-pass-rate 0.9 --fail-on-threshold true --group-variants-by-base-id true --out ../../.data/evals/ops-stability-anthropic.json",
+    "export-openapi": "NODE_ENV=test tsx src/scripts/export-openapi.ts"
   },
   "dependencies": {
     "@ai-site-editor/migration-sdk": "workspace:*",
@@ -32,6 +33,7 @@
     "@anthropic-ai/sdk": "^0.80.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^9.4.0",
+    "@fastify/swagger": "^9.5.1",
     "@google/genai": "^1.46.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.3.1",

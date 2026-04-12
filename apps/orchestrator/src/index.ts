@@ -4,6 +4,7 @@ import { resolve } from "node:path"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
 import multipart from "@fastify/multipart"
+import swagger from "@fastify/swagger"
 import {
   isLikelyClarificationFollowUp,
   parseCreatePageRequest
@@ -25,6 +26,7 @@ import { authRoutes } from "./routes/auth.js"
 import { gdriveRoutes } from "./routes/gdrive.js"
 import { registerAgentRoutes } from "./routes/agent.js"
 import { registerSitesAgentRoutes } from "./routes/sites-agent.js"
+import { sitesRoutes } from "./routes/sites.js"
 import { jiraRoutes } from "./routes/jira.js"
 import { createToolRuntime } from "./tools/runtime.js"
 import {
@@ -81,6 +83,76 @@ await app.register(multipart, {
   }
 })
 
+// ---------------------------------------------------------------------------
+// OpenAPI / Swagger
+// ---------------------------------------------------------------------------
+//
+// Generates an OpenAPI 3.0 spec from the registered route handlers. Most
+// orchestrator routes don't have Fastify schemas attached today, so the
+// generated spec is largely a skeleton — see
+// docs-site/api-reference/index.mdx for the public-facing acknowledgement,
+// and the `orchestrator_openapi_improvements` memory for the deferred plan
+// to upgrade this with real Zod schemas via fastify-type-provider-zod.
+//
+// Internal routes are filtered out so the public spec only documents the
+// surface external clients should rely on.
+const INTERNAL_ROUTE_PREFIXES = [
+  "/telemetry/",
+  "/contentful/",
+  "/gdrive/",
+  "/jira/",
+  "/audio/",
+  "/restore/",
+  "/agent/",        // legacy agent endpoints — superseded by /sites-agent/*
+  "/published/",    // legacy publish-eager endpoint
+  "/status/",       // internal debug
+  "/favicon.ico",
+  "/generated-images/",
+]
+
+await app.register(swagger, {
+  openapi: {
+    openapi: "3.0.3",
+    info: {
+      title: "Avocado Studio Orchestrator API",
+      description: "HTTP API exposed by the orchestrator. The brain that runs editor sessions, calls the LLMs, and serves draft state to integrated sites.\n\n**Note**: this spec is auto-generated from the running Fastify routes. Most routes do not have request/response schemas attached today, so signatures are skeletal — request bodies and response payloads are documented in the route source for now. See [the API Reference index](/api-reference) for context.",
+      version: "0.0.1",
+    },
+    servers: [
+      {
+        url: "http://localhost:4200",
+        description: "Local development orchestrator (default port)",
+      },
+    ],
+    tags: [
+      { name: "Sites", description: "Site registration and listing" },
+      { name: "Chat", description: "AI chat / planning endpoints" },
+      { name: "Sites Agent", description: "Site onboarding agent (migrate / integrate / create)" },
+      { name: "Draft", description: "Draft content read endpoints called by integrated sites" },
+      { name: "Publish", description: "Publishing and content snapshot endpoints" },
+      { name: "History", description: "Undo / redo / version log" },
+      { name: "Auth", description: "Optional access password gate" },
+      { name: "Media", description: "Image upload and generation" },
+      { name: "Health", description: "Service health and readiness" },
+    ],
+  },
+  hideUntagged: false,
+  // Filter out internal routes — they shouldn't appear in the public spec.
+  transform: ({ schema, url }) => {
+    const isInternal = INTERNAL_ROUTE_PREFIXES.some((prefix) => url.startsWith(prefix))
+    if (isInternal) {
+      return { schema: { ...schema, hide: true }, url }
+    }
+    return { schema, url }
+  },
+})
+
+// Expose the spec at /docs/json so the export script (and any external tooling)
+// can fetch it. Memoized: route table is fixed after `app.ready()`, so
+// `app.swagger()` is deterministic and there's no need to recompute per call.
+let cachedSwaggerSpec: object | null = null
+app.get("/docs/json", async () => (cachedSwaggerSpec ??= app.swagger()))
+
 const chatTelemetryFilePath = process.env.CHAT_TELEMETRY_FILE ?? resolve(process.cwd(), "../../.data/chat-telemetry.ndjson")
 const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
 const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
@@ -136,6 +208,7 @@ await app.register((instance) => authRoutes(instance))
 await app.register((instance) => gdriveRoutes(instance, ctx))
 await app.register((instance) => registerAgentRoutes(instance))
 await app.register((instance) => registerSitesAgentRoutes(instance, ctx))
+await app.register((instance) => sitesRoutes(instance, ctx))
 await app.register((instance) => jiraRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------
