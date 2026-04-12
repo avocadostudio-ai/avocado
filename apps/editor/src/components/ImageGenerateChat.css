@@ -345,7 +345,7 @@
   outline: none !important;
   color: #edf4ff;
   font-family: inherit;
-  padding: 0 0 0 4px;
+  padding: 4px 0 4px 6px;
   margin: 0;
   box-sizing: border-box;
   min-height: 20px;
