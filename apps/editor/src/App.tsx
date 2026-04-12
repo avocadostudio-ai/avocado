@@ -5,6 +5,7 @@ import { ChatComposerCore, ChatThreadCore } from "./components/ChatSurface"
 import { VersionHistoryPanel } from "./components/VersionHistoryPanel"
 import Settings2Icon from "./components/settings2-icon"
 import { SettingsModal } from "./components/SettingsModal"
+import { PublishReviewDialog } from "./components/PublishReviewDialog"
 import { SiteConfigDrawer } from "./components/SiteConfigDrawer"
 import { VariationScaledPreview } from "./components/VariationScaledPreview"
 import { SitesPage } from "./components/SitesPage"
@@ -161,6 +162,7 @@ function EditorPage({
   const useStreaming = useEditorStore((s) => s.useStreaming)
   const setUseStreaming = useEditorStore((s) => s.setUseStreaming)
   const [showNestedLabels, setShowNestedLabels] = useState(false)
+  const [showPublishReview, setShowPublishReview] = useState(false)
   const showSettingsModal = useEditorStore((s) => s.showSettingsModal)
   const setShowSettingsModal = useEditorStore((s) => s.setShowSettingsModal)
   const showDebugDetails = useEditorStore((s) => s.showDebugDetails)
@@ -1125,7 +1127,7 @@ function EditorPage({
               >
                 <Ellipsis size={14} aria-hidden="true" />
               </button>
-              <button type="button" className="publish-preview-btn" onClick={() => void publish.publishSite()} disabled={isLoading || publish.isPublishing}>
+              <button type="button" className="publish-preview-btn" onClick={() => setShowPublishReview(true)} disabled={isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
                 {publish.publishInProgress ? t("header.publishing") : t("header.publish")}
               </button>
@@ -1859,6 +1861,14 @@ function EditorPage({
         onClearChat={chatEngine.clearChat}
         agentModeEnabled={backendFeatures.agentMode ?? false}
         showDevOptions={SHOW_DEV_OPTIONS}
+      />
+
+      <PublishReviewDialog
+        open={showPublishReview}
+        onOpenChange={setShowPublishReview}
+        onConfirm={() => void publish.publishSite()}
+        chatLog={chatLog}
+        isPublishing={publish.isPublishing}
       />
 
       <SiteConfigDrawer sites={sites} onPreviewRefresh={() => preview.postToSite("draftUpdated", {})} />

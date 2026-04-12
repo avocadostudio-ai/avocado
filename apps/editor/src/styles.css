@@ -1831,6 +1831,17 @@ textarea {
   opacity: 0.6;
   cursor: not-allowed;
 }
+.msg-suggestion--chosen {
+  background: var(--accent-200);
+  color: #fff;
+  border-color: var(--accent-200);
+  opacity: 1 !important;
+  cursor: default;
+}
+.msg-suggestion--dimmed {
+  opacity: 0.35;
+  pointer-events: none;
+}
 
 /* Inline variation cards in chat */
 .msg-variations {
@@ -2969,6 +2980,54 @@ textarea {
 .publish-preview-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.publish-review-section {
+  margin-top: 4px;
+}
+
+.publish-review-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.publish-review-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  color: #374151;
+}
+
+.publish-review-item {
+  padding: 3px 0;
+}
+
+.publish-review-item::before {
+  content: "•";
+  color: #9ca3af;
+  margin-right: 8px;
+}
+
+.publish-review-changes {
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+}
+
+.publish-review-overflow {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.publish-review-empty {
+  font-size: 13px;
+  color: #9ca3af;
+  font-style: italic;
+  margin: 4px 0;
 }
 
 .publish-spinner {
@@ -4677,6 +4736,11 @@ textarea {
   background: #124743;
   color: #ccfbf1;
   border-color: rgba(45, 212, 191, 0.3);
+}
+.editor-dark .msg-suggestion--chosen {
+  background: #0d9488;
+  color: #fff;
+  border-color: #0d9488;
 }
 
 .editor-dark .msg-page-link {
