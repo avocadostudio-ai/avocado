@@ -160,7 +160,8 @@ export const EACH_BLOCK_TYPE_PATTERN = new RegExp(
 
 export const PAGE_WIDE_REWRITE_PATTERNS: RegExp[] = [
   /\b(?:refocus|rebrand|retheme|overhaul|redesign|transform)\s+(?:this|the)\s+page\b/,
-  /\brewrite\s+(?:all|the|this)\s+(?:page|content)\b/,
+  /\brewrite\s+(?:all|the|this)\s+(?:page|content|copy)\b/,
+  /\brewrite\s+copy\b/,
   /\bredo\s+(?:this|the)\s+(?:whole\s+|entire\s+)?page\b/,
   /\b(?:update|change)\s+(?:this|the)\s+(?:whole|entire)\s+page\b/,
   // Structural audit requests — "review heading hierarchy", "fix heading structure", "review Grapefruits page heading tag hierarchy"
