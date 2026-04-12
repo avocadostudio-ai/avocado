@@ -69,6 +69,7 @@ export function ImageGenerateChat(props: ImageGenerateChatProps) {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollRafRef = useRef(0)
+  const composerAreaRef = useRef<HTMLDivElement>(null)
 
   const nextId = useRef(0)
   const mkId = () => `imgchat_${++nextId.current}_${Date.now()}`
@@ -192,6 +193,16 @@ export function ImageGenerateChat(props: ImageGenerateChatProps) {
   const showEditContext = hasEditableImage && editMode === "edit" && messages.length === 0
   const showComposer = !showChoiceCards
 
+  // ── Focus composer textarea when it becomes visible ──
+  useEffect(() => {
+    if (showComposer) {
+      requestAnimationFrame(() => {
+        const ta = composerAreaRef.current?.querySelector("textarea")
+        if (ta) ta.focus()
+      })
+    }
+  }, [showComposer])
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <div
@@ -270,7 +281,7 @@ export function ImageGenerateChat(props: ImageGenerateChatProps) {
 
         {/* Composer (assistant-ui powered) */}
         {showComposer && (
-          <div className="aui-image-composer-area">
+          <div className="aui-image-composer-area" ref={composerAreaRef}>
             <input ref={refImageInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleRefImageInput} />
             {/* Reference images strip */}
             {referenceImages.length > 0 && (
@@ -311,7 +322,6 @@ export function ImageGenerateChat(props: ImageGenerateChatProps) {
                       : t("imagePicker.examplePrompt")
                 }
                 className="aui-image-composer-input"
-                autoFocus
               />
               {isRunning ? (
                 <button className="aui-image-composer-stop" onClick={handleCancel}>
