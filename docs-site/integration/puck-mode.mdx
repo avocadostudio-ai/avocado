@@ -8,6 +8,29 @@ description: "Enable a visual drag-and-drop editing experience alongside AI chat
 
 Puck mode is an alternative editing experience that replaces the default chat-driven editor with a visual drag-and-drop canvas powered by [Puck](https://github.com/measuredco/puck). AI chat remains available as a sidebar plugin, so users get the best of both worlds: direct manipulation **and** natural-language editing.
 
+### Zero extra integration
+
+<Info>
+  Puck mode requires **no additional integration work** from the site developer. If your site is already integrated with Avocado Studio, Puck mode works automatically.
+</Info>
+
+Your site talks to the orchestrator — not to the editor UI. Whether the user edits via chat or via the Puck canvas, the orchestrator receives the same operations through the same endpoints (`/ops`, `/draft/pages`, `/chat`). The site never knows which editor produced the changes.
+
+This is possible because Puck mode runs entirely inside the editor app, with an **adapter layer** that translates between Puck's data model and ours:
+
+```
+Chat Editor ──────────────→ ops ──→ Orchestrator ──→ Site
+Puck Editor ──→ adapter ──→ ops ──→ Orchestrator ──→ Site
+```
+
+| Adapter function | What it does |
+|------------------|--------------|
+| `pageToPuckData()` | Converts PageDoc → PuckData so the Puck canvas can render it |
+| `buildOpsFromPuckDiff()` | Converts Puck state changes back into standard operations |
+| `createPuckConfig()` | Converts the block manifest into Puck field definitions |
+
+This means you integrate once with Avocado Studio and get both editing experiences — chat-driven AI editing and visual drag-and-drop — without any extra work on your site.
+
 ## Enabling per site
 
 Puck mode is controlled per-site via the site settings panel.
@@ -88,6 +111,69 @@ Puck's built-in "Publish" button triggers the full publish workflow:
 4. A **"View deploy"** link appears in the header after a successful deployment
 
 Publishing uses the same `usePublish` hook as the main editor — it supports Git-based deploy, Vercel deploy hooks, and site contract publishing.
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph "Editor App (Vite :4100)"
+        Router{"/editor/puck?"}
+        ChatEditor["Chat-Only Editor<br/>(default)"]
+        PuckRoute["PuckPrototypeRoute.tsx<br/>injects HostApi"]
+    end
+
+    Router -->|No| ChatEditor
+    Router -->|Yes| PuckRoute
+
+    subgraph "Puck Editor Instance"
+        PuckCore["&lt;Puck&gt; Editor Canvas<br/>drag & drop, inline editing"]
+
+        subgraph "Plugins (right sidebar)"
+            AIChat["AI Chat Plugin<br/>ai-site-editor-chat"]
+            History["History Plugin<br/>ai-site-editor-history"]
+            Blocks["blocksPlugin()"]
+            Fields["fieldsPlugin()"]
+            Outline["outlinePlugin()"]
+        end
+
+        subgraph "Overrides"
+            Iframe["iframe override<br/>CSS vars, layout"]
+            Header["headerActions override<br/>page selector, undo/redo"]
+        end
+
+        CustomFields["Custom Field Types<br/>image picker"]
+    end
+
+    PuckRoute --> PuckCore
+
+    subgraph "Adapters Layer (packages/editor-puck)"
+        Config["createPuckConfig()<br/>manifest → Puck fields"]
+        Diff["buildOpsFromPuckDiff()<br/>PuckData → ops"]
+        Convert["pageToPuckData()<br/>PageDoc → PuckData"]
+    end
+
+    PuckCore -->|"onPuckChange<br/>(debounce 600ms)"| Diff
+    Config --> PuckCore
+    Convert --> PuckCore
+
+    subgraph "Orchestrator (Fastify :4200)"
+        Ops["POST /ops"]
+        Draft["GET /draft/pages"]
+        ChatSSE["POST /chat (SSE)"]
+    end
+
+    Diff -->|"add_block, update_props,<br/>remove_block, move_block"| Ops
+    Draft -->|PageDoc| Convert
+
+    AIChat -->|user message + selection context| ChatSSE
+    ChatSSE -->|"op_applied events"| PuckCore
+
+    subgraph "Site (Next.js :3000)"
+        Preview["Live Preview<br/>renders BlockInstances"]
+    end
+
+    Ops --> Preview
+```
 
 ## Current limitations
 

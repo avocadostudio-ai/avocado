@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from "react"
 import { applyLiveDraftToPuckData, pageToPuckData } from "./adapters"
-import { fetchDraftPage } from "./draft-api"
+import { fetchDraftPage, fetchDraftSlugs } from "./draft-api"
 import type { PuckData } from "./types"
 
 type UsePuckSiteSyncArgs = {
@@ -8,6 +8,7 @@ type UsePuckSiteSyncArgs = {
   siteId: string
   slugRef: RefObject<string>
   setSlug: (slug: string) => void
+  setAvailableSlugs: (slugs: string[] | ((prev: string[]) => string[])) => void
   puckDispatchRef: MutableRefObject<((action: any) => void) | null>
   setPuckData: Dispatch<SetStateAction<PuckData | null>>
   onRemoteData?: (data: PuckData) => void
@@ -18,6 +19,7 @@ export function usePuckSiteSync({
   siteId,
   slugRef,
   setSlug,
+  setAvailableSlugs,
   puckDispatchRef,
   setPuckData,
   onRemoteData,
@@ -56,10 +58,16 @@ export function usePuckSiteSync({
     const navigateTo = typeof payload.navigateTo === "string" && payload.navigateTo.length > 0
       ? payload.navigateTo
       : slugRef.current
-    if (navigateTo !== slugRef.current) setSlug(navigateTo)
+    if (navigateTo !== slugRef.current) {
+      setSlug(navigateTo)
+      // Optimistically add the new slug so the selector shows it before the fetch completes.
+      setAvailableSlugs((prev: string[]) => prev.includes(navigateTo) ? prev : [...prev, navigateTo])
+    }
 
+    // Refresh slug list from server — handles creates, deletes, and renames.
+    void fetchDraftSlugs(session, siteId).then(setAvailableSlugs).catch(() => undefined)
     void syncDraftPage(navigateTo).catch(() => undefined)
-  }, [setPuckData, puckDispatchRef, slugRef, setSlug, syncDraftPage])
+  }, [session, siteId, setPuckData, puckDispatchRef, slugRef, setSlug, setAvailableSlugs, syncDraftPage])
 
   const postPatchToSite = useCallback((
     _op: unknown,
