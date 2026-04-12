@@ -18,7 +18,9 @@ shipped in the same session, 3 were dropped as incorrect, and 3 remain below.
 | /simplify pass | `c6d746b` | Unified classifier, fixed setStreamStatus race, will-change, dropped wrapper |
 
 Dropped as incorrect: **F** (Undo label — was `(/)` misread as `0`),
-**G** (Home badge — `slugLabel("/")` returns `Home (/)`).
+**G** (Home badge — `slugLabel("/")` returns `Home (/)`),
+**J** (block-type label — already exists via `ensureBlockBadges()` /
+`.editor-block-badge-label`; missed in compressed video frames).
 
 ## Remaining: P2
 
@@ -38,18 +40,6 @@ neighboring fields." No client change needed.
 **Open question:** drive from the planner prompt (server, context-aware) or
 hard-code per block-type/field-kind on the client (predictable, testable)?
 Current impl is server-driven.
-
-### J. Block-type label on selection outline
-
-`applyBlockFocus` (`packages/preview-adapter/src/bridge-functions.ts`)
-builds a `.editor-block-toolbar` with move/add/delete buttons but no text
-label. A small `<span class="editor-block-label">` showing the block type
-("Hero", "CTA") anchored top-left of the highlight would help users
-identify which block is selected at a glance.
-
-**Fix:** after creating the toolbar, create a label element with
-`textContent` from `data-block-type`. Style in
-`packages/preview-adapter/src/styles.css` next to `.editor-block-toolbar`.
 
 ### M. Publish review modal
 
