@@ -33,6 +33,9 @@ export function usePuckBootstrap({ session, siteId, slug, setSlug }: UsePuckBoot
     await bootstrapDraft(session, siteId, pages)
   }, [session, siteId])
 
+  const slugRef = useRef(slug)
+  slugRef.current = slug
+
   const loadManifestAndSlugs = useCallback(async () => {
     const [nextManifest, slugs] = await Promise.all([
       fetchManifest(),
@@ -41,8 +44,8 @@ export function usePuckBootstrap({ session, siteId, slug, setSlug }: UsePuckBoot
 
     setManifest(nextManifest)
     setAvailableSlugs(slugs)
-    if (!slugs.includes(slug)) setSlug(slugs[0])
-  }, [session, siteId, slug, setSlug])
+    if (!slugs.includes(slugRef.current)) setSlug(slugs[0])
+  }, [session, siteId, setSlug])
 
   const loadPage = useCallback(async (nextSlug: string) => {
     const loadSeq = ++latestLoadSeqRef.current
@@ -52,6 +55,8 @@ export function usePuckBootstrap({ session, siteId, slug, setSlug }: UsePuckBoot
     setRemotePuckVersion((v) => v + 1)
   }, [session, siteId])
 
+  // Does NOT re-run on slug changes — handled by the effect below.
+  const bootstrapDoneRef = useRef(false)
   useEffect(() => {
     let cancelled = false
 
@@ -63,7 +68,8 @@ export function usePuckBootstrap({ session, siteId, slug, setSlug }: UsePuckBoot
         if (cancelled) return
         await loadManifestAndSlugs()
         if (cancelled) return
-        await loadPage(slug)
+        await loadPage(slugRef.current)
+        bootstrapDoneRef.current = true
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : "Failed to load Puck prototype")
@@ -74,7 +80,14 @@ export function usePuckBootstrap({ session, siteId, slug, setSlug }: UsePuckBoot
 
     void run()
     return () => { cancelled = true }
-  }, [ensureDraftInitialized, loadManifestAndSlugs, loadPage, slug])
+  }, [ensureDraftInitialized, loadManifestAndSlugs, loadPage])
+
+  // Re-fetch page on slug change (covers manual page-selector navigation).
+  useEffect(() => {
+    if (!bootstrapDoneRef.current) return
+    setError(null)
+    void loadPage(slug).catch(() => undefined)
+  }, [loadPage, slug])
 
   return {
     manifest,

@@ -125,5 +125,6 @@ export type PuckHostApi = {
   renderFinalMarkdown: (text: string) => ReactNode
   renderSimpleMarkdown: (text: string) => ReactNode
   setGlobalSelection: (selection?: PuckHostSelection) => void
+  setGlobalSlug: (slug: string) => void
   agentModeEnabled?: boolean
 }

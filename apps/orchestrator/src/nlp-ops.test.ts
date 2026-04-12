@@ -3635,6 +3635,41 @@ test("normalizePlanCandidate: add_block with props at block top level (no .props
   }
 })
 
+test("normalizePlanCandidate: update_props with flat props (no .patch wrapper)", () => {
+  // LLMs sometimes put prop values directly on the op object instead of under patch
+  const page = demoPublishedPages()[0]
+  const heroId = page.blocks.find((b) => b.type === "Hero")!.id
+  const raw = {
+    intent: "edit_plan",
+    summary_for_user: "Updating hero.",
+    change_log: ["Update heading"],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/",
+        blockId: heroId,
+        heading: "New Heading",
+        subheading: "New Subheading"
+      }
+    ]
+  }
+
+  const normalized = normalizePlanCandidate(raw, {
+    defaultSlug: "/",
+    currentPage: page
+  }) as any
+  const op = normalized.ops[0]
+  assert.ok(op.patch, "should have patch extracted from flat props")
+  assert.equal(op.patch.heading, "New Heading")
+  assert.equal(op.patch.subheading, "New Subheading")
+
+  const result = editPlanSchema.safeParse(normalized)
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    assert.fail(`editPlanSchema validation failed: ${issue?.message} at ${issue?.path?.join(".")}`)
+  }
+})
+
 // ---------------------------------------------------------------------------
 // tryCompoundDeterministicPlan
 // ---------------------------------------------------------------------------

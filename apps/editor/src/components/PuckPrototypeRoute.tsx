@@ -74,6 +74,11 @@ const puckHostApi: PuckHostApi = {
     state.setActiveBlock(selection?.activeBlockId, selection?.activeBlockType)
     state.setActiveEditablePath(selection?.activeEditablePath)
   },
+  setGlobalSlug: (slug: string) => {
+    // Puck mode tracks slug locally, but useChatEngine reads slug from the
+    // Zustand store when building chat request bodies. Keep them in sync.
+    useEditorStore.getState().setSlug(slug)
+  },
   agentModeEnabled: false, // Detected from /status/planner at runtime
 }
 

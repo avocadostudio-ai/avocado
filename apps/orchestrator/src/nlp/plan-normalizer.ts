@@ -681,6 +681,27 @@ export function normalizePlanCandidate(input: unknown, args?: { defaultSlug?: st
     if (!raw.patch) {
       raw.patch = raw.props ?? raw.changes
     }
+    // LLMs sometimes put prop values directly on the op object instead of
+    // nesting them under "patch". Extract non-structural keys as the patch.
+    if (!raw.patch && raw.op === "update_props") {
+      const structuralKeys = new Set([
+        "op", "pageSlug", "page_slug", "blockId", "block_id", "patch", "props", "changes",
+        "type", "blockType", "block_type", "newBlockType", "new_block_type", "targetBlockType", "target_block_type",
+        "newPageSlug", "new_page_slug", "targetSlug", "target_slug", "toPageSlug", "to_page_slug",
+        "afterBlockId", "after_block_id", "afterPageSlug", "after_page_slug", "beforePageSlug", "before_page_slug",
+        "newBlockId", "new_block_id", "listKey", "list_key", "block",
+        "path", "index", "item", "afterIndex", "itemPath",
+      ])
+      const extracted: Record<string, unknown> = {}
+      let found = false
+      for (const key of Object.keys(raw)) {
+        if (!structuralKeys.has(key)) {
+          extracted[key] = raw[key]
+          found = true
+        }
+      }
+      if (found) raw.patch = extracted
+    }
     // Remap update_props patch keys: heading→title for non-Hero, question→q/answer→a in list items
     if (raw.op === "update_props" && raw.patch && typeof raw.patch === "object" && !Array.isArray(raw.patch) && typeof raw.blockId === "string") {
       const patch = raw.patch as Record<string, unknown>
