@@ -8,6 +8,12 @@ The **Site Assistant** is an AI agent built into the editor's *Sites* page. You 
 
 Three modes (Migrate / Integrate / Create), one chat UI, two execution backends (your Claude subscription via the CLI, or pay-per-token via API key). Same end state regardless of which combination you pick.
 
+<Note>
+**Claude only — for now.** The Site Assistant runs exclusively on **Anthropic Claude**, on both backends. There is no OpenAI / Gemini / local-model code path: the CLI backend shells out to the official `claude` CLI, and the SDK backend uses `@anthropic-ai/claude-agent-sdk` against your `ANTHROPIC_API_KEY`. If you only have an `OPENAI_API_KEY`, the assistant will not run — you'll need a Claude subscription (free for the CLI backend) or an Anthropic API key.
+
+This is *only* a constraint for the Site Assistant. The editor's per-edit chat (the AI you talk to *after* a site exists) already supports OpenAI, Anthropic, and demo mode — see [model selection](/integration/editor-quickstart). Multi-provider support for the Site Assistant is on the roadmap but not implemented today; if it matters to you, the **[Bring Your Own Coding Agent](/sites/coding-agent)** path lets you use any agent (Codex, Cursor, Aider, …) regardless of which model it runs on.
+</Note>
+
 ## Prerequisites
 
 Before you can run the Site Assistant for the first time, you need three layers of prerequisites: **base stack**, **mode-specific**, and **backend-specific**.
@@ -32,7 +38,7 @@ If you only ever ran `pnpm dev`, you already have all of this.
 | Mode | Extra requirements |
 |---|---|
 | **Migrate** (URL → site) | Internet access from the orchestrator host. The target URL must be publicly reachable (no auth wall). Sites with heavy client-side JS render the worst — server-rendered HTML works best. |
-| **Integrate** (existing repo → SDK wired in) | `git` on `PATH` if cloning. Read/write access to the target directory. The project should be **Next.js 15 App Router**; other frameworks fall back to the [Site Provider SPI](/site-provider-spi) and may need manual finishing. |
+| **Integrate** (existing repo → SDK wired in) | `git` on `PATH` if cloning. Read/write access to the target directory. The project should be **Next.js 15 App Router**; other frameworks need to follow the [Non-Next.js Integration](/integration/non-nextjs) path, which the agent doesn't fully automate today and will need manual finishing. |
 | **Create** (idea → scaffolded site) | Nothing extra beyond the base stack. |
 
 ### Backend-specific prerequisites
@@ -45,10 +51,11 @@ The Site Assistant runs through one of two backends. Pick **one** and configure 
 
     **You need:**
 
-    - The `claude` CLI installed and on `PATH`:
+    - The `claude` CLI installed and on `PATH`. Always install the **latest** version — the orchestrator passes flags like `--system-prompt-file`, `--strict-mcp-config`, and `--no-session-persistence`, so an older CLI will fail with "unknown option" errors:
       ```bash
-      npm i -g @anthropic-ai/claude-code
-      which claude   # should print a path
+      npm i -g @anthropic-ai/claude-code@latest
+      which claude     # should print a path
+      claude --version # confirm a recent build
       ```
     - Logged in via OAuth (one-time):
       ```bash
@@ -69,11 +76,12 @@ The Site Assistant runs through one of two backends. Pick **one** and configure 
 
     **You need:**
 
-    - `ANTHROPIC_API_KEY` in the orchestrator's environment (`.env` at the repo root):
+    - `ANTHROPIC_API_KEY` in the orchestrator's environment (`.env` at the repo root). The key **must** start with `sk-ant-` — an OpenAI key (`sk-...` or `sk-proj-...`) will be accepted at startup but every agent call will fail with a 401 from Anthropic, which is hard to spot from the editor. Double-check with `echo $ANTHROPIC_API_KEY | head -c 7`:
       ```bash
       ANTHROPIC_API_KEY=sk-ant-...
       ```
-    - *(Optional but recommended)* a per-run budget cap:
+    - **Restart the orchestrator** after editing the root `.env` (`pnpm dev:orchestrator`). The orchestrator reads `ANTHROPIC_API_KEY` once at startup — there's no HMR, so a new key won't take effect until the process restarts.
+    - *(Optional but recommended)* a per-run budget cap, also in the root `.env`:
       ```bash
       SITES_AGENT_MAX_BUDGET_USD=2   # default; aborts the run when exceeded
       ```
@@ -81,9 +89,9 @@ The Site Assistant runs through one of two backends. Pick **one** and configure 
       ```bash
       VITE_AGENT_USE_CLI=false
       ```
-      Then restart the editor.
+      Then restart the editor (`pnpm dev:editor`) — Vite snapshots `import.meta.env.*` at startup.
 
-    Restart the orchestrator after changing root `.env`. The editor flag only needs an editor restart; the orchestrator picks up the backend choice per request from the `useCliAgent` field on the request body.
+    The orchestrator picks the backend per request from the `useCliAgent` field the editor sends, so once both processes are up you can flip backends just by changing `VITE_AGENT_USE_CLI` and restarting the editor — no orchestrator restart needed.
   </Tab>
 </Tabs>
 
@@ -201,3 +209,44 @@ You might be in a non-default editor route. Make sure you're on the **Sites** pa
 
 **The agent says "I need a URL" but I gave it one**
 The agent extracts URLs from your message via regex. If your URL is wrapped in markdown link syntax or quotes, try pasting it bare: `https://example.com` instead of `[example](https://example.com)`.
+
+**Which backend did this run actually use?** *(both backends)*
+The chat UI doesn't surface this directly. Two ways to confirm:
+
+1. **Orchestrator stdout** — every run logs an init line like `[sites-agent] Stream <id> INIT mode=migrate cli=true message="..."`. `cli=true` is the CLI backend (your subscription), `cli=false` is the SDK backend (`ANTHROPIC_API_KEY`).
+2. **Editor build-time flag** — open the browser devtools, run `import.meta.env.VITE_AGENT_USE_CLI`. Whatever it returns is what the editor will send on the *next* request. If it doesn't match what you set in `apps/editor/.env`, you forgot to restart `pnpm dev:editor`.
+
+Use this when a run was unexpectedly slow (likely SDK + multi-agent), unexpectedly cheap (likely CLI), or unexpectedly shallow on a Migrate run — the CLI backend skips the structure-analyzer / block-coder split, see the *"Migrate mode produces shallow / incomplete results"* entry above.
+
+## Programmatic entry points
+
+If you want to register a site **without** using the assistant or the editor UI — for example, from a CI job, a script, or your own coding agent — the orchestrator exposes the same registration as a plain HTTP endpoint, and the SDK ships a CLI that wraps it.
+
+**HTTP**:
+
+```bash
+curl -X POST http://localhost:4200/sites/register \
+  -H 'content-type: application/json' \
+  -d '{
+    "siteId": "marketing-site",
+    "name": "Marketing Site",
+    "port": 3000,
+    "session": "dev",
+    "secret": "<your DRAFT_MODE_SECRET>"
+  }'
+```
+
+The endpoint returns the registered config plus a `warnings` array (e.g. if the secret you passed doesn't match the orchestrator's `DRAFT_MODE_SECRET` env var).
+
+`GET /sites?session=dev` lists all sites the orchestrator knows about — the editor calls it on mount to populate the dashboard.
+
+**CLI** (shipped with `@ai-site-editor/site-sdk`):
+
+```bash
+cd /path/to/your/next-js-project
+npx avocado-register --name "Marketing Site"
+```
+
+Generates a `DRAFT_MODE_SECRET` if missing, writes `.env.local`, POSTs to the orchestrator. Run `npx avocado-register --help` for all flags.
+
+This is the recommended path for the **[Bring Your Own Coding Agent](/sites/coding-agent)** workflow — your external agent finishes the code-level work and runs `avocado-register` as its final step, after which the site auto-appears in the editor.

@@ -1,0 +1,303 @@
+---
+title: "Next.js Integration"
+sidebarTitle: "Next.js Integration"
+description: "Canonical onboarding path for any Next.js 15 site — two SDK helpers, one catch-all editor route, edit through Draft Mode without a /preview route."
+---
+
+This is the canonical onboarding path for any Next.js 15 (App Router) site. For background, see [Core Concepts](/concepts) and the [Integration Overview](/integration).
+
+**Goal**: keep your existing routes serving published content, enable AI editing through Next.js [Draft Mode](/concepts#draft-mode) cookies, and register the site so it shows up in the editor's dashboard. **No `/preview` route required.**
+
+Related:
+- [Editor Quickstart](/integration/editor-quickstart) — env vars, iframe URL pattern, smoke checks
+- [Custom Blocks](/integration/custom-blocks) — register your own component types alongside (or instead of) the built-in blocks
+- [Architecture](/architecture) — how the three services communicate
+
+## How it works in two helpers
+
+The SDK collapses the entire integration into two factory functions. Most adopters need exactly two new files; nothing else changes in your project.
+
+| Helper | What it gives you | Mount at |
+|---|---|---|
+| `createEditorApiHandler` | One catch-all route that serves `blocks`, `pages`, `draft`, `draft/disable`, and `publish` | `app/api/editor/[...path]/route.ts` |
+| `createSitePage` | A `Page` component + `generateStaticParams` with draft mode, navigation, footer, editor overlay, and 404 fallbacks already wired in | `app/[[...slug]]/page.tsx` |
+
+You wire both with your existing CMS / content fetchers (`getPage`, `getSlugs`, `getSiteConfig`), then register the site with `npx avocado-register`. That's the whole integration.
+
+If you need fine-grained control instead, the [low-level primitives](#low-level-primitives) section shows the underlying handlers (`createBlocksHandler`, `createDraftEnableHandler`, `createDraftDisableHandler`, `fetchEditorPage`, `fetchEditorSlugs`).
+
+## Walkthrough
+
+<Steps>
+  <Step title="Install the SDK">
+    From your Next.js project root:
+
+    ```bash
+    pnpm add @ai-site-editor/site-sdk
+    # or: npm install @ai-site-editor/site-sdk
+    ```
+
+    Peer dependencies (`next` ≥ 15, `react` ≥ 19) should already be in your project. The SDK has no other runtime dependencies.
+  </Step>
+
+  <Step title="Mount the catch-all editor API route">
+    Create `app/api/editor/[...path]/route.ts`:
+
+    ```ts
+    // app/api/editor/[...path]/route.ts
+    import { createEditorApiHandler } from "@ai-site-editor/site-sdk/routes"
+    import { getPages, publishPages } from "@/lib/my-cms" // your fetchers
+
+    export const { GET, POST, OPTIONS } = createEditorApiHandler({
+      // Required: return all published pages so the editor can seed
+      // a fresh session with your real content.
+      getPages: () => getPages(),
+
+      // Optional: lets the editor publish edits back into your CMS.
+      // Omit this and the editor runs in read-only / draft-only mode.
+      onPublish: async (pages, config) => {
+        await publishPages(pages, config)
+        return { ok: true }
+      },
+
+      // Optional: require a token on POST /api/editor/publish.
+      // Compared against the `x-publish-token` header.
+      publishSecret: process.env.PUBLISH_TOKEN,
+    })
+    ```
+
+    This single file exposes:
+
+    - `GET /api/editor/blocks` — block manifest (auto-built from the SDK's built-in registry, override via `getManifest` for [custom blocks](/integration/custom-blocks))
+    - `GET /api/editor/pages` — `{ pages: PageDoc[] }` for editor session bootstrap
+    - `GET /api/editor/draft?secret=...&redirect=...` — Draft Mode entry, validates `secret` against `DRAFT_MODE_SECRET`, only allows internal redirects
+    - `GET /api/editor/draft/disable?redirect=...` — Draft Mode exit
+    - `POST /api/editor/publish` — receives published pages back from the editor
+
+    Secret validation, internal-redirect enforcement, CORS preflight, and the draft cookie are all handled by the helper. You do not implement these yourself.
+  </Step>
+
+  <Step title="Replace your page route with createSitePage">
+    Create (or replace) `app/[[...slug]]/page.tsx`:
+
+    ```tsx
+    // app/[[...slug]]/page.tsx
+    import { createSitePage } from "@ai-site-editor/site-sdk/page"
+    import { getPage, getSlugs, getSiteConfig } from "@/lib/my-cms"
+
+    const { Page, generateStaticParams } = createSitePage({
+      siteId: "my-site",            // any kebab-case ID, must match avocado-register
+      getPage,                      // (slug: string) => Promise<PageDoc | null>
+      getSlugs,                     // () => Promise<string[]>
+      getSiteConfig,                // () => Promise<SiteConfig>  (optional, for nav/logo)
+    })
+
+    export default Page
+    export { generateStaticParams }
+    ```
+
+    `createSitePage` handles, in order:
+
+    - Detecting Draft Mode via `next/headers` and switching reads to `fetchEditorPage` / `fetchEditorSlugs` (which call the orchestrator)
+    - Building site nav/header chrome from `getSiteConfig`
+    - Rendering blocks via the SDK's `renderBlocks` and the shared block library
+    - Mounting the live `EditorOverlay` when in editor mode
+    - Falling back to your CMS data if the orchestrator is unreachable
+    - Returning a 404 (or "Draft unavailable") fallback when no page exists for the slug
+
+    Your existing `lib/my-cms.ts` does not change — `createSitePage` calls into it.
+  </Step>
+
+  <Step title="Register the site with the orchestrator">
+    Make sure the orchestrator is running (`pnpm dev:orchestrator` from the Avocado repo, or your hosted instance), then from your Next.js project directory:
+
+    ```bash
+    npx avocado-register --name "My Site"
+    ```
+
+    The CLI (shipped inside `@ai-site-editor/site-sdk`) will:
+
+    1. Generate a `DRAFT_MODE_SECRET` if `.env.local` doesn't already have one (32 random bytes, hex-encoded).
+    2. Write `ORCHESTRATOR_URL`, `DRAFT_MODE_SECRET`, `NEXT_PUBLIC_DEFAULT_SITE_ID`, `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_EDITOR_ORIGIN` to `.env.local` if missing (existing values are never overwritten).
+    3. POST your site config to `${ORCHESTRATOR_URL}/sites/register`.
+
+    All flags: `npx avocado-register --help`. Common ones: `--id`, `--port`, `--orchestrator`, `--secret`, `--session`, `--purpose`.
+
+    After it succeeds, the site appears in the editor's dashboard the next time you open or refresh `http://localhost:4100`.
+  </Step>
+
+  <Step title="Verify the contract">
+    Start your dev server, then run these from a second terminal. All four should pass:
+
+    ```bash
+    # 1. Block manifest is non-empty
+    curl -s http://localhost:3000/api/editor/blocks | jq '.version, (.blocks | length)'
+    # → 1
+    # → 20  (or whatever your custom registry returns)
+
+    # 2. Pages endpoint returns your CMS content
+    curl -s http://localhost:3000/api/editor/pages | jq '.pages | length'
+    # → number > 0
+
+    # 3. Valid secret enters Draft Mode and redirects with a draft cookie
+    curl -i "http://localhost:3000/api/editor/draft?secret=$(grep DRAFT_MODE_SECRET .env.local | cut -d= -f2)&redirect=/" \
+      | grep -i 'set-cookie\|location'
+    # → set-cookie: __prerender_bypass=...
+    # → location: /
+
+    # 4. Wrong secret is rejected
+    curl -i "http://localhost:3000/api/editor/draft?secret=wrong&redirect=/" \
+      | head -1
+    # → HTTP/1.1 401 Unauthorized
+    ```
+
+    And one negative check that's worth running by hand because it's the security-critical one:
+
+    ```bash
+    # 5. External redirects are rejected (open-redirect protection)
+    curl -i "http://localhost:3000/api/editor/draft?secret=<your-secret>&redirect=https://evil.com" \
+      | head -1
+    # → HTTP/1.1 400 Bad Request  (or 401 — must NOT be a 307 to evil.com)
+    ```
+
+    If all five behave as shown, the integration is complete.
+  </Step>
+
+  <Step title="Open the editor and confirm round-trip">
+    Open `http://localhost:4100`. Your site should be in the dashboard. Click its tile, then send a simple edit from the chat panel like *"change the hero headline to Hello world"*. You should see:
+
+    1. The AI generate an operation
+    2. The preview update inside the iframe
+    3. An undo entry appear in the history
+
+    If anything's wrong, jump to [Troubleshooting](#troubleshooting).
+  </Step>
+</Steps>
+
+<Warning>
+**Open-redirect risk on `/api/editor/draft`.** The `redirect` query parameter accepts the destination after Draft Mode is enabled. If you bypass `createEditorApiHandler` and roll your own route, **you must reject anything that isn't an internal path starting with `/`**. An unvalidated `redirect=https://evil.com` would let an attacker craft a phishing link that briefly visits your domain (granting it credibility) before bouncing victims to a malicious page. The SDK handler enforces this for you — that's the main reason to use it instead of writing the route by hand.
+</Warning>
+
+## TypeScript types
+
+The SDK re-exports the core types from `@ai-site-editor/shared`. Import what your fetchers need:
+
+```ts
+import type { PageDoc, BlockInstance, SiteConfig } from "@ai-site-editor/site-sdk"
+
+// Your CMS fetchers should be typed as:
+async function getPage(slug: string): Promise<PageDoc | null> { /* ... */ }
+async function getSlugs(): Promise<string[]> { /* ... */ }
+async function getSiteConfig(): Promise<SiteConfig> { /* ... */ }
+```
+
+`PageDoc` has shape `{ id: string; slug: string; meta?: PageMeta; blocks: BlockInstance[] }`. `BlockInstance` is `{ id: string; type: string; props: Record<string, unknown> }`. See `packages/shared/src/schemas.ts` in the repo for the Zod schemas that back these types.
+
+## Block manifest
+
+The manifest is what tells the editor which block types exist and what props each one accepts. `createEditorApiHandler` builds it automatically from the SDK's built-in block registry — you only need to think about it if you have custom React components.
+
+Example response shape from `GET /api/editor/blocks`:
+
+```json
+{
+  "version": 1,
+  "blocks": [
+    {
+      "type": "Hero",
+      "displayName": "Hero",
+      "editablePaths": ["heading", "subheading", "ctaText", "ctaHref", "imageUrl", "imageAlt"],
+      "propsSchema": { "type": "object", "properties": { "heading": { "type": "string" } } },
+      "defaultProps": { "heading": "New hero heading" }
+    }
+  ]
+}
+```
+
+If the manifest is missing or the route returns 404, the editor falls back to **degraded mode** — read-only preview with text-only edits, no add/remove/reorder/update-props operations. Use this as your "is the SDK actually wired in?" canary: a present manifest unlocks the full editing experience.
+
+To register your own components, see [Custom Blocks](/integration/custom-blocks) — you pass a `getManifest` function to `createEditorApiHandler` and the SDK uses yours instead of the built-in one.
+
+## Component matching
+
+The editor never infers components from DOM class names. It matches by **stable `type` strings** that must agree across three places:
+
+```ts
+// 1. Manifest entry  (returned by GET /api/editor/blocks)
+{ "type": "Hero", "propsSchema": { "type": "object" } }
+
+// 2. Content block  (returned by your getPage())
+{ "id": "b1", "type": "Hero", "props": { "heading": "Hello" } }
+
+// 3. Renderer registry  (in your React tree, or the SDK's built-in registry)
+const renderers = { Hero: HeroSection }
+```
+
+If a block type appears in content but **not** in the manifest, it still renders on the published site, but the editor refuses structural ops on that specific block (degraded for that type only — the rest of the page stays editable).
+
+## Environment variables
+
+The values written by `npx avocado-register` into your project's `.env.local`:
+
+| Variable | Where it lives | Purpose |
+|---|---|---|
+| `DRAFT_MODE_SECRET` | site `.env.local` | Validates `?secret=` on Draft Mode entry. Generated by `avocado-register` if missing. |
+| `ORCHESTRATOR_URL` | site `.env.local` | Where the SDK fetches draft pages from. Defaults to `http://127.0.0.1:4200` in dev. |
+| `NEXT_PUBLIC_DEFAULT_SITE_ID` | site `.env.local` | The site ID this project corresponds to in the orchestrator. |
+| `NEXT_PUBLIC_SITE_NAME` | site `.env.local` | Display name shown in the editor's site picker. |
+| `NEXT_PUBLIC_EDITOR_ORIGIN` | site `.env.local` | Editor origin for postMessage trust checks. Defaults to `http://localhost:4100`. |
+
+And in the editor itself (`apps/editor/.env`, set by you), single-tenant build-time:
+
+| Variable | Purpose |
+|---|---|
+| `VITE_SITE_ORIGIN` | Where the editor's iframe loads from |
+| `VITE_SITE_DRAFT_SECRET` | **Must equal** the site's `DRAFT_MODE_SECRET` — the editor uses this to construct the bootstrap URL the iframe loads |
+
+A mismatch between `VITE_SITE_DRAFT_SECRET` (built into the editor) and `DRAFT_MODE_SECRET` (read by the site at runtime) is the single most common failure — `avocado-register` surfaces it as a warning, and the orchestrator's `/sites/register` response includes a `warnings` array for the same reason.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Editor iframe loads but no edits work, header says **Degraded** | Manifest route not mounted or returning empty | `curl http://localhost:3000/api/editor/blocks` — should return `version` + non-empty `blocks` array. Check that `app/api/editor/[...path]/route.ts` exists and exports `GET`. |
+| `curl /api/editor/draft?secret=…` returns **401** even with the right secret | The site's `DRAFT_MODE_SECRET` doesn't match what you're passing | `cat .env.local \| grep DRAFT_MODE_SECRET` — make sure you copied the *full* value, not just a prefix. Restart the Next.js dev server after editing `.env.local`. |
+| Editor opens the iframe but the page renders **published** content, not the draft | Page loader isn't branching on Draft Mode | If you wrote the loader by hand, check it calls `(await draftMode()).isEnabled` and switches to `fetchEditorPage` / `fetchEditorSlugs`. **Or** switch to `createSitePage`, which does this for you. |
+| Iframe loads but `EditorOverlay` doesn't appear | Draft cookie not being sent because of `sameSite` | If your Next.js site is on a different origin from the editor, the draft cookie needs `SameSite=None; Secure`. The SDK helper sets `sameSite=lax` by default, which works for `localhost:3000` ↔ `localhost:4100` but not cross-origin HTTPS. For production, mount the editor on the same domain or override the cookie via your own draft route. |
+| `npx avocado-register` says **"could not reach the orchestrator"** | Orchestrator isn't running | Start `pnpm dev:orchestrator`, or pass `--orchestrator http://your-host:4200`. |
+| `avocado-register` warns **"DRAFT_MODE_SECRET mismatch"** | The secret in your project's `.env.local` doesn't match the one the editor was built with (`VITE_SITE_DRAFT_SECRET`) | Either rebuild the editor against your project's secret, or pass `--secret <editor-value>` to `avocado-register` to overwrite your `.env.local`. |
+| Site registered but doesn't appear in the editor | The editor caches the site list in localStorage and only fetches `GET /sites` on mount | Hard-refresh the editor (Cmd+Shift+R). |
+| Custom React components render fine on the live site but the editor refuses to edit them | Component type isn't in the manifest | Register the component via `getManifest` — see [Custom Blocks](/integration/custom-blocks). |
+| `import.meta.env.VITE_SITE_DRAFT_SECRET` change isn't picked up | Vite snapshots `import.meta.env.*` at startup | Restart `pnpm dev:editor`. HMR doesn't re-evaluate `.env`. |
+
+## Low-level primitives
+
+If `createEditorApiHandler` and `createSitePage` are too opinionated for your project — for example you have a custom routing layer, you mount the editor API at a non-standard path, or you need to compose draft mode with your own middleware — the same building blocks are exported individually:
+
+```ts
+import {
+  createBlocksHandler,
+  createPagesHandler,
+  createPublishHandler,
+  createDraftEnableHandler,
+  createDraftDisableHandler,
+} from "@ai-site-editor/site-sdk/routes"
+
+import { fetchEditorPage, fetchEditorSlugs } from "@ai-site-editor/site-sdk/draft"
+```
+
+Each factory returns a `{ GET, POST, OPTIONS }` object you mount at any route you like. `fetchEditorPage(slug, session, siteId)` and `fetchEditorSlugs(session, siteId)` are the primitives `createSitePage` calls internally — use them directly inside your own page component if you need to compose them with other data sources.
+
+The contract these primitives implement is the same one `createEditorApiHandler` mounts:
+
+- Block manifest: `GET /api/editor/blocks` (or wherever you mount it)
+- Pages snapshot: `GET /api/editor/pages`
+- Draft enter: `GET /api/editor/draft?secret=...&redirect=/...` — **must** validate the secret and reject non-internal redirects
+- Draft exit: `GET /api/editor/draft/disable?redirect=/...`
+- Publish: `POST /api/editor/publish`
+
+If you change the URL paths, update the editor's `VITE_SITE_ORIGIN` and the bootstrap URL builder accordingly — the editor expects the standard paths by default.
+
+## Optional: dedicated /preview/* route group
+
+If you want stronger isolation between published and draft content (e.g. a separate route group with its own middleware, layout, or feature flags), you can add a `/preview/*` route group that calls into `fetchEditorPage` directly. This is opt-in and not part of the standard onboarding path — most adopters don't need it because Draft Mode cookies already give you per-request isolation.

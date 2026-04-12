@@ -1,0 +1,331 @@
+---
+title: "Non-Next.js Integration"
+sidebarTitle: "Non-Next.js Integration"
+description: "How to implement the editor API contract on Astro, Remix, SvelteKit, Hono, or any framework that exposes web-standard Request/Response handlers — using the SDK's framework-agnostic /core primitives."
+---
+
+The default integration path uses [`createEditorApiHandler`](/integration/nextjs-integration) and [`createSitePage`](/integration/nextjs-integration#walkthrough) — both of which import from `next/headers` and `next/server`. If your site is on **Astro, Remix, SvelteKit, Hono, Cloudflare Workers, or any other framework that gives you web-standard `Request` and `Response` objects**, you can implement the same contract by hand using the SDK's framework-agnostic `/core` primitives instead. Same `/api/editor/*` URL paths, same wire format, same end state — your site appears in the editor's dashboard, edits round-trip through Draft Mode (or the framework's equivalent), and the rest of the docs apply.
+
+<Note>
+**Next.js is the only officially tested framework today.** The `/core` primitives below are framework-agnostic by design, but the only adapters shipped in the box are the Next.js ones in `@ai-site-editor/site-sdk/draft` and `@ai-site-editor/site-sdk/routes`. On any other framework you'll be a first mover. The patterns on this page are real and the primitives work, but expect to file bugs and contribute back as you discover gaps.
+
+If you need an officially supported path on day one, the simplest option is to wrap your app in a thin Next.js shell that proxies to your existing backend, and use the standard [Next.js Integration](/integration/nextjs-integration). That's not what most readers of this page want to hear, but it's the truth.
+</Note>
+
+## What you have to implement
+
+The contract the editor speaks is **five HTTP routes** mounted under `/api/editor/*`. On Next.js the SDK's catch-all handler implements all five for you. Off Next.js, you implement them yourself, but the SDK gives you most of the logic via the `/core` exports — you only have to provide a small **adapter** that translates between your framework's request/cookie/redirect primitives and the SDK's web-standard ones.
+
+| Route | Purpose | SDK helper to call |
+|---|---|---|
+| `GET /api/editor/blocks` | Block manifest (auto-built from the SDK's built-in registry, override with your own) | [`createBlocksHandler`](#1-blocks-and-pages-no-adapter-needed) |
+| `GET /api/editor/pages` | `{ pages: PageDoc[] }` of published content for editor session bootstrap | [`createPagesHandler`](#1-blocks-and-pages-no-adapter-needed) |
+| `GET /api/editor/draft?secret=...&redirect=...` | Draft Mode entry — validates secret, sets cookies, redirects | [`createDraftEnableHandlerCore`](#2-draft-mode-routes-needs-an-adapter) |
+| `GET /api/editor/draft/disable?redirect=...` | Draft Mode exit — clears cookies, redirects | [`createDraftDisableHandlerCore`](#2-draft-mode-routes-needs-an-adapter) |
+| `POST /api/editor/publish` | Receives published pages back from the editor (only if you support publish) | [`createPublishHandler`](#1-blocks-and-pages-no-adapter-needed) |
+
+The SDK exports come from three subpaths:
+
+```ts
+// Web-standard handlers (no framework dependency)
+import {
+  createBlocksHandler,
+  createPagesHandler,
+  createPublishHandler,
+} from "@ai-site-editor/site-sdk/routes"
+
+// Draft Mode handlers (need an adapter — see below)
+import {
+  createDraftEnableHandlerCore,
+  createDraftDisableHandlerCore,
+  type DraftRouteAdapter,
+} from "@ai-site-editor/site-sdk/routes/core"
+
+// Draft context resolver (for your page render path — also needs an adapter)
+import {
+  resolveDraftContextCore,
+  type DraftModeAdapter,
+} from "@ai-site-editor/site-sdk/draft/core"
+
+// Server-side draft fetching (no framework dependency — just fetch())
+import { fetchEditorPage, fetchEditorSlugs } from "@ai-site-editor/site-sdk/draft"
+```
+
+## 1. Blocks and pages (no adapter needed)
+
+`createBlocksHandler`, `createPagesHandler`, and `createPublishHandler` already accept and return web-standard `Request` and `Response` objects. They have **no Next.js dependency** — you can mount them on any framework that lets you wire a `(request: Request) => Response` handler to a route.
+
+### Astro example
+
+```ts
+// src/pages/api/editor/blocks.ts
+import {
+  createBlocksHandler,
+  createPagesHandler,
+  createPublishHandler,
+} from "@ai-site-editor/site-sdk/routes"
+import { getMyPages, publishMyPages } from "../../../lib/my-cms"
+
+const blocks = createBlocksHandler()
+const pages = createPagesHandler(() => getMyPages())
+const publish = createPublishHandler(
+  async (pages, config) => { await publishMyPages(pages, config); return { ok: true } },
+  { publishSecret: import.meta.env.PUBLISH_TOKEN }
+)
+
+// Astro endpoint signature
+export const GET = ({ request }: { request: Request }) => {
+  const url = new URL(request.url)
+  if (url.pathname.endsWith("/blocks")) return blocks.GET(request)
+  if (url.pathname.endsWith("/pages")) return pages.GET(request)
+  return new Response("Not found", { status: 404 })
+}
+export const POST = ({ request }: { request: Request }) => publish.POST(request)
+export const OPTIONS = ({ request }: { request: Request }) => blocks.OPTIONS(request)
+```
+
+(In practice you'd use Astro's `[...path].ts` catch-all for a cleaner version — this is the verbose form to make the wiring obvious.)
+
+### Hono / Cloudflare Workers example
+
+```ts
+import { Hono } from "hono"
+import {
+  createBlocksHandler,
+  createPagesHandler,
+  createPublishHandler,
+} from "@ai-site-editor/site-sdk/routes"
+import { getMyPages, publishMyPages } from "./lib/my-cms"
+
+const blocks = createBlocksHandler()
+const pages = createPagesHandler(() => getMyPages())
+const publish = createPublishHandler(
+  async (pages, config) => { await publishMyPages(pages, config); return { ok: true } }
+)
+
+const app = new Hono()
+app.get("/api/editor/blocks", (c) => blocks.GET(c.req.raw))
+app.get("/api/editor/pages", (c) => pages.GET(c.req.raw))
+app.post("/api/editor/publish", (c) => publish.POST(c.req.raw))
+app.options("/api/editor/blocks", (c) => blocks.OPTIONS(c.req.raw))
+```
+
+These three handlers are the easy half — they just work as-is on any web-standard server.
+
+## 2. Draft Mode routes (needs an adapter)
+
+The Draft Mode entry / exit routes need to do three framework-specific things:
+
+1. **Toggle draft mode** — on Next.js this is `(await draftMode()).enable()`. On other frameworks, draft mode is usually a cookie *you* set; there's no global "enable" function. The SDK calls `enableDraftMode()` on your adapter; you decide what that means.
+2. **Set cookies on the response** — every framework handles this differently. The SDK passes a list of cookies to your adapter; you attach them to whatever response object you return.
+3. **Build the redirect response** — same idea. The SDK gives you the destination `URL` and the cookies; you return a framework-appropriate `Response`.
+
+The interface you implement is small:
+
+```ts
+import type { DraftRouteAdapter } from "@ai-site-editor/site-sdk/routes/core"
+
+const adapter: DraftRouteAdapter = {
+  // Called when the user is entering Draft Mode after a valid secret check.
+  // On Next.js this is `(await draftMode()).enable()`. On other frameworks, this
+  // is usually a no-op — the cookie set in `createRedirect` is what enables draft
+  // mode in your page handlers (see section 3 below).
+  enableDraftMode: async () => { /* usually nothing here */ },
+
+  // Same shape, called by the /draft/disable route.
+  disableDraftMode: async () => { /* usually nothing here */ },
+
+  // Build a redirect response with the given cookies attached.
+  // The SDK already validated the secret and resolved a safe internal redirect URL.
+  createRedirect: (url: URL, cookies) => {
+    // ... your framework's redirect builder, with the cookies attached
+  },
+}
+```
+
+### SvelteKit example
+
+```ts
+// src/routes/api/editor/draft/+server.ts
+import {
+  createDraftEnableHandlerCore,
+  type DraftRouteAdapter,
+} from "@ai-site-editor/site-sdk/routes/core"
+
+export function svelteKitAdapter(): DraftRouteAdapter {
+  return {
+    // SvelteKit has no built-in "draft mode" toggle. The cookies set by createRedirect
+    // are what tell our render path to fetch draft content (see section 3).
+    enableDraftMode: async () => {},
+    disableDraftMode: async () => {},
+
+    createRedirect: (url, cookies) => {
+      const headers = new Headers({ Location: url.toString() })
+      // We also add a "draft mode" cookie ourselves so our +page.server.ts files
+      // can branch on it. The cookies the SDK passes are the editor session/siteId
+      // cookies — we add our own draft-enabled flag alongside.
+      const cookieParts: string[] = ["__draft_enabled=1; Path=/; SameSite=Lax"]
+      for (const c of cookies ?? []) {
+        if (c.delete) {
+          cookieParts.push(`${c.name}=; Path=/; Max-Age=0`)
+        } else {
+          cookieParts.push(`${c.name}=${c.value}; Path=/; SameSite=Lax`)
+        }
+      }
+      headers.set("Set-Cookie", cookieParts.join(", "))
+      return new Response(null, { status: 307, headers })
+    },
+  }
+}
+
+export const GET = async ({ request }) => {
+  return createDraftEnableHandlerCore(svelteKitAdapter())(request)
+}
+```
+
+```ts
+// src/routes/api/editor/draft/disable/+server.ts
+import { createDraftDisableHandlerCore } from "@ai-site-editor/site-sdk/routes/core"
+import { svelteKitAdapter } from "../+server"
+
+export const GET = async ({ request }) => {
+  // The exit handler will pass `delete: true` cookies — make sure your
+  // adapter's createRedirect handles those (the example above does).
+  return createDraftDisableHandlerCore(svelteKitAdapter())(request)
+}
+```
+
+### What `enableDraftMode` actually means off Next.js
+
+Next.js has a global `draftMode()` API that flips a server-side flag, and `next/headers` reads it back from inside your page render. **No other framework has this.** On every other framework, the closest equivalent is "set a cookie that your page-render code checks."
+
+The `__draft_enabled=1` cookie in the SvelteKit example above is illustrative — pick whatever name and shape works for your stack. The SDK doesn't care what your draft flag looks like; it only cares that:
+
+- The `/api/editor/draft` route validates the secret and sets it
+- The `/api/editor/draft/disable` route clears it
+- Your page render code reads it and switches between published and draft data sources
+
+The `enableDraftMode` / `disableDraftMode` adapter callbacks are usually no-ops on non-Next.js frameworks — the `createRedirect` callback does the real work by attaching the cookie.
+
+<Warning>
+**Open-redirect protection is enforced inside the SDK, not in your adapter.** `createDraftEnableHandlerCore` validates the `?secret=` against `process.env.DRAFT_MODE_SECRET` and resolves the `?redirect=` against an internal-paths-only allowlist *before* it calls `adapter.createRedirect`. Don't second-guess the URL it gives you — just turn it into a framework-appropriate response. If you bypass the core handler and roll your own validation, you must reject anything that isn't an internal path starting with `/`. See the [Next.js Integration warning](/integration/nextjs-integration#walkthrough) for the full reasoning.
+</Warning>
+
+## 3. Page render: switching between published and draft
+
+This is the part that lives outside the editor API routes. When a user visits `/pricing` on your site:
+
+- **Published mode** (no draft cookie): your page handler reads from your CMS / file system / database and renders normally.
+- **Draft mode** (your draft cookie is set, OR `?session=…&siteId=…` query params from the editor iframe): your page handler reads from the orchestrator's `/draft/pages` endpoint instead, and shows the editor overlay.
+
+The SDK gives you two helpers for this.
+
+### Helper A: `fetchEditorPage` and `fetchEditorSlugs` (no adapter needed)
+
+These are plain `fetch()` wrappers around the orchestrator's draft endpoints. Use them anywhere you can call `await fetch()`:
+
+```ts
+import { fetchEditorPage, fetchEditorSlugs } from "@ai-site-editor/site-sdk/draft"
+
+// In your page handler, after detecting draft mode:
+const page = await fetchEditorPage(slug, session, siteId)
+if (page) {
+  // Render `page.blocks` using your block renderer
+}
+```
+
+That's the whole API — no framework coupling. Both functions accept an optional `{ orchestratorUrl }` override if you don't want to set the env var.
+
+### Helper B: `resolveDraftContextCore` (needs an adapter)
+
+This is the helper that figures out *whether* you're in draft mode by looking at cookies, query params, and env defaults — the same logic `createSitePage` uses internally on Next.js. It needs a tiny adapter so it can read your framework's cookies:
+
+```ts
+import {
+  resolveDraftContextCore,
+  type DraftModeAdapter,
+} from "@ai-site-editor/site-sdk/draft/core"
+
+// SvelteKit example:
+async function getDraftContext(event) {
+  const adapter: DraftModeAdapter = {
+    isDraftMode: event.cookies.get("__draft_enabled") === "1",
+    getCookie: (name) => event.cookies.get(name) ?? undefined,
+  }
+  const searchParams = Object.fromEntries(event.url.searchParams)
+  return resolveDraftContextCore(searchParams, adapter, {
+    defaultSession: "dev",
+    defaultSiteId: "my-site",
+  })
+}
+```
+
+The function returns either `null` (you're in published mode) or `{ session, siteId, editorOrigin }` (you're in draft mode and should call `fetchEditorPage` with these values).
+
+### Putting it together (SvelteKit pseudo-code)
+
+```ts
+// src/routes/[...slug]/+page.server.ts
+import { fetchEditorPage } from "@ai-site-editor/site-sdk/draft"
+import { getMyCmsPage } from "$lib/my-cms"
+import { getDraftContext } from "$lib/draft"
+
+export async function load(event) {
+  const slug = event.params.slug || "/"
+  const draft = await getDraftContext(event)
+
+  const page = draft
+    ? (await fetchEditorPage(slug, draft.session, draft.siteId)) ?? (await getMyCmsPage(slug))
+    : await getMyCmsPage(slug)
+
+  return { page, isDraft: !!draft }
+}
+```
+
+The Astro / Remix / Hono versions look almost identical — same three calls, same fallback chain.
+
+## 4. Register the site
+
+This step is framework-independent. From your project directory, run the same registration CLI that the Next.js path uses:
+
+```bash
+npx avocado-register --name "My Site" --port <your-dev-server-port>
+```
+
+The CLI doesn't care which framework you're on. It writes `DRAFT_MODE_SECRET`, `ORCHESTRATOR_URL`, `NEXT_PUBLIC_DEFAULT_SITE_ID`, `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_EDITOR_ORIGIN` to your `.env.local`. The `NEXT_PUBLIC_*` variable names are vestigial from the Next.js convention — your framework will read them just fine, or you can rename them on the way in (the SDK doesn't actually require those specific names; only `DRAFT_MODE_SECRET` is non-negotiable).
+
+After it succeeds, the site appears in the editor's dashboard the next time you open or refresh `http://localhost:4100`.
+
+## 5. Verify the contract
+
+Same `curl` checks as the Next.js walkthrough — the contract is identical regardless of which framework implements it. See the [Verify the contract step](/integration/nextjs-integration#walkthrough) for the five `curl` commands that should all pass against your routes.
+
+## What you don't get on the non-Next.js path
+
+The Next.js `createSitePage` helper does several things automatically that you'll have to do by hand:
+
+| What `createSitePage` does | What you'll do instead |
+|---|---|
+| Branches between draft and published reads via `next/headers` | Branch on your own `getDraftContext` (section 3 above) |
+| Renders the SDK's built-in block library out of the box | Import `renderBlocks` from `@ai-site-editor/site-sdk` and call it yourself, OR use your own block renderer that maps `block.type` strings to your components |
+| Mounts the live `EditorOverlay` for in-iframe editing | Import `EditorOverlay` from `@ai-site-editor/site-sdk/editor` and mount it conditionally when in draft mode |
+| Builds the site header / nav / footer chrome from `getSiteConfig` | Build your own — or just import `buildNavItems` and `buildSiteHeaderBlock` from `@ai-site-editor/site-sdk/navigation` |
+| Generates `generateStaticParams` from `getSlugs` | Implement your framework's equivalent (Astro `getStaticPaths`, Remix loaders + dynamic rendering, etc.) |
+
+None of these are blockers — they're "you have to write the integration glue, but the building blocks exist." The SDK source under `packages/site-sdk/src/create-site-page.tsx` is the reference implementation; on a non-Next.js framework, you're translating it into your framework's idioms.
+
+## Compared to the alternatives
+
+If this looks like a lot of work, here are your other options:
+
+1. **Wrap your app in a thin Next.js shell** that proxies to your existing backend. Use the standard [Next.js Integration](/integration/nextjs-integration). Most people who try the non-Next.js path end up here anyway. ~30 minutes of work, fully supported.
+2. **Use the [Bring Your Own Coding Agent](/sites/coding-agent) workflow** to have your IDE agent (Codex / Cursor / Claude Code) do the wiring for you, on your framework. The prompt template still assumes Next.js but the agent can usually adapt; results vary.
+3. **File a feature request** for an official adapter for your framework. If we see repeated requests for Astro / Remix / SvelteKit, those become candidates for first-class support and stop being "first mover" territory.
+
+## Filing bugs and contributing
+
+The `/core` exports are real and tested (the Next.js shims in the SDK use them as their own implementation), but the *patterns* on this page are illustrative — they haven't been verified against every framework's quirks. If you hit something:
+
+- Open an issue at [github.com/yu7321/avocado](https://github.com/yu7321/avocado/issues) with the framework, the version, and the exact symptom
+- If you build a working adapter for a popular framework, please contribute it back as `@ai-site-editor/site-sdk/draft-routes-{framework}.ts` — that's how Astro / Remix / SvelteKit move from "first mover territory" to "officially supported"
+- The Next.js adapter at `packages/site-sdk/src/draft-routes.ts` is 30 lines and is the reference for what a framework adapter looks like

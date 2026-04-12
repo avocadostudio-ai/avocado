@@ -56,16 +56,16 @@
             "group": "Getting Started",
             "pages": [
               "integration/index",
+              "integration/nextjs-integration",
               "integration/editor-quickstart",
-              "integration/puck-mode",
-              "integration/nextjs-mvp-embedded",
-              "integration/custom-blocks"
+              "integration/custom-blocks",
+              "integration/puck-mode"
             ]
           },
           {
             "group": "Advanced",
             "pages": [
-              "site-provider-spi",
+              "integration/non-nextjs",
               "integration/tools-mvp"
             ]
           }
@@ -82,6 +82,19 @@
               "operations/vercel-deployment",
               "operations/netlify-deployment"
             ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": ["api-reference/index"]
+          },
+          {
+            "group": "Orchestrator endpoints",
+            "openapi": "api-reference/orchestrator.openapi.json"
           }
         ]
       },
@@ -128,6 +141,16 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/integration/nextjs-mvp-embedded",
+      "destination": "/integration/nextjs-integration"
+    },
+    {
+      "source": "/site-provider-spi",
+      "destination": "/integration/non-nextjs"
+    }
+  ],
   "navbar": {
     "links": [
       {

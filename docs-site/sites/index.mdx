@@ -5,7 +5,7 @@ description: "Two ways to bring a website into Avocado Studio: let our Site Assi
 ---
 
 <Note>
-**Next.js only (for now).** Avocado Studio is currently built and tested against **Next.js 15+ (App Router)**. Every path on this page assumes your site is — or will be — a Next.js project. Other frameworks can be supported via the [Site Provider SPI](/site-provider-spi), but they're not officially tested and you'll be a first mover.
+**Next.js only (officially tested).** Avocado Studio is currently built and tested against **Next.js 15+ (App Router)**. Every path on this page assumes your site is — or will be — a Next.js project. If you're on Astro / Remix / SvelteKit / Hono / etc., the SDK ships framework-agnostic `/core` primitives you can wire up by hand — see [Non-Next.js Integration](/integration/non-nextjs). The patterns are real and the primitives work, but you'll be a first mover and should expect to file bugs.
 </Note>
 
 Avocado Studio manages websites as **sites** — each one has its own pages, blocks, theme, and publishing target. Before you can edit anything, you need at least one site registered with the orchestrator.
@@ -21,7 +21,7 @@ There are **two ways** to get a site in:
   </Card>
 </CardGroup>
 
-Both approaches produce the same end state: a Next.js site registered with the orchestrator, with pages, theme, and a wired-in [Site SDK](/integration/nextjs-mvp-embedded). Pick whichever matches your trust level for AI and the complexity of your codebase.
+Both approaches produce the same end state: a Next.js site registered with the orchestrator, with pages, theme, and a wired-in [Site SDK](/integration/nextjs-integration). Pick whichever matches your trust level for AI and the complexity of your codebase.
 
 ## Which approach should I pick?
 
@@ -44,6 +44,8 @@ The Site Assistant is an AI agent in the editor's *Sites* page. Pick one of thre
 | **Migrate** | A **public website URL** (any framework — Webflow, Framer, WordPress, plain HTML, another Next.js site) | Scrapes the live HTML, extracts structure, downloads images, generates page specs, applies the theme, and creates a fresh **Next.js site** in the editor |
 | **Integrate** | An **existing Next.js project on GitHub** (public or private repo URL, or a local clone) | Clones the repo, analyzes the codebase, wires `@ai-site-editor/site-sdk` into your existing Next.js app, registers the site |
 | **Create** | A **natural-language description** of the site you want | Scaffolds a fresh Next.js site with starter blocks, theme, and pages from your description |
+
+**Heads up: Claude only.** The Site Assistant runs exclusively on Anthropic Claude (via your Claude subscription or an `ANTHROPIC_API_KEY`). An OpenAI key alone won't work for *this* path — though the editor's per-edit chat supports OpenAI/Anthropic/demo once a site exists. If you need a different model, use the **[Bring Your Own Coding Agent](/sites/coding-agent)** path with any agent you like.
 
 → Full reference: **[Site Assistant](/sites/site-agent)** (modes, prerequisites, CLI vs SDK billing, troubleshooting)
 
