@@ -12,7 +12,7 @@ This page is the human path. You'll wire your site into Avocado Studio yourself 
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A Next.js 15 project (App Router) — or any framework that can implement the [Site Provider SPI](/site-provider-spi)
+- A Next.js 15 project (App Router) — or any framework where you're willing to wire up the editor API contract by hand using the SDK's `/core` primitives ([Non-Next.js Integration](/integration/non-nextjs))
 - The Avocado orchestrator running locally or remotely (`pnpm dev:orchestrator`)
 - One of: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or demo mode (no key) for testing
 
@@ -28,7 +28,7 @@ This page is the human path. You'll wire your site into Avocado Studio yourself 
   </Step>
 
   <Step title="Wire the SDK into your Next.js site">
-    Follow **[Next.js Embedded MVP](/integration/nextjs-mvp-embedded)**. This is the meat — five contract endpoints (`GET /api/editor/blocks`, `GET /api/draft`, `GET /api/draft/disable`, page data loader changes, and the iframe URL pattern). The `createBlocksHandler()` helper from the SDK does most of the work.
+    Follow **[Next.js Integration](/integration/nextjs-integration)**. This is the meat — two SDK helpers do almost all the work: `createEditorApiHandler` mounts the `/api/editor/*` catch-all (blocks, pages, draft, draft/disable, publish) and `createSitePage` provides a drop-in `app/[[...slug]]/page.tsx` with draft mode, navigation, and the editor overlay already wired up.
 
     At the end of this step you should be able to load your site inside the editor's iframe and see Draft Mode toggle.
   </Step>
@@ -39,6 +39,18 @@ This page is the human path. You'll wire your site into Avocado Studio yourself 
 
   <Step title="(Optional) Enable Puck mode">
     For visual drag-and-drop editing, follow **[Puck mode](/integration/puck-mode)**. This is opt-in per site.
+  </Step>
+
+  <Step title="Register the site with the orchestrator">
+    From your project directory, run:
+
+    ```bash
+    npx avocado-register --name "My Site"
+    ```
+
+    This bin script (shipped with `@ai-site-editor/site-sdk`) generates a `DRAFT_MODE_SECRET` if one isn't already set, fills in the rest of the env vars, and POSTs the site config to the orchestrator's `/sites/register` endpoint. After it succeeds, the site appears in the editor's dashboard automatically.
+
+    See `npx avocado-register --help` for all available flags (`--id`, `--port`, `--orchestrator`, `--secret`, `--session`, `--purpose`, `--preview-url`).
   </Step>
 
   <Step title="Verify it works">
@@ -52,7 +64,7 @@ The Site Agent does a few extras that the manual path doesn't:
 
 | Step | Agent does it | Manual |
 |---|---|---|
-| Register the site with the orchestrator's site registry | Yes (`register_site` MCP tool) | You need to call it yourself or use the editor's "Add Site" UI |
+| Register the site with the orchestrator | Yes (`register_site` MCP tool, automatic) | Run `npx avocado-register --name "..."` from your project directory |
 | Bootstrap initial pages from a URL or description | Yes | You start with whatever pages your project already has |
 | Extract and apply a theme automatically | Yes | You configure your own theme tokens |
 | Download remote images into your project | Yes | Bring your own assets |

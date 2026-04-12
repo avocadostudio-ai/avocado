@@ -1,22 +1,54 @@
 ---
 title: "Docker Deployment"
-description: "Deploy the orchestrator as a self-contained Docker image."
+description: "Deploy the orchestrator as a self-contained Docker image. The orchestrator is the one part of Avocado Studio that isn't open source today — Docker is the supported self-hosting path."
 ---
 
-# Deploy with Docker
+<Note>
+**The orchestrator is not open source today.** Avocado Studio is built from three layers: the **site templates**, the **editor app**, and the **`@ai-site-editor/site-sdk`** are all source-distributed and live in the public repo — you can read, fork, and self-host them directly. The **orchestrator** (the brain that runs sessions, calls the LLMs, and serves draft state) is the one component that we don't currently release under an open-source license. Docker is the supported path for running it on your own infrastructure. If you need access to the orchestrator image or source for self-hosting, [open an issue](https://github.com/yu7321/avocado/issues) or reach out — we'll work with you.
+</Note>
 
-The orchestrator is distributed as a Docker image for self-hosted deployments. The site and Content Studio apps remain source-distributed and deploy as static/serverless apps (Vercel, Netlify, etc.).
+For self-hosted deployments of the orchestrator, you run it as a Docker container on any host that supports long-lived containers with a persistent volume. The site templates and editor app remain source-distributed and deploy as static / serverless apps to Vercel, Netlify, or any other host that runs Next.js / Vite.
 
-## Why Docker for the orchestrator?
+## Where to host the orchestrator
 
-- **Single artifact** — One image with the orchestrator, Node.js runtime, and all dependencies
-- **Reproducible** — No Node version or pnpm mismatch on production hosts
-- **Easy rollbacks** — Tag and pin image versions
-- **State isolation** — Persistent state lives in a mounted volume
+The orchestrator is a small Node.js Fastify service. It's stateful but not heavy — most production deployments fit comfortably on the smallest paid tier of any modern container host.
+
+### Tested hosts
+
+| Host | Notes |
+|---|---|
+| **Render** | The reference deployment — what we run internally today. Free tier is too small for real use; the smallest paid tier is fine. Use a Render disk for persistent state. |
+| **Fly.io** | Works well — the always-on machine model fits the orchestrator's long-lived sessions. Use a Fly Volume for `/app/.data`. |
+| **Railway** | Works. Make sure you provision a volume for state persistence; ephemeral filesystems will lose sessions on every redeploy. |
+| **DigitalOcean App Platform** | Works as a Web Service with an attached volume. |
+| **AWS ECS / Fargate, GCP Cloud Run (with min instances ≥ 1), Azure Container Apps** | All work. Cloud Run requires `min instances = 1` so the container doesn't cold-start mid-session. |
+| **Kubernetes** | Works as a single-replica `StatefulSet` with a `PersistentVolumeClaim` mounted at `/app/.data`. **Do not** run multiple replicas — see the constraints below. |
+| **Self-managed VPS (Hetzner, Linode, etc.)** | The simplest option. `docker compose up -d` and a reverse proxy (Caddy, nginx, Traefik) for HTTPS. |
+
+### Resource requirements
+
+- **Memory**: ~300–500 MB at idle, ~600–800 MB under typical load. A 1 GB instance is comfortable; the smallest "$7/month-ish" tier on most hosts is enough for early use.
+- **CPU**: Mostly I/O-bound — the orchestrator spends most of its time waiting on LLM API calls, not computing. 0.5 vCPU is fine for a handful of concurrent sessions; 1 vCPU is comfortable for a small team.
+- **Disk**: A persistent volume for `/app/.data` (session state, telemetry, generated images). 1–5 GB is plenty for early use; generated-image storage is what grows fastest if you use AI image generation heavily.
+- **Network**: Outbound HTTPS to your chosen LLM providers (`api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com`); inbound HTTPS from your editor and site origins. No inbound from end-users — only your editor and Next.js site need to reach it.
+
+### Critical hosting constraints
+
+A few things matter regardless of which host you pick:
+
+<Warning>
+**Single instance only.** The orchestrator keeps all session state — draft pages, undo history, chat threads, version log, site configs — in in-memory `Map`s, with periodic snapshots to disk. **Do not run multiple replicas behind a load balancer**: requests would round-robin between processes that don't share state, and sessions would appear to randomly lose their work. Horizontal scaling is on the roadmap but not implemented today. Configure your host for exactly one instance and scale vertically (more memory / CPU on a single machine) if you need more capacity.
+</Warning>
+
+- **Persistent volume is required.** The orchestrator survives restarts by writing snapshots to `/app/.data/orchestrator-state.json`. If you mount that path on an ephemeral filesystem (Cloud Run without a volume, Heroku-style ephemeral dynos, default container hosts without disk attachment), every redeploy or container reschedule will wipe all sessions and undo history. Always attach a persistent volume — even 1 GB is enough.
+- **SSE-friendly reverse proxy.** The chat endpoint streams server-sent events for live editor updates. Some reverse proxies and CDNs buffer responses by default, which makes the editor look frozen until the full response lands. If you put a reverse proxy in front of the orchestrator, disable response buffering on `/chat/*` and `/sites-agent/*` (in nginx: `proxy_buffering off`; in Caddy: `flush_interval -1` on `reverse_proxy`; in Cloudflare: bypass cache for these paths).
+- **Long timeouts.** Sites-agent runs (full URL migration, repo integration) can take several minutes. If your host has a default request timeout of 30s or 60s, the agent will be killed mid-run. Bump request timeouts to at least 10 minutes on the orchestrator's routes — most hosts let you configure this per service.
+- **CORS for the editor's origin.** Set `ORCHESTRATOR_CORS_ORIGINS` to include both your site and editor origins (HTTPS, no trailing slash). See [CORS configuration](#cors-configuration) below.
+- **Public HTTPS reachable from your editor and site.** Both the editor (browser) and your Next.js site (server-side draft fetches) need to call the orchestrator. If your editor is on `https://editor.example.com` and your site is on `https://www.example.com`, the orchestrator needs to be on a URL both can reach — usually a public HTTPS endpoint like `https://orchestrator.example.com`.
 
 ## Building the image
 
-From the repository root:
+If you have access to the orchestrator source (the `apps/orchestrator` directory in the private workspace), you can build the image yourself from the repository root:
 
 ```bash
 docker build -f apps/orchestrator/Dockerfile -t avocado-orchestrator:latest .
@@ -52,7 +84,7 @@ By default the container accepts requests from `http://localhost:3000` and `http
 </Note>
 
 ```bash
-ORCHESTRATOR_CORS_ORIGINS=https://your-site.example.com,https://studio.example.com
+ORCHESTRATOR_CORS_ORIGINS=https://your-site.example.com,https://editor.example.com
 ```
 
 ### State persistence
@@ -100,18 +132,22 @@ See `.env.example` at the repo root for the complete list of environment variabl
 | `PUBLISH_TOKEN` | Required token for `/publish/*` endpoints |
 | `ACCESS_PASSWORD_HASH` | Optional password hash for `/auth/verify` |
 
-## Running locally without Docker
+## Running locally without Docker (contributors only)
 
-Docker is optional. For local development, run the orchestrator directly via pnpm:
+<Note>
+This section requires access to the orchestrator source, which is **not currently public** — see the closed-source note at the top of the page. If you don't have repo access, the Docker image is your supported path. If you do have access (early contributor, design partner, etc.), you can run the orchestrator directly from source for a faster dev loop.
+</Note>
+
+For local development with source access, run the orchestrator directly via pnpm from the repository root:
 
 ```bash
 pnpm install
-pnpm dev:start        # starts site + Content Studio + orchestrator via tsx
+pnpm dev:start        # starts site + editor + orchestrator via tsx
 # or run just the orchestrator:
 pnpm --filter @ai-site-editor/orchestrator dev
 ```
 
-The Dockerfile is an **additional** distribution option — not a replacement for the local dev workflow.
+The Dockerfile is an **additional** distribution option, not a replacement for the source-based dev workflow.
 
 ## Troubleshooting
 
@@ -119,9 +155,9 @@ The Dockerfile is an **additional** distribution option — not a replacement fo
 
 Check logs: `docker logs avocado-orchestrator`. The most common cause is missing API keys or an invalid `.env` file.
 
-### CORS errors from Content Studio or site
+### CORS errors from editor or site
 
-Set `ORCHESTRATOR_CORS_ORIGINS` to include both the site and Content Studio origins (no trailing slashes).
+Set `ORCHESTRATOR_CORS_ORIGINS` to include both the site and editor origins (no trailing slashes).
 
 ### State not persisting
 

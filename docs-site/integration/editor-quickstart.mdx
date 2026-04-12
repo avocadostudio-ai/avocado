@@ -1,15 +1,14 @@
 ---
-title: "Content Studio Quickstart"
-description: "Quick guide to integrating the Content Studio with an existing Next.js site in embedded draft mode."
+title: "Editor Quickstart"
+sidebarTitle: "Editor Quickstart"
+description: "Env vars, iframe bootstrap URL pattern, and smoke checks for the editor's connection to a Next.js site in embedded Draft Mode."
 ---
 
-# Content Studio Integration Quickstart (Embedded Draft Mode)
-
-Use this when integrating the Content Studio with any existing Next.js site. For background on core concepts, see [Core Concepts](/concepts).
+This page is the short reference for **how the editor connects to a Next.js site** — env vars, the iframe bootstrap URL pattern, and the smoke checks. For the full integration walkthrough (mounting routes, wiring page components, registering the site), see [Next.js Integration](/integration/nextjs-integration).
 
 ## Expose your components via the Block Manifest
 
-The Content Studio needs to know which components on your site are editable and what props they accept. You do this by exposing a **block manifest** at `GET /api/editor/blocks`.
+The editor needs to know which components on your site are editable and what props they accept. You do this by exposing a **block manifest** at `GET /api/editor/blocks`.
 
 **Using the built-in blocks** (quickest start):
 
@@ -22,7 +21,7 @@ export const { GET, POST, OPTIONS } = createEditorApiHandler({
 })
 ```
 
-`createEditorApiHandler()` automatically builds the manifest from the 20 built-in block types. The Content Studio and AI planner read this manifest to understand what blocks exist, what fields they have, and what values are valid.
+`createEditorApiHandler()` automatically builds the manifest from the 20 built-in block types and mounts the draft / pages / publish routes alongside it under `/api/editor/*`. The editor and AI planner read this manifest to understand what blocks exist, what fields they have, and what values are valid.
 
 **Using your own custom components**:
 
@@ -33,15 +32,15 @@ If your site has its own component library, you define a custom manifest describ
 - How to mix your custom blocks with the built-in ones
 - How field types (image, text, list, enum) are inferred from your schema
 
-Without a manifest, the Content Studio runs in **degraded mode** (read-only preview or text-only edits).
+Without a manifest, the editor runs in **degraded mode** (read-only preview or text-only edits).
 
-For the full Next.js integration walkthrough, see [Next.js Embedded MVP](/integration/nextjs-mvp-embedded).
+For the full Next.js integration walkthrough, see [Next.js Integration](/integration/nextjs-integration).
 
 ## Required env vars
 
 - Site:
   - `DRAFT_MODE_SECRET`
-- Content Studio:
+- Editor:
   - `VITE_SITE_ORIGIN`
   - `VITE_SITE_DRAFT_SECRET` (same value as site `DRAFT_MODE_SECRET`)
 
@@ -50,7 +49,7 @@ For the full Next.js integration walkthrough, see [Next.js Embedded MVP](/integr
 Pattern:
 
 ```text
-${VITE_SITE_ORIGIN}/api/draft?secret=${VITE_SITE_DRAFT_SECRET}&redirect=${encodeURIComponent(pathWithQuery)}
+${VITE_SITE_ORIGIN}/api/editor/draft?secret=${VITE_SITE_DRAFT_SECRET}&redirect=${encodeURIComponent(pathWithQuery)}
 ```
 
 Where `pathWithQuery` is your target site path plus context query params, for example:
@@ -62,7 +61,7 @@ Where `pathWithQuery` is your target site path plus context query params, for ex
 Full example:
 
 ```text
-http://localhost:3000/api/draft?secret=top-secret&redirect=%2Fpricing%3Fsession%3Ddev%26siteId%3Davocado-stories
+http://localhost:3000/api/editor/draft?secret=top-secret&redirect=%2Fpricing%3Fsession%3Ddev%26siteId%3Davocado-stories
 ```
 
 ## Exit draft mode (view live page)
@@ -70,22 +69,22 @@ http://localhost:3000/api/draft?secret=top-secret&redirect=%2Fpricing%3Fsession%
 Pattern:
 
 ```text
-${VITE_SITE_ORIGIN}/api/draft/disable?redirect=${encodeURIComponent(path)}
+${VITE_SITE_ORIGIN}/api/editor/draft/disable?redirect=${encodeURIComponent(path)}
 ```
 
 Example:
 
 ```text
-http://localhost:3000/api/draft/disable?redirect=%2Fpricing
+http://localhost:3000/api/editor/draft/disable?redirect=%2Fpricing
 ```
 
 ## Minimal behavior checks
 
 1. `GET /api/editor/blocks` returns valid block manifest JSON.
 2. `GET /api/editor/pages` returns `{ pages: [...] }` with published pages.
-3. Wrong secret returns `401` from `/api/draft`.
+3. Wrong secret returns `401` from `/api/editor/draft`.
 4. Valid secret redirects and sets draft cookie.
-5. `/api/draft/disable` clears draft cookie and redirects.
+5. `/api/editor/draft/disable` clears draft cookie and redirects.
 6. Same page renders published content when draft cookie is absent.
 
 ## Contract self-check (recommended before onboarding)

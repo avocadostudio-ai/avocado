@@ -28,14 +28,15 @@ an open-source AI content operations platform. The full docs are at https://docs
 
 ## Goal
 Add the @ai-site-editor/site-sdk to my project so the Avocado Content Studio
-can edit my content via Draft Mode. Same end state as if I had followed
-the manual integration guide myself.
+can edit my content via Draft Mode, then register the site with the orchestrator
+so it appears in the editor's dashboard. Same end state as if I had used the
+built-in Site Agent.
 
 ## Required reading (in order)
 1. https://docs.avocado.studio/concepts — page model, blocks, operations, draft mode
-2. https://docs.avocado.studio/integration/nextjs-mvp-embedded — the canonical contract
+2. https://docs.avocado.studio/integration/nextjs-integration — the canonical contract
 3. https://docs.avocado.studio/integration/custom-blocks — only if my project has custom React components I want editable
-4. https://docs.avocado.studio/site-provider-spi — only if I'm not on Next.js
+4. https://docs.avocado.studio/integration/non-nextjs — only if I'm not on Next.js
 
 Read these pages BEFORE writing any code. Do not skim. The contract is exact.
 
@@ -43,43 +44,79 @@ Read these pages BEFORE writing any code. Do not skim. The contract is exact.
 
 1. Inspect my project structure. Confirm it's Next.js 15 App Router. If it isn't, stop and ask me how to proceed.
 2. Add `@ai-site-editor/site-sdk` to package.json and install it.
-3. Add the five required contract endpoints from the nextjs-mvp-embedded doc:
-   - `GET /api/editor/blocks` (use `createBlocksHandler()` from the SDK)
-   - `GET /api/draft` (Draft Mode entry, validates `?secret=` and only allows internal redirects)
-   - `GET /api/draft/disable` (Draft Mode exit)
-   - Update my page data loaders to call `fetchEditorPage()` / `fetchEditorSlugs()` from the SDK when Draft Mode is enabled
-   - Confirm the iframe URL pattern works: `/api/draft?secret=<DRAFT_MODE_SECRET>&redirect=/<slug>`
-4. Add the `DRAFT_MODE_SECRET` env var to `.env.local` (generate a random one) and document it in `.env.example`.
-5. If my project has custom React components for hero / cta / faq / etc that aren't in the built-in block library, register them with the SDK following the custom-blocks doc.
+3. Mount the editor API as a single catch-all route at `app/api/editor/[...path]/route.ts`:
+   ```ts
+   import { createEditorApiHandler } from "@ai-site-editor/site-sdk/routes"
+   import { getMyPages, publishMyPages } from "@/lib/my-cms"
+
+   export const { GET, POST, OPTIONS } = createEditorApiHandler({
+     getPages: () => getMyPages(),
+     onPublish: async (pages, config) => { await publishMyPages(pages, config); return { ok: true } },
+     publishSecret: process.env.PUBLISH_TOKEN,
+   })
+   ```
+   This single helper mounts ALL of: `/api/editor/blocks`, `/api/editor/pages`, `/api/editor/draft`, `/api/editor/draft/disable`, `/api/editor/publish`. It validates `?secret=` against `DRAFT_MODE_SECRET`, rejects non-internal redirects, sets the draft cookie, and handles CORS preflight. Do NOT write these routes by hand.
+4. Replace `app/[[...slug]]/page.tsx` with the SDK's `createSitePage` factory:
+   ```tsx
+   import { createSitePage } from "@ai-site-editor/site-sdk/page"
+   import { getPage, getSlugs, getSiteConfig } from "@/lib/my-cms"
+
+   const { Page, generateStaticParams } = createSitePage({
+     siteId: "my-site",
+     getPage,
+     getSlugs,
+     getSiteConfig,
+   })
+   export default Page
+   export { generateStaticParams }
+   ```
+   This handles draft mode detection, the editor overlay, navigation chrome, 404 fallbacks, and switching between published vs draft reads. Do NOT write loader branching logic by hand.
+5. If my project has custom React components for hero / cta / faq / etc that aren't in the built-in block library, register them with the SDK following the custom-blocks doc and pass `getManifest` to `createEditorApiHandler`.
 6. Run my dev server and verify:
    - `GET /api/editor/blocks` returns a non-empty `blocks` array
-   - `GET /api/draft?secret=<my-secret>&redirect=/` sets the draft cookie and redirects
+   - `GET /api/editor/draft?secret=<my-secret>&redirect=/` sets the draft cookie and redirects
    - The site still renders normally without Draft Mode
+7. **Register the site with the orchestrator** — run from inside my project directory:
+   ```bash
+   npx avocado-register --name "My Site"
+   ```
+   This bin script (shipped with `@ai-site-editor/site-sdk`) generates a
+   `DRAFT_MODE_SECRET` if `.env.local` doesn't already have one, writes the
+   required env vars, and POSTs the site config to `POST /sites/register` on
+   the orchestrator. After it succeeds, the site auto-appears in the editor's
+   dashboard the next time the editor is opened (or refreshed).
+
+   Make sure the orchestrator is running at http://localhost:4200 (or wherever
+   `$ORCHESTRATOR_URL` points) before you run this step.
 
 ## What NOT to do
 
-- Do not invent endpoint paths or schemas. The contract is exact — if a doc says `GET /api/editor/blocks`, that's the path.
-- Do not skip the secret validation or the internal-redirect check on `/api/draft`. These are security-critical.
+- Do not invent endpoint paths or schemas. The contract is exact — the editor calls `/api/editor/draft` (not `/api/draft`), `/api/editor/blocks`, `/api/editor/pages`, `/api/editor/draft/disable`, `/api/editor/publish`. All five live under `/api/editor/*`.
+- Do not write the draft routes by hand. Use `createEditorApiHandler` from `@ai-site-editor/site-sdk/routes` — it does secret validation and the internal-redirect check for you. These are security-critical and easy to get wrong.
 - Do not modify my existing route handlers' published-data path. Draft Mode is additive.
 - Do not commit `DRAFT_MODE_SECRET` to git. It goes in `.env.local` only.
 - Do not refactor my existing components unless they need to be wrapped to expose props for AI editing.
+- Do not register the site by hand-editing `.env.local` and asking me to add the site through the editor UI — use the `npx avocado-register` script in step 7.
 
 ## Verification checklist (run this at the end)
 
 - [ ] `pnpm typecheck` (or my project's equivalent) passes
 - [ ] My existing pages still render at their existing routes without Draft Mode
 - [ ] `curl http://localhost:3000/api/editor/blocks` returns valid JSON with `blocks: [...]`
-- [ ] `curl -i 'http://localhost:3000/api/draft?secret=<secret>&redirect=/'` returns a 307 with the draft cookie set
-- [ ] `curl -i 'http://localhost:3000/api/draft?secret=wrong&redirect=/'` returns 401 or 403
-- [ ] `curl -i 'http://localhost:3000/api/draft?secret=<secret>&redirect=https://evil.com'` is rejected
+- [ ] `curl -i 'http://localhost:3000/api/editor/draft?secret=<secret>&redirect=/'` returns a 307 with the draft cookie set
+- [ ] `curl -i 'http://localhost:3000/api/editor/draft?secret=wrong&redirect=/'` returns 401 or 403
+- [ ] `curl -i 'http://localhost:3000/api/editor/draft?secret=<secret>&redirect=https://evil.com'` is rejected (must NOT 307 to evil.com)
 - [ ] No `DRAFT_MODE_SECRET` value appears in any committed file
+- [ ] `npx avocado-register --name "..."` returned a `registered` status with no warnings (warnings about secret mismatch are surfaced — flag them if present)
+- [ ] `curl http://localhost:4200/sites?session=dev` includes my new site in the response
 
 ## Reporting
 
 When you're done, tell me:
 1. Which files you created or modified, with one-sentence reasons
 2. The verification checklist results (one line each)
-3. What I need to do next: add the orchestrator URL to the editor, register the site, generate my first edit
+3. The exact `npx avocado-register` invocation you used and its output
+4. Any warnings the orchestrator returned (especially about secret mismatch)
 ````
 
 ## Reading the docs offline
@@ -91,7 +128,7 @@ git clone https://github.com/yu7321/avocado.git /tmp/avocado
 # then in your prompt:
 # "Required reading: read these files in order:
 #   /tmp/avocado/docs-site/concepts.mdx
-#   /tmp/avocado/docs-site/integration/nextjs-mvp-embedded.mdx
+#   /tmp/avocado/docs-site/integration/nextjs-integration.mdx
 #   /tmp/avocado/docs-site/integration/custom-blocks.mdx"
 ```
 
@@ -112,10 +149,37 @@ If you're still stuck after that, fall back to the **[Site Agent](/sites/site-ag
 
 ## After the agent finishes
 
-The integration is code-level. To finish bringing the site online you still need to:
+If your agent followed the prompt above (especially **step 6 — `npx avocado-register`**), the site is already registered with the orchestrator and will appear in the editor's dashboard the next time you open or refresh `http://localhost:4100`. There's nothing left for you to click.
 
-1. Start the orchestrator (`pnpm dev:orchestrator` or your hosted instance)
-2. Open the editor and **register the site** — give it your dev URL, the `DRAFT_MODE_SECRET`, and pick a publishing target
-3. Generate your first edit from the chat panel to confirm the round trip works
+If your agent **skipped** the registration step — or you ran the integration manually — you can do it yourself from your project directory:
 
-Steps 2 and 3 are UI-driven and aren't something a coding agent can do for you.
+```bash
+cd /path/to/your/project
+npx avocado-register --name "My Site"
+```
+
+The bin script will:
+
+1. Check `.env.local` for an existing `DRAFT_MODE_SECRET`. If missing, generate a cryptographically random one and write it.
+2. Fill in `ORCHESTRATOR_URL`, `NEXT_PUBLIC_DEFAULT_SITE_ID`, `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_EDITOR_ORIGIN` if absent.
+3. POST the site config to `<ORCHESTRATOR_URL>/sites/register`.
+4. Print any warnings (e.g. secret mismatch with the editor's build-time `VITE_SITE_DRAFT_SECRET`).
+
+You only need the orchestrator running (`pnpm dev:orchestrator` or your hosted instance) before you run the script.
+
+### After registration
+
+1. Start your dev server: `pnpm dev` (or whatever your project uses)
+2. Open the editor: `http://localhost:4100` — the site should be in the dashboard
+3. Click the site, then generate your first edit from the chat panel to confirm the round trip works
+
+If the site doesn't appear after a hard refresh, see [Troubleshooting](#troubleshooting) below.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `avocado-register` says "could not reach the orchestrator" | Orchestrator isn't running or the URL is wrong | Start `pnpm dev:orchestrator`, or pass `--orchestrator http://your-host:4200` |
+| Script registered the site but it doesn't appear in the editor | The editor caches the site list in localStorage and only fetches `GET /sites` on mount | Hard-refresh the editor (Cmd+Shift+R) — the orchestrator-side list is fetched on mount and merged with localStorage |
+| Warning: "DRAFT_MODE_SECRET mismatch" | The secret in your project's `.env.local` doesn't match what the orchestrator was started with (and what the editor was built against) | Either update `apps/editor/.env`'s `VITE_SITE_DRAFT_SECRET` to match your project's secret and rebuild the editor, or pass `--secret <orchestrator-value>` to `avocado-register` |
+| Warning: "Orchestrator has no DRAFT_MODE_SECRET set" | The orchestrator was started without a `DRAFT_MODE_SECRET` env var | Add `DRAFT_MODE_SECRET=<your-value>` to the root `.env` and restart the orchestrator |

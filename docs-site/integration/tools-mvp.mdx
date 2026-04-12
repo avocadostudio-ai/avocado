@@ -1,17 +1,15 @@
 ---
-title: "Native Tools MVP"
-description: "MVP tool contract and onboarding flow for Anthropic-first adopter tools."
+title: "Native Tools"
+sidebarTitle: "Native Tools"
+description: "Tool contract and onboarding flow for connecting external services (PIM, DAM, search, AI image generation) to the AI planner."
 ---
-
-# Native Tools
 
 This document defines the tool contract and onboarding flow for connecting external services (PIM, DAM, search, etc.) to the AI planner. See [How It Works](/how-it-works) for how tools fit into the editing pipeline.
 
 ## Scope
 
-- MVP provider path: Anthropic tool use only.
-- Runtime is provider-neutral internally so OpenAI Responses tools can be added later.
-- Built-in tools shipped in MVP:
+- Provider path: Anthropic tool use today. The runtime is provider-neutral internally so OpenAI Responses tools can be added later.
+- Built-in tools shipped today:
   - `unsplash.search` — licensed photo search (see schema below).
   - `image.generate` — AI image generation via OpenAI (`gpt-image-1`) or Google Gemini (`gemini-2.5-flash-image`, nicknamed "nano-banana"). Full reference: [Asset Picker & AI Images](/features/asset-picker#imagegenerate-tool-chat-pipeline-path).
 
