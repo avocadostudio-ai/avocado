@@ -104,7 +104,8 @@
           {
             "group": "Specifications",
             "pages": [
-              "specs/ai-website-editor-poc-spec"
+              "specs/ai-website-editor-poc-spec",
+              "specs/block-schema-contracts"
             ]
           },
           {
