@@ -121,6 +121,51 @@ Copy `.env.example` to `.env` before running. Key variables:
 - `OPENAI_MODEL_*` / `ANTHROPIC_MODEL_*` — override model names per tier (fast/balanced/reasoning/codex)
 - `ORCHESTRATOR_URL` — defaults to `http://localhost:4200`
 
+## Demo mode (limited public playground)
+
+Setting `DEMO_MODE=1` on the orchestrator turns the deployment into a locked-down "try before you sign up" playground that runs on your shared API key. The gate is **server-enforced** (client-sent capability flags can't bypass it) and lives in `apps/orchestrator/src/demo-mode.ts`.
+
+**What demo mode does:**
+- Only allow-listed ops are permitted (default: `update_props` on `Hero` blocks). Everything else returns a friendly `needs_clarification` with example prompts. Enforcement sits inside `applyOpsAtomically` so both `/chat` and direct `/ops` calls are covered.
+- Each visitor gets an isolated ephemeral session keyed by `demo-<sha1(ip).slice(0,10)>`, seeded from `demoPublishedPages()`. No persistence — state resets on server restart.
+- `/agent/*`, `/sites-agent/*`, and `/jira/*` return `403` (they'd bypass the op gate).
+- Image generation (DALL-E / Unsplash) is short-circuited inside `detectImageOps` so no external image APIs get hit.
+- Per-IP hourly rate limit on `/chat*` and `/ops` (default 20/hr, header `retry-after` + HTTP 429).
+- `/status/planner` returns `plannerSource: "demo"` so the editor shows its demo badge.
+
+**Orchestrator env vars (Render):**
+```
+DEMO_MODE=1
+DEMO_ALLOWED_OPS=update_props                  # comma list
+DEMO_ALLOWED_BLOCK_TYPES=Hero                  # comma list
+DEMO_RATE_LIMIT_PER_IP_PER_HOUR=20
+DEMO_DISABLE_IMAGE_GEN=1
+OPENAI_API_KEY=<your shared key>               # or ANTHROPIC_API_KEY
+ORCHESTRATOR_CORS_ORIGINS=https://demo-editor.vercel.app,https://demo-site.vercel.app
+ORCHESTRATOR_STATE_FILE=                       # leave empty — state is ephemeral
+```
+
+**Editor env vars (Vercel):** (build-time; needs separate Vercel project from prod editor)
+```
+VITE_DEMO_MODE=1
+VITE_ORCHESTRATOR_URL=https://<your-demo-orchestrator>.onrender.com
+VITE_SITE_ORIGIN=https://demo-site.vercel.app
+VITE_LOCK_SITE_ID=1
+```
+
+**Site env vars (Vercel):** (server-side; also needs a separate project)
+```
+ORCHESTRATOR_URL=https://<your-demo-orchestrator>.onrender.com
+NEXT_PUBLIC_EDITOR_ORIGIN=https://demo-editor.vercel.app
+DRAFT_DEFAULT_SESSION=dev
+NEXT_PUBLIC_DEFAULT_SITE_ID=avocado-stories
+NEXT_PUBLIC_ENABLE_EDITOR=1
+```
+
+The orchestrator middleware rewrites `body.session` / `body.siteId` on every demo request, so clients do NOT need to know their demo session key — they just send `session=dev` (or anything) and the middleware swaps it for `demo-<hash(ip)>` + `siteId=avocado-stories` before handlers run.
+
+To widen the demo allow-list (e.g. to include CTA edits) without redeploying code, set `DEMO_ALLOWED_BLOCK_TYPES=Hero,CTA`. To allow additional op types, set `DEMO_ALLOWED_OPS=update_props,update_item`. Tests in `apps/orchestrator/src/demo-mode.test.ts` cover the split-allow logic.
+
 ### Chat Pipeline Flags
 
 Responsiveness optimizations — all default **on** (`1`). Set to `0` to disable.

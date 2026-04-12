@@ -18,6 +18,7 @@ import {
   OperationError,
   toErrorDetail as _unifiedToErrorDetail
 } from "../errors.js"
+import { isDemoModeEnabled, enforceDemoOps } from "../demo-mode.js"
 import type { ContentSource } from "../state/content-source.js"
 import { acquireSessionLock } from "../state/session-lock.js"
 import {
@@ -439,6 +440,14 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
       }
       addBlockIds.add(op.block.id)
     }
+  }
+
+  // Demo-mode gate: when DEMO_MODE=1, only permit the narrow allow-list
+  // (defaults to `update_props` on `Hero` blocks). Throws OperationError if
+  // any op would fall outside the allow-list. Runs AFTER staging is built
+  // so we can resolve blockId → blockType from the current draft.
+  if (isDemoModeEnabled()) {
+    enforceDemoOps(ops, staged)
   }
 
   for (let opIndex = 0; opIndex < ops.length; opIndex += 1) {
