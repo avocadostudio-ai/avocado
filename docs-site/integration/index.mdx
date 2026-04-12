@@ -1,60 +1,119 @@
 ---
 title: "Integration Overview"
-description: "Entry point for onboarding any Next.js site with the Content Studio integration."
+description: "Entry point for adding AI editing to your site. Next.js 15 (App Router) is the only officially supported path today; other frameworks are first-mover territory."
 ---
 
-# Integration Overview
+This page is the entry point for wiring your site into Avocado Studio. New to the project? Start with [Core Concepts](/concepts) first, then come back here.
 
-Use this page as the entry point for adding AI editing to your website. New to the project? Start with [Core Concepts](/concepts) first.
+<Note>
+**Next.js 15 (App Router) is the only officially supported integration path today.** Every example in the docs, every SDK helper that ships with adapters out of the box, and every example app in the repo (`examples/strapi-site`, `examples/contentful-marketing-site`) is built on Next.js. If your site is on Next.js, follow the [Next.js Integration](/integration/nextjs-integration) walkthrough — that's the canonical path and what we test against.
 
-Related docs:
-- [Custom Blocks](/integration/custom-blocks) — register your own block types with custom schemas and renderers
-- [Site Provider SPI](/site-provider-spi) — advanced REST API contract for non-Next.js integrations
-- [Native Tools](/integration/tools-mvp) — tool contract for connecting PIM, DAM, or other external services
+Other frameworks (Astro, Remix, SvelteKit, Hono, Cloudflare Workers, etc.) **can** be integrated today using the SDK's framework-agnostic `/core` primitives, but you'll be a first mover — see [Other frameworks](#other-frameworks) below.
+</Note>
 
-## Recommended reading order
+## The supported path: Next.js Integration
 
-1. [Content Studio Quickstart](/integration/editor-quickstart) — expose your components and connect the Content Studio
-2. [Next.js Embedded MVP](/integration/nextjs-mvp-embedded) — full Next.js integration walkthrough
-3. [Custom Blocks](/integration/custom-blocks) — define your own block types
+<CardGroup cols={1}>
+  <Card title="Next.js Integration" icon="react" href="/integration/nextjs-integration">
+    The canonical walkthrough. Two SDK helpers (`createEditorApiHandler` mounts the catch-all editor route; `createSitePage` is a drop-in `app/[[...slug]]/page.tsx`) plus `npx avocado-register`. End-to-end in ~30 minutes for a vanilla Next.js 15 App Router project.
+  </Card>
+</CardGroup>
 
-## MVP integration model
+### How it works in two helpers
 
-- Source of truth: adopter-owned component registry in code.
-- Transport contract: `GET /api/editor/blocks` manifest JSON generated from that registry.
-- Preview bootstrap: Next.js Draft Mode (`/api/draft`, `/api/draft/disable`).
-- Fallback behavior: if manifest is missing/invalid, the Content Studio runs in degraded mode (no structural edits).
+| Helper | What it gives you | Mount at |
+|---|---|---|
+| `createEditorApiHandler` | One catch-all route that serves `blocks`, `pages`, `draft`, `draft/disable`, and `publish` | `app/api/editor/[...path]/route.ts` |
+| `createSitePage` | A `Page` component + `generateStaticParams` with draft mode, navigation, footer, editor overlay, and 404 fallbacks already wired in | `app/[[...slug]]/page.tsx` |
 
-## Required endpoints
+You wire both with your existing CMS / content fetchers (`getPage`, `getSlugs`, `getSiteConfig`), then register the site with `npx avocado-register`. That's the whole integration. The full walkthrough including code, the 5-step verification curl checks, and troubleshooting is in [Next.js Integration](/integration/nextjs-integration).
 
-- `GET /api/editor/blocks` — block manifest for structural edits
-- `GET /api/editor/pages` — returns `{ pages: PageDoc[] }` of published content; the Content Studio calls this to seed the orchestrator with initial draft content when a session has no pages yet
-- `GET /api/draft?secret=...&redirect=...` — enables Next.js draft mode and redirects
-- `GET /api/draft/disable?redirect=...` — disables draft mode and redirects
+### Recommended reading order
 
-## Required environment variables
+If you're integrating today, read these in order:
 
-- Site:
-  - `DRAFT_MODE_SECRET`
-- Content Studio:
-  - `VITE_SITE_ORIGIN`
-  - `VITE_SITE_DRAFT_SECRET`
+1. [Next.js Integration](/integration/nextjs-integration) — the canonical walkthrough you'll actually follow
+2. [Editor Quickstart](/integration/editor-quickstart) — env vars, iframe URL pattern, smoke checks
+3. [Custom Blocks](/integration/custom-blocks) — define your own component types alongside (or instead of) the built-in block library
+4. [Visual editor](/integration/puck-mode) — opt-in drag-and-drop direct manipulation, **if you'd rather click on blocks and edit them in place than describe changes in chat**. Same blocks, same publishing pipeline, same orchestrator — different UI on top.
 
-## Adoption checklist
+## Integration model (high level)
 
-1. Add local component registry in site code.
-2. Generate manifest from registry and expose `/api/editor/blocks`.
-3. Add draft mode routes and secret validation.
-4. Verify CORS for Content Studio origin on `/api/editor/blocks` in local/dev.
-5. Confirm Content Studio header shows `Manifest` (not `Degraded`).
+Whichever framework you're on, the contract is the same:
 
-## Quick validation script
+- **Source of truth**: adopter-owned component registry in code (your React components, exposed via the SDK's manifest)
+- **Transport contract**: `GET /api/editor/blocks` returns the block manifest as JSON, generated automatically by the SDK from your registry
+- **Preview bootstrap**: Draft Mode cookies, set by `GET /api/editor/draft?secret=…&redirect=…` and cleared by `GET /api/editor/draft/disable?redirect=…`
+- **Page render**: when Draft Mode is on, your page handler reads from the orchestrator's `/draft/pages` endpoint instead of your CMS, and shows the editor overlay
+- **Publish**: optionally, `POST /api/editor/publish` accepts the edited content back so you can write it to your CMS / file system / database
 
-Run:
+### Required endpoints
 
-```bash
-./docs/integration/scripts/check-manifest.sh http://localhost:3000
-```
+The SDK's `createEditorApiHandler` mounts all five at once under a single catch-all route on Next.js — see the [Next.js Integration](/integration/nextjs-integration#walkthrough) page for the one-file setup. On other frameworks, you mount them yourself using the `/core` primitives — see [Other frameworks](#other-frameworks).
 
-Expected:
-- prints `PASS: version=..., components=...`
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/editor/blocks` | Block manifest for structural edits |
+| `GET` | `/api/editor/pages` | `{ pages: PageDoc[] }` of published content for editor session bootstrap |
+| `GET` | `/api/editor/draft?secret=…&redirect=…` | Enable Draft Mode (validates secret, only allows internal redirects) |
+| `GET` | `/api/editor/draft/disable?redirect=…` | Disable Draft Mode |
+| `POST` | `/api/editor/publish` | Receives published pages back from the editor (only mounted if you pass `onPublish`) |
+
+### Required environment variables
+
+| Where | Variable | Purpose |
+|---|---|---|
+| Site `.env.local` | `DRAFT_MODE_SECRET` | Validates `?secret=` on Draft Mode entry. Generated by `avocado-register` if missing. |
+| Site `.env.local` | `ORCHESTRATOR_URL` | Where the SDK fetches draft pages from. Defaults to `http://127.0.0.1:4200` in dev. |
+| Editor `apps/editor/.env` | `VITE_SITE_ORIGIN` | Where the editor's iframe loads from |
+| Editor `apps/editor/.env` | `VITE_SITE_DRAFT_SECRET` | **Must equal** `DRAFT_MODE_SECRET`. The editor uses this to construct the bootstrap URL. |
+
+A mismatch between the editor's `VITE_SITE_DRAFT_SECRET` and the site's `DRAFT_MODE_SECRET` is the single most common failure — `avocado-register` surfaces it as a warning.
+
+### Adoption checklist
+
+For a Next.js 15 App Router project, the entire adoption is:
+
+1. `pnpm add @ai-site-editor/site-sdk` in your project
+2. Create `app/api/editor/[...path]/route.ts` with `createEditorApiHandler` (see [Next.js Integration](/integration/nextjs-integration#walkthrough), step 2)
+3. Replace `app/[[...slug]]/page.tsx` with `createSitePage` (step 3)
+4. Run `npx avocado-register --name "My Site"` from the project directory
+5. Run the 5 verification `curl` commands (step 5) and confirm the editor's *Sites* page shows your site
+
+For non-Next.js frameworks the conceptual steps are identical but you implement the route handlers and the page-render branching by hand — see [Non-Next.js Integration](/integration/non-nextjs).
+
+## Other frameworks
+
+<Warning>
+**First-mover territory.** Avocado Studio is built and tested against Next.js. The SDK's `/core` primitives are framework-agnostic by design and the patterns work, but the only adapters shipped in the box are the Next.js ones. If you're on Astro / Remix / SvelteKit / Hono / Cloudflare Workers, expect to file bugs and contribute back as you discover gaps. There is no support SLA on the non-Next.js path today.
+</Warning>
+
+If your site is not on Next.js, you have three honest options:
+
+<CardGroup cols={3}>
+  <Card title="Wrap in a Next.js shell" icon="layer-group">
+    Stand up a thin Next.js project that proxies to your existing backend, and use the standard [Next.js Integration](/integration/nextjs-integration). ~30 minutes, fully supported. Most people who try the non-Next.js path end up here anyway.
+  </Card>
+  <Card title="DIY with /core primitives" icon="screwdriver-wrench" href="/integration/non-nextjs">
+    Implement the editor API contract by hand using `createDraftEnableHandlerCore`, `createBlocksHandler`, `resolveDraftContextCore`, and friends. Working examples for Astro, Hono, and SvelteKit. **First-mover territory** — file bugs and contribute back.
+  </Card>
+  <Card title="Bring your own coding agent" icon="terminal" href="/sites/coding-agent">
+    Hand the integration to Codex / Cursor / Claude Code with our prompt template. The prompt assumes Next.js but agents can usually adapt; results vary on other frameworks.
+  </Card>
+</CardGroup>
+
+### What we want to do (and what the community can help with)
+
+The roadmap for non-Next.js support is community-driven by design — first-class adapters get prioritized when there's repeated demand for a specific framework. If you'd like Avocado Studio to officially support your framework:
+
+1. **File a feature request** at [github.com/yu7321/avocado](https://github.com/yu7321/avocado/issues) with the framework, version, and your use case. We tally these and prioritize accordingly.
+2. **If you build a working adapter** (the [Non-Next.js Integration](/integration/non-nextjs) page shows what one looks like — the Next.js adapter at `packages/site-sdk/src/draft-routes.ts` is 30 lines), please contribute it back as `@ai-site-editor/site-sdk/draft-routes-{framework}.ts`. That's the path from "first mover territory" to "officially supported".
+3. **Share what you learn**. Bug reports, gotchas, framework-specific quirks, and "this part of the docs needs more detail" notes are all welcome.
+
+We don't have a formal commitment to support any specific non-Next.js framework today — the priority is making the Next.js path rock-solid, then expanding outward where there's pull from real users.
+
+## Related
+
+- [Custom Blocks](/integration/custom-blocks) — register your own React components alongside (or instead of) the built-in block library
+- [Native Tools](/integration/tools-mvp) — tool contract for connecting PIM, DAM, Unsplash, AI image generation, and other external services to the AI planner
+- [Site Assistant](/sites/site-agent) — let the editor's built-in AI agent do the integration for you (Next.js only)

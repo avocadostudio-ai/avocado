@@ -1,0 +1,74 @@
+---
+title: "API Reference"
+sidebarTitle: "Introduction"
+description: "OpenAPI 3.0 reference for the orchestrator's HTTP API. Auto-generated from the running Fastify routes — currently a skeleton without request/response schemas (placeholder spec, see notes below)."
+---
+
+This tab documents the **Orchestrator HTTP API** — the brain that runs editor sessions, calls the LLMs, and serves draft state to integrated sites. The same API is what the editor app, the `avocado-register` CLI, the Site Assistant, and any [Bring Your Own Coding Agent](/sites/coding-agent) workflow all talk to.
+
+## Status
+
+<Warning>
+**This is a placeholder spec, not a complete contract.** The OpenAPI document under *Orchestrator endpoints* in the sidebar is **auto-generated** from the running Fastify routes via [`@fastify/swagger`](https://github.com/fastify/fastify-swagger). Most orchestrator routes do not have request/response schemas attached today, so what you see for each operation is essentially "this URL exists, accepts these HTTP methods, and returns *something*" — the actual request body shape and response payload are not yet documented in the spec.
+
+**What this means in practice:**
+
+- The list of endpoints is **complete and accurate** (it's reflected from the live route table).
+- The **HTTP methods** are accurate.
+- The **request bodies, query parameters, and response shapes** are mostly empty placeholders.
+- The **"Try it" panel** in each operation page lets you send requests, but won't validate or autocomplete payloads.
+- **Internal-only routes** (`/telemetry/*`, `/contentful/*`, `/gdrive/*`, `/jira/*`, `/restore/*`, etc.) are filtered out — only the public-facing surface is listed.
+
+**If you actually need to call one of these endpoints today**, the most reliable references are:
+
+1. The route source files in `apps/orchestrator/src/routes/*.ts` — every route is named, documented, and the request/response types are inline.
+2. The editor's network calls — open browser devtools, perform an action, and inspect what the editor sends to the orchestrator.
+3. The [`avocado-register` CLI source](/integration/nextjs-integration#walkthrough) for a complete worked example of `POST /sites/register`.
+
+We plan to upgrade this spec to a real, complete OpenAPI document by attaching Zod schemas to the most-used routes via [`fastify-type-provider-zod`](https://github.com/turkerdev/fastify-type-provider-zod) — which would also add runtime validation as a side benefit. There's no timeline for that work; if you need it sooner, [open an issue](https://github.com/yu7321/avocado/issues) describing your use case so we can prioritize.
+</Warning>
+
+## What the orchestrator exposes (high level)
+
+The public surface groups into nine areas, mirroring the OpenAPI tags:
+
+| Tag | What it covers | Used by |
+|---|---|---|
+| **Sites** | Site registration and listing — `POST /sites/register`, `GET /sites` | The editor on mount, `avocado-register` CLI |
+| **Chat** | AI chat / planning — `POST /chat`, `POST /chat/start`, `GET /chat/stream`, `POST /chat/cancel` | Editor's per-edit chat panel |
+| **Sites Agent** | Site onboarding agent (migrate / integrate / create modes) — `POST /sites-agent/start`, `GET /sites-agent/stream`, `POST /sites-agent/respond`, `POST /sites-agent/cancel` | Editor's Site Assistant FAB |
+| **Draft** | Draft content read endpoints — `GET /draft/pages`, `GET /draft/slugs`, `GET /draft/site-config`, `POST /draft/bootstrap` | The integrated site (called from `fetchEditorPage` / `createSitePage`) |
+| **Publish** | Publishing endpoints — `POST /publish`, `GET /publish/status`, `GET /publish/content` | Editor's publish flow |
+| **History** | Undo / redo / version log — `GET /history/log`, `GET /history/status`, `POST /history/undo`, `POST /history/redo`, `POST /history/restore` | Editor's history panel |
+| **Auth** | Optional access password gate — `POST /auth/verify`, `GET /auth/status` | Editor login screen if `ACCESS_PASSWORD_HASH` is set |
+| **Media** | Image upload, generation, search — `POST /image/upload`, `POST /image/generate`, `POST /image/generate/chat`, `POST /image/interpret`, `GET /unsplash/search`, `GET /generated-images/:fileName` | Editor's Asset Picker |
+| **Health** | Service health and readiness — `GET /health`, `GET /docs/json` | Container health checks, this docs site |
+
+## Auth model
+
+Most orchestrator routes are **unauthenticated** today. The orchestrator is designed to be reachable from your editor and from your integrated sites — both of which run inside your trust boundary. There are two optional gates:
+
+1. **Access password** (editor-facing) — set `ACCESS_PASSWORD_HASH` on the orchestrator and the editor will prompt for a password before letting users in. Verified via `POST /auth/verify`. Off by default.
+2. **Publish token** (integration-facing) — set `PUBLISH_TOKEN` on the orchestrator and `POST /publish` requests must include `x-publish-token: <token>` in headers. Off by default; recommended for production.
+
+There's no per-user authentication or session-bound API key today. If you expose the orchestrator to the public internet without these gates, anyone who knows the URL can use it. See [Docker Deployment](/operations/docker-deployment#critical-hosting-constraints) for the broader hosting story.
+
+## Regenerating this spec
+
+The spec file at `docs-site/api-reference/orchestrator.openapi.json` is generated by a one-shot script that imports the orchestrator's app, waits for all routes to register, then dumps the `@fastify/swagger` reflection.
+
+```bash
+pnpm --filter @ai-site-editor/orchestrator export-openapi
+```
+
+The script runs with `NODE_ENV=test` so the orchestrator does not actually start listening on port 4200 — it only registers route plugins, which is enough for `@fastify/swagger` to introspect them. Output goes to `docs-site/api-reference/orchestrator.openapi.json` and counts the operations exported.
+
+Run this any time after adding, removing, or renaming a route on the orchestrator. The Mintlify docs site will pick up the new spec on its next reload.
+
+## Reporting issues with the spec
+
+If an operation here is missing, mislabeled, or you need a request/response shape that isn't documented:
+
+- For **missing schemas** (the placeholder situation above): file an issue at [github.com/yu7321/avocado](https://github.com/yu7321/avocado/issues) describing which route you need and your use case. This helps prioritize the Zod-schema upgrade work.
+- For **outright bugs** (an endpoint listed here doesn't exist on the running orchestrator): the spec is stale — either the orchestrator changed without re-running `export-openapi`, or there's a bug in the route filter. Open an issue with `[api-reference]` in the title.
+- For **internal routes that shouldn't be public**: the route filter at `apps/orchestrator/src/index.ts` (`INTERNAL_ROUTE_PREFIXES`) decides what's filtered. Add your prefix there and re-run the export.
