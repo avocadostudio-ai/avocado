@@ -57,6 +57,12 @@ interface SettingsModalProps {
   onModelChange: (provider: AIProvider, model: ModelKey) => void
   onClearChat: () => void
   agentModeEnabled?: boolean
+  /**
+   * When true, show developer-only toggles (Streaming, Nested labels, Field
+   * draft telemetry, Debug mode) and switch the title to "Developer mode".
+   * See resolveDevOptionsEnabled() in lib/defaults.ts.
+   */
+  showDevOptions?: boolean
 }
 
 export function SettingsModal({
@@ -78,6 +84,7 @@ export function SettingsModal({
   onModelChange,
   onClearChat,
   agentModeEnabled,
+  showDevOptions = false,
 }: SettingsModalProps) {
   const { t, locale, setLocale } = useT()
   const currentValue = selectionValue(provider, modelKey)
@@ -110,7 +117,9 @@ export function SettingsModal({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className={cn("w-full max-w-none gap-0 p-0 font-sans text-foreground text-sm", chatDarkMode && "editor-dark")} showCloseButton={true}>
         <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
-          <SheetTitle className="text-base font-bold tracking-tight">{t("settings.title")}</SheetTitle>
+          <SheetTitle className="text-base font-bold tracking-tight">
+            {showDevOptions ? t("settings.devTitle") : t("settings.title")}
+          </SheetTitle>
         </SheetHeader>
 
         <div className="grid gap-5 px-5 py-5">
@@ -128,12 +137,20 @@ export function SettingsModal({
             </Select>
           </div>
 
-          <div className="grid gap-0" role="group" aria-label="Developer toggles">
-            <ToggleRow label={t("settings.streaming")} checked={useStreaming} onCheckedChange={onStreamingChange} />
-            <ToggleRow label={t("settings.nestedLabels")} checked={showNestedLabels} onCheckedChange={onNestedLabelsChange} />
-            <ToggleRow label={t("settings.fieldDraftTelemetry")} checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
+          <div className="grid gap-0" role="group" aria-label="Settings toggles">
+            {showDevOptions ? (
+              <ToggleRow label={t("settings.streaming")} checked={useStreaming} onCheckedChange={onStreamingChange} />
+            ) : null}
+            {showDevOptions ? (
+              <ToggleRow label={t("settings.nestedLabels")} checked={showNestedLabels} onCheckedChange={onNestedLabelsChange} />
+            ) : null}
+            {showDevOptions ? (
+              <ToggleRow label={t("settings.fieldDraftTelemetry")} checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
+            ) : null}
             <ToggleRow label={t("settings.darkMode")} checked={chatDarkMode} onCheckedChange={onDarkModeChange} />
-            <ToggleRow label={t("settings.debugMode")} checked={showDebugDetails} onCheckedChange={onDebugDetailsChange} />
+            {showDevOptions ? (
+              <ToggleRow label={t("settings.debugMode")} checked={showDebugDetails} onCheckedChange={onDebugDetailsChange} />
+            ) : null}
           </div>
 
           <div className="grid gap-1.5 text-left">

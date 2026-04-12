@@ -45,11 +45,13 @@ import {
   resolveDefaultProvider,
   resolveEditorSiteId,
   resolveAnchoredComposerEnabled,
+  resolveDevOptionsEnabled,
   slugLabel
 } from "./lib/editor-utils"
 
 const STREAMING_INDICATOR_STYLE = resolveStreamingIndicatorStyle()
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
+const SHOW_DEV_OPTIONS = resolveDevOptionsEnabled()
 const PuckChatPrototype = lazy(
   () => import("./components/PuckPrototypeRoute").then((mod) => ({ default: mod.PuckPrototypeRoute }))
 )
@@ -1856,6 +1858,7 @@ function EditorPage({
         onModelChange={(p, m) => { setProvider(p); setModelKey(m) }}
         onClearChat={chatEngine.clearChat}
         agentModeEnabled={backendFeatures.agentMode ?? false}
+        showDevOptions={SHOW_DEV_OPTIONS}
       />
 
       <SiteConfigDrawer sites={sites} onPreviewRefresh={() => preview.postToSite("draftUpdated", {})} />
