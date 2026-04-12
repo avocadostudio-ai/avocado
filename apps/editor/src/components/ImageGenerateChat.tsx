@@ -305,10 +305,10 @@ export function ImageGenerateChat(props: ImageGenerateChatProps) {
               <ComposerPrimitive.Input
                 placeholder={
                   messages.length > 0
-                    ? t("imagePicker.examplePrompt")
+                    ? t("imagePicker.followUpPrompt")
                     : editMode === "edit"
-                      ? t("imagePicker.edit")
-                      : t("imagePicker.examplePrompt")
+                      ? t("imagePicker.editPrompt")
+                      : t("imagePicker.generatePrompt")
                 }
                 className="aui-image-composer-input"
               />
