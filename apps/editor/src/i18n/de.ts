@@ -93,7 +93,8 @@ const de: LocaleDict = {
   "preview.title": "Live-Vorschau",
 
   // -- Settings modal --
-  "settings.title": "Entwicklermodus",
+  "settings.title": "Einstellungen",
+  "settings.devTitle": "Entwicklermodus",
   "settings.streaming": "Streaming",
   "settings.nestedLabels": "Verschachtelte Labels",
   "settings.fieldDraftTelemetry": "Feld-Entwurfs-Telemetrie",
