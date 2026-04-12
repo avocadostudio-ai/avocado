@@ -24,6 +24,18 @@ export function monorepoRoot(): string {
   return resolve(dirname(new URL(import.meta.url).pathname), "../../../../")
 }
 
+/**
+ * Resolve the DRAFT_MODE_SECRET to write into a scaffolded site's `.env.local`.
+ * Reads from the orchestrator's own environment so the scaffolded site lines up
+ * with the editor's build-time `VITE_SITE_DRAFT_SECRET`. Falls back to a known
+ * dev placeholder if the orchestrator wasn't started with one — that placeholder
+ * is intentionally weak so production deployments fail closed if env config is
+ * forgotten.
+ */
+export function getDraftModeSecret(): string {
+  return process.env.DRAFT_MODE_SECRET ?? "top-secret"
+}
+
 export async function findAvailablePort(root: string): Promise<number> {
   const appsDir = join(root, "apps")
   const usedPorts = new Set<number>([3000, 4100, 4200])
@@ -888,7 +900,7 @@ export async function scaffoldSiteProject(options: {
   await writeFile(join(projectDir, "public/logo.svg"), defaultLogoSvg(name), "utf-8")
   await writeFile(join(projectDir, "public/favicon.svg"), faviconSvg(name), "utf-8")
 
-  const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=top-secret\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
+  const envContent = `ORCHESTRATOR_URL=http://localhost:4200\nDRAFT_MODE_SECRET=${getDraftModeSecret()}\nNEXT_PUBLIC_DEFAULT_SITE_ID=${siteId}\nNEXT_PUBLIC_SITE_NAME=${name}\nNEXT_PUBLIC_EDITOR_ORIGIN=http://localhost:4100\n`
   await writeFile(join(projectDir, ".env.local"), envContent, "utf-8")
 
   // Run pnpm install

@@ -437,6 +437,37 @@ export function setSiteConfig(session: string, config: SiteConfig) {
   siteConfigs.set(session, { ...existing, ...config })
 }
 
+/**
+ * Walk the in-memory `siteConfigs` map and return one entry per unique siteId,
+ * preferring entries that match `wantedSession` over legacy unscoped ones.
+ *
+ * The map keys come from `scopedSessionKey()`: either `{siteId}::{session}` or
+ * just `{session}` for legacy sites (avocado-stories convention). Owning that
+ * parsing here keeps route handlers from having to know about the key format.
+ */
+export function listSitesForSession(
+  wantedSession: string
+): Array<SiteConfig & { id: string }> {
+  const byId = new Map<string, { config: SiteConfig & { id: string }; matchesSession: boolean }>()
+
+  for (const [key, config] of siteConfigs.entries()) {
+    const sep = key.indexOf("::")
+    const siteId = sep === -1 ? DEFAULT_SITE_ID : key.slice(0, sep)
+    const session = sep === -1 ? key : key.slice(sep + 2)
+    const matchesSession = session === wantedSession
+
+    const existing = byId.get(siteId)
+    if (!existing || (matchesSession && !existing.matchesSession)) {
+      byId.set(siteId, {
+        config: { id: siteId, ...config },
+        matchesSession,
+      })
+    }
+  }
+
+  return Array.from(byId.values()).map((entry) => entry.config)
+}
+
 // ---------------------------------------------------------------------------
 // Persistence helpers
 // ---------------------------------------------------------------------------
