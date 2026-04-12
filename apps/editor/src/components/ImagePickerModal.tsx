@@ -121,6 +121,18 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
   const refImageInputRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  // Blur any element outside the modal (e.g. main chat textarea) to prevent
+  // its cursor from blinking behind the semi-transparent overlay.
+  useEffect(() => {
+    if (open) {
+      const active = document.activeElement as HTMLElement | null
+      if (active && active !== document.body && modalRef.current && !modalRef.current.contains(active)) {
+        active.blur()
+      }
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open && searchTimerRef.current) {
@@ -357,7 +369,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
 
   return (
     <div style={S.overlay} onClick={onClose}>
-      <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+      <div ref={modalRef} style={S.modal} onClick={(e) => e.stopPropagation()}>
         <style>{`@keyframes imgPickerDotBounce { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }
 .imgpicker-zoom-wrap .imgpicker-zoom-icon { opacity: 0; transition: opacity 0.15s; }
 .imgpicker-zoom-wrap:hover .imgpicker-zoom-icon { opacity: 1; }
