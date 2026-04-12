@@ -95,7 +95,7 @@ test("splitDemoOps: rejects remove_block, move_block, create_page, etc.", () => 
   const staged = stagedFromPage(pageWithHeroAndCta())
   const ops: Operation[] = [
     { op: "remove_block", pageSlug: "/", blockId: "b_hero" },
-    { op: "move_block", pageSlug: "/", blockId: "b_hero", toIndex: 1 },
+    { op: "move_block", pageSlug: "/", blockId: "b_hero", afterBlockId: "b_cta" },
     {
       op: "create_page",
       page: {
