@@ -28,11 +28,12 @@ export function resolveSiteOrigin(config?: { previewUrl?: string }) {
 
 export function buildSiteDraftEnableUrl(pathname: string, params: Record<string, string | undefined>, origin?: string) {
   const base = origin || siteOrigin
-  const redirectPath = buildSitePathWithQuery(pathname, params)
+  // Always include __editor=1 so the site enters editor mode even when
+  // the draft-mode cookie is blocked (cross-origin iframe + incognito).
+  const editorParams = { ...params, __editor: "1" }
+  const redirectPath = buildSitePathWithQuery(pathname, editorParams)
   if (!siteDraftSecret) {
-    const direct = new URL(`${base}${redirectPath}`)
-    if (!direct.searchParams.has("__editor")) direct.searchParams.set("__editor", "1")
-    return direct.toString()
+    return new URL(`${base}${redirectPath}`).toString()
   }
   const entry = new URL(`${base}/api/editor/draft`)
   entry.searchParams.set("secret", siteDraftSecret)
