@@ -11,6 +11,14 @@ const en = {
   "header.viewAllSites": "View all sites",
   "header.limited": "Limited",
   "header.demoMode": "Demo mode",
+
+  // -- Demo mode banner --
+  "demo.bannerTitle": "You're in demo mode",
+  "demo.bannerBody": "This is a live playground. You can edit the Hero section with plain language — everything else is locked for now.",
+  "demo.tryExample1": "Change the hero headline to \"Welcome to my new site\"",
+  "demo.tryExample2": "Make the hero subheading sound more playful",
+  "demo.tryExample3": "Update the hero CTA to \"Get Started\"",
+  "demo.placeholder": "Try: change the hero headline to \u2026",
   "header.moreOptions": "More options",
   "header.publish": "Publish",
   "header.publishing": "Publishing",
