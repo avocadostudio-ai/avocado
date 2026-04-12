@@ -142,7 +142,7 @@ function buildLightweightPlannerPrompt(opts: PlannerPromptOptions): string {
     "Do not return no-op updates: patch must change at least one effective value.",
     "Use future tense in summary_for_user and change_log.",
     "For edit_plan: summary_for_user must be ONE short sentence (max ~20 words).",
-    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases.",
+    "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next (max 6 words each). Every suggestion must be an action the user can perform inside this editor (editing content, adding/removing sections, changing images, rewriting copy). Never suggest actions outside the editor's scope such as A/B testing, analytics, performance monitoring, user research, or marketing strategy.",
     opts.selectedBlockId.length > 0
       ? `Selected block is ${opts.selectedBlockId}. Target only this block in ops.`
       : "Respect explicit user target references when present.",

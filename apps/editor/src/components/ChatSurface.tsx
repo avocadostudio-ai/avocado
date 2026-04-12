@@ -112,7 +112,6 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
           className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""} ${entry.fieldAiContext ? "msg-field-context" : ""}`}
         >
           <div className="msg-main">{entry.role === "assistant" ? renderFinalMarkdown(safeText) : safeText}</div>
-          {entry.status && !entry.canUndo && entry.status !== "needs_clarification" && entry.status !== "plan_ready" ? <div className="msg-status">{entry.status}</div> : null}
           {(() => {
             const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(rawText, line))
             if (changeLines.length === 0) return null
