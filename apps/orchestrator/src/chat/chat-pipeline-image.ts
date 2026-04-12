@@ -21,6 +21,12 @@ import {
 } from "../image/image-helpers.js"
 import { isGdriveConfigured } from "../image/gdrive-client.js"
 import { firstUrlFromText, preferredImageAltText } from "./chat-pipeline-ui.js"
+import { isDemoModeEnabled, isDemoImageGenDisabled } from "../demo-mode.js"
+
+/** Is demo mode active AND image gen disabled for demo? Memoized per call. */
+function isDemoImageGenActive(): boolean {
+  return isDemoModeEnabled() && isDemoImageGenDisabled()
+}
 
 export function blockHasImageUrlProp(
   block: PageDoc["blocks"][number] | null | undefined
@@ -872,6 +878,10 @@ export function detectImageOps(args: {
   activeBlockId?: string
   activeEditablePath?: string
 }): PendingImageGeneration[] {
+  // Demo mode: image generation is disabled entirely. A failed DALL-E call
+  // or a 10s Unsplash lookup is the worst possible first-impression UX, so
+  // we short-circuit here before any external API is touched.
+  if (isDemoImageGenActive()) return []
   const lowerMessage = args.message.toLowerCase()
   if (args.plan.intent !== "edit_plan") return []
   // Translation requests don't need image resolution — skip to avoid forcing approval mode
