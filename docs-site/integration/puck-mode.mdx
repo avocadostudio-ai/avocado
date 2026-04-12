@@ -8,6 +8,29 @@ description: "Enable a visual drag-and-drop editing experience alongside AI chat
 
 Puck mode is an alternative editing experience that replaces the default chat-driven editor with a visual drag-and-drop canvas powered by [Puck](https://github.com/measuredco/puck). AI chat remains available as a sidebar plugin, so users get the best of both worlds: direct manipulation **and** natural-language editing.
 
+### Zero extra integration
+
+<Info>
+  Puck mode requires **no additional integration work** from the site developer. If your site is already integrated with Avocado Studio, Puck mode works automatically.
+</Info>
+
+Your site talks to the orchestrator — not to the editor UI. Whether the user edits via chat or via the Puck canvas, the orchestrator receives the same operations through the same endpoints (`/ops`, `/draft/pages`, `/chat`). The site never knows which editor produced the changes.
+
+This is possible because Puck mode runs entirely inside the editor app, with an **adapter layer** that translates between Puck's data model and ours:
+
+```
+Chat Editor ──────────────→ ops ──→ Orchestrator ──→ Site
+Puck Editor ──→ adapter ──→ ops ──→ Orchestrator ──→ Site
+```
+
+| Adapter function | What it does |
+|------------------|--------------|
+| `pageToPuckData()` | Converts PageDoc → PuckData so the Puck canvas can render it |
+| `buildOpsFromPuckDiff()` | Converts Puck state changes back into standard operations |
+| `createPuckConfig()` | Converts the block manifest into Puck field definitions |
+
+This means you integrate once with Avocado Studio and get both editing experiences — chat-driven AI editing and visual drag-and-drop — without any extra work on your site.
+
 ## Enabling per site
 
 Puck mode is controlled per-site via the site settings panel.
