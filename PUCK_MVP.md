@@ -1,25 +1,26 @@
-# Nano Banana — MVP Launch Plan
+# Puck MVP Launch Plan
 
-> AI-powered editing as a native Puck plugin.
-> Codename: **Nano Banana** (smaller sibling of Avocado)
+> Ship the orchestrator + image GenAI as a **native Puck plugin**.
+> Codename: **Nano Banana**
 
 ## Vision
 
 Ship the orchestrator's AI planning + image generation capabilities as a
 **native Puck editor plugin**. Users `npm install` one package, add it to their
 `<Puck plugins={[...]} />` config, and get an AI chat sidebar + image
-generation — indistinguishable from a first-party Puck feature.
+generation — following Puck's own plugin architecture, indistinguishable
+from a first-party feature.
 
 ```tsx
-import { nanoBananaPlugin } from "@nano-banana/puck-ai"
+import { aiPlugin } from "@ai-site-editor/puck-ai"
 
 <Puck
   config={myConfig}
   data={myData}
   plugins={[
-    nanoBananaPlugin({
-      orchestratorUrl: "https://api.nanobanana.dev",
-      apiKey: "nb_...",
+    aiPlugin({
+      orchestratorUrl: "https://api.example.com",
+      apiKey: "sk_...",
     }),
     blocksPlugin(),
     outlinePlugin(),
@@ -36,11 +37,11 @@ import { nanoBananaPlugin } from "@nano-banana/puck-ai"
 graph LR
   subgraph "User's App"
     P["Puck Editor"]
-    NB["nanoBananaPlugin()"]
-    P --> NB
+    AI["aiPlugin()"]
+    P --> AI
   end
 
-  subgraph "Nano Banana Service"
+  subgraph "Orchestrator Service"
     O["Orchestrator API"]
     LLM["LLM Providers<br/>(OpenAI / Anthropic / Gemini)"]
     IMG["Image Gen<br/>(DALL-E / Unsplash)"]
@@ -48,20 +49,20 @@ graph LR
     O --> IMG
   end
 
-  NB -- "SSE /chat/stream" --> O
-  NB -- "POST /ops" --> O
-  NB -- "GET /draft/*" --> O
+  AI -- "SSE /chat/stream" --> O
+  AI -- "POST /ops" --> O
+  AI -- "GET /draft/*" --> O
 ```
 
 ### What ships
 
 | Deliverable | Description |
 |---|---|
-| **`@nano-banana/puck-ai`** | npm package — Puck plugin + chat UI + image picker + SSE transport |
+| **`@ai-site-editor/puck-ai`** | npm package — Puck plugin + chat UI + image picker + SSE transport |
 | **Orchestrator API** | Hosted service — LLM planning, ops engine, image gen, session state |
 | **Block manifest adapter** | Reads user's Puck config, generates manifest for the orchestrator |
 
-### What does NOT ship (deferred from Avocado)
+### What does NOT ship (deferred)
 
 - Custom editor app (`apps/editor`)
 - Next.js site renderer (`apps/site`)
@@ -75,7 +76,8 @@ graph LR
 
 ## Puck Plugin Architecture
 
-Nano Banana follows Puck's official extension points — no hacks, no wrapping:
+The plugin follows Puck's official extension points — no hacks, no wrapping.
+This is what `packages/editor-puck/` already does today:
 
 | Puck API | How we use it |
 |---|---|
@@ -89,22 +91,22 @@ Nano Banana follows Puck's official extension points — no hacks, no wrapping:
 ### Plugin factory
 
 ```tsx
-export function nanoBananaPlugin(config: NanoBananaConfig): PuckPlugin {
+export function aiPlugin(config: AIPluginConfig): PuckPlugin {
   return {
-    name: "nano-banana-ai",
+    name: "ai-site-editor",
     label: "AI",
     icon: <BotMessageSquare size={24} />,
     render: () => (
-      <NanoBananaProvider config={config}>
+      <AIPluginProvider config={config}>
         <AIChatPanel />
-      </NanoBananaProvider>
+      </AIPluginProvider>
     ),
   }
 }
 
-type NanoBananaConfig = {
+type AIPluginConfig = {
   orchestratorUrl: string
-  apiKey?: string                 // Nano Banana API key (hosted mode)
+  apiKey?: string                 // Platform API key (hosted mode)
   llmApiKey?: string              // User's own OpenAI/Anthropic key (BYOK mode)
   llmProvider?: "openai" | "anthropic" | "gemini"
   modelTier?: "fast" | "balanced" | "reasoning"
@@ -120,7 +122,7 @@ type NanoBananaConfig = {
 
 ### Phase 1: Prove it (target: 2-3 weeks)
 
-#### Plugin package (`@nano-banana/puck-ai`)
+#### Plugin package (`@ai-site-editor/puck-ai`)
 
 - [ ] Extract `PuckChatPluginPanel` from `packages/editor-puck` into standalone
 - [ ] Bundle chat SSE transport (from `apps/editor/src/chat/chat-transports.ts`)
@@ -131,13 +133,13 @@ type NanoBananaConfig = {
       — simplified version of `ImagePickerModal`
 - [ ] Auto-generate block manifest from Puck config at runtime
       — `createPuckConfig()` adapter already exists, needs reverse direction
-- [ ] Plugin config factory: `nanoBananaPlugin({ orchestratorUrl, apiKey })`
+- [ ] Plugin config factory: `aiPlugin({ orchestratorUrl, apiKey })`
 - [ ] Apply AI ops to Puck state via dispatch bridge
       — existing `PuckDispatchBridge` + `applyLiveDraftToPuckData()`
 
 #### Orchestrator changes
 
-- [ ] Auth middleware: validate `Authorization: Bearer nb_...` API keys
+- [ ] Auth middleware: validate `Authorization: Bearer sk_...` API keys
 - [ ] BYOK forwarding: accept `x-llm-api-key` header, use as provider key
 - [ ] CORS: allow any origin with valid API key (not just whitelisted origins)
 - [ ] Manifest-from-client: accept block manifest in `/chat/start` body
@@ -171,7 +173,7 @@ type NanoBananaConfig = {
 
 ## Extraction Map
 
-What comes from where:
+What comes from where in the existing codebase:
 
 | Target module | Source | Changes needed |
 |---|---|---|
@@ -194,7 +196,7 @@ What comes from where:
 
 Puck users define their own components. The orchestrator needs a manifest
 (block schemas, field types, defaults) to plan edits. Today the manifest
-comes from `@ai-site-editor/shared` — but Nano Banana users won't use our
+comes from `@ai-site-editor/shared` — but plugin users won't use our
 block library.
 
 ### Solution: Runtime manifest inference
@@ -270,8 +272,8 @@ sequenceDiagram
 
 ### Hosted (default)
 
-- User installs `@nano-banana/puck-ai` from npm
-- Plugin connects to `https://api.nanobanana.dev` (our hosted orchestrator)
+- User installs `@ai-site-editor/puck-ai` from npm
+- Plugin connects to hosted orchestrator
 - We provide API key, we pay for LLM tokens
 - Pricing: freemium (N free edits/month) → paid tiers
 
@@ -315,12 +317,13 @@ sequenceDiagram
 
 ## Open Questions
 
-1. **Package naming**: `@nano-banana/puck-ai` vs `puck-plugin-ai` vs `@puckeditor/ai`?
-   Consider whether to align with Puck's namespace or our own brand.
+1. **Package naming**: `@ai-site-editor/puck-ai` vs `puck-plugin-ai` vs
+   something under Puck's namespace?
 
 2. **Manifest fidelity**: How much can we infer from Puck's field types alone?
    Puck's `type: "text"` doesn't tell us if it's a heading, paragraph, or URL.
-   May need optional field annotations: `{ type: "text", label: "Heading", _ai: { semantic: "heading" } }`.
+   May need optional field annotations:
+   `{ type: "text", label: "Heading", _ai: { semantic: "heading" } }`.
 
 3. **Op application strategy**: Apply via Puck dispatch (granular, animated) or
    full data replacement (simpler, may flicker)? Current code does full replacement
@@ -329,6 +332,6 @@ sequenceDiagram
 4. **Undo model**: Use Puck's built-in undo or orchestrator's server-side history?
    Plugin users expect Ctrl+Z to work — need to decide who owns undo state.
 
-5. **Preview rendering**: Puck renders blocks in its own iframe. Our blocks use
-   `SharedBlockRenderer`. For Nano Banana, the user provides their own renderers
+5. **Preview rendering**: Puck renders blocks in its own canvas. Our blocks use
+   `SharedBlockRenderer`. For the plugin, the user provides their own renderers
    via Puck config — so we don't need our block library at all. Confirm this.
