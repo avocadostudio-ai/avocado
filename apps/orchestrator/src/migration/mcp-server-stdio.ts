@@ -23,6 +23,7 @@ import { existsSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { getCachedScrape, setCachedScrape } from "./scrape-cache.js"
 import { saveScreenshot, saveScrapeDebug } from "./migration-tools.js"
+import { getDraftModeSecret } from "../agent/sites-agent-shared.js"
 import {
   sanitizeSiteId, monorepoRoot, findAvailablePort, patchGlobalsCssVars,
   normalizePageBlocks, scaffoldSiteProject, analyzeCodebase, cloneRepo, detectSitePort,
@@ -451,7 +452,7 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
     const envPath = join(projectDir, ".env.local")
     const envVars: Record<string, string> = {
       ORCHESTRATOR_URL: "http://localhost:4200",
-      DRAFT_MODE_SECRET: "top-secret",
+      DRAFT_MODE_SECRET: getDraftModeSecret(),
       NEXT_PUBLIC_DEFAULT_SITE_ID: siteId,
       NEXT_PUBLIC_SITE_NAME: siteName,
       NEXT_PUBLIC_EDITOR_ORIGIN: "http://localhost:4100",
