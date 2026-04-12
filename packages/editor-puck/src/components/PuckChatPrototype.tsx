@@ -40,6 +40,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
   const activeBlockTypeRef = useRef<string | undefined>(undefined)
   const activeEditablePathRef = useRef<string | undefined>(undefined)
   const slugRef = useRef(slug)
+  slugRef.current = slug
   const latestPuckDataRef = useRef<PuckData | null>(null)
   const persistedPuckDataRef = useRef<PuckData | null>(null)
   const pendingPersistDataRef = useRef<PuckData | null>(null)
@@ -76,9 +77,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     document.body.style.userSelect = ""
   }, [])
 
-  useEffect(() => {
-    slugRef.current = slug
-  }, [slug])
+  useEffect(() => { hostApi.setGlobalSlug(slug) }, [slug, hostApi])
 
   const onOpenImagePicker = useCallback((target: ImagePickerTarget) => {
     setImagePickerTarget(target)
@@ -113,6 +112,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     siteId,
     slugRef,
     setSlug,
+    setAvailableSlugs,
     puckDispatchRef,
     setPuckData,
     onRemoteData: onRemotePuckData,
@@ -153,9 +153,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
     componentManifest: manifest,
     allowStructuralEdits: true,
     getBlockDefaultProps,
-    onApplied: () => {
-      void syncDraftPage(slugRef.current).catch(() => undefined)
-    },
+    // onApplied omitted: postToSite("draftUpdated") already triggers syncDraftPage
     agentModeEnabled,
   })
 
@@ -446,7 +444,7 @@ export function PuckChatPrototype({ host }: { host: PuckHostApi }) {
 
   return (
     !config || !puckData ? (
-      <div className="puck-poc-loading">Loading prototype…</div>
+      <div className="puck-poc-loading">Loading…</div>
     ) : (
       <>
         <PuckChatContextProvider value={chatContextValue}>
