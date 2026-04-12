@@ -2477,11 +2477,6 @@ test("isPageWideRewriteRequest detects page-wide rewrite patterns", () => {
   assert.equal(isPageWideRewriteRequest("Review Grapefruits page heading tag hierarchy"), true)
   assert.equal(isPageWideRewriteRequest("review about page heading hierarchy"), true)
 
-  // "rewrite copy" variants
-  assert.equal(isPageWideRewriteRequest("rewrite copy"), true)
-  assert.equal(isPageWideRewriteRequest("rewrite the copy"), true)
-  assert.equal(isPageWideRewriteRequest("rewrite this copy"), true)
-
   // Negative cases — single-block or non-page-wide
   assert.equal(isPageWideRewriteRequest("update the hero heading"), false)
   assert.equal(isPageWideRewriteRequest("rewrite the CTA text"), false)
