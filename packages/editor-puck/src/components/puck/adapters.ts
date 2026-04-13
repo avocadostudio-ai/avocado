@@ -16,7 +16,9 @@ function mapScalarField(field: FieldMeta, options?: FieldBuilderOptions): Record
     return { type: "select", label: field.label, options: ["h1", "h2", "h3", "h4", "h5", "h6"] }
   }
   if (field.kind === "richtext") {
-    return { type: "richtext", label: field.label }
+    // Puck's native richtext outputs HTML, but blocks store markdown.
+    // Use textarea until we add markdown↔HTML conversion at the boundary.
+    return { type: "textarea", label: field.label }
   }
   if (field.kind === "image") {
     return options?.mapImageField?.(field) ?? { type: "text", label: field.label }
