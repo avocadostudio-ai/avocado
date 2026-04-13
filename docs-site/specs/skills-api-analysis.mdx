@@ -1,9 +1,9 @@
 ---
-title: "Claude Skills API — Fit Analysis"
-description: "Analysis of whether Claude Skills API (container.skills, /v1/skills) fits Avocado's site onboarding and site editing use cases."
+title: "Claude Skills & Managed Agents — Fit Analysis"
+description: "Analysis of Claude Skills API and Managed Agents for Avocado's site onboarding and site editing use cases."
 ---
 
-# Claude Skills API — Fit Analysis
+# Claude Skills & Managed Agents — Fit Analysis
 
 _Last updated: 2026-04-13_
 
@@ -246,3 +246,238 @@ graph TD
 3. **Evaluate Console workflow.** Determine if managing Skills in Claude Console vs git-tracked prompt files is acceptable for the team's development workflow.
 4. **Measure latency.** Confirm Skills don't add latency overhead that would degrade the onboarding experience (current flow: ~30-60s for full migration).
 5. **Plan the MCP tool boundary.** Skills orchestrate MCP tools — the tool handlers (`scrape_url`, `create_site`, `bootstrap_pages`) stay in our codebase. Decide if tool handler code needs refactoring to work cleanly as a standalone MCP server.
+
+---
+
+## 7) Claude Managed Agents
+
+Managed Agents is a separate, complementary offering from Anthropic: a **pre-built agent harness running in managed cloud infrastructure**. Instead of building your own agent loop, tool execution, and container runtime, you get a fully managed environment where Claude can read files, run commands, browse the web, and execute code.
+
+### Core concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Agent** | Reusable config: model, system prompt, tools, MCP servers, skills. Created once, referenced by ID. |
+| **Environment** | Cloud container template: pre-installed packages (Node.js, Python, etc.), networking rules. |
+| **Session** | A running agent instance in an environment. Persistent filesystem, conversation history. |
+| **Events** | SSE-based communication: `user.message` in, `agent.tool_use` / `agent.message` / `session.status_idle` out. |
+
+### Built-in tools
+
+Managed sessions include: `bash`, `read`, `write`, `edit`, `glob`, `grep`, `web_fetch`, `web_search`. All enabled by default, individually toggleable.
+
+### Custom tools
+
+You define a tool schema on the agent; Claude emits structured `agent.custom_tool_use` events; your application executes the tool and sends `user.custom_tool_result` back. Claude never executes custom tools directly — your server handles the logic.
+
+### Multi-agent (research preview)
+
+A coordinator agent can delegate to specialized sub-agents via `callable_agents`. Each runs in its own thread with isolated context but shares the container filesystem. One level of delegation only. Event types: `session.thread_created`, `session.thread_idle`, `agent.thread_message_sent/received`.
+
+### Environments
+
+- Pre-install packages via `apt`, `pip`, `npm`, `cargo`, `gem`, `go`
+- Networking: `unrestricted` (default) or `limited` with `allowed_hosts`
+- Each session gets an isolated container; environments are reusable templates
+- Persistent filesystem within a session; no sharing between sessions
+
+### Event observability
+
+Rich SSE event stream with:
+- `agent.tool_use` / `agent.tool_result` — see every tool call and result
+- `agent.mcp_tool_use` / `agent.mcp_tool_result` — MCP tool observability
+- `span.model_request_start/end` — timing and token usage per inference call
+- `session.status_running/idle/terminated` — lifecycle tracking
+- `user.interrupt` — stop the agent mid-execution and redirect
+
+## 8) Managed Agents — Fit Analysis
+
+### a) Site Onboarding — Strong fit
+
+The sites-agent is the most compelling candidate. Here's why:
+
+**What Managed Agents replaces:**
+
+```mermaid
+graph LR
+    subgraph "Today: Self-hosted"
+        A[Fastify server] --> B[Claude Agent SDK query]
+        B --> C[MCP tools on your server]
+        C --> D[File system + child_process]
+        A --> E[Custom SSE streaming]
+        A --> F[Phase tracking code]
+    end
+
+    subgraph "With Managed Agents"
+        G[Your server] -->|custom_tool_result| H[Managed Session]
+        H --> I[Built-in bash/file tools]
+        H --> J[Your MCP server]
+        H -->|SSE events| G
+    end
+```
+
+**Concrete mapping:**
+
+| Current component | Managed Agents equivalent |
+|-------------------|--------------------------|
+| `agent-loop.ts` (custom Anthropic agent loop) | Eliminated — harness runs the loop |
+| `sites-agent-tools.ts` MCP server | Same MCP server, connected to managed session |
+| `child_process` calls (`pnpm install`, dev server) | Built-in `bash` tool runs in the container |
+| Phase tracking (`TOOL_PHASE_MAP`) | `agent.tool_use` / `agent.mcp_tool_use` events map to phases |
+| SSE streaming in `routes/sites-agent.ts` | Forward managed session SSE events to client |
+| Prompt caching logic | Built-in — harness handles caching and compaction |
+| Context window management | Built-in `agent.thread_context_compacted` event |
+
+**Key benefits for onboarding:**
+
+1. **Eliminate the agent loop.** The ~200 LOC agent loop (`agent-loop.ts` + `agent-loop-openai.ts`) and all its edge cases (token limits, tool call caps, error recovery, streaming) are handled by the harness. Built-in prompt caching and compaction are included.
+
+2. **Container-native file operations.** The sites-agent currently runs `pnpm install`, starts dev servers, and writes files via `child_process` in tool handlers. In a managed container, the agent can use the built-in `bash` and `write` tools directly — no child_process wrapper needed. The scaffolding code in `sites-agent-shared.ts` (template strings for `package.json`, `next.config.ts`, etc.) could become files in the container rather than inline JavaScript strings.
+
+3. **Rich event observability.** The `agent.tool_use`, `agent.mcp_tool_use`, and `span.model_request_start/end` events give you tool-level observability for free. Your current `TOOL_PHASE_MAP` + manual SSE wiring (~30 LOC) gets replaced by event filtering:
+
+    ```typescript
+    // Map managed agent events to onboarding phases
+    if (event.type === "agent.mcp_tool_use") {
+      const phase = TOOL_PHASE_MAP[event.name]
+      if (phase) emitPhaseToClient(phase)
+    }
+    ```
+
+4. **Interrupt and steer.** If a migration is going wrong (e.g., wrong site structure detected), you can send `user.interrupt` and redirect with a new `user.message`. Today this requires aborting the agent SDK query and starting over.
+
+5. **Long-running resilience.** Migrations can take 30-60s. Today, if your Fastify server restarts mid-migration, the session is lost. Managed sessions persist server-side — you can reconnect to the SSE stream and resume.
+
+**Architecture for onboarding with Managed Agents:**
+
+```
+1. Create "Site Migration" agent (once):
+   - model: claude-sonnet-4-6
+   - system: migration system prompt
+   - tools: agent_toolset_20260401 (bash, file ops)
+   - custom tools: scrape_url, bootstrap_pages (call back to your server)
+   - MCP servers: sites-agent MCP server (on your orchestrator)
+
+2. Create "migration-env" environment (once):
+   - packages: { npm: ["sharp", "playwright"] }
+   - networking: limited, allowed_hosts: [your-orchestrator-url]
+
+3. Per user request:
+   - POST /v1/sessions → session_id
+   - Send user.message: "Migrate https://example.com"
+   - Stream events → map to phase UI
+   - On agent.custom_tool_use: execute against your orchestrator, return result
+   - On session.status_idle: migration complete
+```
+
+**What stays on your server:**
+- State mutations (`setPage`, `bumpVersion`, `setSiteConfig`) — exposed as custom tools or via your MCP server
+- The editor client SSE connection — you relay managed session events to the browser
+- Site registration and session scoping logic
+
+### b) Site Editing — Two-layer analysis
+
+**Chat pipeline (fast path) — Does not fit**
+
+Same conclusion as Skills analysis. The managed harness adds latency (network hops to/from Anthropic's container), and you need direct Messages API control for streaming progressive apply, intent routing, and multi-provider support.
+
+**Agent editing mode — Interesting fit, especially multi-agent**
+
+Multi-agent is where Managed Agents offers something you can't easily build yourself:
+
+```
+Coordinator: "Website Editor"
+├── callable_agent: "Content Writer"
+│   tools: get_page, edit_page, batch_update_props
+│   system: "You write and refine website copy..."
+│
+├── callable_agent: "Image Specialist"
+│   tools: unsplash_search, image_generate, batch_update_props
+│   system: "You find and generate images..."
+│
+└── callable_agent: "SEO Optimizer"
+    tools: get_page, update_page_meta, list_pages
+    system: "You optimize SEO metadata..."
+```
+
+**Why this is compelling:**
+
+1. **Parallel execution.** When a user says "Redesign the homepage with new copy, images, and SEO", the coordinator can delegate to all three agents concurrently. Today this is sequential in the agent loop.
+
+2. **Specialized context.** Each sub-agent has a focused system prompt and tool set. The Content Writer doesn't see image tools; the SEO Optimizer doesn't see content editing tools. This reduces tool selection ambiguity and improves output quality.
+
+3. **Shared filesystem.** All agents share the container filesystem, so the Content Writer's changes are visible to the SEO Optimizer without explicit data passing.
+
+4. **Isolated conversation history.** Each agent maintains its own context. A complex image generation conversation doesn't pollute the content writer's context window.
+
+**But there are real constraints:**
+
+| Constraint | Impact |
+|------------|--------|
+| Latency | Network round-trips to Anthropic's container add ~100-500ms per tool call. Fine for complex edits (already 10-30s), problematic if used for quick edits. |
+| State sync | Your in-memory `draftPages` / `siteConfigs` are on your Fastify server. Custom tools need to call back to your server for every state mutation. |
+| Anthropic-only | No OpenAI/Gemini provider support. The managed harness only runs Claude. |
+| Research preview | Multi-agent is not GA yet. Not production-ready. |
+| Cost | Managed Agents pricing may differ from raw Messages API. Multiple sub-agents multiply token usage. |
+
+### c) Combined approach — Skills + Managed Agents
+
+Skills and Managed Agents are composable. An agent definition accepts `skills` alongside `tools`:
+
+```json
+{
+  "name": "Site Migration Agent",
+  "model": "claude-sonnet-4-6",
+  "tools": [{"type": "agent_toolset_20260401"}],
+  "skills": ["skill_migration_workflow_v2"],
+  "callable_agents": [...]
+}
+```
+
+This means you could:
+- Define **Skills** for workflow expertise (migration steps, editing patterns)
+- Run them inside **Managed Agents** for infrastructure (containers, file ops, bash)
+- Use **custom tools** to bridge back to your orchestrator state
+
+## 9) Updated Summary
+
+```mermaid
+graph TD
+    subgraph "Adopt: Site Onboarding"
+        A1[Managed Agents] --> A2[Eliminate agent loop code]
+        A1 --> A3[Container-native file ops]
+        A1 --> A4[Built-in bash for pnpm/dev server]
+        A5[Skills] --> A6[Workflow reliability]
+        A5 --> A7[Mode variants as separate Skills]
+    end
+
+    subgraph "Experiment: Complex Editing"
+        B1[Multi-agent] --> B2[Content Writer agent]
+        B1 --> B3[Image Specialist agent]
+        B1 --> B4[SEO Optimizer agent]
+        B5[Skills] --> B6[Iterative refinement pattern]
+    end
+
+    subgraph "Skip: Chat Pipeline"
+        C1[Direct Messages API] --> C2[Streaming progressive apply]
+        C1 --> C3[Intent routing + head-start]
+        C1 --> C4[Multi-provider support]
+    end
+```
+
+| Use case | Technology | Verdict | Key benefit |
+|----------|-----------|---------|-------------|
+| **Site onboarding** | Managed Agents + Skills | **Adopt** | Eliminates agent loop, gets container-native bash/file ops, rich event observability, session persistence |
+| **Editing (chat pipeline)** | Direct Messages API | **Skip** | Latency-sensitive; needs streaming control and multi-provider |
+| **Editing (agent mode)** | Managed Agents (multi-agent) | **Experiment** | Parallel specialized agents for content/image/SEO; research preview |
+| **Future: user capabilities** | Skills | **Revisit** | Versioned capability marketplace |
+
+## 10) Updated Prerequisites
+
+1. **Verify custom tool round-trip latency.** Your orchestrator state (`draftPages`, `siteConfigs`) lives on your Fastify server. Custom tools in Managed Agents call back to your server. Measure the round-trip overhead for `setPage`, `bumpVersion`, etc.
+2. **Build a migration PoC.** Create a "Site Migration" agent + environment. Expose `scrape_url` and `bootstrap_pages` as custom tools. Compare reliability and latency vs current `query()` approach.
+3. **Test event-to-phase mapping.** Confirm `agent.mcp_tool_use` events arrive with enough detail to map to onboarding phase UI labels.
+4. **Evaluate multi-agent for editing.** Request research preview access. Build coordinator + Content Writer + Image Specialist. Benchmark quality and latency vs single-agent loop.
+5. **Plan the state bridge.** Decide between custom tools (your server executes, returns result) vs MCP server (your orchestrator exposes MCP endpoint). Custom tools are simpler; MCP is more standard.
+6. **Cost modeling.** Compare Managed Agents pricing vs self-hosted agent loop. Multi-agent multiplies token usage — model whether the quality/speed gains justify the cost for complex edits.
+7. **Fallback strategy.** Keep the current `agent-loop.ts` path as fallback for when Managed Agents has issues (beta reliability, rate limits). Feature-flag the switch.
