@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import type { ChatEntry } from "../lib/editor-types"
 import {
   Dialog,
@@ -17,10 +18,47 @@ type Props = {
   isPublishing: boolean
 }
 
+/** Extract page slug from deterministic change entries like "Updated Hero image on /home" */
+function parsePageSlug(line: string): string | null {
+  const match = line.match(/ on \/([\w-]+(?:\/[\w-]+)*)$/)
+  return match ? `/${match[1]}` : null
+}
+
+/** Strip the trailing " on /slug" suffix for grouped display */
+function stripSlugSuffix(line: string): string {
+  return line.replace(/ on \/[\w-]+(?:\/[\w-]+)*$/, "")
+}
+
+function groupChangesByPage(changes: string[]): Map<string, string[]> | null {
+  const grouped = new Map<string, string[]>()
+  let hasMultiplePages = false
+  let firstPage: string | null = null
+
+  for (const line of changes) {
+    const slug = parsePageSlug(line)
+    const key = slug ?? "_general"
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(slug ? stripSlugSuffix(line) : line)
+
+    if (slug && !firstPage) firstPage = slug
+    if (slug && firstPage && slug !== firstPage) hasMultiplePages = true
+  }
+
+  // Only group if there are multiple pages
+  if (!hasMultiplePages) return null
+  return grouped
+}
+
 export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, isPublishing }: Props) {
-  const changes = chatLog
-    .filter((e) => e.role === "assistant" && e.canUndo && e.changes && e.changes.length > 0)
-    .flatMap((e) => e.changes!)
+  const changes = useMemo(
+    () =>
+      chatLog
+        .filter((e) => e.role === "assistant" && e.canUndo && e.changes && e.changes.length > 0)
+        .flatMap((e) => e.changes!),
+    [chatLog]
+  )
+
+  const grouped = useMemo(() => groupChangesByPage(changes), [changes])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -32,7 +70,25 @@ export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, is
           </DialogDescription>
         </DialogHeader>
 
-        {changes.length > 0 && (
+        {changes.length > 0 && grouped && (
+          <div className="publish-review-section">
+            <h4 className="publish-review-section-title">Changes</h4>
+            {[...grouped.entries()].map(([page, items]) => (
+              <div key={page} className="publish-review-page-group">
+                {page !== "_general" && (
+                  <h5 className="publish-review-page-slug">{page}</h5>
+                )}
+                <ul className="publish-review-list publish-review-changes">
+                  {items.slice(0, 20).map((line, idx) => (
+                    <li key={idx} className="publish-review-item">{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {changes.length > 0 && !grouped && (
           <div className="publish-review-section">
             <h4 className="publish-review-section-title">Changes</h4>
             <ul className="publish-review-list publish-review-changes">

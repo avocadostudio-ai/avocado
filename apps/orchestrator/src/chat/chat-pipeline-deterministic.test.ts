@@ -7,6 +7,7 @@ import {
   collectChangedTextFields,
   buildMetaChangeLogEntries,
   buildAiInsightChanges,
+  buildOpChangeLogEntries,
   deterministicCreatePagePlan,
   shouldReturnDeterministicClarification
 } from "./chat-pipeline-deterministic.js"
@@ -308,4 +309,146 @@ test("deterministicCreatePagePlan: does NOT defer when templates exist but messa
   const result = deterministicCreatePagePlan({ session: "test-template-no-mention", message, hasPageTemplates: true })
   assert.ok(result !== null, "should create page deterministically when user doesn't mention template")
   assert.equal(result!.ops[0].op, "create_page")
+})
+
+// ---------------------------------------------------------------------------
+// buildOpChangeLogEntries
+// ---------------------------------------------------------------------------
+
+const noopCtx = { getBlockType: () => undefined }
+const heroCtx = { getBlockType: () => "Hero" as string | undefined }
+
+test("buildOpChangeLogEntries: create_page", () => {
+  const ops: Operation[] = [
+    { op: "create_page", page: { id: "p1", slug: "about", title: "About Us", updatedAt: "2024-01-01", blocks: [] } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, noopCtx)
+  assert.equal(lines.length, 1)
+  assert.ok(lines[0].includes("About Us"))
+  assert.ok(lines[0].includes("/about"))
+})
+
+test("buildOpChangeLogEntries: add_block includes block type", () => {
+  const ops: Operation[] = [
+    { op: "add_block", pageSlug: "home", block: { id: "b1", type: "CTA", props: { heading: "Go" } } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, noopCtx)
+  assert.equal(lines.length, 1)
+  assert.ok(lines[0].includes("CTA"))
+  assert.ok(lines[0].includes("/home"))
+})
+
+test("buildOpChangeLogEntries: remove_block uses ctx for type", () => {
+  const ops: Operation[] = [
+    { op: "remove_block", pageSlug: "home", blockId: "b1" }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.ok(lines[0].includes("Hero"))
+  assert.ok(lines[0].includes("Removed"))
+})
+
+test("buildOpChangeLogEntries: update_props with imageUrl mentions image", () => {
+  const ops: Operation[] = [
+    { op: "update_props", pageSlug: "home", blockId: "b1", patch: { props: { imageUrl: "https://img.com/a.jpg" } } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.ok(lines[0].includes("image"))
+  assert.ok(lines[0].includes("Hero"))
+})
+
+test("buildOpChangeLogEntries: update_props with text fields lists them", () => {
+  const ops: Operation[] = [
+    { op: "update_props", pageSlug: "home", blockId: "b1", patch: { heading: "New", subheading: "Sub" } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.ok(lines[0].includes("heading"))
+  assert.ok(lines[0].includes("subheading"))
+})
+
+test("buildOpChangeLogEntries: update_props with image and text fields", () => {
+  const ops: Operation[] = [
+    { op: "update_props", pageSlug: "home", blockId: "b1", patch: { heading: "New", imageUrl: "https://img.com/a.jpg" } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.ok(lines[0].includes("image"))
+  assert.ok(lines[0].includes("heading"))
+})
+
+test("buildOpChangeLogEntries: update_item with image field", () => {
+  const ops: Operation[] = [
+    { op: "update_item", pageSlug: "home", blockId: "b1", listKey: "cards", index: 0, patch: { imageUrl: "https://img.com/b.jpg" } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, { getBlockType: () => "CardGrid" })
+  assert.ok(lines[0].includes("item image"))
+  assert.ok(lines[0].includes("CardGrid"))
+})
+
+test("buildOpChangeLogEntries: add_item and remove_item", () => {
+  const ops: Operation[] = [
+    { op: "add_item", pageSlug: "home", blockId: "b1", listKey: "features", item: { title: "Fast" } },
+    { op: "remove_item", pageSlug: "home", blockId: "b1", listKey: "features", index: 2 }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.equal(lines.length, 2)
+  assert.ok(lines[0].includes("Added item"))
+  assert.ok(lines[1].includes("Removed item"))
+})
+
+test("buildOpChangeLogEntries: move_block and duplicate_block", () => {
+  const ops: Operation[] = [
+    { op: "move_block", pageSlug: "home", blockId: "b1" },
+    { op: "duplicate_block", pageSlug: "home", blockId: "b1" }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.ok(lines[0].includes("Moved"))
+  assert.ok(lines[1].includes("Duplicated"))
+})
+
+test("buildOpChangeLogEntries: rename_page", () => {
+  const ops: Operation[] = [
+    { op: "rename_page", pageSlug: "old-name", newPageSlug: "new-name", newTitle: "New Name" }
+  ]
+  const lines = buildOpChangeLogEntries(ops, noopCtx)
+  assert.ok(lines[0].includes("/old-name"))
+  assert.ok(lines[0].includes("/new-name"))
+  assert.ok(lines[0].includes("New Name"))
+})
+
+test("buildOpChangeLogEntries: remove_page and duplicate_page", () => {
+  const ops: Operation[] = [
+    { op: "remove_page", pageSlug: "old" },
+    { op: "duplicate_page", pageSlug: "home", newPageSlug: "home-copy" }
+  ]
+  const lines = buildOpChangeLogEntries(ops, noopCtx)
+  assert.ok(lines[0].includes("Removed"))
+  assert.ok(lines[0].includes("/old"))
+  assert.ok(lines[1].includes("Duplicated"))
+  assert.ok(lines[1].includes("/home-copy"))
+})
+
+test("buildOpChangeLogEntries: move_page and move_item", () => {
+  const ops: Operation[] = [
+    { op: "move_page", pageSlug: "about" },
+    { op: "move_item", pageSlug: "home", blockId: "b1", listKey: "cards", index: 0, afterIndex: 2 }
+  ]
+  const lines = buildOpChangeLogEntries(ops, heroCtx)
+  assert.ok(lines[0].includes("Reordered page"))
+  assert.ok(lines[1].includes("Reordered item"))
+})
+
+test("buildOpChangeLogEntries: update_page_meta is skipped (handled by buildMetaChangeLogEntries)", () => {
+  const ops: Operation[] = [
+    { op: "update_page_meta", pageSlug: "home", patch: { title: "New Title" } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, noopCtx)
+  assert.deepEqual(lines, [])
+})
+
+test("buildOpChangeLogEntries: update_site_config", () => {
+  const ops: Operation[] = [
+    { op: "update_site_config", patch: { name: "My Site", logo: "/logo.png" } }
+  ]
+  const lines = buildOpChangeLogEntries(ops, noopCtx)
+  assert.ok(lines.some((l) => l.includes("My Site")))
+  assert.ok(lines.some((l) => l.includes("logo")))
 })
