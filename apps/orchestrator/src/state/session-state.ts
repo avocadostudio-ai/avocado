@@ -156,10 +156,8 @@ export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assi
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
 export const publishStatusBySession = new Map<string, PublishTracker>()
 export const siteConfigs = new Map<string, SiteConfig>()
-// Seed default configs
-siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
+// Seed default config
 siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
-siteConfigs.set("dev-site::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
@@ -578,8 +576,7 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
   }
 
   siteConfigs.clear()
-  // Re-seed defaults
-  siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
+  // Re-seed default
   siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
   if (parsed.siteConfigs && typeof parsed.siteConfigs === "object") {
     for (const [session, config] of Object.entries(parsed.siteConfigs)) {
