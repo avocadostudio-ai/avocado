@@ -159,6 +159,7 @@ export const siteConfigs = new Map<string, SiteConfig>()
 // Seed default configs
 siteConfigs.set("dev", { name: "Avocado Stories", logo: "/logos/avocado-stories.svg" })
 siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
+siteConfigs.set("dev-site::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
