@@ -19,6 +19,61 @@ import {
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
 
+// ---------------------------------------------------------------------------
+// Auto-bootstrap: fetch published pages from a site origin when a session
+// is empty (cold start / no persisted state). Runs at most once per session.
+// ---------------------------------------------------------------------------
+const autoBootstrapAttempted = new Set<string>()
+
+async function autoBootstrapIfEmpty(
+  session: string,
+  siteId: string | undefined,
+  draft: Map<string, PageDoc>,
+  log?: { info: (...a: unknown[]) => void; warn: (...a: unknown[]) => void }
+): Promise<void> {
+  if (draft.size > 0) return
+  if (autoBootstrapAttempted.has(session)) return
+  autoBootstrapAttempted.add(session)
+
+  // Determine site origin from CORS origins or a dedicated env var
+  const corsOrigins = (process.env.ORCHESTRATOR_CORS_ORIGINS ?? "").split(",").map(s => s.trim()).filter(Boolean)
+  const siteOrigin = process.env.AUTO_BOOTSTRAP_SITE_ORIGIN?.trim()
+    || corsOrigins.find(o => !o.includes("editor") && !o.includes("4100"))
+    || ""
+  if (!siteOrigin) return
+
+  try {
+    const url = new URL(`${siteOrigin}/api/editor/pages`)
+    if (siteId) url.searchParams.set("siteId", siteId)
+    const res = await fetch(url.toString(), {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(8000)
+    })
+    if (!res.ok) {
+      log?.warn({ session, siteOrigin, status: res.status }, "auto-bootstrap: site returned non-200")
+      return
+    }
+    const body = (await res.json()) as { pages?: unknown[] }
+    const rawPages = Array.isArray(body.pages) ? body.pages : Array.isArray(body) ? body : []
+    const pages = rawPages
+      .map(p => pageDocSchemaLenient.safeParse(p))
+      .filter((r): r is { success: true; data: PageDoc } => r.success)
+      .map(r => r.data)
+
+    if (pages.length === 0) return
+
+    for (const page of pages) {
+      const copy = structuredClone(page)
+      ensureHeroImageProps(copy)
+      draft.set(copy.slug, copy)
+    }
+    bumpVersion(session)
+    log?.info({ session, count: pages.length, siteOrigin }, "auto-bootstrap: seeded from site published content")
+  } catch (err) {
+    log?.warn({ session, siteOrigin, err: String(err) }, "auto-bootstrap: fetch failed")
+  }
+}
+
 export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
   app.get("/published/pages", async (request, reply) => {
     const query = request.query as { slug?: string }
@@ -33,6 +88,8 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     const query = request.query as { session?: string; siteId?: string; slug?: string }
     if (!query.slug || !query.session) return reply.code(400).send({ error: "session and slug are required" })
     const session = scopedSessionKey(query.session, query.siteId)
+    const draft = getSessionDraft(session)
+    await autoBootstrapIfEmpty(session, query.siteId, draft, request.log)
 
     const page = getPage(session, query.slug)
     if (!page) return reply.code(404).send({ error: "not found" })
@@ -44,6 +101,7 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     const query = request.query as { session?: string; siteId?: string }
     const session = scopedSessionKey(query.session, query.siteId)
     const draft = getSessionDraft(session)
+    await autoBootstrapIfEmpty(session, query.siteId, draft, request.log)
     const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
     return { slugs }
   })
