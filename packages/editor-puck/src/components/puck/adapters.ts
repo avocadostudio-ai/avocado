@@ -86,7 +86,10 @@ function mapScalarField(field: FieldMeta, options?: FieldBuilderOptions): Record
     return { type: "select", label: field.label, options: ["h1", "h2", "h3", "h4", "h5", "h6"] }
   }
   if (field.kind === "richtext") {
-    return { type: "richtext", label: field.label }
+    // Disable contentEditable — Puck wraps richtext values in React elements
+    // when contentEditable is true, which breaks our block renderers that
+    // expect markdown strings. Our preview bridge handles inline editing.
+    return { type: "richtext", label: field.label, contentEditable: false }
   }
   if (field.kind === "image") {
     return options?.mapImageField?.(field) ?? { type: "text", label: field.label }
