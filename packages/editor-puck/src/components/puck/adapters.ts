@@ -23,13 +23,14 @@ function markdownToHtml(md: string): string {
         return `<h${level}>${inlineToHtml(headingMatch[2].trim())}</h${level}>`
       }
       const lines = block.split("\n").map((l) => l.trim()).filter(Boolean)
-      const ulItems = lines.map((l) => /^\s*[-*+•]\s+(.+)$/.exec(l)?.[1]).filter(Boolean)
+      const isString = (x: unknown): x is string => typeof x === "string" && x.length > 0
+      const ulItems = lines.map((l) => /^\s*[-*+•]\s+(.+)$/.exec(l)?.[1]).filter(isString)
       if (ulItems.length === lines.length && ulItems.length > 0) {
-        return `<ul>${ulItems.map((item) => `<li>${inlineToHtml(item!)}</li>`).join("")}</ul>`
+        return `<ul>${ulItems.map((item) => `<li>${inlineToHtml(item)}</li>`).join("")}</ul>`
       }
-      const olItems = lines.map((l) => /^\s*\d+[.)]\s+(.+)$/.exec(l)?.[1]).filter(Boolean)
+      const olItems = lines.map((l) => /^\s*\d+[.)]\s+(.+)$/.exec(l)?.[1]).filter(isString)
       if (olItems.length === lines.length && olItems.length > 0) {
-        return `<ol>${olItems.map((item) => `<li>${inlineToHtml(item!)}</li>`).join("")}</ol>`
+        return `<ol>${olItems.map((item) => `<li>${inlineToHtml(item)}</li>`).join("")}</ol>`
       }
       return `<p>${inlineToHtml(block.replace(/\n/g, " "))}</p>`
     })
@@ -136,32 +137,25 @@ export function registerRichtextKeys(blockType: string, keys: Set<string>) {
   if (keys.size > 0) richtextKeysByType.set(blockType, keys)
 }
 
-export function convertRichtextPropsForRender(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
-  return convertPropsHtmlToMarkdown(blockType, props)
-}
-
-function convertPropsMarkdownToHtml(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
+function convertRichtextProps(
+  blockType: string,
+  props: Record<string, unknown>,
+  converter: (s: string) => string
+): Record<string, unknown> {
   const keys = richtextKeysByType.get(blockType)
   if (!keys) return props
   const converted = { ...props }
   for (const key of keys) {
     if (typeof converted[key] === "string") {
-      converted[key] = markdownToHtml(converted[key] as string)
+      converted[key] = converter(converted[key] as string)
     }
   }
   return converted
 }
 
-function convertPropsHtmlToMarkdown(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
-  const keys = richtextKeysByType.get(blockType)
-  if (!keys) return props
-  const converted = { ...props }
-  for (const key of keys) {
-    if (typeof converted[key] === "string") {
-      converted[key] = htmlToMarkdown(converted[key] as string)
-    }
-  }
-  return converted
+/** Convert richtext props from HTML (Puck) back to markdown (block storage). */
+export function convertPropsHtmlToMarkdown(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
+  return convertRichtextProps(blockType, props, htmlToMarkdown)
 }
 
 export function pageToPuckData(page: PageDoc): PuckData {
@@ -169,7 +163,7 @@ export function pageToPuckData(page: PageDoc): PuckData {
     type: block.type,
     props: {
       id: block.id,
-      ...convertPropsMarkdownToHtml(block.type, block.props as Record<string, unknown>),
+      ...convertRichtextProps(block.type, block.props as Record<string, unknown>, markdownToHtml),
       _blockId: block.id,
     }
   }))

@@ -1,6 +1,6 @@
 import { SharedBlockRenderer, hasRenderer } from "@ai-site-editor/blocks"
 import { getAllBlockMeta, type BlockManifest, type FieldMeta } from "@ai-site-editor/shared"
-import { buildFields, registerRichtextKeys, convertRichtextPropsForRender } from "./adapters"
+import { buildFields, registerRichtextKeys, convertPropsHtmlToMarkdown } from "./adapters"
 import { PuckImageFieldControl } from "./PuckImageFieldControl"
 import type { ImagePickerTarget, PuckCustomFieldRenderProps } from "./types"
 
@@ -54,8 +54,7 @@ export function createPuckConfig(
               ? props._blockId
               : `puck-${def.type}`
             const { _blockId: _, id: __, ...rawRest } = props
-            // Convert richtext fields back to markdown for the block renderer
-            const rest = convertRichtextPropsForRender(def.type, rawRest)
+            const rest = convertPropsHtmlToMarkdown(def.type, rawRest)
 
             if (!hasRenderer(def.type)) {
               return (
