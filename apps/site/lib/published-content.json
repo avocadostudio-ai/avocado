@@ -4,7 +4,7 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-04-12T21:01:31.686Z",
+      "updatedAt": "2026-04-13T20:51:32.584Z",
       "meta": {
         "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
         "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -15,7 +15,7 @@
           "type": "Hero",
           "props": {
             "heading": "Eat Smarter. Feel Better. Live Greener.",
-            "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance\u2014no credit card needed.",
+            "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
             "imageUrl": "/generated-images/gen_1776027688668_eichxm.jpg",
@@ -40,7 +40,7 @@
               },
               {
                 "title": "Avocado & Mango Salsa",
-                "description": "A vibrant, tropical salsa bursting with fresh mango, cilantro, and creamy avocado \u2014 perfect for tacos or chips.",
+                "description": "A vibrant, tropical salsa bursting with fresh mango, cilantro, and creamy avocado — perfect for tacos or chips.",
                 "ctaText": "View Recipe",
                 "ctaHref": "/recipes",
                 "imageUrl": "https://images.unsplash.com/photo-1579639482794-abf71bcd3960?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxtYW5nbyUyMGF2b2NhZG8lMjBzYWxzYXxlbnwxfDB8fHwxNzc0NTIwNjUwfDA&ixlib=rb-4.1.0&q=80&w=1080"
@@ -60,10 +60,10 @@
           "type": "CardGrid",
           "props": {
             "title": "Discover Your Avocado Path",
-            "subtitle": "Three paths to avocado mastery\u2014cook like a pro, nourish your body, or champion sustainability. Find your passion.",
+            "subtitle": "Three paths to avocado mastery—cook like a pro, nourish your body, or champion sustainability. Find your passion.",
             "cards": [
               {
-                "title": "\ud83e\udd51 Avocado Culinary Delights",
+                "title": "🥑 Avocado Culinary Delights",
                 "description": "Unlock restaurant-quality meals in minutes. 50+ proven recipes to impress everyone at your table.",
                 "ctaText": "Try Now",
                 "ctaHref": "/avocado-culinary",
@@ -71,7 +71,7 @@
                 "imageAlt": "avocado3"
               },
               {
-                "title": "\ud83e\udd51 Avocado Wellness",
+                "title": "🥑 Avocado Wellness",
                 "description": "Transform your energy & heart health today. Trusted by 100K+ nutrition-conscious individuals worldwide.",
                 "ctaText": "Explore",
                 "ctaHref": "/avocado-wellness",
@@ -79,7 +79,7 @@
                 "imageAlt": "woman with white face mask holding green fruit"
               },
               {
-                "title": "\ud83e\udd51 Avocado Sustainability",
+                "title": "🥑 Avocado Sustainability",
                 "description": "Join the movement for ethical farming. Your choices directly support communities & planet.",
                 "ctaText": "Learn More",
                 "ctaHref": "/avocado-sustainability",
@@ -93,8 +93,8 @@
           "id": "b_richtext_1771982675835",
           "type": "RichText",
           "props": {
-            "title": "Avocados for Everyone\u2014Health, Flavor & Sustainability",
-            "body": "## Daily Avocado Benefits\n\nEnjoy \u00bd\u20131 avocado daily for vibrant heart health, sustained energy, and natural satiety that keeps you satisfied longer.\n\n## Find Your Avocado Journey\n\n- Home Cooks: Master recipes and discover flavor combinations that celebrate avocado's rich, creamy texture.\n- Wellness Enthusiasts: Nourish your body with healthy fats, potassium, and antioxidants for optimal heart and brain health.\n- Growers & Farmers: Embrace regenerative practices that strengthen soil, conserve water, and build thriving ecosystems.\n- Sustainability Advocates: Join the movement\u2014supporting fair trade, ethical sourcing, and environmental stewardship."
+            "title": "Why Eat Avocados",
+            "body": "## Daily Avocado Benefits\n\nEat half to one avocado daily for better heart health, steady energy, and lasting fullness.\n\n## Find Your Avocado Path\n\n- **Home Cooks**: Try new recipes and learn flavor combinations that work with avocado.\n- **Wellness Enthusiasts**: Get healthy fats, potassium, and antioxidants for heart and brain health.\n- **Growers & Farmers**: Use sustainable farming methods that improve soil, save water, and help ecosystems.\n- **Sustainability Advocates**: Support fair trade and ethical sourcing practices."
           }
         },
         {
@@ -125,23 +125,23 @@
             "tabs": [
               {
                 "label": "Overview",
-                "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n\u2022 **Hass Avocados** \u2013 The most popular variety worldwide; creamy texture and rich flavor\n\u2022 **Fuerte Avocados** \u2013 Pear-shaped with smooth, mild taste\n\u2022 **Bacon Avocados** \u2013 Thinner skin and milder flavor\n\u2022 **Reed Avocados** \u2013 Large, round, and creamy\n\nAvailable year-round."
+                "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
               },
               {
                 "label": "Recipes & Ideas",
-                "content": "\u2022 **Breakfast** \u2013 Toast, smoothie bowls, eggs, omelets\n\u2022 **Lunch & Salads** \u2013 Grain bowls, salads, seafood\n\u2022 **Dinner** \u2013 Tacos, pasta, stuffed vegetables\n\u2022 **Snacks & Desserts** \u2013 Guacamole, chocolate mousse, vegan ice cream, parfaits"
+                "content": "• **Breakfast** – Toast, smoothie bowls, eggs, omelets\n• **Lunch & Salads** – Grain bowls, salads, seafood\n• **Dinner** – Tacos, pasta, stuffed vegetables\n• **Snacks & Desserts** – Guacamole, chocolate mousse, vegan ice cream, parfaits"
               },
               {
                 "label": "Sustainability",
-                "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n\u2022 **Water Conservation** \u2013 Modern irrigation reduces water use by up to 50%\n\u2022 **Soil Health** \u2013 Regenerative practices build organic matter and support wildlife\n\u2022 **Reduced Pesticides** \u2013 Integrated pest management protects ecosystems and farmworkers\n\u2022 **Community Impact** \u2013 Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
+                "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
               },
               {
                 "label": "Fun Facts",
-                "content": "\u2022 **Fruit, Not Vegetable** \u2013 Botanically classified as berries with a single large seed\n\u2022 **Unique Fat Profile** \u2013 The only fruit with significant monounsaturated fat\n\u2022 **Longevity** \u2013 Trees live over 100 years and continue producing throughout\n\u2022 **Slow Growth** \u2013 Takes 3\u20134 years for the first fruit; then decades of abundance\n\u2022 **Ancient Origins** \u2013 Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
+                "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
               },
               {
                 "label": "Selection & Storage Tips",
-                "content": "\u2022 **Selection** \u2013 Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n\u2022 **Ripeness** \u2013 Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n\u2022 **Storage** \u2013 Keep unripe at room temperature; refrigerate when ripe (lasts 3\u20135 days)\n\u2022 **Cut Avocados** \u2013 Preserve with lemon juice and plastic wrap; use within 1\u20132 days\n\nMaster these techniques for perfect avocados whenever you need them."
+                "content": "• **Selection** – Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n• **Ripeness** – Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n• **Storage** – Keep unripe at room temperature; refrigerate when ripe (lasts 3–5 days)\n• **Cut Avocados** – Preserve with lemon juice and plastic wrap; use within 1–2 days\n\nMaster these techniques for perfect avocados whenever you need them."
               }
             ]
           }
@@ -165,7 +165,7 @@
             "items": [
               {
                 "q": "Are avocados really that healthy?",
-                "a": "Absolutely! Avocados are packed with heart-healthy monounsaturated fats, potassium, vitamins C, E, and K, plus fiber. They're a nutrient-dense food that supports heart health and keeps you feeling full. Like any food, balance is key\u2014a quarter to half an avocado per serving is a great way to enjoy the benefits."
+                "a": "Absolutely! Avocados are packed with heart-healthy monounsaturated fats, potassium, vitamins C, E, and K, plus fiber. They're a nutrient-dense food that supports heart health and keeps you feeling full. Like any food, balance is key—a quarter to half an avocado per serving is a great way to enjoy the benefits."
               },
               {
                 "q": "How do I choose a ripe avocado?",
@@ -183,7 +183,7 @@
           "type": "RichText",
           "props": {
             "title": "Four Audiences, One Avocado Passion",
-            "body": "Whether you're a home cook perfecting guacamole, a wellness enthusiast exploring nutrition, a farmer building regenerative practices, or an advocate for sustainable food systems\u2014avocados unite us.\n\n**Home Cooks & Culinary Explorers** discover recipes, techniques, and unexpected flavor pairings that turn avocados into everyday magic. From toast to salads to creative fusion, learn how to make avocados shine on every plate.\n\n**Wellness Seekers** explore how avocado nutrition supports heart health, sustained energy, and whole-body vitality. Rich in healthy fats, antioxidants, and essential minerals, avocados are a true superfood for those who care about their health.\n\n**Farmers & Growers** dive into regenerative agriculture, soil health, and sustainable farming methods that produce better avocados while healing the land. Share innovations and celebrate the craft of growing exceptional fruit.\n\n**Sustainability Advocates** trace the story behind every avocado\u2014fair trade practices, water stewardship, and environmental impact. Learn how conscious choices drive positive change in global agriculture.\n\nYour avocado journey starts here. Explore the segments below to find your community and passion."
+            "body": "Whether you're a home cook perfecting guacamole, a wellness enthusiast exploring nutrition, a farmer building regenerative practices, or an advocate for sustainable food systems—avocados unite us.\n\n**Home Cooks & Culinary Explorers** discover recipes, techniques, and unexpected flavor pairings that turn avocados into everyday magic. From toast to salads to creative fusion, learn how to make avocados shine on every plate.\n\n**Wellness Seekers** explore how avocado nutrition supports heart health, sustained energy, and whole-body vitality. Rich in healthy fats, antioxidants, and essential minerals, avocados are a true superfood for those who care about their health.\n\n**Farmers & Growers** dive into regenerative agriculture, soil health, and sustainable farming methods that produce better avocados while healing the land. Share innovations and celebrate the craft of growing exceptional fruit.\n\n**Sustainability Advocates** trace the story behind every avocado—fair trade practices, water stewardship, and environmental impact. Learn how conscious choices drive positive change in global agriculture.\n\nYour avocado journey starts here. Explore the segments below to find your community and passion."
           }
         },
         {
@@ -208,7 +208,7 @@
           "id": "b_hero_1772048325072",
           "type": "Hero",
           "props": {
-            "heading": "Finest Olive Oils \ud83e\uded2",
+            "heading": "Finest Olive Oils 🫒",
             "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
             "ctaText": "Shop the Collection",
             "ctaHref": "/shop",
@@ -263,7 +263,7 @@
           "type": "RichText",
           "props": {
             "title": "Olive Varieties & Origin Stories",
-            "body": "**Arbequina** \u2014 Hailing from Catalonia, these petite golden olives deliver a buttery, delicate flavor with hints of almond and green apple. Perfect for everyday cooking and dipping.\n\n**Koroneiki** \u2014 Greece's pride, these small dark olives produce oil with a peppery finish and herbaceous notes. A staple of the Mediterranean diet, ideal for finishing dishes and robust salads.\n\n**Frantoio** \u2014 Tuscany's heritage variety yields an intense, grassy oil bursting with complexity. Best used raw or drizzled over soups\u2014its bold character shines brightest when uncooked."
+            "body": "**Arbequina** — Hailing from Catalonia, these petite golden olives deliver a buttery, delicate flavor with hints of almond and green apple. Perfect for everyday cooking and dipping.\n\n**Koroneiki** — Greece's pride, these small dark olives produce oil with a peppery finish and herbaceous notes. A staple of the Mediterranean diet, ideal for finishing dishes and robust salads.\n\n**Frantoio** — Tuscany's heritage variety yields an intense, grassy oil bursting with complexity. Best used raw or drizzled over soups—its bold character shines brightest when uncooked."
           }
         },
         {
@@ -274,7 +274,7 @@
             "items": [
               {
                 "q": "How should I store olive oil to keep it fresh?",
-                "a": "Store olive oil in a cool, dark place away from heat and direct sunlight. A pantry or cabinet is ideal. Keep the bottle tightly sealed to prevent oxidation. Extra virgin olive oil is best consumed within 18\u201324 months of harvest for optimal flavor."
+                "a": "Store olive oil in a cool, dark place away from heat and direct sunlight. A pantry or cabinet is ideal. Keep the bottle tightly sealed to prevent oxidation. Extra virgin olive oil is best consumed within 18–24 months of harvest for optimal flavor."
               },
               {
                 "q": "Which olive oils pair best with specific dishes?",
@@ -282,7 +282,7 @@
               },
               {
                 "q": "Does olive oil go bad or expire?",
-                "a": "Olive oil doesn't truly \"expire,\" but it degrades over time. Look for rancid or musty aromas\u2014a sign it's past its prime. When in doubt, replace oils older than 2 years."
+                "a": "Olive oil doesn't truly \"expire,\" but it degrades over time. Look for rancid or musty aromas—a sign it's past its prime. When in doubt, replace oils older than 2 years."
               }
             ]
           }
@@ -392,7 +392,7 @@
           "type": "Hero",
           "props": {
             "heading": "Grapefruits",
-            "subheading": "Discover the vibrant, refreshing world of grapefruits \u2014 a citrus fruit full of wellness benefits, zesty flavor, and endless culinary possibilities.",
+            "subheading": "Discover the vibrant, refreshing world of grapefruits — a citrus fruit full of wellness benefits, zesty flavor, and endless culinary possibilities.",
             "ctaText": "Explore Grapefruits",
             "ctaHref": "/grapefruits",
             "imageUrl": "https://images.unsplash.com/photo-1528826194825-a71b700fe80b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxMzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -416,7 +416,7 @@
                 "Pink/Red",
                 "Sweet and tart",
                 "High",
-                "Winter\u2013Spring"
+                "Winter–Spring"
               ],
               [
                 "White",
@@ -428,13 +428,13 @@
                 "Star Ruby",
                 "Sweet and juicy",
                 "Very high",
-                "Winter\u2013Spring"
+                "Winter–Spring"
               ],
               [
                 "Pomelo",
                 "Mild and sweet",
                 "Moderate",
-                "Fall\u2013Winter"
+                "Fall–Winter"
               ]
             ],
             "striped": "true"
@@ -465,7 +465,7 @@
                 "imageUrl": "https://images.unsplash.com/photo-1718833051058-4caaf174ed27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNnx8bWFueSUyMGdyYXBlZnJ1aXRzfGVufDF8MHx8fDE3NzM2ODUyMTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
                 "imageAlt": "many grapefruits sitting next to each other",
                 "heading": "Endless Culinary Uses",
-                "description": "From breakfast juice to salads and desserts \u2013 versatile and delicious",
+                "description": "From breakfast juice to salads and desserts – versatile and delicious",
                 "ctaText": "",
                 "ctaHref": ""
               }
@@ -560,7 +560,7 @@
                 "label": "Countries"
               },
               {
-                "value": "4.9\u2605",
+                "value": "4.9★",
                 "label": "Average Rating"
               }
             ]
@@ -639,7 +639,7 @@
           "type": "Hero",
           "props": {
             "heading": "Blueberry Lovers Unite",
-            "subheading": "Discover the world's finest blueberries\u2014packed with antioxidants, bursting with flavor. Join our community of passionate blueberry enthusiasts.",
+            "subheading": "Discover the world's finest blueberries—packed with antioxidants, bursting with flavor. Join our community of passionate blueberry enthusiasts.",
             "ctaText": "Explore Our Collection",
             "ctaHref": "/community",
             "imageUrl": "https://images.unsplash.com/photo-1628104017776-50e38eb63041?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycmllcyUyMGZyZXNoJTIwaGFydmVzdHxlbnwxfDB8fHwxNzczNzgzNDg5fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
@@ -665,7 +665,7 @@
               },
               {
                 "title": "Versatile & Delicious",
-                "description": "Perfect fresh, frozen, baked, or blended\u2014endless culinary possibilities await."
+                "description": "Perfect fresh, frozen, baked, or blended—endless culinary possibilities await."
               }
             ]
           }
@@ -701,7 +701,7 @@
               },
               {
                 "q": "How do I grow blueberries at home?",
-                "a": "Blueberries prefer acidic soil (pH 4.5\u20135.5) and full sun (6+ hours daily). Plant in well-draining soil, water regularly, and prune annually for best yields. Most varieties produce fruit in 2\u20133 years."
+                "a": "Blueberries prefer acidic soil (pH 4.5–5.5) and full sun (6+ hours daily). Plant in well-draining soil, water regularly, and prune annually for best yields. Most varieties produce fruit in 2–3 years."
               },
               {
                 "q": "How should I store fresh blueberries?",
@@ -798,7 +798,7 @@
                 "label": "Home Cooks"
               },
               {
-                "value": "4.8\u2605",
+                "value": "4.8★",
                 "label": "Average Rating"
               }
             ]
@@ -833,23 +833,23 @@
             "items": [
               {
                 "q": "How do I know how long prep will take?",
-                "a": "Most recipes include prep and cook time at the top. Start by reading through the entire recipe, then add 5\u201310 minutes for setup. As you practice, you'll work faster."
+                "a": "Most recipes include prep and cook time at the top. Start by reading through the entire recipe, then add 5–10 minutes for setup. As you practice, you'll work faster."
               },
               {
                 "q": "Can I substitute ingredients?",
-                "a": "Yes! Swap seasonal vegetables freely, use different oils, or swap dairy-free alternatives. Check if an ingredient affects texture or flavor\u2014for example, butter and oil behave differently in baking."
+                "a": "Yes! Swap seasonal vegetables freely, use different oils, or swap dairy-free alternatives. Check if an ingredient affects texture or flavor—for example, butter and oil behave differently in baking."
               },
               {
                 "q": "Which recipes are best for beginners?",
-                "a": "Look for recipes with 5\u20137 ingredients, simple techniques (no special tools), and 30 minutes or less cook time. Start there, then build skills with more complex recipes."
+                "a": "Look for recipes with 5–7 ingredients, simple techniques (no special tools), and 30 minutes or less cook time. Start there, then build skills with more complex recipes."
               },
               {
                 "q": "How should I store leftovers?",
-                "a": "Cool food to room temperature, then transfer to airtight containers. Most cooked dishes keep 3\u20134 days in the fridge. Label with the date to stay organized."
+                "a": "Cool food to room temperature, then transfer to airtight containers. Most cooked dishes keep 3–4 days in the fridge. Label with the date to stay organized."
               },
               {
                 "q": "What's the best way to learn a new cooking technique?",
-                "a": "Watch a short video first, then follow a trusted recipe step-by-step. Practice the same technique 2\u20133 times before moving on. Don't skip mise en place\u2014prep all ingredients before you start cooking."
+                "a": "Watch a short video first, then follow a trusted recipe step-by-step. Practice the same technique 2–3 times before moving on. Don't skip mise en place—prep all ingredients before you start cooking."
               }
             ]
           }
