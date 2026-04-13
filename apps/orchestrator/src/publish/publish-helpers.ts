@@ -13,6 +13,7 @@ import {
   ensureHeroImageProps,
   persistStateNow,
   getSessionPages,
+  getSiteConfig,
   isLegacySiteId
 } from "../state/session-state.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
@@ -366,7 +367,8 @@ export async function collectInlineAssets(
 export async function recordPublishSnapshot(
   session: string,
   pages: PageDoc[],
-  log?: FastifyBaseLogger
+  log?: FastifyBaseLogger,
+  siteConfig?: Record<string, unknown>
 ): Promise<string | undefined> {
   const repoRoot = resolve(process.cwd(), "../..")
   const targetPath = "apps/site/lib/published-content.json"
@@ -374,7 +376,8 @@ export async function recordPublishSnapshot(
   try {
     // The site's publish handler is responsible for rewriting image URLs
     // and saving assets. We just commit whatever state is on disk.
-    const payload = `${JSON.stringify(pages, null, 2)}\n`
+    const cfg = siteConfig ?? getSiteConfig(session)
+    const payload = `${JSON.stringify({ pages, siteConfig: cfg }, null, 2)}\n`
     await writeFile(absoluteTargetPath, payload, "utf8")
     await runGit(["add", targetPath], repoRoot)
 
@@ -450,7 +453,8 @@ export async function publishViaGit(session: string) {
     pages = rewriteImageUrlsInPages(pages, imageUrlMap)
   }
 
-  const payload = `${JSON.stringify(pages, null, 2)}\n`
+  const siteConfig = getSiteConfig(session)
+  const payload = `${JSON.stringify({ pages, siteConfig }, null, 2)}\n`
   await writeFile(absoluteTargetPath, payload, "utf8")
 
   const statusRaw = await runGit(["status", "--porcelain"], repoRoot)

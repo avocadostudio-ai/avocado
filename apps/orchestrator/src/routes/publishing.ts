@@ -171,7 +171,7 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
       // writing their pages to apps/site/lib/published-content.json would
       // overwrite the avocado-stories content.
       const snapshotCommit = isLegacySiteId(normalizeSiteId(body.siteId))
-        ? await recordPublishSnapshot(scopedSession, pages, request.log)
+        ? await recordPublishSnapshot(scopedSession, pages, request.log, siteConfig)
         : undefined
 
       const publishedSlugs = siteResult.slugs ?? slugs

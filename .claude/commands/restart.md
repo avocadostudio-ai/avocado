@@ -17,6 +17,7 @@ Restart dev servers. The user may specify which server(s) to restart via `$ARGUM
 | sanity | 3004 | `/Users/yury/Projects/ai-site-editor/examples/sanity-site` | `pnpm dev` |
 | strapi | 3005 | `/Users/yury/Projects/ai-site-editor/examples/strapi-site` | `pnpm dev` |
 | strapi-backend | 1337 | `/Users/yury/Projects/strapi-backend` | `source ~/.nvm/nvm.sh && nvm use 22 && npm run develop` |
+| docs | 5555 | `/Users/yury/Projects/ai-site-editor/docs-site` | `mintlify dev --port 5555` |
 
 ## Important: Minimize concurrent servers
 
@@ -36,15 +37,17 @@ If `$ARGUMENTS` is empty, first check which ports are currently active using `ls
 ```
 Which servers to restart?
 
-1. all — Core stack (orchestrator + editor + avocado)
-2. core — Orchestrator + Editor only (:4200 + :4100)
-3. orchestrator — Orchestrator only (:4200)
+1. min — Core + docs (orchestrator + editor + avocado + docs)
+2. all — Core stack (orchestrator + editor + avocado)
+3. core — Orchestrator + Editor only (:4200 + :4100)
+4. orchestrator — Orchestrator only (:4200)
 4. editor — Editor only (:4100)
 5. avocado — Avocado site (:3000)
 6. sample — Sample site (:3002)
 7. contentful — Contentful site (:3003)
 8. sanity — Sanity site (:3004)
 9. strapi — Strapi site + backend (:3005 + :1337)
+10. docs — Mintlify docs site (:5555)
 
 Currently running: [list ports that have active processes]
 ```
@@ -53,6 +56,7 @@ Then proceed with the user's choice.
 
 ### With arguments → Direct restart
 
+- **`min`**: Kill core ports + docs (4200, 4100, 3000, 5555), start orchestrator + editor + avocado + docs.
 - **`all`**: Kill core ports (4200, 4100, 3000), start orchestrator + editor + avocado only.
 - **`core`**: Restart orchestrator + editor only.
 - **One or more names** (e.g. `orchestrator`, `sanity strapi`): Kill only those ports, restart only those servers.
