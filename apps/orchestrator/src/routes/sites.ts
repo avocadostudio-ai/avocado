@@ -113,16 +113,20 @@ export async function sitesRoutes(app: FastifyInstance, _ctx: RouteContext) {
     return { sites: listSitesForSession(wantedSession) }
   })
 
-  /** Admin: remove site configs that match a filter (e.g. localhost preview URLs). */
+  /** Admin: remove site configs by key pattern or previewUrl filter. */
   app.delete("/sites", async (request) => {
-    const query = request.query as { filter?: string }
-    const filter = query.filter ?? "localhost"
+    const query = request.query as { filter?: string; key?: string }
     const removed: string[] = []
     for (const [key, config] of siteConfigs.entries()) {
-      const url = (config as Record<string, unknown>).previewUrl
-      if (typeof url === "string" && url.includes(filter)) {
+      if (query.key && key.includes(query.key)) {
         siteConfigs.delete(key)
         removed.push(key)
+      } else if (query.filter) {
+        const url = (config as Record<string, unknown>).previewUrl
+        if (typeof url === "string" && url.includes(query.filter)) {
+          siteConfigs.delete(key)
+          removed.push(key)
+        }
       }
     }
     if (removed.length > 0) schedulePersistState(request.log)
