@@ -10,10 +10,17 @@ export function decodeSoftHyphenEntities(input: string) {
 
 export function normalizeSoftHyphenEntities<T>(value: T, seen?: WeakSet<object>): T {
   if (typeof value === "string") {
-    return decodeSoftHyphenEntities(value) as T
+    const decoded = decodeSoftHyphenEntities(value)
+    return (decoded === value ? value : decoded) as T
   }
   if (Array.isArray(value)) {
-    return value.map((item) => normalizeSoftHyphenEntities(item, seen)) as T
+    let changed = false
+    const result = value.map((item) => {
+      const normalized = normalizeSoftHyphenEntities(item, seen)
+      if (normalized !== item) changed = true
+      return normalized
+    })
+    return (changed ? result : value) as T
   }
   if (value && typeof value === "object") {
     // Skip non-plain objects (React elements, class instances, DOM nodes)
@@ -23,11 +30,14 @@ export function normalizeSoftHyphenEntities<T>(value: T, seen?: WeakSet<object>)
     const visited = seen ?? new WeakSet()
     if (visited.has(value)) return value
     visited.add(value)
+    let changed = false
     const normalized: Record<string, unknown> = {}
     for (const [key, nestedValue] of Object.entries(value)) {
-      normalized[key] = normalizeSoftHyphenEntities(nestedValue, visited)
+      const result = normalizeSoftHyphenEntities(nestedValue, visited)
+      normalized[key] = result
+      if (result !== nestedValue) changed = true
     }
-    return normalized as T
+    return (changed ? normalized : value) as T
   }
   return value
 }
