@@ -8,7 +8,8 @@ export const siteOrigin = resolveOrigin(import.meta.env.VITE_SITE_ORIGIN as stri
 export const orchestrator = resolveOrigin(import.meta.env.VITE_ORCHESTRATOR_URL as string | undefined, "http://localhost:4200")
 export const publishToken = import.meta.env.VITE_PUBLISH_TOKEN as string | undefined
 export const enablePatchTransport = import.meta.env.VITE_ENABLE_PATCH_TRANSPORT === "1"
-export const siteDraftSecret = (import.meta.env.VITE_SITE_DRAFT_SECRET as string | undefined)?.trim() ?? ""
+/** @deprecated Draft secret flow replaced by middleware-based __editor=1 detection */
+export const siteDraftSecret = ""
 
 export function buildSitePathWithQuery(pathname: string, params: Record<string, string | undefined>) {
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`
