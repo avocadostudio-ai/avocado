@@ -5,6 +5,75 @@ type FieldBuilderOptions = {
   mapImageField?: (field: FieldMeta) => Record<string, unknown>
 }
 
+// ---------------------------------------------------------------------------
+// Markdown ↔ HTML conversion for Puck richtext fields
+// ---------------------------------------------------------------------------
+
+function markdownToHtml(md: string): string {
+  if (!md) return ""
+  return md
+    .replace(/\r\n?/g, "\n")
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const headingMatch = /^(#{1,6})\s+(.+)$/.exec(block)
+      if (headingMatch) {
+        const level = headingMatch[1].length
+        return `<h${level}>${inlineToHtml(headingMatch[2].trim())}</h${level}>`
+      }
+      const lines = block.split("\n").map((l) => l.trim()).filter(Boolean)
+      const ulItems = lines.map((l) => /^\s*[-*+•]\s+(.+)$/.exec(l)?.[1]).filter(Boolean)
+      if (ulItems.length === lines.length && ulItems.length > 0) {
+        return `<ul>${ulItems.map((item) => `<li>${inlineToHtml(item!)}</li>`).join("")}</ul>`
+      }
+      const olItems = lines.map((l) => /^\s*\d+[.)]\s+(.+)$/.exec(l)?.[1]).filter(Boolean)
+      if (olItems.length === lines.length && olItems.length > 0) {
+        return `<ol>${olItems.map((item) => `<li>${inlineToHtml(item!)}</li>`).join("")}</ol>`
+      }
+      return `<p>${inlineToHtml(block.replace(/\n/g, " "))}</p>`
+    })
+    .join("")
+}
+
+function inlineToHtml(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
+}
+
+function htmlToMarkdown(html: string): string {
+  if (!html) return ""
+  return html
+    .replace(/<h([1-6])[^>]*>(.*?)<\/h\1>/gi, (_m, level, content) => `${"#".repeat(Number(level))} ${stripTags(content)}\n\n`)
+    .replace(/<ul[^>]*>(.*?)<\/ul>/gis, (_m, inner) => {
+      const items = [...inner.matchAll(/<li[^>]*>(.*?)<\/li>/gis)].map((m) => `- ${stripTags(m[1])}`).join("\n")
+      return items + "\n\n"
+    })
+    .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (_m, inner) => {
+      const items = [...inner.matchAll(/<li[^>]*>(.*?)<\/li>/gis)].map((m, i) => `${i + 1}. ${stripTags(m[1])}`).join("\n")
+      return items + "\n\n"
+    })
+    .replace(/<p[^>]*>(.*?)<\/p>/gis, (_m, content) => `${stripInline(content)}\n\n`)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+function stripTags(html: string): string {
+  return stripInline(html).replace(/<[^>]+>/g, "")
+}
+
+function stripInline(html: string): string {
+  return html
+    .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**")
+    .replace(/<b[^>]*>(.*?)<\/b>/gi, "**$1**")
+    .replace(/<em[^>]*>(.*?)<\/em>/gi, "*$1*")
+    .replace(/<i[^>]*>(.*?)<\/i>/gi, "*$1*")
+    .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, "[$2]($1)")
+}
+
 function mapScalarField(field: FieldMeta, options?: FieldBuilderOptions): Record<string, unknown> {
   if (field.kind === "number") {
     return { type: "number", label: field.label }
@@ -16,9 +85,7 @@ function mapScalarField(field: FieldMeta, options?: FieldBuilderOptions): Record
     return { type: "select", label: field.label, options: ["h1", "h2", "h3", "h4", "h5", "h6"] }
   }
   if (field.kind === "richtext") {
-    // Puck's native richtext outputs HTML, but blocks store markdown.
-    // Use textarea until we add markdown↔HTML conversion at the boundary.
-    return { type: "textarea", label: field.label }
+    return { type: "richtext", label: field.label }
   }
   if (field.kind === "image") {
     return options?.mapImageField?.(field) ?? { type: "text", label: field.label }
@@ -30,13 +97,16 @@ export function buildFields(
   def: BlockDefinition,
   meta: BlockMeta | undefined,
   options?: FieldBuilderOptions
-): Record<string, unknown> {
+): { fields: Record<string, unknown>; richtextKeys: Set<string> } {
   const derived = deriveFieldMetaFromSchema(def.propsSchema)
   const fields: Record<string, unknown> = {}
+  const richtextKeys = new Set<string>()
 
   for (const [key, field] of Object.entries(derived.fields)) {
     const richer = meta?.fields[key]
-    fields[key] = mapScalarField(richer ?? field, options)
+    const effective = richer ?? field
+    fields[key] = mapScalarField(effective, options)
+    if (effective.kind === "richtext") richtextKeys.add(key)
   }
 
   for (const [listKey, listField] of Object.entries(derived.listFields)) {
@@ -56,7 +126,42 @@ export function buildFields(
     }
   }
 
-  return fields
+  return { fields, richtextKeys }
+}
+
+/** Map of block type → set of richtext field keys. Populated by createPuckConfig. */
+const richtextKeysByType = new Map<string, Set<string>>()
+
+export function registerRichtextKeys(blockType: string, keys: Set<string>) {
+  if (keys.size > 0) richtextKeysByType.set(blockType, keys)
+}
+
+export function convertRichtextPropsForRender(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
+  return convertPropsHtmlToMarkdown(blockType, props)
+}
+
+function convertPropsMarkdownToHtml(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
+  const keys = richtextKeysByType.get(blockType)
+  if (!keys) return props
+  const converted = { ...props }
+  for (const key of keys) {
+    if (typeof converted[key] === "string") {
+      converted[key] = markdownToHtml(converted[key] as string)
+    }
+  }
+  return converted
+}
+
+function convertPropsHtmlToMarkdown(blockType: string, props: Record<string, unknown>): Record<string, unknown> {
+  const keys = richtextKeysByType.get(blockType)
+  if (!keys) return props
+  const converted = { ...props }
+  for (const key of keys) {
+    if (typeof converted[key] === "string") {
+      converted[key] = htmlToMarkdown(converted[key] as string)
+    }
+  }
+  return converted
 }
 
 export function pageToPuckData(page: PageDoc): PuckData {
@@ -64,7 +169,7 @@ export function pageToPuckData(page: PageDoc): PuckData {
     type: block.type,
     props: {
       id: block.id,
-      ...block.props,
+      ...convertPropsMarkdownToHtml(block.type, block.props as Record<string, unknown>),
       _blockId: block.id,
     }
   }))
@@ -104,9 +209,9 @@ function createGeneratedBlockId(type: string): string {
   return `b_${type.toLowerCase()}_${Date.now().toString(36)}_${suffix}`
 }
 
-function normalizePersistableProps(input: Record<string, unknown>): Record<string, unknown> {
+function normalizePersistableProps(input: Record<string, unknown>, blockType: string): Record<string, unknown> {
   const { id: _, _blockId: __, ...rest } = input
-  return rest
+  return convertPropsHtmlToMarkdown(blockType, rest)
 }
 
 function stableSerialize(value: unknown): string {
@@ -130,7 +235,7 @@ function persistableBlocksFromPuckData(data: PuckData): PersistableBlock[] {
       return {
         id,
         type,
-        props: normalizePersistableProps(props),
+        props: normalizePersistableProps(props, type),
       }
     })
     .filter((item): item is PersistableBlock => Boolean(item))
