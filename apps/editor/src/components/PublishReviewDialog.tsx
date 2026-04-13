@@ -20,13 +20,14 @@ type Props = {
 
 /** Extract page slug from deterministic change entries like "Updated Hero image on /home" */
 function parsePageSlug(line: string): string | null {
-  const match = line.match(/ on \/([\w-]+(?:\/[\w-]+)*)$/)
-  return match ? `/${match[1]}` : null
+  // Match " on /" (home page) or " on /some-slug"
+  const match = line.match(/ on (\/([\w-]+(?:\/[\w-]+)*)?)$/)
+  return match ? (match[2] ? `/${match[2]}` : "/") : null
 }
 
 /** Strip the trailing " on /slug" suffix for grouped display */
 function stripSlugSuffix(line: string): string {
-  return line.replace(/ on \/[\w-]+(?:\/[\w-]+)*$/, "")
+  return line.replace(/ on \/(?:[\w-]+(?:\/[\w-]+)*)?$/, "")
 }
 
 function groupChangesByPage(changes: string[]): Map<string, string[]> | null {

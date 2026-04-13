@@ -140,6 +140,11 @@ function describeUpdatePropsFields(patch: Record<string, unknown>): { hasImage: 
   return { hasImage, textFields }
 }
 
+/** Format a page slug for display — avoids double-slash for home page "/" */
+export function fmtSlug(slug: string): string {
+  return slug === "/" ? "/" : `/${slug}`
+}
+
 export function buildOpChangeLogEntries(
   ops: Operation[],
   ctx: { getBlockType: (slug: string, blockId: string) => string | undefined }
@@ -149,46 +154,46 @@ export function buildOpChangeLogEntries(
     switch (op.op) {
       case "create_page": {
         const title = op.page.title ?? op.page.slug
-        lines.push(`Created page "${title}" (/${op.page.slug})`)
+        lines.push(`Created page "${title}" (${fmtSlug(op.page.slug)})`)
         break
       }
       case "add_block": {
         const bt = op.block.type
-        lines.push(`Added ${bt} block to /${op.pageSlug}`)
+        lines.push(`Added ${bt} block to ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "remove_block": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "unknown"
-        lines.push(`Removed ${bt} block from /${op.pageSlug}`)
+        lines.push(`Removed ${bt} block from ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "move_block": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
-        lines.push(`Moved ${bt} block on /${op.pageSlug}`)
+        lines.push(`Moved ${bt} block on ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "duplicate_block": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
-        lines.push(`Duplicated ${bt} block on /${op.pageSlug}`)
+        lines.push(`Duplicated ${bt} block on ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "update_props": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
         const { hasImage, textFields } = describeUpdatePropsFields(op.patch as Record<string, unknown>)
         if (hasImage && textFields.length > 0) {
-          lines.push(`Updated ${bt} image and ${textFields.join(", ")} on /${op.pageSlug}`)
+          lines.push(`Updated ${bt} image and ${textFields.join(", ")} on ${fmtSlug(op.pageSlug)}`)
         } else if (hasImage) {
-          lines.push(`Updated ${bt} image on /${op.pageSlug}`)
+          lines.push(`Updated ${bt} image on ${fmtSlug(op.pageSlug)}`)
         } else if (textFields.length > 0) {
-          lines.push(`Updated ${bt} ${textFields.join(", ")} on /${op.pageSlug}`)
+          lines.push(`Updated ${bt} ${textFields.join(", ")} on ${fmtSlug(op.pageSlug)}`)
         } else {
-          lines.push(`Updated ${bt} on /${op.pageSlug}`)
+          lines.push(`Updated ${bt} on ${fmtSlug(op.pageSlug)}`)
         }
         break
       }
       case "add_item": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
-        lines.push(`Added item to ${bt} ${op.listKey} on /${op.pageSlug}`)
+        lines.push(`Added item to ${bt} ${op.listKey} on ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "update_item": {
@@ -196,37 +201,37 @@ export function buildOpChangeLogEntries(
         const patch = op.patch as Record<string, unknown>
         const hasImg = Object.keys(patch).some(isImageField)
         if (hasImg) {
-          lines.push(`Updated item image in ${bt} ${op.listKey} on /${op.pageSlug}`)
+          lines.push(`Updated item image in ${bt} ${op.listKey} on ${fmtSlug(op.pageSlug)}`)
         } else {
-          lines.push(`Updated item in ${bt} ${op.listKey} on /${op.pageSlug}`)
+          lines.push(`Updated item in ${bt} ${op.listKey} on ${fmtSlug(op.pageSlug)}`)
         }
         break
       }
       case "remove_item": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
-        lines.push(`Removed item from ${bt} ${op.listKey} on /${op.pageSlug}`)
+        lines.push(`Removed item from ${bt} ${op.listKey} on ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "move_item": {
         const bt = ctx.getBlockType(op.pageSlug, op.blockId) ?? "block"
-        lines.push(`Reordered item in ${bt} ${op.listKey} on /${op.pageSlug}`)
+        lines.push(`Reordered item in ${bt} ${op.listKey} on ${fmtSlug(op.pageSlug)}`)
         break
       }
       case "rename_page": {
-        const label = op.newTitle ? `"${op.newTitle}" (/${op.newPageSlug})` : `/${op.newPageSlug}`
-        lines.push(`Renamed page /${op.pageSlug} → ${label}`)
+        const label = op.newTitle ? `"${op.newTitle}" (${fmtSlug(op.newPageSlug)})` : fmtSlug(op.newPageSlug)
+        lines.push(`Renamed page ${fmtSlug(op.pageSlug)} → ${label}`)
         break
       }
       case "remove_page":
-        lines.push(`Removed page /${op.pageSlug}`)
+        lines.push(`Removed page ${fmtSlug(op.pageSlug)}`)
         break
       case "duplicate_page": {
         const target = op.newPageSlug ?? "copy"
-        lines.push(`Duplicated page /${op.pageSlug} → /${target}`)
+        lines.push(`Duplicated page ${fmtSlug(op.pageSlug)} → ${fmtSlug(target)}`)
         break
       }
       case "move_page":
-        lines.push(`Reordered page /${op.pageSlug}`)
+        lines.push(`Reordered page ${fmtSlug(op.pageSlug)}`)
         break
       case "update_page_meta":
         // Handled by buildMetaChangeLogEntries — skip to avoid duplication
