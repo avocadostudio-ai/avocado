@@ -16,6 +16,7 @@
     "./routes/core": "./src/draft-routes-core.ts",
     "./editor-manifest": "./src/editor-manifest.ts",
     "./publish-handlers/json-file": "./src/publish-handlers/json-file.ts",
+    "./middleware": "./src/middleware.ts",
     "./navigation": "./src/navigation.ts",
     "./page": "./src/create-site-page.tsx"
   },
@@ -61,6 +62,10 @@
       "./publish-handlers/json-file": {
         "import": "./dist/publish-handlers/json-file.js",
         "types": "./dist/publish-handlers/json-file.d.ts"
+      },
+      "./middleware": {
+        "import": "./dist/middleware.js",
+        "types": "./dist/middleware.d.ts"
       },
       "./navigation": {
         "import": "./dist/navigation.js",
