@@ -18,6 +18,7 @@ import {
   listSitesForSession,
   scopedSessionKey,
   setSiteConfig,
+  siteConfigs,
   schedulePersistState,
 } from "../state/session-state.js"
 import type { RouteContext } from "./route-context.js"
@@ -110,5 +111,21 @@ export async function sitesRoutes(app: FastifyInstance, _ctx: RouteContext) {
     const query = request.query as { session?: string }
     const wantedSession = (query.session ?? DEFAULT_SESSION).trim() || DEFAULT_SESSION
     return { sites: listSitesForSession(wantedSession) }
+  })
+
+  /** Admin: remove site configs that match a filter (e.g. localhost preview URLs). */
+  app.delete("/sites", async (request) => {
+    const query = request.query as { filter?: string }
+    const filter = query.filter ?? "localhost"
+    const removed: string[] = []
+    for (const [key, config] of siteConfigs.entries()) {
+      const url = (config as Record<string, unknown>).previewUrl
+      if (typeof url === "string" && url.includes(filter)) {
+        siteConfigs.delete(key)
+        removed.push(key)
+      }
+    }
+    if (removed.length > 0) schedulePersistState(request.log)
+    return { removed, remaining: siteConfigs.size }
   })
 }
