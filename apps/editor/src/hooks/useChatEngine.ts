@@ -312,12 +312,20 @@ export function useChatEngine(config: ChatEngineConfig) {
     } catch { /* non-critical — keep initial suggestions */ }
   }
 
-  async function refreshRouteSlugs() {
+  async function refreshRouteSlugs(retryCount = 0) {
     setIsLoadingSlugs(true)
     try {
       const slugsUrl = `${orchestrator}/draft/slugs?session=${encodeURIComponent(session)}&siteId=${encodeURIComponent(siteId)}`
       const res = await fetch(slugsUrl)
-      if (!res.ok) return store.getState().availableSlugs
+      if (!res.ok) {
+        // Orchestrator may be cold-starting (e.g. Render). Retry with backoff.
+        if (retryCount < 3) {
+          setIsLoadingSlugs(false)
+          await new Promise((r) => setTimeout(r, (retryCount + 1) * 2000))
+          return refreshRouteSlugs(retryCount + 1)
+        }
+        return store.getState().availableSlugs
+      }
       const data = (await res.json()) as { slugs?: unknown }
       const list = Array.isArray(data.slugs)
         ? data.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
@@ -325,13 +333,19 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       // On first load for this session, always sync from the site to pick up CMS changes
       if (!hasBootstrappedRef.current) {
-        hasBootstrappedRef.current = true
         const bootstrapResult = await bootstrapFromSite()
-        setHasBootstrapped(true)
         if (bootstrapResult.synced && bootstrapResult.slugs.length > 0) {
+          hasBootstrappedRef.current = true
+          setHasBootstrapped(true)
           setAvailableSlugs(bootstrapResult.slugs)
           void updateWelcomeSuggestions(bootstrapResult.slugs)
           return bootstrapResult.slugs
+        }
+        // If bootstrap failed (e.g. orchestrator cold-starting), don't mark as done
+        // so it retries on the next call
+        if (bootstrapResult.synced || list.length > 0) {
+          hasBootstrappedRef.current = true
+          setHasBootstrapped(true)
         }
       }
 
@@ -344,6 +358,12 @@ export function useChatEngine(config: ChatEngineConfig) {
 
       return store.getState().availableSlugs
     } catch {
+      // Network error — orchestrator likely unreachable (cold start). Retry with backoff.
+      if (retryCount < 3) {
+        setIsLoadingSlugs(false)
+        await new Promise((r) => setTimeout(r, (retryCount + 1) * 2000))
+        return refreshRouteSlugs(retryCount + 1)
+      }
       return store.getState().availableSlugs
     } finally {
       setIsLoadingSlugs(false)
