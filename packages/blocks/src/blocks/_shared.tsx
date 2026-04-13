@@ -8,17 +8,24 @@ export function decodeSoftHyphenEntities(input: string) {
     .replace(/&shy;|&#0*173;|&#x0*ad;/gi, "\u00AD")
 }
 
-export function normalizeSoftHyphenEntities<T>(value: T): T {
+export function normalizeSoftHyphenEntities<T>(value: T, seen?: WeakSet<object>): T {
   if (typeof value === "string") {
     return decodeSoftHyphenEntities(value) as T
   }
   if (Array.isArray(value)) {
-    return value.map((item) => normalizeSoftHyphenEntities(item)) as T
+    return value.map((item) => normalizeSoftHyphenEntities(item, seen)) as T
   }
   if (value && typeof value === "object") {
+    // Skip non-plain objects (React elements, class instances, DOM nodes)
+    const proto = Object.getPrototypeOf(value)
+    if (proto !== Object.prototype && proto !== null) return value
+    // Guard against circular references
+    const visited = seen ?? new WeakSet()
+    if (visited.has(value)) return value
+    visited.add(value)
     const normalized: Record<string, unknown> = {}
     for (const [key, nestedValue] of Object.entries(value)) {
-      normalized[key] = normalizeSoftHyphenEntities(nestedValue)
+      normalized[key] = normalizeSoftHyphenEntities(nestedValue, visited)
     }
     return normalized as T
   }
