@@ -117,11 +117,14 @@ export function useSiteList(siteId: string, session: string) {
         if (!res.ok || cancelled) return
         const data = (await res.json()) as { sites?: Array<Partial<SiteConfig> & { id?: string }> }
         if (!Array.isArray(data.sites) || data.sites.length === 0) return
+        const isProduction = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
         setSiteList((prev) => {
           const known = new Set(prev.map((s) => s.id))
           const additions: SiteConfig[] = []
           for (const incoming of data.sites!) {
             if (!incoming.id || known.has(incoming.id)) continue
+            // Skip localhost-based sites on production deployments
+            if (isProduction && incoming.previewUrl && /localhost|127\.0\.0\.1/i.test(incoming.previewUrl)) continue
             // Coerce partial orchestrator-side config into the editor's SiteConfig shape
             additions.push({
               id: incoming.id,
