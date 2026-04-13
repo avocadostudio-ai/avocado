@@ -16,7 +16,10 @@ export const metadata: Metadata = {
 
 // Inline script that runs before first paint to prevent dark mode flash.
 // Reads the stored theme preference and applies the `dark` class immediately.
-const themeScript = `(function(){try{var t=localStorage.getItem('site-theme-v1');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()`
+// In an editor iframe (cross-origin), localStorage is isolated and may have
+// stale values. Skip it and follow system preference only so the preview
+// matches what a fresh visitor sees.
+const themeScript = `(function(){try{var e=window.parent!==window;var t=e?null:localStorage.getItem('site-theme-v1');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()`
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
