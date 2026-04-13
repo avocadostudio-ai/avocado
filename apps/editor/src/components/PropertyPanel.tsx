@@ -5,6 +5,7 @@ import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
 import { WandSparkles, Sparkles, Pencil, Replace, Trash2, ImagePlus } from "lucide-react"
 import { useT } from "@/i18n"
 import { useEditorStore } from "../store"
+import { RichTextEditorField } from "./RichTextEditorField"
 
 const AI_ELIGIBLE_KINDS = new Set(["text", "richtext", "imageAlt"])
 const noop = () => {}
@@ -767,7 +768,29 @@ function FieldEditor({
     )
   }
 
-  const useTextarea = field.kind === "richtext" || field.multiline === true
+  if (field.kind === "richtext") {
+    return (
+      <div className="property-field" ref={flashRef}>
+        <div className="property-field-label">
+          <span>
+            {label}
+            {field.required && <span className="property-field-required">*</span>}
+          </span>
+        </div>
+        <div className={`property-field-input-wrap${fieldShimmer ? " property-field-input-wrap--ai-loading" : ""}`}>
+          <RichTextEditorField
+            value={stringValue}
+            onChange={(md) => { setLocalValue(md); debouncedCommit(md) }}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+          />
+          {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={field.kind} fieldLabel={field.label ?? fieldKey} blockType={blockType ?? ""} currentValue={stringValue} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={aiLoading} /> : null}
+        </div>
+      </div>
+    )
+  }
+
+  const useTextarea = field.multiline === true
   const inputType = field.kind === "number" ? "number" : field.kind === "url" ? "url" : "text"
   const sharedProps = {
     value: displayValue,

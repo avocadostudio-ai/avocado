@@ -709,6 +709,75 @@ body.panel-resizing iframe {
   overflow-y: hidden;
 }
 
+/* Rich text editor (TipTap) */
+.rte-wrap {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+.rte-wrap:focus-within {
+  border-color: var(--accent);
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 102, 140, 0.08);
+}
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f5f5f5;
+  flex-wrap: wrap;
+}
+.rte-toolbar-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+}
+.rte-toolbar-btn:hover { background: #e2e8f0; color: #1e293b; }
+.rte-toolbar-btn.is-active { background: #0f766e; color: #fff; }
+.rte-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: #d1d5db;
+  margin: 0 3px;
+}
+.rte-content .tiptap {
+  padding: 8px 12px;
+  min-height: 80px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  line-height: 1.55;
+}
+.rte-content .tiptap p { margin: 0 0 0.4em; }
+.rte-content .tiptap h2,
+.rte-content .tiptap h3,
+.rte-content .tiptap h4 { margin: 0.6em 0 0.3em; font-weight: 600; }
+.rte-content .tiptap h2 { font-size: 1.2em; }
+.rte-content .tiptap h3 { font-size: 1.1em; }
+.rte-content .tiptap ul,
+.rte-content .tiptap ol { margin: 0.3em 0; padding-left: 1.4em; }
+.rte-content .tiptap li { margin: 0.15em 0; }
+.rte-content .tiptap a { color: var(--accent); text-decoration: underline; }
+.rte-content .tiptap strong { font-weight: 600; }
+.property-field-input-wrap .rte-wrap ~ .property-field-ai-btn {
+  top: 8px;
+  transform: none;
+}
+
 .property-field-char-count {
   display: block;
   text-align: right;
@@ -5327,6 +5396,23 @@ textarea {
   border-color: #2dd4bf;
   background: #0f172a;
 }
+
+.editor-dark .rte-wrap {
+  background: #1e293b;
+  border-color: transparent;
+  color: #e2e8f0;
+}
+.editor-dark .rte-wrap:focus-within {
+  border-color: #2dd4bf;
+  background: #0f172a;
+}
+.editor-dark .rte-toolbar {
+  background: #1a2536;
+  border-color: #334155;
+}
+.editor-dark .rte-toolbar-btn { color: #94a3b8; }
+.editor-dark .rte-toolbar-btn:hover { background: #334155; color: #e2e8f0; }
+.editor-dark .rte-toolbar-sep { background: #475569; }
 
 .editor-dark .property-field-char-count {
   color: #64748b;
