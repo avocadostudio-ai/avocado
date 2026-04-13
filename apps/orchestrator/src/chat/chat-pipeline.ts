@@ -99,7 +99,7 @@ import { executeToolCall } from "../tools/runtime.js"
 export { sentenceCase, firstUrlFromText, preferredImageAltText, collectMentionedSlugsFromPlan, collectMentionedSlugsFromOps, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
 export { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, isNonEmptyString, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
 export { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation } from "./chat-pipeline-context.js"
-export { isRewriteLikeMessage, isPerformanceAwareMessage, isLikelyTextField, collectChangedTextFields, buildMetaChangeLogEntries, buildAiInsightChanges, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
+export { isRewriteLikeMessage, isPerformanceAwareMessage, isLikelyTextField, collectChangedTextFields, buildMetaChangeLogEntries, buildAiInsightChanges, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification, fmtSlug } from "./chat-pipeline-deterministic.js"
 export { blockHasImageUrlProp, parsePath, getValueAtPath, setValueAtPath, deleteValueAtPath, extractIndexedQueries, extractReferencedItemIndices, blockSupportsImageAtPath, detectImagePaths, imageQueryFromItem, shouldPopulateAllChildImages, findImageTargets, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, shouldResolveCreatePageHeroImage, resolveHeroImageForCreatePage, detectImageOps } from "./chat-pipeline-image.js"
 export { type ChatPipelineContext, type DeferredCreatePageImage, GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER, isGeneratingPlaceholder, cleanupImagePlaceholders, buildPageDirectory, resolveEffectiveSlug, CancelError, isCancelError, throwIfCanceled, raceCancel, sseWrite, sleepMs, suppressCancelOnly } from "./chat-pipeline-shared.js"
 
@@ -107,7 +107,7 @@ export { type ChatPipelineContext, type DeferredCreatePageImage, GENERATING_IMAG
 import { collectMentionedSlugsFromPlan, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
 import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
 import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation, classifyMessageComplexity, isRouterPlanTooShallow } from "./chat-pipeline-context.js"
-import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification } from "./chat-pipeline-deterministic.js"
+import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification, fmtSlug } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
 import { runVariationPipeline } from "./variation-pipeline.js"
@@ -1588,7 +1588,7 @@ export async function runChatPipeline(
                   focusBlockId: deferred.blockId
                 })
                 const deferredBlockType = getPage(body.session!, deferred.pageSlug)?.blocks?.find((b) => b.id === deferred.blockId)?.type ?? "block"
-                resolvedPlan.change_log = [...resolvedPlan.change_log, `Generated AI image for ${deferredBlockType} on /${deferred.pageSlug}`]
+                resolvedPlan.change_log = [...resolvedPlan.change_log, `Generated AI image for ${deferredBlockType} on ${fmtSlug(deferred.pageSlug)}`]
                 ctx.log.info(
                   { event: "deferred_hero_image_resolved", chatRequestId, pageSlug: deferred.pageSlug, blockId: deferred.blockId, source: imageResult.source, durationMs: deferredImageDurationMs },
                   `Deferred hero image resolved and applied in ${deferredImageDurationMs}ms`
@@ -1664,7 +1664,7 @@ export async function runChatPipeline(
                 focusBlockId: resolvedOp.blockId
               })
               const resolvedBlockType = getPage(body.session!, resolvedOp.pageSlug)?.blocks?.find((b) => b.id === resolvedOp.blockId)?.type ?? "block"
-              resolvedPlan.change_log = [...resolvedPlan.change_log, `Resolved image for ${resolvedBlockType} on /${resolvedOp.pageSlug}`]
+              resolvedPlan.change_log = [...resolvedPlan.change_log, `Resolved image for ${resolvedBlockType} on ${fmtSlug(resolvedOp.pageSlug)}`]
             }
           }
         } catch (deferredErr) {
@@ -1797,7 +1797,7 @@ export async function runChatPipeline(
                     focusBlockId: op.blockId
                   })
                   const nativeBlockType = getPage(body.session!, op.pageSlug)?.blocks?.find((b) => b.id === op.blockId)?.type ?? "block"
-                  resolvedPlan.change_log = [...resolvedPlan.change_log, `Generated image for ${nativeBlockType} on /${op.pageSlug}`]
+                  resolvedPlan.change_log = [...resolvedPlan.change_log, `Generated image for ${nativeBlockType} on ${fmtSlug(op.pageSlug)}`]
                 }
               }
             } catch (singleErr) {
