@@ -163,7 +163,11 @@ start() {
 
 check_health() {
   curl -sf "http://localhost:4200/status/planner" >/dev/null || return 1
-  curl -sf "http://localhost:3000" >/dev/null || return 1
+  # Hit the site with __editor=1 so Next.js compiles the /preview-draft route
+  # that the editor iframe actually loads — not just the public / route.
+  # This single curl warms both the middleware rewrite and the target page,
+  # so the iframe loads instantly on first open.
+  curl -sf "http://localhost:3000/?__editor=1&session=dev&siteId=avocado-hub" >/dev/null || return 1
   curl -sf "http://localhost:4100" >/dev/null || return 1
 }
 
