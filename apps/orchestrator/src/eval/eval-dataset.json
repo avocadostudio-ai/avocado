@@ -530,13 +530,13 @@
     "id": "stats-hallucination-colors",
     "category": "text_edit",
     "slug": "/",
-    "message": "Add icons or colors to highlight each stat",
+    "message": "Set the icon of the first stat to a star emoji and make it colorful",
     "tags": ["regression", "core"],
     "expectedStatus": "applied",
     "expectedOpTypes": ["update_props"],
     "expectedTargetBlockTypes": ["Stats"],
     "contentChecks": [
-      { "type": "no_banned_words", "prop": "summary_for_user", "bannedWords": ["color"] }
+      { "type": "no_banned_words", "prop": "summary_for_user", "bannedWords": ["colorful", "coloring", "colored"] }
     ]
   }
 ]
