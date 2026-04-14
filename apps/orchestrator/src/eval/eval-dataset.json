@@ -474,5 +474,40 @@
     "expectedStatus": "applied",
     "expectedOpTypes": ["update_item"],
     "expectedTargetBlockTypes": ["Testimonials"]
+  },
+  {
+    "id": "regression-create-page-with-analysis",
+    "category": "page_ops",
+    "slug": "/",
+    "message": "add a new landing page for community - we want an alternate version of the existing one. analyze it and suggest improvements",
+    "tags": ["regression", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["create_page"],
+    "expectedOpCount": { "min": 2, "max": 10 },
+    "assertions": [
+      { "type": "page_exists", "slug": "/community" }
+    ]
+  },
+  {
+    "id": "regression-delete-page-with-selected-block",
+    "category": "page_ops",
+    "slug": "/strawberries",
+    "message": "delete this page",
+    "tags": ["regression", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_page"],
+    "assertions": [
+      { "type": "page_not_exists", "slug": "/strawberries" }
+    ]
+  },
+  {
+    "id": "populate-existing-page",
+    "category": "multi_op",
+    "slug": "/cherries",
+    "message": "populate this page with more sections - add a features grid, testimonials, FAQ, and CTA",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"],
+    "expectedOpCount": { "min": 3, "max": 6 }
   }
 ]

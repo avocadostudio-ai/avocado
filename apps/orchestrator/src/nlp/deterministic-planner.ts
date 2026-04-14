@@ -346,6 +346,8 @@ export function inferDeterministicIntent(args: {
  * - Route slugs ("/pricing", "/about-us") — these are page refs, not block types
  */
 function messageRefersToBlock(message: string, activeBlockId?: string): boolean {
+  // When the message explicitly says "this/the page", "this" refers to the page, not the selected block
+  if (activeBlockId && /\b(this|the|current)\s+page\b/i.test(message)) return false
   if (activeBlockId) return true
   // Strip text after "this/the/current page" (page name references)
   // and strip route slugs (/pricing, /about) that could false-match block keywords

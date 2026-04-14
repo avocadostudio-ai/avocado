@@ -187,7 +187,10 @@ export function requestsContentGeneration(message: string) {
   const asksContent =
     /\bcontent\b/.test(lower) ||
     /\b(fill|populate)\b.*\b(page|it)\b/.test(lower) ||
-    /\b(write|describe|explain)\b.*\b(about|for|on)\b/.test(lower)
+    /\b(write|describe|explain)\b.*\b(about|for|on)\b/.test(lower) ||
+    /\b(analyze|analyse|suggest|improve|rethink|rework)\b/.test(lower) ||
+    /\balternate\s+(version|layout)\b/.test(lower) ||
+    /\bbased\s+on\s+(the\s+)?(existing|current|original)\b/.test(lower)
   // Strip route paths before checking for block types so /faq doesn't match "faq"
   const withoutRoutes = lower.replace(/\/[a-z0-9/_-]+/g, "")
   const hasExplicitBlockTypes =
