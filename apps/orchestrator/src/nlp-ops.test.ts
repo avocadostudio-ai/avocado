@@ -632,7 +632,10 @@ test("requestsContentGeneration detects content-generation requests", () => {
     "create page /team and fill it with content",
     "make a page /services and write about our offerings",
     "generate page /faq with content",
-    "build new page /about and describe our mission for visitors"
+    "build new page /about and describe our mission for visitors",
+    "add a new landing page for community - we want an alternate version of the existing one. analyze it and suggest improvements",
+    "create a new /pricing page based on the existing one with improvements",
+    "make an alternate version of the home page and improve the layout",
   ]
   const negatives = [
     "create new page /test2",
@@ -1359,6 +1362,22 @@ test("compileDeterministicPlan removes current page when site context includes u
   if (plan?.ops[0]?.op === "remove_page") {
     assert.equal(plan.ops[0].pageSlug, "/pricing")
   }
+})
+
+test("compileDeterministicPlan deletes page even with activeBlockId selected", () => {
+  const currentPage = demoPublishedPages().find((page) => page.slug === "/pricing")
+  assert.ok(currentPage)
+  const plan = compileDeterministicPlan({
+    session: "test-suite",
+    intent: { action: "remove" },
+    message: "delete this page",
+    slug: "/pricing",
+    currentPage: currentPage!,
+    activeBlockId: currentPage!.blocks[0]?.id
+  })
+
+  assert.ok(plan, "'delete this page' with selected block should still produce a plan")
+  assert.equal(plan?.ops[0]?.op, "remove_page", "should be remove_page, not a block removal")
 })
 
 test("buildCreatePagePlan returns clarification when slug already exists", () => {
@@ -2615,6 +2634,15 @@ test("isHighConfidenceDeterministicCase accepts 'delete this page' (genuine page
   assert.equal(
     isHighConfidenceDeterministicCase({ message: "delete this page", currentPage }),
     true
+  )
+})
+
+test("isHighConfidenceDeterministicCase accepts 'delete this page' even with activeBlockId", () => {
+  const currentPage = demoPublishedPages()[0]
+  assert.equal(
+    isHighConfidenceDeterministicCase({ message: "delete this page", currentPage, activeBlockId: "b_hero" }),
+    true,
+    "'delete this page' with a selected block should still be a page delete"
   )
 })
 
