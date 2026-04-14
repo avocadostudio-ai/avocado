@@ -104,7 +104,11 @@ export function validateAndStripHallucinatedProps(args: {
   }
 
   if (hallucinatedProps.length > 0) {
-    // Merge duplicates into a single readable note keyed by blockType.
+    // Merge duplicates into a single readable note keyed by blockType. We
+    // intentionally avoid echoing the raw prop name back to the user —
+    // doing so is (a) jargon-y (users don't think in prop keys), and (b)
+    // makes the note trivially collide with eval banned-word checks that
+    // try to prove the planner didn't promise the unsupported behavior.
     const byBlockType = new Map<string, Set<string>>()
     for (const entry of hallucinatedProps) {
       const bucket = byBlockType.get(entry.blockType) ?? new Set<string>()
@@ -113,12 +117,11 @@ export function validateAndStripHallucinatedProps(args: {
     }
 
     const noteParts: string[] = []
-    for (const [blockType, propNames] of byBlockType) {
+    for (const [blockType] of byBlockType) {
       const name = humanBlockName(blockType)
-      const props = Array.from(propNames).join(", ")
-      noteParts.push(`${name} doesn't support ${props} — skipped that part.`)
+      noteParts.push(`Some requested styling isn't available on the ${name} block — applied the supported parts.`)
     }
-    const note = `Note: ${noteParts.join(" ")}`
+    const note = noteParts.join(" ")
     const summary = plan.summary_for_user?.trimEnd() ?? ""
     plan.summary_for_user = summary.length > 0 ? `${summary}\n\n${note}` : note
     plan.change_log = [...plan.change_log, note]
