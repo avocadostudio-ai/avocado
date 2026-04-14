@@ -497,6 +497,16 @@
     ]
   },
   {
+    "id": "regression-add-hero-image-existing-block",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Add a hero image of fresh avocados in sunlight",
+    "tags": ["regression", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"]
+  },
+  {
     "id": "populate-existing-page",
     "category": "multi_op",
     "slug": "/oranges",
