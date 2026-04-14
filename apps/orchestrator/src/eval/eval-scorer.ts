@@ -64,7 +64,7 @@ export function scoreCase(input: ScorerInput): CaseScore {
   const assertionsScore = scoreAssertions(evalCase, draftAfter, draftBefore, failureDetails)
 
   // --- Dimension 5: Content quality ---
-  const contentScore = scoreContentChecks(evalCase, draftAfter, failureDetails)
+  const contentScore = scoreContentChecks(evalCase, chatResult, draftAfter, failureDetails)
 
   // --- Composite ---
   const composite =
@@ -339,17 +339,26 @@ function scoreAssertions(evalCase: EvalCase, draftAfter: DraftState, draftBefore
 // Content quality scorer
 // ---------------------------------------------------------------------------
 
-function scoreContentChecks(evalCase: EvalCase, draftAfter: DraftState, failures: string[]): number {
+function scoreContentChecks(evalCase: EvalCase, chatResult: ChatResultPayload, draftAfter: DraftState, failures: string[]): number {
   if (!evalCase.contentChecks || evalCase.contentChecks.length === 0) return 1.0
 
   const page = draftAfter.pages.get(evalCase.slug)
   let passed = 0
 
+  // Plan-level fields that live on the chatResult, not on a block.
+  const PLAN_LEVEL_PROPS = new Set(["summary_for_user", "summary"])
+
   for (const check of evalCase.contentChecks) {
-    const block = check.blockType
+    // When `prop` refers to a plan-level field, check the planner's summary
+    // text instead of a block prop. Useful for catching hallucinated
+    // promises (e.g. "Adding colors…" when the block has no color field).
+    const isPlanLevel = !check.blockType && check.prop !== undefined && PLAN_LEVEL_PROPS.has(check.prop)
+    const block = !isPlanLevel && check.blockType
       ? page?.blocks.find((b) => b.type === check.blockType)
       : undefined
-    const propValue = block && check.prop
+    const propValue = isPlanLevel
+      ? String(chatResult.summary ?? "")
+      : block && check.prop
       ? String((block.props as Record<string, unknown>)[check.prop] ?? "")
       : ""
 
@@ -370,10 +379,11 @@ function scoreContentChecks(evalCase: EvalCase, draftAfter: DraftState, failures
           if (/^\W+$/.test(w)) return lower.includes(w)
           return new RegExp(`\\b${w}\\b`, "i").test(lower)
         })
+        const target = isPlanLevel ? `plan.${check.prop}` : `${check.blockType}.${check.prop}`
         if (found.length === 0) {
           passed++
         } else {
-          failures.push(`content[no_banned_words]: ${check.blockType}.${check.prop} contains banned words: ${found.join(", ")}`)
+          failures.push(`content[no_banned_words]: ${target} contains banned words: ${found.join(", ")}`)
         }
         break
       }
