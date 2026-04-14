@@ -135,6 +135,30 @@ function parseImageSourceChoiceFromMessage(message: string): ImageSourcePreferen
 }
 
 /**
+ * Appends a source hint token ("unsplash" / "generate image") to the planner
+ * message IFF the user's message doesn't already name a source. Avoids
+ * contradicting an explicit prompt like "Generate an AI image of X" when the
+ * session preference happens to be Unsplash.
+ *
+ * Exported for unit tests.
+ */
+export function applyImageSourceHint(
+  plannerMessage: string,
+  sanitizedMessage: string,
+  preference: ImageSourcePreference | undefined
+): string {
+  if (!preference || preference === "either") return plannerMessage
+  const hasExplicit =
+    /\b(unsplash|stock\s+photo|stock\s+image|royalty[-\s]?free)\b/i.test(sanitizedMessage) ||
+    /\b(generate|generated|ai[-\s]?generated|ai\s+image|ai\s+photo|dall[-\s]?e|midjourney|stable\s+diffusion)\b/i.test(sanitizedMessage) ||
+    /\bwith\s+ai\b/i.test(sanitizedMessage)
+  if (hasExplicit) return plannerMessage
+  if (preference === "unsplash") return `${plannerMessage} unsplash`
+  if (preference === "genai") return `${plannerMessage} generate image`
+  return plannerMessage
+}
+
+/**
  * Image fields that, when they are the ONLY fields touched in an update_props
  * patch, make the op a pure "image update" — safe to auto-apply via the deferred
  * image resolution path (shimmer placeholder → real URL streamed in over SSE).
@@ -375,11 +399,7 @@ export async function runChatPipeline(
   }
   const activeImageSourcePreference: ImageSourcePreference | undefined =
     capturedImageSourceChoice ?? imageSourcePreferenceBySession.get(body.session)
-  if (activeImageSourcePreference === "unsplash") {
-    plannerMessage = `${plannerMessage} unsplash`
-  } else if (activeImageSourcePreference === "genai") {
-    plannerMessage = `${plannerMessage} generate image`
-  }
+  plannerMessage = applyImageSourceHint(plannerMessage, sanitizedMessage, activeImageSourcePreference)
 
   const inferredTranslationScope = inferTranslationScopeFromMessage(plannerMessage)
   const translationScope = shouldPreferFocusedTranslation({
