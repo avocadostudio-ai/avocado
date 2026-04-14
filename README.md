@@ -1,4 +1,4 @@
-# AI Site Editor
+# Avocado Studio
 
 **AI-powered content operations for websites.** Manage site content through natural language — the system plans, validates, and applies structured edits with live preview, undo/redo, and one-click publishing.
 
@@ -8,9 +8,9 @@
 
 <!-- TODO: Add screenshot or demo GIF of the split-pane Content Studio UI -->
 
-## Why AI Site Editor?
+## Why Avocado Studio?
 
-Teams spend too much time on routine content updates — tweaking copy, adding sections, rearranging blocks. AI Site Editor turns these into simple conversations. Type what you want, review the plan, approve the changes.
+Teams spend too much time on routine content updates — tweaking copy, adding sections, rearranging blocks. Avocado Studio turns these into simple conversations. Type what you want, review the plan, approve the changes.
 
 Built for **developers** and **agencies** integrating AI editing into client sites, and **site owners** who want to manage content without touching code. Self-hosted, no vendor lock-in, no per-seat pricing.
 
