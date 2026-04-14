@@ -154,6 +154,13 @@ export const versionLog = new Map<string, VersionEntry[]>()
 export const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()
 export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
+/**
+ * Per-session image-source preference ("unsplash" | "genai" | "either"), set when
+ * the user resolves a source-ambiguity clarification. Stops repeated prompting
+ * within the same session. Ephemeral (in-memory) only.
+ */
+export type ImageSourcePreference = "unsplash" | "genai" | "either"
+export const imageSourcePreferenceBySession = new Map<string, ImageSourcePreference>()
 export const publishStatusBySession = new Map<string, PublishTracker>()
 export const siteConfigs = new Map<string, SiteConfig>()
 // Seed default config
