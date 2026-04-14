@@ -122,11 +122,6 @@ async function main() {
     },
   })
 
-  // Determine model used (from first successful case)
-  const modelUsed = scores.find((s) => s.chatResult.status !== "error")?.chatResult.opTypes.length !== undefined
-    ? `${provider}/${modelKey}`
-    : `${provider}/${modelKey}`
-
   // Build report
   const gitSha = getGitSha()
   const report = buildReport({
@@ -135,7 +130,7 @@ async function main() {
     gitSha,
     provider,
     modelKey,
-    modelUsed,
+    modelUsed: `${provider}/${modelKey}`,
   })
 
   // Load baseline and detect regressions

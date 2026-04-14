@@ -61,7 +61,7 @@ export function scoreCase(input: ScorerInput): CaseScore {
   const targetingScore = scoreTargeting(evalCase, chatResult, draftAfter, draftBefore, failureDetails)
 
   // --- Dimension 4: Assertions ---
-  const assertionsScore = scoreAssertions(evalCase, draftAfter, failureDetails)
+  const assertionsScore = scoreAssertions(evalCase, draftAfter, draftBefore, failureDetails)
 
   // --- Dimension 5: Content quality ---
   const contentScore = scoreContentChecks(evalCase, draftAfter, failureDetails)
@@ -205,7 +205,7 @@ function findBlock(page: PageDoc | undefined, assertion: EvalAssertion): BlockIn
   return undefined
 }
 
-function scoreAssertions(evalCase: EvalCase, draftAfter: DraftState, failures: string[]): number {
+function scoreAssertions(evalCase: EvalCase, draftAfter: DraftState, draftBefore: DraftState, failures: string[]): number {
   if (!evalCase.assertions || evalCase.assertions.length === 0) return 1.0
 
   let passed = 0
@@ -237,12 +237,22 @@ function scoreAssertions(evalCase: EvalCase, draftAfter: DraftState, failures: s
       }
       case "block_prop_changed": {
         const block = findBlock(page, assertion)
-        // We need original to compare — look it up from RICH_PAGES via the draftBefore snapshot
-        // For now, just check the block exists and has the prop
-        if (block && assertion.prop && (block.props as Record<string, unknown>)[assertion.prop!] !== undefined) {
+        const beforeSlug = assertion.slug ?? evalCase.slug
+        const pageBefore = draftBefore.pages.get(beforeSlug)
+        const blockBefore = pageBefore ? findBlock(pageBefore, assertion) : undefined
+        if (!block || !assertion.prop) {
+          failures.push(`assertion[block_prop_changed]: block or prop not found after edit`)
+        } else if (!blockBefore) {
+          // Block didn't exist before — it was added, so the prop is "changed"
           passed++
         } else {
-          failures.push(`assertion[block_prop_changed]: block or prop not found`)
+          const valueBefore = (blockBefore.props as Record<string, unknown>)[assertion.prop!]
+          const valueAfter = (block.props as Record<string, unknown>)[assertion.prop!]
+          if (JSON.stringify(valueBefore) !== JSON.stringify(valueAfter)) {
+            passed++
+          } else {
+            failures.push(`assertion[block_prop_changed]: ${assertion.blockType ?? assertion.blockId}.${assertion.prop} was not modified (still ${JSON.stringify(valueAfter)})`)
+          }
         }
         break
       }
@@ -302,15 +312,17 @@ function scoreAssertions(evalCase: EvalCase, draftAfter: DraftState, failures: s
         const prop = assertion.prop ?? "items"
         const items = block ? (block.props as Record<string, unknown>)[prop] : undefined
         const afterCount = Array.isArray(items) ? items.length : 0
-        // Infer before count from the original fixture for the slug
-        // This is a simplification — the runner should pass draftBefore
+        const beforeSlug = assertion.slug ?? evalCase.slug
+        const pageBefore = draftBefore.pages.get(beforeSlug)
+        const blockBefore = pageBefore ? findBlock(pageBefore, assertion) : undefined
+        const itemsBefore = blockBefore ? (blockBefore.props as Record<string, unknown>)[prop] : undefined
+        const beforeCount = Array.isArray(itemsBefore) ? itemsBefore.length : 0
         if (assertion.delta !== undefined) {
-          // We can't precisely check delta without before state here,
-          // so just check that items array exists and has reasonable length
-          if (afterCount > 0) {
+          const actualDelta = afterCount - beforeCount
+          if (actualDelta === assertion.delta) {
             passed++
           } else {
-            failures.push(`assertion[item_count_delta]: no items found after edit`)
+            failures.push(`assertion[item_count_delta]: delta=${actualDelta} (${beforeCount}→${afterCount}), expected delta=${assertion.delta}`)
           }
         } else {
           passed++
@@ -353,7 +365,11 @@ function scoreContentChecks(evalCase: EvalCase, draftAfter: DraftState, failures
       }
       case "no_banned_words": {
         const lower = propValue.toLowerCase()
-        const found = (check.bannedWords ?? []).filter((w) => new RegExp(`\\b${w}\\b`, "i").test(lower))
+        const found = (check.bannedWords ?? []).filter((w) => {
+          // For non-word characters (like !), use simple includes
+          if (/^\W+$/.test(w)) return lower.includes(w)
+          return new RegExp(`\\b${w}\\b`, "i").test(lower)
+        })
         if (found.length === 0) {
           passed++
         } else {

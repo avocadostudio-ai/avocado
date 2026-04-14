@@ -156,29 +156,12 @@ export async function saveReport(report: EvalReport, outPath?: string): Promise<
 // ---------------------------------------------------------------------------
 
 export function printReport(report: EvalReport, quiet: boolean): void {
-  const { summary, cases } = report
+  const { summary } = report
 
+  // Per-case output is already printed by onCaseComplete during the run.
+  // Only print the summary section here.
   console.log("")
-  console.log(`Planner Eval — ${report.provider}/${report.modelKey} (${report.modelUsed}) — ${summary.totalCount} cases`)
   console.log("=".repeat(80))
-
-  if (!quiet) {
-    for (const score of cases) {
-      const tag = score.pass ? "\x1b[32m[PASS]\x1b[0m" : "\x1b[31m[FAIL]\x1b[0m"
-      const cost = score.estimatedUsd !== null ? `$${score.estimatedUsd.toFixed(3)}` : "n/a"
-      const line = `${tag} ${score.caseId.padEnd(45)} ${score.composite.toFixed(2)}  (${score.latencyMs}ms, ${cost})`
-      console.log(line)
-      if (score.failureDetails && score.failureDetails.length > 0) {
-        for (const detail of score.failureDetails.slice(0, 3)) {
-          console.log(`  \x1b[33m↳ ${detail}\x1b[0m`)
-        }
-        if (score.failureDetails.length > 3) {
-          console.log(`  \x1b[33m↳ ... and ${score.failureDetails.length - 3} more\x1b[0m`)
-        }
-      }
-    }
-    console.log("-".repeat(80))
-  }
 
   // Category breakdown
   const cats = Object.entries(summary.byCategory).sort(([a], [b]) => a.localeCompare(b))

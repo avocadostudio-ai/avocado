@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // RICH_PAGES fixture — 8 pages, ~40 blocks
-// Identical to the fixture in e2e-editing.test.ts.
+// Single source of truth. Imported by both eval runner and e2e-editing.test.ts.
 // ---------------------------------------------------------------------------
 
 import type { PageDoc } from "@ai-site-editor/shared"
