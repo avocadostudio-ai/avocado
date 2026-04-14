@@ -4,6 +4,14 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
+import {
+  CANONICAL_OPS,
+  type CanonicalOp,
+  OP_ALIASES,
+  normalizeOp,
+  type CommandEval,
+  evaluateCommandMatchFromPredicted,
+} from "../eval/eval-scoring-utils.js"
 
 type EndpointMode = "auto" | "chat" | "responses" | "messages"
 type ProviderMode = "auto" | "openai" | "anthropic"
@@ -37,16 +45,7 @@ type RunResult = {
   error?: string
 }
 
-type CommandEval = {
-  expectedOps: string[]
-  predictedOps: string[]
-  missingOps: string[]
-  unexpectedOps: string[]
-  precision: number
-  recall: number
-  f1: number
-  exactMatch: boolean
-}
+// CommandEval type imported from eval-scoring-utils.ts
 
 type Aggregate = {
   ok: number
@@ -147,97 +146,7 @@ const USD_PER_MTOK: Record<string, { input: number; output: number }> = {
   "gpt-5.2-codex": { input: 1.75, output: 14 }
 }
 
-const CANONICAL_OPS = [
-  "create_page",
-  "add_block",
-  "update_props",
-  "remove_block",
-  "move_block",
-  "duplicate_block",
-  "add_item",
-  "update_item",
-  "remove_item",
-  "move_item",
-  "rename_page",
-  "remove_page",
-  "move_page",
-  "duplicate_page",
-  "update_page_meta",
-  "update_site_config"
-] as const
-type CanonicalOp = (typeof CANONICAL_OPS)[number]
-
-const OP_ALIASES: Record<string, CanonicalOp> = {
-  create_page: "create_page",
-  createpage: "create_page",
-  create_page_op: "create_page",
-  add_block: "add_block",
-  addblock: "add_block",
-  insert_block: "add_block",
-  insertblock: "add_block",
-  update_props: "update_props",
-  updateprops: "update_props",
-  update_block: "update_props",
-  updateblock: "update_props",
-  edit_block: "update_props",
-  editblock: "update_props",
-  remove_block: "remove_block",
-  removeblock: "remove_block",
-  delete_block: "remove_block",
-  deleteblock: "remove_block",
-  move_block: "move_block",
-  moveblock: "move_block",
-  reorder_block: "move_block",
-  reorderblock: "move_block",
-  duplicate_block: "duplicate_block",
-  duplicateblock: "duplicate_block",
-  copy_block: "duplicate_block",
-  copyblock: "duplicate_block",
-  clone_block: "duplicate_block",
-  cloneblock: "duplicate_block",
-  add_item: "add_item",
-  additem: "add_item",
-  insert_item: "add_item",
-  insertitem: "add_item",
-  append_item: "add_item",
-  appenditem: "add_item",
-  update_item: "update_item",
-  updateitem: "update_item",
-  edit_item: "update_item",
-  edititem: "update_item",
-  remove_item: "remove_item",
-  removeitem: "remove_item",
-  delete_item: "remove_item",
-  deleteitem: "remove_item",
-  move_item: "move_item",
-  moveitem: "move_item",
-  reorder_item: "move_item",
-  reorderitem: "move_item",
-  rename_page: "rename_page",
-  renamepage: "rename_page",
-  remove_page: "remove_page",
-  removepage: "remove_page",
-  delete_page: "remove_page",
-  deletepage: "remove_page",
-  move_page: "move_page",
-  movepage: "move_page",
-  reorder_page: "move_page",
-  reorderpage: "move_page",
-  duplicate_page: "duplicate_page",
-  duplicatepage: "duplicate_page",
-  copy_page: "duplicate_page",
-  copypage: "duplicate_page",
-  clone_page: "duplicate_page",
-  clonepage: "duplicate_page",
-  update_page_meta: "update_page_meta",
-  updatepagemeta: "update_page_meta",
-  set_page_meta: "update_page_meta",
-  setpagemeta: "update_page_meta",
-  update_site_config: "update_site_config",
-  updatesiteconfig: "update_site_config",
-  set_site_config: "update_site_config",
-  setsiteconfig: "update_site_config"
-}
+// CANONICAL_OPS, CanonicalOp, OP_ALIASES imported from eval-scoring-utils.ts
 
 function parseArgs(argv: string[]) {
   const args = new Map<string, string>()
@@ -291,12 +200,7 @@ function toBasePromptId(promptId: string, groupVariantsByBaseId: boolean) {
   return promptId.replace(VARIANT_SUFFIX_REGEX, "")
 }
 
-function normalizeOp(value: unknown): CanonicalOp | null {
-  if (typeof value !== "string") return null
-  const key = value.toLowerCase().trim().replace(/[\s-]+/g, "_")
-  if ((CANONICAL_OPS as readonly string[]).includes(key)) return key as CanonicalOp
-  return OP_ALIASES[key] ?? null
-}
+// normalizeOp imported from eval-scoring-utils.ts
 
 function parseExpectedOps(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
@@ -458,32 +362,7 @@ function evaluateCommandMatch(expectedOps: string[] | undefined, text: string): 
   }
 }
 
-function evaluateCommandMatchFromPredicted(expectedOps: string[] | undefined, predicted: CanonicalOp[]): CommandEval | undefined {
-  if (!expectedOps || expectedOps.length === 0) return undefined
-  const expected = Array.from(new Set(expectedOps.map((item) => normalizeOp(item)).filter((item): item is CanonicalOp => !!item)))
-  if (expected.length === 0) return undefined
-
-  const predictedSet = new Set(predicted)
-  const expectedSet = new Set(expected)
-  const intersection = expected.filter((op) => predictedSet.has(op))
-  const missing = expected.filter((op) => !predictedSet.has(op))
-  const unexpected = predicted.filter((op) => !expectedSet.has(op))
-  const precision = predicted.length > 0 ? intersection.length / predicted.length : 0
-  const recall = expected.length > 0 ? intersection.length / expected.length : 0
-  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0
-  const exactMatch = missing.length === 0 && unexpected.length === 0
-
-  return {
-    expectedOps: expected,
-    predictedOps: predicted,
-    missingOps: missing,
-    unexpectedOps: unexpected,
-    precision,
-    recall,
-    f1,
-    exactMatch
-  }
-}
+// evaluateCommandMatchFromPredicted imported from eval-scoring-utils.ts
 
 function parsePrompts(raw: string): PromptCase[] {
   const parsed = JSON.parse(raw) as unknown
