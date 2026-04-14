@@ -1,0 +1,478 @@
+[
+  {
+    "id": "home-hero-heading-exact",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Change the hero heading to 'Fresh Avocado Stories Every Day'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_equals", "blockType": "Hero", "prop": "heading", "value": "Fresh Avocado Stories Every Day" }
+    ]
+  },
+  {
+    "id": "home-hero-multi-field",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Update the hero: set the subheading to 'Discover recipes, tips, and tales' and change the CTA button text to 'Start Reading'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_equals", "blockType": "Hero", "prop": "subheading", "value": "Discover recipes, tips, and tales" },
+      { "type": "block_prop_equals", "blockType": "Hero", "prop": "ctaText", "value": "Start Reading" }
+    ]
+  },
+  {
+    "id": "home-add-testimonials",
+    "category": "add_block",
+    "slug": "/",
+    "message": "Add a testimonials section after the features grid with the title 'What Our Readers Say'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"],
+    "assertions": [
+      { "type": "block_exists", "blockType": "Testimonials" },
+      { "type": "block_prop_matches", "blockType": "Testimonials", "prop": "title", "pattern": "reader|customer|testimonial|say" }
+    ]
+  },
+  {
+    "id": "about-us-add-faq-item",
+    "category": "list_ops",
+    "slug": "/about-us",
+    "message": "Add a new FAQ question: 'Do you offer a free trial?' with the answer 'Yes, all plans include a 14-day free trial'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_item"],
+    "expectedTargetBlockTypes": ["FAQAccordion"]
+  },
+  {
+    "id": "home-remove-cta",
+    "category": "remove_block",
+    "slug": "/",
+    "message": "Remove the call-to-action section from this page",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_block"],
+    "assertions": [
+      { "type": "block_not_exists", "blockId": "b_cta_home" }
+    ]
+  },
+  {
+    "id": "home-create-about-page",
+    "category": "page_ops",
+    "slug": "/",
+    "message": "Create a new About page at /about with a hero titled 'About Us' and a RichText block explaining our mission",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["create_page"],
+    "assertions": [
+      { "type": "page_exists", "slug": "/about" },
+      { "type": "block_exists", "blockType": "Hero", "slug": "/about" },
+      { "type": "block_prop_matches", "blockType": "Hero", "prop": "heading", "pattern": "about us", "slug": "/about" },
+      { "type": "block_exists", "blockType": "RichText", "slug": "/about" }
+    ]
+  },
+  {
+    "id": "about-lemons-rename",
+    "category": "page_ops",
+    "slug": "/about-lemons",
+    "message": "Rename this page to /lemons and update its title to 'All About Lemons'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["rename_page"],
+    "assertions": [
+      { "type": "page_not_exists", "slug": "/about-lemons" },
+      { "type": "page_exists", "slug": "/lemons" }
+    ]
+  },
+  {
+    "id": "home-duplicate-featuregrid",
+    "category": "multi_op",
+    "slug": "/",
+    "message": "Duplicate the features grid on this page",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["duplicate_block"],
+    "expectedTargetBlockTypes": ["FeatureGrid"]
+  },
+  {
+    "id": "home-hero-edit-then-cta",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Change the hero heading to 'Avocado Paradise'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "expectedTargetBlockIds": ["b_hero_home_rich"],
+    "assertions": [
+      { "type": "block_prop_equals", "blockType": "Hero", "prop": "heading", "value": "Avocado Paradise" }
+    ]
+  },
+  {
+    "id": "home-ordinal-reference-second-section",
+    "category": "ambiguous",
+    "slug": "/",
+    "message": "Change the title of the second section to 'Our Avocado Adventures'",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "assertions": [
+      { "type": "block_prop_matches", "blockType": "CardGrid", "prop": "title", "pattern": "avocado adventure" }
+    ]
+  },
+  {
+    "id": "strawberries-remove-first-faq",
+    "category": "list_ops",
+    "slug": "/strawberries",
+    "message": "Remove the first question from the FAQ section",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_item"],
+    "expectedTargetBlockTypes": ["FAQAccordion"]
+  },
+  {
+    "id": "strawberries-move-cta-top",
+    "category": "move_block",
+    "slug": "/strawberries",
+    "message": "Move the call-to-action section to the top of the page",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["move_block"],
+    "expectedTargetBlockTypes": ["CTA"]
+  },
+  {
+    "id": "bananas-vague-rewrite-hero",
+    "category": "rewrite",
+    "slug": "/bananas",
+    "message": "Make the hero section more exciting and energetic",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_changed", "blockType": "Hero", "prop": "heading" }
+    ]
+  },
+  {
+    "id": "home-typo-remove-testimonials",
+    "category": "robustness",
+    "slug": "/",
+    "message": "remove the testomonials section",
+    "tags": ["core", "robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_block"],
+    "assertions": [
+      { "type": "block_not_exists", "blockType": "Testimonials" }
+    ]
+  },
+  {
+    "id": "oranges-typo-add-features",
+    "category": "robustness",
+    "slug": "/oranges",
+    "message": "ad a fetures section with 3 items",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"],
+    "assertions": [
+      { "type": "block_exists", "blockType": "FeatureGrid" }
+    ]
+  },
+  {
+    "id": "cherries-informal-add-cta",
+    "category": "add_block",
+    "slug": "/cherries",
+    "message": "put a cta at the bottom",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"],
+    "assertions": [
+      { "type": "block_exists", "blockType": "CTA" }
+    ]
+  },
+  {
+    "id": "olives-delete-page",
+    "category": "page_ops",
+    "slug": "/olives",
+    "message": "Delete this page",
+    "tags": ["core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_page"],
+    "assertions": [
+      { "type": "page_not_exists", "slug": "/olives" }
+    ]
+  },
+  {
+    "id": "bananas-duplicate-to-plantains",
+    "category": "page_ops",
+    "slug": "/bananas",
+    "message": "Duplicate /bananas to /plantains",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["duplicate_page"],
+    "assertions": [
+      { "type": "page_exists", "slug": "/plantains" },
+      { "type": "page_exists", "slug": "/bananas" }
+    ]
+  },
+  {
+    "id": "about-us-batch-add-testimonials-cta",
+    "category": "multi_op",
+    "slug": "/about-us",
+    "message": "Add a testimonials section and a CTA section to the bottom of this page",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"]
+  },
+  {
+    "id": "bananas-voice-rewrite-constraints",
+    "category": "rewrite",
+    "slug": "/bananas",
+    "message": "Rewrite the hero so it sounds confident and modern. Keep heading under 8 words, avoid cliches like 'unlock' or 'journey', keep CTA intact.",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "contentChecks": [
+      { "type": "max_word_count", "blockType": "Hero", "prop": "heading", "maxWords": 8 },
+      { "type": "no_banned_words", "blockType": "Hero", "prop": "heading", "bannedWords": ["unlock", "journey"] }
+    ]
+  },
+  {
+    "id": "oranges-transform-richtext-bullets",
+    "category": "rewrite",
+    "slug": "/oranges",
+    "message": "Refactor the existing rich-text body into exactly three concise benefit bullets, each starting with an action verb. Keep the same title and do not add new blocks.",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["RichText"],
+    "assertions": [
+      { "type": "block_exists", "blockType": "RichText" },
+      { "type": "block_prop_changed", "blockType": "RichText", "prop": "body" }
+    ]
+  },
+  {
+    "id": "home-cross-block-cta-consistency",
+    "category": "multi_op",
+    "slug": "/",
+    "message": "Rewrite both CTA labels on this page so they are consistent and action-oriented: hero CTA should invite exploring, footer CTA should invite joining. Keep all links unchanged and avoid exclamation marks.",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "contentChecks": [
+      { "type": "no_banned_words", "blockType": "CTA", "prop": "ctaText", "bannedWords": ["!"] }
+    ]
+  },
+  {
+    "id": "home-ambiguous-second-section-premium",
+    "category": "ambiguous",
+    "slug": "/",
+    "message": "Make the second section title more premium and less generic, and tighten that section's copy.",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"]
+  },
+  {
+    "id": "cherries-multi-turn-style",
+    "category": "rewrite",
+    "slug": "/cherries",
+    "message": "Rewrite the hero in a crisp, expert tone for health-conscious readers.",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_changed", "blockType": "Hero", "prop": "heading" }
+    ]
+  },
+  {
+    "id": "about-us-noisy-prompt",
+    "category": "robustness",
+    "slug": "/about-us",
+    "message": "k, pls make hero less corp-y, more human. keep CTA link same. also trim subheading by ~30%, thx",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_equals", "blockType": "Hero", "prop": "ctaHref", "value": "/about-us" },
+      { "type": "block_prop_changed", "blockType": "Hero", "prop": "heading" }
+    ]
+  },
+  {
+    "id": "robustness-all-caps-prompt",
+    "category": "robustness",
+    "slug": "/",
+    "message": "CHANGE THE HERO HEADING TO 'AVOCADO HEAVEN'",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_matches", "blockType": "Hero", "prop": "heading", "pattern": "avocado heaven" }
+    ]
+  },
+  {
+    "id": "robustness-terse-prompt",
+    "category": "robustness",
+    "slug": "/",
+    "message": "rm hero",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_block"],
+    "assertions": [
+      { "type": "block_not_exists", "blockType": "Hero" }
+    ]
+  },
+  {
+    "id": "robustness-emoji-prompt",
+    "category": "robustness",
+    "slug": "/bananas",
+    "message": "🍌 make the hero heading say 'Go Bananas!' 🎉",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_matches", "blockType": "Hero", "prop": "heading", "pattern": "go bananas" }
+    ]
+  },
+  {
+    "id": "robustness-german-prompt",
+    "category": "robustness",
+    "slug": "/",
+    "message": "Ändere die Überschrift des Helden zu 'Frische Avocados für Alle'",
+    "tags": ["robustness"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_matches", "blockType": "Hero", "prop": "heading", "pattern": "frische avocados" }
+    ]
+  },
+  {
+    "id": "edge-nonexistent-block",
+    "category": "ambiguous",
+    "slug": "/oranges",
+    "message": "Update the FAQ section title to 'Common Questions'",
+    "tags": ["edge"],
+    "expectedStatus": "needs_clarification",
+    "expectedOpTypes": []
+  },
+  {
+    "id": "edge-impossible-request",
+    "category": "ambiguous",
+    "slug": "/",
+    "message": "Move the hero section to a page that doesn't exist yet called /new-landing",
+    "tags": ["edge"],
+    "expectedStatus": "needs_clarification",
+    "expectedOpTypes": []
+  },
+  {
+    "id": "clarification-ambiguous-which-richtext",
+    "category": "ambiguous",
+    "slug": "/cherries",
+    "message": "Update the rich text body",
+    "tags": ["edge"],
+    "expectedStatus": "needs_clarification",
+    "expectedOpTypes": []
+  },
+  {
+    "id": "home-add-faq-section",
+    "category": "add_block",
+    "slug": "/",
+    "message": "Add an FAQ section at the bottom of the page with 3 questions about avocados",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"],
+    "assertions": [
+      { "type": "block_exists", "blockType": "FAQAccordion" }
+    ]
+  },
+  {
+    "id": "strawberries-update-hero-cta-href",
+    "category": "text_edit",
+    "slug": "/strawberries",
+    "message": "Change the hero CTA link to '/strawberry-recipes'",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"],
+    "assertions": [
+      { "type": "block_prop_equals", "blockType": "Hero", "prop": "ctaHref", "value": "/strawberry-recipes" }
+    ]
+  },
+  {
+    "id": "olives-update-cardgrid-card-description",
+    "category": "text_edit",
+    "slug": "/olives",
+    "message": "In the card grid, change the first card's description to 'Premium extra-virgin olive oil rich in oleic acid.'",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props", "update_item"],
+    "expectedTargetBlockTypes": ["CardGrid"]
+  },
+  {
+    "id": "home-rewrite-richtext-body",
+    "category": "rewrite",
+    "slug": "/",
+    "message": "Rewrite the first RichText block body to be more engaging and under 50 words",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["RichText"],
+    "contentChecks": [
+      { "type": "max_word_count", "blockType": "RichText", "prop": "body", "maxWords": 60 }
+    ]
+  },
+  {
+    "id": "bananas-add-cta-with-content",
+    "category": "add_block",
+    "slug": "/bananas",
+    "message": "Add a CTA section at the bottom with title 'Try Our Banana Recipes', description 'Explore delicious and healthy banana recipes.', button text 'Get Recipes', and link '/banana-recipes'",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["add_block"],
+    "assertions": [
+      { "type": "block_exists", "blockType": "CTA" },
+      { "type": "block_prop_matches", "blockType": "CTA", "prop": "title", "pattern": "banana" }
+    ]
+  },
+  {
+    "id": "cherries-remove-second-richtext",
+    "category": "remove_block",
+    "slug": "/cherries",
+    "message": "Remove the 'Vitamins in Cherries' rich text section",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["remove_block"],
+    "assertions": [
+      { "type": "block_not_exists", "blockId": "b_richtext_cherries_2" }
+    ]
+  },
+  {
+    "id": "strawberries-update-faq-answer",
+    "category": "list_ops",
+    "slug": "/strawberries",
+    "message": "Update the answer to 'Can strawberries be frozen?' to say 'Absolutely! Wash, dry, and freeze on a baking sheet before transferring to bags.'",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_item"],
+    "expectedTargetBlockTypes": ["FAQAccordion"]
+  },
+  {
+    "id": "home-update-testimonial-quote",
+    "category": "list_ops",
+    "slug": "/",
+    "message": "Update Emily Avocado's testimonial quote to 'Avocados transformed my cooking — I use them in everything!'",
+    "tags": [],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_item"],
+    "expectedTargetBlockTypes": ["Testimonials"]
+  }
+]
