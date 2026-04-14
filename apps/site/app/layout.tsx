@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import type { ReactNode } from "react"
 import { DEFAULT_SITE_DESCRIPTION } from "../lib/seo"
 import { DEFAULT_SITE_NAME } from "../lib/defaults"
+import { NextLinkProvider } from "../components/next-link-provider"
 
 export const metadata: Metadata = {
   title: { default: DEFAULT_SITE_NAME, template: `%s · ${DEFAULT_SITE_NAME}` },
@@ -23,11 +24,13 @@ const themeScript = `(function(){try{var e=window.parent!==window;var t=e?null:l
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning style={{ background: "var(--bg-0, #faf9f5)" }}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body style={{ background: "var(--bg-0, #faf9f5)" }}>
+        <NextLinkProvider>{children}</NextLinkProvider>
+      </body>
     </html>
   )
 }
