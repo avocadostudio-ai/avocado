@@ -180,6 +180,44 @@ export function parseDuplicatePageRequest(message: string, args?: { currentSlug?
   return { sourceSlug, targetSlug }
 }
 
+/**
+ * Detects whether a message is a generic image intent that needs clarification
+ * about which source to use (Unsplash vs AI generation).
+ *
+ * Returns true only when:
+ * - Both image sources are configured AND
+ * - The message contains a generic image intent ("add an image", "change the photo") AND
+ * - No explicit source keyword (unsplash, stock photo, generate, ai, dall-e, midjourney)
+ *
+ * Meant to be called before the planner so the editor can ask the user to pick
+ * a source upfront instead of making an arbitrary choice later.
+ */
+export function detectImageSourceAmbiguity(
+  message: string,
+  config: { hasUnsplash: boolean; hasGenAI: boolean }
+): boolean {
+  if (!config.hasUnsplash || !config.hasGenAI) return false
+  if (typeof message !== "string") return false
+  const normalized = message.toLowerCase().replace(/\s+/g, " ").trim()
+  if (!normalized) return false
+
+  // Explicit source mentions short-circuit — no ambiguity
+  const hasExplicitSource =
+    /\b(unsplash|stock\s+photo|stock\s+image|royalty[-\s]?free)\b/.test(normalized) ||
+    /\b(generate|generated|ai[-\s]?generated|ai\s+image|ai\s+photo|dall[-\s]?e|midjourney|stable\s+diffusion|create\s+(?:an?\s+)?(?:image|photo|picture))\b/.test(normalized) ||
+    /\bwith\s+ai\b/.test(normalized) ||
+    /\b(drive|brand\s+(?:assets?|images?|photos?))\b/.test(normalized)
+  if (hasExplicitSource) return false
+
+  // Generic image intent: "add/change/set/find/pick/use/update/replace/put ... image/photo/picture"
+  const hasGenericImageIntent =
+    /\b(add|change|set|find|pick|choose|use|update|replace|put|include|insert|swap)\b[^.!?]{0,40}\b(images?|photos?|pictures?|hero\s+image)\b/.test(normalized) ||
+    /\b(images?|photos?|pictures?)\b[^.!?]{0,12}\b(for|of|to)\b/.test(normalized) ||
+    /^(?:a\s+)?(?:new\s+)?(?:hero\s+)?(?:image|photo|picture)\b/.test(normalized)
+
+  return hasGenericImageIntent
+}
+
 /** Returns true when the message asks for AI-generated content alongside a page create. */
 export function requestsContentGeneration(message: string) {
   const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "").trim()

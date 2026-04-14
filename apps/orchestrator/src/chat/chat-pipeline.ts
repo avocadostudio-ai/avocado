@@ -41,12 +41,14 @@ import {
   type AIProvider,
   type ModelKey,
   type ContinuationChain,
+  type ImageSourcePreference,
   type PendingImageGeneration,
   versions,
   pendingClarificationBySession,
   chatHistoryBySession,
   pendingApprovalPlanBySession,
   continuationChainBySession,
+  imageSourcePreferenceBySession,
   getSessionDraft,
   getPage,
   setPage,
@@ -92,6 +94,7 @@ import { generatePlanWithAnthropic, parseIntentWithAnthropic, type DeferredNativ
 import { generatePlanWithGemini, parseIntentWithGemini } from "./gemini-planner.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import { executeToolCall } from "../tools/runtime.js"
+import { detectImageSourceAmbiguity } from "../nlp/intent-helpers.js"
 
 // ---------------------------------------------------------------------------
 // Re-exports from extracted modules (for backwards compat with external importers)
@@ -111,6 +114,61 @@ import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntri
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
 import { runVariationPipeline } from "./variation-pipeline.js"
+
+/**
+ * Parses an image-source chip answer ("Use Unsplash photo", "Generate with AI",
+ * "Either's fine — pick for me") and returns the matching preference, or null
+ * when the message isn't a chip reply. Matching is loose (plain-text containment)
+ * so typed-out variants still resolve.
+ */
+function parseImageSourceChoiceFromMessage(message: string): ImageSourcePreference | null {
+  if (typeof message !== "string") return null
+  const normalized = message.toLowerCase().replace(/\s+/g, " ").trim()
+  if (!normalized) return null
+  // "Either's fine" must take precedence — otherwise a message that mentions
+  // both sources ("I'll let you pick between unsplash or AI") would resolve
+  // ambiguously.
+  if (/\beither\b/.test(normalized) && /\b(fine|pick|choose|you\s+decide)\b/.test(normalized)) return "either"
+  if (/\buse\s+unsplash\b/.test(normalized) || /^unsplash(?:\s+photo)?$/.test(normalized)) return "unsplash"
+  if (/\bgenerate\s+with\s+ai\b/.test(normalized) || /^(?:ai|ai[-\s]?generated)$/.test(normalized)) return "genai"
+  return null
+}
+
+/**
+ * Image fields that, when they are the ONLY fields touched in an update_props
+ * patch, make the op a pure "image update" — safe to auto-apply via the deferred
+ * image resolution path (shimmer placeholder → real URL streamed in over SSE).
+ *
+ * Compound plans or plans that touch text fields alongside images keep the
+ * approval gate so the user can still review text copy before it lands.
+ */
+const IMAGE_ONLY_PATCH_FIELDS = new Set(["imageUrl", "imageAlt", "ogImage", "logoUrl"])
+
+/**
+ * True when every op in the plan is an `update_props` whose patch touches
+ * only image-related fields (imageUrl/imageAlt/ogImage/logoUrl). Such plans
+ * should skip the approval gate — image resolution is deterministic work.
+ *
+ * Exported for unit tests.
+ */
+export function isImageOnlyUpdatePropsPlan(plan: EditPlan): boolean {
+  if (plan.intent !== "edit_plan") return false
+  if (!Array.isArray(plan.ops) || plan.ops.length === 0) return false
+  return plan.ops.every((op) => {
+    if (op.op !== "update_props") return false
+    const rawPatch = op.patch as Record<string, unknown> | undefined
+    if (!rawPatch || typeof rawPatch !== "object") return false
+    const patch =
+      typeof (rawPatch as { props?: unknown }).props === "object" &&
+      (rawPatch as { props?: unknown }).props !== null &&
+      !Array.isArray((rawPatch as { props?: unknown }).props)
+        ? ((rawPatch as { props: Record<string, unknown> }).props)
+        : rawPatch
+    const keys = Object.keys(patch)
+    if (keys.length === 0) return false
+    return keys.every((k) => IMAGE_ONLY_PATCH_FIELDS.has(k))
+  })
+}
 
 let generatePlanWithOpenAIImpl = generatePlanWithOpenAI
 export function setGeneratePlanWithOpenAIForTests(fn?: typeof generatePlanWithOpenAI) {
@@ -302,7 +360,27 @@ export async function runChatPipeline(
     pageDirectory: pageDirectory || undefined
   })
   // Site context is now passed to the LLM system prompt (cacheable) instead of the user message.
-  const plannerMessage = plannerMessageWithPendingContext(body.session, sanitizedMessage)
+  let plannerMessage = plannerMessageWithPendingContext(body.session, sanitizedMessage)
+
+  // ---------------------------------------------------------------------------
+  // Image source preference (Layer 3): capture the user's choice from a chip
+  // answer (if any), then bias downstream image-source detection via a hint
+  // token so repeated prompts stop within the same session. The ambiguity
+  // challenge itself (returning needs_clarification chips) runs further down
+  // once withDebugPayload is in scope.
+  // ---------------------------------------------------------------------------
+  const capturedImageSourceChoice = parseImageSourceChoiceFromMessage(sanitizedMessage)
+  if (capturedImageSourceChoice) {
+    imageSourcePreferenceBySession.set(body.session, capturedImageSourceChoice)
+  }
+  const activeImageSourcePreference: ImageSourcePreference | undefined =
+    capturedImageSourceChoice ?? imageSourcePreferenceBySession.get(body.session)
+  if (activeImageSourcePreference === "unsplash") {
+    plannerMessage = `${plannerMessage} unsplash`
+  } else if (activeImageSourcePreference === "genai") {
+    plannerMessage = `${plannerMessage} generate image`
+  }
+
   const inferredTranslationScope = inferTranslationScopeFromMessage(plannerMessage)
   const translationScope = shouldPreferFocusedTranslation({
     message: plannerMessage,
@@ -644,6 +722,39 @@ export async function runChatPipeline(
     current = { id: effectiveSlug, slug: effectiveSlug, title: "", updatedAt: new Date().toISOString(), blocks: [] }
   }
 
+  // Layer 3: upfront image-source choice. Ask once when the prompt is a
+  // generic image intent and both Unsplash + GenAI are configured. Choice is
+  // remembered for the session (imageSourcePreferenceBySession) so subsequent
+  // prompts skip the question.
+  if (!activeImageSourcePreference && body.message) {
+    const hasUnsplash = Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
+    const hasGenAI = Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim())
+    if (detectImageSourceAmbiguity(sanitizedMessage, { hasUnsplash, hasGenAI })) {
+      pendingClarificationBySession.set(body.session, {
+        baseRequest: sanitizedMessage,
+        updatedAt: new Date().toISOString()
+      })
+      return {
+        code: 200,
+        payload: withDebugPayload({
+          status: "needs_clarification",
+          summary: "Where should this image come from?",
+          changes: [],
+          suggestions: [
+            "Use Unsplash photo",
+            "Generate with AI",
+            "Either's fine — pick for me"
+          ],
+          mentionedSlugs: [effectiveSlug],
+          previewVersion: versions.get(body.session) ?? 0,
+          plannerSource,
+          modelUsed,
+          modelKey
+        } satisfies ChatResult, { outcome: "needs_clarification", reasonCategory: "ambiguity" })
+      }
+    }
+  }
+
   // "describe this image" on an image field — return the current image URL and suggest alt text
   if (body.message && /\bdescribe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration)\b/i.test(body.message) && body.activeEditablePath) {
     const isImageField = /(?:imageUrl|image\.?src|\.url)$/i.test(body.activeEditablePath)
@@ -958,10 +1069,20 @@ export async function runChatPipeline(
       }
 
       if (detectedImageOps.length > 0) {
-        // Force plan approval so user can review before expensive image generation
-        effectiveApplyMode = "plan_only"
+        // Decide whether to hold for approval. Image resolution alone is
+        // deterministic background work — if the plan is nothing but image
+        // updates, auto-apply and resolve in the background so the user sees
+        // "Added a spring avocados image" → shimmer → real image without a
+        // redundant "approve" button. Compound plans (structural changes,
+        // text updates, multi-op) keep the approval gate.
+        const imageOnlyPlan = isImageOnlyUpdatePropsPlan(resolvedPlan)
+        if (!imageOnlyPlan) {
+          effectiveApplyMode = "plan_only"
+        }
 
-        // Strip placeholder imageUrl values from ops so preview shows current image
+        // Strip placeholder imageUrl values from ops so preview shows current image.
+        // For approval flow: values are restored to "pending" before withUnsplashHeroImage.
+        // For auto-apply flow: the deferred resolution path restores them (see below).
         for (const op of resolvedPlan.ops) {
           if (op.op !== "update_props") continue
           const imgOps = detectedImageOps.filter((io) => io.blockId === op.blockId && io.pageSlug === op.pageSlug)
@@ -985,15 +1106,68 @@ export async function runChatPipeline(
           }
         }
 
-        // Annotate change_log with deferred image generation info
+        // Annotate change_log with image work.
+        // Phrasing differs: approval flow uses future tense ("Will ..."),
+        // auto-apply uses present tense ("Adding ...") so the summary reads
+        // sensibly even though the image arrives a moment later.
         for (const imgOp of detectedImageOps) {
-          const pendingImageMessage =
-            imgOp.provider === "unsplash"
+          const pendingImageMessage = imageOnlyPlan
+            ? imgOp.provider === "unsplash"
+              ? `Finding an image on Unsplash for "${imgOp.query}"…`
+              : imgOp.provider === "openai"
+                ? `Generating an AI image for "${imgOp.query}"…`
+                : `Resolving an image for "${imgOp.query}"…`
+            : imgOp.provider === "unsplash"
               ? `Will find an image on Unsplash: "${imgOp.query}".`
               : imgOp.provider === "openai"
                 ? `Will generate an image with AI: "${imgOp.query}".`
                 : `Will resolve an image for: "${imgOp.query}".`
           resolvedPlan.change_log = [...resolvedPlan.change_log, pendingImageMessage]
+        }
+
+        if (imageOnlyPlan) {
+          // Auto-apply path: tag the plan so the post-apply deferred block
+          // resolves the real image and streams it back via onOpApplied.
+          ;(resolvedPlan as EditPlan & { _deferredImageResolution?: true })._deferredImageResolution = true
+          ;(resolvedPlan as EditPlan & { _deferredImageArgs?: unknown })._deferredImageArgs = {
+            message: plannerMessage,
+            slug: effectiveSlug,
+            currentPage: current,
+            activeBlockId: planningActiveBlockId,
+            activeEditablePath: planningActiveEditablePath,
+            chatRequestId,
+            gdriveFolderId,
+            preferredImageOps: detectedImageOps
+          }
+
+          // Mirror the else-branch's progress markers so the editor gets instant
+          // "plan ready" feedback while images resolve in the background.
+          options?.onPlanMeta?.({
+            intent: resolvedPlan.intent,
+            summary: resolvedPlan.summary_for_user,
+            estimatedOps: resolvedPlan.ops.length
+          })
+          markFirstStructuredProgress()
+          if (!stageTimeline.some((item) => item.stage === "plan_ready")) {
+            const planReadyAtMs = Date.now() - pipelineStartedAtMs
+            stageTimeline.push({ stage: "plan_ready", atMs: planReadyAtMs })
+            ctx.chatTelemetry.push({
+              id: chatRequestId,
+              at: new Date().toISOString(),
+              phase: "milestone",
+              timelineStage: "plan_ready",
+              session: body.session!,
+              requestedSlug,
+              effectiveSlug,
+              plannerSource: source,
+              modelKey,
+              modelUsed,
+              promptHash,
+              promptExcerpt,
+              promptLength: plannerMessage.length,
+              totalDurationMs: planReadyAtMs
+            })
+          }
         }
       } else {
         // Emit plan metadata and progress markers so the UI gets instant feedback
@@ -1610,17 +1784,78 @@ export async function runChatPipeline(
       // Deferred image resolution for non-create_page ops: resolve images after
       // text/structural ops are already visible in the preview, then patch them in.
       const deferredImageArgs = (resolvedPlan as EditPlan & { _deferredImageResolution?: boolean; _deferredImageArgs?: {
-        message: string; slug: string; currentPage: PageDoc; activeBlockId?: string; activeEditablePath?: string; chatRequestId: string; gdriveFolderId?: string
+        message: string; slug: string; currentPage: PageDoc; activeBlockId?: string; activeEditablePath?: string; chatRequestId: string; gdriveFolderId?: string; preferredImageOps?: PendingImageGeneration[]
       } })._deferredImageArgs
       if ((resolvedPlan as EditPlan & { _deferredImageResolution?: boolean })._deferredImageResolution && deferredImageArgs && options?.onOpApplied && deferredNativeImageCalls.length === 0) {
         try {
           const imageResolutionStartMs = Date.now()
           emitStatusTone("resolving_assets")
+
+          const preferredImageOps = deferredImageArgs.preferredImageOps ?? []
+
+          // When auto-apply runs for an image-only plan, the original patches
+          // had their imageUrl/imageAlt stripped. Apply shimmer placeholders
+          // so the preview shows "Searching…" / "Generating…" while we resolve.
+          // This mirrors the approval-flow UX in chat-pipeline.ts (pending plan block).
+          if (preferredImageOps.length > 0) {
+            const shimmerOps: Operation[] = preferredImageOps.map((imgOp) => {
+              const placeholder = imgOp.provider === "unsplash" ? SEARCHING_IMAGE_PLACEHOLDER : GENERATING_IMAGE_PLACEHOLDER
+              const patchProps: Record<string, unknown> = {}
+              if (typeof imgOp.path === "string" && imgOp.path.length > 0) {
+                setValueAtPath(patchProps, imgOp.path, placeholder)
+              } else {
+                patchProps.imageUrl = placeholder
+              }
+              return { op: "update_props" as const, pageSlug: imgOp.pageSlug, blockId: imgOp.blockId, patch: { props: patchProps } }
+            })
+            try {
+              await applyOpsAtomically(body.session!, shimmerOps, { componentsManifest })
+              const shimmerVersion = bumpVersion(body.session!)
+              const firstShimmer = shimmerOps[0]
+              options.onOpApplied({
+                index: 1,
+                total: 1,
+                op: firstShimmer,
+                previewVersion: shimmerVersion,
+                focusBlockId: firstShimmer.op === "update_props" ? firstShimmer.blockId : undefined
+              })
+            } catch (shimmerErr) {
+              ctx.log.debug(
+                { event: "deferred_image_shimmer_failed", chatRequestId, error: toErrorDetail(shimmerErr) },
+                "Shimmer placeholder injection failed; continuing with resolution"
+              )
+            }
+          }
+
+          // Restore "pending" imageUrl/imageAlt into ops whose patch was stripped,
+          // so withUnsplashHeroImage's `hasImageUrlInPatch` check passes and image
+          // resolution actually runs for these ops.
+          const planForResolve = structuredClone(resolvedPlan) as EditPlan
+          for (const imgOp of preferredImageOps) {
+            const op = planForResolve.ops.find(
+              (o) => o.op === "update_props" && o.blockId === imgOp.blockId && o.pageSlug === imgOp.pageSlug
+            )
+            if (!op || op.op !== "update_props") continue
+            const rawPatch = op.patch as Record<string, unknown>
+            const patchTarget =
+              rawPatch && typeof rawPatch.props === "object" && rawPatch.props !== null && !Array.isArray(rawPatch.props)
+                ? (rawPatch.props as Record<string, unknown>)
+                : rawPatch
+            if (typeof imgOp.path === "string" && imgOp.path.length > 0) {
+              if (getValueAtPath(patchTarget, imgOp.path) === undefined) {
+                setValueAtPath(patchTarget, imgOp.path, "pending")
+              }
+            } else if (!Object.prototype.hasOwnProperty.call(patchTarget, "imageUrl")) {
+              patchTarget.imageUrl = "pending"
+            }
+          }
+
           const resolvedImagePlan = await raceCancel(withUnsplashHeroImage({
-            plan: resolvedPlan,
+            plan: preferredImageOps.length > 0 ? planForResolve : resolvedPlan,
             message: deferredImageArgs.message,
             slug: deferredImageArgs.slug,
             currentPage: deferredImageArgs.currentPage,
+            preferredImageOps: preferredImageOps.length > 0 ? preferredImageOps : undefined,
             activeBlockId: deferredImageArgs.activeBlockId,
             activeEditablePath: deferredImageArgs.activeEditablePath,
             chatRequestId: deferredImageArgs.chatRequestId,
