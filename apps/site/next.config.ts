@@ -35,12 +35,13 @@ const nextConfig: NextConfig = {
         ...config.resolve,
         symlinks: false,
       }
-      // Bust persistent cache for workspace packages so HMR picks up changes
-      // without needing to manually delete .next/cache.
-      // Uses BUILD_ID env (set by dev script) or timestamp as cache version.
+      // Cache version for workspace packages. Stable by default so Next.js
+      // reuses .next/cache across restarts — skipping ~15s of cold compile.
+      // Set WORKSPACE_CACHE_BUST to any new value (e.g. $(date +%s)) to force
+      // a rebuild when a workspace package change isn't picked up by HMR.
       config.cache = {
         ...config.cache,
-        version: `${process.env.WORKSPACE_CACHE_BUST ?? Date.now()}`,
+        version: `${process.env.WORKSPACE_CACHE_BUST ?? "stable-v1"}`,
       }
     }
     return config
