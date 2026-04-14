@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import type { EditPlan } from "@ai-site-editor/shared"
-import { isImageOnlyUpdatePropsPlan } from "./chat-pipeline.js"
+import { isImageOnlyUpdatePropsPlan, applyImageSourceHint } from "./chat-pipeline.js"
 
 function makePlan(ops: EditPlan["ops"]): EditPlan {
   return {
@@ -87,4 +87,46 @@ test("isImageOnlyUpdatePropsPlan: multi-block image-only plan → true", () => {
     { op: "update_props", pageSlug: "/about", blockId: "hero-2", patch: { props: { imageUrl: "pending", imageAlt: "team" } } }
   ])
   assert.equal(isImageOnlyUpdatePropsPlan(plan), true)
+})
+
+// ---------------------------------------------------------------------------
+// applyImageSourceHint
+// ---------------------------------------------------------------------------
+
+test("applyImageSourceHint: no preference → returns message unchanged", () => {
+  assert.equal(applyImageSourceHint("add an image", "add an image", undefined), "add an image")
+})
+
+test("applyImageSourceHint: 'either' preference → returns message unchanged", () => {
+  assert.equal(applyImageSourceHint("add an image", "add an image", "either"), "add an image")
+})
+
+test("applyImageSourceHint: unsplash preference + generic message → appends 'unsplash'", () => {
+  assert.equal(applyImageSourceHint("add an image", "add an image", "unsplash"), "add an image unsplash")
+})
+
+test("applyImageSourceHint: genai preference + generic message → appends 'generate image'", () => {
+  assert.equal(applyImageSourceHint("add an image", "add an image", "genai"), "add an image generate image")
+})
+
+test("applyImageSourceHint: explicit 'Generate an AI image' in message + unsplash preference → no hint (regression)", () => {
+  // Regression for traceId 01bc6423: stored 'unsplash' preference leaking into an
+  // explicit "Generate an AI image of a mountain" prompt caused no_effective_change.
+  const msg = "Generate an AI image of a mountain"
+  assert.equal(applyImageSourceHint(msg, msg, "unsplash"), msg)
+})
+
+test("applyImageSourceHint: explicit 'unsplash' in message + genai preference → no hint", () => {
+  const msg = "Find an unsplash photo of avocados"
+  assert.equal(applyImageSourceHint(msg, msg, "genai"), msg)
+})
+
+test("applyImageSourceHint: 'with ai' in message short-circuits", () => {
+  const msg = "make a hero image with ai"
+  assert.equal(applyImageSourceHint(msg, msg, "unsplash"), msg)
+})
+
+test("applyImageSourceHint: 'stock photo' in message short-circuits", () => {
+  const msg = "add a stock photo of a sunset"
+  assert.equal(applyImageSourceHint(msg, msg, "genai"), msg)
 })
