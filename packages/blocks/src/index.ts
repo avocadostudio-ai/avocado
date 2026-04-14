@@ -2,6 +2,8 @@ export { SharedBlockRenderer, registerCustomRenderer, hasRenderer, getCustomRend
 export type { BlockRenderer } from "./renderer"
 export { BlockCatalogue } from "./catalogue"
 export { BlocksHydrator } from "./blocks-hydrator"
+export { BlocksLinkProvider, useBlocksLink } from "./link-context"
+export type { BlocksLinkComponent, BlocksLinkProps } from "./link-context"
 export { BlockErrorBoundary } from "./block-error-boundary"
 export { rendererTypes } from "./blocks/index"
 export type { BlockImageProps } from "./blocks/block-image"

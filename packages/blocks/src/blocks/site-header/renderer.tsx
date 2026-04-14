@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useId } from "react"
 import { BlockImage } from "../_shared"
+import { useBlocksLink } from "../../link-context"
 
 type NavLink = { label: string; href?: string; children?: NavLink[] }
 
@@ -22,6 +23,8 @@ export function SiteHeader(props: Record<string, unknown>) {
         (l) => l && typeof l.label === "string" && (typeof l.href === "string" || Array.isArray(l.children))
       )
     : []
+
+  const Link = useBlocksLink()
 
   const [isOpen, setIsOpen] = useState(false)
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
@@ -80,10 +83,10 @@ export function SiteHeader(props: Record<string, unknown>) {
     <>
       <header className="site-top-nav" data-block-chrome="true">
         <div className="site-top-nav-inner">
-          <a className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
+          <Link className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
             {logoUrl ? <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" /> : null}
             <span className="site-brand-text">{siteName}</span>
-          </a>
+          </Link>
 
           {/* Desktop nav */}
           <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
@@ -101,28 +104,28 @@ export function SiteHeader(props: Record<string, unknown>) {
                   </button>
                   <div className="site-nav-dropdown-menu">
                     {link.children.map((child, j) => (
-                      <a
+                      <Link
                         key={child.href}
-                        href={child.href}
+                        href={child.href ?? "#"}
                         className={isActive(child.href) ? "is-active" : undefined}
                         data-editable-target={`links[${i}].children[${j}].label`}
                         data-editable-target-label={`links[${i}].children[${j}].label`}
                       >
                         {child.label}
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 </div>
               ) : (
-                <a
+                <Link
                   key={link.href}
-                  href={link.href}
+                  href={link.href ?? "#"}
                   className={isActive(link.href) ? "is-active" : undefined}
                   data-editable-target={`links[${i}].label`}
                   data-editable-target-label={`links[${i}].label`}
                 >
                   {link.label}
-                </a>
+                </Link>
               )
             )}
           </nav>
@@ -162,29 +165,29 @@ export function SiteHeader(props: Record<string, unknown>) {
                       {expandedGroup === i ? (
                         <div className="site-nav-mobile-group-children">
                           {link.children.map((child, j) => (
-                            <a
+                            <Link
                               key={`mobile-${child.href}`}
-                              href={child.href}
+                              href={child.href ?? "#"}
                               className={isActive(child.href) ? "is-active" : undefined}
                               data-editable-target={`links[${i}].children[${j}].label`}
                               onClick={close}
                             >
                               {child.label}
-                            </a>
+                            </Link>
                           ))}
                         </div>
                       ) : null}
                     </div>
                   ) : (
-                    <a
+                    <Link
                       key={`mobile-${link.href}`}
-                      href={link.href}
+                      href={link.href ?? "#"}
                       className={isActive(link.href) ? "is-active" : undefined}
                       data-editable-target={`links[${i}].label`}
                       onClick={close}
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   )
                 )}
               </nav>
