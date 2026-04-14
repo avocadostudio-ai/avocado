@@ -514,5 +514,15 @@
     "tags": ["core"],
     "expectedStatus": "applied",
     "expectedOpTypes": ["add_block"]
+  },
+  {
+    "id": "image-update-autoapplies",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Add a hero image of fresh avocados in sunlight",
+    "tags": ["regression", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["Hero"]
   }
 ]
