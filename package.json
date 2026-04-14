@@ -47,5 +47,12 @@
     "vercel:env:check": "./scripts/vercel-env-check.sh all",
     "vercel:env:site": "./scripts/vercel-env-check.sh site",
     "vercel:env:editor": "./scripts/vercel-env-check.sh editor"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs",
+      "sharp"
+    ]
   }
 }
