@@ -45,7 +45,17 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 
 ## Quick Start
 
-**Prerequisites:** Node.js 22+ and [corepack](https://nodejs.org/api/corepack.html) enabled.
+**Prerequisites:** Node.js 22+.
+
+```bash
+git clone https://github.com/yu7321/avocado.git && cd avocado
+./start
+```
+
+That's it. `./start` verifies Node, enables corepack, installs deps, prompts for an API key, boots the dev stack, and opens the editor in your browser. Re-running `./start` anytime is safe — it skips steps that are already done.
+
+<details>
+<summary><strong>Prefer manual steps?</strong></summary>
 
 ```bash
 corepack enable          # provides pnpm at the pinned version
@@ -53,6 +63,8 @@ pnpm install             # install dependencies
 pnpm dev:setup           # copy .env.example → .env, prompt for API key
 pnpm dev:start           # start all 3 services (backgrounded)
 ```
+
+</details>
 
 | Service          | URL                    | Description                                        |
 |------------------|------------------------|----------------------------------------------------|
