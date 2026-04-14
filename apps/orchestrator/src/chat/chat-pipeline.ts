@@ -114,6 +114,7 @@ import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntri
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
 import { runVariationPipeline } from "./variation-pipeline.js"
+import { validateAndStripHallucinatedProps } from "./hallucination-validator.js"
 
 /**
  * Parses an image-source chip answer ("Use Unsplash photo", "Generate with AI",
@@ -1023,6 +1024,33 @@ export async function runChatPipeline(
         currentPage: current,
         slug: effectiveSlug
       })
+
+      // Strip hallucinated props (planner promising changes to fields the
+      // block schema doesn't have — e.g. "colors" on Stats). Appends a note
+      // to summary_for_user and change_log so the user isn't misled.
+      const hallucinationResult = validateAndStripHallucinatedProps({
+        plan: resolvedPlan,
+        draft: getSessionDraft(body.session!)
+      })
+      if (hallucinationResult.hallucinatedProps.length > 0) {
+        for (const entry of hallucinationResult.hallucinatedProps) {
+          ctx.log.warn(
+            {
+              event: "planner_hallucinated_prop",
+              chatRequestId,
+              session: body.session!,
+              slug: effectiveSlug,
+              blockId: entry.blockId,
+              blockType: entry.blockType,
+              propName: entry.propName,
+              plannerSource: source,
+              modelKey,
+              modelUsed
+            },
+            "Planner generated an unsupported prop; stripped before apply"
+          )
+        }
+      }
 
       // Detect image ops synchronously before making any API calls
       detectedImageOps = detectImageOps({
