@@ -167,10 +167,39 @@ check_health() {
   curl -sf "http://localhost:4100" >/dev/null || return 1
 }
 
+print_ready_banner() {
+  local elapsed="$1"
+  # Terminal colors — no-op when stdout isn't a TTY.
+  local bold="" dim="" green="" nc=""
+  if [[ -t 1 ]]; then
+    bold="\033[1m"
+    dim="\033[2m"
+    green="\033[0;32m"
+    nc="\033[0m"
+  fi
+  echo ""
+  echo -e "${green}${bold}🥑 Avocado Studio is ready${nc} ${dim}(warmed up in ${elapsed}s)${nc}"
+  echo ""
+  echo -e "  ${bold}Open:${nc}   http://localhost:4100    ${dim}# Content Studio${nc}"
+  echo -e "  ${dim}Site:${nc}   http://localhost:3000    ${dim}# rendered site${nc}"
+  echo -e "  ${dim}API:${nc}    http://localhost:4200    ${dim}# orchestrator${nc}"
+  echo ""
+  echo -e "  ${dim}Logs:${nc}   pnpm dev:logs"
+  echo -e "  ${dim}Stop:${nc}   pnpm dev:stop"
+  echo ""
+}
+
 wait_for_ready() {
   local timeout_secs="${1:-60}"
   local started_at
   started_at="$(date +%s)"
+
+  # Print a live progress hint so the dev knows why we're pausing. The site
+  # app (Next.js) JIT-compiles on first request — the curl inside
+  # check_health blocks until that's done, which is exactly what we want.
+  if [[ -t 1 ]]; then
+    echo "warming up services (site does a one-time Next.js compile, ~15s)..."
+  fi
 
   while true; do
     if ! is_running; then
@@ -179,7 +208,10 @@ wait_for_ready() {
     fi
 
     if check_health; then
-      echo "dev stack is healthy."
+      local now elapsed
+      now="$(date +%s)"
+      elapsed=$((now - started_at))
+      print_ready_banner "$elapsed"
       return 0
     fi
 

@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# Avocado Studio — one-command bootstrap + run.
+#
+# Usage:
+#   ./start              # bootstrap anything missing, then start the dev stack
+#   ./start --help
+#
+# Idempotent: rerunning is cheap. Each step only executes if its preconditions
+# aren't met — re-running after a reboot just restarts the dev stack without
+# reinstalling dependencies or re-prompting for keys.
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+# --- Colors ---------------------------------------------------------------
+
+if [[ -t 1 ]]; then
+  BOLD="\033[1m"
+  DIM="\033[2m"
+  GREEN="\033[0;32m"
+  YELLOW="\033[1;33m"
+  RED="\033[0;31m"
+  NC="\033[0m"
+else
+  BOLD="" DIM="" GREEN="" YELLOW="" RED="" NC=""
+fi
+
+say()  { echo -e "${DIM}→${NC} $*"; }
+ok()   { echo -e "${GREEN}✓${NC} $*"; }
+warn() { echo -e "${YELLOW}!${NC} $*" >&2; }
+die()  { echo -e "${RED}✗${NC} $*" >&2; exit 1; }
+
+# --- Args -----------------------------------------------------------------
+
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      cat <<EOF
+Usage: ./start [--help]
+
+Bootstraps anything missing and starts the Avocado Studio dev stack.
+
+What it does, only if needed:
+  1. Verify Node.js 22+
+  2. Enable corepack (provides pnpm at the pinned version)
+  3. Run pnpm install (if node_modules is missing or stale)
+  4. Run pnpm dev:setup (if no API key is configured)
+  5. Start the dev stack (if not already running) and wait until healthy
+  6. Open http://localhost:4100 in your browser
+
+Idempotent — re-run this anytime.
+EOF
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $arg (try --help)"
+      ;;
+  esac
+done
+
+# --- Banner ---------------------------------------------------------------
+
+echo ""
+echo -e "${BOLD}🥑 Avocado Studio${NC}"
+echo -e "${DIM}────────────────${NC}"
+echo ""
+
+# --- Step 1: Node version -------------------------------------------------
+
+if ! command -v node >/dev/null 2>&1; then
+  die "Node.js is not installed. Install Node 22+: https://nodejs.org/"
+fi
+
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if (( NODE_MAJOR < 22 )); then
+  die "Node.js 22+ required (you have $(node -v)). Upgrade: https://nodejs.org/"
+fi
+ok "Node $(node -v)"
+
+# --- Step 2: corepack + pnpm ----------------------------------------------
+
+if ! command -v corepack >/dev/null 2>&1; then
+  die "corepack not found. It ships with Node 22 — your install may be incomplete."
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  say "enabling corepack (provides pnpm)..."
+  corepack enable >/dev/null 2>&1 || die "corepack enable failed. Try: sudo corepack enable"
+fi
+
+# Verify pnpm resolves to the pinned version (from packageManager field).
+# Corepack handles this transparently; this just confirms the binary works.
+if ! pnpm --version >/dev/null 2>&1; then
+  die "pnpm not usable. Try: corepack prepare --activate"
+fi
+ok "pnpm $(pnpm --version)"
+
+# --- Step 3: dependencies -------------------------------------------------
+#
+# Check if install is needed by comparing pnpm-lock.yaml vs node_modules/.modules.yaml.
+# If node_modules doesn't exist, or the lockfile is newer, run install.
+
+needs_install=0
+if [[ ! -d "node_modules" ]]; then
+  needs_install=1
+elif [[ "pnpm-lock.yaml" -nt "node_modules/.modules.yaml" ]]; then
+  needs_install=1
+fi
+
+if (( needs_install )); then
+  say "installing dependencies (first time: ~1-2 min)..."
+  pnpm install
+  ok "dependencies installed"
+else
+  ok "dependencies up to date"
+fi
+
+# --- Step 4: API key / .env -----------------------------------------------
+#
+# If .env is missing OR neither ANTHROPIC_API_KEY nor OPENAI_API_KEY is set,
+# run the interactive setup script. dev-setup.sh handles the prompt + key
+# validation flow; we just decide whether to invoke it.
+
+needs_setup=0
+if [[ ! -f ".env" ]]; then
+  needs_setup=1
+elif ! grep -qE '^(ANTHROPIC_API_KEY|OPENAI_API_KEY)=.+' .env; then
+  needs_setup=1
+fi
+
+if (( needs_setup )); then
+  echo ""
+  ./scripts/dev-setup.sh
+  echo ""
+else
+  ok "API key configured"
+fi
+
+# --- Step 5: start dev stack ----------------------------------------------
+
+say "starting dev stack..."
+pnpm dev:start
+
+# --- Step 6: open the browser ---------------------------------------------
+
+EDITOR_URL="http://localhost:4100"
+if command -v open >/dev/null 2>&1; then
+  open "$EDITOR_URL" >/dev/null 2>&1 || true
+elif command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "$EDITOR_URL" >/dev/null 2>&1 || true
+fi
