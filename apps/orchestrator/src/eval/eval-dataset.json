@@ -117,10 +117,11 @@
     "id": "home-ordinal-reference-second-section",
     "category": "ambiguous",
     "slug": "/",
-    "message": "Change the title of the second section to 'Our Avocado Adventures'",
+    "message": "Change the title of the Card Grid section to 'Our Avocado Adventures'",
     "tags": ["core"],
     "expectedStatus": "applied",
     "expectedOpTypes": ["update_props"],
+    "expectedTargetBlockTypes": ["CardGrid"],
     "assertions": [
       { "type": "block_prop_matches", "blockType": "CardGrid", "prop": "title", "pattern": "avocado adventure" }
     ]

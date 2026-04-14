@@ -65,9 +65,16 @@ test("validateAndStripHallucinatedProps: strips unsupported Stats color prop and
     assert.equal(patch.title, "Updated title", "valid props survive")
   }
 
-  assert.match(result.plan.summary_for_user, /doesn't support color/)
+  // Note stays generic on purpose — no raw prop names leak into user copy.
+  assert.match(result.plan.summary_for_user, /Stats block/)
+  assert.match(result.plan.summary_for_user, /isn't available/)
+  assert.doesNotMatch(
+    result.plan.summary_for_user,
+    /\bcolor\b/,
+    "user-facing note must not echo the raw prop name"
+  )
   assert.ok(
-    result.plan.change_log.some((entry) => /doesn't support color/.test(entry)),
+    result.plan.change_log.some((entry) => /isn't available/.test(entry)),
     "change_log should carry the note as well"
   )
 })
@@ -145,10 +152,13 @@ test("validateAndStripHallucinatedProps: merges multiple stripped props for same
 
   const result = validateAndStripHallucinatedProps({ plan, draft: makeDraft(statsPage()) })
   assert.equal(result.hallucinatedProps.length, 3)
-  // All three should be mentioned in one consolidated note.
-  assert.match(result.plan.summary_for_user, /Stats doesn't support/)
-  const note = result.plan.change_log[result.plan.change_log.length - 1]
-  assert.ok(note.includes("color") && note.includes("gradient") && note.includes("animation"))
+  // One consolidated note — no raw prop names. Still confirms all three
+  // were reported via the structured return value.
+  assert.match(result.plan.summary_for_user, /Stats block/)
+  assert.match(result.plan.summary_for_user, /isn't available/)
+  assert.doesNotMatch(result.plan.summary_for_user, /\b(color|gradient|animation)\b/)
+  const stripped = result.hallucinatedProps.map((h) => h.propName).sort()
+  assert.deepEqual(stripped, ["animation", "color", "gradient"])
 })
 
 test("validateAndStripHallucinatedProps: skips unregistered block types", () => {
