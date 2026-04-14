@@ -457,6 +457,9 @@ export function isHighConfidenceDeterministicCase(args: {
     return true
   }
   if (action === "remove" && args.activeBlockId && /\b(this|selected|it)\b/i.test(raw)) return true
+  // "add a hero image of X" when Hero already exists = image update, not block add — defer to LLM
+  const addBlockType = action === "add" ? inferBlockTypeFromText(raw) : null
+  if (action === "add" && addBlockType && /\b(image|photo|picture|icon)\b/i.test(raw) && args.currentPage.blocks.some(b => b.type === addBlockType)) return false
   // "add CTA directing to recipes" = needs LLM for content-aware props
   if (action === "add" && inferBlockTypeFromText(raw) && hasContentDirective(raw)) return false
   // Defer to LLM when topic + multiple block types are enumerated (needs content generation)

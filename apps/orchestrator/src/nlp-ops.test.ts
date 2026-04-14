@@ -2646,6 +2646,22 @@ test("isHighConfidenceDeterministicCase accepts 'delete this page' even with act
   )
 })
 
+test("isHighConfidenceDeterministicCase rejects 'add a hero image' when Hero already exists (image update, not block add)", () => {
+  const currentPage = demoPublishedPages()[0]
+  // Page already has a Hero — "add a hero image of X" means update the existing Hero's image, not add a new Hero block
+  for (const msg of [
+    "Add a hero image of spring avocados",
+    "add a hero photo showing our team",
+    "add hero picture of the product",
+  ]) {
+    assert.equal(
+      isHighConfidenceDeterministicCase({ message: msg, currentPage }),
+      false,
+      `"${msg}" should defer to LLM — it's an image update on existing Hero, not a new block`
+    )
+  }
+})
+
 test("compileDeterministicPlan does not generate move_page for 'move CTA to top of the page'", () => {
   const currentPage = demoPublishedPages()[0]
   const plan = compileDeterministicPlan({
