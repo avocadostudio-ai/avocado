@@ -13,7 +13,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   de: "Deutsch",
 }
 
-function resolveLocale(): Locale {
+export function resolveLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === "de") return "de"

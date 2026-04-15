@@ -44,6 +44,8 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
 
   const [showAllSites, setShowAllSites] = useState(false)
   const [agentOpen, setAgentOpen] = useState(false)
+  const [pendingDeleteSiteId, setPendingDeleteSiteId] = useState<string | null>(null)
+  const pendingDeleteSite = dedupedSites.find((s) => s.id === pendingDeleteSiteId) ?? null
 
   // Auto-open sidebar when agent starts streaming (assistant-ui openOnRunStart pattern)
   const wasStreamingRef = useRef(false)
@@ -206,6 +208,15 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
           <Label htmlFor="show-offline">Show {offlineCount} offline site{offlineCount > 1 ? "s" : ""}</Label>
         </div>
       )}
+      {dedupedSites.length > 0 && visibleSites.length === 0 ? (
+        <div className="sites-empty-state" role="status" style={{ padding: "32px 16px", textAlign: "center" }}>
+          <h2 style={{ marginBottom: 8 }}>{t("sites.allOffline")}</h2>
+          <p style={{ marginBottom: 16, color: "var(--muted-foreground, #888)" }}>{t("sites.allOfflineHint")}</p>
+          <button type="button" className="secondary-btn" onClick={() => setShowAllSites(true)}>
+            Show {dedupedSites.length} offline site{dedupedSites.length > 1 ? "s" : ""}
+          </button>
+        </div>
+      ) : null}
       <section className="sites-grid" aria-label="Site tiles">
         {visibleSites.map((site) => {
           const capability = capabilityBySiteId[site.id]
@@ -219,11 +230,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
               <button
                 type="button"
                 className="site-tile-delete-btn"
-                onClick={() => {
-                  if (window.confirm(t("sites.confirmDelete", { name: site.name }))) {
-                    sites.removeSite(site.id)
-                  }
-                }}
+                onClick={() => setPendingDeleteSiteId(site.id)}
                 aria-label={`${t("sites.deleteSite")} ${site.name}`}
               >
                 <Trash2 size={14} />
@@ -414,6 +421,43 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
         </div>
       ) : null}
       <SiteConfigDrawer sites={sites} />
+      {pendingDeleteSite ? (
+        <div className="sites-modal-backdrop" onClick={() => setPendingDeleteSiteId(null)}>
+          <section
+            className="sites-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-delete-title"
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: 440 }}
+          >
+            <header className="sites-modal-header">
+              <h2 id="confirm-delete-title">{t("sites.confirmDeleteTitle")}</h2>
+              <button type="button" className="settings-close-btn" onClick={() => setPendingDeleteSiteId(null)} aria-label={t("sites.close")}>
+                ×
+              </button>
+            </header>
+            <div className="sites-modal-body">
+              <p>{t("sites.confirmDeleteBody", { name: pendingDeleteSite.name })}</p>
+            </div>
+            <footer className="sites-modal-footer">
+              <button type="button" className="secondary-btn" onClick={() => setPendingDeleteSiteId(null)}>
+                {t("sites.cancel")}
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  sites.removeSite(pendingDeleteSite.id)
+                  setPendingDeleteSiteId(null)
+                }}
+              >
+                {t("sites.deleteSite")}
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
       {sites.restoreState.siteId ? (
         <div className="sites-modal-backdrop" onClick={() => sites.updateRestoreState({ siteId: null })}>
           <section className="sites-modal sites-modal-wide" role="dialog" aria-modal="true" aria-label={t("sites.versionHistory")} onClick={(event) => event.stopPropagation()}>

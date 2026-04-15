@@ -10,6 +10,9 @@ import {
   resolveEditorPreviewUrl
 } from "../lib/editor-utils"
 import { isPresetId, markPresetDeleted, unmarkPresetDeleted } from "../lib/site-presets"
+import { useEditorStore } from "../store"
+import { showSiteSwitchOverlay } from "../lib/site-switch-overlay"
+import { getT, resolveLocale } from "@/i18n"
 
 /** Orchestrator-side site header config (name, logo, navLabels). */
 export interface HeaderConfig {
@@ -227,12 +230,18 @@ export function useSiteList(siteId: string, session: string) {
     } satisfies SiteConfig
   }, [siteId, siteList, queryPreviewUrl])
 
-  const openEditorForSite = (targetSiteId: string) => {
+  const openEditorForSite = (targetSiteId: string, opts?: { skipDirtyCheck?: boolean }) => {
     const targetSite = siteList.find((s) => s.id === targetSiteId)
+    const t = getT(resolveLocale())
+    if (!opts?.skipDirtyCheck) {
+      const inFlight = useEditorStore.getState().isLoading
+      if (inFlight && !window.confirm(t("sites.switchInFlight"))) return
+    }
     const editorPath = targetSite?.enablePuck ? "/editor/puck" : "/editor"
     const url = new URL(editorPath, window.location.origin)
     url.searchParams.set("siteId", targetSiteId)
     url.searchParams.delete("poc")
+    showSiteSwitchOverlay(targetSite?.name ?? targetSiteId, t("sites.switchingTo"))
     window.location.href = url.toString()
   }
 
@@ -312,7 +321,7 @@ export function useSiteList(siteId: string, session: string) {
         return
       }
       setSiteTileRefreshToken((prev) => prev + 1)
-      openEditorForSite(restoreState.siteId)
+      openEditorForSite(restoreState.siteId, { skipDirtyCheck: true })
       setRestoreState(INITIAL_RESTORE_STATE)
     } catch {
       setRestoreState((prev) => ({ ...prev, error: "Failed to restore snapshot.", isRestoring: false }))
