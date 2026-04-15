@@ -7,7 +7,6 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./link-context": "./src/link-context.tsx",
     "./styles.css": "./src/blocks/styles.css"
   },
   "scripts": {

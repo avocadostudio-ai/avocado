@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, useId } from "react"
 import { BlockImage } from "../_shared"
-import { useBlocksLink } from "../../link-context"
 
 type NavLink = { label: string; href?: string; children?: NavLink[] }
 
@@ -23,8 +22,6 @@ export function SiteHeader(props: Record<string, unknown>) {
         (l) => l && typeof l.label === "string" && (typeof l.href === "string" || Array.isArray(l.children))
       )
     : []
-
-  const Link = useBlocksLink()
 
   const [isOpen, setIsOpen] = useState(false)
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
@@ -83,10 +80,10 @@ export function SiteHeader(props: Record<string, unknown>) {
     <>
       <header className="site-top-nav" data-block-chrome="true">
         <div className="site-top-nav-inner">
-          <Link className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
+          <a className="site-brand" href={links[0]?.href ?? "/"} data-editable-target="siteName">
             {logoUrl ? <BlockImage className="site-logo" src={logoUrl} alt={`${siteName} logo`} width={38} height={38} data-editable-target="logoUrl" /> : null}
             <span className="site-brand-text">{siteName}</span>
-          </Link>
+          </a>
 
           {/* Desktop nav */}
           <nav className="site-nav-links site-nav-links-desktop" aria-label="Primary">
@@ -104,7 +101,7 @@ export function SiteHeader(props: Record<string, unknown>) {
                   </button>
                   <div className="site-nav-dropdown-menu">
                     {link.children.map((child, j) => (
-                      <Link
+                      <a
                         key={child.href}
                         href={child.href ?? "#"}
                         className={isActive(child.href) ? "is-active" : undefined}
@@ -112,12 +109,12 @@ export function SiteHeader(props: Record<string, unknown>) {
                         data-editable-target-label={`links[${i}].children[${j}].label`}
                       >
                         {child.label}
-                      </Link>
+                      </a>
                     ))}
                   </div>
                 </div>
               ) : (
-                <Link
+                <a
                   key={link.href}
                   href={link.href ?? "#"}
                   className={isActive(link.href) ? "is-active" : undefined}
@@ -125,7 +122,7 @@ export function SiteHeader(props: Record<string, unknown>) {
                   data-editable-target-label={`links[${i}].label`}
                 >
                   {link.label}
-                </Link>
+                </a>
               )
             )}
           </nav>
@@ -165,7 +162,7 @@ export function SiteHeader(props: Record<string, unknown>) {
                       {expandedGroup === i ? (
                         <div className="site-nav-mobile-group-children">
                           {link.children.map((child, j) => (
-                            <Link
+                            <a
                               key={`mobile-${child.href}`}
                               href={child.href ?? "#"}
                               className={isActive(child.href) ? "is-active" : undefined}
@@ -173,13 +170,13 @@ export function SiteHeader(props: Record<string, unknown>) {
                               onClick={close}
                             >
                               {child.label}
-                            </Link>
+                            </a>
                           ))}
                         </div>
                       ) : null}
                     </div>
                   ) : (
-                    <Link
+                    <a
                       key={`mobile-${link.href}`}
                       href={link.href ?? "#"}
                       className={isActive(link.href) ? "is-active" : undefined}
@@ -187,7 +184,7 @@ export function SiteHeader(props: Record<string, unknown>) {
                       onClick={close}
                     >
                       {link.label}
-                    </Link>
+                    </a>
                   )
                 )}
               </nav>

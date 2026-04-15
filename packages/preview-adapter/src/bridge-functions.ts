@@ -1224,6 +1224,41 @@ export function createBridgeFunctions(
     // Ignore clicks inside editor widget overlays (immersive prompt, FAB, panel)
     if (target?.closest("[data-editor-widget-ignore]")) return
 
+    // Route internal anchor clicks through the app router. Otherwise they cause
+    // a full-document navigation inside the preview iframe, which unloads the
+    // document and flashes white for a frame before the new page paints.
+    // Only hijack plain-modifier, same-tab, same-origin, non-download clicks —
+    // modifier-clicks, target=_blank, downloads, mailto/tel/hash, and
+    // cross-origin links fall through to their default behavior.
+    const anchor = target?.closest<HTMLAnchorElement>("a")
+    if (
+      anchor &&
+      event.button === 0 &&
+      !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey &&
+      (!anchor.target || anchor.target === "_self") &&
+      !anchor.hasAttribute("download")
+    ) {
+      const rel = anchor.getAttribute("rel")
+      const hrefAttr = anchor.getAttribute("href")
+      if (
+        hrefAttr &&
+        !(rel && /\bexternal\b/i.test(rel)) &&
+        !/^(?:[a-z][a-z0-9+\-.]*:|mailto:|tel:|#)/i.test(hrefAttr)
+      ) {
+        try {
+          const url = new URL(hrefAttr, window.location.href)
+          if (url.origin === window.location.origin) {
+            event.preventDefault()
+            event.stopPropagation()
+            navigate(url.pathname + url.search + url.hash)
+            return
+          }
+        } catch {
+          // malformed href — fall through to default handling
+        }
+      }
+    }
+
     const editing = state.inlineEditing
     if (editing && target && !editing.node.contains(target)) {
       commitInlineEdit()
