@@ -74,6 +74,81 @@ function selectionValue(provider: AIProvider, model: ModelKey) {
   return `${provider}:${model}`
 }
 
+const REACHABILITY_TTL_MS = 30_000
+const REACHABILITY_PREFIX = "site-reachable-v1:"
+
+function readReachabilityEntry(siteId: string): boolean | null {
+  if (typeof sessionStorage === "undefined") return null
+  try {
+    const raw = sessionStorage.getItem(REACHABILITY_PREFIX + siteId)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { ok: boolean; ts: number }
+    if (Date.now() - parsed.ts > REACHABILITY_TTL_MS) return null
+    return parsed.ok
+  } catch { return null }
+}
+
+function writeReachabilityEntry(siteId: string, ok: boolean): void {
+  if (typeof sessionStorage === "undefined") return
+  try {
+    sessionStorage.setItem(REACHABILITY_PREFIX + siteId, JSON.stringify({ ok, ts: Date.now() }))
+  } catch { /* quota */ }
+}
+
+function SiteSwitcherRow({
+  name,
+  origin,
+  statusClass,
+  active,
+  dimmed,
+  onSelect,
+}: {
+  name: string
+  origin: string
+  statusClass: "online" | "offline" | "probing"
+  active?: boolean
+  dimmed?: boolean
+  onSelect: () => void
+}) {
+  const display = origin.replace(/^https?:\/\//, "")
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={`site-switcher-item${active ? " is-active" : ""}${dimmed ? " is-dimmed" : ""}`}
+      onClick={onSelect}
+      title={origin}
+    >
+      <span className={`site-switcher-item-dot site-switcher-item-dot-${statusClass}`} aria-hidden="true" />
+      <span className="site-switcher-item-body">
+        <span className="site-switcher-item-name">{name}</span>
+        <span className="site-switcher-item-origin">{display}</span>
+      </span>
+      {active ? <Check size={12} aria-hidden="true" /> : null}
+    </button>
+  )
+}
+
+function readReachabilityCache(siteIds: string[]): Set<string> | null {
+  if (typeof sessionStorage === "undefined") return null
+  const reachable = new Set<string>()
+  let anyKnown = false
+  for (const id of siteIds) {
+    const entry = readReachabilityEntry(id)
+    if (entry === null) continue
+    anyKnown = true
+    if (entry) reachable.add(id)
+  }
+  return anyKnown ? reachable : null
+}
+
+function setsEqual(a: Set<string> | null, b: Set<string> | null): boolean {
+  if (a === b) return true
+  if (!a || !b || a.size !== b.size) return false
+  for (const v of a) if (!b.has(v)) return false
+  return true
+}
+
 export function App() {
   const pathName = typeof window !== "undefined" ? window.location.pathname : "/"
   const isEditorPath = pathName === "/" || pathName === "/editor" || pathName === "/editor/"
@@ -212,29 +287,62 @@ function EditorPage({
     return () => { document.removeEventListener("mousedown", onClickOutside); document.removeEventListener("keydown", onKey) }
   }, [showSiteSwitcher])
 
-  // Check which sites are reachable when the dropdown opens
-  const [reachableSiteIds, setReachableSiteIds] = useState<Set<string> | null>(null)
+  // Cached in sessionStorage with a 30s TTL so re-opening the dropdown is
+  // instant and offline sites don't hang the UI.
+  const [reachableSiteIds, setReachableSiteIds] = useState<Set<string> | null>(
+    () => readReachabilityCache(sites.siteList.map(s => s.id))
+  )
+  const applyReachability = useCallback((next: Set<string> | null) => {
+    setReachableSiteIds((prev) => (setsEqual(prev, next) ? prev : next))
+  }, [])
   useEffect(() => {
-    if (!showSiteSwitcher) { setReachableSiteIds(null); return }
+    if (!showSiteSwitcher) return
+    applyReachability(readReachabilityCache(sites.siteList.map(s => s.id)))
     let active = true
     const check = async () => {
+      let allCached = true
       const results = await Promise.all(
         sites.siteList.map(async (site) => {
+          const cached = readReachabilityEntry(site.id)
+          if (cached !== null) return { id: site.id, ok: cached }
+          allCached = false
           const origin = resolveSiteOrigin(site)
           try {
             const res = await fetch(`${origin}/api/editor/blocks?siteId=${encodeURIComponent(site.id)}`, { signal: AbortSignal.timeout(2500) })
-            return res.ok ? site.id : null
-          } catch { return null }
+            writeReachabilityEntry(site.id, res.ok)
+            return { id: site.id, ok: res.ok }
+          } catch {
+            writeReachabilityEntry(site.id, false)
+            return { id: site.id, ok: false }
+          }
         })
       )
-      if (active) setReachableSiteIds(new Set(results.filter(Boolean) as string[]))
+      if (active && !allCached) {
+        applyReachability(new Set(results.filter(r => r.ok).map(r => r.id)))
+      }
     }
     void check()
     return () => { active = false }
-  }, [showSiteSwitcher, sites.siteList])
-  const dropdownSites = reachableSiteIds
-    ? sites.siteList.filter(site => site.id === siteId || reachableSiteIds.has(site.id))
-    : sites.siteList
+  }, [showSiteSwitcher, sites.siteList, applyReachability])
+  const dropdownEntries = useMemo(() => {
+    const probing = reachableSiteIds === null
+    return sites.siteList
+      .map((site) => {
+        const online = probing || site.id === siteId || reachableSiteIds!.has(site.id)
+        return { site, origin: resolveSiteOrigin(site), online, probing }
+      })
+      .sort((a, b) => {
+        if (a.site.id === siteId) return -1
+        if (b.site.id === siteId) return 1
+        if (a.online !== b.online) return a.online ? -1 : 1
+        return a.site.name.localeCompare(b.site.name)
+      })
+  }, [reachableSiteIds, sites.siteList, siteId])
+  const { onlineEntries, offlineEntries, activeEntry } = useMemo(() => ({
+    onlineEntries: dropdownEntries.filter((e) => e.online),
+    offlineEntries: dropdownEntries.filter((e) => !e.online),
+    activeEntry: dropdownEntries.find((e) => e.site.id === siteId),
+  }), [dropdownEntries, siteId])
 
   const chatPanelRef = useRef<HTMLElement>(null)
   const chatThreadRef = useRef<HTMLDivElement>(null)
@@ -874,7 +982,10 @@ function EditorPage({
   }, [])
 
   useEffect(() => {
-    const clampChatWidth = (w: number) => Math.max(340, Math.min(w, window.innerWidth * 0.5))
+    const clampChatWidth = (w: number) => {
+      const max = Math.max(240, window.innerWidth * 0.5)
+      return Math.max(240, Math.min(w, max))
+    }
     const onPointerMove = (event: PointerEvent) => {
       const composerStarted = resizeStartRef.current
       if (composerStarted) {
@@ -908,7 +1019,7 @@ function EditorPage({
   useEffect(() => {
     const onWindowResize = () => {
       setComposerHeight((prev) => clampComposerHeight(prev))
-      setChatWidth((prev) => prev ? Math.max(340, Math.min(prev, window.innerWidth * 0.5)) : prev)
+      setChatWidth((prev) => prev ? Math.max(240, Math.min(prev, Math.max(240, window.innerWidth * 0.5))) : prev)
     }
     window.addEventListener("resize", onWindowResize)
     return () => window.removeEventListener("resize", onWindowResize)
@@ -1045,11 +1156,15 @@ function EditorPage({
               {sites.siteList.length > 1 ? (
                 <button
                   type="button"
-                  className="site-switcher-trigger"
+                  className={`site-switcher-trigger${showSiteSwitcher ? " is-open" : ""}`}
                   onClick={() => setShowSiteSwitcher((v) => !v)}
                   aria-expanded={showSiteSwitcher}
                   aria-haspopup="menu"
                 >
+                  <span
+                    className={`site-switcher-item-dot site-switcher-item-dot-${activeEntry?.probing ? "probing" : activeEntry?.online ? "online" : "offline"}`}
+                    aria-hidden="true"
+                  />
                   <span className="site-switcher-trigger-label">{activeSiteConfig.name}</span>
                   <ChevronDown size={12} className={`site-switcher-chevron${showSiteSwitcher ? " is-open" : ""}`} aria-hidden="true" />
                 </button>
@@ -1086,26 +1201,51 @@ function EditorPage({
               </button>
               {showSiteSwitcher && (
                 <div className="site-switcher-dropdown" role="menu" aria-label={t("header.allSites")}>
+                  <div className="site-switcher-header">
+                    <span>{t("header.allSites")}</span>
+                    <a href="/sites" className="site-switcher-add-link" onClick={() => setShowSiteSwitcher(false)}>
+                      + {t("sites.addSite")}
+                    </a>
+                  </div>
                   <div className="site-switcher-list">
-                    {dropdownSites.map((site) => (
-                      <button
-                        key={site.id}
-                        type="button"
-                        role="menuitem"
-                        className={`site-switcher-item${site.id === siteId ? " is-active" : ""}`}
-                        onClick={() => {
-                          if (site.id !== siteId) sites.openEditorForSite(site.id)
+                    {onlineEntries.length > 0 && offlineEntries.length > 0 ? (
+                      <div className="site-switcher-section-label">Online</div>
+                    ) : null}
+                    {onlineEntries.map((entry) => (
+                      <SiteSwitcherRow
+                        key={entry.site.id}
+                        name={entry.site.name}
+                        origin={entry.origin}
+                        statusClass={entry.probing ? "probing" : "online"}
+                        active={entry.site.id === siteId}
+                        onSelect={() => {
+                          if (entry.site.id !== siteId) sites.openEditorForSite(entry.site.id)
                           setShowSiteSwitcher(false)
                         }}
-                      >
-                        <span className="site-switcher-item-dot" />
-                        <span className="site-switcher-item-name">{site.name}</span>
-                        {site.id === siteId && <Check size={12} aria-hidden="true" />}
-                      </button>
+                      />
+                    ))}
+                    {offlineEntries.length > 0 ? (
+                      <div className="site-switcher-section-label">
+                        {t("sites.offlineSiteCount", { count: offlineEntries.length })}
+                      </div>
+                    ) : null}
+                    {offlineEntries.map((entry) => (
+                      <SiteSwitcherRow
+                        key={entry.site.id}
+                        name={entry.site.name}
+                        origin={entry.origin}
+                        statusClass="offline"
+                        dimmed
+                        onSelect={() => {
+                          sites.openEditorForSite(entry.site.id)
+                          setShowSiteSwitcher(false)
+                        }}
+                      />
                     ))}
                   </div>
                   <a href="/sites" className="site-switcher-footer" onClick={() => setShowSiteSwitcher(false)}>
                     {t("header.viewAllSites")}
+                    <ExternalLink size={11} aria-hidden="true" />
                   </a>
                 </div>
               )}

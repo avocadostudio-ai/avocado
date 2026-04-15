@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useT } from "@/i18n"
 import { useEditorStore } from "../store"
-import { orchestrator } from "../lib/editor-utils"
+import { orchestrator, resolveEditorPreviewUrl } from "../lib/editor-utils"
 import type { UseSiteListReturn } from "../hooks/useSiteList"
 
 type DriveValidation = { status: "loading" | "ok" | "error"; message?: string } | null
@@ -35,6 +35,8 @@ export function SiteConfigDrawer({ sites, onPreviewRefresh }: SiteConfigDrawerPr
   }, [sites.configSiteId, setSiteConfigTab])
 
   const configSite = sites.configSite
+  const queryPreviewOverride = useMemo(() => resolveEditorPreviewUrl(), [])
+  const previewUrlOverridden = !!queryPreviewOverride && !configSite?.previewUrl
 
   return (
     <Sheet open={!!configSite} onOpenChange={(open) => { if (!open) sites.setConfigSiteId(null) }}>
@@ -66,9 +68,14 @@ export function SiteConfigDrawer({ sites, onPreviewRefresh }: SiteConfigDrawerPr
                     <input
                       type="url"
                       value={configSite.previewUrl ?? ""}
-                      placeholder={t("sites.previewUrlPlaceholder")}
+                      placeholder={previewUrlOverridden ? queryPreviewOverride : t("sites.previewUrlPlaceholder")}
                       onChange={(e) => sites.updateConfigSite({ previewUrl: e.target.value })}
                     />
+                    {previewUrlOverridden ? (
+                      <span style={{ fontSize: 12, marginTop: 4, color: "#f59e0b" }}>
+                        {t("sites.previewUrlOverride")}
+                      </span>
+                    ) : null}
                   </label>
                   <label className="sites-form-field sites-form-field-inline">
                     <input
