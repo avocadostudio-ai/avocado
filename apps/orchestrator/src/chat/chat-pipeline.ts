@@ -1152,6 +1152,18 @@ export async function runChatPipeline(
               delete patchCandidate.imageAlt
             }
           }
+          // If stripping left the patch empty, write a shimmer placeholder so
+          // applyOpsAtomically doesn't reject the op as a no-op (which aborts
+          // the deferred image resolution before it can swap in the real URL).
+          if (Object.keys(patchCandidate).length === 0) {
+            const primary = imgOps[0]
+            const placeholder = primary.provider === "unsplash" ? SEARCHING_IMAGE_PLACEHOLDER : GENERATING_IMAGE_PLACEHOLDER
+            if (typeof primary.path === "string" && primary.path.length > 0) {
+              setValueAtPath(patchCandidate, primary.path, placeholder)
+            } else {
+              patchCandidate.imageUrl = placeholder
+            }
+          }
         }
 
         // Annotate change_log with image work.

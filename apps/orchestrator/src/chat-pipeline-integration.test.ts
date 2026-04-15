@@ -2040,3 +2040,98 @@ test("chat returns planner_exception when demo planner throws", async (t) => {
   assert.equal(payload.debug?.outcome, "planner_exception")
   assert.equal(payload.plannerSource, "demo")
 })
+
+test("chat unsplash hero request: LLM placeholder matching current value still applies (no false no_effective_change)", async (t) => {
+  // Regression for traceId a3508c99: "populate hero image with unsplash" returned
+  // "No changes needed" because the LLM emitted update_props with imageUrl equal to
+  // the current placeholder (/hero-generated.svg). The image-strip block left the
+  // patch empty → applyOpsAtomically threw no_effective_change → deferred image
+  // resolution never ran. Strip should leave a shimmer placeholder behind so apply
+  // succeeds and downstream resolution can swap in the real image.
+  const previousKey = process.env.OPENAI_API_KEY
+  const previousUnsplash = process.env.UNSPLASH_ACCESS_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  delete process.env.UNSPLASH_ACCESS_KEY
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+    if (previousUnsplash === undefined) delete process.env.UNSPLASH_ACCESS_KEY
+    else process.env.UNSPLASH_ACCESS_KEY = previousUnsplash
+  })
+
+  const session = newSession()
+  const placeholderUrl = "/hero-generated.svg"
+  const createPage = await app.inject({
+    method: "POST",
+    url: "/ops",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      ops: [
+        {
+          op: "create_page",
+          page: {
+            id: "p_spring",
+            slug: "/spring",
+            title: "Spring",
+            updatedAt: new Date().toISOString(),
+            blocks: [
+              {
+                id: "b_hero_spring",
+                type: "Hero",
+                props: {
+                  heading: "Spring Avocados",
+                  subheading: "Fresh from the orchard",
+                  ctaText: "Shop",
+                  ctaHref: "/",
+                  imageUrl: placeholderUrl,
+                  imageAlt: "spring avocados"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  })
+  assert.equal(createPage.statusCode, 200)
+
+  // Mock the planner to mimic what Claude Haiku 4.5 actually did in trace
+  // a3508c99: an update_props on the Hero whose imageUrl is identical to the
+  // current value (the placeholder).
+  const mockedPlan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Populate hero image from Unsplash.",
+    change_log: ["Set the hero image."],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/spring",
+        blockId: "b_hero_spring",
+        patch: { props: { imageUrl: placeholderUrl, imageAlt: "spring avocados from unsplash" } }
+      }
+    ]
+  }
+  setGeneratePlanWithOpenAIForTests(async () => ({ plan: mockedPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/spring",
+      message: "populate hero image with unsplash"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as { status?: string; summary?: string; debug?: { outcome?: string } }
+  assert.notEqual(
+    payload.debug?.outcome,
+    "no_effective_change",
+    `expected apply to succeed (shimmer placeholder), got no_effective_change with summary: ${payload.summary}`
+  )
+  assert.doesNotMatch(String(payload.summary ?? ""), /already up to date/i)
+})
