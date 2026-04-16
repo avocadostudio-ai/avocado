@@ -74,7 +74,7 @@ body {
 .chat-panel > *:not(.panel-tabs-main) {
   grid-column: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .panel-splitter {

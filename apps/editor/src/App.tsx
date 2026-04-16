@@ -38,6 +38,7 @@ import {
   previewPresetWidths,
   buildSiteDraftDisableUrl,
   buildSiteDraftEnableUrl,
+  clampChatWidth,
   resolveSiteOrigin,
   siteDraftSecret,
   resolveDefaultChatDarkMode,
@@ -982,10 +983,6 @@ function EditorPage({
   }, [])
 
   useEffect(() => {
-    const clampChatWidth = (w: number) => {
-      const max = Math.max(240, window.innerWidth * 0.5)
-      return Math.max(240, Math.min(w, max))
-    }
     const onPointerMove = (event: PointerEvent) => {
       const composerStarted = resizeStartRef.current
       if (composerStarted) {
@@ -1019,11 +1016,11 @@ function EditorPage({
   useEffect(() => {
     const onWindowResize = () => {
       setComposerHeight((prev) => clampComposerHeight(prev))
-      setChatWidth((prev) => prev ? Math.max(240, Math.min(prev, Math.max(240, window.innerWidth * 0.5))) : prev)
+      setChatWidth((prev) => prev ? clampChatWidth(prev) : prev)
     }
     window.addEventListener("resize", onWindowResize)
     return () => window.removeEventListener("resize", onWindowResize)
-  }, [])
+  }, [setChatWidth])
 
   // Variation modal escape
   useEffect(() => {
