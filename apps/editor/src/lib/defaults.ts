@@ -7,6 +7,27 @@ export const MODEL_KEY_STORAGE_KEY = "editor-model-key-v1"
 export const PROVIDER_STORAGE_KEY = "editor-provider-v1"
 export const CHAT_THEME_STORAGE_KEY = "editor-chat-theme-v1"
 export const DEV_OPTIONS_STORAGE_KEY = "editor-dev-options-v1"
+export const CHAT_WIDTH_STORAGE_KEY = "editor-chat-width-v1"
+
+// Chat panel resize bounds. Content area = chatWidth - 56px rail padding,
+// so 380 leaves ~324 for composer/messages (tighter breaks layout).
+export const CHAT_WIDTH_MIN = 380
+export const CHAT_WIDTH_MAX_ABS = 720
+
+export function clampChatWidth(w: number, viewportWidth?: number): number {
+  const vw = viewportWidth ?? (typeof window !== "undefined" ? window.innerWidth : 1440)
+  const max = Math.max(CHAT_WIDTH_MIN, Math.min(CHAT_WIDTH_MAX_ABS, vw * 0.5))
+  return Math.max(CHAT_WIDTH_MIN, Math.min(w, max))
+}
+
+export function resolveDefaultChatWidth(): number | null {
+  if (typeof window === "undefined") return null
+  const stored = window.localStorage.getItem(CHAT_WIDTH_STORAGE_KEY)
+  if (!stored) return null
+  const parsed = Number.parseInt(stored, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return clampChatWidth(parsed)
+}
 
 /**
  * Resolves whether developer-only settings (Streaming, Nested labels, Field

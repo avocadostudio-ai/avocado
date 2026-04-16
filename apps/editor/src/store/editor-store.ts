@@ -24,11 +24,13 @@ import type {
 import type { AnchorRect } from "../hooks/usePreviewBridge"
 import {
   CHAT_THEME_STORAGE_KEY,
+  CHAT_WIDTH_STORAGE_KEY,
   DEBUG_MODE_STORAGE_KEY,
   MODEL_KEY_STORAGE_KEY,
   PROVIDER_STORAGE_KEY,
   createId,
   resolveDefaultChatDarkMode,
+  resolveDefaultChatWidth,
   resolveDefaultDebugMode,
   resolveDefaultModelKey,
   resolveDefaultProvider,
@@ -238,7 +240,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
 
     // ── ui defaults ───────────────────────────────────────────────
     composerHeight: 56,
-    chatWidth: null,
+    chatWidth: resolveDefaultChatWidth(),
     activeTab: "chat",
     showSettingsModal: false,
     showDebugDetails: resolveDefaultDebugMode(),
@@ -466,5 +468,14 @@ useEditorStore.subscribe(
   (show) => {
     if (typeof window === "undefined") return
     window.localStorage.setItem(DEBUG_MODE_STORAGE_KEY, show ? "1" : "0")
+  }
+)
+
+useEditorStore.subscribe(
+  (s) => s.chatWidth,
+  (width) => {
+    if (typeof window === "undefined") return
+    if (width == null) window.localStorage.removeItem(CHAT_WIDTH_STORAGE_KEY)
+    else window.localStorage.setItem(CHAT_WIDTH_STORAGE_KEY, String(Math.round(width)))
   }
 )
