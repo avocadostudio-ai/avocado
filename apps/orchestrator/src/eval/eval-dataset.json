@@ -538,5 +538,27 @@
     "contentChecks": [
       { "type": "no_banned_words", "prop": "summary_for_user", "bannedWords": ["colorful", "coloring", "colored"] }
     ]
+  },
+  {
+    "id": "home-duplicate-featuregrid",
+    "category": "add_block",
+    "slug": "/",
+    "message": "Duplicate the features grid on this page",
+    "tags": ["regression", "router", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["duplicate_block"],
+    "expectedTargetBlockTypes": ["FeatureGrid"],
+    "assertions": [
+      { "type": "block_count", "blockType": "FeatureGrid", "count": 2 }
+    ]
+  },
+  {
+    "id": "home-cross-block-cta-alignment",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Align the CTA language across this page so every call-to-action button uses consistent, action-oriented wording",
+    "tags": ["regression", "cross_block", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"]
   }
 ]
