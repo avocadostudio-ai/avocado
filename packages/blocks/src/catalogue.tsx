@@ -8,6 +8,24 @@ import { initTabs } from "./blocks/tabs/init"
 import { getAllBlockMeta, allowedBlockTypes, defaultPropsForType, getChromeTypes, type BlockMeta, type FieldMeta, type ImageSpec } from "@ai-site-editor/shared"
 
 const CATEGORY_ORDER: NonNullable<BlockMeta["category"]>[] = ["content", "conversion", "layout", "navigation", "media"]
+
+// Catalogue-only prop overrides: richer sample data than the block's insert
+// defaults, so previews showcase the block's full capability without bloating
+// what the AI planner seeds into real sites.
+const CATALOGUE_FIXTURES: Record<string, Record<string, unknown>> = {
+  CardGrid: {
+    title: "Explore more",
+    subtitle: "A mix of getting-started guides, reference material, and product updates.",
+    cards: [
+      { title: "Fast setup", description: "Create and ship updates quickly.", ctaText: "Get started", ctaHref: "/" },
+      { title: "Safe updates", description: "Schema-validated edits reduce breakage.", ctaText: "See how", ctaHref: "/pricing" },
+      { title: "Team workflow", description: "Collaborate with clear, reviewable changes.", ctaText: "Read guide", ctaHref: "/" },
+      { title: "Live preview", description: "Every change renders instantly in the preview pane.", ctaText: "Try it", ctaHref: "/" },
+      { title: "AI assistance", description: "Describe what you want and let the planner draft it.", ctaText: "Learn more", ctaHref: "/" },
+      { title: "Rollbacks", description: "Revert to any previous published version in one click.", ctaText: "Explore", ctaHref: "/" },
+    ],
+  },
+}
 const CATEGORY_LABELS: Record<string, string> = {
   content: "Content",
   media: "Media",
@@ -136,7 +154,8 @@ export function BlockCatalogue() {
   const activeBlock = blocks.find((b) => b.type === activeType)
   const activeMeta = activeBlock?.meta
   const activeDefaultProps = activeBlock?.defaultProps ?? {}
-  const activeRawProps = { ...activeDefaultProps, ...(liveProps[activeType] ?? {}) }
+  const activeFixture = CATALOGUE_FIXTURES[activeType] ?? {}
+  const activeRawProps = { ...activeDefaultProps, ...activeFixture, ...(liveProps[activeType] ?? {}) }
   const activeProps = withDummyImages(activeRawProps, activeMeta)
 
   // Build enum variants — for each enum field with options, render one preview per value
