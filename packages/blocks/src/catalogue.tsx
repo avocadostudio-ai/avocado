@@ -24,7 +24,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 function dummyImageUrl(spec?: ImageSpec): string {
   const w = spec?.width ?? 600
   const h = spec?.height ?? 400
-  return `https://dummyimage.com/${w}x${h}/ab96ab/000000.jpg`
+  return `https://placehold.co/${w}x${h}/ab96ab/000000.jpg`
 }
 
 function withDummyImages(

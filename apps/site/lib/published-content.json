@@ -4,7 +4,7 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-04-13T20:51:32.584Z",
+      "updatedAt": "2026-04-16T18:45:16.029Z",
       "meta": {
         "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
         "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -14,12 +14,12 @@
           "id": "b_hero_1772138902220_copy",
           "type": "Hero",
           "props": {
-            "heading": "Eat Smarter. Feel Better. Live Greener.",
+            "heading": "Master Avocado's Full Power for Heart Health & Energy",
             "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
-            "imageUrl": "/generated-images/gen_1776027688668_eichxm.jpg",
-            "imageAlt": "modify so that the plate fits in well, preserve other details. remove white crumbles",
+            "imageUrl": "/generated-images/gen_1776365104751_yh8kcx.jpg",
+            "imageAlt": "make the bread with avocado a bit larger",
             "imagePosition": "right",
             "textAlign": "left",
             "secondaryCtaText": "Read Research Studies"
