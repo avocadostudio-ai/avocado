@@ -41,7 +41,7 @@ The public surface groups into nine areas, mirroring the OpenAPI tags:
 | **Publish** | Publishing endpoints — `POST /publish`, `GET /publish/status`, `GET /publish/content` | Editor's publish flow |
 | **History** | Undo / redo / version log — `GET /history/log`, `GET /history/status`, `POST /history/undo`, `POST /history/redo`, `POST /history/restore` | Editor's history panel |
 | **Auth** | Optional access password gate — `POST /auth/verify`, `GET /auth/status` | Editor login screen if `ACCESS_PASSWORD_HASH` is set |
-| **Media** | Image upload, generation, search — `POST /image/upload`, `POST /image/generate`, `POST /image/generate/chat`, `POST /image/interpret`, `GET /unsplash/search`, `GET /generated-images/:fileName` | Editor's Asset Picker |
+| **Media** | Image upload, generation, search — `POST /image/upload`, `POST /image/generate`, `POST /image/generate/chat`, `POST /image/interpret`, `GET /unsplash/search`, `GET /generated-images/:fileName` | Editor's Asset Manager |
 | **Health** | Service health and readiness — `GET /health`, `GET /docs/json` | Container health checks, this docs site |
 
 ## Auth model
