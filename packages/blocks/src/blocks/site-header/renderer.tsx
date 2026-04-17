@@ -7,7 +7,7 @@ type NavLink = { label: string; href?: string; children?: NavLink[] }
 
 function ChevronDown({ className }: { className?: string }) {
   return (
-    <svg className={className} width="20" height="20" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <svg className={className} width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
@@ -107,6 +107,7 @@ export function SiteHeader(props: Record<string, unknown>) {
                         className={isActive(child.href) ? "is-active" : undefined}
                         data-editable-target={`links[${i}].children[${j}].label`}
                         data-editable-target-label={`links[${i}].children[${j}].label`}
+                        onClick={(e) => (e.currentTarget as HTMLElement).blur()}
                       >
                         {child.label}
                       </a>

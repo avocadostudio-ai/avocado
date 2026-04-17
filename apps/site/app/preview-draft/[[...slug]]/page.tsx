@@ -86,7 +86,7 @@ export default async function PreviewPage({ params, searchParams }: PageProps) {
   const editorOrigin = editorCtx?.editorOrigin ?? ""
   const editorQuery = editorMode
     ? (() => {
-        const p = new URLSearchParams({ session, siteId })
+        const p = new URLSearchParams({ session, siteId, __editor: "1" })
         if (editorOrigin) p.set("editorOrigin", editorOrigin)
         return `?${p.toString()}`
       })()
