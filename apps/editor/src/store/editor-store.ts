@@ -90,7 +90,7 @@ export type EditorState = {
   addBlockPicker: { slug: string; afterBlockId?: string; beforeBlockId?: string } | null
   addBlockSearch: string
   isAddingBlock: boolean
-  imagePickerTarget: { slug: string; blockId: string; editablePath: string; currentUrl?: string } | null
+  imagePickerTarget: { slug: string; blockId: string; editablePath: string; currentUrl?: string; blockType?: string } | null
   chatDarkMode: boolean
   selectionModeEnabled: boolean
   anchorRect: AnchorRect
@@ -200,7 +200,7 @@ export type EditorActions = {
   setFieldDraftDebug: (debug: EditorState["fieldDraftDebug"]) => void
 
   // composite actions
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string }) => void
+  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string; imageSwap?: ChatEntry["imageSwap"] }) => void
 }
 
 // ── Store creation ──────────────────────────────────────────────────
@@ -418,6 +418,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         aiPerformanceNote: parsedChanges.aiPerformanceNote,
         pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined,
         continuation: data.continuation ?? undefined,
+        imageSwap: options?.imageSwap,
       }
 
       set((prev) => {

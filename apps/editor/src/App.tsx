@@ -197,6 +197,26 @@ export function App() {
 
 const PRESET_SITE_IDS = new Set(["avocado-hub", "avocado-stories", "avocado-magic", "avocado-odyssey"])
 
+// Humanize an editable path like "cards[0].imageUrl" → "Cards 1 · Image"
+function humanizeImageFieldLabel(path: string): string {
+  return path
+    .split(".")
+    .map((seg) => {
+      const listMatch = seg.match(/^([a-zA-Z_]+)\[(\d+)\]$/)
+      if (listMatch) return `${titleCase(listMatch[1])} ${Number(listMatch[2]) + 1}`
+      return titleCase(seg)
+    })
+    .join(" · ")
+}
+
+function titleCase(s: string): string {
+  const spaced = s.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ")
+  // Drop trailing "Url"/"URL" — field names like "imageUrl" → "Image"
+  const cleaned = spaced.replace(/\s*url\s*$/i, "").trim()
+  if (!cleaned) return s
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+}
+
 function EditorPage({
   sites,
 }: {
@@ -504,8 +524,9 @@ function EditorPage({
       setActiveEditablePath(undefined)
       void chatEngine.moveListItem(newSlug, blockId, blockType, listKey, index, afterIndex)
     },
-    onOpenImagePicker: (newSlug, blockId, editablePath, currentUrl) => {
-      setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl })
+    onOpenImagePicker: (newSlug, blockId, editablePath, currentUrl, blockType) => {
+      const effectiveBlockType = blockType ?? (blockId === activeBlockId ? activeBlockType : undefined)
+      setImagePickerTarget({ slug: newSlug, blockId, editablePath, currentUrl, blockType: effectiveBlockType })
     },
     onEditBlockRequested: (_slug, _blockId) => {
       setAnchoredExpanded(true)
@@ -1425,6 +1446,38 @@ function EditorPage({
                   })()}
                 </div>
               ) : null}
+              {entry.imageSwap ? (() => {
+                const swap = entry.imageSwap
+                // Drop a generic "Image" field label when we also show the block
+                // name (would just read "Hero · Image" → redundant with summary).
+                const fieldIsGeneric = /^image$/i.test((swap.fieldLabel ?? "").trim())
+                const showField = swap.fieldLabel && !(swap.blockDisplayName && fieldIsGeneric)
+                const headline = swap.blockDisplayName ?? (showField ? swap.fieldLabel : null)
+                const subhead = swap.blockDisplayName && showField ? swap.fieldLabel : null
+                return (
+                  <button
+                    type="button"
+                    className="msg-image-swap-card"
+                    onClick={() => {
+                      setImagePickerTarget({
+                        slug: swap.slug,
+                        blockId: swap.blockId,
+                        editablePath: swap.editablePath,
+                        currentUrl: swap.imageUrl,
+                        blockType: activeBlockId === swap.blockId ? activeBlockType : undefined,
+                      })
+                    }}
+                    title={t("ops.imageSwap.pickAnother")}
+                  >
+                    <img src={swap.imageUrl} alt={swap.altText ?? ""} />
+                    <div className="msg-image-swap-meta">
+                      {headline ? <span className="msg-image-swap-block">{headline}</span> : null}
+                      {subhead ? <span className="msg-image-swap-field">{subhead}</span> : null}
+                      <span className="msg-image-swap-action">{t("ops.imageSwap.pickAnother")}</span>
+                    </div>
+                  </button>
+                )
+              })() : null}
               {entry.continuation ? (
                 <div className="msg-plan-actions">
                   <button
@@ -1695,7 +1748,7 @@ function EditorPage({
           }}
           onImageClick={(fieldPath, currentUrl) => {
             if (!activeBlockId) return
-            setImagePickerTarget({ slug, blockId: activeBlockId, editablePath: fieldPath, currentUrl })
+            setImagePickerTarget({ slug, blockId: activeBlockId, editablePath: fieldPath, currentUrl, blockType: activeBlockType })
           }}
           onAiAssist={handleFieldAiAssist}
           onPageAiAssist={handlePageAiAssist}
@@ -2021,21 +2074,40 @@ function EditorPage({
         onClose={() => setImagePickerTarget(null)}
         onSelect={(imageUrl, alt) => {
           if (!imagePickerTarget) return
-          const { slug: targetSlug, blockId, editablePath } = imagePickerTarget
+          const { slug: targetSlug, blockId, editablePath, currentUrl: previousUrl, blockType } = imagePickerTarget
           const altPath = toAltPath(editablePath)
           // Detect indexed list paths like "cards[0].imageUrl" → use update_item
           const listMatch = editablePath.match(/^([a-zA-Z_]+)\[(\d+)\]\.(.+)$/)
           const altListMatch = altPath !== editablePath ? altPath.match(/^([a-zA-Z_]+)\[(\d+)\]\.(.+)$/) : null
           let ops: Record<string, unknown>[]
+          let fieldLabel: string
           if (listMatch) {
             const [, listKey, indexStr, fieldKey] = listMatch
             const itemPatch: Record<string, string> = { [fieldKey]: imageUrl }
             if (altListMatch) itemPatch[altListMatch[3]] = alt
             ops = [{ op: "update_item", pageSlug: targetSlug, blockId, listKey, index: Number(indexStr), patch: itemPatch }]
+            fieldLabel = `${listKey}[${indexStr}].${fieldKey}`
           } else {
             const patch: Record<string, string> = { [editablePath]: imageUrl }
             if (altPath !== editablePath) patch[altPath] = alt
             ops = [{ op: "update_props", pageSlug: targetSlug, blockId, patch }]
+            fieldLabel = editablePath
+          }
+          const resolvedBlockType = blockType
+            ?? (blockId === activeBlockId ? activeBlockType : undefined)
+            ?? (blockId === activeBlockId && blockProps.blockType ? blockProps.blockType : undefined)
+          const blockDisplayName = resolvedBlockType
+            ? (getAllBlockMeta()[resolvedBlockType]?.displayName ?? resolvedBlockType)
+            : undefined
+          const imageSwap = {
+            imageUrl,
+            previousUrl,
+            altText: alt,
+            slug: targetSlug,
+            blockId,
+            editablePath,
+            blockDisplayName,
+            fieldLabel: humanizeImageFieldLabel(fieldLabel),
           }
           void (async () => {
             try {
@@ -2047,12 +2119,25 @@ function EditorPage({
               const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string; details?: unknown }
               if (res.ok && data.status === "applied") {
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
-                chatEngine.pushAssistantFromResult({ status: "applied", summary: t("ops.changedImage") }, { canUndo: true })
+                chatEngine.pushAssistantFromResult(
+                  { status: "applied", summary: t("ops.changedImage") },
+                  { canUndo: true, imageSwap }
+                )
                 void blockProps.refetch()
               } else {
                 console.error("[ImagePicker] ops failed:", res.status, data.error, data.details ?? "", "ops:", JSON.stringify(ops))
+                chatEngine.pushAssistantFromResult(
+                  { status: "error", summary: t("ops.imageChangeFailed") },
+                  { imageSwap: { ...imageSwap, imageUrl: previousUrl ?? imageUrl } }
+                )
               }
-            } catch (err) { console.error("[ImagePicker] ops failed:", err) }
+            } catch (err) {
+              console.error("[ImagePicker] ops failed:", err)
+              chatEngine.pushAssistantFromResult(
+                { status: "error", summary: t("ops.imageChangeFailed") },
+                { imageSwap: { ...imageSwap, imageUrl: previousUrl ?? imageUrl } }
+              )
+            }
           })()
         }}
       />

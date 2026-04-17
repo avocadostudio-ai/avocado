@@ -171,6 +171,17 @@ export type ChatEntry = {
     rating: "up" | "down"
     note?: string
   }
+  /** Populated for image-picker swaps so the chat can render a thumbnail confirmation card. */
+  imageSwap?: {
+    imageUrl: string
+    previousUrl?: string
+    altText?: string
+    slug: string
+    blockId: string
+    editablePath: string
+    blockDisplayName?: string
+    fieldLabel?: string
+  }
 }
 
 export type ApplyOpsResponse = {

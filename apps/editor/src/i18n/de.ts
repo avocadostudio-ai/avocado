@@ -235,7 +235,7 @@ const de: LocaleDict = {
   "chatInput.transcribeFailed": "Audiotranskription fehlgeschlagen.",
 
   // -- Image picker --
-  "imagePicker.title": "Medienbibliothek",
+  "imagePicker.title": "Asset-Manager",
   "imagePicker.close": "Schließen",
   "imagePicker.drive": "Drive",
   "imagePicker.unsplash": "Unsplash",
@@ -323,6 +323,10 @@ const de: LocaleDict = {
   "ops.addedItem": "Listenelement hinzugefügt.",
   "ops.deletedBlock": "Block gelöscht.",
   "ops.changedImage": "Bild geändert.",
+  "ops.replacedImageAt": "{{block}} · {{field}}",
+  "ops.imageChangeFailed": "Bild konnte nicht geändert werden. Bitte erneut versuchen.",
+  "ops.imageSwap.pickAnother": "Ändern",
+  "ops.imageSwap.retry": "Erneut versuchen",
   "ops.continueNext": "Weiter zum nächsten Schritt",
 
   // -- Field AI suggestions --
