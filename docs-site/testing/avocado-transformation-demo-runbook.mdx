@@ -1,35 +1,39 @@
 ---
-title: "Transformation Demo Runbook"
-description: "Step-by-step runbook for the Avocado Stories transformation demo aimed at product stakeholders."
+title: "Transformation Runbook"
+description: "Step-by-step runbook for the Avocado Stories transformation walkthrough aimed at product stakeholders."
 ---
 
-# Avocado Stories Transformation Demo Runbook
+# Avocado Stories Transformation Runbook
 
 Audience: product stakeholders  
 Style: transformation narrative  
 Site: `avocado-stories`  
 Purpose: brand awareness + education
 
-## Demo promise
+## Promise
 
-Transform a generic starter site into an audience-aware avocado education experience in one live session, with visible reversibility and publish proof.
+Transform a generic starter site into a visually polished, audience-aware avocado education experience in one live session — with AI-generated copy *and imagery*, visible reversibility, multi-provider model choice, and publish proof.
 
-## Demo setup
+## Setup
 
 1. Start services:
    - `pnpm dev:start`
 2. Verify services are healthy:
    - Site: `http://localhost:3000`
-   - Editor: `http://localhost:4100`
+   - Content Studio: `http://localhost:4100`
    - Orchestrator: `http://localhost:4200/health`
-3. Optional automated check:
+3. Confirm at least one provider key is set in `.env`:
+   - `ANTHROPIC_API_KEY` (recommended — Site Assistant requires it)
+   - `OPENAI_API_KEY`
+   - `GOOGLE_GENERATIVE_AI_API_KEY` (required for image generation via Gemini)
+4. Optional automated check:
    - `pnpm demo:avocado:check`
 
 ## Opening narrative (before state)
 
-1. Open `http://localhost:4100/sites`
-2. Open editor for `Avocado Stories`.
-3. Show the current weak baseline (`/` and `/pricing`, generic hero text).
+1. Open `http://localhost:4100/sites`.
+2. Open the editor for `Avocado Stories`.
+3. Show the current weak baseline (`/` and `/pricing`, generic hero text, placeholder imagery).
 
 Speaker line:
 `We're starting from a plain baseline so the business impact is obvious as we go.`
@@ -39,7 +43,7 @@ Speaker line:
 ### 1. Route control + preview sync
 
 Action:
-1. Use route dropdown to switch between `/` and `/pricing`.
+1. Use the route dropdown to switch between `/` and `/pricing`.
 
 Speaker line:
 `Route context is explicit, so every AI edit is scoped and predictable.`
@@ -47,128 +51,192 @@ Speaker line:
 Pass criteria:
 1. Preview switches route immediately.
 
-### 2. Hero value proposition rewrite
+### 2. Model tier selection
 
-Prompt:
-`Rewrite hero headline/subheading for premium avocado products`
+Action:
+1. Open the Settings (gear icon) and point out the model picker.
+2. Show tiers: **Fast**, **Balanced**, **Reasoning**.
+3. Leave on **Fast** (default) for the rest of the demo.
 
 Speaker line:
-`This improves message clarity before we touch structure.`
+`Teams pick the provider and tier that fit the task — fast models for routine copy tweaks, reasoning models for complex restructuring — without changing code.`
 
 Pass criteria:
-1. Hero heading/subheading visibly changes.
+1. Tier selector visible with Anthropic / OpenAI / Gemini options.
+
+### 3. Hero value proposition rewrite (streaming)
+
+Prompt:
+`Rewrite the hero headline and subheading for premium avocado products in an educational, modern tone.`
+
+Speaker line:
+`Watch the plan stream in — changes apply as the model produces them, not after a spinner. The team sees progress, not a wall at the end.`
+
+Pass criteria:
+1. Hero heading/subheading visibly change *while* the response streams.
 2. Assistant response reports applied changes.
 
 Fallback prompt:
 `On /, rewrite only the hero headline and subheading for premium avocado products in an educational, modern tone.`
 
-### 3. Structural edit: testimonials below hero
+### 4. AI-generated hero image (Gemini)
 
-Prompt:
-`Add testimonials section below hero`
+Action:
+1. In the preview, click the hero image.
+2. In the asset picker, switch to the **Generate** tab.
+3. Prompt:
+   `A sun-dappled close-up of a perfectly ripe Hass avocado halved on a linen cloth, soft morning light, premium food editorial style.`
+4. Apply the generated image to the hero.
 
 Speaker line:
-`Now we move from copy edits to layout-level trust building.`
+`One brand voice, one visual system — generated in the same flow, not outsourced to a separate tool.`
 
 Pass criteria:
-1. New testimonials block appears directly below hero.
+1. Generated image appears in the asset picker preview.
+2. Applying it updates the hero image in the live preview without a reload.
+
+Fallback:
+1. If Gemini is unavailable, switch to the **Unsplash** tab, search `ripe avocado`, and apply a photo. Call out that the asset picker supports Unsplash, Google Drive, Contentful / Sanity / Strapi, upload, and URL paste out of the box.
+
+### 5. Image edit with reference consistency
+
+Action:
+1. Click the hero image again and return to **Generate**.
+2. Prompt:
+   `Same scene and lighting, but add a small ceramic pinch-pot of flaky salt next to the avocado.`
+3. Apply the edited result.
+
+Speaker line:
+`Reference-aware editing keeps the visual language consistent — not a new image every time, an evolution of the current one.`
+
+Pass criteria:
+1. The new image visibly retains the previous composition/lighting while adding the requested element.
+
+### 6. Structural edit: testimonials below hero
+
+Prompt:
+`Add a testimonials section below the hero with 3 concise customer quotes.`
+
+Speaker line:
+`Now we move from copy and imagery to layout-level trust building.`
+
+Pass criteria:
+1. New testimonials block appears directly below the hero.
 
 Fallback prompt:
 `On /, insert a testimonials section immediately after the hero with 3 concise customer quotes.`
 
-### 4. New route generation
+### 7. New route generation with imagery
 
 Prompt:
-`Create new page /recipes and add 3 featured recipes`
+`Create /recipes with a hero and a featured recipes section containing exactly 3 cards, each with an AI-generated food photograph of the recipe.`
 
 Speaker line:
-`We're not just editing existing pages; we're creating net-new content paths.`
+`We're not just editing existing pages — we're creating net-new content paths with both copy *and* imagery produced inline.`
 
 Pass criteria:
-1. `/recipes` appears in route selector.
-2. `/recipes` renders with 3 featured recipe items.
+1. `/recipes` appears in the route selector.
+2. `/recipes` renders with 3 recipe cards.
+3. Each card has a generated image (not a placeholder).
 
 Fallback prompt:
-`Create /recipes with a hero plus a featured recipes section containing exactly 3 items.`
+`Create /recipes with a hero plus a featured recipes section containing exactly 3 recipe cards. Generate an image for each card.`
 
-### 5. Audience-proof generation on /recipes
+### 8. Audience-proof generation on /recipes
 
 Prompt:
-`For /recipes, generate 3 audience-targeted educational sections for beginner home cooks, nutrition-focused families, and premium food enthusiasts. Each section should include a practical takeaway and educational CTA.`
+`For /recipes, generate 3 audience-targeted educational sections for beginner home cooks, nutrition-focused families, and premium food enthusiasts. Each section should include a practical takeaway and an educational CTA.`
 
 Speaker line:
-`This shows one brand voice adapting to multiple audiences without fragmenting the product story.`
+`One brand voice adapting to multiple audiences — without fragmenting the product story.`
 
 Pass criteria:
 1. Three distinct sections are present.
 2. Tone/wording differs by audience.
-3. CTAs remain educational (learn/explore/guide-oriented).
+3. CTAs remain educational (learn / explore / guide-oriented).
 
 Fallback prompt:
 `On /recipes, add one section per audience: beginner home cooks, nutrition-focused families, premium food enthusiasts. Keep each section educational and end with one practical CTA.`
 
-### 6. Inline edit in preview
+### 9. Inline edit in preview
 
 Action:
-1. Click an editable text region in preview.
+1. Click an editable text region in the preview.
 2. Change one sentence and commit.
 
 Speaker line:
-`Direct manipulation keeps momentum high for marketing teams.`
+`Direct manipulation keeps momentum high for marketing teams — no round-trip through chat for small tweaks.`
 
 Pass criteria:
 1. Text updates instantly.
-2. Edit persists after route switch away and back.
+2. Edit persists after switching routes away and back.
 
-### 7. Variations on selected block
+### 10. Variations on a selected block
 
 Action:
-1. Select a block in preview.
-2. Prompt: `Generate 3 variations for this block`
+1. Select a recipe card block in the preview.
+2. Prompt: `Generate 3 variations of this block`.
 3. Apply one variation.
 
 Speaker line:
-`Teams can explore alternatives quickly without losing control.`
+`Teams explore alternatives quickly without losing control of what ships.`
 
 Pass criteria:
-1. Variation modal opens.
+1. Variation modal opens with 3 options.
 2. Applied option visibly updates the selected block.
 
-### 8. Reversibility with Undo
+### 11. Reversibility with Undo
 
 Action:
-1. Click Undo on last undoable assistant message.
+1. Click **Undo** on the last undoable assistant message.
 
 Speaker line:
-`Experimentation is safe because edits are reversible.`
+`Experimentation is safe because every edit is reversible at the step level.`
 
 Pass criteria:
-1. Latest applied change is reverted.
+1. The latest applied change reverts cleanly.
 
-### 9. Publish confidence
+### 12. Language switch (optional)
 
 Action:
-1. Click Publish.
-2. Open `Open live site` link (and `View deploy` if available).
+1. In Settings, switch the UI language to **Deutsch**.
+2. Send a short prompt (e.g. `Ändere die Hero-Überschrift zu "Avocados neu entdecken"`).
 
 Speaker line:
-`We've moved from idea to publish-ready output with a verifiable release step.`
+`The Content Studio UI and the assistant both speak the user's language — today English and German, more on the way.`
+
+Pass criteria:
+1. UI labels flip to German.
+2. Assistant responses (`summary`, `change log`, suggestions) come back in German.
+3. Applied edit is correct.
+
+### 13. Publish confidence
+
+Action:
+1. Click **Publish**.
+2. Open the `Open live site` link (and `View deploy` if available).
+
+Speaker line:
+`We've moved from idea to publish-ready output — copy, imagery, structure, and routes — with a verifiable release step.`
 
 Pass criteria:
 1. Publish status is `triggered` or `ready`.
-2. Live site link opens successfully.
+2. Live site link opens successfully and reflects the session's edits, including generated images.
 
 ## Workflow behavior callouts to show live
 
-1. If a response is `plan_ready`, click `Approve plan` to continue.
-2. Confirm created routes appear in selector after generation.
-3. Mention that variation generation requires selected block context.
+1. If a response is `plan_ready`, click **Approve plan** to continue.
+2. Confirm that newly created routes appear in the route selector after generation.
+3. Mention that variation generation requires an active block selection.
+4. Mention that image generation uses the **Generate** tab in the asset picker; **Unsplash**, **Google Drive**, **CMS**, **Upload**, and **URL paste** are peer tabs in the same picker.
 
 ## Dry run scorecard (quick)
 
-1. Preflight: all 3 services healthy.
+1. Preflight: all 3 services healthy; at least one LLM key and a Gemini key present.
 2. Baseline: initial hero is generic and site looks plain.
-3. Edits: prompts 1-3 each produce visible applied changes.
-4. Audience proof: `/recipes` has 3 differentiated audience sections.
-5. Interactions: inline edit, variation apply, and undo all succeed.
-6. Publish: success state and live link open.
+3. Copy edits: prompts 3, 6, 8 each produce visible applied changes while streaming.
+4. Imagery: hero image generated (step 4) and edited with reference (step 5); `/recipes` cards each have generated images (step 7).
+5. Audience proof: `/recipes` has 3 differentiated audience sections.
+6. Interactions: inline edit, variation apply, and undo all succeed.
+7. Locale: UI and assistant output switch to German cleanly (optional).
+8. Publish: success state and live link open with generated imagery intact.

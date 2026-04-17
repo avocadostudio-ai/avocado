@@ -11,7 +11,7 @@ Three modes (Migrate / Integrate / Create), one chat UI, two execution backends 
 <Note>
 **Claude only — for now.** The Site Assistant runs exclusively on **Anthropic Claude**, on both backends. There is no OpenAI / Gemini / local-model code path: the CLI backend shells out to the official `claude` CLI, and the SDK backend uses `@anthropic-ai/claude-agent-sdk` against your `ANTHROPIC_API_KEY`. If you only have an `OPENAI_API_KEY`, the assistant will not run — you'll need a Claude subscription (free for the CLI backend) or an Anthropic API key.
 
-This is *only* a constraint for the Site Assistant. The editor's per-edit chat (the AI you talk to *after* a site exists) already supports OpenAI, Anthropic, and demo mode — see [model selection](/integration/editor-quickstart). Multi-provider support for the Site Assistant is on the roadmap but not implemented today; if it matters to you, the **[Bring Your Own Coding Agent](/sites/coding-agent)** path lets you use any agent (Codex, Cursor, Aider, …) regardless of which model it runs on.
+This is *only* a constraint for the Site Assistant. The editor's per-edit chat (the AI you talk to *after* a site exists) already supports OpenAI and Anthropic — see [model selection](/integration/editor-quickstart). Multi-provider support for the Site Assistant is on the roadmap but not implemented today; if it matters to you, the **[Bring Your Own Coding Agent](/sites/coding-agent)** path lets you use any agent (Codex, Cursor, Aider, …) regardless of which model it runs on.
 </Note>
 
 ## Prerequisites
