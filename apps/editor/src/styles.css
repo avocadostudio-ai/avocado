@@ -76,6 +76,9 @@ body {
   min-width: 0;
   overflow-x: hidden;
 }
+.chat-panel > .chat-header {
+  overflow: visible;
+}
 
 .panel-splitter {
   grid-column: 2;
@@ -125,6 +128,8 @@ body.panel-resizing iframe {
   display: grid;
   gap: 18px;
   overflow: visible;
+  position: relative;
+  z-index: 20;
 }
 
 .chat-header-top {
