@@ -6,7 +6,7 @@
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<!-- TODO: Add screenshot or demo GIF of the split-pane Content Studio UI -->
+<!-- TODO: Add screenshot or GIF of the split-pane Content Studio UI -->
 
 ## Why Avocado Studio?
 

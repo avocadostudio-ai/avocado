@@ -59,6 +59,45 @@ The feature flags the editor reads (`imageGenerate`, `imageGenerateChat`,
 `GET /status/planner` and are set purely from env vars — there is no
 per-session toggle today.
 
+### Unsplash: licensing & attribution
+
+<Note>
+**Why Unsplash is in the picker.** The Unsplash tab ships primarily as a
+**demo / placeholder convenience** — it lets stakeholders, evaluators, and
+new sites populate a site with real-looking imagery during a live session
+without leaving the editor or wiring up a DAM. Production sites should
+usually graduate to branded photography, generated imagery, or a CMS-backed
+asset library. If you *do* ship Unsplash photos to end users, the rules
+below apply — attribution and API compliance are the adopter's
+responsibility, not the orchestrator's.
+</Note>
+
+Photos returned by the Unsplash tab (and by the `unsplash.search` tool) are
+served under the [Unsplash License](https://unsplash.com/license). The
+license is permissive — photos are free for commercial and non-commercial
+use and no permission from the photographer is required — but the Unsplash
+API Terms impose a few concrete obligations that adopters are responsible
+for meeting:
+
+- **Credit the photographer and Unsplash** wherever a selected photo is
+  rendered. The `unsplash.search` response includes `author` (photographer
+  name) and `sourceUrl` (photo page on unsplash.com) specifically so you can
+  surface attribution in your UI — for example:
+  *Photo by [Photographer Name](sourceUrl) on [Unsplash](https://unsplash.com).*
+- **Do not resell, redistribute, or host** unmodified Unsplash photos as a
+  stock-photo service, wallpaper pack, or competing search product.
+- **Do not imply endorsement** by photographers or by Unsplash of your
+  product, brand, or customers.
+- **Track downloads** when building your own Unsplash-powered integration.
+  The API requires a `GET /photos/:id/download` trigger per selected photo;
+  the `unsplash.search` tool in this repo does not do this automatically —
+  adopters integrating Unsplash into a custom flow outside of the built-in
+  tab should implement it to stay within Unsplash's API guidelines.
+
+Generated images (OpenAI, Gemini) and assets returned from CMS tabs
+(Contentful, Sanity, Strapi) have their own licensing and usage rules;
+consult the relevant provider terms before shipping content publicly.
+
 ## AI providers
 
 ### OpenAI (default)
