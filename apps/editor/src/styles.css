@@ -2056,6 +2056,81 @@ textarea {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+.msg-image-swap-card {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 6px;
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.msg-image-swap-card:hover {
+  border-color: rgba(0, 102, 140, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.msg-image-swap-card img {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+.msg-image-swap-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.msg-image-swap-block {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg-image-swap-field {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg-image-swap-action {
+  font-size: 11px;
+  color: rgba(0, 102, 140, 0.85);
+  margin-top: 2px;
+}
+
+.editor-dark .msg-image-swap-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.editor-dark .msg-image-swap-block {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.editor-dark .msg-image-swap-field {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .msg-variation-card:hover:not(:disabled) {
   border-color: rgba(0, 102, 140, 0.5);
   box-shadow: 0 2px 8px rgba(0, 102, 140, 0.12);

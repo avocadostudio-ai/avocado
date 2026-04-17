@@ -5,6 +5,7 @@ import type { BlockInstance } from "@ai-site-editor/shared"
 export type BlockPropsResult = {
   status: "idle" | "loading" | "ready" | "error"
   props: Record<string, unknown> | null
+  blockType: string | null
   refetch: () => void
 }
 
@@ -20,6 +21,7 @@ export function useBlockProps(
 ): BlockPropsResult {
   const [status, setStatus] = useState<BlockPropsResult["status"]>("idle")
   const [props, setProps] = useState<Record<string, unknown> | null>(null)
+  const [blockType, setBlockType] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const propsJsonRef = useRef<string>("")
   const retryCountRef = useRef(0)
@@ -29,6 +31,7 @@ export function useBlockProps(
     if (!activeBlockId) {
       setStatus("idle")
       setProps(null)
+      setBlockType(null)
       propsJsonRef.current = ""
       retryCountRef.current = 0
       return
@@ -62,6 +65,7 @@ export function useBlockProps(
           propsJsonRef.current = json
           setProps(block.props)
         }
+        setBlockType(block.type)
         setStatus("ready")
         retryCountRef.current = 0
       } else {
@@ -73,6 +77,7 @@ export function useBlockProps(
         }
         propsJsonRef.current = ""
         setProps(null)
+        setBlockType(null)
         setStatus("error")
       }
     } catch (err) {
@@ -96,5 +101,5 @@ export function useBlockProps(
   }, [doFetch, enabled])
 
   // refetch is always callable — not gated on `enabled`
-  return { status, props, refetch: doFetch }
+  return { status, props, blockType, refetch: doFetch }
 }

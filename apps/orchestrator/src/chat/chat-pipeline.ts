@@ -92,6 +92,7 @@ const isCancelError = _isCancelError
 import { isMultiStepCandidate, decomposeRequest } from "./decomposer.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic, type DeferredNativeImageCall } from "./anthropic-planner.js"
 import { generatePlanWithGemini, parseIntentWithGemini } from "./gemini-planner.js"
+import { createPlannerRegistry } from "./planner-types.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import { executeToolCall } from "../tools/runtime.js"
 import { detectImageSourceAmbiguity } from "../nlp/intent-helpers.js"
@@ -2660,10 +2661,38 @@ export async function runChatPipeline(
   const parallelPlannerEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_PARALLEL_PLANNER ?? "1").trim())
   const routerHeadStartMs = Math.max(0, Math.min(Number(process.env.CHAT_ROUTER_HEAD_START_MS ?? 200), 1000))
 
-  const isGeminiPlanner = plannerSource === "gemini"
-  const isAnthropicPlanner = plannerSource === "anthropic"
-  const supportsNativeTools = isAnthropicPlanner || isGeminiPlanner
-  const generatePlanImpl = isAnthropicPlanner ? generatePlanWithAnthropicImpl : isGeminiPlanner ? generatePlanWithGeminiImpl : generatePlanWithOpenAIImpl
+  // Request-scoped registry. Closures over *Impl vars so test hooks
+  // (setGeneratePlanWith*ForTests) still take effect.
+  const plannerRegistry = createPlannerRegistry({
+    openai: {
+      source: "openai",
+      supportsNativeTools: false,
+      parseIntent: (a) => {
+        const { log: _log, ...rest } = a
+        return parseIntentWithOpenAIImpl(rest)
+      },
+      generatePlan: (a) => {
+        const { onStatusUpdate: _s, onImageProgress: _i, log: _l, ...rest } = a
+        return generatePlanWithOpenAIImpl(rest)
+      },
+    },
+    anthropic: {
+      source: "anthropic",
+      supportsNativeTools: true,
+      parseIntent: (a) => parseIntentWithAnthropicImpl(a),
+      generatePlan: (a) => generatePlanWithAnthropicImpl(a),
+    },
+    gemini: {
+      source: "gemini",
+      supportsNativeTools: true,
+      parseIntent: (a) => parseIntentWithGeminiImpl(a),
+      generatePlan: (a) => generatePlanWithGeminiImpl(a),
+    },
+  })
+  // `plannerSource === "demo"` is handled earlier; here it's always a real planner.
+  const planner = plannerRegistry.get(plannerSource)!
+  const supportsNativeTools = planner.supportsNativeTools
+  const generatePlanImpl = planner.generatePlan
   const maxPlanningAttempts = 3
   let initialPlan: EditPlan | null = null
   let routerDetectedInfo = false
@@ -2687,38 +2716,16 @@ export async function runChatPipeline(
     // Intent router promise
     emitStatusTone("understanding")
     const routerPromise = (async () => {
-      const routedIntent =
-        isAnthropicPlanner
-          ? await parseIntentWithAnthropicImpl({
-              message: plannerMessage,
-              slug: effectiveSlug,
-              currentPage: current,
-              activeBlockId: planningActiveBlockId,
-              activeBlockType: body.activeBlockType,
-              activeEditablePath: planningActiveEditablePath,
-              model: routerModel,
-              log: ctx.log
-            })
-          : isGeminiPlanner
-            ? await parseIntentWithGeminiImpl({
-                message: plannerMessage,
-                slug: effectiveSlug,
-                currentPage: current,
-                activeBlockId: planningActiveBlockId,
-                activeBlockType: body.activeBlockType,
-                activeEditablePath: planningActiveEditablePath,
-                model: routerModel,
-                log: ctx.log
-              })
-            : await parseIntentWithOpenAIImpl({
-                message: plannerMessage,
-                slug: effectiveSlug,
-                currentPage: current,
-                activeBlockId: planningActiveBlockId,
-                activeBlockType: body.activeBlockType,
-                activeEditablePath: planningActiveEditablePath,
-                model: routerModel
-              })
+      const routedIntent = await planner.parseIntent({
+        message: plannerMessage,
+        slug: effectiveSlug,
+        currentPage: current,
+        activeBlockId: planningActiveBlockId,
+        activeBlockType: body.activeBlockType,
+        activeEditablePath: planningActiveEditablePath,
+        model: routerModel,
+        log: ctx.log
+      })
 
       const routedPlan = compileDeterministicPlan({
         session: body.session!,
@@ -2971,38 +2978,16 @@ export async function runChatPipeline(
         ctx.modelLookup[provider]?.balanced ??
         modelUsed
 
-      const routedIntent =
-        isAnthropicPlanner
-          ? await parseIntentWithAnthropicImpl({
-              message: plannerMessage,
-              slug: effectiveSlug,
-              currentPage: current,
-              activeBlockId: planningActiveBlockId,
-              activeBlockType: body.activeBlockType,
-              activeEditablePath: planningActiveEditablePath,
-              model: routerModel,
-              log: ctx.log
-            })
-          : isGeminiPlanner
-            ? await parseIntentWithGeminiImpl({
-                message: plannerMessage,
-                slug: effectiveSlug,
-                currentPage: current,
-                activeBlockId: planningActiveBlockId,
-                activeBlockType: body.activeBlockType,
-                activeEditablePath: planningActiveEditablePath,
-                model: routerModel,
-                log: ctx.log
-              })
-            : await parseIntentWithOpenAIImpl({
-                message: plannerMessage,
-                slug: effectiveSlug,
-                currentPage: current,
-                activeBlockId: planningActiveBlockId,
-                activeBlockType: body.activeBlockType,
-                activeEditablePath: planningActiveEditablePath,
-                model: routerModel
-              })
+      const routedIntent = await planner.parseIntent({
+        message: plannerMessage,
+        slug: effectiveSlug,
+        currentPage: current,
+        activeBlockId: planningActiveBlockId,
+        activeBlockType: body.activeBlockType,
+        activeEditablePath: planningActiveEditablePath,
+        model: routerModel,
+        log: ctx.log
+      })
 
       emitStatusTone("planning")
       const routedPlan = compileDeterministicPlan({

@@ -348,7 +348,7 @@ export type BridgeCallbacks = {
   onListItemAddRequested: (payload: { slug: string; blockId: string; blockType: string; listKey: string; afterIndex: number }) => void
   onListItemMoveRequested: (payload: { slug: string; blockId: string; blockType: string; listKey: string; index: number; afterIndex?: number }) => void
   onInlineTextCommitted: (payload: { slug: string; blockId: string; blockType: string; editablePath: string; value: string }) => void
-  onOpenImagePicker: (payload: { slug: string; blockId: string; editablePath: string; currentUrl?: string }) => void
+  onOpenImagePicker: (payload: { slug: string; blockId: string; blockType?: string; editablePath: string; currentUrl?: string }) => void
   onScroll: () => void
 }
 
@@ -946,6 +946,7 @@ export function createBridgeFunctions(
       const block = el.closest<HTMLElement>("[data-block-id]")
       if (!block) return
       const blockId = block.getAttribute("data-block-id") ?? ""
+      const blockType = block.getAttribute("data-block-type") ?? ""
       const currentSlug = pathname || "/"
 
       const img = el.querySelector<HTMLImageElement>("img")
@@ -962,6 +963,7 @@ export function createBridgeFunctions(
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>'
       btn.setAttribute("data-image-slug", currentSlug)
       btn.setAttribute("data-image-block-id", blockId)
+      if (blockType) btn.setAttribute("data-image-block-type", blockType)
       btn.setAttribute("data-image-path", path)
       if (currentUrl) btn.setAttribute("data-image-current-url", currentUrl)
       el.append(btn)
@@ -1283,6 +1285,7 @@ export function createBridgeFunctions(
       callbacks.onOpenImagePicker({
         slug: imgBtn.getAttribute("data-image-slug") || pathname || "/",
         blockId: imgBtn.getAttribute("data-image-block-id") || "",
+        blockType: imgBtn.getAttribute("data-image-block-type") || undefined,
         editablePath: imgBtn.getAttribute("data-image-path") || "",
         currentUrl: imgBtn.getAttribute("data-image-current-url") || undefined,
       })

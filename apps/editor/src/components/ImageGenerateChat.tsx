@@ -1,5 +1,5 @@
 /**
- * Image generation chat for the Asset Picker Generate tab.
+ * Image generation chat for the Asset Manager Generate tab.
  * Uses assistant-ui ComposerPrimitive for the input area, with direct
  * message rendering and SSE streaming to the Gemini chat endpoint.
  */
