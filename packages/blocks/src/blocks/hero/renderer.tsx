@@ -69,10 +69,12 @@ export function Hero(props: Record<string, unknown>) {
     )
   }
 
-  const imageLeftClass = imagePosition === "left" ? " layout-grid--image-left hero--image-left" : ""
+  const isImageLeft = imagePosition === "left"
+  const sectionClass = isImageLeft ? "hero hero--image-left" : "hero"
+  const gridClass = `section__inner hero__inner layout-grid layout-grid--content-heavy${isImageLeft ? " layout-grid--image-left" : ""}`
   return (
-    <section className={`hero${imageLeftClass}`}>
-      <div className="section__inner hero__inner layout-grid layout-grid--content-heavy">
+    <section className={sectionClass}>
+      <div className={gridClass}>
         {content}
         <div className="hero__media layout-grid__col" data-editable-target="imageUrl" data-editable-target-label="Hero block image">
           <BlockImage
