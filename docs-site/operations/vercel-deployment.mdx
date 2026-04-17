@@ -158,7 +158,7 @@ Then add orchestrator/Content Studio deployment as phase 2.
 
 ## Recommended Beta Split (Avoid Production Overwrite)
 
-Use separate URLs/environments for production and Content Studio demo.
+Use separate URLs/environments for production and Content Studio staging.
 
 ### Production site (stable)
 
@@ -170,16 +170,16 @@ Use separate URLs/environments for production and Content Studio demo.
 
 Behavior: serves committed `apps/site/lib/published-content.json` only.
 
-### Staging/demo site (Content Studio preview target)
+### Staging site (Content Studio preview target)
 
 - Vercel project or branch: `beta-editor` (recommended separate project URL)
-- URL: staging/demo URL
+- URL: staging URL
 - Env:
   - `ORCHESTRATOR_URL=https://<orchestrator-host>`
   - `NEXT_PUBLIC_ENABLE_EDITOR=1`
   - `NEXT_PUBLIC_EDITOR_ORIGIN=https://<editor-host>`
 
-Behavior: can read live draft content from orchestrator for demo/editing.
+Behavior: can read live draft content from orchestrator for editing.
 
 ### Content Studio app
 
@@ -216,7 +216,7 @@ The block selector requires a working postMessage channel between Content Studio
 
 5. **CORS on orchestrator** — `ORCHESTRATOR_CORS_ORIGINS` must include both the Content Studio and site origins.
 
-### Required env vars (full demo)
+### Required env vars (full stack)
 
 | Component | Variable | Notes |
 |-----------|----------|-------|
