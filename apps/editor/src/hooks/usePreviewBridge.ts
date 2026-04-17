@@ -16,7 +16,7 @@ export type PreviewBridgeCallbacks = {
   onListItemRemoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number) => void
   onListItemMoveRequested: (slug: string, blockId: string, blockType: string, listKey: string, index: number, afterIndex: number | undefined) => void
   onInlineTextCommitted: (slug: string, blockId: string, editablePath: string, value: string) => void
-  onOpenImagePicker: (slug: string, blockId: string, editablePath: string, currentUrl: string | undefined) => void
+  onOpenImagePicker: (slug: string, blockId: string, editablePath: string, currentUrl: string | undefined, blockType: string | undefined) => void
   onEditBlockRequested: (slug: string, blockId: string) => void
   onIframeScrolled?: () => void
 }
@@ -164,7 +164,8 @@ export function usePreviewBridge(slug: string, callbacks: PreviewBridgeCallbacks
         const blockId = parseString(msg.payload.blockId, "")
         const editablePath = parseString(msg.payload.editablePath, "")
         const currentUrl = parseOptionalString(msg.payload.currentUrl)
-        callbacks.onOpenImagePicker(nextSlug, blockId, editablePath, currentUrl)
+        const blockType = parseOptionalString(msg.payload.blockType)
+        callbacks.onOpenImagePicker(nextSlug, blockId, editablePath, currentUrl, blockType)
       }
 
       if (msg.type === "inlineTextCommitted") {

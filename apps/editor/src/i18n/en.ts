@@ -233,7 +233,7 @@ const en = {
   "chatInput.transcribeFailed": "Failed to transcribe audio.",
 
   // -- Image picker --
-  "imagePicker.title": "Asset Picker",
+  "imagePicker.title": "Asset Manager",
   "imagePicker.close": "Close",
   "imagePicker.drive": "Drive",
   "imagePicker.unsplash": "Unsplash",
@@ -321,6 +321,10 @@ const en = {
   "ops.addedItem": "Added list item.",
   "ops.deletedBlock": "Deleted block.",
   "ops.changedImage": "Changed image.",
+  "ops.replacedImageAt": "{{block}} · {{field}}",
+  "ops.imageChangeFailed": "Couldn't change the image. Please try again.",
+  "ops.imageSwap.pickAnother": "Change",
+  "ops.imageSwap.retry": "Try again",
   "ops.continueNext": "Continue to next step",
 
   // -- Field AI suggestions --
