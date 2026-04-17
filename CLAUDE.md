@@ -57,14 +57,20 @@ Tests use Node's built-in test runner (`node:test`) with `tsx`. Test files live 
 
 ## Architecture
 
-pnpm monorepo — chat-driven website editor with live preview. Three apps + two packages:
+pnpm monorepo — chat-driven website editor with live preview. Four apps + eight packages:
 
 - **apps/orchestrator** (Fastify :4200) — brain: in-memory session state, AI planning, operations engine, publishing
 - **apps/editor** (Vite+React :4100) — chat UI, model selection, iframe communication via postMessage
 - **apps/site** (Next.js :3000) — renders `BlockInstance` pages, fetches drafts from orchestrator, editor overlay via preview-adapter
+- **apps/paintball-bern** — demo/test site
 - **packages/shared** — Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
-- **packages/blocks** — build-in block renderers (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText)
+- **packages/blocks** — built-in block renderers (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, and more)
 - **packages/preview-adapter** — PreviewBridge component, postMessage protocol (`site-editor/v1`), CSS overlay system
+- **packages/site-sdk** — SDK for integrating AI editing into any Next.js 15+ site
+- **packages/editor-puck** — Puck-based visual drag-and-drop editor
+- **packages/migration-sdk** — utilities for migrating existing content into PageDoc/BlockInstance shape
+- **packages/immersive-widget** — embeddable widget for immersive block experiences
+- **packages/create-ai-site-editor** — CLI scaffolder for new Next.js sites
 
 See `.claude/skills/` for deep architecture, block system, preview-editor, and chat pipeline docs.
 

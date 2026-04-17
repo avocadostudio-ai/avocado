@@ -27,9 +27,10 @@ An **operation** is a structured, schema-validated edit action. When a user says
 
 ```json
 {
-  "op": "update_block",
+  "op": "update_props",
+  "pageSlug": "/about",
   "blockId": "hero-1",
-  "props": { "heading": "Welcome" }
+  "patch": { "heading": "Welcome" }
 }
 ```
 
@@ -38,12 +39,21 @@ Operations are the unit of change in Avocado Studio. They can be:
 | Operation | What it does |
 |-----------|-------------|
 | `add_block` | Insert a new block at a specific position |
-| `update_block` | Change one or more props on an existing block |
+| `update_props` | Change one or more props on an existing block |
 | `remove_block` | Delete a block from the page |
 | `move_block` | Reorder a block within the page |
-| `add_page` | Create a new page |
+| `duplicate_block` | Copy a block within or across pages |
+| `add_item` | Add an item to a list field (e.g. a new testimonial) |
+| `update_item` | Update a list item by index |
+| `remove_item` | Delete a list item by index |
+| `move_item` | Reorder a list item |
+| `create_page` | Create a new page |
 | `duplicate_page` | Copy an existing page |
-| `delete_page` | Remove a page |
+| `rename_page` | Change a page's slug and/or title |
+| `remove_page` | Delete a page |
+| `move_page` | Reorder a page in the site nav |
+| `update_page_meta` | Update SEO meta fields (title, description, ogImage) |
+| `update_site_config` | Update global site settings (name, logo, nav) |
 
 Every operation is validated against the block's Zod schema before it's applied. If the AI generates an invalid edit (e.g., setting a `heading` to a number), it's rejected automatically.
 
@@ -94,12 +104,23 @@ When the Content Studio connects to your site, it fetches the **block manifest**
   "blocks": [
     {
       "type": "Hero",
-      "fields": {
-        "heading": { "type": "string", "label": "Heading" },
-        "subheading": { "type": "string", "label": "Subheading" },
-        "imageUrl": { "type": "image", "label": "Hero image" },
-        "ctaText": { "type": "string", "label": "CTA button text" },
-        "ctaHref": { "type": "string", "label": "CTA link" }
+      "displayName": "Hero",
+      "editablePaths": ["heading", "subheading", "imageUrl", "ctaText", "ctaHref"],
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "heading":    { "type": "string" },
+          "subheading": { "type": "string" },
+          "imageUrl":   { "type": "string" },
+          "ctaText":    { "type": "string" },
+          "ctaHref":    { "type": "string" }
+        },
+        "required": ["heading", "ctaText", "ctaHref"]
+      },
+      "defaultProps": {
+        "heading": "Welcome",
+        "ctaText": "Get started",
+        "ctaHref": "/contact"
       }
     }
   ]

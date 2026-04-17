@@ -1,11 +1,11 @@
 ---
-title: "Asset Picker & AI Images"
+title: "Asset Manager & AI Images"
 description: "Image sources, AI generation with OpenAI and Gemini (nano-banana), multi-turn image chat, and how the editor and chat pipeline resolve images."
 ---
 
 ## Overview
 
-Avocado Studio has two entry points for images: the **Asset Picker modal** in
+Avocado Studio has two entry points for images: the **Asset Manager modal** in
 the editor, and the **`image.generate` tool** that the chat planner can call
 during natural-language edits. Both paths share the same providers and the
 same on-disk storage.
@@ -15,7 +15,7 @@ flowchart TD
     editor["Editor image field click"]
     chat["Chat message:<br/>'generate a hero image…'"]
 
-    editor --> modal["Asset Picker modal"]
+    editor --> modal["Asset Manager modal"]
     chat --> tool["image.generate tool"]
 
     modal --> generate["Generate tab"]
@@ -273,4 +273,4 @@ All from `apps/orchestrator/src/routes/media.ts`.
 - [Tools MVP](/integration/tools-mvp) — the broader tool contract that
   `image.generate` and `unsplash.search` implement.
 - [Custom Blocks › Image fields](/integration/custom-blocks) — how to declare
-  image fields on your own blocks so the Asset Picker opens for them.
+  image fields on your own blocks so the Asset Manager opens for them.
