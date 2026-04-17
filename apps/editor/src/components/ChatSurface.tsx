@@ -122,9 +122,12 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
             const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(rawText, line))
             if (changeLines.length === 0) return null
             if (changeLines.length > 5) {
-              const summaryLabel = /translat/i.test(rawText)
-                ? `${changeLines.length} fields translated`
-                : `${changeLines.length} changes applied`
+              const remaining = changeLines.length - 3
+              const moreLabel = entry.status === "info"
+                ? `${remaining} more`
+                : /translat/i.test(rawText)
+                  ? `${remaining} more translations`
+                  : `${remaining} more changes`
               const previewCount = 3
               return (
                 <>
@@ -132,7 +135,7 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
                     {changeLines.slice(0, previewCount).map((line, idx) => <li key={idx}>{line}</li>)}
                   </ul>
                   <details className="msg-list-details">
-                    <summary>{changeLines.length - previewCount} more changes</summary>
+                    <summary>{moreLabel}</summary>
                     <ul className="msg-list">
                       {changeLines.slice(previewCount).map((line, idx) => <li key={idx}>{line}</li>)}
                     </ul>
