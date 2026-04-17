@@ -140,7 +140,15 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
       return reply.code(400).send({ error: "No valid pages to bootstrap." })
     }
 
-    if (overwrite) draft.clear()
+    if (overwrite) {
+      // Only clobber pages that will be replaced by a source page. Draft-only
+      // pages (e.g. user-duplicated pages not yet in the CMS) must survive —
+      // otherwise every editor refresh destroys them.
+      const sourceSlugs = new Set(sourcePages.map((p) => p.slug))
+      for (const slug of Array.from(draft.keys())) {
+        if (sourceSlugs.has(slug)) draft.delete(slug)
+      }
+    }
     for (const page of sourcePages) {
       const copy = structuredClone(page)
       ensureHeroImageProps(copy)
