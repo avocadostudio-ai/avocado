@@ -39,6 +39,15 @@ import {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
+function readInitialSlug(): string {
+  if (typeof window === "undefined") return "/"
+  const raw = new URLSearchParams(window.location.search).get("slug")
+  if (!raw) return "/"
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed === "/") return "/"
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`
+}
+
 function normalizeValidationErrors(raw: AssistantResponse["validationErrors"]) {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.map(String)
@@ -213,7 +222,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     activeEditablePath: undefined,
 
     // ── navigation defaults ───────────────────────────────────────
-    slug: "/",
+    slug: readInitialSlug(),
     availableSlugs: ["/"],
     isLoadingSlugs: false,
 

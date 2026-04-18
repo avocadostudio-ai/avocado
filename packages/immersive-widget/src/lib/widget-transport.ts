@@ -11,8 +11,6 @@ export type ChatRequestPayload = {
   siteId: string
   slug: string
   message: string
-  modelKey: string
-  provider: string
   locale?: string
   activeBlockId?: string
   activeBlockType?: string

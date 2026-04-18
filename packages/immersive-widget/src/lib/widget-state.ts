@@ -16,6 +16,8 @@ export type WidgetConfig = {
   orchestratorUrl: string
   session: string
   siteId: string
+  /** Origin of the main editor (apps/editor). Enables the "Back" pill when present. */
+  editorOrigin?: string
 }
 
 const STORAGE_PREFIX = "immersive-chat"
