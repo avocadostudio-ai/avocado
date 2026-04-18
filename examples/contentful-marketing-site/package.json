@@ -26,7 +26,7 @@
     "clsx": "^2.1.1",
     "contentful": "^11.5.0",
     "contentful-management": "^11.44.0",
-    "next": "15.2.8",
+    "next": "15.5.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
