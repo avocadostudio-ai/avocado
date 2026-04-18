@@ -113,6 +113,37 @@ validate_openai_key() {
   esac
 }
 
+validate_gemini_key() {
+  local key="$1"
+  local status
+  status=$(curl -sS -o /dev/null -w '%{http_code}' \
+    --max-time 10 \
+    "https://generativelanguage.googleapis.com/v1beta/models?key=$key" 2>/dev/null || echo "000")
+  case "$status" in
+    200) return 0 ;;
+    400|401|403) echo "key rejected (HTTP $status) — check it was copied in full" >&2; return 1 ;;
+    429) echo "rate-limited (HTTP 429) — key looks valid, continuing" >&2; return 0 ;;
+    000) echo "couldn't reach generativelanguage.googleapis.com — skipping validation" >&2; return 0 ;;
+    *) echo "unexpected response (HTTP $status) — saving key anyway" >&2; return 0 ;;
+  esac
+}
+
+validate_unsplash_key() {
+  local key="$1"
+  local status
+  status=$(curl -sS -o /dev/null -w '%{http_code}' \
+    --max-time 10 \
+    -H "Authorization: Client-ID $key" \
+    "https://api.unsplash.com/photos/random?count=1" 2>/dev/null || echo "000")
+  case "$status" in
+    200) return 0 ;;
+    401|403) echo "key rejected (HTTP $status) — check it was copied in full" >&2; return 1 ;;
+    429) echo "rate-limited (HTTP 429) — key looks valid, continuing" >&2; return 0 ;;
+    000) echo "couldn't reach api.unsplash.com — skipping validation" >&2; return 0 ;;
+    *) echo "unexpected response (HTTP $status) — saving key anyway" >&2; return 0 ;;
+  esac
+}
+
 # Abort the setup cleanly — the app is non-functional without a key, so we
 # refuse to continue rather than leaving the dev with a broken install.
 abort_no_key() {
@@ -156,6 +187,31 @@ prompt_and_validate() {
   done
   echo "  giving up after 3 failed attempts." >&2
   abort_no_key
+}
+
+# Prompt for an OPTIONAL key (asset sources, image-gen providers).
+# Unlike prompt_and_validate, empty input and validation failure both just
+# skip the feature instead of aborting — these sources are nice-to-have.
+# Echoes the key on stdout and returns 0 when a key is captured, 1 when skipped.
+prompt_optional_and_validate() {
+  local label="$1" validator="$2"
+  local key=""
+  printf "  Paste your ${label} API key (Enter to skip): " >&2
+  read -r key
+  if [[ -z "$key" ]]; then
+    echo -e "  ${DIM}skipped${NC}" >&2
+    return 1
+  fi
+  printf "  validating... " >&2
+  if "$validator" "$key"; then
+    printf "%bok%b\n" "$GREEN" "$NC" >&2
+    printf '%s' "$key"
+    return 0
+  else
+    printf "  ${DIM}saving anyway — fix in .env if the feature misbehaves${NC}\n" >&2
+    printf '%s' "$key"
+    return 0
+  fi
 }
 
 # --- Banner ----------------------------------------------------------------
@@ -270,7 +326,118 @@ else
   fi
 fi
 
-# --- Step 3: install dependencies ------------------------------------------
+# --- Step 3: image generation (optional) -----------------------------------
+# Image gen is independent of the planner LLM. If the user chose OpenAI it's
+# already enabled (same key powers gpt-image-1). If they chose Anthropic there
+# is *no* image generation until they add a second key. Gemini is also the
+# only provider for the conversational image-editor chat feature.
+
+has_env_gemini=$(grep -E '^GOOGLE_GENAI_API_KEY=.+' "$ENV_FILE" 2>/dev/null || true)
+openai_available=$(grep -E '^OPENAI_API_KEY=.+' "$ENV_FILE" 2>/dev/null || true)
+
+echo ""
+echo -e "${BOLD}🎨 Image generation${NC} ${DIM}(optional)${NC}"
+
+if [[ -n "$has_env_gemini" ]]; then
+  echo -e "${GREEN}✓${NC} Gemini already configured"
+elif [[ -n "$openai_available" ]]; then
+  echo -e "  ${DIM}→ Your OpenAI key already enables image gen via gpt-image-1.${NC}"
+  echo -e "  ${DIM}  Add Gemini too for conversational image editing (Gemini-only feature)?${NC}"
+  read -rp "  Add Gemini? [y/N]: " img_ans
+  if [[ "$img_ans" =~ ^[Yy]$ ]]; then
+    open_url "https://aistudio.google.com/apikey"
+    echo -e "  ${DIM}Opened https://aistudio.google.com/apikey${NC}"
+    if gemini_key=$(prompt_optional_and_validate "Gemini" validate_gemini_key); then
+      write_key "GOOGLE_GENAI_API_KEY" "$gemini_key"
+      echo -e "${GREEN}✓${NC} saved GOOGLE_GENAI_API_KEY to .env"
+    fi
+  fi
+else
+  echo -e "  ${DIM}→ Anthropic does not generate images. Add a separate provider?${NC}"
+  echo "    1) Gemini  (recommended — also powers conversational image editing)"
+  echo "    2) OpenAI  (gpt-image-1 only; separate key from your Anthropic planner)"
+  echo "    3) Skip"
+  read -rp "  Choose [1-3] (default: 3): " img_choice
+  case "${img_choice:-3}" in
+    1)
+      open_url "https://aistudio.google.com/apikey"
+      echo -e "  ${DIM}Opened https://aistudio.google.com/apikey${NC}"
+      if gemini_key=$(prompt_optional_and_validate "Gemini" validate_gemini_key); then
+        write_key "GOOGLE_GENAI_API_KEY" "$gemini_key"
+        echo -e "${GREEN}✓${NC} saved GOOGLE_GENAI_API_KEY to .env"
+      fi
+      ;;
+    2)
+      open_url "$OPENAI_KEYS_URL"
+      echo -e "  ${DIM}Opened $OPENAI_KEYS_URL${NC}"
+      if oai_key=$(prompt_optional_and_validate "OpenAI" validate_openai_key); then
+        write_key "OPENAI_API_KEY" "$oai_key"
+        echo -e "${GREEN}✓${NC} saved OPENAI_API_KEY to .env (image generation only)"
+      fi
+      ;;
+    *)
+      echo -e "  ${DIM}skipped — the editor's Generate tab will be hidden${NC}"
+      ;;
+  esac
+fi
+
+# --- Step 4: Unsplash stock photos (optional) ------------------------------
+
+has_env_unsplash=$(grep -E '^UNSPLASH_ACCESS_KEY=.+' "$ENV_FILE" 2>/dev/null || true)
+
+echo ""
+echo -e "${BOLD}📷 Unsplash stock photos${NC} ${DIM}(optional)${NC}"
+
+if [[ -n "$has_env_unsplash" ]]; then
+  echo -e "${GREEN}✓${NC} already configured"
+else
+  echo -e "  ${DIM}→ Free stock photos from the editor's asset picker.${NC}"
+  echo -e "  ${DIM}  Create an \"application\" on Unsplash and copy its Access Key.${NC}"
+  read -rp "  Configure Unsplash? [y/N]: " ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    open_url "https://unsplash.com/oauth/applications"
+    echo -e "  ${DIM}Opened https://unsplash.com/oauth/applications${NC}"
+    if uns_key=$(prompt_optional_and_validate "Unsplash" validate_unsplash_key); then
+      write_key "UNSPLASH_ACCESS_KEY" "$uns_key"
+      echo -e "${GREEN}✓${NC} saved UNSPLASH_ACCESS_KEY to .env"
+    fi
+  fi
+fi
+
+# --- Step 5: Google Drive brand assets (optional) --------------------------
+# No validator — Drive API requires both a folder ID and auth, and "is this
+# API key valid" is a different question from "can it read that folder".
+# We trust the user's copy-paste and let the editor surface real errors.
+
+has_env_gdrive=$(grep -E '^GOOGLE_DRIVE_FOLDER_ID=.+' "$ENV_FILE" 2>/dev/null || true)
+
+echo ""
+echo -e "${BOLD}📂 Google Drive brand assets${NC} ${DIM}(optional)${NC}"
+
+if [[ -n "$has_env_gdrive" ]]; then
+  echo -e "${GREEN}✓${NC} already configured"
+else
+  echo -e "  ${DIM}→ Browse a shared Drive folder from the editor's asset picker.${NC}"
+  echo -e "  ${DIM}  Needs: a publicly-shared folder + a Google API key with Drive API enabled.${NC}"
+  read -rp "  Configure Google Drive? [y/N]: " ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    open_url "https://console.cloud.google.com/apis/credentials"
+    echo -e "  ${DIM}Opened Google Cloud Console — create an API key and enable the Drive API.${NC}"
+    echo ""
+    read -rp "  Drive folder ID (the part after /folders/ in the URL): " folder_id
+    read -rp "  Google API key: " api_key
+    if [[ -n "$folder_id" && -n "$api_key" ]]; then
+      write_key "GOOGLE_DRIVE_FOLDER_ID" "$folder_id"
+      write_key "GOOGLE_API_KEY" "$api_key"
+      echo -e "${GREEN}✓${NC} saved GOOGLE_DRIVE_FOLDER_ID and GOOGLE_API_KEY to .env"
+      echo -e "  ${DIM}(for private folders, use GOOGLE_SERVICE_ACCOUNT_KEY_JSON instead — see .env.example)${NC}"
+    else
+      echo -e "  ${DIM}skipped — need both folder ID and API key${NC}"
+    fi
+  fi
+fi
+
+# --- Step 6: install dependencies ------------------------------------------
 
 if (( DRY_RUN )); then
   echo ""
@@ -291,4 +458,8 @@ echo ""
 echo "Next:"
 echo -e "  ${BOLD}pnpm dev:start${NC}              start all services"
 echo -e "  ${BOLD}open http://localhost:4100${NC}  open Avocado Studio"
+echo ""
+echo -e "${DIM}Using a CMS for assets?${NC}"
+echo -e "${DIM}  • Contentful — set CONTENTFUL_SPACE_ID + CONTENTFUL_DELIVERY_TOKEN in .env${NC}"
+echo -e "${DIM}  • Sanity / Strapi — configure per-site in the editor's Site Config drawer${NC}"
 echo ""
