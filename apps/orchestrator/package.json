@@ -27,7 +27,8 @@
     "export-openapi": "NODE_ENV=test tsx src/scripts/export-openapi.ts",
     "eval": "NODE_ENV=test tsx src/eval/eval-cli.ts",
     "eval:quick": "NODE_ENV=test tsx src/eval/eval-cli.ts --tags core --concurrency 3",
-    "eval:compare": "NODE_ENV=test tsx src/eval/eval-cli.ts --baseline latest"
+    "eval:compare": "NODE_ENV=test tsx src/eval/eval-cli.ts --baseline latest",
+    "eval:promote": "tsx src/eval/eval-promote-cli.ts"
   },
   "dependencies": {
     "@ai-site-editor/migration-sdk": "workspace:*",

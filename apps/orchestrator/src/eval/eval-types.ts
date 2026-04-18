@@ -2,6 +2,8 @@
 // Planner quality eval — type definitions
 // ---------------------------------------------------------------------------
 
+import type { PageDoc } from "@ai-site-editor/shared"
+
 export type EvalCase = {
   id: string
   category: string
@@ -9,6 +11,13 @@ export type EvalCase = {
   message: string
   tags: string[]
   weight?: number
+
+  // Optional per-case fixture. When absent the runner bootstraps RICH_PAGES.
+  // Used by cases promoted from real traces (see eval-promote-cli.ts) so the
+  // replay sees the exact page state the user saw.
+  fixture?: PageDoc[]
+  activeBlockId?: string
+  activeEditablePath?: string
 
   expectedStatus: "applied" | "needs_clarification"
   expectedOpTypes: string[]
