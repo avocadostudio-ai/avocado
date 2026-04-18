@@ -98,3 +98,143 @@ were editing — no flash to the home route before the iframe catches up.
 | Site wrapper | `apps/site/components/immersive-wrapper.tsx` |
 | Editor "Open in immersive" button | `apps/editor/src/App.tsx` (chat-header-right) |
 | Editor slug bootstrap | `apps/editor/src/store/editor-store.ts` — `readInitialSlug()` |
+
+---
+
+## Embedding on an external site
+
+The widget ships as a standalone package — `@ai-site-editor/immersive-widget` — so you can mount it on any Next.js 15 (App Router) site that is already integrated with the orchestrator via the site-sdk. The monorepo's `apps/site` is just the first consumer; your own project can do the same thing.
+
+### Prerequisites
+
+- Next.js 15 App Router (React 19 peer dep)
+- Site already registered with the orchestrator (`npx avocado-register`) — you need a valid `session` and `siteId`
+- The orchestrator reachable at a known URL from the browser (it's called directly by the widget over SSE, not proxied through Next.js)
+
+### Install
+
+```bash
+pnpm add @ai-site-editor/immersive-widget
+# or: npm install @ai-site-editor/immersive-widget
+```
+
+### Import the CSS
+
+Add the widget stylesheet once, in your root layout or a global CSS file:
+
+```ts
+// app/layout.tsx  (or globals.css @import)
+import "@ai-site-editor/immersive-widget/styles.css"
+```
+
+The styles use `.iw-*` class names with a `--iw-*` CSS custom property API so they don't conflict with your site's own styles.
+
+### Mount the widget
+
+Create a `"use client"` wrapper — the widget needs browser APIs and the Next.js router:
+
+```tsx
+// components/ImmersiveEditingWidget.tsx
+"use client"
+
+import { useRouter, usePathname } from "next/navigation"
+import { ImmersiveWidget } from "@ai-site-editor/immersive-widget"
+import type { WidgetConfig } from "@ai-site-editor/immersive-widget"
+
+const config: WidgetConfig = {
+  orchestratorUrl: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "http://localhost:4200",
+  session: "my-session",   // replace with your session logic — see below
+  siteId: process.env.NEXT_PUBLIC_DEFAULT_SITE_ID ?? "my-site",
+  // Optional: if you want the "← Back" pill to appear
+  editorOrigin: process.env.NEXT_PUBLIC_EDITOR_ORIGIN,
+}
+
+export function ImmersiveEditingWidget({ slug }: { slug: string }) {
+  const router = useRouter()
+  const pathname = usePathname()
+
+  return (
+    <ImmersiveWidget
+      config={config}
+      slug={slug}
+      pathname={pathname}
+      refresh={() => router.refresh()}
+      navigate={(href) => router.push(href)}
+    />
+  )
+}
+```
+
+Then render it from your page component (must be a Server Component that passes the slug down):
+
+```tsx
+// app/[[...slug]]/page.tsx
+import { ImmersiveEditingWidget } from "@/components/ImmersiveEditingWidget"
+
+export default async function Page({ params }: { params: { slug?: string[] } }) {
+  const slug = params.slug?.join("/") ?? ""
+  // ... your existing page rendering ...
+  return (
+    <>
+      {/* your page content */}
+      <ImmersiveEditingWidget slug={slug} />
+    </>
+  )
+}
+```
+
+The widget portals itself to `document.body`, so its position in the tree doesn't matter for z-index or layout.
+
+### Passing the block manifest (recommended)
+
+Without a manifest the widget's block picker falls back to the SDK's built-in block list. To show only your site's actual blocks, fetch the manifest from your existing `/api/editor/blocks` route and pass it in:
+
+```tsx
+// Fetch once at page load (Server Component)
+const manifestRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/editor/blocks`)
+const manifest = manifestRes.ok ? await manifestRes.json() : null
+
+// Pass to the client wrapper
+<ImmersiveEditingWidget slug={slug} manifest={manifest} />
+```
+
+Update the client wrapper's props signature to accept and forward `manifest`.
+
+### Session management
+
+`WidgetConfig.session` is the orchestrator session key that scopes the draft. You have a few options:
+
+| Approach | When to use |
+|---|---|
+| Hard-coded string (e.g. `"dev"`) | Local dev / single editor |
+| `NEXT_PUBLIC_*` env var | Staging deploys where one session serves all visitors |
+| URL query param (`?session=...`) | Entering from the main editor — read it from `useSearchParams()` |
+| Short-lived JWT / cookie | Production multi-user deploys (not yet shipped) |
+
+The main editor passes `?session=...` in the URL when opening immersive mode — read it via `useSearchParams()` if you want the immersive view to share the editor's session automatically.
+
+### Props reference
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `config` | `WidgetConfig` | yes | `orchestratorUrl`, `session`, `siteId`, optional `editorOrigin` |
+| `slug` | `string` | yes | Current page slug (without leading `/`) |
+| `pathname` | `string` | yes | Full pathname — used by the block selection overlay |
+| `refresh` | `() => void` | yes | Called after ops apply; use `router.refresh()` |
+| `navigate` | `(href: string) => void` | yes | Called on undo/redo when slug changes; use `router.push()` |
+| `manifest` | `BlockManifest \| null` | no | Block list for the picker and AI context |
+| `siteContext` | `SiteContext` | no | `{ siteName?, purpose?, tone?, constraints? }` — enriches AI prompts |
+| `accessToken` | `string` | no | Bearer token forwarded to the orchestrator on every request |
+| `textOnly` | `boolean` | no | Restricts picker to `Hero`, `FeatureGrid`, `Testimonials`, `FAQAccordion`, `CTA`, `RichText` and routes text selections to the inline field prompt |
+
+### Restricting access
+
+The widget renders unconditionally if mounted. Gate it behind your existing auth check before rendering the component — for example, only mount it when a `?__editor=1` query param is present or when a Draft Mode cookie is set:
+
+```tsx
+import { draftMode } from "next/headers"
+
+const { isEnabled } = await draftMode()
+// Only mount the widget in draft/edit mode
+{isEnabled && <ImmersiveEditingWidget slug={slug} />}
+```
