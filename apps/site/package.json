@@ -2,7 +2,6 @@
   "name": "@ai-site-editor/site",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "WATCHPACK_POLLING=true WATCHPACK_POLLING_INTERVAL=1000 next dev -p 3000",
     "build": "node ./scripts/sync-published-content.mjs && next build",
@@ -18,7 +17,7 @@
     "@ai-site-editor/immersive-widget": "workspace:*",
     "@tailwindcss/postcss": "^4.2.1",
     "lucide-react": "^0.575.0",
-    "next": "15.2.8",
+    "next": "15.5.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.2.1",
