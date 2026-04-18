@@ -1195,34 +1195,6 @@ function EditorPage({
               ) : (
                 <span className="site-switcher-trigger-label">{activeSiteConfig.name}</span>
               )}
-              <button
-                type="button"
-                className="chat-header-icon-btn"
-                aria-label={t("header.siteSettings")}
-                title={t("header.siteSettings")}
-                onClick={() => sites.setConfigSiteId(siteId)}
-              >
-                <Settings size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="chat-header-icon-btn"
-                aria-label={t("header.syncFromSite")}
-                title={t("header.syncFromSiteTitle")}
-                disabled={isLoading}
-                onClick={async () => {
-                  const count = await chatEngine.syncFromSite()
-                  if (count > 0) {
-                    chatEngine.pushAssistantFromResult({
-                      status: "applied",
-                      summary: count === 1 ? t("header.syncedPage") : t("header.syncedPages", { count }),
-                      changes: []
-                    })
-                  }
-                }}
-              >
-                <RefreshCw size={14} aria-hidden="true" />
-              </button>
               {showSiteSwitcher && (
                 <div className="site-switcher-dropdown" role="menu" aria-label={t("header.allSites")}>
                   <div className="site-switcher-header">
@@ -1267,6 +1239,40 @@ function EditorPage({
                       />
                     ))}
                   </div>
+                  <div className="site-switcher-actions" role="group">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="site-switcher-action"
+                      onClick={() => {
+                        setShowSiteSwitcher(false)
+                        sites.setConfigSiteId(siteId)
+                      }}
+                    >
+                      <Settings size={14} aria-hidden="true" />
+                      <span>{t("header.siteSettings")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="site-switcher-action"
+                      disabled={isLoading}
+                      onClick={async () => {
+                        setShowSiteSwitcher(false)
+                        const count = await chatEngine.syncFromSite()
+                        if (count > 0) {
+                          chatEngine.pushAssistantFromResult({
+                            status: "applied",
+                            summary: count === 1 ? t("header.syncedPage") : t("header.syncedPages", { count }),
+                            changes: []
+                          })
+                        }
+                      }}
+                    >
+                      <RefreshCw size={14} aria-hidden="true" />
+                      <span>{t("header.syncFromSite")}</span>
+                    </button>
+                  </div>
                   <a href="/sites" className="site-switcher-footer" onClick={() => setShowSiteSwitcher(false)}>
                     {t("header.viewAllSites")}
                     <ExternalLink size={11} aria-hidden="true" />
@@ -1282,26 +1288,6 @@ function EditorPage({
               ) : null}
               {plannerBadgeState === "demo" ? (
                 <span className="planner-badge planner-badge-demo">{t("header.demoMode")}</span>
-              ) : null}
-              <button
-                type="button"
-                className="chat-header-icon-btn"
-                aria-label={t("header.moreOptions")}
-                onClick={() => setShowSettingsModal(true)}
-              >
-                <Ellipsis size={14} aria-hidden="true" />
-              </button>
-              {immersiveUrl ? (
-                <a
-                  className="chat-header-icon-btn"
-                  href={immersiveUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={t("header.openImmersive")}
-                  title={t("header.openImmersive")}
-                >
-                  <Fullscreen size={14} aria-hidden="true" />
-                </a>
               ) : null}
               <button type="button" className="publish-preview-btn" onClick={() => setShowPublishReview(true)} disabled={isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
@@ -1330,15 +1316,39 @@ function EditorPage({
               ) : null}
             </div>
           </div>
-          <label className="chat-header-slug">
-            <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
-              {routeOptions.map((route) => (
-                <option key={route} value={route}>
-                  {slugLabel(route)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="chat-header-slug-row">
+            <label className="chat-header-slug">
+              <select value={slug} onChange={(e) => setSlug(e.target.value || "/")} disabled={isLoadingSlugs}>
+                {routeOptions.map((route) => (
+                  <option key={route} value={route}>
+                    {slugLabel(route)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="chat-header-slug-actions">
+              {immersiveUrl ? (
+                <a
+                  className="chat-header-icon-btn"
+                  href={immersiveUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t("header.openImmersive")}
+                  title={t("header.openImmersive")}
+                >
+                  <Fullscreen size={14} aria-hidden="true" />
+                </a>
+              ) : null}
+              <button
+                type="button"
+                className="chat-header-icon-btn"
+                aria-label={t("header.moreOptions")}
+                onClick={() => setShowSettingsModal(true)}
+              >
+                <Ellipsis size={14} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
         </header>
 
         {IS_DEMO_MODE && activeTab === "chat" ? (
