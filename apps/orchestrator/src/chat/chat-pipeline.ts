@@ -441,6 +441,20 @@ export async function runChatPipeline(
     "Chat pipeline request received"
   )
 
+  if (ctx.evalCandidates && body.message) {
+    const draftMap = getSessionDraft(body.session)
+    const fixture = Array.from(draftMap.values()).map((page) => structuredClone(page))
+    ctx.evalCandidates.start({
+      id: chatRequestId,
+      session: body.session,
+      slug: effectiveSlug,
+      prompt: body.message,
+      fixture,
+      activeBlockId: planningActiveBlockId,
+      activeEditablePath: planningActiveEditablePath
+    })
+  }
+
   const requestedProvider = body.provider ?? (ctx.availableProviders[0] as AIProvider | undefined)
   const provider: AIProvider = resolveEffectiveProvider({
     requestedProvider,

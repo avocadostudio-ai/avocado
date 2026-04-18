@@ -79,6 +79,7 @@ type CreateChatTelemetryStoreArgs = {
   limit: number
   persistEnabled: boolean
   logger: Logger
+  onPush?: (entry: ChatTelemetryEntry) => void
 }
 
 // Use the canonical toErrorDetail from errors.ts
@@ -150,6 +151,13 @@ export function createChatTelemetryStore(args: CreateChatTelemetryStoreArgs) {
     if (args.persistEnabled) {
       pendingWrites.push(entry)
       scheduleFlush()
+    }
+    if (args.onPush) {
+      try {
+        args.onPush(entry)
+      } catch (error) {
+        args.logger.error({ err: toErrorDetail(error) }, "chat-telemetry onPush hook failed")
+      }
     }
     args.logger.info(
       {

@@ -152,6 +152,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
   const pipelineCtx: ChatPipelineContext = {
     log: app.log,
     chatTelemetry: ctx.chatTelemetry,
+    evalCandidates: ctx.evalCandidates,
     modelLookup: ctx.modelLookup,
     availableProviders: ctx.availableProviders,
     toolRuntime: ctx.toolRuntime

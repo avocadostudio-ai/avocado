@@ -11,6 +11,7 @@ import {
 } from "./nlp/intent-helpers.js"
 import { plannerMessageWithPendingContext } from "./nlp/intent-detection.js"
 import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
+import { createEvalCandidateStore } from "./telemetry/eval-candidate-store.js"
 import { normalizePlanCandidate } from "./nlp/plan-normalizer.js"
 import { buildCreatePagePlan, compileDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { type AIProvider, loadStateFromDisk } from "./state/session-state.js"
@@ -158,11 +159,38 @@ const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolv
 const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
 const chatTelemetryLimit = Number(process.env.CHAT_TELEMETRY_LIMIT ?? 500)
 const chatTelemetryPersistEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_TELEMETRY_PERSIST ?? "1").trim())
+
+const evalCandidatesEnabled = !/^(0|false|no|off)$/i.test((process.env.EVAL_CANDIDATES_ENABLED ?? "1").trim())
+const evalCandidatesFilePath = process.env.EVAL_CANDIDATES_FILE ?? resolve(process.cwd(), "../../.data/eval-candidates.ndjson")
+const evalCandidatesLimit = Number(process.env.EVAL_CANDIDATES_LIMIT ?? 1000)
+const evalCandidatesTtlDays = Number(process.env.EVAL_CANDIDATES_TTL_DAYS ?? 7)
+const evalCandidates = evalCandidatesEnabled
+  ? createEvalCandidateStore({
+      filePath: evalCandidatesFilePath,
+      limit: evalCandidatesLimit,
+      persistEnabled: true,
+      ttlDays: evalCandidatesTtlDays,
+      logger: app.log
+    })
+  : undefined
+
 const chatTelemetry = createChatTelemetryStore({
   filePath: chatTelemetryFilePath,
   limit: chatTelemetryLimit,
   persistEnabled: chatTelemetryPersistEnabled,
-  logger: app.log
+  logger: app.log,
+  onPush: evalCandidates
+    ? (entry) => {
+        if (entry.phase !== "result") return
+        evalCandidates.finalize(entry.id, {
+          outcome: entry.outcome,
+          reasonCategory: entry.reasonCategory,
+          plannerTier: entry.plannerTier,
+          opTypes: entry.opTypes,
+          opCount: entry.opCount
+        })
+      }
+    : undefined
 })
 const toolRuntime = await createToolRuntime({ logger: app.log })
 
@@ -196,7 +224,7 @@ const availableProviders: AIProvider[] = [
 // Route plugins
 // ---------------------------------------------------------------------------
 
-const ctx: RouteContext = { chatTelemetry, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin, toolRuntime }
+const ctx: RouteContext = { chatTelemetry, evalCandidates, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin, toolRuntime }
 
 await app.register((instance) => contentRoutes(instance, ctx))
 await app.register((instance) => publishingRoutes(instance, ctx))
@@ -340,6 +368,7 @@ async function startServer() {
   await loadStateFromDisk(app.log)
   await ensurePresetRestoreSessions(app.log)
   await chatTelemetry.loadFromDisk()
+  if (evalCandidates) await evalCandidates.loadFromDisk()
   await app.listen({ port, host: "0.0.0.0" })
   app.log.info(`Orchestrator listening on ${port}`)
 
