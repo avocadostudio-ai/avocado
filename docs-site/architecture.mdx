@@ -116,12 +116,10 @@ flowchart LR
     Draft["Draft (orchestrator)"] --> PT["PublishTarget"] --> Prod["Production (your site)"]
 ```
 
-The `PublishTarget` interface is pluggable. The built-in `GitVercelPublishTarget`:
+The `PublishTarget` interface is pluggable. Three built-in targets ship in the box:
 
-1. Serializes all draft pages to JSON
-2. Commits to a Git branch
-3. Pushes to the remote repository
-4. Triggers a Vercel deploy hook (optional)
-5. Tracks deployment status
+- **`site-contract`** — POSTs pages + assets to the remote site's `/api/editor/publish` endpoint. Selected when `siteOrigin` is supplied.
+- **`git`** — Serializes draft pages to JSON, commits, and pushes to a Git branch. A Vercel deploy hook wired to that branch auto-builds.
+- **`deploy-hook`** — Calls a raw `VERCEL_DEPLOY_HOOK_URL` and polls the Vercel API for deployment status.
 
-Implement your own `PublishTarget` to integrate with any deployment workflow — CI/CD pipelines, CMS APIs, static hosting, etc.
+Register your own via `registerPublishTarget()` to integrate with any workflow — S3, GitLab Pages, Netlify, a CMS API, a custom CI/CD pipeline. See [How it Works — Publishing](/how-it-works#publishing) for the full interface.

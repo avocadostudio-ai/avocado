@@ -3,10 +3,7 @@ import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { PageDoc } from "@ai-site-editor/shared"
 import {
-  type PublishTracker,
   normalizeSession,
-  normalizeSiteId,
-  isLegacySiteId,
   scopedSessionKey,
   publishStatusBySession,
   getSessionPages,
@@ -22,18 +19,14 @@ import {
 import { computePublishDiff } from "../publish/diff-engine.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
 import {
-  deploymentIdFromAny,
   refreshPublishStatusFromVercel,
   requirePublishToken,
   listRestoreSnapshots,
   deletePublishSnapshot,
-  loadPublishedSnapshotFromCommit,
-  publishViaGit,
-  collectInlineAssets,
-  recordPublishSnapshot
+  loadPublishedSnapshotFromCommit
 } from "../publish/publish-helpers.js"
-import { firstUrlFromText } from "../chat/chat-pipeline.js"
-import { parseJsonMaybe } from "../chat/variation-pipeline.js"
+import { selectPublishTarget } from "../publish/publish-target-registry.js"
+import type { PublishContext } from "../publish/publish-target.js"
 import type { RouteContext } from "./route-context.js"
 
 /**
@@ -90,26 +83,6 @@ async function loadPublishedForDiff(opts: {
 
   logger.warn("publish/diff: falling back to in-memory publishedPages — diff may be inaccurate")
   return Array.from(publishedPages.values())
-}
-
-function findStringByKeys(root: unknown, wanted: Set<string>): string | undefined {
-  if (!root || typeof root !== "object") return undefined
-  if (Array.isArray(root)) {
-    for (const item of root) {
-      const found = findStringByKeys(item, wanted)
-      if (found) return found
-    }
-    return undefined
-  }
-  const obj = root as Record<string, unknown>
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === "string" && wanted.has(key)) return value
-    if (value && typeof value === "object") {
-      const found = findStringByKeys(value, wanted)
-      if (found) return found
-    }
-  }
-  return undefined
 }
 
 /** Reject origins that point at private/loopback IPs or non-http protocols. */
@@ -172,190 +145,30 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
 
     const pages = getSessionPages(scopedSession)
     const slugs = pages.map((page) => page.slug)
+    const siteConfig = getSiteConfig(scopedSession)
 
-    // Publish via the site's contract endpoint
-    if (siteOrigin) {
-      const siteConfig = getSiteConfig(scopedSession)
-      const assets = await collectInlineAssets(pages, ctx.generatedImageDir)
-      let siteRes: Response
-      try {
-        const publishTokenValue = process.env.PUBLISH_TOKEN?.trim()
-        siteRes = await fetch(`${siteOrigin}/api/editor/publish`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            ...(publishTokenValue ? { "x-publish-token": publishTokenValue } : {})
-          },
-          body: JSON.stringify({
-            pages,
-            siteConfig,
-            session: scopedSession,
-            publishedAt: new Date().toISOString(),
-            ...(Object.keys(assets).length > 0 ? { assets } : {})
-          })
-        })
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : "fetch failed"
-        return reply.code(502).send({
-          status: "failed",
-          session,
-          slugs,
-          reason: `Site unreachable at ${siteOrigin}/api/editor/publish: ${detail}`
-        })
-      }
-
-      if (siteRes.status === 404) {
-        return reply.code(400).send({
-          status: "failed",
-          session,
-          slugs,
-          reason: `Site does not implement the publish contract. POST ${siteOrigin}/api/editor/publish returned 404.`
-        })
-      }
-
-      const siteResult = (await siteRes.json()) as { ok?: boolean; slugs?: string[]; error?: string }
-      const ok = siteRes.ok && siteResult.ok !== false
-      const now = new Date().toISOString()
-
-      const tracker: PublishTracker = {
-        session,
-        status: ok ? "triggered" : "failed",
-        startedAt: now,
-        updatedAt: now,
-        slugs,
-        vercelState: ok ? "READY" : "ERROR",
-        deployResponse: "site_contract",
-        deployStatus: siteRes.status
-      }
-      publishStatusBySession.set(scopedSession, tracker)
-      if (ok) setLastPublishedScopedSession(scopedSession)
-
-      if (!ok) {
-        return reply.code(400).send({
-          status: "failed",
-          session,
-          slugs,
-          reason: siteResult.error ?? "site publish failed"
-        })
-      }
-
-      // Record snapshot in git only for the default site (json-file based).
-      // CMS sites (sanity, contentful, strapi) publish to their CMS directly;
-      // writing their pages to apps/site/lib/published-content.json would
-      // overwrite the avocado-stories content.
-      const snapshotCommit = isLegacySiteId(normalizeSiteId(body.siteId))
-        ? await recordPublishSnapshot(scopedSession, pages, request.log, siteConfig)
-        : undefined
-
-      const publishedSlugs = siteResult.slugs ?? slugs
-      const pageNames = publishedSlugs.map((s) => s === "/" ? "Home" : s.replace(/^\//, ""))
-      return {
-        status: "ready" as const,
-        session,
-        slugs: publishedSlugs,
-        vercelState: "READY",
-        commitSha: snapshotCommit?.slice(0, 12),
-        message: `Published ${pageNames.join(", ")} to site.`
-      }
+    const publishCtx: PublishContext = {
+      session,
+      scopedSession,
+      siteId: body.siteId,
+      siteOrigin: siteOrigin || undefined,
+      pages,
+      slugs,
+      siteConfig,
+      generatedImageDir: ctx.generatedImageDir,
+      logger: request.log
     }
 
-    // No siteOrigin provided — use legacy publish modes
-    const publishMode = (process.env.PUBLISH_MODE?.trim().toLowerCase() || "git") as "deploy_hook" | "git"
-
-    if (publishMode === "git") {
-      const result = await publishViaGit(scopedSession)
-      const tracker: PublishTracker = {
-        session,
-        status: result.status === "failed" ? "failed" : "triggered",
-        startedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        slugs: result.slugs,
-        vercelState: result.status === "failed" ? "ERROR" : "READY",
-        deployResponse: "git_publish",
-        deployStatus: result.status === "failed" ? 500 : 200
-      }
-      publishStatusBySession.set(scopedSession, tracker)
-      if (result.status !== "failed") setLastPublishedScopedSession(scopedSession)
-
-      if (result.status === "failed") {
-        return reply.code(400).send({
-          status: "failed",
-          session,
-          slugs: result.slugs,
-          reason: result.reason,
-          details: result.details
-        })
-      }
-
-      return {
-        status: result.status,
-        session,
-        slugs: result.slugs,
-        branch: result.branch,
-        commitSha: result.commitSha,
-        message: result.message,
-        vercelState: result.vercelState ?? "READY"
-      }
+    const target = selectPublishTarget(publishCtx)
+    if (!target) {
+      return reply.code(500).send({ error: "no publish target registered" })
     }
 
-    const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL?.trim()
-    if (!deployHookUrl) {
-      return reply.code(400).send({ error: "VERCEL_DEPLOY_HOOK_URL is not configured" })
-    }
+    const outcome = await target.publish(publishCtx)
+    publishStatusBySession.set(scopedSession, outcome.tracker)
+    if (outcome.ok) setLastPublishedScopedSession(scopedSession)
 
-    try {
-      const hookResponse = await fetch(deployHookUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          source: "orchestrator",
-          session: scopedSession,
-          slugs,
-          publishedAt: new Date().toISOString()
-        })
-      })
-
-      const responseText = await hookResponse.text()
-      const responseJson = parseJsonMaybe(responseText)
-      const inspectUrl =
-        findStringByKeys(responseJson, new Set(["inspectorUrl", "inspectUrl", "url"])) ?? firstUrlFromText(responseText)
-      const deploymentId =
-        findStringByKeys(responseJson, new Set(["deploymentId", "id"])) ??
-        (inspectUrl ? deploymentIdFromAny(inspectUrl) : undefined) ??
-        deploymentIdFromAny(responseText)
-      const vercelStateRaw =
-        findStringByKeys(responseJson, new Set(["state", "readyState", "status"])) ??
-        (hookResponse.ok ? "TRIGGERED" : "FAILED")
-      const vercelState = typeof vercelStateRaw === "string" ? vercelStateRaw.toUpperCase() : undefined
-
-      const tracker: PublishTracker = {
-        session,
-        status: hookResponse.ok ? "triggered" : "failed",
-        startedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        slugs,
-        deployStatus: hookResponse.status,
-        deployResponse: responseText.slice(0, 500),
-        inspectUrl,
-        deploymentId,
-        vercelState
-      }
-      publishStatusBySession.set(scopedSession, tracker)
-      if (hookResponse.ok) setLastPublishedScopedSession(scopedSession)
-
-      return {
-        status: hookResponse.ok ? "triggered" : "failed",
-        session,
-        slugs,
-        deployStatus: hookResponse.status,
-        deployResponse: responseText.slice(0, 500),
-        inspectUrl,
-        deploymentId,
-        vercelState
-      }
-    } catch (error) {
-      return reply.code(502).send({ error: toErrorDetail(error) })
-    }
+    return reply.code(outcome.httpStatus).send(outcome.response)
   })
 
   app.get("/publish/status", async (request, reply) => {
