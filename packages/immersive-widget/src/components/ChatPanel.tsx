@@ -18,9 +18,14 @@ type ChatPanelProps = {
   /** Quick action suggestions shown at the top */
   quickActions?: string[]
   selectedBlockLabel?: string | null
+  /** Undo/redo — when omitted, the buttons hide */
+  canUndo?: boolean
+  canRedo?: boolean
+  onUndo?: () => void
+  onRedo?: () => void
 }
 
-export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose, initialInput, quickActions, selectedBlockLabel }: ChatPanelProps) {
+export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose, initialInput, quickActions, selectedBlockLabel, canUndo, canRedo, onUndo, onRedo }: ChatPanelProps) {
   const [input, setInput] = useState(initialInput ?? "")
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -53,9 +58,39 @@ export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose,
   return (
     <div className="iw-panel">
       <div className="iw-panel-header">
-        <span className="iw-panel-title">AI Editor</span>
+        <span className="iw-panel-title">AI Assistant</span>
         {selectedBlockLabel && (
           <span className="iw-panel-context">{selectedBlockLabel}</span>
+        )}
+        {(onUndo || onRedo) && (
+          <div className="iw-panel-history">
+            <button
+              type="button"
+              className="iw-panel-history-btn"
+              onClick={onUndo}
+              disabled={!canUndo}
+              aria-label="Undo (⌘Z)"
+              title="Undo (⌘Z)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="iw-panel-history-btn"
+              onClick={onRedo}
+              disabled={!canRedo}
+              aria-label="Redo (⌘⇧Z)"
+              title="Redo (⌘⇧Z)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 14 5-5-5-5" />
+                <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" />
+              </svg>
+            </button>
+          </div>
         )}
         <button type="button" className="iw-panel-close" onClick={onClose} aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -109,7 +144,8 @@ export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose,
                     key={i}
                     type="button"
                     className="iw-suggestion-pill"
-                    onClick={() => { setInput(s); inputRef.current?.focus() }}
+                    onClick={() => { onSubmit(s) }}
+                    disabled={isLoading}
                   >
                     {s}
                   </button>
