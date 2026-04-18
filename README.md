@@ -76,10 +76,21 @@ Open the **Content Studio** at `http://localhost:4100` to start editing your sit
 
 ### Environment
 
-`pnpm dev:setup` copies `.env.example` to `.env` and prompts for an API key. You need **at least one** of:
+`pnpm dev:setup` copies `.env.example` to `.env` and walks you through the required + common-optional keys. You need **at least one** LLM provider:
 
-- `ANTHROPIC_API_KEY` — for Claude models
-- `OPENAI_API_KEY` — for OpenAI models
+- `ANTHROPIC_API_KEY` — for Claude models (recommended, best-tested)
+- `OPENAI_API_KEY` — for OpenAI models (also powers `gpt-image-1` image generation)
+
+The script then prompts for these **optional** asset-manager integrations (press Enter to skip any):
+
+- **Image generation** — `GOOGLE_GENAI_API_KEY` for Gemini, or a second-opinion `OPENAI_API_KEY` if you picked Anthropic as the planner (Anthropic does not generate images). Gemini is also required for the conversational image-editing chat.
+- **Unsplash stock photos** — `UNSPLASH_ACCESS_KEY` enables the editor's Unsplash asset-picker tab.
+- **Google Drive** — `GOOGLE_DRIVE_FOLDER_ID` + `GOOGLE_API_KEY` (or `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` for private folders) enables the Drive asset-picker tab.
+
+**CMS asset libraries** (not prompted by the setup script):
+
+- **Contentful** — set `CONTENTFUL_SPACE_ID` + `CONTENTFUL_DELIVERY_TOKEN` in `.env` to expose a Contentful asset tab in the editor.
+- **Sanity / Strapi** — configured per-site via the editor's Site Config drawer (no env vars).
 
 <details>
 <summary><strong>Dev server management commands</strong></summary>
