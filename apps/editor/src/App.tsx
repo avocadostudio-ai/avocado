@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Bot, Check, ChevronDown, Clock, Copy, Ellipsis, ExternalLink, Maximize2, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Bot, Check, ChevronDown, Clock, Copy, Ellipsis, ExternalLink, Fullscreen, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import { ChatComposerCore, ChatThreadCore } from "./components/ChatSurface"
 import { VersionHistoryPanel } from "./components/VersionHistoryPanel"
@@ -1300,7 +1300,7 @@ function EditorPage({
                   aria-label={t("header.openImmersive")}
                   title={t("header.openImmersive")}
                 >
-                  <Maximize2 size={14} aria-hidden="true" />
+                  <Fullscreen size={14} aria-hidden="true" />
                 </a>
               ) : null}
               <button type="button" className="publish-preview-btn" onClick={() => setShowPublishReview(true)} disabled={isLoading || publish.isPublishing}>
