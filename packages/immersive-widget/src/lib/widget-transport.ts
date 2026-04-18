@@ -3,7 +3,8 @@
  * Talks directly to the orchestrator via HTTP + SSE — no postMessage middleman.
  */
 
-import type { BlockManifest } from "@ai-site-editor/shared"
+import type { BlockManifest, ChatStreamEvent } from "@ai-site-editor/shared"
+import { parseChatStreamFrame } from "@ai-site-editor/shared"
 import { getAccessToken } from "./access-auth"
 
 export type ChatRequestPayload = {
@@ -120,15 +121,6 @@ export type ChatResult = {
   error?: string
 }
 
-type StreamEvent =
-  | { type: "status"; message: string }
-  | { type: "op_applied"; index: number; total: number; previewVersion: number; focusBlockId?: string; updatedSlug?: string }
-  | { type: "field_draft"; blockId: string; editablePath: string; value: string }
-  | { type: "final"; result: ChatResult }
-  | { type: "error"; result: ChatResult }
-  | { type: "heartbeat"; stage: string; label: string }
-  | { type: "canceled"; message: string }
-
 export type StreamCallbacks = {
   onStatus?: (message: string) => void
   onOpApplied?: (event: { index: number; total: number; previewVersion: number; focusBlockId?: string; updatedSlug?: string }) => void
@@ -208,36 +200,60 @@ export function submitChatStream(
       // The orchestrator sends plain `data:` lines (no `event:` prefix).
       // All events arrive through the generic `onmessage` handler.
       source.onmessage = (e: MessageEvent) => {
+        let raw: unknown
         try {
-          const d = JSON.parse(e.data) as Record<string, unknown>
-          const type = d.type as string
+          raw = JSON.parse(e.data)
+        } catch {
+          return
+        }
+        const frame = parseChatStreamFrame(raw)
+        if (!frame) return
+        const event: ChatStreamEvent = frame
 
-          if (type === "status") {
-            callbacks.onStatus?.(d.message as string)
-          } else if (type === "heartbeat") {
-            callbacks.onStatus?.(d.label as string)
-          } else if (type === "op_applied") {
-            callbacks.onOpApplied?.(d as unknown as { index: number; total: number; previewVersion: number; focusBlockId?: string; updatedSlug?: string })
-          } else if (type === "field_draft") {
-            callbacks.onFieldDraft?.(d as unknown as { blockId: string; editablePath: string; value: string })
-          } else if (type === "summary_token") {
-            // Could display incremental summary text — for now just show status
+        switch (event.type) {
+          case "status":
+            callbacks.onStatus?.(event.message)
+            break
+          case "heartbeat":
+            callbacks.onStatus?.(event.label)
+            break
+          case "op_applied":
+            callbacks.onOpApplied?.({
+              index: event.index,
+              total: event.total,
+              previewVersion: event.previewVersion,
+              focusBlockId: event.focusBlockId ?? undefined,
+              updatedSlug: event.updatedSlug,
+            })
+            break
+          case "field_draft":
+            callbacks.onFieldDraft?.({
+              blockId: event.blockId,
+              editablePath: event.editablePath,
+              value: event.value,
+            })
+            break
+          case "summary_token":
             callbacks.onStatus?.("Generating response...")
-          } else if (type === "final") {
+            break
+          case "final":
             settled = true
-            const result = (d.result ?? d) as ChatResult
-            callbacks.onFinal?.(result)
+            callbacks.onFinal?.(event.result as ChatResult)
             source?.close()
-          } else if (type === "error") {
+            break
+          case "error":
             settled = true
-            const result = (d.result ?? d) as ChatResult
-            callbacks.onError?.(result)
+            callbacks.onError?.((event.result ?? { status: "error", summary: "Error", changes: [] }) as ChatResult)
             source?.close()
-          } else if (type === "canceled") {
+            break
+          case "canceled":
             settled = true
             source?.close()
-          }
-        } catch { /* ignore unparseable frames */ }
+            break
+          default:
+            // Unhandled event types (op_candidate, plan_meta, rollback_*, image_progress, token, changelog_entry, op_skipped) — ignored for now
+            break
+        }
       }
 
       source.onerror = () => {

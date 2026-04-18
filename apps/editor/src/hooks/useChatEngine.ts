@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useT } from "../i18n"
 import {
+  parseChatStreamFrame,
   type BlockManifest,
+  type ChatStreamFrame,
   type Operation
 } from "@ai-site-editor/shared"
 import type {
@@ -782,37 +784,18 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
 
       source.onmessage = (event) => {
-        let payload: {
-          type: "status" | "token" | "field_draft" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error" | "canceled" | "summary_token" | "changelog_entry" | "image_progress"
-          _seq?: number
-          message?: string
-          text?: string
-          blockId?: string
-          editablePath?: string
-          value?: string
-          stage?: string
-          label?: string
-          percent?: number
-          elapsedMs?: number
-          intent?: string
-          summary?: string
-          estimatedOps?: number
-          index?: number
-          total?: number
-          op?: Operation
-          reason?: string
-          previewVersion?: number
-          focusBlockId?: string | null
-          updatedSlug?: string
-          appliedCount?: number
-          restoredVersion?: number
-          result?: AssistantResponse
-        }
+        let raw: unknown
         try {
-          payload = JSON.parse(event.data) as typeof payload
+          raw = JSON.parse(event.data)
         } catch {
           return
         }
+        const payload = parseChatStreamFrame(raw) as (ChatStreamFrame & {
+          result?: AssistantResponse
+          op?: Operation
+          entry?: string
+        }) | null
+        if (!payload) return
         gotAnyEvent = true
 
         // Track sequence number for reconnect
