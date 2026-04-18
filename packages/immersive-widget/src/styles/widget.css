@@ -112,6 +112,55 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Back-to-editor pill (top-left)                                     */
+/* ------------------------------------------------------------------ */
+
+.iw-back-pill {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  color: #1a1a2e;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.iw-back-pill:hover {
+  background: rgba(255, 255, 255, 0.92);
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.iw-back-pill svg {
+  color: #6366f1;
+}
+
+.iw-back-pill--hidden {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
 /* Panel                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -711,6 +760,12 @@
   background: rgba(99, 102, 241, 0.15);
   border-color: rgba(99, 102, 241, 0.3);
   color: #4f46e5;
+}
+
+.iw-block-picker-empty {
+  font-size: 12px;
+  color: #6b7280;
+  padding: 4px 8px;
 }
 
 /* ------------------------------------------------------------------ */

@@ -8,6 +8,7 @@ import { ImmersiveWidget, type WidgetConfig, type SiteContext } from "@ai-site-e
 import "@ai-site-editor/immersive-widget/styles.css"
 import "@ai-site-editor/preview-adapter/styles.css"
 import type { SiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
+import type { BlockManifest } from "@ai-site-editor/shared"
 import type { PageDoc } from "../lib/site-contract"
 
 export type ImmersivePageProps = {
@@ -18,12 +19,14 @@ export type ImmersivePageProps = {
   siteContext?: SiteContext
   /** Query string to append to navigation links (preserves immersive mode) */
   editorQuery?: string
+  /** Block manifest — drives the widget's block picker options. */
+  manifest?: BlockManifest | null
   /** MVP gate: restrict block picker to text-first blocks and route text selection to inline field prompt. */
   textOnly?: boolean
 }
 
 export function ImmersivePageWrapper({
-  page, chromeHeader, slug, config, siteContext, editorQuery, textOnly
+  page, chromeHeader, slug, config, siteContext, editorQuery, manifest, textOnly
 }: ImmersivePageProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -55,6 +58,7 @@ export function ImmersivePageWrapper({
         refresh={refresh}
         navigate={navigate}
         siteContext={siteContext}
+        manifest={manifest}
         textOnly={textOnly}
       />
     </>

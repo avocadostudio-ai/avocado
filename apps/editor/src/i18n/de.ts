@@ -26,6 +26,7 @@ const de: LocaleDict = {
   "header.publishing": "Wird veröffentlicht",
   "header.viewDeploy": "Deployment ansehen",
   "header.openLiveSite": "Live-Seite öffnen",
+  "header.openImmersive": "Im Immersive-Modus öffnen",
   "header.syncedPage": "1 Seite von der Website synchronisiert.",
   "header.syncedPages": "{{count}} Seiten von der Website synchronisiert.",
 
