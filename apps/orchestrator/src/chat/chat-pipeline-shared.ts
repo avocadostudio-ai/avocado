@@ -13,6 +13,7 @@ import {
   setContextCache
 } from "../state/session-state.js"
 import type { createChatTelemetryStore } from "../telemetry/chat-telemetry.js"
+import type { EvalCandidateStore } from "../telemetry/eval-candidate-store.js"
 import type { AIProvider, ModelKey } from "../state/session-state.js"
 import type { ToolRuntime } from "../tools/runtime.js"
 import { normalizeVariationTypos } from "./chat-pipeline-translation.js"
@@ -24,6 +25,7 @@ import { normalizeVariationTypos } from "./chat-pipeline-translation.js"
 export type ChatPipelineContext = {
   log: FastifyBaseLogger
   chatTelemetry: ReturnType<typeof createChatTelemetryStore>
+  evalCandidates?: EvalCandidateStore
   modelLookup: Record<AIProvider, Record<ModelKey, string>>
   availableProviders: AIProvider[]
   toolRuntime: ToolRuntime
