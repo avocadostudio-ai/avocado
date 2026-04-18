@@ -71,6 +71,14 @@ export {
 } from "./block-names.ts"
 
 export {
+  chatStreamEventSchema,
+  parseChatStreamFrame,
+  type ChatStreamEvent,
+  type ChatStreamEventType,
+  type ChatStreamFrame,
+} from "./chat-events.ts"
+
+export {
   // Types
   type PageMeta,
   type PageDoc,

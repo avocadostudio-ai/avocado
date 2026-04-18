@@ -1,4 +1,5 @@
-import type { BlockManifest, Operation } from "@ai-site-editor/shared"
+import type { BlockManifest, ChatStreamFrame, Operation } from "@ai-site-editor/shared"
+import { parseChatStreamFrame } from "@ai-site-editor/shared"
 import type {
   AIProvider,
   AssistantResponse,
@@ -314,34 +315,17 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       }
 
       source.onmessage = (event) => {
-        let payload: {
-          type: "status" | "token" | "field_draft" | "plan_meta" | "op_candidate" | "op_applied" | "op_skipped" | "heartbeat" | "rollback_started" | "rollback_done" | "final" | "error"
-          message?: string
-          text?: string
-          blockId?: string
-          editablePath?: string
-          value?: string
-          stage?: string
-          label?: string
-          elapsedMs?: number
-          intent?: string
-          summary?: string
-          estimatedOps?: number
-          index?: number
-          total?: number
-          op?: Operation
-          reason?: string
-          previewVersion?: number
-          focusBlockId?: string | null
-          appliedCount?: number
-          restoredVersion?: number
-          result?: AssistantResponse
-        }
+        let raw: unknown
         try {
-          payload = JSON.parse(event.data) as typeof payload
+          raw = JSON.parse(event.data)
         } catch {
           return
         }
+        const payload = parseChatStreamFrame(raw) as (ChatStreamFrame & {
+          result?: AssistantResponse
+          op?: Operation
+        }) | null
+        if (!payload) return
         gotAnyEvent = true
 
         if (payload.type === "status") {
