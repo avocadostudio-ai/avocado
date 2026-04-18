@@ -57,14 +57,14 @@ class Semaphore {
 // HTTP helpers (via Fastify inject)
 // ---------------------------------------------------------------------------
 
-async function bootstrap(session: string): Promise<void> {
+async function bootstrap(session: string, pages: PageDoc[]): Promise<void> {
   const res = await app.inject({
     method: "POST",
     url: "/draft/bootstrap",
     payload: {
       session,
       siteId: SITE_ID,
-      pages: RICH_PAGES,
+      pages,
     },
   })
   if (res.statusCode !== 200) {
@@ -77,7 +77,9 @@ async function chat(
   slug: string,
   message: string,
   provider: AIProvider,
-  modelKey: ModelKey
+  modelKey: ModelKey,
+  activeBlockId?: string,
+  activeEditablePath?: string
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await app.inject({
     method: "POST",
@@ -90,6 +92,8 @@ async function chat(
       provider,
       modelKey,
       executionMode: "auto",
+      ...(activeBlockId ? { activeBlockId } : {}),
+      ...(activeEditablePath ? { activeEditablePath } : {}),
     },
   })
   return { status: res.statusCode, body: res.json() as Record<string, unknown> }
@@ -142,8 +146,8 @@ async function runCase(
 ): Promise<CaseScore> {
   const session = `eval-${evalCase.id}-${Date.now()}`
 
-  // Bootstrap RICH_PAGES
-  await bootstrap(session)
+  // Bootstrap per-case fixture when set; fall back to the shared RICH_PAGES.
+  await bootstrap(session, evalCase.fixture ?? RICH_PAGES)
 
   // Capture before-state
   const slugsBefore = await getDraftSlugs(session)
@@ -151,7 +155,15 @@ async function runCase(
 
   // Run chat
   const startMs = performance.now()
-  const { body } = await chat(session, evalCase.slug, evalCase.message, provider, modelKey)
+  const { body } = await chat(
+    session,
+    evalCase.slug,
+    evalCase.message,
+    provider,
+    modelKey,
+    evalCase.activeBlockId,
+    evalCase.activeEditablePath
+  )
   const latencyMs = Math.round(performance.now() - startMs)
 
   // Capture after-state
