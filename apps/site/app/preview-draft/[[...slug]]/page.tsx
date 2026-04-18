@@ -11,6 +11,7 @@ import { resolveContentSource, getPage, getNavSlugs, getSiteConfig } from "../..
 import { getPublishedPage } from "../../../lib/published-content-api"
 import { derivePageDescription } from "../../../lib/seo"
 import { buildNavItems, buildSiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
+import { buildBlockManifest } from "@ai-site-editor/site-sdk/editor-manifest"
 import { DEFAULT_SITE_ID, DEFAULT_SESSION } from "../../../lib/defaults"
 import { ThemeOverrides } from "../../../components/theme-overrides"
 
@@ -182,8 +183,9 @@ export default async function PreviewPage({ params, searchParams }: PageProps) {
           page={page}
           chromeHeader={immersiveHeader}
           slug={slug}
-          config={{ orchestratorUrl, session, siteId }}
+          config={{ orchestratorUrl, session, siteId, editorOrigin: editorOrigin || undefined }}
           siteContext={{ siteName: siteConfig.name }}
+          manifest={buildBlockManifest()}
           textOnly={process.env.NEXT_PUBLIC_IMMERSIVE_TEXT_ONLY === "1"}
         />
       </>

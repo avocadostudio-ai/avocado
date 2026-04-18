@@ -30,7 +30,8 @@
           {
             "group": "Features",
             "pages": [
-              "features/asset-picker"
+              "features/asset-picker",
+              "features/immersive-mode"
             ]
           }
         ]

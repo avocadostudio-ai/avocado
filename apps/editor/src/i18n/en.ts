@@ -24,6 +24,7 @@ const en = {
   "header.publishing": "Publishing",
   "header.viewDeploy": "View deploy",
   "header.openLiveSite": "Open live site",
+  "header.openImmersive": "Open in immersive mode",
   "header.syncedPage": "Synced 1 page from site.",
   "header.syncedPages": "Synced {{count}} pages from site.",
 

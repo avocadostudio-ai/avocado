@@ -16,6 +16,7 @@ import { createPortal } from "react-dom"
 import { ChatFab } from "./components/ChatFab"
 import { ChatPanel } from "./components/ChatPanel"
 import { AddBlockFab } from "./components/AddBlockFab"
+import { BackToEditorPill } from "./components/BackToEditorPill"
 import { InlineFieldPrompt, type FieldContext } from "./components/InlineFieldPrompt"
 import { InlineBlockPicker, type AddBlockContext } from "./components/InlineBlockPicker"
 import { TextSelectionToolbar } from "./components/TextSelectionToolbar"
@@ -26,7 +27,7 @@ import { findBlockNode, findEditableNode, supportsInlineEditablePath, applyAiFie
 import { submitChatStream, applyOps, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
 import type { BlockManifest } from "@ai-site-editor/shared"
-import { defaultPropsForType } from "@ai-site-editor/shared"
+import { defaultPropsForType, allowedBlockTypes, getAllBlockMeta } from "@ai-site-editor/shared"
 
 export type SiteContext = {
   siteName?: string
@@ -50,15 +51,11 @@ export type ImmersiveWidgetProps = {
   siteContext?: SiteContext
   /** Access token for orchestrator auth */
   accessToken?: string
-  /** AI model key */
-  modelKey?: string
-  /** AI provider */
-  provider?: string
   /** When true, restrict the MVP to text-first blocks and route text selections to the field prompt. */
   textOnly?: boolean
 }
 
-const TEXT_ONLY_BLOCK_TYPES = ["Hero", "FeatureGrid", "Testimonials", "FAQAccordion", "CTA", "RichText"]
+const TEXT_ONLY_BLOCK_TYPES = new Set(["Hero", "FeatureGrid", "Testimonials", "FAQAccordion", "CTA", "RichText"])
 
 export function ImmersiveWidget({
   config,
@@ -69,11 +66,21 @@ export function ImmersiveWidget({
   manifest,
   siteContext,
   accessToken,
-  modelKey = "balanced",
-  provider = "anthropic",
   textOnly = false,
 }: ImmersiveWidgetProps) {
-  const allowedBlockTypes = textOnly ? TEXT_ONLY_BLOCK_TYPES : undefined
+  const blockPickerOptions = useMemo(() => {
+    const base = manifest && manifest.blocks.length > 0
+      ? manifest.blocks.map((b) => ({ type: b.type, label: b.displayName ?? b.type }))
+      : (() => {
+          const meta = getAllBlockMeta()
+          return [...allowedBlockTypes].map((type) => ({
+            type,
+            label: meta[type]?.displayName ?? type
+          }))
+        })()
+    const filtered = textOnly ? base.filter((b) => TEXT_ONLY_BLOCK_TYPES.has(b.type)) : base
+    return filtered.sort((a, b) => a.label.localeCompare(b.label))
+  }, [manifest, textOnly])
   const [panelOpen, setPanelOpen] = useState(false)
   const [blockPickerContext, setBlockPickerContext] = useState<AddBlockContext | null>(null)
   const [activeField, setActiveField] = useState<FieldContext | null>(null)
@@ -248,8 +255,6 @@ export function ImmersiveWidget({
       siteId: config.siteId,
       slug,
       message,
-      modelKey,
-      provider,
       activeBlockId: selectedBlock.blockId ?? undefined,
       activeBlockType: selectedBlock.blockType ?? undefined,
       activeEditablePath: selectedBlock.editablePath ?? undefined,
@@ -301,7 +306,7 @@ export function ImmersiveWidget({
     )
 
     cancelRef.current = cancel
-  }, [config, slug, modelKey, provider, selectedBlock, manifest, accessToken, focusBlock, renderLiveDraft, triggerRefresh, handleChatResult])
+  }, [config, slug, selectedBlock, manifest, accessToken, focusBlock, renderLiveDraft, triggerRefresh, handleChatResult])
 
   // Field-level submit — targets a specific editable field
   const handleFieldSubmit = useCallback((message: string) => {
@@ -316,8 +321,6 @@ export function ImmersiveWidget({
       siteId: config.siteId,
       slug,
       message,
-      modelKey,
-      provider,
       activeBlockId: activeField.blockId,
       activeBlockType: activeField.blockType,
       activeEditablePath: activeField.editablePath,
@@ -361,7 +364,7 @@ export function ImmersiveWidget({
     )
 
     cancelRef.current = cancel
-  }, [activeField, config, slug, modelKey, provider, manifest, siteContext, accessToken, focusBlock, renderLiveDraft, triggerRefresh])
+  }, [activeField, config, slug, manifest, siteContext, accessToken, focusBlock, renderLiveDraft, triggerRefresh])
 
   const handleTextSelectionAskAI = useCallback((ctx: TextSelectionContext) => {
     clearSelection()
@@ -419,7 +422,7 @@ export function ImmersiveWidget({
       {blockPickerContext && (
         <InlineBlockPicker
           context={blockPickerContext}
-          allowedTypes={allowedBlockTypes}
+          options={blockPickerOptions}
           placement={blockPickerContext.anchorElement === addBlockFabRef.current ? "above" : "below"}
           onAdd={(blockType) => {
             const ctx = blockPickerContext
@@ -475,6 +478,17 @@ export function ImmersiveWidget({
       {/* Add-block pill — hidden when the chat panel is open to avoid overlap */}
       {!panelOpen && (
         <AddBlockFab ref={addBlockFabRef} onClick={handleAddBlockFabClick} />
+      )}
+
+      {/* Back-to-editor pill (top-left) — only when editor origin is known */}
+      {config.editorOrigin && (
+        <BackToEditorPill
+          editorOrigin={config.editorOrigin}
+          session={config.session}
+          siteId={config.siteId}
+          slug={slug}
+          hidden={panelOpen}
+        />
       )}
 
       {/* FAB */}

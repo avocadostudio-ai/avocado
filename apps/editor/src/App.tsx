@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { Bot, Check, ChevronDown, Clock, Copy, Ellipsis, ExternalLink, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Bot, Check, ChevronDown, Clock, Copy, Ellipsis, ExternalLink, Maximize2, RefreshCw, Settings, SlidersHorizontal, ThumbsUp, ThumbsDown } from "lucide-react"
 import ClaudeStyleChatInput from "./components/claude-style-chat-input"
 import { ChatComposerCore, ChatThreadCore } from "./components/ChatSurface"
 import { VersionHistoryPanel } from "./components/VersionHistoryPanel"
@@ -658,7 +658,7 @@ function EditorPage({
   // Preview src: bootstrap draft mode via /api/draft once per origin,
   // then switch routes directly to avoid extra redirect navigations.
   const [previewSrc, setPreviewSrc] = useState(() =>
-    buildSiteDraftEnableUrl("/", { session, siteId, editorOrigin }, activeSiteOrigin)
+    buildSiteDraftEnableUrl(slug, { session, siteId, editorOrigin }, activeSiteOrigin)
   )
 
   useEffect(() => {
@@ -701,6 +701,12 @@ function EditorPage({
       return undefined
     }
   }, [activeSiteConfig.vercelProductionUrl, activeSiteOrigin, slug])
+
+  const immersiveUrl = useMemo(() => {
+    if (!activeSiteOrigin) return undefined
+    const params: Record<string, string | undefined> = { session, siteId, editorOrigin, immersive: "1" }
+    return `${activeSiteOrigin}${buildSitePathWithQuery(slug, { ...params, __editor: "1" })}`
+  }, [activeSiteOrigin, editorOrigin, session, siteId, slug])
 
   // Planner status check
   useEffect(() => {
@@ -1285,6 +1291,18 @@ function EditorPage({
               >
                 <Ellipsis size={14} aria-hidden="true" />
               </button>
+              {immersiveUrl ? (
+                <a
+                  className="chat-header-icon-btn"
+                  href={immersiveUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t("header.openImmersive")}
+                  title={t("header.openImmersive")}
+                >
+                  <Maximize2 size={14} aria-hidden="true" />
+                </a>
+              ) : null}
               <button type="button" className="publish-preview-btn" onClick={() => setShowPublishReview(true)} disabled={isLoading || publish.isPublishing}>
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
                 {publish.publishInProgress ? t("header.publishing") : t("header.publish")}
