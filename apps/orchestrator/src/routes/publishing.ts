@@ -1,4 +1,7 @@
-import type { FastifyInstance } from "fastify"
+import type { FastifyInstance, FastifyBaseLogger } from "fastify"
+import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
+import type { PageDoc } from "@ai-site-editor/shared"
 import {
   type PublishTracker,
   normalizeSession,
@@ -13,8 +16,10 @@ import {
   bumpVersion,
   schedulePersistState,
   setLastPublishedScopedSession,
-  markRecentlyRestored
+  markRecentlyRestored,
+  publishedPages
 } from "../state/session-state.js"
+import { computePublishDiff } from "../publish/diff-engine.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
 import {
   deploymentIdFromAny,
@@ -30,6 +35,62 @@ import {
 import { firstUrlFromText } from "../chat/chat-pipeline.js"
 import { parseJsonMaybe } from "../chat/variation-pipeline.js"
 import type { RouteContext } from "./route-context.js"
+
+/**
+ * Load the authoritative published pages for diff computation.
+ *
+ * Priority (first hit wins):
+ *   1. `${siteOrigin}/api/editor/pages` — accurate in both dev and prod.
+ *   2. `PUBLISHED_CONTENT_PATH` env var — direct file read (ops override).
+ *   3. `apps/site/lib/published-content.json` — monorepo default for local dev.
+ *   4. In-memory `publishedPages` Map — stale demo seed, last resort.
+ *
+ * The in-memory Map is NOT authoritative: it is seeded from demo data at
+ * startup and never updated on publish. Relying on it produces bogus diffs
+ * (e.g. "all pages added" when the site already has them published).
+ */
+async function loadPublishedForDiff(opts: {
+  siteOrigin?: string
+  logger: FastifyBaseLogger
+}): Promise<PageDoc[]> {
+  const { siteOrigin, logger } = opts
+
+  if (siteOrigin) {
+    try {
+      const res = await fetch(`${siteOrigin.replace(/\/+$/, "")}/api/editor/pages`, {
+        headers: { accept: "application/json" },
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { pages?: PageDoc[] }
+        if (Array.isArray(data.pages)) return data.pages
+      } else {
+        logger.warn({ siteOrigin, status: res.status }, "publish/diff: site pages endpoint not ok, falling back")
+      }
+    } catch (err) {
+      logger.warn({ siteOrigin, err: String(err) }, "publish/diff: site fetch failed, falling back")
+    }
+  }
+
+  const paths: string[] = []
+  if (process.env.PUBLISHED_CONTENT_PATH?.trim()) paths.push(process.env.PUBLISHED_CONTENT_PATH.trim())
+  // Monorepo default — orchestrator cwd is apps/orchestrator in dev.
+  paths.push(resolve(process.cwd(), "../../apps/site/lib/published-content.json"))
+  paths.push(resolve(process.cwd(), "../site/lib/published-content.json"))
+
+  for (const path of paths) {
+    try {
+      const raw = await readFile(path, "utf8")
+      const parsed = JSON.parse(raw) as { pages?: PageDoc[] } | PageDoc[]
+      const pages = Array.isArray(parsed) ? parsed : parsed.pages
+      if (Array.isArray(pages)) return pages
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  logger.warn("publish/diff: falling back to in-memory publishedPages — diff may be inaccurate")
+  return Array.from(publishedPages.values())
+}
 
 function findStringByKeys(root: unknown, wanted: Set<string>): string | undefined {
   if (!root || typeof root !== "object") return undefined
@@ -82,6 +143,18 @@ function isSafeOrigin(raw: string): boolean {
 }
 
 export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) {
+  app.get("/publish/diff", async (request, reply) => {
+    const query = request.query as { session?: string; siteId?: string; siteOrigin?: string }
+    if (!query.session) return reply.code(400).send({ error: "session is required" })
+    const scopedSession = scopedSessionKey(normalizeSession(query.session), query.siteId)
+    const draft = getSessionPages(scopedSession)
+    const published = await loadPublishedForDiff({
+      siteOrigin: query.siteOrigin,
+      logger: app.log,
+    })
+    return computePublishDiff(draft, published)
+  })
+
   app.post("/publish", async (request, reply) => {
     if (!requirePublishToken(request as { headers: Record<string, unknown> })) {
       return reply.code(401).send({ error: "invalid publish token" })

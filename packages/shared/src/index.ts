@@ -1,4 +1,13 @@
 export { getConfiguredDraftSecret, getSafeInternalRedirectPath, validateDraftSecret, type DraftSecretValidationResult } from "./draft-mode.ts"
+export type {
+  FieldDiffKind,
+  FieldDiff,
+  BlockDiffStatus,
+  BlockDiff,
+  PageDiffStatus,
+  PageDiff,
+  PublishDiff,
+} from "./publish-diff.ts"
 export { isImagePath, toAltPath } from "./editable-path.ts"
 export {
   blockDefinitionSchema,
