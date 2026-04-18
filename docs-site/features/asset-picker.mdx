@@ -51,13 +51,80 @@ the site passes to the editor. Tab selection is computed in
 | **Generate** | `OPENAI_API_KEY` or `GOOGLE_GENAI_API_KEY` set | AI image generation (OpenAI or Gemini) |
 | **Drive** | `GOOGLE_DRIVE_FOLDER_ID` (or a Google service-account key) set | Google Drive folder listing |
 | **Unsplash** | `UNSPLASH_ACCESS_KEY` set | Unsplash search API |
-| **Contentful / Sanity / Strapi** | Site passes a matching `cmsMedia` config to the editor | CMS asset library |
+| **Contentful** | `CONTENTFUL_SPACE_ID` + `CONTENTFUL_DELIVERY_TOKEN` set, **or** site passes a matching `cmsMedia` config | CMS asset library |
+| **Sanity / Strapi** | Site passes a matching `cmsMedia` config to the editor | CMS asset library |
 | **Upload** | Always available | Local file → `POST /image/upload` |
+
+<Tip>
+**Fastest way to configure the env-var sources** (Generate / Drive / Unsplash / Contentful) is the first-time setup script. Running `pnpm dev:setup` walks you through each prompt, opens the provider's signup/console page in your browser, and validates the key before writing it to `.env`. Sanity and Strapi are configured per-site in the editor's Site Config drawer — there are no env vars for them.
+</Tip>
 
 The feature flags the editor reads (`imageGenerate`, `imageGenerateChat`,
 `googleDrive`, `unsplash`, `contentful`) are published by the orchestrator at
 `GET /status/planner` and are set purely from env vars — there is no
 per-session toggle today.
+
+### CMS asset libraries
+
+Three CMS providers can appear as asset-picker tabs: **Contentful**,
+**Sanity**, and **Strapi**. They have two different configuration
+mechanisms, and the choice depends on the provider:
+
+| Provider | Env-var path (orchestrator default) | Per-site path (editor Site Config) |
+|---|---|---|
+| Contentful | ✅ `CONTENTFUL_SPACE_ID` + `CONTENTFUL_DELIVERY_TOKEN` (+ optional `CONTENTFUL_ENVIRONMENT`) | ✅ `cmsMedia: { provider: "contentful", spaceId, deliveryToken, environment? }` |
+| Sanity | ❌ not supported | ✅ `cmsMedia: { provider: "sanity", projectId, dataset? }` |
+| Strapi | ❌ not supported | ✅ `cmsMedia: { provider: "strapi", url, token? }` |
+
+**When to pick which for Contentful.** Use the env-var path for
+single-space, single-tenant setups where every site in the orchestrator
+should share the same Contentful space — it's a quick `.env` change.
+Use the per-site `cmsMedia` path when different sites point at different
+spaces, when end users need to supply their own credentials without
+redeploying the orchestrator, or when you want the asset picker to switch
+spaces as the active site switches.
+
+**How the env-var path works.** When `CONTENTFUL_SPACE_ID` and
+`CONTENTFUL_DELIVERY_TOKEN` are set, the orchestrator exposes
+`GET /contentful/assets` (see `apps/orchestrator/src/routes/media.ts`) as
+a proxy to the Contentful CDA. The editor's asset picker calls that
+endpoint directly — no site-side code needed. Without those vars, the
+endpoint returns `404 Contentful not configured`.
+
+**How the per-site `cmsMedia` path works.** `CmsMediaConfig` (defined in
+`apps/editor/src/lib/editor-types.ts`) is a discriminated union stored on
+`SiteConfig.cmsMedia`. The editor calls the CMS API directly from the
+browser using whatever credentials the site's `cmsMedia` entry carries —
+there is no orchestrator proxy involved. Fetch logic lives in
+`apps/editor/src/lib/cms-media.ts` (`fetchContentfulMedia`,
+`fetchSanityMedia`, `fetchStrapiMedia`).
+
+**Click path to configure a site's `cmsMedia`:**
+
+1. Open the editor at `http://localhost:4100`.
+2. Click the **gear icon** next to the site name in the chat header
+   (aria-label *"Site settings"*), or open the Sites page and click
+   **Configure** on a site card.
+3. In the drawer that slides in, scroll to the **CMS media** section.
+4. Pick a **Provider** (Contentful / Sanity / Strapi / none) and fill in
+   the provider-specific fields:
+   - **Contentful** — Space ID and Delivery token (environment defaults
+     to `master`).
+   - **Sanity** — Project ID and optional dataset (defaults to
+     `production`). No token needed for public datasets.
+   - **Strapi** — Base URL (e.g. `https://cms.example.com`) and optional
+     API token. Public upload endpoints work without a token.
+5. Close the drawer. The CMS tab appears in the asset picker on next open.
+
+<Tip>
+The CMS config is stored per-site in the orchestrator's site registry,
+not in the browser — it persists across sessions and across machines,
+and the AI planner sees it too.
+</Tip>
+
+{/* TODO: screenshot of the Site Config drawer with the CMS media section
+    expanded (Contentful provider selected). Save to
+    docs-site/images/site-config-cms-media.png and embed here. */}
 
 ### Unsplash: licensing & attribution
 
@@ -288,6 +355,9 @@ All from `apps/orchestrator/src/routes/media.ts`.
 | `GOOGLE_GENAI_IMAGE_MODEL` | `gemini-2.5-flash-image` | Gemini image model — the "nano-banana" model. |
 | `UNSPLASH_ACCESS_KEY` | — | Enables the Unsplash tab and the `unsplash.search` tool. |
 | `GOOGLE_DRIVE_FOLDER_ID` | — | Enables the Drive tab (alternatively `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` or `GOOGLE_API_KEY`). |
+| `CONTENTFUL_SPACE_ID` | — | Enables the Contentful tab as an orchestrator default (must be paired with `CONTENTFUL_DELIVERY_TOKEN`). Per-site `cmsMedia` overrides this. |
+| `CONTENTFUL_DELIVERY_TOKEN` | — | Contentful Content Delivery API token. Required alongside `CONTENTFUL_SPACE_ID`. |
+| `CONTENTFUL_ENVIRONMENT` | `master` | Contentful environment (branch) to read assets from. |
 | `ORCHESTRATOR_GENERATED_IMAGE_DIR` | `.data/generated-images` | Filesystem target for uploaded and generated images. |
 | `CHAT_DEFER_IMAGE_RESOLUTION` | `1` | Apply text/structural ops first and resolve images in the background. |
 
