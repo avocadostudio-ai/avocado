@@ -116,68 +116,96 @@ Publishing is defined by a single TypeScript interface:
 
 ```typescript
 interface PublishTarget {
-  publish(session: string, pages: PageDoc[], config: SiteConfig): Promise<PublishResult>
-  getStatus?(session: string): Promise<PublishStatus | null>
+  readonly name: string
+  canHandle?(ctx: PublishContext): boolean
+  publish(ctx: PublishContext): Promise<PublishOutcome>
 }
 ```
 
-- `publish()` — Takes the session ID, all draft pages, and the site config. Returns whether the publish succeeded and which page slugs were published.
-- `getStatus()` — Optional. Lets the Content Studio poll for deployment progress (e.g., "building", "ready", "failed").
+- `name` — Stable identifier used by the registry and the `PUBLISH_TARGET` env var.
+- `canHandle()` — Optional selection hint. The registry iterates targets on each `POST /publish` and picks the first whose `canHandle(ctx)` returns true.
+- `publish()` — Receives the full `PublishContext` (session, scopedSession, pages, siteConfig, siteOrigin, generatedImageDir, logger) and returns a `PublishOutcome` (ok, httpStatus, tracker, response body).
 
-### Built-in: Git + Vercel Deploy Hook
+### Built-in Targets
 
-The default publish target (`GitVercelPublishTarget`) works in two modes:
+Three targets ship in the box, registered at module load (in order) from `apps/orchestrator/src/publish/publish-target-registry.ts`:
 
-**Git mode** (`PUBLISH_MODE=git`, the default):
+**`site-contract`** — Selected when the request includes a `siteOrigin`. POSTs pages + siteConfig + inline image assets to the remote site's `/api/editor/publish` contract endpoint. The site owns content storage (json file, CMS, database, etc.). For the legacy `avocado-stories` siteId this target also records a git snapshot for version history.
+
+**`git`** — Selected when no `siteOrigin` and `PUBLISH_MODE=git` (default):
 1. Serializes all draft pages to `apps/site/lib/published-content.json`
 2. Copies any generated images to `apps/site/public/generated-images/`
 3. Rewrites localhost image URLs to relative paths
 4. Commits and pushes to the configured branch (`PUBLISH_GIT_BRANCH`, defaults to `main`)
 5. If a Vercel deploy hook is configured, the push triggers a rebuild automatically
 
-**Deploy hook mode** (`PUBLISH_MODE=deploy_hook`):
-1. Calls the `VERCEL_DEPLOY_HOOK_URL` endpoint to trigger a Vercel rebuild
+**`deploy-hook`** — Selected when no `siteOrigin` and `PUBLISH_MODE=deploy_hook`:
+1. Calls `VERCEL_DEPLOY_HOOK_URL` to trigger a Vercel rebuild
 2. Tracks deployment status by polling the Vercel API (`VERCEL_TOKEN`)
 3. Reports back to the Content Studio: triggered → building → ready (or failed)
+
+To force a specific target regardless of the selection rules, set `PUBLISH_TARGET=<name>` (e.g. `PUBLISH_TARGET=git`).
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PUBLISH_MODE` | `git` | `git` or `deploy_hook` |
+| `PUBLISH_MODE` | `git` | Legacy selection: `git` or `deploy_hook` (used when no `canHandle` match and no `PUBLISH_TARGET` override) |
+| `PUBLISH_TARGET` | _(none)_ | Force a specific target by name (overrides `canHandle` and `PUBLISH_MODE`) |
 | `PUBLISH_GIT_BRANCH` | `main` | Branch to push published content to |
 | `PUBLISH_GIT_STRICT` | `0` | If `1`, abort publish when working tree has unrelated changes |
 | `PUBLISH_TOKEN` | _(none)_ | Require this token in `x-publish-token` header to authorize publishes |
-| `VERCEL_DEPLOY_HOOK_URL` | _(none)_ | Vercel deploy hook URL (for deploy_hook mode) |
+| `VERCEL_DEPLOY_HOOK_URL` | _(none)_ | Vercel deploy hook URL (for `deploy-hook` target) |
 | `VERCEL_TOKEN` | _(none)_ | Vercel API token for polling deployment status |
 
 ### Implementing a Custom Publish Target
 
-To publish to a different platform (Netlify, AWS, a CMS, or your own CI/CD pipeline), implement the `PublishTarget` interface:
+To publish to a different platform (Netlify, AWS, a CMS, or your own CI/CD pipeline), implement the `PublishTarget` interface and register it before the server starts handling requests:
 
 ```typescript
-import type { PublishTarget, PublishResult } from "./publish-target.js"
-import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import type { PublishTarget, PublishContext, PublishOutcome } from "./publish/publish-target.js"
+import { registerPublishTarget } from "./publish/publish-target-registry.js"
 
-export class MyPublishTarget implements PublishTarget {
-  async publish(session: string, pages: PageDoc[], config: SiteConfig): Promise<PublishResult> {
-    // pages is the full array of PageDoc objects (JSON)
-    // Each page has: slug, title, blocks (array of BlockInstance)
-    
-    // Example: POST to your CMS API
-    const res = await fetch("https://your-cms.example.com/api/publish", {
+class S3PublishTarget implements PublishTarget {
+  readonly name = "s3"
+
+  canHandle(ctx: PublishContext): boolean {
+    // Claim publishes routed at a specific siteId, for example.
+    return ctx.siteId === "my-s3-site"
+  }
+
+  async publish(ctx: PublishContext): Promise<PublishOutcome> {
+    const { session, pages, slugs, logger } = ctx
+    // Example: upload to S3
+    const res = await fetch("https://my-bucket.s3.amazonaws.com/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pages })
     })
 
+    const now = new Date().toISOString()
     return {
       ok: res.ok,
-      slugs: pages.map(p => p.slug),
-      error: res.ok ? undefined : `CMS returned ${res.status}`
+      httpStatus: res.ok ? 200 : 400,
+      tracker: {
+        session,
+        status: res.ok ? "triggered" : "failed",
+        startedAt: now,
+        updatedAt: now,
+        slugs,
+        vercelState: res.ok ? "READY" : "ERROR"
+      },
+      response: {
+        status: res.ok ? "ready" : "failed",
+        session,
+        slugs,
+        message: res.ok ? "Published to S3" : `S3 returned ${res.status}`
+      }
     }
   }
 }
+
+registerPublishTarget(new S3PublishTarget())
 ```
 
 The orchestrator passes full `PageDoc` objects — your publish target receives structured JSON, not HTML. Your target decides how to store, transform, or deploy that content.
