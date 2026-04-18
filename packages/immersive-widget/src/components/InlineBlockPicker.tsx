@@ -17,6 +17,10 @@ type InlineBlockPickerProps = {
   context: AddBlockContext
   onAdd: (blockType: string) => void
   onClose: () => void
+  /** Optional allowlist of block types. When provided, only these are shown. */
+  allowedTypes?: string[]
+  /** Where to place the picker relative to the anchor element. Default: "below". */
+  placement?: "above" | "below"
 }
 
 const BLOCK_TYPES = [
@@ -29,15 +33,21 @@ const BLOCK_TYPES = [
   { type: "RichText", label: "Rich Text" },
 ]
 
-export function InlineBlockPicker({ context, onAdd, onClose }: InlineBlockPickerProps) {
+export function InlineBlockPicker({ context, onAdd, onClose, allowedTypes, placement = "below" }: InlineBlockPickerProps) {
+  const types = allowedTypes
+    ? BLOCK_TYPES.filter((bt) => allowedTypes.includes(bt.type))
+    : BLOCK_TYPES
   const containerRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
     const updatePosition = () => {
       const rect = context.anchorElement.getBoundingClientRect()
+      const top = placement === "above"
+        ? rect.top + window.scrollY - 8
+        : rect.bottom + window.scrollY + 8
       setPosition({
-        top: rect.bottom + window.scrollY + 8,
+        top,
         left: rect.left + window.scrollX + rect.width / 2,
       })
     }
@@ -48,7 +58,7 @@ export function InlineBlockPicker({ context, onAdd, onClose }: InlineBlockPicker
       window.removeEventListener("scroll", updatePosition)
       window.removeEventListener("resize", updatePosition)
     }
-  }, [context.anchorElement])
+  }, [context.anchorElement, placement])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -79,11 +89,11 @@ export function InlineBlockPicker({ context, onAdd, onClose }: InlineBlockPicker
         position: "absolute",
         top: `${position.top}px`,
         left: `${position.left}px`,
-        transform: "translateX(-50%)",
+        transform: placement === "above" ? "translate(-50%, -100%)" : "translateX(-50%)",
         zIndex: 2147483647,
       }}
     >
-      {BLOCK_TYPES.map((bt) => (
+      {types.map((bt) => (
         <button
           key={bt.type}
           type="button"

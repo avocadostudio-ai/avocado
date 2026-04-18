@@ -50,6 +50,67 @@ export async function applyOps(
   }
 }
 
+export type HistoryStatus = { canUndo: boolean; canRedo: boolean }
+export type HistoryResult = {
+  ok: boolean
+  error?: string
+  previewVersion?: number
+  canUndo?: boolean
+  canRedo?: boolean
+  navigateToSlug?: string
+}
+
+export async function fetchHistoryStatus(
+  orchestratorUrl: string,
+  args: { session: string; siteId: string; slug: string },
+): Promise<HistoryStatus> {
+  const token = getAccessToken()
+  const headers: Record<string, string> = {}
+  if (token) headers["x-access-token"] = token
+  const url = `${orchestratorUrl}/history/status?session=${encodeURIComponent(args.session)}&siteId=${encodeURIComponent(args.siteId)}&slug=${encodeURIComponent(args.slug)}`
+  try {
+    const res = await fetch(url, { headers })
+    if (!res.ok) return { canUndo: false, canRedo: false }
+    const data = await res.json() as HistoryStatus
+    return { canUndo: !!data.canUndo, canRedo: !!data.canRedo }
+  } catch {
+    return { canUndo: false, canRedo: false }
+  }
+}
+
+async function postHistory(
+  orchestratorUrl: string,
+  action: "undo" | "redo",
+  args: { session: string; siteId: string; slug: string },
+): Promise<HistoryResult> {
+  const token = getAccessToken()
+  const headers: Record<string, string> = { "content-type": "application/json" }
+  if (token) headers["x-access-token"] = token
+  try {
+    const res = await fetch(`${orchestratorUrl}/history/${action}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(args),
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data?.error ?? `Status ${res.status}` }
+    return {
+      ok: true,
+      previewVersion: data.previewVersion,
+      canUndo: !!data.canUndo,
+      canRedo: !!data.canRedo,
+      navigateToSlug: data.navigateToSlug,
+    }
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+}
+
+export const applyHistoryUndo = (url: string, args: { session: string; siteId: string; slug: string }) =>
+  postHistory(url, "undo", args)
+export const applyHistoryRedo = (url: string, args: { session: string; siteId: string; slug: string }) =>
+  postHistory(url, "redo", args)
+
 export type ChatResult = {
   status: string
   summary: string

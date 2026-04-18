@@ -18,10 +18,12 @@ export type ImmersivePageProps = {
   siteContext?: SiteContext
   /** Query string to append to navigation links (preserves immersive mode) */
   editorQuery?: string
+  /** MVP gate: restrict block picker to text-first blocks and route text selection to inline field prompt. */
+  textOnly?: boolean
 }
 
 export function ImmersivePageWrapper({
-  page, chromeHeader, slug, config, siteContext, editorQuery
+  page, chromeHeader, slug, config, siteContext, editorQuery, textOnly
 }: ImmersivePageProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -53,6 +55,7 @@ export function ImmersivePageWrapper({
         refresh={refresh}
         navigate={navigate}
         siteContext={siteContext}
+        textOnly={textOnly}
       />
     </>
   )
