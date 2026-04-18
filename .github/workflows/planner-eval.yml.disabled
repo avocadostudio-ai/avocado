@@ -1,0 +1,42 @@
+name: Planner Eval
+
+on:
+  pull_request:
+    paths:
+      - "apps/orchestrator/src/chat/**"
+      - "apps/orchestrator/src/nlp/**"
+      - "apps/orchestrator/src/ops/**"
+      - "apps/orchestrator/src/eval/**"
+      - "packages/shared/src/schemas.ts"
+      - ".github/workflows/planner-eval.yml"
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run planner eval (core tags, regression gate)
+        working-directory: apps/orchestrator
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          E2E_CHAT_PROVIDER: openai
+          E2E_CHAT_MODEL_KEY: balanced
+          OPENAI_MODEL_BALANCED: gpt-4.1
+        run: pnpm eval --tags core --concurrency 3 --min-score 0.70
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: planner-eval-report
+          path: .data/evals/planner/*.json
+          if-no-files-found: ignore

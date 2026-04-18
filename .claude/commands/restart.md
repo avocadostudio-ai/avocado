@@ -12,6 +12,7 @@ Restart dev servers. The user may specify which server(s) to restart via `$ARGUM
 | orchestrator | 4200 | `/Users/yury/Projects/ai-site-editor` | `pnpm dev:orchestrator` |
 | editor | 4100 | `/Users/yury/Projects/ai-site-editor` | `pnpm dev:editor` |
 | avocado | 3000 | `/Users/yury/Projects/ai-site-editor` | `pnpm dev:site` |
+| widget | 3000 | `/Users/yury/Projects/ai-site-editor` | clears `apps/site/.next`, then `pnpm dev:site` (picks up `@ai-site-editor/immersive-widget` changes) |
 | sample | 3002 | `/Users/yury/Projects/ai-site-editor/examples/sample-site` | `pnpm dev` |
 | contentful | 3003 | `/Users/yury/Projects/ai-site-editor/examples/contentful-site` | `pnpm dev` |
 | sanity | 3004 | `/Users/yury/Projects/ai-site-editor/examples/sanity-site` | `pnpm dev` |
@@ -43,7 +44,8 @@ Which servers to restart?
 4. orchestrator — Orchestrator only (:4200)
 4. editor — Editor only (:4100)
 5. avocado — Avocado site (:3000)
-6. sample — Sample site (:3002)
+6. widget — Clear apps/site/.next + restart avocado (picks up immersive-widget changes)
+7. sample — Sample site (:3002)
 7. contentful — Contentful site (:3003)
 8. sanity — Sanity site (:3004)
 9. strapi — Strapi site + backend (:3005 + :1337)
@@ -59,6 +61,7 @@ Then proceed with the user's choice.
 - **`min`**: Kill core ports + docs (4200, 4100, 3000, 5555), start orchestrator + editor + avocado + docs.
 - **`all`**: Kill core ports (4200, 4100, 3000), start orchestrator + editor + avocado only.
 - **`core`**: Restart orchestrator + editor only.
+- **`widget`**: Kill port 3000, delete `apps/site/.next`, restart avocado. Use this after editing files in `packages/immersive-widget` — Next.js caches workspace packages and HMR doesn't always pick up changes, so the cache clear is required.
 - **One or more names** (e.g. `orchestrator`, `sanity strapi`): Kill only those ports, restart only those servers.
 
 ## Steps
