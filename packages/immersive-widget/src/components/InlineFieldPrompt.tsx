@@ -12,6 +12,8 @@ export type FieldContext = {
   editablePath: string
   /** The DOM element being edited — used to position the prompt */
   element: HTMLElement
+  /** Optional text the user highlighted before invoking the prompt. Scopes the AI edit via a prompt hint. */
+  selectedText?: string
 }
 
 type InlineFieldPromptProps = {
@@ -93,7 +95,11 @@ export function InlineFieldPrompt({ field, isLoading, onSubmit, onClose }: Inlin
   const handleSubmit = (text: string) => {
     const msg = text.trim()
     if (!msg || isLoading) return
-    onSubmit(msg)
+    const excerpt = field.selectedText?.trim()
+    const scoped = excerpt
+      ? `${msg}. Focus on this excerpt: "${excerpt.slice(0, 200)}"`
+      : msg
+    onSubmit(scoped)
   }
 
   if (!position) return null
@@ -126,6 +132,10 @@ export function InlineFieldPrompt({ field, isLoading, onSubmit, onClose }: Inlin
           </svg>
         </button>
       </div>
+
+      {field.selectedText && (
+        <div className="iw-field-prompt-excerpt">“{field.selectedText.slice(0, 120)}{field.selectedText.length > 120 ? "…" : ""}”</div>
+      )}
 
       <div className="iw-field-prompt-input-row">
         <input

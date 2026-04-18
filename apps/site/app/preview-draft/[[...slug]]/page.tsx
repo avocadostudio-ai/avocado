@@ -184,6 +184,7 @@ export default async function PreviewPage({ params, searchParams }: PageProps) {
           slug={slug}
           config={{ orchestratorUrl, session, siteId }}
           siteContext={{ siteName: siteConfig.name }}
+          textOnly={process.env.NEXT_PUBLIC_IMMERSIVE_TEXT_ONLY === "1"}
         />
       </>
     )
