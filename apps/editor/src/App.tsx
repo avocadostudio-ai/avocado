@@ -2060,6 +2060,9 @@ function EditorPage({
         onConfirm={() => void publish.publishSite()}
         chatLog={chatLog}
         isPublishing={publish.isPublishing}
+        session={session}
+        siteId={siteId}
+        siteOrigin={activeSiteOrigin}
       />
 
       <SiteConfigDrawer sites={sites} onPreviewRefresh={() => preview.postToSite("draftUpdated", {})} />

@@ -3354,6 +3354,243 @@ textarea {
   margin: 4px 0;
 }
 
+/* --- Publish diff view --- */
+
+.publish-diff-summary {
+  font-size: 13px;
+  color: #111827;
+  font-weight: 500;
+  margin: 4px 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.publish-diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.publish-diff-page {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.publish-diff-page-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+
+.publish-diff-page-header:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.publish-diff-page-header:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.publish-diff-page-slug {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #111827;
+  font-weight: 600;
+}
+
+.publish-diff-page-summary {
+  color: #6b7280;
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.publish-diff-caret {
+  color: #9ca3af;
+  font-size: 10px;
+  margin-left: 6px;
+}
+
+.publish-diff-page-body {
+  padding: 8px 12px 10px;
+  border-top: 1px solid #f3f4f6;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.publish-diff-title {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #f3f4f6;
+}
+
+.publish-diff-block {
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.publish-diff-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.publish-diff-block-label {
+  letter-spacing: -0.01em;
+}
+
+.publish-diff-field-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.publish-diff-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.publish-diff-field-path {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #6b7280;
+  flex-shrink: 0;
+  min-width: 80px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publish-diff-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: #111827;
+}
+
+.publish-diff-before {
+  color: #9ca3af;
+  background: #fef2f2;
+  border-radius: 4px;
+  padding: 1px 6px;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.publish-diff-after {
+  color: #065f46;
+  background: #ecfdf5;
+  border-radius: 4px;
+  padding: 1px 6px;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.publish-diff-arrow {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.publish-diff-expand,
+.publish-diff-collapse {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #6366f1;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.publish-diff-expand:hover,
+.publish-diff-collapse:hover {
+  text-decoration: underline;
+}
+
+.publish-diff-thumbs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.publish-diff-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.publish-diff-thumb--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 18px;
+}
+
+.publish-diff-unchanged-note {
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.publish-diff-chat-log {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.publish-diff-chat-log > summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Status pills (tiny colored dot + implicit label via parent text) */
+.publish-diff-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.publish-diff-status--added { background: #10b981; }
+.publish-diff-status--removed { background: #ef4444; }
+.publish-diff-status--modified { background: #3b82f6; }
+.publish-diff-status--moved { background: #f59e0b; }
+.publish-diff-status--unchanged { background: #d1d5db; }
+
 .publish-spinner {
   width: 12px;
   height: 12px;
