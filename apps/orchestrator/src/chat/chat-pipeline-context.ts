@@ -74,9 +74,6 @@ export function shouldEnableReasoningForMessage(message: string): boolean {
   // user is describing a non-trivial transformation
   if (normalized.length > 200 && /\b(if|when|so\s+that|in\s+order\s+to|but|however|unless)\b/.test(lower)) return true
 
-  // Fall back: don't escalate trivial edits
-  if (shouldPreferFastModelForMessage(message)) return false
-
   return false
 }
 

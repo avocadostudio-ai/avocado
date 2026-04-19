@@ -92,7 +92,7 @@ const isCancelError = _isCancelError
 import { isMultiStepCandidate, decomposeRequest } from "./decomposer.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic, type DeferredNativeImageCall } from "./anthropic-planner.js"
 import { generatePlanWithGemini, parseIntentWithGemini } from "./gemini-planner.js"
-import { createPlannerRegistry } from "./planner-types.js"
+import { createPlannerRegistry, type ThinkingEvent } from "./planner-types.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import { executeToolCall } from "../tools/runtime.js"
 import { detectImageSourceAmbiguity } from "../nlp/intent-helpers.js"
@@ -240,7 +240,7 @@ export async function runChatPipeline(
   body: ChatRequestBody,
   options?: {
     onPlanningToken?: (token: string) => void
-    onThinking?: (event: { type: "start" } | { type: "token"; text: string } | { type: "end"; durationMs: number }) => void
+    onThinking?: (event: ThinkingEvent) => void
     onFieldDraft?: (event: { blockId: string; editablePath: string; value: string }) => void
     onPlannedOp?: (event: { index: number; op: Operation }) => void
     onSummaryChunk?: (text: string) => void
@@ -482,7 +482,17 @@ export async function runChatPipeline(
   // Only applies when provider = anthropic (other providers ignore `thinking`).
   // User can disable with CHAT_AUTO_REASONING=0.
   const reasoningAutoEnabled = process.env.CHAT_AUTO_REASONING !== "0"
-  const reasoningBudgetTokens = Math.max(1024, Number(process.env.CHAT_AUTO_REASONING_BUDGET ?? 2048))
+  const parsedReasoningBudget = Number(process.env.CHAT_AUTO_REASONING_BUDGET ?? 2048)
+  const reasoningBudgetTokens = Math.max(
+    1024,
+    Number.isFinite(parsedReasoningBudget) ? parsedReasoningBudget : 2048
+  )
+  if (!Number.isFinite(parsedReasoningBudget)) {
+    ctx.log.warn({
+      event: "reasoning_budget_invalid",
+      raw: process.env.CHAT_AUTO_REASONING_BUDGET
+    }, "CHAT_AUTO_REASONING_BUDGET is not a number; falling back to 2048")
+  }
   const reasoningEnabled =
     reasoningAutoEnabled &&
     plannerSource === "anthropic" &&

@@ -17,6 +17,7 @@ import {
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
 import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
+import type { ThinkingEvent } from "./planner-types.js"
 import {
   extractJsonObject,
   normalizeOpName,
@@ -235,7 +236,7 @@ export async function generatePlanWithAnthropic(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
-  onThinking?: (event: { type: "start" } | { type: "token"; text: string } | { type: "end"; durationMs: number }) => void
+  onThinking?: (event: ThinkingEvent) => void
   onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
