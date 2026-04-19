@@ -38,7 +38,9 @@ type CreateChatTransportsArgs = {
   applyChatResult: (data: AssistantResponse) => void
   pushAssistantFromResult: (data: AssistantResponse) => void
   setVariationModal: (state: VariationModalState | null) => void
-  postToSite: (type: "draftUpdated" | "liveDraft" | "showSkeleton" | "removeSkeleton", payload: Record<string, unknown>) => void
+  postToSite: (type: "draftUpdated" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "scrollToBlock", payload: Record<string, unknown>) => void
+  /** Returns true when auto-scroll should follow the focused block on op_applied. */
+  shouldAutoScrollFollow: () => boolean
   postPatchToSite: (op: Operation, fromVersion: number, toVersion: number, focusBlockId?: string) => void
   setActiveBlockId: (id: string | undefined) => void
   setActiveEditablePath: (value: string | undefined) => void
@@ -447,6 +449,9 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           }
           pendingFocusBlockId = typeof payload.focusBlockId === "string" ? payload.focusBlockId : null
           if (pendingFocusBlockId) args.setLatestStreamFocusBlockId(pendingFocusBlockId)
+          if (pendingFocusBlockId && args.shouldAutoScrollFollow()) {
+            args.postToSite("scrollToBlock", { blockId: pendingFocusBlockId, behavior: "smooth", block: "center" })
+          }
           lastOpAppliedAt = Date.now()
           lastOpTotal = total > 0 ? total : index > 0 ? index : lastOpTotal
           if (args.enablePatchTransport && payload.op && typeof payload.previewVersion === "number") {

@@ -28,7 +28,7 @@ export type PreviewBridgeConfig = {
 type SiteMessage =
   | {
       protocol: "site-editor/v1"
-      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading" | "setSelectionMode"
+      type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "navigate" | "aiFieldLoading" | "setSelectionMode" | "scrollToBlock"
       payload: Record<string, unknown>
     }
   | ({ protocol: "site-editor/v1" } & ApplyPatchMessage)
@@ -51,6 +51,7 @@ export function PreviewBridgeCore(props: PreviewBridgeCoreProps) {
 
 function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathname }: PreviewBridgeCoreProps) {
   const stateRef = useRef<BridgeState | null>(null)
+  const programmaticScrollUntilRef = useRef<number>(0)
 
   useEffect(() => {
     // -- postMessage helpers ------------------------------------------------
@@ -271,10 +272,33 @@ function PreviewBridgeCoreInner({ slug, editorOrigin, navigate, refresh, pathnam
         state.activeShimmer = active ? { blockId, editablePath } : null
         applyAiFieldLoading(blockId, editablePath, active)
       }
+
+      if (msg.type === "scrollToBlock") {
+        const blockId = String(msg.payload.blockId ?? "")
+        if (!blockId) return
+        const behavior = msg.payload.behavior === "auto" ? "auto" : "smooth"
+        const block = ["start", "center", "end", "nearest"].includes(String(msg.payload.block))
+          ? (String(msg.payload.block) as ScrollLogicalPosition)
+          : "center"
+        const run = () => {
+          const el = findBlockNode(blockId)
+          if (!el) return false
+          // Mark that the next scroll event is programmatic so we don't
+          // interpret our own scroll as a user cancel.
+          programmaticScrollUntilRef.current = Date.now() + 800
+          el.scrollIntoView({ behavior, block, inline: "nearest" })
+          return true
+        }
+        // The block may not yet be in the DOM if the iframe just re-rendered;
+        // retry on the next frame and again after a short delay.
+        if (!run()) requestAnimationFrame(() => { if (!run()) setTimeout(run, 120) })
+      }
     }
 
     // -- Scroll handler ----------------------------------------------------
     const onScroll = () => {
+      // Swallow the scroll event if it originated from our own scrollIntoView.
+      if (Date.now() < programmaticScrollUntilRef.current) return
       callbacks.onScroll()
     }
 
