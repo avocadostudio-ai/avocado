@@ -56,6 +56,12 @@ export async function fetchEditorPage(
       const payload = (await res.json()) as unknown
       const parsed = pageDocSchemaLenient.safeParse(payload)
       if (parsed.success) return parsed.data
+      // Schema parse failed — surface the issues so this doesn't show up as a
+      // mysterious "Draft unavailable" in the UI. A common cause is the
+      // orchestrator returning a page doc that's missing required fields
+      // (e.g. id/updatedAt on pages created via the agent create_page tool).
+      const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+      console.warn(`[site-sdk/draft] fetchEditorPage: schema parse failed for slug=${slug} session=${session} siteId=${siteId} — ${issues}`)
     } catch {
       // Try the next candidate.
     }

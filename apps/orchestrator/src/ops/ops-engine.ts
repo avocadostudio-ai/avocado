@@ -468,8 +468,22 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
     }
 
     if (op.op === "create_page") {
-      staged.set(op.page.slug, structuredClone(op.page))
-      touchedSlugs.add(op.page.slug)
+      // Normalize required PageDoc fields the caller may have omitted. Agent
+      // and chat callers only pass slug/title/blocks — the `id` and
+      // `updatedAt` fields are required by `pageDocSchemaLenient`, and if
+      // they're missing the site's draft fetcher rejects the page as
+      // malformed and renders "Draft unavailable". Backfilling here covers
+      // every create path (agent tool, chat planner, demo seeding, SDK).
+      const incoming = structuredClone(op.page) as PageDoc
+      const normalized: PageDoc = {
+        ...incoming,
+        id: incoming.id && incoming.id.length > 0 ? incoming.id : pageIdFromSlug(incoming.slug),
+        slug: incoming.slug,
+        title: incoming.title && incoming.title.trim().length > 0 ? incoming.title : pageTitleFromSlug(incoming.slug),
+        updatedAt: incoming.updatedAt && incoming.updatedAt.length > 0 ? incoming.updatedAt : new Date().toISOString(),
+      }
+      staged.set(normalized.slug, normalized)
+      touchedSlugs.add(normalized.slug)
       continue
     }
 
