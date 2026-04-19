@@ -68,7 +68,8 @@
             "group": "Advanced",
             "pages": [
               "integration/non-nextjs",
-              "integration/tools-mvp"
+              "integration/tools-mvp",
+              "integration/jira"
             ]
           }
         ]
