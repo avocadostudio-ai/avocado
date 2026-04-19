@@ -23,6 +23,14 @@
 - Use empty string "" for no image
 - Image alt text should be descriptive and accessible
 
+### Honoring user-supplied image URLs
+When the user or reporter gave you an image URL (in the prompt, description, or a ticket comment), use *their* URL — do not silently substitute a search result:
+- **Direct image URL** (ends in .jpg/.jpeg/.png/.webp/.gif, or host is `images.unsplash.com`, a CDN, etc.) → use it verbatim in `imageUrl`.
+- **Unsplash photo page URL** (`https://unsplash.com/photos/...`) → call `unsplash_get_by_id` first to resolve it to a direct asset URL, then use that. Never assign a `unsplash.com/photos/...` URL to `imageUrl` — it's an HTML page and will break `<img>`.
+- **Anything else** (a broken link, a Pinterest/Google redirect, a page URL that isn't an image) → ask the user to provide a direct image URL instead of silently falling back to a search. Only search or generate if the user clearly asked for that, or explicitly declined to provide a URL.
+
+When you do fall back to search because no URL was given, say so in the summary (e.g. "No image URL was provided, so I searched Unsplash for 'tropical beach'").
+
 ### Image Generation Context
 - Always pass blockType, blockId, and pageSlug to image_generate for context-aware results
 - Hero/Banner blocks → aspectRatio: "landscape", style: "photorealistic", cinematic composition

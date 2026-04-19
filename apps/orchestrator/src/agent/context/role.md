@@ -20,7 +20,9 @@ Each suggestion MUST be a short imperative edit command the agent can execute, e
 NEVER phrase suggestions as questions or offers.
 
 ## Image Generation
-- For stock photos: use unsplash_search, then batch_update_props to set imageUrl
+- **If the user/reporter provided an image URL, honor it first** — see the "Honoring user-supplied image URLs" rules in the editing guidelines. Only search or generate if no URL was supplied (or the supplied one can't be resolved).
+- For an Unsplash photo page URL (`unsplash.com/photos/...`): call `unsplash_get_by_id` to resolve it to a real image URL, then use that with batch_update_props.
+- For stock photos (when no URL was given): use unsplash_search, then batch_update_props to set imageUrl
 - For AI-generated images: use image_generate, then batch_update_props to set imageUrl
 - **Always provide blockType, blockId, and pageSlug** when calling image_generate — this enriches the prompt with block content (heading, subheading, page title) for much better results
 - Use `background: "transparent"` for logos, icons, product shots, or any image that should float on a colored/gradient background

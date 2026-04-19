@@ -418,6 +418,68 @@ describe("markdownToAdf", () => {
     assert.ok(!joined.includes("site-editor:review"), `HTML comment leaked: ${joined}`)
     assert.ok(joined.includes("Hello"))
   })
+
+  test("renders pipe-delimited markdown table as ADF table node", () => {
+    const md = [
+      "| What | Before | After |",
+      "|---|---|---|",
+      "| Hero headline | \"Old\" | **New** |",
+      "| Hero subtitle | x | y |",
+    ].join("\n")
+    const doc = markdownToAdf(md) as {
+      content: Array<{ type: string; content?: Array<{ type: string; content?: unknown[] }> }>
+    }
+    const tables = doc.content.filter((n) => n.type === "table")
+    assert.equal(tables.length, 1, "expected one table node")
+    const table = tables[0]
+    assert.equal(table.content?.length, 3, "header + 2 data rows")
+    // First row: header cells
+    const headerRow = table.content?.[0] as { content: Array<{ type: string }> }
+    assert.ok(headerRow.content.every((c) => c.type === "tableHeader"))
+    assert.equal(headerRow.content.length, 3)
+    // Second row: data cells
+    const firstData = table.content?.[1] as { content: Array<{ type: string }> }
+    assert.ok(firstData.content.every((c) => c.type === "tableCell"))
+  })
+
+  test("tolerates blank lines between table rows (LLM-friendly)", () => {
+    const md = [
+      "| A | B |",
+      "",
+      "|---|---|",
+      "",
+      "| 1 | 2 |",
+      "",
+      "| 3 | 4 |",
+    ].join("\n")
+    const doc = markdownToAdf(md) as { content: Array<{ type: string; content?: unknown[] }> }
+    const table = doc.content.find((n) => n.type === "table")
+    assert.ok(table, "table node expected")
+    assert.equal((table!.content as unknown[]).length, 3, "header + 2 data rows")
+  })
+
+  test("does not treat a single pipe-row as a table (no separator)", () => {
+    const md = "| just | text |"
+    const doc = markdownToAdf(md) as { content: Array<{ type: string }> }
+    assert.equal(doc.content[0].type, "paragraph", "no separator → paragraph")
+  })
+
+  test("parses inline markdown inside table cells", () => {
+    const md = [
+      "| A | B |",
+      "|---|---|",
+      "| **bold** | [link](https://x) |",
+    ].join("\n")
+    const doc = markdownToAdf(md) as {
+      content: Array<{ type: string; content?: Array<{ content: Array<{ content: Array<{ content: Array<{ marks?: Array<{ type: string }> }> }> }> }> }>
+    }
+    const table = doc.content.find((n) => n.type === "table")!
+    const dataRow = (table.content as Array<{ content: Array<{ content: Array<{ content: Array<{ marks?: Array<{ type: string }> }> }> }> }>)[1]
+    const boldCell = dataRow.content[0].content[0].content
+    const linkCell = dataRow.content[1].content[0].content
+    assert.ok(boldCell.some((n) => n.marks?.[0]?.type === "strong"), "bold preserved in cell")
+    assert.ok(linkCell.some((n) => n.marks?.[0]?.type === "link"), "link preserved in cell")
+  })
 })
 
 // ---------------------------------------------------------------------------
