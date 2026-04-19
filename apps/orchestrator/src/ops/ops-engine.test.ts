@@ -342,6 +342,23 @@ describe("ops-engine: create_page", () => {
     assert.equal(page!.title, "Pricing")
     assert.equal(page!.blocks.length, 1)
   })
+
+  it("backfills id and updatedAt when caller omits them", async () => {
+    // Agent create_page tool casts its input `as PageDoc` without setting id
+    // or updatedAt. Without backfill, the stored page fails
+    // pageDocSchemaLenient when the site fetches it → "Draft unavailable".
+    seedSession(makePage())
+    const partial = {
+      slug: "/test",
+      title: "Test",
+      blocks: [{ id: "b_hero_test", type: "Hero", props: { heading: "Hi" } }],
+    } as unknown as PageDoc
+    await applyOpsAtomically(TEST_SESSION, [{ op: "create_page", page: partial }])
+    const page = getDraft("/test")
+    assert.ok(page)
+    assert.equal(page!.id, "p_test")
+    assert.ok(typeof page!.updatedAt === "string" && page!.updatedAt.length > 0)
+  })
 })
 
 describe("ops-engine: remove_page", () => {
