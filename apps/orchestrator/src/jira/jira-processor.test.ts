@@ -7,6 +7,7 @@ import {
   resolveSiteForTicket,
   parseReviewDecision,
   countAgentReviewComments,
+  buildCommentHistory,
 } from "./jira-processor.js"
 import { loadJiraConfig, type JiraConfig, type JiraIssue } from "./jira-types.js"
 import { markdownToAdf } from "./jira-client.js"
@@ -386,6 +387,37 @@ describe("markdownToAdf", () => {
     assert.ok(bold && bold.text === "Preview:")
     assert.ok(link && link.text === "/welcome")
   })
+
+  test("renders _text_ as italic (em)", () => {
+    const doc = markdownToAdf("_What I think you want:_ update hero copy.") as {
+      content: Array<{ content: Array<{ text: string; marks?: Array<{ type: string }> }> }>
+    }
+    const inline = doc.content[0].content
+    const em = inline.find((n) => n.marks?.[0]?.type === "em")
+    assert.ok(em, "expected an em-marked text node")
+    assert.equal(em!.text, "What I think you want:")
+  })
+
+  test("does not italicize underscores inside identifiers (snake_case)", () => {
+    const doc = markdownToAdf("Update b_hero_home heading.") as {
+      content: Array<{ content: Array<{ text: string; marks?: Array<{ type: string }> }> }>
+    }
+    const inline = doc.content[0].content
+    const em = inline.find((n) => n.marks?.[0]?.type === "em")
+    assert.equal(em, undefined, "snake_case should not trigger italics")
+    const joined = inline.map((n) => n.text).join("")
+    assert.ok(joined.includes("b_hero_home"), "identifier preserved verbatim")
+  })
+
+  test("strips HTML comments (<!-- ... -->)", () => {
+    const doc = markdownToAdf("<!-- site-editor:review -->\n**Hello**") as {
+      content: Array<{ type: string; content?: Array<{ text?: string }> }>
+    }
+    // The HTML comment line should be gone — only the bold paragraph remains.
+    const joined = JSON.stringify(doc)
+    assert.ok(!joined.includes("site-editor:review"), `HTML comment leaked: ${joined}`)
+    assert.ok(joined.includes("Hello"))
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -394,35 +426,35 @@ describe("markdownToAdf", () => {
 
 describe("parseReviewDecision", () => {
   test("parses a bare JSON proceed response", () => {
-    const raw = '{"decision":"proceed","plan":"Update hero copy on /"}'
+    const raw = '{"decision":"proceed","plan":["Update hero copy on /"]}'
     const result = parseReviewDecision(raw)
     assert.equal(result.decision, "proceed")
-    assert.equal(result.plan, "Update hero copy on /")
+    assert.deepEqual(result.plan, ["Update hero copy on /"])
   })
 
   test("parses a questions response with array", () => {
-    const raw = '{"decision":"questions","plan":"Best guess plan","questions":["Which page?","What copy?"]}'
+    const raw = '{"decision":"questions","plan":["Best guess plan"],"questions":["Which page?","What copy?"]}'
     const result = parseReviewDecision(raw)
     assert.equal(result.decision, "questions")
     assert.deepEqual(result.questions, ["Which page?", "What copy?"])
   })
 
   test("extracts JSON from ```json fence", () => {
-    const raw = 'Here is my plan:\n```json\n{"decision":"proceed","plan":"Do it"}\n```'
+    const raw = 'Here is my plan:\n```json\n{"decision":"proceed","plan":["Do it"]}\n```'
     const result = parseReviewDecision(raw)
     assert.equal(result.decision, "proceed")
-    assert.equal(result.plan, "Do it")
+    assert.deepEqual(result.plan, ["Do it"])
   })
 
   test("extracts JSON when wrapped in prose", () => {
-    const raw = 'Sure! {"decision":"proceed","plan":"Update hero"} Hope that helps.'
+    const raw = 'Sure! {"decision":"proceed","plan":["Update hero"]} Hope that helps.'
     const result = parseReviewDecision(raw)
     assert.equal(result.decision, "proceed")
-    assert.equal(result.plan, "Update hero")
+    assert.deepEqual(result.plan, ["Update hero"])
   })
 
   test("strips thinking tags before parsing", () => {
-    const raw = '<thinking>Let me think</thinking>{"decision":"proceed","plan":"Go"}'
+    const raw = '<thinking>Let me think</thinking>{"decision":"proceed","plan":["Go"]}'
     const result = parseReviewDecision(raw)
     assert.equal(result.decision, "proceed")
   })
@@ -435,9 +467,94 @@ describe("parseReviewDecision", () => {
   })
 
   test("filters out non-string questions", () => {
-    const raw = '{"decision":"questions","plan":"X","questions":["ok",42,null,"fine"]}'
+    const raw = '{"decision":"questions","plan":["X"],"questions":["ok",42,null,"fine"]}'
     const result = parseReviewDecision(raw)
     assert.deepEqual(result.questions, ["ok", "fine"])
+  })
+
+  test("back-compat: string plan is split into bullets on sentence boundaries", () => {
+    const raw = '{"decision":"proceed","plan":"Update heading to X. Update subtitle to Y. Replace hero image."}'
+    const result = parseReviewDecision(raw)
+    assert.deepEqual(result.plan, [
+      "Update heading to X.",
+      "Update subtitle to Y.",
+      "Replace hero image.",
+    ])
+  })
+
+  test("back-compat: string plan with newlines is split on newlines", () => {
+    const raw = '{"decision":"proceed","plan":"- Update heading\\n- Update subtitle"}'
+    const result = parseReviewDecision(raw)
+    assert.deepEqual(result.plan, ["Update heading", "Update subtitle"])
+  })
+
+  test("plan array is trimmed and empty items dropped", () => {
+    const raw = '{"decision":"proceed","plan":["  step one  ","","step two"]}'
+    const result = parseReviewDecision(raw)
+    assert.deepEqual(result.plan, ["step one", "step two"])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Comment history — so reporter clarifications reach the execute agent
+// ---------------------------------------------------------------------------
+
+describe("buildCommentHistory", () => {
+  function issueWith(comments: Array<{ author: string; body: string; created?: string }>): JiraIssue {
+    return {
+      key: "T-1",
+      id: "1",
+      fields: {
+        summary: "", description: "",
+        status: { name: "To Do", id: "1" },
+        labels: [], attachment: [],
+        comment: {
+          comments: comments.map((c, i) => ({
+            id: String(i),
+            author: { accountId: c.author, displayName: c.author },
+            body: c.body,
+            created: c.created ?? "2026-04-19T10:00:00Z",
+            updated: c.created ?? "2026-04-19T10:00:00Z",
+          })),
+        },
+      },
+    }
+  }
+
+  test("empty when no comments", () => {
+    const issue = issueWith([])
+    assert.equal(buildCommentHistory(issue, "agent"), "")
+  })
+
+  test("labels reporter and agent roles based on body shape", () => {
+    const issue = issueWith([
+      { author: "reporter", body: "Please update the hero", created: "2026-04-19T10:00:00Z" },
+      { author: "agent", body: "**Review — I need a bit more info before I make changes.**\n\nQuestions: which page?", created: "2026-04-19T10:05:00Z" },
+      { author: "reporter", body: "Use the home page, and this specific Unsplash URL: https://unsplash.com/photos/abc", created: "2026-04-19T10:10:00Z" },
+    ])
+    const out = buildCommentHistory(issue, "agent")
+    assert.ok(out.includes("Reporter:\nPlease update the hero"))
+    assert.ok(out.includes("Agent:\n**Review — I need a bit more info"))
+    assert.ok(out.includes("Use the home page, and this specific Unsplash URL"))
+    assert.ok(out.indexOf("Please update the hero") < out.indexOf("Unsplash URL"), "chronological order preserved")
+  })
+
+  test("solo tenant: agent-shaped body is labelled Agent even when accountId is shared", () => {
+    const issue = issueWith([
+      { author: "solo", body: "**Review — I need a bit more info before I make changes.**" },
+      { author: "solo", body: "use the pricing page" },
+    ])
+    const out = buildCommentHistory(issue, "solo")
+    assert.ok(out.includes("Agent:\n**Review"))
+    assert.ok(out.includes("Reporter:\nuse the pricing page"), "plain reply from shared accountId must still be Reporter-labelled")
+  })
+
+  test("truncates very long bodies to keep token usage bounded", () => {
+    const long = "x".repeat(2000)
+    const issue = issueWith([{ author: "reporter", body: long }])
+    const out = buildCommentHistory(issue, "agent")
+    assert.ok(out.includes("[truncated]"))
+    assert.ok(out.length < long.length + 200)
   })
 })
 
@@ -469,26 +586,41 @@ describe("countAgentReviewComments", () => {
     }
   }
 
-  test("counts agent comments that carry a review marker", () => {
+  test("counts agent comments with review headlines", () => {
     const issue = makeIssueWithComments([
-      { author: "agent", body: "<!-- site-editor:review -->\n**Review — I need info.**" },
+      { author: "agent", body: "**Review — I need a bit more info before I make changes.**" },
       { author: "reporter", body: "Here are the details." },
-      { author: "agent", body: "<!-- site-editor:proceed -->\n**Review complete.**" },
+      { author: "agent", body: "**Review complete — ready to proceed.**" },
     ])
     assert.equal(countAgentReviewComments(issue, "agent"), 2)
   })
 
-  test("ignores non-agent comments even if they include the marker text", () => {
+  test("counts the cap-reached headline as a review comment", () => {
     const issue = makeIssueWithComments([
-      { author: "reporter", body: "<!-- site-editor:review --> fake" },
+      { author: "agent", body: "**I've asked for clarification several times.**\n\nReview attempts exhausted." },
+    ])
+    assert.equal(countAgentReviewComments(issue, "agent"), 1)
+  })
+
+  test("backward-compatible with legacy HTML-comment markers", () => {
+    const issue = makeIssueWithComments([
+      { author: "agent", body: "<!-- site-editor:review -->\nStale comment from before the format change." },
+      { author: "agent", body: "<!-- site-editor:proceed -->\nAnother stale one." },
+    ])
+    assert.equal(countAgentReviewComments(issue, "agent"), 2)
+  })
+
+  test("ignores non-agent comments even if they mimic the headline", () => {
+    const issue = makeIssueWithComments([
+      { author: "reporter", body: "**Review — I'm pretending to be the agent.**" },
     ])
     assert.equal(countAgentReviewComments(issue, "agent"), 0)
   })
 
-  test("ignores agent comments without review markers (e.g. executed comments)", () => {
+  test("ignores agent comments from non-review stages", () => {
     const issue = makeIssueWithComments([
-      { author: "agent", body: "<!-- site-editor:executed -->\n**Draft updated.**" },
-      { author: "agent", body: "<!-- site-editor:published -->\n**Published.**" },
+      { author: "agent", body: "**Draft updated. Ready for your review.**" },
+      { author: "agent", body: "**Published. Changes are live.**" },
     ])
     assert.equal(countAgentReviewComments(issue, "agent"), 0)
   })

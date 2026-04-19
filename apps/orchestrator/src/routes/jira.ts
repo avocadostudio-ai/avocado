@@ -14,7 +14,7 @@
 import { timingSafeEqual } from "node:crypto"
 import type { FastifyInstance } from "fastify"
 import { loadJiraConfig, type JiraConfig, type JiraWebhookPayload, type JiraUser } from "../jira/jira-types.js"
-import { processJiraTicket, getProcessingStatus, adfToPlainText, type JiraProcessingMode } from "../jira/jira-processor.js"
+import { processJiraTicket, getProcessingStatus, adfToPlainText, isAgentAuthoredComment, type JiraProcessingMode } from "../jira/jira-processor.js"
 import { getPollerStatus } from "../jira/jira-poller.js"
 import { isApprovalComment } from "../jira/jira-approval.js"
 import type { RouteContext } from "./route-context.js"
@@ -95,12 +95,14 @@ export function routeWebhook(payload: JiraWebhookPayload, config: JiraConfig): W
 
   if (isCommentEvent && payload.comment) {
     const authorId = payload.comment.author?.accountId
-    if (agentId && authorId === agentId) {
-      return { action: "skip", reason: "comment is from agent (self-loop guard)" }
-    }
     const bodyText = typeof payload.comment.body === "string"
       ? payload.comment.body
       : adfToPlainText(payload.comment.body)
+    // Classify by body shape as well as accountId so reporter replies in
+    // solo tenants (same account as the agent) aren't dropped as self-loops.
+    if (isAgentAuthoredComment(bodyText, authorId, agentId)) {
+      return { action: "skip", reason: "comment is from agent (self-loop guard)" }
+    }
     const approval = isApprovalComment(bodyText)
 
     if (statusEquals(currentStatus, config.reviewStatus) || statusEquals(currentStatus, config.triggerStatus)) {
