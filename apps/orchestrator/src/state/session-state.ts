@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises"
-import { basename, dirname, resolve } from "node:path"
+import { dirname, resolve } from "node:path"
 import type { FastifyBaseLogger } from "fastify"
 import {
   demoPublishedPages,
@@ -11,6 +10,14 @@ import {
   type SiteConfig
 } from "@ai-site-editor/shared"
 import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
+import {
+  archiveMigratedJson,
+  getStore,
+  readLegacyJson,
+  resolveJsonMigrationTtlDays,
+  sweepStaleMigrations,
+} from "./sqlite-store-singleton.js"
+import type { SqliteStore } from "./sqlite-store.js"
 
 // ---------------------------------------------------------------------------
 // ModelKey inline type (avoids circular dependency with index.ts)
@@ -205,24 +212,28 @@ export function markRecentlyRestored(session: string) { recentlyRestoredSessions
 export function consumeRecentlyRestored(session: string): boolean { return recentlyRestoredSessions.delete(session) }
 
 // ---------------------------------------------------------------------------
-// Persistence config constants
+// Persistence config
 // ---------------------------------------------------------------------------
-export const stateFilePath =
-  process.env.ORCHESTRATOR_STATE_FILE ?? resolve(process.cwd(), "../../.data/orchestrator-state.json")
-export const stateBackupDir = resolve(stateFilePath, "..")
-const stateFileBase = basename(stateFilePath).replace(/\.json$/i, "")
-export const stateBackupPrefix = `${stateFileBase}.backup-`
-const stateBackupLimitRaw = Number(process.env.ORCHESTRATOR_STATE_BACKUP_LIMIT ?? 40)
-export const stateBackupLimit =
-  Number.isFinite(stateBackupLimitRaw) && stateBackupLimitRaw >= 5 ? Math.floor(stateBackupLimitRaw) : 40
-const stateBackupMinIntervalRaw = Number(process.env.ORCHESTRATOR_STATE_BACKUP_MIN_INTERVAL_MS ?? 120000)
-export const stateBackupMinIntervalMs =
-  Number.isFinite(stateBackupMinIntervalRaw) && stateBackupMinIntervalRaw >= 1000
-    ? Math.floor(stateBackupMinIntervalRaw)
-    : 120000
+/**
+ * Legacy JSON state file path. Resolved lazily each call so tests can
+ * point to a temp file via `ORCHESTRATOR_STATE_FILE`. Read only at
+ * startup, for one-shot migration into SQLite. Once migrated, the file
+ * is renamed to `<path>.migrated-<ts>` and swept after
+ * `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS`.
+ */
+export function resolveStateFilePath(): string {
+  return (
+    process.env.ORCHESTRATOR_STATE_FILE ??
+    resolve(process.cwd(), "../../.data/orchestrator-state.json")
+  )
+}
 
-export let persistTimer: NodeJS.Timeout | null = null
-export let lastStateBackupAt = 0
+/**
+ * Sentinel session key used to store the global `publishedPages` Map in the
+ * per-session `pages` table. Picked so it can never collide with a real
+ * session key (which is either `<site>::<session>` or a bare session name).
+ */
+const PUBLISHED_GLOBAL_KEY = "__published_global__"
 
 // ---------------------------------------------------------------------------
 // Utility: error detail extractor — canonical impl in ../errors.ts
@@ -648,111 +659,265 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
   }
 }
 
-async function rotateStateBackups(logger: FastifyBaseLogger) {
-  try {
-    const entries = await readdir(stateBackupDir)
-    const backupFiles = entries
-      .filter((name) => name.startsWith(stateBackupPrefix) && name.endsWith(".json"))
-      .sort()
-    if (backupFiles.length <= stateBackupLimit) return
-    const toDelete = backupFiles.slice(0, backupFiles.length - stateBackupLimit)
-    await Promise.all(
-      toDelete.map(async (name) => {
-        try {
-          await unlink(resolve(stateBackupDir, name))
-        } catch {
-          // Ignore cleanup failures; retaining extra backups is acceptable.
-        }
-      })
-    )
-  } catch {
-    // Ignore backup rotation failures; state persistence must continue.
-  }
-  void logger
-}
-
-async function createStateBackup(reason: "persist" | "startup", logger: FastifyBaseLogger, force = false) {
-  if (!existsSync(stateFilePath)) return
-  const now = Date.now()
-  if (!force && now - lastStateBackupAt < stateBackupMinIntervalMs) return
-  await mkdir(stateBackupDir, { recursive: true })
-  const stamp = new Date(now).toISOString().replace(/[:-]/g, "").replace(/\.\d{3}Z$/, "Z")
-  const backupPath = resolve(stateBackupDir, `${stateBackupPrefix}${stamp}.json`)
-  const raw = await readFile(stateFilePath, "utf8")
-  await writeFile(backupPath, raw, "utf8")
-  lastStateBackupAt = now
-  await rotateStateBackups(logger)
-  logger.info({ file: backupPath, reason }, "Created orchestrator state backup")
-}
-
-async function tryLoadStateFromLatestBackup(logger: FastifyBaseLogger) {
-  try {
-    const entries = await readdir(stateBackupDir)
-    const backupFiles = entries
-      .filter((name) => name.startsWith(stateBackupPrefix) && name.endsWith(".json"))
-      .sort()
-      .reverse()
-    for (const name of backupFiles) {
-      try {
-        const file = resolve(stateBackupDir, name)
-        const raw = await readFile(file, "utf8")
-        const parsed = JSON.parse(raw) as Partial<PersistedState>
-        applyPersistedState(parsed)
-        logger.warn({ file }, "Recovered orchestrator state from backup")
-        return true
-      } catch {
-        // Try older backup.
+// ---------------------------------------------------------------------------
+// SQLite persistence (Phase 2+)
+// ---------------------------------------------------------------------------
+/**
+ * Snapshot every in-memory Map into SQLite inside a single transaction.
+ * Callers are `schedulePersistState` (hot path) and one-shot migrations.
+ *
+ * Tradeoff: this writes every session every call, not just the mutated one.
+ * Because SQLite in WAL mode wraps the whole thing in one fsync and our
+ * state is small (<1 MB typical), it stays sub-millisecond. Per-session
+ * write-through is a future optimization if writes ever become hot.
+ */
+function writeAllStateToStore(store: SqliteStore) {
+  store.transaction(() => {
+    // Pages — drop-all-then-reinsert so deletes propagate. Cheap for our sizes.
+    store.db.prepare("DELETE FROM pages").run()
+    for (const [slug, page] of publishedPages) {
+      store.db.prepare(
+        "INSERT INTO pages(session, slug, kind, doc) VALUES (?, ?, 'published', ?)"
+      ).run(PUBLISHED_GLOBAL_KEY, slug, JSON.stringify(page))
+    }
+    for (const [session, bySlug] of draftPages) {
+      for (const [slug, page] of bySlug) {
+        store.db.prepare(
+          "INSERT INTO pages(session, slug, kind, doc) VALUES (?, ?, 'draft', ?)"
+        ).run(session, slug, JSON.stringify(page))
       }
     }
-  } catch {
-    // Ignore backup lookup failures.
-  }
-  return false
+    // History — drop + reinsert so pops propagate.
+    store.db.prepare("DELETE FROM history").run()
+    const insertHist = store.db.prepare(
+      "INSERT INTO history(session, slug, direction, seq, snapshot) VALUES (?, ?, ?, ?, ?)"
+    )
+    for (const [session, bySlug] of historyUndo) {
+      for (const [slug, list] of bySlug) {
+        list.forEach((snap, i) =>
+          insertHist.run(session, slug, "undo", i + 1, snap === null ? null : JSON.stringify(snap))
+        )
+      }
+    }
+    for (const [session, bySlug] of historyRedo) {
+      for (const [slug, list] of bySlug) {
+        list.forEach((snap, i) =>
+          insertHist.run(session, slug, "redo", i + 1, snap === null ? null : JSON.stringify(snap))
+        )
+      }
+    }
+    // Versions
+    store.db.prepare("DELETE FROM sessions").run()
+    for (const [session, v] of versions) store.setVersion(session, v)
+
+    // Version log
+    store.db.prepare("DELETE FROM version_log").run()
+    const insertVLog = store.db.prepare(
+      "INSERT INTO version_log(session, seq, entry) VALUES (?, ?, ?)"
+    )
+    for (const [session, list] of versionLog) {
+      list.forEach((entry, i) => insertVLog.run(session, i + 1, JSON.stringify(entry)))
+    }
+
+    // Recent edits
+    store.db.prepare("DELETE FROM recent_edits").run()
+    const insertEdit = store.db.prepare(
+      "INSERT INTO recent_edits(session, seq, entry) VALUES (?, ?, ?)"
+    )
+    for (const [session, list] of recentEdits) {
+      list.forEach((entry, i) => insertEdit.run(session, i + 1, JSON.stringify(entry)))
+    }
+
+    // Chat history
+    store.db.prepare("DELETE FROM chat_history").run()
+    const insertChat = store.db.prepare(
+      "INSERT INTO chat_history(session, seq, role, content) VALUES (?, ?, ?, ?)"
+    )
+    for (const [session, list] of chatHistoryBySession) {
+      list.forEach((m, i) => insertChat.run(session, i + 1, m.role, m.content))
+    }
+
+    // Site configs
+    store.db.prepare("DELETE FROM site_configs").run()
+    for (const [session, cfg] of siteConfigs) store.setSiteConfig(session, cfg)
+
+    // Issue-touched
+    store.db.prepare("DELETE FROM issue_touched").run()
+    for (const [key, row] of issueTouchedSlugsByKey) store.setIssueTouched(key, row)
+  })
 }
 
+/**
+ * Hydrate the in-memory Maps from a SqliteStore. Caller must have cleared
+ * the Maps first if they want authoritative replacement.
+ */
+function hydrateMapsFromStore(store: SqliteStore) {
+  // Published (global) pages live under PUBLISHED_GLOBAL_KEY.
+  for (const page of store.listPages(PUBLISHED_GLOBAL_KEY, "published")) {
+    ensureHeroImageProps(page)
+    publishedPages.set(page.slug, page)
+  }
+
+  // Draft pages — walk every session except the sentinel.
+  for (const session of store.listDraftSessions()) {
+    if (session === PUBLISHED_GLOBAL_KEY) continue
+    const bySlug = new Map<string, PageDoc>()
+    for (const page of store.listPages(session, "draft")) {
+      ensureHeroImageProps(page)
+      bySlug.set(page.slug, page)
+    }
+    if (bySlug.size > 0) draftPages.set(session, bySlug)
+  }
+
+  // History — need a list of sessions/slugs. We rely on the fact that any
+  // session with history also has draft pages, plus a fallback scan via the
+  // session-slug pairs already captured in the DB.
+  const histRows = store.db
+    .prepare(
+      `SELECT session, slug, direction, seq, snapshot FROM history ORDER BY session, slug, direction, seq`
+    )
+    .all() as Array<{
+      session: string
+      slug: string
+      direction: "undo" | "redo"
+      seq: number
+      snapshot: string | null
+    }>
+  for (const row of histRows) {
+    const target = row.direction === "undo" ? historyUndo : historyRedo
+    let bySlug = target.get(row.session)
+    if (!bySlug) {
+      bySlug = new Map()
+      target.set(row.session, bySlug)
+    }
+    const list = bySlug.get(row.slug) ?? []
+    list.push(row.snapshot === null ? null : (JSON.parse(row.snapshot) as PageDoc))
+    bySlug.set(row.slug, list)
+  }
+
+  // Versions
+  const versionRows = store.db
+    .prepare("SELECT session, version FROM sessions")
+    .all() as Array<{ session: string; version: number }>
+  for (const r of versionRows) versions.set(r.session, r.version)
+
+  // Version log
+  const vlogSessions = store.db
+    .prepare("SELECT DISTINCT session FROM version_log")
+    .all() as Array<{ session: string }>
+  for (const { session } of vlogSessions) {
+    versionLog.set(session, store.listVersionLog(session, undefined, VERSION_LOG_MAX))
+  }
+
+  // Recent edits
+  const editSessions = store.db
+    .prepare("SELECT DISTINCT session FROM recent_edits")
+    .all() as Array<{ session: string }>
+  for (const { session } of editSessions) {
+    recentEdits.set(session, store.listRecentEdits(session))
+  }
+
+  // Chat history
+  const chatSessions = store.db
+    .prepare("SELECT DISTINCT session FROM chat_history")
+    .all() as Array<{ session: string }>
+  for (const { session } of chatSessions) {
+    chatHistoryBySession.set(session, store.listChatHistory(session))
+  }
+
+  // Site configs
+  for (const { session, config } of store.listSiteConfigs()) {
+    siteConfigs.set(session, config)
+  }
+
+  // Issue-touched
+  for (const { issueKey, row } of store.listIssueTouched()) {
+    issueTouchedSlugsByKey.set(issueKey, row)
+  }
+}
+
+/**
+ * Persist the current in-memory state to SQLite. Synchronous internally
+ * (better-sqlite3 is sync) but async-compatible for callers that want to
+ * `await` it (publish flow does).
+ */
 export async function persistStateNow(logger: FastifyBaseLogger) {
-  await createStateBackup("persist", logger)
-  const payload: PersistedState = {
-    publishedPages: Array.from(publishedPages.values()).map((page) => structuredClone(page)),
-    draftPages: nestedPageMapToObject(draftPages),
-    historyUndo: nestedHistoryMapToObject(historyUndo),
-    historyRedo: nestedHistoryMapToObject(historyRedo),
-    versions: Object.fromEntries(versions.entries()),
-    recentEdits: Object.fromEntries(recentEdits.entries()),
-    chatHistory: Object.fromEntries(chatHistoryBySession.entries()),
-    siteConfigs: Object.fromEntries(siteConfigs.entries()),
-    versionLog: Object.fromEntries(versionLog.entries()),
-    issueTouchedSlugs: Object.fromEntries(issueTouchedSlugsByKey.entries())
+  try {
+    writeAllStateToStore(getStore())
+  } catch (error) {
+    logger.error(
+      { err: toErrorDetail(error) },
+      "Failed to persist orchestrator state to SQLite"
+    )
+    throw error
   }
-  await mkdir(resolve(stateFilePath, ".."), { recursive: true })
-  const tempPath = `${stateFilePath}.tmp-${process.pid}`
-  await writeFile(tempPath, JSON.stringify(payload), "utf8")
-  await rename(tempPath, stateFilePath)
 }
 
+/**
+ * Same semantics as before: schedule a persist. The 80ms debounce is gone
+ * (SQLite+WAL handles per-call writes fine), so this is now synchronous
+ * best-effort — any write error is logged, not propagated.
+ */
 export function schedulePersistState(logger: FastifyBaseLogger) {
-  if (persistTimer) clearTimeout(persistTimer)
-  persistTimer = setTimeout(() => {
-    void persistStateNow(logger).catch((error: unknown) => {
-      logger.error({ err: toErrorDetail(error) }, "Failed to persist orchestrator state")
-    })
-  }, 80)
+  try {
+    writeAllStateToStore(getStore())
+  } catch (error) {
+    logger.error(
+      { err: toErrorDetail(error) },
+      "Failed to persist orchestrator state to SQLite"
+    )
+  }
 }
 
 export async function loadStateFromDisk(logger: FastifyBaseLogger) {
-  if (!existsSync(stateFilePath)) return
+  let store: SqliteStore
   try {
-    await createStateBackup("startup", logger, true)
-    const raw = await readFile(stateFilePath, "utf8")
-    const parsed = JSON.parse(raw) as Partial<PersistedState>
-    applyPersistedState(parsed)
-    logger.info({ file: stateFilePath }, "Loaded persisted orchestrator state")
+    store = getStore()
   } catch (error) {
-    logger.error({ err: toErrorDetail(error), file: stateFilePath }, "Failed to load persisted orchestrator state")
-    const recovered = await tryLoadStateFromLatestBackup(logger)
-    if (!recovered) {
-      logger.error("No usable orchestrator state backup found")
+    logger.error(
+      { err: toErrorDetail(error) },
+      "Failed to open orchestrator SQLite store"
+    )
+    return
+  }
+
+  const jsonPath = resolveStateFilePath()
+  // Sweep stale .json.migrated-<ts> siblings first; never blocks startup.
+  void sweepStaleMigrations(jsonPath, resolveJsonMigrationTtlDays(), logger)
+
+  // If SQLite already has state, just hydrate from it.
+  const sessionsSeeded = (store.db
+    .prepare("SELECT COUNT(*) AS n FROM pages")
+    .get() as { n: number }).n > 0
+  if (sessionsSeeded) {
+    hydrateMapsFromStore(store)
+    logger.info({ backend: "sqlite" }, "Loaded persisted orchestrator state")
+    return
+  }
+
+  // DB is empty — migrate from legacy JSON if it exists.
+  if (!existsSync(jsonPath)) {
+    logger.info({ backend: "sqlite" }, "No prior orchestrator state; starting fresh")
+    return
+  }
+  try {
+    const parsed = await readLegacyJson<Partial<PersistedState>>(jsonPath)
+    if (parsed) {
+      applyPersistedState(parsed)
+      writeAllStateToStore(store)
+      const archived = await archiveMigratedJson(jsonPath)
+      logger.info(
+        { file: jsonPath, archived },
+        "Migrated orchestrator state from JSON to SQLite"
+      )
+    } else {
+      logger.info({ file: jsonPath }, "Legacy JSON state file was empty; ignoring")
     }
+  } catch (error) {
+    logger.error(
+      { err: toErrorDetail(error), file: jsonPath },
+      "Failed to migrate orchestrator state from JSON"
+    )
   }
 }
 
