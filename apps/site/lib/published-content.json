@@ -4,914 +4,103 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-04-17T20:49:49.089Z",
-      "meta": {
-        "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
-        "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
-      },
+      "updatedAt": "2026-04-19T07:41:36.307Z",
       "blocks": [
         {
-          "id": "b_hero_1772138902220_copy",
+          "id": "b_hero_home",
           "type": "Hero",
           "props": {
-            "heading": "Master Avocado's Full Power for Heart Health & Energy",
-            "subheading": "Get instant access to science-backed recipes, wellness tips, and expert guidance—no credit card needed.",
-            "ctaText": "Explore Recipes",
-            "ctaHref": "/recipes",
-            "imageUrl": "/generated-images/gen_1776458726798_77k5l3.jpg",
-            "imageAlt": "turn the image add more greens",
+            "heading": "Fresh Avocado Stories For You",
+            "subheading": "Discover the best avocado recipes, Yury.",
+            "ctaText": "Start Editing",
+            "ctaHref": "/pricing",
+            "imageUrl": "https://images.unsplash.com/photo-1775807319100-caeac311698f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8dHJvcGljYWwlMjB0aGVtZXxlbnwxfDB8fHwxNzc2NTgzNjg5fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+            "imageAlt": "People floating in a lazy river at a tropical resort",
             "imagePosition": "right",
-            "textAlign": "left",
-            "secondaryCtaText": "Read Research Studies"
+            "textAlign": "left"
           }
         },
         {
-          "id": "b_cardgrid_1774520663617_434",
-          "type": "CardGrid",
+          "id": "b_features_home",
+          "type": "FeatureGrid",
           "props": {
-            "title": "Featured Recipes",
-            "cards": [
+            "title": "Why teams use it",
+            "features": [
               {
-                "title": "Creamy Avocado Toast",
-                "description": "A quick, nutrient-packed breakfast with smashed avocado, lemon zest, and chili flakes on sourdough.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1616902666559-af398792d890?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxhdm9jYWRvJTIwdG9hc3QlMjBicmVha2Zhc3R8ZW58MXwwfHx8MTc3NDUyMDY0OXww&ixlib=rb-4.1.0&q=80&w=1080"
+                "title": "Fast edits",
+                "description": "See updates without rebuilding."
               },
               {
-                "title": "Avocado & Mango Salsa",
-                "description": "A vibrant, tropical salsa bursting with fresh mango, cilantro, and creamy avocado — perfect for tacos or chips.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1579639482794-abf71bcd3960?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxtYW5nbyUyMGF2b2NhZG8lMjBzYWxzYXxlbnwxfDB8fHwxNzc0NTIwNjUwfDA&ixlib=rb-4.1.0&q=80&w=1080"
+                "title": "Safe changes",
+                "description": "Schema-validated structured operations."
               },
               {
-                "title": "Green Goddess Smoothie",
-                "description": "Blend avocado, spinach, banana, and almond milk for a silky, energizing smoothie that keeps you full for hours.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1623002071634-54590669fe3d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmVlbiUyMHNtb290aGllJTIwaGVhbHRoeXxlbnwxfDB8fHwxNzc0NTIwNjUwfDA&ixlib=rb-4.1.0&q=80&w=1080"
+                "title": "Simple workflow",
+                "description": "Chat to edit, preview to verify."
               }
             ]
           }
         },
         {
-          "id": "b_cardgrid_1771979444550",
-          "type": "CardGrid",
+          "id": "b_cta_home",
+          "type": "CTA",
           "props": {
-            "title": "Discover Your Avocado Path",
-            "subtitle": "Three paths to avocado mastery—cook like a pro, nourish your body, or champion sustainability. Find your passion.",
-            "cards": [
-              {
-                "title": "🥑 Avocado Culinary Delights",
-                "description": "Unlock restaurant-quality meals in minutes. 50+ proven recipes to impress everyone at your table.",
-                "ctaText": "Try Now",
-                "ctaHref": "/avocado-culinary",
-                "imageUrl": "/generated-images/gdrive_1ql_bdk2KM_27u01rkMd8KoiCRJ_R7UOy.webp",
-                "imageAlt": "avocado3"
-              },
-              {
-                "title": "🥑 Avocado Wellness",
-                "description": "Transform your energy & heart health today. Trusted by 100K+ nutrition-conscious individuals worldwide.",
-                "ctaText": "Explore",
-                "ctaHref": "/avocado-wellness",
-                "imageUrl": "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvJTIwc2tpbnxlbnwxfDB8fHwxNzczNTgyMzYzfDA&ixlib=rb-4.1.0&q=80&w=1080",
-                "imageAlt": "woman with white face mask holding green fruit"
-              },
-              {
-                "title": "🥑 Avocado Sustainability",
-                "description": "Join the movement for ethical farming. Your choices directly support communities & planet.",
-                "ctaText": "Learn More",
-                "ctaHref": "/avocado-sustainability",
-                "imageUrl": "/generated-images/var_1773872370443_poycxy.png",
-                "imageAlt": "AI-generated CardGrid image featuring natural eco-friendly scene showing"
-              }
-            ]
+            "title": "Ready for your first change?",
+            "description": "Use the editor to modify this page now.",
+            "ctaText": "Open Pricing",
+            "ctaHref": "/pricing"
           }
         },
         {
-          "id": "b_richtext_1771982675835",
-          "type": "RichText",
-          "props": {
-            "title": "Why Eat Avocados",
-            "body": "## Daily Avocado Benefits\n\nEat half to one avocado daily for better heart health, steady energy, and lasting fullness.\n\n## Find Your Avocado Path\n\n- **Home Cooks**: Try new recipes and learn flavor combinations that work with avocado.\n- **Wellness Enthusiasts**: Get healthy fats, potassium, and antioxidants for heart and brain health.\n- **Growers & Farmers**: Use sustainable farming methods that improve soil, save water, and help ecosystems.\n- **Sustainability Advocates**: Support fair trade and ethical sourcing practices."
-          }
-        },
-        {
-          "id": "b_stats_1773439854509",
-          "type": "Stats",
-          "props": {
-            "title": "Avocado Impact",
-            "stats": [
-              {
-                "value": "12B+",
-                "label": "avocados in tested recipes you can master today"
-              },
-              {
-                "value": "95M",
-                "label": "servings for sustained energy & heart health"
-              },
-              {
-                "value": "3M+",
-                "label": "wellness enthusiasts exploring nutrition science"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_tabs_1773679560096_781",
-          "type": "Tabs",
-          "props": {
-            "tabs": [
-              {
-                "label": "Overview",
-                "content": "From the creamy Hass to the buttery Fuerte, each avocado variety offers unique flavors and textures.\n\n• **Hass Avocados** – The most popular variety worldwide; creamy texture and rich flavor\n• **Fuerte Avocados** – Pear-shaped with smooth, mild taste\n• **Bacon Avocados** – Thinner skin and milder flavor\n• **Reed Avocados** – Large, round, and creamy\n\nAvailable year-round."
-              },
-              {
-                "label": "Recipes & Ideas",
-                "content": "• **Breakfast** – Toast, smoothie bowls, eggs, omelets\n• **Lunch & Salads** – Grain bowls, salads, seafood\n• **Dinner** – Tacos, pasta, stuffed vegetables\n• **Snacks & Desserts** – Guacamole, chocolate mousse, vegan ice cream, parfaits"
-              },
-              {
-                "label": "Sustainability",
-                "content": "Progressive growers protect water, soil, and communities through regenerative farming.\n\n• **Water Conservation** – Modern irrigation reduces water use by up to 50%\n• **Soil Health** – Regenerative practices build organic matter and support wildlife\n• **Reduced Pesticides** – Integrated pest management protects ecosystems and farmworkers\n• **Community Impact** – Fair-trade certification ensures fair wages and local investment\n\nChoosing sustainably sourced avocados directly supports farmers and future generations."
-              },
-              {
-                "label": "Fun Facts",
-                "content": "• **Fruit, Not Vegetable** – Botanically classified as berries with a single large seed\n• **Unique Fat Profile** – The only fruit with significant monounsaturated fat\n• **Longevity** – Trees live over 100 years and continue producing throughout\n• **Slow Growth** – Takes 3–4 years for the first fruit; then decades of abundance\n• **Ancient Origins** – Cultivated for 5,000+ years, originating in south-central Mexico\n\nAvocados are nature's golden treasure."
-              },
-              {
-                "label": "Selection & Storage Tips",
-                "content": "• **Selection** – Gently squeeze for firmness; choose avocados that yield slightly to palm pressure\n• **Ripeness** – Use a paper bag with an apple to speed ripening; test with a small knife near the pit\n• **Storage** – Keep unripe at room temperature; refrigerate when ripe (lasts 3–5 days)\n• **Cut Avocados** – Preserve with lemon juice and plastic wrap; use within 1–2 days\n\nMaster these techniques for perfect avocados whenever you need them."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_video_1773685338972_965",
-          "type": "Video",
-          "props": {
-            "src": "https://www.youtube.com/watch?xv=cYPKqRIFVdU",
-            "title": "",
-            "posterUrl": "",
-            "autoplay": "false",
-            "loop": "false"
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773150551758",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Frequently Asked Questions",
-            "items": [
-              {
-                "q": "Are avocados really that healthy?",
-                "a": "Absolutely! Avocados are packed with heart-healthy monounsaturated fats, potassium, vitamins C, E, and K, plus fiber. They're a nutrient-dense food that supports heart health and keeps you feeling full. Like any food, balance is key—a quarter to half an avocado per serving is a great way to enjoy the benefits."
-              },
-              {
-                "q": "How do I choose a ripe avocado?",
-                "a": "Gently press the avocado in your palm. A ripe avocado should yield slightly to pressure without feeling mushy. If it feels firm, let it sit on your kitchen counter for one to two days to ripen naturally."
-              },
-              {
-                "q": "Are avocados sustainable?",
-                "a": "Sustainable avocado farming is possible and important. Look for growers who prioritize water conservation and ethical practices. By choosing responsibly grown avocados, you support both your health and the planet."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_richtext_1773782083093_683",
-          "type": "RichText",
-          "props": {
-            "title": "Four Audiences, One Avocado Passion",
-            "body": "Whether you're a home cook perfecting guacamole, a wellness enthusiast exploring nutrition, a farmer building regenerative practices, or an advocate for sustainable food systems—avocados unite us.\n\n**Home Cooks & Culinary Explorers** discover recipes, techniques, and unexpected flavor pairings that turn avocados into everyday magic. From toast to salads to creative fusion, learn how to make avocados shine on every plate.\n\n**Wellness Seekers** explore how avocado nutrition supports heart health, sustained energy, and whole-body vitality. Rich in healthy fats, antioxidants, and essential minerals, avocados are a true superfood for those who care about their health.\n\n**Farmers & Growers** dive into regenerative agriculture, soil health, and sustainable farming methods that produce better avocados while healing the land. Share innovations and celebrate the craft of growing exceptional fruit.\n\n**Sustainability Advocates** trace the story behind every avocado—fair trade practices, water stewardship, and environmental impact. Learn how conscious choices drive positive change in global agriculture.\n\nYour avocado journey starts here. Explore the segments below to find your community and passion."
-          }
-        },
-        {
-          "id": "b_cta_1771983958937",
+          "id": "b_cta_1776584496305_393",
           "type": "CTA",
           "props": {
             "title": "Start Your Avocado Journey Today",
-            "description": "Join 50K+ food lovers exploring recipes, wellness, and sustainable farming.",
-            "ctaText": "Join Free",
-            "ctaHref": "/community"
-          }
-        },
-        {
-          "id": "b_cardgrid_1776458794640",
-          "type": "CardGrid",
-          "props": {
-            "title": "Continue Exploring",
-            "columns": "3",
-            "cardVariant": "default",
-            "cards": [
-              {
-                "title": "Sustainability Practices",
-                "description": "Learn how avocado farming supports regenerative agriculture.",
-                "ctaText": "Read More",
-                "ctaHref": "/blueberries",
-                "imageUrl": "/generated-images/gen_1776458907692_zlrbkg.jpg",
-                "imageAlt": "Sustainable farming landscape with green crops"
-              },
-              {
-                "title": "Quick Avocado Recipes",
-                "description": "Master simple, nutritious avocado dishes for everyday meals.",
-                "ctaText": "View Recipes",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=768&h=512&fit=crop",
-                "imageAlt": "Freshly made avocado toast with toppings"
-              },
-              {
-                "title": "Wellness & Nutrition Tips",
-                "description": "Science-backed insights on heart health and sustained energy.",
-                "ctaText": "Explore Tips",
-                "ctaHref": "/community",
-                "imageUrl": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=768&h=512&fit=crop",
-                "imageAlt": "Healthy meal with fresh vegetables and nutrients"
-              }
-            ]
+            "description": "Join thousands of avocado lovers discovering fresh recipes every day.",
+            "ctaText": "Get Started",
+            "ctaHref": "/pricing"
           }
         }
       ]
     },
     {
-      "id": "p_olives",
-      "slug": "/olives",
-      "title": "Olives",
-      "updatedAt": "2026-03-17T20:12:19.275Z",
+      "id": "p_pricing",
+      "slug": "/pricing",
+      "title": "Pricing",
+      "updatedAt": "2026-04-19T07:29:01.857Z",
       "blocks": [
         {
-          "id": "b_hero_1772048325072",
+          "id": "b_hero_pricing",
           "type": "Hero",
           "props": {
-            "heading": "Finest Olive Oils 🫒",
-            "subheading": "From sun-soaked Mediterranean groves to small artisan producers, discover extra virgin olive oils crafted for depth, richness, and everyday elegance.",
-            "ctaText": "Shop the Collection",
-            "ctaHref": "/shop",
-            "imageUrl": "/generated-images/var_1773434968055_8g99nk.png",
-            "imageAlt": "Three fresh green olives on white marble surface with delicate drops of virgin olive oil, minimalist and elegant photography, soft natural lighting, clean and sophisticated composition",
-            "imagePosition": "right"
-          }
-        },
-        {
-          "id": "b_cardgrid_1772048497347",
-          "type": "CardGrid",
-          "props": {
-            "title": "Key Health Benefits of Olive Oil",
-            "cards": [
-              {
-                "title": "Rich in Healthy Fats",
-                "description": "Olive oil is high in oleic acid, a monounsaturated fat that is believed to reduce inflammation.",
-                "ctaText": "Learn More",
-                "ctaHref": "/health-benefits#healthy-fats",
-                "imageUrl": "/generated-images/var_1773435042084_wvet78.png",
-                "imageAlt": "Fresh green olives on a neutral warm olive-toned background, minimalist product photography, soft natural lighting, clean composition"
-              },
-              {
-                "title": "High in Antioxidants",
-                "description": "Contains large amounts of antioxidants that may help reduce the risk of chronic diseases.",
-                "ctaText": "Discover More",
-                "ctaHref": "/health-benefits#antioxidants",
-                "imageUrl": "/generated-images/var_1773435061562_6hf8s6.png",
-                "imageAlt": "Golden-green olives arranged on a neutral warm olive-toned background, professional product photography, soft diffused lighting, elegant and simple"
-              },
-              {
-                "title": "Anti-inflammatory Properties",
-                "description": "The antioxidants in olive oil can reduce inflammation, a leading driver of many diseases.",
-                "ctaText": "Read More",
-                "ctaHref": "/health-benefits#anti-inflammatory",
-                "imageUrl": "/generated-images/var_1773435080764_6ocahu.png",
-                "imageAlt": "Glossy olives with olive oil drops on neutral warm olive-toned background, luxury product photography, sophisticated lighting, minimal aesthetic"
-              },
-              {
-                "title": "Supports Heart Health",
-                "description": "Regular consumption of olive oil is linked to a reduced risk of heart disease.",
-                "ctaText": "Find Out More",
-                "ctaHref": "/health-benefits#heart-health",
-                "imageUrl": "/generated-images/var_1773435101045_1y544z.png",
-                "imageAlt": "Beautiful ripe olives on neutral warm olive-toned background, artisanal product photography, natural soft lighting, clean and inviting composition"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_richtext_1773778195147",
-          "type": "RichText",
-          "props": {
-            "title": "Olive Varieties & Origin Stories",
-            "body": "**Arbequina** — Hailing from Catalonia, these petite golden olives deliver a buttery, delicate flavor with hints of almond and green apple. Perfect for everyday cooking and dipping.\n\n**Koroneiki** — Greece's pride, these small dark olives produce oil with a peppery finish and herbaceous notes. A staple of the Mediterranean diet, ideal for finishing dishes and robust salads.\n\n**Frantoio** — Tuscany's heritage variety yields an intense, grassy oil bursting with complexity. Best used raw or drizzled over soups—its bold character shines brightest when uncooked."
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773778311735",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Storage & Cooking Tips",
-            "items": [
-              {
-                "q": "How should I store olive oil to keep it fresh?",
-                "a": "Store olive oil in a cool, dark place away from heat and direct sunlight. A pantry or cabinet is ideal. Keep the bottle tightly sealed to prevent oxidation. Extra virgin olive oil is best consumed within 18–24 months of harvest for optimal flavor."
-              },
-              {
-                "q": "Which olive oils pair best with specific dishes?",
-                "a": "Buttery Arbequina pairs beautifully with mild cheeses and vegetables. Peppery Koroneiki complements hearty salads and grilled meats. Bold Frantoio shines over soups, pasta, and roasted root vegetables."
-              },
-              {
-                "q": "Does olive oil go bad or expire?",
-                "a": "Olive oil doesn't truly \"expire,\" but it degrades over time. Look for rancid or musty aromas—a sign it's past its prime. When in doubt, replace oils older than 2 years."
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "p_oranges",
-      "slug": "/oranges",
-      "title": "Oranges",
-      "updatedAt": "2026-03-15T19:18:59.078Z",
-      "meta": {
-        "title": "Fresh Oranges: Health Benefits, Recipes & Wellness | Avocado Stories",
-        "description": "Explore the vibrant world of oranges. Discover recipes, nutrition insights, and wellness benefits of this citrus essential. Learn how oranges complement a healthy lifestyle."
-      },
-      "blocks": [
-        {
-          "id": "b_hero_1772135749521",
-          "type": "Hero",
-          "props": {
-            "heading": "Fresh & Vibrant Oranges",
-            "subheading": "Discover the vibrant world of citrus fruits.",
-            "ctaText": "Learn More",
-            "ctaHref": "/oranges",
-            "imageUrl": "https://images.unsplash.com/photo-1598048150218-53ab5609ef31?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8T3JhbmdlfGVufDF8MHx8fDE3NzM2MDEyODB8MA&ixlib=rb-4.1.0&q=80&w=1080",
-            "imageAlt": "sliced lemon on orange surface",
-            "imagePosition": "right"
-          }
-        },
-        {
-          "id": "b_richtext_1772135749521",
-          "type": "RichText",
-          "props": {
-            "title": "The Wonders of Oranges",
-            "body": "**Oranges** are among the most beloved fruits globally, cherished not only for their **delicious taste** but also for their nutritional benefits. Here are some intriguing insights about oranges:\n\n- **Rich in Vitamin C**, oranges play a crucial role in boosting the immune system and maintaining skin health.\n- The orange tree, an evergreen species, can reach heights of up to 10 meters and blooms with fragrant flowers.\n- With over **600 varieties**, oranges offer a diverse range of flavors and uses.\n- Originating in Southeast Asia, oranges have a rich history of cultivation spanning thousands of years.\n- Beyond being consumed fresh, oranges are versatile ingredients in cooking, baking, and are essential in producing juices and marmalades.\n\nDiscover more about the diverse benefits and culinary uses of oranges on our page."
-          }
-        },
-        {
-          "id": "b_stats_1773435579852_761",
-          "type": "Stats",
-          "props": {
-            "title": "Orange Nutrition & Global Impact",
-            "stats": [
-              {
-                "value": "53mg",
-                "label": "Vitamin C per medium orange"
-              },
-              {
-                "value": "120M+",
-                "label": "Tons produced annually worldwide"
-              },
-              {
-                "value": "600+",
-                "label": "Varieties grown globally"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_cardgrid_1773601007304_177",
-          "type": "CardGrid",
-          "props": {
-            "title": "Discover Oranges",
-            "cards": [
-              {
-                "title": "Orange Varieties",
-                "description": "From bright Valencia to zesty Blood oranges, explore the diverse world of orange cultivars. Each variety brings its own flavor profile and best uses, whether fresh, juiced, or cooked.",
-                "ctaText": "Learn varieties",
-                "ctaHref": "/oranges",
-                "imageUrl": "https://images.unsplash.com/photo-1764457004444-8639f0912b92?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxvcmFuZ2UlMjBzbGljZXMlMjBudXRyaXRpb24lMjBoZWFsdGh5fGVufDF8MHx8fDE3NzM2MDEyMDB8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-                "imageAlt": "Several orange slices on a dark background"
-              },
-              {
-                "title": "Health & Wellness",
-                "description": "Discover how oranges support your wellbeing. Packed with vitamin C and fiber, they boost immunity, skin health, and digestion. A simple, delicious way to nourish your body.",
-                "ctaText": "Explore benefits",
-                "ctaHref": "/oranges",
-                "imageUrl": "https://images.unsplash.com/photo-1617218607489-4d28d612bd07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw0fHxvcmFuZ2VzJTIwYW5kJTIwaGVhbHRofGVufDF8MHx8fDE3NzM2MDIzMzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
-                "imageAlt": "orange fruit on clear glass bowl"
-              },
-              {
-                "title": "Culinary Inspiration",
-                "description": "Transform your kitchen with orange-infused recipes. From fresh juices and zesty marmalades to savory dishes and baked goods, oranges bring brightness and depth to every meal.",
-                "ctaText": "Get recipes",
-                "ctaHref": "/oranges",
-                "imageUrl": "https://images.unsplash.com/photo-1763221126410-de574de88b16?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxN3x8ZnJlc2glMjBvcmFuZ2VzJTIwY2l0cnVzJTIwZnJ1aXR8ZW58MXwwfHx8MTc3MzYwMTE5OXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-                "imageAlt": "A pile of fresh, ripe oranges"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "p_grapefruits",
-      "slug": "/grapefruits",
-      "title": "Grapefruits",
-      "updatedAt": "2026-04-11T19:33:59.723Z",
-      "meta": {
-        "title": "Grapefruit Varieties, Health & Benefits | Avocado Stories",
-        "description": "Discover grapefruit varieties, nutrition facts, and wellness benefits. Learn how to select, store, and enjoy this vibrant citrus fruit daily.",
-        "ogImage": "https://images.unsplash.com/photo-1718627741306-bb717005339b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxncmFwZWZydWl0JTIwZnJlc2glMjBjaXRydXMlMjBmcnVpdHxlbnwxfDB8fHwxNzczNTU3MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
-      },
-      "blocks": [
-        {
-          "id": "b_hero_about",
-          "type": "Hero",
-          "props": {
-            "heading": "Grapefruits",
-            "subheading": "Discover the vibrant, refreshing world of grapefruits — a citrus fruit full of wellness benefits, zesty flavor, and endless culinary possibilities.",
-            "ctaText": "Explore Grapefruits",
-            "ctaHref": "/grapefruits",
-            "imageUrl": "https://images.unsplash.com/photo-1528826194825-a71b700fe80b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxMzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
-            "imageAlt": "slice grapefruit",
-            "imagePosition": "right"
-          }
-        },
-        {
-          "id": "b_table_1773681049002_351",
-          "type": "Table",
-          "props": {
-            "title": "Grapefruit Varieties & Nutrition Guide",
-            "headers": [
-              "Variety",
-              "Flavor Profile",
-              "Vitamin C",
-              "Best Season"
-            ],
-            "rows": [
-              [
-                "Pink/Red",
-                "Sweet and tart",
-                "High",
-                "Winter–Spring"
-              ],
-              [
-                "White",
-                "Tart and bitter",
-                "High",
-                "Year-round"
-              ],
-              [
-                "Star Ruby",
-                "Sweet and juicy",
-                "Very high",
-                "Winter–Spring"
-              ],
-              [
-                "Pomelo",
-                "Mild and sweet",
-                "Moderate",
-                "Fall–Winter"
-              ]
-            ],
-            "striped": "true"
-          }
-        },
-        {
-          "id": "b_carousel_1773681087702_227",
-          "type": "Carousel",
-          "props": {
-            "items": [
-              {
-                "imageUrl": "https://images.unsplash.com/photo-1568651239222-7af48d48d3eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNXx8cGluayUyMGdyYXBlZnJ1aXR8ZW58MXwwfHx8MTc3MzY4NTE1N3ww&ixlib=rb-4.1.0&q=80&w=1080",
-                "imageAlt": "shallow focus photo of sliced pink grapefruit",
-                "heading": "Pink Grapefruit",
-                "description": "Sweet and tart perfection in every bite",
-                "ctaText": "",
-                "ctaHref": ""
-              },
-              {
-                "imageUrl": "https://images.unsplash.com/photo-1670259382864-c532bcf1fa5e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxjdXQlMjBncmFwZWZydWl0fGVufDF8MHx8fDE3NzM2ODUxOTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
-                "imageAlt": "a grapefruit cut in half",
-                "heading": "Rich in Nutrients",
-                "description": "Rich in vitamin C, potassium, and antioxidants for daily wellness",
-                "ctaText": "",
-                "ctaHref": ""
-              },
-              {
-                "imageUrl": "https://images.unsplash.com/photo-1718833051058-4caaf174ed27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxNnx8bWFueSUyMGdyYXBlZnJ1aXRzfGVufDF8MHx8fDE3NzM2ODUyMTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
-                "imageAlt": "many grapefruits sitting next to each other",
-                "heading": "Endless Culinary Uses",
-                "description": "From breakfast juice to salads and desserts – versatile and delicious",
-                "ctaText": "",
-                "ctaHref": ""
-              }
-            ],
-            "autoplay": "false",
-            "interval": 5000
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773558915222",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Frequently Asked Questions",
-            "items": [
-              {
-                "q": "How quickly can we publish?",
-                "a": "Most teams deploy updates within minutes."
-              },
-              {
-                "q": "Can we revise later?",
-                "a": "Yes, every block can be updated at any time."
-              },
-              {
-                "q": "How do I select a ripe grapefruit?",
-                "a": "Choose grapefruits that feel heavy for their size and have a smooth, unblemished skin. They should give slightly to gentle pressure, indicating they are juicy and ready to eat."
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "p_community",
-      "slug": "/community",
-      "title": "Community",
-      "updatedAt": "2026-03-17T18:20:06.593Z",
-      "blocks": [
-        {
-          "id": "b_hero_new-page",
-          "type": "Hero",
-          "props": {
-            "heading": "Join Our Community Today",
-            "subheading": "Sign up in seconds and start exploring. No credit card required.",
-            "ctaText": "Create Free Account",
+            "heading": "Pricing that grows with you",
+            "subheading": "Start free, upgrade when you're ready.",
+            "ctaText": "Choose Plan",
             "ctaHref": "/",
-            "imageUrl": "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxDb21tdW5pdHl8ZW58MXwwfHx8MTc3Mzc2NzIyNHww&ixlib=rb-4.1.0&q=80&w=1080",
-            "imageAlt": "person in red sweater holding babys hand",
+            "imageUrl": "/hero-generated.svg",
+            "imageAlt": "Abstract generated illustration for the pricing hero",
             "imagePosition": "right"
           }
         },
         {
-          "id": "b_featuregrid_1773767196470",
-          "type": "FeatureGrid",
-          "props": {
-            "title": "Why Join Us",
-            "features": [
-              {
-                "title": "Instant Setup",
-                "description": "Get started in under 60 seconds. No complicated forms or lengthy verification."
-              },
-              {
-                "title": "Free Forever",
-                "description": "Access core features at no cost. Upgrade anytime to unlock premium benefits."
-              },
-              {
-                "title": "Your Data, Your Control",
-                "description": "Complete privacy and security. We never sell your data to third parties."
-              },
-              {
-                "title": "24/7 Support",
-                "description": "Our support team is always here to help you succeed on your journey."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_stats_1773767196470",
-          "type": "Stats",
-          "props": {
-            "title": "Trusted by Members Worldwide",
-            "stats": [
-              {
-                "value": "50K+",
-                "label": "Active Members"
-              },
-              {
-                "value": "99%",
-                "label": "Satisfaction Rate"
-              },
-              {
-                "value": "150+",
-                "label": "Countries"
-              },
-              {
-                "value": "4.9★",
-                "label": "Average Rating"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_testimonials_1773767196470",
-          "type": "Testimonials",
-          "props": {
-            "title": "What Members Say",
-            "items": [
-              {
-                "quote": "Signing up was so easy. I was exploring the platform within minutes. Highly recommend!",
-                "author": "Sarah Chen"
-              },
-              {
-                "quote": "The free tier is incredibly generous. I've been using it for 6 months without spending a dime.",
-                "author": "Marcus Rodriguez"
-              },
-              {
-                "quote": "Best decision I made. The community and support team are amazing.",
-                "author": "Emily Watson"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773767196470",
+          "id": "b_faq_pricing",
           "type": "FAQAccordion",
           "props": {
-            "title": "Signup Questions",
+            "title": "Pricing FAQ",
             "items": [
               {
-                "q": "Is my credit card required to sign up?",
-                "a": "No. You can create a free account and explore all core features without entering payment information. Only when you upgrade to premium will we ask for billing details."
+                "q": "Can I cancel anytime?",
+                "a": "Yes, there are no long-term contracts."
               },
               {
-                "q": "How long does signup take?",
-                "a": "Less than a minute. Just provide your email, create a password, and verify your email address. You'll be ready to go in seconds."
-              },
-              {
-                "q": "What happens to my data after I sign up?",
-                "a": "Your data is encrypted and stored securely. We never share or sell your information to third parties. You own your data and can export or delete it anytime."
-              },
-              {
-                "q": "Can I cancel my account?",
-                "a": "Yes. You can cancel anytime with one click. No questions asked, no cancellation fees."
+                "q": "Do you offer support?",
+                "a": "Yes, email support is included."
               }
             ]
-          }
-        },
-        {
-          "id": "b_cta_1773767196470",
-          "type": "CTA",
-          "props": {
-            "title": "Ready to Get Started?",
-            "description": "Join thousands of members who are already part of our community. Sign up now and unlock exclusive features.",
-            "ctaText": "Sign Up Free",
-            "ctaHref": "/community"
-          }
-        }
-      ]
-    },
-    {
-      "id": "p_blueberries",
-      "slug": "/blueberries",
-      "title": "Blueberries",
-      "updatedAt": "2026-03-26T10:34:13.627Z",
-      "meta": {
-        "title": "Blueberry Varieties, Growing Tips & Community Guide",
-        "description": "Learn about blueberry varieties, growing guides, and health benefits. Join our community of growers and enthusiasts. Discover highbush, lowbush, and rabbiteye blueberries."
-      },
-      "blocks": [
-        {
-          "id": "b_hero_blueberriy-lovers",
-          "type": "Hero",
-          "props": {
-            "heading": "Blueberry Lovers Unite",
-            "subheading": "Discover the world's finest blueberries—packed with antioxidants, bursting with flavor. Join our community of passionate blueberry enthusiasts.",
-            "ctaText": "Explore Our Collection",
-            "ctaHref": "/community",
-            "imageUrl": "https://images.unsplash.com/photo-1628104017776-50e38eb63041?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycmllcyUyMGZyZXNoJTIwaGFydmVzdHxlbnwxfDB8fHwxNzczNzgzNDg5fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-            "imageAlt": "Fresh ripe blueberries on the vine",
-            "imagePosition": "right",
-            "secondaryCtaText": "Learn More",
-            "secondaryCtaHref": "/"
-          }
-        },
-        {
-          "id": "b_featuregrid_1773783519651",
-          "type": "FeatureGrid",
-          "props": {
-            "title": "Why Blueberries?",
-            "features": [
-              {
-                "title": "Antioxidant Powerhouse",
-                "description": "Loaded with anthocyanins and other powerful antioxidants that support overall wellness and vitality."
-              },
-              {
-                "title": "Natural Energy Boost",
-                "description": "Rich in vitamins and natural sugars, perfect for sustained energy throughout your day."
-              },
-              {
-                "title": "Versatile & Delicious",
-                "description": "Perfect fresh, frozen, baked, or blended—endless culinary possibilities await."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_richtext_1773784054786",
-          "type": "RichText",
-          "props": {
-            "title": "Blueberry Varieties",
-            "body": "# Highbush Blueberries\n\nThe most common variety grown commercially, highbush blueberries thrive in cooler climates. They produce large, firm berries with a balanced sweet-tart flavor, making them perfect for fresh eating, baking, and preserving.\n\n# Lowbush Blueberries\n\nNative to North America, lowbush varieties are smaller and intensely flavored with deep blue color. Often called 'wild blueberries,' they pack the highest antioxidant content and are favored by health enthusiasts and gourmet chefs alike.\n\n# Rabbiteye Blueberries\n\nOriginally from the southeastern United States, rabbiteye varieties are heat-tolerant and drought-resistant. Their medium-sized berries offer a unique tart finish and excellent shelf life, ideal for warm-climate growers.\n\n# Southern Highbush Blueberries\n\nBred for warm climates, southern highbush varieties combine the best traits of their parents: large berries, sweet flavor, and heat tolerance. They're revolutionizing blueberry cultivation in previously unsuitable regions."
-          }
-        },
-        {
-          "id": "b_video_1773784186502",
-          "type": "Video",
-          "props": {
-            "src": "https://www.youtube.com/watch?v=z1sy6wO00MU",
-            "title": "Blueberry Harvest & Growing Tips",
-            "posterUrl": "https://images.unsplash.com/photo-1628104017776-50e38eb63041?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycmllcyUyMGZyZXNoJTIwaGFydmVzdHxlbnwxfDB8fHwxNzczNzgzNDg5fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-            "autoplay": "false",
-            "loop": "false"
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773784186501",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Blueberry FAQs",
-            "items": [
-              {
-                "q": "What are the health benefits of blueberries?",
-                "a": "Blueberries are rich in antioxidants, vitamin C, and fiber. They support heart health, improve brain function, and help regulate blood sugar. Regular consumption may reduce inflammation and support healthy aging."
-              },
-              {
-                "q": "How do I grow blueberries at home?",
-                "a": "Blueberries prefer acidic soil (pH 4.5–5.5) and full sun (6+ hours daily). Plant in well-draining soil, water regularly, and prune annually for best yields. Most varieties produce fruit in 2–3 years."
-              },
-              {
-                "q": "How should I store fresh blueberries?",
-                "a": "Store unwashed blueberries in a sealed container in the refrigerator for up to two weeks, or freeze them on a baking sheet before transferring to freezer bags for up to 10 months."
-              },
-              {
-                "q": "Which blueberry variety is best for my climate?",
-                "a": "Highbush varieties thrive in cooler climates; southern highbush in warm regions; rabbiteye in hot, dry areas; and lowbush (wild) in northern zones. Choose based on your USDA hardiness zone and available sunlight."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_cta_1773784068524",
-          "type": "CTA",
-          "props": {
-            "title": "Join Our Blueberry Community",
-            "description": "Attend exclusive blueberry events, gain early access to premium varieties, and network with passionate growers and collectors worldwide.",
-            "ctaText": "Join Now",
-            "ctaHref": "/community"
-          }
-        },
-        {
-          "id": "b_cardgrid_1774521117453_330",
-          "type": "CardGrid",
-          "props": {
-            "title": "Featured Recipes",
-            "subtitle": "From smoothie bowls to cheesecakes, explore delicious ways to enjoy blueberries in every meal.",
-            "cards": [
-              {
-                "title": "Blueberry Smoothie Bowl",
-                "description": "A vibrant, nutrient-packed smoothie bowl topped with fresh blueberries, granola, and honey. The perfect energizing start to your morning.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1554495644-8ce87fe3e713?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycnklMjBzbW9vdGhpZSUyMGJvd2wlMjBicmVha2Zhc3R8ZW58MXwwfHx8MTc3NDUyMTIwOXww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
-              },
-              {
-                "title": "Classic Blueberry Muffins",
-                "description": "Fluffy, golden muffins bursting with juicy blueberries. A timeless bake that's perfect for breakfast, brunch, or an afternoon treat.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1762417420596-b90e84efcfad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHw3fHxibHVlYmVycnklMjBtdWZmaW5zJTIwYmFrZWQlMjBnb2xkZW58ZW58MXwwfHx8MTc3NDUyMTIxMHww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
-              },
-              {
-                "title": "Blueberry Lemon Cheesecake",
-                "description": "A rich, creamy cheesecake with a bright lemon zest and a luscious blueberry compote topping. Elegant enough for any occasion.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1768260730506-72cca589bb91?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycnklMjBsZW1vbiUyMGNoZWVzZWNha2UlMjBkZXNzZXJ0fGVufDF8MHx8fDE3NzQ1MjEyMTF8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
-              },
-              {
-                "title": "Blueberry Chia Jam",
-                "description": "A wholesome, no-cook jam packed with fresh blueberries and chia seeds. Ready in minutes and perfect on toast, yogurt, or oatmeal.",
-                "ctaText": "View Recipe",
-                "ctaHref": "/recipes",
-                "imageUrl": "https://images.unsplash.com/photo-1750469501607-3bbbcb7112a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxibHVlYmVycnklMjBjaGlhJTIwamFtJTIwdG9hc3R8ZW58MXwwfHx8MTc3NDUyMTIxMnww&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "p_recipes",
-      "slug": "/recipes",
-      "title": "Recipes",
-      "updatedAt": "2026-03-31T21:18:25.358Z",
-      "blocks": [
-        {
-          "id": "b_hero_for-recipes",
-          "type": "Hero",
-          "props": {
-            "heading": "Recipes Made Simple",
-            "subheading": "Discover easy, delicious recipes for every kitchen skill level.",
-            "ctaText": "Browse Recipes",
-            "ctaHref": "/olives",
-            "imageUrl": "/generated-images/gen_1774991902955_0p1i2o.jpg",
-            "imageAlt": "I want the woman to look at me smiling, replace lemons by avocados. do not change anything else",
-            "imagePosition": "right"
-          }
-        },
-        {
-          "id": "b_stats_1773947687526",
-          "type": "Stats",
-          "props": {
-            "title": "Recipe Stats",
-            "stats": [
-              {
-                "value": "2,500+",
-                "label": "Recipes"
-              },
-              {
-                "value": "50k+",
-                "label": "Home Cooks"
-              },
-              {
-                "value": "4.8★",
-                "label": "Average Rating"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_featuregrid_1773947612365",
-          "type": "FeatureGrid",
-          "props": {
-            "title": "Cook Like a Pro",
-            "features": [
-              {
-                "title": "Quick & Delicious",
-                "description": "Transform everyday ingredients into restaurant-quality dishes in your own kitchen."
-              },
-              {
-                "title": "Flavor Combinations",
-                "description": "Master the art of pairing fruits and vegetables to elevate every meal."
-              },
-              {
-                "title": "Kitchen Confidence",
-                "description": "Follow step-by-step guides that make cooking accessible, no matter your skill level."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773947679848",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Cooking Help",
-            "items": [
-              {
-                "q": "How do I know how long prep will take?",
-                "a": "Most recipes include prep and cook time at the top. Start by reading through the entire recipe, then add 5–10 minutes for setup. As you practice, you'll work faster."
-              },
-              {
-                "q": "Can I substitute ingredients?",
-                "a": "Yes! Swap seasonal vegetables freely, use different oils, or swap dairy-free alternatives. Check if an ingredient affects texture or flavor—for example, butter and oil behave differently in baking."
-              },
-              {
-                "q": "Which recipes are best for beginners?",
-                "a": "Look for recipes with 5–7 ingredients, simple techniques (no special tools), and 30 minutes or less cook time. Start there, then build skills with more complex recipes."
-              },
-              {
-                "q": "How should I store leftovers?",
-                "a": "Cool food to room temperature, then transfer to airtight containers. Most cooked dishes keep 3–4 days in the fridge. Label with the date to stay organized."
-              },
-              {
-                "q": "What's the best way to learn a new cooking technique?",
-                "a": "Watch a short video first, then follow a trusted recipe step-by-step. Practice the same technique 2–3 times before moving on. Don't skip mise en place—prep all ingredients before you start cooking."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_cta_1773947706826",
-          "type": "CTA",
-          "props": {
-            "title": "Ready to get started?",
-            "description": "Apply your next change in seconds.",
-            "ctaText": "Start now",
-            "ctaHref": "/"
           }
         }
       ]
     }
   ],
-  "siteConfig": {
-    "name": "The Avocado Hub",
-    "logo": "/logos/avocado-hub.svg",
-    "navGroups": {
-      "Fruits": [
-        "/olives",
-        "/oranges",
-        "/grapefruits",
-        "/blueberries"
-      ]
-    }
-  }
+  "siteConfig": {}
 }
