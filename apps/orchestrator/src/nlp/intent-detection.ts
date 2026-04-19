@@ -17,7 +17,8 @@ import {
   PAGE_WIDE_REWRITE_PATTERNS,
   BATCH_REORDER_PATTERNS,
   PAGE_LIST_PATTERNS,
-  CONTENT_QUERY_PATTERNS
+  CONTENT_QUERY_PATTERNS,
+  FIELD_CONTENT_UPDATE_PATTERN
 } from "./intent-patterns.js"
 
 // Re-export for backward compatibility
@@ -170,12 +171,28 @@ export function extractMentionedBlockTypes(message: string): BlockType[] {
   return found.map((f) => KEYWORD_TO_BLOCK_TYPE[f.key]!)
 }
 
+/**
+ * Returns true when the message is "add X in/to [the Y] heading/subheading/copy/..."
+ * — a field-content update phrased with "add", NOT a batch block add.
+ * Guards the loose fallback below from false positives when field-targeting
+ * prepositions are combined with block-type keyword aliases like "numbers"
+ * (Stats) or "copy" (RichText).
+ */
+export function isFieldContentUpdateRequest(message: string) {
+  return FIELD_CONTENT_UPDATE_PATTERN.test(stripSiteContextEnvelope(message))
+}
+
 export function isBatchAddRequest(message: string) {
   const m = normalizeForIntent(stripSiteContextEnvelope(message))
   if (BATCH_ADD_PATTERNS.some((re) => re.test(m)) || BATCH_PAGE_CREATE_PATTERNS.some((re) => re.test(m))) return true
   if (BATCH_UPDATE_PATTERNS.some((re) => re.test(m))) return true
   if (COUNTED_MULTI_BLOCK_ADD_PATTERN.test(m)) return true
   if (EACH_BLOCK_TYPE_PATTERN.test(m)) return true
+
+  // "add X in/to Y heading/subheading/copy/..." is a field update, not a batch add.
+  // The loose fallback below would otherwise fire on messages where block-type
+  // keywords like "numbers" (Stats) or "copy" (RichText) happen to appear.
+  if (isFieldContentUpdateRequest(message)) return false
 
   const mentionedBlockTypes = countMentionedBlockTypes(m)
   const hasListSeparator = /,|\band\b|&|\bplus\b/.test(m)

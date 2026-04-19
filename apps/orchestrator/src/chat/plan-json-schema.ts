@@ -21,7 +21,7 @@ export const editPlanJsonSchema = {
     },
     summary_for_user: {
       type: "string",
-      description: "Human-readable summary. Use future tense. Use **bold** and bullet lists (- item) for readability when listing multiple points."
+      description: "Human-readable summary of what was done. Use past tense. Use **bold** and bullet lists (- item) for readability when listing multiple points."
     },
     change_log: {
       type: "string",

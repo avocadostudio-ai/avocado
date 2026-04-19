@@ -2547,6 +2547,48 @@ test("compileDeterministicPlan generates 3 add_block ops for batch add", () => {
   assert.equal(new Set(ids).size, 3)
 })
 
+test("isBatchAddRequest rejects 'add X in the Hero subheading' as field content update", () => {
+  // Regression: message "add numbers in the Hero subheading copy and heading" was
+  // misclassified as a batch add because 3 block-type keywords matched
+  // (hero, "numbers"→Stats, "copy"→RichText). It's an update to Hero fields.
+  assert.equal(isBatchAddRequest("add numbers in the Hero subheading copy and heading"), false)
+  assert.equal(isBatchAddRequest("add a bullet to the description"), false)
+  assert.equal(isBatchAddRequest("insert emojis in the subheading"), false)
+  // Still detects real batch adds
+  assert.equal(isBatchAddRequest("add 3 blocks: hero, cardgrid and CTA"), true)
+})
+
+test("inferDeterministicIntent treats 'add X in the Hero subheading' as update, not add", () => {
+  const currentPage = demoPublishedPages()[0]
+  const parsed = inferDeterministicIntent({
+    message: "add numbers in the Hero subheading copy and heading",
+    currentPage
+  })
+  // Should be classified as update (field content change), not add
+  assert.equal(parsed?.action, "update")
+})
+
+test("compileDeterministicPlan does not batch-add for 'add X in the Hero subheading'", () => {
+  // Regression: deterministic planner produced 3 add_block ops (Stats, Hero, RichText)
+  // for "add numbers in the Hero subheading copy and heading"
+  const currentPage = demoPublishedPages()[0]
+  const intent = inferDeterministicIntent({
+    message: "add numbers in the Hero subheading copy and heading",
+    currentPage
+  })
+  const plan = compileDeterministicPlan({
+    session: "test-field-add-not-batch",
+    intent: intent ?? { action: "update" },
+    message: "add numbers in the Hero subheading copy and heading",
+    slug: "/",
+    currentPage
+  })
+  // Either needs_clarification (no concrete patch) or defers cleanly —
+  // but must NOT emit 3 add_block ops.
+  const addBlockOps = (plan?.ops ?? []).filter((op) => op.op === "add_block")
+  assert.equal(addBlockOps.length, 0, `expected 0 add_block ops, got ${addBlockOps.length}`)
+})
+
 test("compileDeterministicPlan batch add with site context envelope", () => {
   const currentPage = demoPublishedPages()[0]
   const message = "add 3 blocks: hero, cardgrid and CTA [site context] Site purpose: Discover the Magic of Avocados. Site name: Avocado Magic [/site context]"
