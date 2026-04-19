@@ -33,7 +33,7 @@ stateDiagram-v2
 
 No site changes are made during review. The review prompt explicitly lists what the execute pass is capable of (Unsplash search, photo-page URL resolution, AI image generation) so the agent doesn't fabricate limitations or ask for things it already has.
 
-**Execute** — The agent runs with full tool access, including the complete comment history so any clarifications posted as replies reach the agent. It reads the current site state, applies ops, and transitions the ticket to the preview status (`In Review` by default). It posts a comment listing every change made and links to the live preview.
+**Execute** — The ticket is immediately transitioned to `JIRA_EXECUTE_STATUS` (`In Progress`) so the board reflects live progress. The agent then runs with full tool access, including the complete comment history so any clarifications posted as replies reach the agent. It reads the current site state, applies ops, posts a comment listing every change with clickable preview links, then parks the ticket at `JIRA_PREVIEW_STATUS`.
 
 **Preview** — The reporter reviews the draft in the editor. An approval comment triggers publish and moves the ticket to Done. Any other comment re-runs execute with the new instruction.
 
@@ -51,7 +51,7 @@ Examples that don't: *"going through the feedback"* (`go` only matches as a whol
 
 ### Self-loop prevention
 
-The agent tracks its own Jira account ID (`JIRA_AGENT_ACCOUNT_ID`). Comments and status changes authored by that account are always skipped. Without this, the agent's own comment on a ticket would re-trigger processing.
+The agent detects its own comments using **both** the author account ID and the comment body. A comment is only treated as agent-authored when the Jira `accountId` matches `JIRA_AGENT_ACCOUNT_ID` AND the comment body starts with a known agent headline (e.g. "Draft updated. Ready for your review." or "Review complete — ready to proceed."). The dual check prevents false positives on solo / dev Jira tenants where the operator and agent share the same account — reporter replies from that account are still treated as reporter input, not self-loops.
 
 ---
 
@@ -59,6 +59,7 @@ The agent tracks its own Jira account ID (`JIRA_AGENT_ACCOUNT_ID`). Comments and
 
 - A Jira Cloud or Jira Server / Data Center instance
 - An API token (Cloud) or Personal Access Token (Server/DC)
+- `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the orchestrator environment — the Jira processor uses the same AI backend as the chat pipeline; without at least one key it will refuse every ticket with an error
 - Orchestrator reachable from Jira's webhook delivery (for webhook mode) or able to reach Jira (for polling mode)
 
 ### Cloud vs Server/DC auth
@@ -227,6 +228,70 @@ When a reporter pastes an Unsplash photo-page URL (`https://unsplash.com/photos/
 
 ---
 
+## What reporters see
+
+Every agent action posts a comment to the ticket. Here's what each one looks like and what to reply.
+
+### Review comment (waiting for approval)
+
+```
+Review complete — ready to proceed.
+
+Plan:
+- Update the Hero heading to "Grow Your Business"
+- Add a CTA block linking to /contact
+
+Reply `go` (or `proceed`, `lgtm`, `approved`, etc.)
+or move the ticket to In Progress and I'll apply the edits.
+```
+
+Or, if information is missing:
+
+```
+Review — I need a bit more info before I make changes.
+
+What I think you want:
+- Update the Hero section
+
+Questions:
+- Which page should this change apply to?
+
+Reply with the answers and I'll re-review.
+```
+
+### Execution complete (waiting for publish approval)
+
+```
+Draft updated. Ready for your review.
+
+Changes made:
+- Updated Hero heading to "Grow Your Business"
+- Added CTA block linking to /contact
+
+Preview:
+- Open preview → /home  (clickable link)
+
+Next step: Reply `approved` / `publish` / `lgtm` to publish,
+or send a follow-up instruction for more changes.
+
+AI Model: claude-sonnet-4-5 | Duration: 12.3s | Tool calls: 8
+```
+
+### After publish
+
+```
+Published. Changes are live.
+
+Live pages:
+- Open live → /home  (clickable link)
+```
+
+### Session isolation
+
+Each Jira ticket gets its own isolated editing session named `{JIRA_SESSION}-{issue-key-lowercase}` (e.g. `jira-site-42`). Changes made while handling one ticket cannot affect another ticket's draft.
+
+---
+
 ## Endpoints
 
 All three endpoints require the `x-jira-webhook-secret` header (or `?secret=` query parameter) if `JIRA_WEBHOOK_SECRET` is configured.
@@ -309,6 +374,9 @@ The orchestrator also logs a structured `JIRA: agent tool call` line to stdout f
 
 **503 from `/jira/webhook`**
 `JIRA_BASE_URL` or `JIRA_API_TOKEN` is missing. Check your `.env` and restart the orchestrator.
+
+**Ticket errors with "No AI API key configured"**
+Neither `ANTHROPIC_API_KEY` nor `OPENAI_API_KEY` is set in the orchestrator environment. Add one and restart the orchestrator. The Anthropic key is preferred when both are present.
 
 **401 from `/jira/webhook`**
 `JIRA_WEBHOOK_SECRET` is set but the request didn't include the right value in `x-jira-webhook-secret`. Confirm Jira is sending the secret in the webhook header.
