@@ -2,6 +2,19 @@ import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { FastifyInstance } from "fastify"
 import { pageDocSchemaLenient, siteConfigSchema, type PageDoc, type SiteConfig } from "@ai-site-editor/shared"
+import { pageIdFromSlug, pageTitleFromSlug } from "../nlp/plan-normalizer.js"
+
+/**
+ * Ensure required PageDoc fields are populated before sending over the wire.
+ * The site's `pageDocSchemaLenient` requires `id`, `title`, and `updatedAt`;
+ * legacy in-memory state may be missing them. Mutates + returns the argument.
+ */
+function normalizePageForResponse(page: PageDoc): PageDoc {
+  if (!page.id || page.id.length === 0) page.id = pageIdFromSlug(page.slug)
+  if (!page.title || page.title.trim().length === 0) page.title = pageTitleFromSlug(page.slug)
+  if (!page.updatedAt || page.updatedAt.length === 0) page.updatedAt = new Date().toISOString()
+  return page
+}
 import {
   publishedPages,
   scopedSessionKey,
@@ -94,7 +107,12 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     const page = getPage(session, query.slug)
     if (!page) return reply.code(404).send({ error: "not found" })
 
-    return structuredClone(page)
+    // Defensive backfill: pages created via the agent tool pre-fix (or any
+    // future caller that forgets) end up without `id` / `updatedAt`, which the
+    // site's `pageDocSchemaLenient` then rejects silently. Normalize on the
+    // way out so legacy in-memory state still renders. The engine-side fix in
+    // ops-engine.ts covers newly-created pages; this covers what's already there.
+    return normalizePageForResponse(structuredClone(page))
   })
 
   app.get("/draft/slugs", async (request, reply) => {
