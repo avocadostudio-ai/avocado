@@ -16,7 +16,14 @@ import { runAgentLoop } from "../agent/agent-loop.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
 import type { AgentProvider } from "../agent/agent-provider.js"
 import { resolveAgentModel } from "../agent/agent-provider.js"
-import { scopedSessionKey, listSitesForSession, getSessionPages } from "../state/session-state.js"
+import {
+  scopedSessionKey,
+  listSitesForSession,
+  getSessionPages,
+  setIssueTouchedSlugs,
+  getIssueTouchedSlugs,
+  schedulePersistState,
+} from "../state/session-state.js"
 import { pushJiraTelemetry, redactToolInput, type JiraTelemetryEntry, type JiraToolCallTrace } from "../telemetry/jira-telemetry.js"
 
 // ---------------------------------------------------------------------------
@@ -474,8 +481,17 @@ export async function processJiraTicket(options: {
     // Mode: PUBLISH — publish draft, transition to Done, post "Published" comment.
     // -----------------------------------------------------------------------
     if (mode === "publish") {
-      const pagesBeforePublish = getSessionPages(session)
-      const slugs = pagesBeforePublish.map((p) => p.slug).filter((s): s is string => typeof s === "string")
+      // Prefer the per-ticket slugs recorded during execute mode, so we only
+      // advertise the pages this ticket actually touched. Fall back to the
+      // full session list when we have no record (e.g. legacy tickets).
+      const ticketSlugs = getIssueTouchedSlugs(issueKey)
+      const sessionPages = getSessionPages(session)
+      const sessionSlugs = sessionPages.map((p) => p.slug).filter((s): s is string => typeof s === "string")
+      const slugs = ticketSlugs.length > 0 ? ticketSlugs : []
+      logger.info(
+        { issueKey, siteId, ticketSlugCount: ticketSlugs.length, sessionPageCount: sessionSlugs.length },
+        "JIRA: publishing"
+      )
 
       try {
         await triggerPublish(session, siteId, logger)
@@ -503,6 +519,10 @@ export async function processJiraTicket(options: {
       await client.addComment(issueKey, comment).catch((err) => {
         logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to post published comment")
       })
+      logger.info(
+        { issueKey, publishedSlugs: slugs, durationMs: Date.now() - startedAt },
+        "JIRA: publish succeeded"
+      )
 
       if (config.doneStatus) {
         const transitioned = await client.transitionIssue(issueKey, config.doneStatus).catch(() => false)
@@ -515,7 +535,7 @@ export async function processJiraTicket(options: {
       const result: JiraProcessingResult = {
         issueKey,
         status: "success",
-        summary: `Published ${slugs.length} page(s).`,
+        summary: slugs.length > 0 ? `Published ${slugs.length} page(s).` : "Published.",
         changes: slugs,
         durationMs: Date.now() - startedAt,
         published: true,
@@ -682,7 +702,19 @@ export async function processJiraTicket(options: {
     }
 
     const durationMs = Date.now() - startedAt
-    logger.info({ issueKey, changes: changes.length, durationMs }, "JIRA: agent completed")
+    const touchedSlugList = Array.from(touchedSlugs)
+    logger.info(
+      { issueKey, changes: changes.length, touchedSlugs: touchedSlugList, toolCallCount, durationMs },
+      "JIRA: agent completed"
+    )
+
+    // Persist per-ticket touched slugs so publish mode (a separate invocation)
+    // can list exactly what this ticket changed — instead of every page in the
+    // shared session.
+    if (touchedSlugList.length > 0) {
+      setIssueTouchedSlugs(issueKey, touchedSlugList)
+      schedulePersistState(logger)
+    }
 
     // 7. Auto-publish if enabled (legacy single-stage flow)
     let published = false
@@ -936,13 +968,15 @@ function formatPublishedComment(opts: { sitePublicOrigin: string; slugs: string[
     "",
   ]
   if (opts.slugs.length > 0) {
-    lines.push("**Live pages:**")
+    lines.push("**Pages updated by this ticket:**")
     for (const slug of opts.slugs) {
       const normalized = slug.startsWith("/") ? slug : `/${slug}`
       const pageLabel = normalized === "/" ? "Home" : normalized
       const url = `${opts.sitePublicOrigin}${normalized === "/" ? "" : normalized}`
       lines.push(`- [Open live → ${pageLabel}](${url})`)
     }
+  } else {
+    lines.push(`[View site](${opts.sitePublicOrigin})`)
   }
   return lines.join("\n")
 }
