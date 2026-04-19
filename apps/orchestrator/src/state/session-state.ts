@@ -79,6 +79,13 @@ export type PendingApprovalPlan = {
   plan: EditPlan
   pendingImageOps?: PendingImageGeneration[]
   originalMessage?: string
+  /**
+   * Human-readable reasons from the tier-1 destructive-action gate. Present
+   * when the approval gate was triggered by destructive ops (as opposed to,
+   * say, pending image generation). The editor renders these in the approval
+   * card so the user knows exactly what the plan will delete.
+   */
+  destructiveReasons?: string[]
 }
 
 export type ContinuationChain = {
