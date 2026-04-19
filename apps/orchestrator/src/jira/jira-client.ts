@@ -157,8 +157,8 @@ export class JiraClient {
 
 /**
  * Convert simple markdown text to Atlassian Document Format (ADF).
- * Handles paragraphs, bulletLists, bold (**text**), italic (_text_), inline
- * code (`text`), and links ([label](url)). Strips HTML comments.
+ * Handles paragraphs, bulletLists, tables, bold (**text**), italic (_text_),
+ * inline code (`text`), and links ([label](url)). Strips HTML comments.
  * Good enough for status/clarification comments.
  */
 export function markdownToAdf(markdown: string): object {
@@ -172,6 +172,32 @@ export function markdownToAdf(markdown: string): object {
   while (i < lines.length) {
     const line = lines[i]
     if (line.trim() === "") { i++; continue }
+
+    // Table: pipe-row header + separator row + pipe-row data rows.
+    // Tolerates blank lines between rows because Jira re-renders each line
+    // as its own paragraph when the table parser doesn't fire, and LLMs
+    // sometimes emit tables that way.
+    if (isTableRow(line)) {
+      let j = i + 1
+      while (j < lines.length && lines[j].trim() === "") j++
+      if (j < lines.length && isTableSeparator(lines[j])) {
+        const headerCells = splitTableRow(line)
+        const rows: object[] = [buildTableRow(headerCells, "tableHeader")]
+        i = j + 1
+        while (i < lines.length) {
+          if (lines[i].trim() === "") { i++; continue }
+          if (!isTableRow(lines[i])) break
+          rows.push(buildTableRow(splitTableRow(lines[i]), "tableCell"))
+          i++
+        }
+        content.push({
+          type: "table",
+          attrs: { isNumberColumnEnabled: false, layout: "default" },
+          content: rows,
+        })
+        continue
+      }
+    }
 
     // Bullet list: consecutive lines starting with "- "
     if (/^\s*-\s+/.test(line)) {
@@ -193,6 +219,34 @@ export function markdownToAdf(markdown: string): object {
   }
 
   return { version: 1, type: "doc", content }
+}
+
+function isTableRow(line: string): boolean {
+  const t = line.trim()
+  return t.length >= 2 && t.startsWith("|") && t.endsWith("|")
+}
+
+function isTableSeparator(line: string): boolean {
+  if (!isTableRow(line)) return false
+  const inner = line.trim().slice(1, -1)
+  return /^\s*:?-+:?\s*(\|\s*:?-+:?\s*)*$/.test(inner)
+}
+
+function splitTableRow(line: string): string[] {
+  const inner = line.trim().slice(1, -1)
+  return inner.split("|").map((s) => s.trim())
+}
+
+function buildTableRow(cells: string[], cellType: "tableHeader" | "tableCell"): object {
+  return {
+    type: "tableRow",
+    content: cells.map((text) => ({
+      type: cellType,
+      attrs: {},
+      // ADF rejects empty text nodes — substitute a single space for blank cells.
+      content: [{ type: "paragraph", content: parseInlineMarkdown(text.length > 0 ? text : " ") }],
+    })),
+  }
 }
 
 /**
