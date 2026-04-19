@@ -105,6 +105,14 @@ export function resolveDefaultChatDarkMode() {
 }
 
 export const ANCHORED_COMPOSER_STORAGE_KEY = "editor-anchored-composer-v1"
+export const AUTO_SCROLL_TRACKING_STORAGE_KEY = "editor-auto-scroll-tracking-v1"
+
+export function resolveAutoScrollTrackingEnabled() {
+  if (typeof window === "undefined") return true
+  const stored = window.localStorage.getItem(AUTO_SCROLL_TRACKING_STORAGE_KEY)
+  if (stored === "0" || stored === "false") return false
+  return true
+}
 
 export function resolveAnchoredComposerEnabled() {
   // env override takes priority

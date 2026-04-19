@@ -80,6 +80,12 @@ export function useChatEngine(config: ChatEngineConfig) {
     return null
   }
 
+  /** True when the preview should auto-scroll to the focused block on op_applied. */
+  const shouldAutoScrollFollow = (): boolean => {
+    const s = store.getState()
+    return s.autoScrollTrackingEnabled && !s.autoScrollSuppressed
+  }
+
   const labelFromOperation = (op: unknown): string => {
     if (!op || typeof op !== "object") return "Processing"
     const rec = op as Record<string, unknown>
@@ -421,6 +427,10 @@ export function useChatEngine(config: ChatEngineConfig) {
 
     // Show immediate feedback before any SSE events arrive
     setStreamStatus(t("stream.thinking"))
+
+    // Re-enable auto-scroll for this stream; previous stream's user scroll
+    // should not carry over.
+    store.getState().setAutoScrollSuppressed(false)
 
     let streamId: string
     try {
@@ -991,6 +1001,9 @@ export function useChatEngine(config: ChatEngineConfig) {
           }
           pendingFocusBlockId = typeof payload.focusBlockId === "string" ? payload.focusBlockId : null
           if (pendingFocusBlockId) setLatestStreamFocusBlockId(pendingFocusBlockId)
+          if (pendingFocusBlockId && shouldAutoScrollFollow()) {
+            postToSite("scrollToBlock", { blockId: pendingFocusBlockId, behavior: "smooth", block: "center" })
+          }
           lastOpAppliedAt = Date.now()
           lastOpTotal = total > 0 ? total : index > 0 ? index : lastOpTotal
           if (enablePatchTransport && payload.op && typeof payload.previewVersion === "number") {
@@ -1353,6 +1366,9 @@ export function useChatEngine(config: ChatEngineConfig) {
       // Agent mode: when server has AGENT_API_KEY configured
       if (config.agentModeEnabled) {
         const { slug: agentSlug, activeBlockId: agentBlockId, activeBlockType: agentBlockType, activeEditablePath: agentEditablePath } = store.getState()
+        // Re-enable auto-scroll for this stream (user scroll from a prior
+        // stream should not carry over).
+        store.getState().setAutoScrollSuppressed(false)
         const handle = submitAgentStream({
           orchestrator,
           session,
@@ -1375,6 +1391,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           pushAssistantFromResult,
           postToSite,
           setActiveBlockId: (id: string | undefined) => store.getState().setActiveBlock(id),
+          shouldAutoScrollFollow,
         })
         agentCancelRef.current = handle.cancel
         const ok = await handle.promise
