@@ -34,6 +34,11 @@ export type CommonParseIntentArgs = {
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
 }
 
+export type ThinkingEvent =
+  | { type: "start" }
+  | { type: "token"; text: string }
+  | { type: "end"; durationMs: number }
+
 export type CommonGeneratePlanArgs = {
   message: string
   slug: string
@@ -43,6 +48,7 @@ export type CommonGeneratePlanArgs = {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
+  onThinking?: (event: ThinkingEvent) => void
   onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
@@ -65,6 +71,8 @@ export type CommonGeneratePlanArgs = {
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
+  /** Enable extended thinking (Anthropic). Ignored by providers that don't support it. */
+  thinking?: { budgetTokens: number }
 }
 
 export type GeneratePlanResult = {
@@ -99,7 +107,8 @@ const openAIPlanner: Planner = {
     return parseIntentWithOpenAI(rest)
   },
   async generatePlan(args) {
-    const { onStatusUpdate: _s, onImageProgress: _i, log: _l, ...rest } = args
+    // OpenAI doesn't yet support Anthropic-style thinking events — drop them.
+    const { onStatusUpdate: _s, onImageProgress: _i, log: _l, onThinking: _t, thinking: _th, ...rest } = args
     return generatePlanWithOpenAI(rest)
   },
 }
@@ -115,7 +124,10 @@ const geminiPlanner: Planner = {
   source: "gemini",
   supportsNativeTools: true,
   parseIntent: parseIntentWithGemini,
-  generatePlan: generatePlanWithGemini,
+  async generatePlan(args) {
+    const { onThinking: _t, thinking: _th, ...rest } = args
+    return generatePlanWithGemini(rest)
+  },
 }
 
 // ---------------------------------------------------------------------------
