@@ -463,7 +463,9 @@ export async function processJiraTicket(options: {
     const siteId = resolved.siteId
     logger.info({ issueKey, siteId, mode }, "JIRA: resolved site")
 
-    const sessionName = `${config.session}-${issueKey.toLowerCase()}`
+    // Share the session with the editor so Jira changes show up in the
+    // editor view without per-ticket URLs. Concurrent tickets interleave.
+    const sessionName = config.session
     const session = scopedSessionKey(sessionName, siteId)
     telemetry.siteId = siteId
     telemetry.session = session

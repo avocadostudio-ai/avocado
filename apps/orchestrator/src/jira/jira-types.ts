@@ -158,7 +158,7 @@ export function loadJiraConfig(): JiraConfig | null {
     doneStatus,
     failedStatus: process.env.JIRA_FAILED_STATUS?.trim() || undefined,
     siteId: process.env.JIRA_SITE_ID?.trim() || "avocado-stories",
-    session: process.env.JIRA_SESSION?.trim() || "jira",
+    session: process.env.JIRA_SESSION?.trim() || "dev",
     autoPublish: process.env.JIRA_AUTO_PUBLISH === "1",
     maxReviewPasses: Number(process.env.JIRA_MAX_REVIEW_PASSES) || 3,
     pollEnabled: process.env.JIRA_POLL_ENABLED === "1",
