@@ -24,7 +24,10 @@ import {
   CHAT_HISTORY_MAX_TURNS,
   pushChatHistory,
   pushRecentEdit,
-  getRecentEdits
+  getRecentEdits,
+  issueTouchedSlugsByKey,
+  setIssueTouchedSlugs,
+  getIssueTouchedSlugs
 } from "./session-state.js"
 import type { PageDoc } from "@ai-site-editor/shared"
 import type { PersistedState } from "./session-state.js"
@@ -256,15 +259,15 @@ test("applyPersistedState: restores all state maps from persisted payload", () =
   // Verify chat history
   assert.equal(chatHistoryBySession.get("test-persist")!.length, 2)
 
-  // Verify site configs (dev default always present)
-  assert.ok(siteConfigs.has("dev"))
+  // Verify site configs (avocado-hub default always present)
+  assert.ok(siteConfigs.has("avocado-hub::dev"))
   assert.equal(siteConfigs.get("test-persist")!.name, "Test Site")
 })
 
 test("applyPersistedState: handles empty/missing fields gracefully", () => {
   applyPersistedState({})
-  // Should not throw; default dev config should be re-seeded
-  assert.ok(siteConfigs.has("dev"))
+  // Should not throw; default avocado-hub config should be re-seeded
+  assert.ok(siteConfigs.has("avocado-hub::dev"))
 })
 
 test("applyPersistedState: skips invalid published pages", () => {
@@ -323,4 +326,49 @@ test("pushRecentEdit + getRecentEdits: filters by slug and limits to 3", () => {
 
   const aboutEdits = getRecentEdits(session, "/about")
   assert.equal(aboutEdits.length, 1)
+})
+
+// ---------------------------------------------------------------------------
+// issueTouchedSlugs — set/get, dedupe, roundtrip through applyPersistedState
+// ---------------------------------------------------------------------------
+
+test("setIssueTouchedSlugs: stores slugs and dedupes, empty key is ignored", () => {
+  issueTouchedSlugsByKey.clear()
+  setIssueTouchedSlugs("SCRUM-99", ["/test", "/test", "/about", "", "other"])
+  const stored = getIssueTouchedSlugs("SCRUM-99")
+  assert.deepEqual(stored.sort(), ["/about", "/test", "other"])
+
+  setIssueTouchedSlugs("", ["/whatever"])
+  assert.equal(issueTouchedSlugsByKey.has(""), false)
+})
+
+test("getIssueTouchedSlugs: returns empty array for unknown key", () => {
+  assert.deepEqual(getIssueTouchedSlugs("DOES-NOT-EXIST"), [])
+})
+
+test("applyPersistedState: roundtrips issueTouchedSlugs", () => {
+  applyPersistedState({
+    issueTouchedSlugs: {
+      "SCRUM-17": { slugs: ["/test"], updatedAt: "2026-04-19T00:00:00Z" },
+      "SCRUM-18": { slugs: ["/", "/about"], updatedAt: "2026-04-19T01:00:00Z" },
+    },
+  })
+  assert.deepEqual(getIssueTouchedSlugs("SCRUM-17"), ["/test"])
+  assert.deepEqual(getIssueTouchedSlugs("SCRUM-18"), ["/", "/about"])
+})
+
+test("applyPersistedState: skips malformed issueTouchedSlugs entries", () => {
+  issueTouchedSlugsByKey.clear()
+  applyPersistedState({
+    issueTouchedSlugs: {
+      "GOOD": { slugs: ["/ok"], updatedAt: "2026-04-19T00:00:00Z" },
+      "BAD-NO-SLUGS": {} as any,
+      "BAD-WRONG-TYPE": "nope" as any,
+      "BAD-NON-STRING-SLUG": { slugs: [123, null, "/real"] as any, updatedAt: "x" },
+    },
+  })
+  assert.deepEqual(getIssueTouchedSlugs("GOOD"), ["/ok"])
+  assert.equal(issueTouchedSlugsByKey.has("BAD-NO-SLUGS"), false)
+  assert.equal(issueTouchedSlugsByKey.has("BAD-WRONG-TYPE"), false)
+  assert.deepEqual(getIssueTouchedSlugs("BAD-NON-STRING-SLUG"), ["/real"])
 })
