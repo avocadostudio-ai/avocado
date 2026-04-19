@@ -23,12 +23,14 @@ import type {
 } from "../lib/editor-types"
 import type { AnchorRect } from "../hooks/usePreviewBridge"
 import {
+  AUTO_SCROLL_TRACKING_STORAGE_KEY,
   CHAT_THEME_STORAGE_KEY,
   CHAT_WIDTH_STORAGE_KEY,
   DEBUG_MODE_STORAGE_KEY,
   MODEL_KEY_STORAGE_KEY,
   PROVIDER_STORAGE_KEY,
   createId,
+  resolveAutoScrollTrackingEnabled,
   resolveDefaultChatDarkMode,
   resolveDefaultChatWidth,
   resolveDefaultDebugMode,
@@ -123,6 +125,12 @@ export type EditorState = {
   availableProviders: AIProvider[]
   useStreaming: boolean
 
+  // ── scroll tracking ─────────────────────────────────────────────
+  autoScrollTrackingEnabled: boolean
+  // Suppressed for the current stream (true while the user has scrolled
+  // manually mid-generation). Resets when a new stream begins.
+  autoScrollSuppressed: boolean
+
   // ── features ────────────────────────────────────────────────────
   backendFeatures: {
     googleDrive?: boolean
@@ -211,6 +219,10 @@ export type EditorActions = {
   setAvailableProviders: (providers: AIProvider[]) => void
   setUseStreaming: (streaming: boolean) => void
 
+  // scroll tracking
+  setAutoScrollTrackingEnabled: (enabled: boolean) => void
+  setAutoScrollSuppressed: (suppressed: boolean) => void
+
   // features
   setBackendFeatures: (features: EditorState["backendFeatures"]) => void
 
@@ -285,6 +297,10 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     provider: resolveDefaultProvider(),
     availableProviders: [],
     useStreaming: true,
+
+    // ── scroll tracking defaults ──────────────────────────────────
+    autoScrollTrackingEnabled: resolveAutoScrollTrackingEnabled(),
+    autoScrollSuppressed: false,
 
     // ── features defaults ─────────────────────────────────────────
     backendFeatures: {},
@@ -409,6 +425,12 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     setAvailableProviders: (providers) => set({ availableProviders: providers }),
     setUseStreaming: (streaming) => set({ useStreaming: streaming }),
 
+    // ── scroll tracking actions ───────────────────────────────────
+    setAutoScrollTrackingEnabled: (enabled) =>
+      set((prev) => (prev.autoScrollTrackingEnabled === enabled ? prev : { ...prev, autoScrollTrackingEnabled: enabled })),
+    setAutoScrollSuppressed: (suppressed) =>
+      set((prev) => (prev.autoScrollSuppressed === suppressed ? prev : { ...prev, autoScrollSuppressed: suppressed })),
+
     // ── features actions ──────────────────────────────────────────
     setBackendFeatures: (features) => set({ backendFeatures: features }),
 
@@ -504,5 +526,13 @@ useEditorStore.subscribe(
     if (typeof window === "undefined") return
     if (width == null) window.localStorage.removeItem(CHAT_WIDTH_STORAGE_KEY)
     else window.localStorage.setItem(CHAT_WIDTH_STORAGE_KEY, String(Math.round(width)))
+  }
+)
+
+useEditorStore.subscribe(
+  (s) => s.autoScrollTrackingEnabled,
+  (enabled) => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(AUTO_SCROLL_TRACKING_STORAGE_KEY, enabled ? "1" : "0")
   }
 )

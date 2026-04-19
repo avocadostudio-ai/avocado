@@ -27,7 +27,9 @@ type AgentTransportArgs = {
   setLatestStreamFocusBlockId: (value: string | null) => void
   applyChatResult: (data: AssistantResponse) => void
   pushAssistantFromResult: (data: AssistantResponse) => void
-  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading", payload: Record<string, unknown>) => void
+  postToSite: (type: "highlightBlock" | "draftUpdated" | "setNestedLabelsVisibility" | "liveDraft" | "showSkeleton" | "removeSkeleton" | "aiFieldLoading" | "scrollToBlock", payload: Record<string, unknown>) => void
+  /** Returns true when auto-scroll should follow the focused block on op_applied. */
+  shouldAutoScrollFollow: () => boolean
   setActiveBlockId: (id: string | undefined) => void
 }
 
@@ -42,6 +44,7 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
     activeBlockId, activeBlockType, activeEditablePath, locale, sitePurpose,
     setStreamStatus, setStreamSteps, setOpChecklist, labelFromOperation, setStreamingText, setStreamingChanges, setLatestStreamFocusBlockId,
     applyChatResult, pushAssistantFromResult, postToSite, setActiveBlockId,
+    shouldAutoScrollFollow,
   } = args
 
   let eventSource: EventSource | null = null
@@ -266,6 +269,9 @@ export function submitAgentStream(args: AgentTransportArgs): AgentStreamHandle {
         if (focusBlockId) {
           lastFocusBlockId = focusBlockId
           setLatestStreamFocusBlockId(focusBlockId)
+          if (shouldAutoScrollFollow()) {
+            postToSite("scrollToBlock", { blockId: focusBlockId, behavior: "smooth", block: "center" })
+          }
         }
         setOpChecklist((prev) => {
           const next = [...prev]

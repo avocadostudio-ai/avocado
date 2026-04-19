@@ -105,6 +105,7 @@ const en = {
   "settings.nestedLabels": "Nested labels",
   "settings.fieldDraftTelemetry": "Field draft telemetry",
   "settings.darkMode": "Dark mode",
+  "settings.autoScrollTracking": "Follow generated content",
   "settings.debugMode": "Debug mode",
   "settings.model": "Model",
   "settings.advanced": "Advanced",

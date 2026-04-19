@@ -51,6 +51,8 @@ interface SettingsModalProps {
   onDebugDetailsChange: (value: boolean) => void
   fieldDraftDebugEnabled: boolean
   onFieldDraftDebugChange: (value: boolean) => void
+  autoScrollTrackingEnabled: boolean
+  onAutoScrollTrackingChange: (value: boolean) => void
   provider: AIProvider
   modelKey: ModelKey
   availableProviders: AIProvider[]
@@ -78,6 +80,8 @@ export function SettingsModal({
   onDebugDetailsChange,
   fieldDraftDebugEnabled,
   onFieldDraftDebugChange,
+  autoScrollTrackingEnabled,
+  onAutoScrollTrackingChange,
   provider,
   modelKey,
   availableProviders,
@@ -148,6 +152,7 @@ export function SettingsModal({
               <ToggleRow label={t("settings.fieldDraftTelemetry")} checked={fieldDraftDebugEnabled} onCheckedChange={onFieldDraftDebugChange} />
             ) : null}
             <ToggleRow label={t("settings.darkMode")} checked={chatDarkMode} onCheckedChange={onDarkModeChange} />
+            <ToggleRow label={t("settings.autoScrollTracking")} checked={autoScrollTrackingEnabled} onCheckedChange={onAutoScrollTrackingChange} />
             {showDevOptions ? (
               <ToggleRow label={t("settings.debugMode")} checked={showDebugDetails} onCheckedChange={onDebugDetailsChange} />
             ) : null}

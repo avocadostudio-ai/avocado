@@ -257,6 +257,8 @@ function EditorPage({
   const setActiveEditablePath = useEditorStore((s) => s.setActiveEditablePath)
   const useStreaming = useEditorStore((s) => s.useStreaming)
   const setUseStreaming = useEditorStore((s) => s.setUseStreaming)
+  const autoScrollTrackingEnabled = useEditorStore((s) => s.autoScrollTrackingEnabled)
+  const setAutoScrollTrackingEnabled = useEditorStore((s) => s.setAutoScrollTrackingEnabled)
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showPublishReview, setShowPublishReview] = useState(false)
   const showSettingsModal = useEditorStore((s) => s.showSettingsModal)
@@ -540,6 +542,14 @@ function EditorPage({
     },
     onIframeScrolled: () => {
       setAnchorRect(null)
+      // If the user scrolls while a stream is running, pause auto-scroll
+      // tracking for the remainder of this stream (re-enabled on next
+      // stream start). The preview bridge already filters out scrolls
+      // produced by our own scrollIntoView, so this fires only on real
+      // user intent.
+      if (useEditorStore.getState().isLoading) {
+        useEditorStore.getState().setAutoScrollSuppressed(true)
+      }
     }
   }), [componentManifest.allowStructuralEdits, setSlugFromPreview, slug])
 
@@ -2073,6 +2083,8 @@ function EditorPage({
         onDebugDetailsChange={setShowDebugDetails}
         fieldDraftDebugEnabled={fieldDraftDebugEnabled}
         onFieldDraftDebugChange={setFieldDraftDebugEnabled}
+        autoScrollTrackingEnabled={autoScrollTrackingEnabled}
+        onAutoScrollTrackingChange={setAutoScrollTrackingEnabled}
         provider={provider}
         modelKey={modelKey}
         availableProviders={availableProviders}
