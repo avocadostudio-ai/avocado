@@ -157,6 +157,7 @@ app.get("/docs/json", async () => (cachedSwaggerSpec ??= app.swagger()))
 const chatTelemetryFilePath = process.env.CHAT_TELEMETRY_FILE ?? resolve(process.cwd(), "../../.data/chat-telemetry.ndjson")
 const generatedImageDir = process.env.ORCHESTRATOR_GENERATED_IMAGE_DIR ?? resolve(process.cwd(), "../../.data/generated-images")
 const orchestratorPublicOrigin = (process.env.ORCHESTRATOR_PUBLIC_ORIGIN ?? "http://localhost:4200").replace(/\/+$/, "")
+const sitePublicOrigin = (process.env.SITE_PUBLIC_ORIGIN ?? "http://localhost:3000").replace(/\/+$/, "")
 const chatTelemetryLimit = Number(process.env.CHAT_TELEMETRY_LIMIT ?? 500)
 const chatTelemetryPersistEnabled = !/^(0|false|no|off)$/i.test((process.env.CHAT_TELEMETRY_PERSIST ?? "1").trim())
 
@@ -224,7 +225,7 @@ const availableProviders: AIProvider[] = [
 // Route plugins
 // ---------------------------------------------------------------------------
 
-const ctx: RouteContext = { chatTelemetry, evalCandidates, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin, toolRuntime }
+const ctx: RouteContext = { chatTelemetry, evalCandidates, modelLookup, availableProviders, generatedImageDir, orchestratorPublicOrigin, sitePublicOrigin, toolRuntime }
 
 await app.register((instance) => contentRoutes(instance, ctx))
 await app.register((instance) => publishingRoutes(instance, ctx))
@@ -378,7 +379,7 @@ async function startServer() {
     const { startJiraPoller } = await import("./jira/jira-poller.js")
     const jiraConfig = loadJiraConfig()
     if (jiraConfig) {
-      startJiraPoller({ config: jiraConfig, generatedImageDir, orchestratorPublicOrigin, logger: app.log })
+      startJiraPoller({ config: jiraConfig, generatedImageDir, orchestratorPublicOrigin, sitePublicOrigin, logger: app.log })
     } else {
       app.log.warn("JIRA_POLL_ENABLED=1 but JIRA_BASE_URL or JIRA_API_TOKEN not set — poller not started")
     }
