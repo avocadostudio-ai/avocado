@@ -44,12 +44,27 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
           previewVersion: version,
           focusBlockId,
           skippedOps: result.skippedOps,
+          slugs: extractSlugsFromOps(ops),
         })
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       return { result: `Error: ${msg}`, isError: true }
     }
+  }
+
+  function extractSlugsFromOps(ops: Operation[]): string[] {
+    const slugs = new Set<string>()
+    for (const op of ops as Array<Record<string, unknown>>) {
+      if (typeof op.pageSlug === "string") slugs.add(op.pageSlug)
+      if (typeof op.newPageSlug === "string") slugs.add(op.newPageSlug)
+      if (typeof op.toPageSlug === "string") slugs.add(op.toPageSlug)
+      const page = op.page
+      if (page && typeof page === "object" && typeof (page as Record<string, unknown>).slug === "string") {
+        slugs.add((page as Record<string, unknown>).slug as string)
+      }
+    }
+    return Array.from(slugs)
   }
 
   return [

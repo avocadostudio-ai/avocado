@@ -152,42 +152,107 @@ export class JiraClient {
 
 /**
  * Convert simple markdown text to Atlassian Document Format (ADF).
- * Handles paragraphs and basic bold (**text**) — good enough for status comments.
+ * Handles paragraphs, bulletLists, bold (**text**), and links ([label](url)).
+ * Good enough for status/clarification comments.
  */
-function markdownToAdf(markdown: string): object {
+export function markdownToAdf(markdown: string): object {
   const lines = markdown.split("\n")
   const content: object[] = []
 
-  for (const line of lines) {
-    if (line.trim() === "") continue
-    const inlineNodes = parseInlineMarkdown(line)
-    content.push({ type: "paragraph", content: inlineNodes })
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.trim() === "") { i++; continue }
+
+    // Bullet list: consecutive lines starting with "- "
+    if (/^\s*-\s+/.test(line)) {
+      const items: object[] = []
+      while (i < lines.length && /^\s*-\s+/.test(lines[i])) {
+        const itemText = lines[i].replace(/^\s*-\s+/, "")
+        items.push({
+          type: "listItem",
+          content: [{ type: "paragraph", content: parseInlineMarkdown(itemText) }],
+        })
+        i++
+      }
+      content.push({ type: "bulletList", content: items })
+      continue
+    }
+
+    content.push({ type: "paragraph", content: parseInlineMarkdown(line) })
+    i++
   }
 
   return { version: 1, type: "doc", content }
 }
 
+/**
+ * Parse inline markdown (bold + links) into ADF inline nodes.
+ * Scans left-to-right, handling **bold** and [label](url) as first-class constructs
+ * and falling through to plain text between them.
+ */
 function parseInlineMarkdown(text: string): object[] {
   const nodes: object[] = []
-  const regex = /\*\*(.+?)\*\*/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null
+  let i = 0
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push({ type: "text", text: text.slice(lastIndex, match.index) })
+  function pushText(raw: string, marks?: object[]) {
+    if (!raw) return
+    const node: Record<string, unknown> = { type: "text", text: raw }
+    if (marks && marks.length) node.marks = marks
+    nodes.push(node)
+  }
+
+  while (i < text.length) {
+    // Bold: **...**
+    if (text[i] === "*" && text[i + 1] === "*") {
+      const end = text.indexOf("**", i + 2)
+      if (end !== -1) {
+        pushText(text.slice(i + 2, end), [{ type: "strong" }])
+        i = end + 2
+        continue
+      }
     }
-    nodes.push({ type: "text", text: match[1], marks: [{ type: "strong" }] })
-    lastIndex = regex.lastIndex
+
+    // Inline code: `...`
+    if (text[i] === "`") {
+      const end = text.indexOf("`", i + 1)
+      if (end !== -1) {
+        pushText(text.slice(i + 1, end), [{ type: "code" }])
+        i = end + 1
+        continue
+      }
+    }
+
+    // Link: [label](url)
+    if (text[i] === "[") {
+      const labelEnd = text.indexOf("]", i + 1)
+      if (labelEnd !== -1 && text[labelEnd + 1] === "(") {
+        const urlEnd = text.indexOf(")", labelEnd + 2)
+        if (urlEnd !== -1) {
+          const label = text.slice(i + 1, labelEnd)
+          const url = text.slice(labelEnd + 2, urlEnd)
+          nodes.push({
+            type: "text",
+            text: label,
+            marks: [{ type: "link", attrs: { href: url } }],
+          })
+          i = urlEnd + 1
+          continue
+        }
+      }
+    }
+
+    // Plain run up to the next special char
+    let next = text.length
+    for (const marker of ["**", "[", "`"]) {
+      const idx = text.indexOf(marker, i)
+      if (idx !== -1 && idx < next) next = idx
+    }
+    if (next === i) next = i + 1
+    pushText(text.slice(i, next))
+    i = next
   }
 
-  if (lastIndex < text.length) {
-    nodes.push({ type: "text", text: text.slice(lastIndex) })
-  }
-
-  if (nodes.length === 0) {
-    nodes.push({ type: "text", text })
-  }
-
+  if (nodes.length === 0) nodes.push({ type: "text", text })
   return nodes
 }

@@ -10,5 +10,6 @@ export type RouteContext = {
   availableProviders: AIProvider[]
   generatedImageDir: string
   orchestratorPublicOrigin: string
+  sitePublicOrigin: string
   toolRuntime: ToolRuntime
 }
