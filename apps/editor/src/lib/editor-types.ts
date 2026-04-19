@@ -171,6 +171,11 @@ export type ChatEntry = {
     rating: "up" | "down"
     note?: string
   }
+  /** Extended thinking trace captured for the assistant turn. Rendered collapsed in the bubble. */
+  thinking?: {
+    text: string
+    durationMs?: number
+  }
   /** Populated for image-picker swaps so the chat can render a thumbnail confirmation card. */
   imageSwap?: {
     imageUrl: string

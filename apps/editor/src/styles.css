@@ -6960,3 +6960,94 @@ textarea {
   }
 }
 
+/* ── Thinking block (Anthropic extended thinking) ─────────────────── */
+.thinking-block {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--chat-border, rgba(0, 0, 0, 0.08));
+  background: var(--chat-thinking-bg, rgba(0, 0, 0, 0.025));
+  overflow: hidden;
+}
+.editor-dark .thinking-block {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+.thinking-block-header {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--chat-muted, rgba(0, 0, 0, 0.6));
+}
+.editor-dark .thinking-block-header {
+  color: rgba(255, 255, 255, 0.7);
+}
+.thinking-block-header:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+.thinking-block-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.thinking-block-label {
+  flex: 1;
+}
+.thinking-block-check {
+  color: var(--chat-accent, #4c8);
+  font-weight: 700;
+}
+.thinking-block-indicator {
+  display: inline-flex;
+  gap: 3px;
+}
+.thinking-block-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  animation: thinking-block-pulse 1.2s infinite ease-in-out;
+}
+.thinking-block-dot:nth-child(2) { animation-delay: 0.15s; }
+.thinking-block-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes thinking-block-pulse {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+.thinking-block-body {
+  padding: 4px 12px 10px;
+  border-top: 1px solid var(--chat-border, rgba(0, 0, 0, 0.06));
+}
+.editor-dark .thinking-block-body {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+.thinking-block-text {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--chat-muted, rgba(0, 0, 0, 0.7));
+}
+.editor-dark .thinking-block-text {
+  color: rgba(255, 255, 255, 0.75);
+}

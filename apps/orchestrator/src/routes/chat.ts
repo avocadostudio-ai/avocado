@@ -442,6 +442,15 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       const result = await runChatPipeline(pipelineCtx, scopedQuery, {
         signal: abortSignal,
         onPlanningToken: (token) => emit("token", { type: "token", text: token }),
+        onThinking: (event) => {
+          if (event.type === "start") {
+            emit("thinking_start", { type: "thinking_start" })
+          } else if (event.type === "token") {
+            emit("thinking_token", { type: "thinking_token", text: event.text })
+          } else if (event.type === "end") {
+            emit("thinking_end", { type: "thinking_end", durationMs: event.durationMs })
+          }
+        },
         onFieldDraft: (event) =>
           emit("field_draft", {
             type: "field_draft",

@@ -5,6 +5,7 @@ import { renderFinalMarkdown, renderStreamingMarkdown } from "../lib/markdown-re
 import { isRedundantChangeLine } from "../lib/editor-utils"
 import ClaudeStyleChatInput from "./claude-style-chat-input"
 import { useEditorStore } from "../store"
+import { ThinkingBlock } from "./ThinkingBlock"
 
 type MediaHandler = (blob: Blob, mimeType: string) => Promise<string>
 
@@ -54,12 +55,14 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
   const storeStreamingText = useEditorStore((s) => s.streamingText)
   const storeStreamSteps = useEditorStore((s) => s.streamSteps)
   const storeStreamingChanges = useEditorStore((s) => s.streamingChanges)
+  const storeStreamingThinking = useEditorStore((s) => s.streamingThinking)
   const entries = entriesProp ?? storeChatLog
   const isLoading = isLoadingProp ?? storeIsLoading
   const streamStatus = streamStatusProp ?? storeStreamStatus
   const streamingText = streamingTextProp ?? storeStreamingText
   const streamSteps = streamStepsProp ?? storeStreamSteps
   const streamingChanges = streamingChangesProp ?? storeStreamingChanges
+  const streamingThinking = storeStreamingThinking
   const opChecklist = useEditorStore((s) => s.opChecklist)
   const doneStreamSteps = streamSteps.filter((s) => s.done)
   const fallbackStatusLabel = streamStatusLabel ?? streamStatus
@@ -117,6 +120,13 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
           key={entry.id}
           className={`msg msg-${entry.role} ${entry.status === "needs_clarification" ? "msg-clarification" : ""} ${entry.canUndo ? "msg-has-undo" : ""} ${entry.fieldAiContext ? "msg-field-context" : ""}`}
         >
+          {entry.role === "assistant" && entry.thinking && entry.thinking.text.length > 0 ? (
+            <ThinkingBlock
+              text={entry.thinking.text}
+              status="done"
+              durationMs={entry.thinking.durationMs}
+            />
+          ) : null}
           <div className="msg-main">{entry.role === "assistant" ? renderFinalMarkdown(safeText) : safeText}</div>
           {(() => {
             const changeLines = (entry.changes ?? []).filter((line) => !isRedundantChangeLine(rawText, line))
@@ -198,6 +208,13 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
               ))}
             </ul>
           ) : null}
+          {streamingThinking ? (
+            <ThinkingBlock
+              text={streamingThinking.text}
+              status={streamingThinking.status}
+              durationMs={streamingThinking.durationMs}
+            />
+          ) : null}
           <div className="msg-main">
             {renderStreamingMarkdown(streamingText)}
           </div>
@@ -226,6 +243,13 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
                     <li key={idx} className="stream-step is-done">{step.label}</li>
                   ))}
                 </ul>
+              ) : null}
+              {streamingThinking ? (
+                <ThinkingBlock
+                  text={streamingThinking.text}
+                  status={streamingThinking.status}
+                  durationMs={streamingThinking.durationMs}
+                />
               ) : null}
               {opChecklist.length > 0 ? (
                 <ul className="op-checklist">
