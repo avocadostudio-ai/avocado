@@ -290,13 +290,13 @@ describe("resolveSiteForTicket", () => {
     else process.env.JIRA_SITE_ID = origEnv
   })
 
-  test("uses config.siteId when only one site is registered", () => {
+  test("uses the single registered site (via single-site)", () => {
     siteConfigs.clear()
     siteConfigs.set("avocado-stories::dev", { name: "Avocado Stories" })
     delete process.env.JIRA_SITE_ID
 
     const result = resolveSiteForTicket(makeIssue("Update homepage"), makeConfig())
-    assert.deepEqual(result, { siteId: "avocado-stories" })
+    assert.deepEqual(result, { siteId: "avocado-stories", via: "single-site" })
   })
 
   test("ambiguous when multiple sites exist and ticket names none", () => {
@@ -313,7 +313,7 @@ describe("resolveSiteForTicket", () => {
     }
   })
 
-  test("resolves by site id mentioned in summary", () => {
+  test("resolves by site id mentioned in summary (via text-match)", () => {
     siteConfigs.clear()
     siteConfigs.set("avocado-stories::dev", { name: "Avocado Stories" })
     siteConfigs.set("paintball-bern::dev", { name: "Paintball Bern" })
@@ -323,10 +323,10 @@ describe("resolveSiteForTicket", () => {
       makeIssue("Update paintball-bern homepage"),
       makeConfig()
     )
-    assert.deepEqual(result, { siteId: "paintball-bern" })
+    assert.deepEqual(result, { siteId: "paintball-bern", via: "text-match" })
   })
 
-  test("resolves by site display name mentioned in description", () => {
+  test("resolves by site display name mentioned in description (via text-match)", () => {
     siteConfigs.clear()
     siteConfigs.set("avocado-stories::dev", { name: "Avocado Stories" })
     siteConfigs.set("paintball-bern::dev", { name: "Paintball Bern" })
@@ -336,10 +336,10 @@ describe("resolveSiteForTicket", () => {
       makeIssue("Homepage", "Please update the Paintball Bern homepage."),
       makeConfig()
     )
-    assert.deepEqual(result, { siteId: "paintball-bern" })
+    assert.deepEqual(result, { siteId: "paintball-bern", via: "text-match" })
   })
 
-  test("explicit JIRA_SITE_ID env wins when no match in ticket", () => {
+  test("JIRA_SITE_ID does NOT lock: still ambiguous when multiple sites and no text match", () => {
     siteConfigs.clear()
     siteConfigs.set("avocado-stories::dev", { name: "Avocado Stories" })
     siteConfigs.set("paintball-bern::dev", { name: "Paintball Bern" })
@@ -349,7 +349,29 @@ describe("resolveSiteForTicket", () => {
       makeIssue("Update homepage"),
       makeConfig({ siteId: "avocado-stories" })
     )
-    assert.deepEqual(result, { siteId: "avocado-stories" })
+    assert.ok("ambiguous" in result && result.ambiguous === true)
+  })
+
+  test("falls back to config.siteId when nothing is registered (via env-fallback)", () => {
+    siteConfigs.clear()
+    process.env.JIRA_SITE_ID = "avocado-stories"
+
+    const result = resolveSiteForTicket(
+      makeIssue("Update homepage"),
+      makeConfig({ siteId: "avocado-stories" })
+    )
+    assert.deepEqual(result, { siteId: "avocado-stories", via: "env-fallback" })
+  })
+
+  test("falls back to config.siteId with default when nothing is registered and no env (via default-fallback)", () => {
+    siteConfigs.clear()
+    delete process.env.JIRA_SITE_ID
+
+    const result = resolveSiteForTicket(
+      makeIssue("Update homepage"),
+      makeConfig({ siteId: "avocado-stories" })
+    )
+    assert.deepEqual(result, { siteId: "avocado-stories", via: "default-fallback" })
   })
 })
 

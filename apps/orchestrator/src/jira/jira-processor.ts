@@ -461,7 +461,7 @@ export async function processJiraTicket(options: {
       return result
     }
     const siteId = resolved.siteId
-    logger.info({ issueKey, siteId, mode }, "JIRA: resolved site")
+    logger.info({ issueKey, siteId, mode, via: resolved.via }, "JIRA: resolved site")
 
     // Share the session with the editor so Jira changes show up in the
     // editor view without per-ticket URLs. Concurrent tickets interleave.
@@ -1171,19 +1171,25 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
+export type SiteResolution =
+  | { siteId: string; via: "text-match" | "single-site" | "env-fallback" | "default-fallback" }
+  | { ambiguous: true; candidates: Array<{ id: string; name?: string }> }
+
 /**
  * Decide which site a ticket targets.
  *
- * 1. If the ticket text (summary + description) uniquely names a registered site,
- *    use it — this overrides defaults, so people can retarget without env changes.
- * 2. If `JIRA_SITE_ID` was explicitly set via env, trust it.
- * 3. If only one site is registered, use it.
- * 4. Otherwise: ambiguous — return the list so the caller can ask for clarification.
+ * Priority:
+ * 1. Ticket text (summary + description) uniquely names a registered site → use it.
+ * 2. Multiple registered sites → ambiguous, ask the reporter.
+ *    (JIRA_SITE_ID is intentionally NOT consulted here — it's a fallback, not a lock,
+ *    so adding a second site doesn't silently keep editing the first one.)
+ * 3. Exactly one registered site → use it.
+ * 4. No registered sites → use `config.siteId` (JIRA_SITE_ID env or built-in default).
  */
 export function resolveSiteForTicket(
   issue: JiraIssue,
   config: JiraConfig
-): { siteId: string } | { ambiguous: true; candidates: Array<{ id: string; name?: string }> } {
+): SiteResolution {
   const registered = listSitesForSession(config.session)
   const summary = issue.fields.summary ?? ""
   const description = typeof issue.fields.description === "string"
@@ -1200,13 +1206,15 @@ export function resolveSiteForTicket(
     }
     return false
   })
-  if (matches.length === 1) return { siteId: matches[0].id }
+  if (matches.length === 1) return { siteId: matches[0].id, via: "text-match" }
+
+  if (registered.length > 1) {
+    const candidates = matches.length > 1 ? matches : registered
+    return { ambiguous: true, candidates: candidates.map((c) => ({ id: c.id, name: c.name })) }
+  }
+
+  if (registered.length === 1) return { siteId: registered[0].id, via: "single-site" }
 
   const envExplicit = typeof process.env.JIRA_SITE_ID === "string" && process.env.JIRA_SITE_ID.trim() !== ""
-  if (envExplicit) return { siteId: config.siteId }
-
-  if (registered.length <= 1) return { siteId: config.siteId }
-
-  const candidates = matches.length > 1 ? matches : registered
-  return { ambiguous: true, candidates: candidates.map((c) => ({ id: c.id, name: c.name })) }
+  return { siteId: config.siteId, via: envExplicit ? "env-fallback" : "default-fallback" }
 }
