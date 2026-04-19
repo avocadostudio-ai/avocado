@@ -109,6 +109,8 @@ export type PublishTracker = {
   lastCheckError?: string
 }
 
+export type IssueTouchedEntry = { slugs: string[]; updatedAt: string }
+
 export type PersistedState = {
   publishedPages: PageDoc[]
   draftPages: Record<string, Record<string, PageDoc>>
@@ -119,6 +121,7 @@ export type PersistedState = {
   chatHistory: Record<string, Array<{ role: "user" | "assistant"; content: string }>>
   siteConfigs?: Record<string, SiteConfig>
   versionLog?: Record<string, VersionEntry[]>
+  issueTouchedSlugs?: Record<string, IssueTouchedEntry>
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +154,34 @@ export type VersionEntry = {
   snapshot?: PageDoc | null
 }
 export const versionLog = new Map<string, VersionEntry[]>()
+
+/**
+ * Per-ticket slugs touched by an agent run. Survives the execute→publish
+ * invocation gap so the publish-mode comment can list exactly what this
+ * ticket changed, rather than every page in the shared session. Capped at
+ * ISSUE_TOUCHED_MAX entries (oldest dropped by updatedAt).
+ */
+export const issueTouchedSlugsByKey = new Map<string, IssueTouchedEntry>()
+const ISSUE_TOUCHED_MAX = 200
+
+export function setIssueTouchedSlugs(issueKey: string, slugs: string[]) {
+  if (!issueKey) return
+  issueTouchedSlugsByKey.set(issueKey, {
+    slugs: Array.from(new Set(slugs.filter((s) => typeof s === "string" && s.length > 0))),
+    updatedAt: new Date().toISOString(),
+  })
+  if (issueTouchedSlugsByKey.size > ISSUE_TOUCHED_MAX) {
+    const sorted = Array.from(issueTouchedSlugsByKey.entries())
+      .sort((a, b) => a[1].updatedAt.localeCompare(b[1].updatedAt))
+    const toDelete = sorted.slice(0, issueTouchedSlugsByKey.size - ISSUE_TOUCHED_MAX)
+    for (const [key] of toDelete) issueTouchedSlugsByKey.delete(key)
+  }
+}
+
+export function getIssueTouchedSlugs(issueKey: string): string[] {
+  return issueTouchedSlugsByKey.get(issueKey)?.slugs ?? []
+}
+
 export const pendingClarificationBySession = new Map<string, { baseRequest: string; updatedAt: string }>()
 export const chatHistoryBySession = new Map<string, Array<{ role: "user" | "assistant"; content: string }>>()
 export const pendingApprovalPlanBySession = new Map<string, PendingApprovalPlan>()
@@ -603,6 +634,18 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
       versionLog.set(session, list.slice(-VERSION_LOG_MAX))
     }
   }
+
+  issueTouchedSlugsByKey.clear()
+  if (parsed.issueTouchedSlugs && typeof parsed.issueTouchedSlugs === "object") {
+    for (const [issueKey, entryRaw] of Object.entries(parsed.issueTouchedSlugs)) {
+      if (!entryRaw || typeof entryRaw !== "object") continue
+      const entry = entryRaw as Partial<IssueTouchedEntry>
+      if (!Array.isArray(entry.slugs)) continue
+      const slugs = entry.slugs.filter((s): s is string => typeof s === "string" && s.length > 0)
+      const updatedAt = typeof entry.updatedAt === "string" ? entry.updatedAt : new Date().toISOString()
+      issueTouchedSlugsByKey.set(issueKey, { slugs, updatedAt })
+    }
+  }
 }
 
 async function rotateStateBackups(logger: FastifyBaseLogger) {
@@ -678,7 +721,8 @@ export async function persistStateNow(logger: FastifyBaseLogger) {
     recentEdits: Object.fromEntries(recentEdits.entries()),
     chatHistory: Object.fromEntries(chatHistoryBySession.entries()),
     siteConfigs: Object.fromEntries(siteConfigs.entries()),
-    versionLog: Object.fromEntries(versionLog.entries())
+    versionLog: Object.fromEntries(versionLog.entries()),
+    issueTouchedSlugs: Object.fromEntries(issueTouchedSlugsByKey.entries())
   }
   await mkdir(resolve(stateFilePath, ".."), { recursive: true })
   const tempPath = `${stateFilePath}.tmp-${process.pid}`
