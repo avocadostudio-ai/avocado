@@ -414,10 +414,28 @@ export function removePage(session: string, slug: string) {
   invalidateContextCache(session)
 }
 
+/**
+ * Per-slug, per-direction cap on the in-memory undo/redo stacks. Matches
+ * `HISTORY_DEPTH_CAP` in sqlite-store.ts so hydrating from SQLite never
+ * over-fills the Maps. Push sites use `pushCappedHistory` to enforce it.
+ */
+export const HISTORY_DEPTH_MAX = 50
+
+/**
+ * Append `snapshot` to an undo/redo stack, evicting the oldest entries
+ * once `HISTORY_DEPTH_MAX` is exceeded. Mutates `list` in place.
+ */
+export function pushCappedHistory(list: (PageDoc | null)[], snapshot: PageDoc | null) {
+  list.push(snapshot === null ? null : structuredClone(snapshot))
+  if (list.length > HISTORY_DEPTH_MAX) {
+    list.splice(0, list.length - HISTORY_DEPTH_MAX)
+  }
+}
+
 export function pushUndo(session: string, slug: string, snapshot: PageDoc | null) {
   const undoMap = getHistoryMap(historyUndo, session)
   const list = undoMap.get(slug) ?? []
-  list.push(snapshot === null ? null : structuredClone(snapshot))
+  pushCappedHistory(list, snapshot)
   undoMap.set(slug, list)
 
   const redoMap = getHistoryMap(historyRedo, session)
@@ -687,25 +705,30 @@ function writeAllStateToStore(store: SqliteStore) {
         ).run(session, slug, JSON.stringify(page))
       }
     }
-    // History — drop + reinsert so pops propagate.
+    // History — drop + reinsert so pops propagate. Trim to HISTORY_DEPTH_MAX
+    // on write as a defense-in-depth (legacy JSON imports could be deeper).
     store.db.prepare("DELETE FROM history").run()
     const insertHist = store.db.prepare(
       "INSERT INTO history(session, slug, direction, seq, snapshot) VALUES (?, ?, ?, ?, ?)"
     )
-    for (const [session, bySlug] of historyUndo) {
-      for (const [slug, list] of bySlug) {
-        list.forEach((snap, i) =>
-          insertHist.run(session, slug, "undo", i + 1, snap === null ? null : JSON.stringify(snap))
-        )
+    const writeHistory = (
+      map: Map<string, Map<string, (PageDoc | null)[]>>,
+      direction: "undo" | "redo"
+    ) => {
+      for (const [session, bySlug] of map) {
+        for (const [slug, list] of bySlug) {
+          const trimmed = list.length > HISTORY_DEPTH_MAX
+            ? list.slice(list.length - HISTORY_DEPTH_MAX)
+            : list
+          if (trimmed !== list) bySlug.set(slug, trimmed) // keep memory in sync
+          trimmed.forEach((snap, i) =>
+            insertHist.run(session, slug, direction, i + 1, snap === null ? null : JSON.stringify(snap))
+          )
+        }
       }
     }
-    for (const [session, bySlug] of historyRedo) {
-      for (const [slug, list] of bySlug) {
-        list.forEach((snap, i) =>
-          insertHist.run(session, slug, "redo", i + 1, snap === null ? null : JSON.stringify(snap))
-        )
-      }
-    }
+    writeHistory(historyUndo, "undo")
+    writeHistory(historyRedo, "redo")
     // Versions
     store.db.prepare("DELETE FROM sessions").run()
     for (const [session, v] of versions) store.setVersion(session, v)

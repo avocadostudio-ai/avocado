@@ -14,7 +14,8 @@ import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
 import { createEvalCandidateStore } from "./telemetry/eval-candidate-store.js"
 import { normalizePlanCandidate } from "./nlp/plan-normalizer.js"
 import { buildCreatePagePlan, compileDeterministicPlan } from "./nlp/deterministic-planner.js"
-import { type AIProvider, loadStateFromDisk } from "./state/session-state.js"
+import { type AIProvider, loadStateFromDisk, persistStateNow } from "./state/session-state.js"
+import { resetStore } from "./state/sqlite-store-singleton.js"
 import { ensurePresetRestoreSessions } from "./publish/publish-helpers.js"
 import type { RouteContext } from "./routes/route-context.js"
 import { contentRoutes } from "./routes/content.js"
@@ -384,6 +385,38 @@ async function startServer() {
       app.log.warn("JIRA_POLL_ENABLED=1 but JIRA_BASE_URL or JIRA_API_TOKEN not set — poller not started")
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Graceful shutdown — flush state, close the SQLite handle, stop Fastify.
+// Without this, Render / docker stop leaves behind a `.db-wal` that needs
+// a subsequent open to checkpoint.
+// ---------------------------------------------------------------------------
+let shuttingDown = false
+async function shutdown(signal: string) {
+  if (shuttingDown) return
+  shuttingDown = true
+  app.log.info({ signal }, "Orchestrator shutting down")
+  try {
+    await persistStateNow(app.log)
+  } catch (err) {
+    app.log.error({ err }, "Final state flush failed")
+  }
+  try {
+    await app.close()
+  } catch (err) {
+    app.log.error({ err }, "Fastify close failed")
+  }
+  try {
+    resetStore()
+  } catch (err) {
+    app.log.error({ err }, "SqliteStore close failed")
+  }
+  process.exit(0)
+}
+
+for (const sig of ["SIGTERM", "SIGINT"] as const) {
+  process.on(sig, () => { void shutdown(sig) })
 }
 
 if (process.env.NODE_ENV !== "test") {

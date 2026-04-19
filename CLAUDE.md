@@ -127,6 +127,23 @@ Copy `.env.example` to `.env` before running. Key variables:
 - `OPENAI_MODEL_*` / `ANTHROPIC_MODEL_*` — override model names per tier (fast/balanced/reasoning/codex)
 - `ORCHESTRATOR_URL` — defaults to `http://localhost:4200`
 
+## Orchestrator persistence
+
+Session state (draft pages, history, version log, chat history, site configs, issue-touched slugs) lives in a single SQLite file managed by `better-sqlite3` (see `apps/orchestrator/src/state/sqlite-store.ts`). Writes land synchronously inside a transaction on every mutation — no debounce, no blob-rewrite. Every Fastify request is effectively atomic because handlers call `schedulePersistState` once at the end of a sync mutation burst.
+
+**Files on disk (`.data/`)**
+- `orchestrator.db` + `orchestrator.db-wal` + `orchestrator.db-shm` — the live state
+- `orchestrator-state.json.migrated-<iso-ts>` — one-shot archive of the legacy JSON writer's output, kept as a safety net and auto-swept after `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS` (default 14)
+
+**Env vars**
+- `ORCHESTRATOR_DB_FILE` — path; auto-switches to `:memory:` under `DEMO_MODE=1` or `NODE_ENV=test`
+- `ORCHESTRATOR_STATE_FILE` — legacy JSON read on first boot; the file is renamed after migration, never rewritten
+- `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS` — retention for the archived JSON
+
+**Caps** — undo/redo stacks are capped at 50 entries per slug + direction; version log at 100; recent edits at 10; chat history at 6 messages. Ephemeral in-memory maps (`pendingApprovalPlanBySession`, `continuationChainBySession`, `publishStatusBySession`, image-source preferences) are **not** persisted.
+
+**Shutdown** — `SIGTERM`/`SIGINT` trigger a final `persistStateNow` → `app.close()` → `resetStore()` sequence so the WAL is checkpointed cleanly.
+
 ## Demo mode (limited public playground)
 
 Setting `DEMO_MODE=1` on the orchestrator turns the deployment into a locked-down "try before you sign up" playground that runs on your shared API key. The gate is **server-enforced** (client-sent capability flags can't bypass it) and lives in `apps/orchestrator/src/demo-mode.ts`.
