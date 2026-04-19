@@ -27,13 +27,13 @@ stateDiagram-v2
     Execute --> Failed : unrecoverable error
 ```
 
-**Review** — The agent reads the ticket (summary, description, attachments, comment history) and posts one of two comments:
+**Review** — The agent reads the full ticket context (summary, description, attachments, complete comment thread) and posts one of two comments:
 - A plan: *"Here's what I'll do — let me know when to proceed."*
 - Questions: *"I need more info on X before I can start."*
 
-No site changes are made during review.
+No site changes are made during review. The review prompt explicitly lists what the execute pass is capable of (Unsplash search, photo-page URL resolution, AI image generation) so the agent doesn't fabricate limitations or ask for things it already has.
 
-**Execute** — The agent runs with full tool access: it reads the current site state, applies ops, and transitions the ticket to the preview status (`In Review` by default). It posts a comment listing every change made and links to the live preview.
+**Execute** — The agent runs with full tool access, including the complete comment history so any clarifications posted as replies reach the agent. It reads the current site state, applies ops, and transitions the ticket to the preview status (`In Review` by default). It posts a comment listing every change made and links to the live preview.
 
 **Preview** — The reporter reviews the draft in the editor. An approval comment triggers publish and moves the ticket to Done. Any other comment re-runs execute with the new instruction.
 
@@ -199,7 +199,7 @@ The table below summarises how the dispatcher maps incoming events to processing
 | Comment created/updated | `JIRA_REVIEW_STATUS` | Anything else | **review** (re-review with new info) |
 | Comment created/updated | `JIRA_PREVIEW_STATUS` | Approval keyword | **publish** |
 | Comment created/updated | `JIRA_PREVIEW_STATUS` | Anything else | **execute** (apply follow-up edits) |
-| Comment (any status) | Any | `@site-editor` / `@website-agent` mention | **review** |
+| Comment (any status) | Any | `@site-editor`, `@website-agent`, `@avocado-agent`, `@ai-editor` mention | **review** |
 | Status changed (by human) | → `JIRA_REVIEW_STATUS` | — | **review** |
 | Status changed (by human) | → `JIRA_EXECUTE_STATUS` | — | **execute** |
 | Status changed (by human) | → anything else | — | skip |
@@ -220,6 +220,10 @@ Attachments on the ticket are downloaded and injected into the agent's context:
 | Other | Ignored |
 
 Maximum attachment size: **25 MB**.
+
+### Unsplash image URLs
+
+When a reporter pastes an Unsplash photo-page URL (`https://unsplash.com/photos/<id>`), the execute agent uses the built-in `unsplash_get_by_id` tool to resolve it to a direct `images.unsplash.com` asset URL instead of searching for a substitute. The same tool accepts a bare photo ID. If the URL can't be resolved, the agent asks rather than silently falling back to a keyword search.
 
 ---
 
@@ -274,6 +278,33 @@ Returns the current state of the processing queue, recent results, and poller st
 
 ---
 
+## Telemetry
+
+Every ticket run appends a line to `~/.data/telemetry/jira-telemetry.jsonl` (NDJSON). Each entry contains:
+
+| Field | Description |
+|---|---|
+| `timestamp` | ISO timestamp of the run |
+| `issueKey` | Jira issue key (e.g. `SITE-42`) |
+| `mode` | `review`, `execute`, or `publish` |
+| `siteId` / `session` | Target site and session name |
+| `status` | `success` or `error` |
+| `durationMs` | Wall-clock time for the run |
+| `model` / `provider` | LLM used (execute mode only) |
+| `instruction` | Full instruction text sent to the agent |
+| `reviewDecision` | `{ decision, plan, questions }` (review mode only) |
+| `toolCalls` | Per-tool trace: name, redacted input, duration, result excerpt, error flag |
+| `toolCallCount` | Total tool calls made |
+| `summary` / `changes` | Agent's output summary and list of changes |
+| `touchedSlugs` | Page slugs modified |
+| `published` | Whether the draft was published in this run |
+| `transitions` | Jira status transitions performed |
+| `error` | Error message if `status = "error"` |
+
+The orchestrator also logs a structured `JIRA: agent tool call` line to stdout for each tool invocation during live runs.
+
+---
+
 ## Troubleshooting
 
 **503 from `/jira/webhook`**
@@ -296,3 +327,6 @@ The fingerprint (`issueKey:status:commentCount`) didn't change between polls. Th
 
 **Edits go to the wrong site**
 `JIRA_SITE_ID` defaults to `avocado-stories`. Set it to your site's ID, or leave it unset and include the site name clearly in the ticket description so the agent can detect it.
+
+**Agent ignores or replaces an Unsplash URL I pasted**
+Paste the full photo-page URL (`https://unsplash.com/photos/<id>`) or just the bare photo ID. The agent resolves it via `unsplash_get_by_id` and uses it directly. If `UNSPLASH_ACCESS_KEY` is missing from the orchestrator environment, resolution will fail and the agent will ask for a direct image URL instead.
