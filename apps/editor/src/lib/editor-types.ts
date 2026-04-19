@@ -26,6 +26,12 @@ export type AssistantResponse = {
   modelKey?: string
   plannerSource?: PlannerSource
   pendingPlanId?: string
+  /**
+   * Tier-1 destructive-action reasons, present when the approval gate was
+   * triggered because the plan contains destructive ops. Rendered as a
+   * warning block in the plan approval card.
+   */
+  destructiveReasons?: string[]
   continuation?: {
     chainId: string
     currentStep: number
@@ -160,6 +166,7 @@ export type ChatEntry = {
   aiJustification?: string
   aiPerformanceNote?: string
   pendingPlanId?: string
+  destructiveReasons?: string[]
   fieldAiContext?: FieldAiContext
   continuation?: {
     chainId: string

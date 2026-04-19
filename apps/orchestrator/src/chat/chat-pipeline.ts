@@ -74,6 +74,7 @@ import {
   pickFocusBlockId,
   pickUpdatedSlug
 } from "../ops/ops-engine.js"
+import { evaluateDestructiveActions } from "../ops/destructive-action-gate.js"
 import {
   clarificationSuggestions,
   postEditSuggestions,
@@ -1378,6 +1379,18 @@ export async function runChatPipeline(
     })
     if (explicitCtaCoverageGap) return { done: false as const, reason: explicitCtaCoverageGap }
 
+    // Tier-1 destructive-action gate. Hold any edit_plan containing destructive
+    // ops (remove_page on a page with content, multi-page scope, bulk deletes)
+    // for explicit approval — undo protects recovery but not accidental intent.
+    let destructiveReasons: string[] = []
+    if (resolvedPlan.intent === "edit_plan" && resolvedPlan.ops.length > 0) {
+      const destructiveEval = evaluateDestructiveActions(resolvedPlan, (slug) => getPage(body.session!, slug))
+      if (destructiveEval.requiresApproval) {
+        effectiveApplyMode = "plan_only"
+        destructiveReasons = destructiveEval.messages
+      }
+    }
+
     // Emit plan metadata if not already emitted (deferred image path and other branches skip the early emit above)
     if (!stageTimeline.some((item) => item.stage === "first_structured_progress")) {
       options?.onPlanMeta?.({
@@ -1536,7 +1549,8 @@ export async function runChatPipeline(
         modelKey,
         plan: structuredClone(resolvedPlan),
         originalMessage: plannerMessage,
-        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps } : {})
+        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps } : {}),
+        ...(destructiveReasons.length > 0 ? { destructiveReasons } : {})
       })
       ctx.chatTelemetry.push({
         id: chatRequestId,
@@ -1572,7 +1586,8 @@ export async function runChatPipeline(
             plannerSource: source,
             modelUsed,
             modelKey,
-            pendingPlanId
+            pendingPlanId,
+            ...(destructiveReasons.length > 0 ? { destructiveReasons } : {})
           } satisfies ChatResult, {
             outcome: "plan_ready_for_approval",
             intent: resolvedPlan.intent,
