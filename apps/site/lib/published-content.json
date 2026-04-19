@@ -238,124 +238,84 @@
       "title": "Test Page",
       "blocks": [
         {
-          "id": "b_hero_test",
+          "id": "b_hero_test_001",
           "type": "Hero",
           "props": {
-            "heading": "Discover the Power of Nature's Superfoods",
-            "subheading": "From avocados to blueberries, explore how whole foods can transform your health, energy, and everyday meals.",
+            "heading": "Discover the Power of Avocados",
+            "subheading": "From heart health to sustained energy — explore the science, recipes, and community behind the world's most beloved superfood.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
             "secondaryCtaText": "Join the Community",
             "secondaryCtaHref": "/community",
             "imageUrl": "https://images.unsplash.com/photo-1758696233586-6d2350a70f0c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxmcmVzaCUyMGF2b2NhZG8lMjBoZWFsdGh5JTIwZm9vZCUyMGxpZmVzdHlsZXxlbnwxfDB8fHwxNzc2NjE2OTM4fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-            "imageAlt": "Fresh fruits and vegetables at a market",
+            "imageAlt": "Fresh fruits and vegetables at a vibrant market",
             "imagePosition": "right",
             "textAlign": "left"
           }
         },
         {
-          "id": "b_featuregrid_test",
-          "type": "FeatureGrid",
-          "props": {
-            "title": "Why Superfoods Change Everything",
-            "columns": "3",
-            "features": [
-              {
-                "icon": "🥑",
-                "title": "Heart-Healthy Fats",
-                "description": "Monounsaturated fats in avocados actively lower bad cholesterol and support cardiovascular health every day."
-              },
-              {
-                "icon": "⚡",
-                "title": "Sustained Energy",
-                "description": "Nutrient-dense superfoods fuel your body with slow-burning energy — no crashes, no cravings."
-              },
-              {
-                "icon": "🫐",
-                "title": "Antioxidant Power",
-                "description": "Blueberries and other superfoods are packed with antioxidants that fight inflammation and protect cells."
-              },
-              {
-                "icon": "🌱",
-                "title": "Sustainably Grown",
-                "description": "Our featured foods come from farms committed to regenerative agriculture and ethical sourcing practices."
-              },
-              {
-                "icon": "👨‍🍳",
-                "title": "100+ Easy Recipes",
-                "description": "From 5-minute snacks to gourmet dinners — every recipe is designed for real kitchens and real people."
-              },
-              {
-                "icon": "🤝",
-                "title": "Thriving Community",
-                "description": "Join 50K+ food lovers sharing tips, recipes, and wellness journeys in a supportive, free community."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_stats_test",
+          "id": "b_stats_test_001",
           "type": "Stats",
           "props": {
-            "title": "Avocado Impact",
-            "stats": [
-              {
-                "value": "12B+",
-                "label": "Avocados featured in tested recipes you can master today"
-              },
-              {
-                "value": "95M",
-                "label": "Servings supporting sustained energy & heart health"
-              },
-              {
-                "value": "3M+",
-                "label": "Wellness enthusiasts exploring nutrition science"
-              },
+            "title": "Avocado by the Numbers",
+            "items": [
               {
                 "value": "50K+",
-                "label": "Community members sharing recipes & wellness tips"
+                "label": "Community Members"
+              },
+              {
+                "value": "300+",
+                "label": "Curated Recipes"
+              },
+              {
+                "value": "40+",
+                "label": "Countries Reached"
+              },
+              {
+                "value": "5",
+                "label": "Proven Health Benefits"
               }
             ]
           }
         },
         {
-          "id": "b_faqaccordion_test",
+          "id": "b_faqaccordion_test_001",
           "type": "FAQAccordion",
           "props": {
             "title": "Frequently Asked Questions",
             "items": [
               {
-                "q": "What makes a food a 'superfood'?",
-                "a": "Superfoods are nutrient-dense foods packed with vitamins, minerals, antioxidants, and healthy fats that provide exceptional health benefits beyond basic nutrition. Examples include avocados, blueberries, and olives."
+                "q": "Are avocados really good for your heart?",
+                "a": "Yes! Avocados are rich in monounsaturated fats, particularly oleic acid, which has been shown to reduce LDL (bad) cholesterol and lower the risk of heart disease. They also contain potassium, which helps regulate blood pressure."
               },
               {
-                "q": "How many servings of superfoods should I eat per day?",
-                "a": "Most nutritionists recommend incorporating 2–3 servings of nutrient-rich whole foods into your daily diet. Even small amounts — like half an avocado or a handful of blueberries — can make a meaningful difference."
+                "q": "How many avocados should I eat per week?",
+                "a": "Most nutritionists recommend 3–5 servings per week. One serving is typically half an avocado. This provides a healthy dose of good fats, fiber, and essential vitamins without excess calorie intake."
               },
               {
-                "q": "Are the recipes on this site suitable for beginners?",
-                "a": "Absolutely! Our recipes range from quick 5-minute snacks to more elaborate meals. Each recipe is clearly labeled by difficulty level so you can find something that matches your cooking confidence."
+                "q": "Can avocados help with weight management?",
+                "a": "Absolutely. Despite being calorie-dense, avocados are high in fiber and healthy fats that promote satiety — helping you feel full longer and reducing overall calorie consumption throughout the day."
               },
               {
-                "q": "Is the community free to join?",
-                "a": "Yes — joining our community is completely free. You'll get access to member-only recipes, wellness tips, and a supportive network of 50,000+ food lovers around the world."
+                "q": "What's the best way to store a ripe avocado?",
+                "a": "Once ripe, store avocados in the refrigerator to slow further ripening — they'll keep for 2–3 days. If you've cut one open, sprinkle lemon or lime juice on the flesh and wrap tightly in plastic wrap to prevent browning."
               }
             ]
           }
         },
         {
-          "id": "b_cta_test",
+          "id": "b_cta_test_001",
           "type": "CTA",
           "props": {
-            "title": "Ready to Start Eating Better?",
-            "description": "Join thousands of food lovers who are discovering the joy of whole, natural superfoods. Get recipes, tips, and community support — all in one place.",
+            "title": "Ready to Start Your Avocado Journey?",
+            "description": "Join 50,000+ food lovers, wellness enthusiasts, and home cooks who are transforming their health one avocado at a time.",
             "ctaText": "Join Free Today",
             "ctaHref": "/community"
           }
         }
       ],
       "id": "p_test",
-      "updatedAt": "2026-04-19T16:44:03.516Z"
+      "updatedAt": "2026-04-19T19:38:26.695Z"
     },
     {
       "id": "p_blueberries",
