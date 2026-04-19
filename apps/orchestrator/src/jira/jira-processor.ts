@@ -16,7 +16,29 @@ import { runAgentLoop } from "../agent/agent-loop.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
 import type { AgentProvider } from "../agent/agent-provider.js"
 import { resolveAgentModel } from "../agent/agent-provider.js"
-import { scopedSessionKey } from "../state/session-state.js"
+import { scopedSessionKey, listSitesForSession, getSessionPages } from "../state/session-state.js"
+
+// ---------------------------------------------------------------------------
+// Processing mode
+// ---------------------------------------------------------------------------
+
+/**
+ * Controls what processJiraTicket does:
+ *  - "review":  agent reads the ticket without tools, posts a plan-or-questions
+ *               comment, does not change the site, does not transition the issue.
+ *  - "execute": agent runs with the full tool set, applies edits, transitions
+ *               the issue to the preview status (or directly to done if
+ *               autoPublish is enabled).
+ *  - "publish": publish the session's draft, transition to done.
+ */
+export type JiraProcessingMode = "review" | "execute" | "publish"
+
+// Markers embedded in the first line of agent comments so we can tell our own
+// review passes apart from user comments when counting attempts.
+const REVIEW_COMMENT_MARKER = "<!-- site-editor:review -->"
+const PROCEED_COMMENT_MARKER = "<!-- site-editor:proceed -->"
+const PUBLISHED_COMMENT_MARKER = "<!-- site-editor:published -->"
+const EXECUTED_COMMENT_MARKER = "<!-- site-editor:executed -->"
 
 // ---------------------------------------------------------------------------
 // Processing queue (in-memory)
@@ -280,12 +302,16 @@ function buildInstructionMessage(
 export async function processJiraTicket(options: {
   issueKey: string
   config: JiraConfig
+  /** Which stage of the workflow to run. Defaults to "execute" for backward compat. */
+  mode?: JiraProcessingMode
   generatedImageDir: string
   orchestratorPublicOrigin: string
+  sitePublicOrigin: string
   logger: FastifyBaseLogger
   assignBackTo?: JiraUser
 }): Promise<JiraProcessingResult> {
-  const { issueKey, config, generatedImageDir, orchestratorPublicOrigin, logger, assignBackTo } = options
+  const { issueKey, config, generatedImageDir, orchestratorPublicOrigin, sitePublicOrigin, logger, assignBackTo } = options
+  const mode: JiraProcessingMode = options.mode ?? "execute"
   const startedAt = Date.now()
 
   // Track in queue
@@ -304,7 +330,82 @@ export async function processJiraTicket(options: {
     logger.info({ issueKey }, "JIRA: fetching issue")
     const issue = await client.getIssue(issueKey)
 
-    // 2. Process attachments
+    // 1b. Resolve which site the ticket targets. If ambiguous, post a
+    // clarification comment listing available sites and stop.
+    const resolved = resolveSiteForTicket(issue, config)
+    if ("ambiguous" in resolved) {
+      logger.info({ issueKey, candidates: resolved.candidates.map((c) => c.id) }, "JIRA: site ambiguous, asking for clarification")
+      const comment = formatSiteClarificationComment(resolved.candidates)
+      await client.addComment(issueKey, comment).catch((err) => {
+        logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to post clarification comment")
+      })
+      const result: JiraProcessingResult = {
+        issueKey,
+        status: "error",
+        summary: "",
+        changes: [],
+        durationMs: Date.now() - startedAt,
+        error: "ambiguous_site",
+      }
+      entry.state = "error"
+      entry.completedAt = Date.now()
+      entry.result = result
+      recentResults.unshift(result)
+      if (recentResults.length > MAX_RECENT) recentResults.pop()
+      return result
+    }
+    const siteId = resolved.siteId
+    logger.info({ issueKey, siteId, mode }, "JIRA: resolved site")
+
+    const sessionName = `${config.session}-${issueKey.toLowerCase()}`
+    const session = scopedSessionKey(sessionName, siteId)
+
+    // -----------------------------------------------------------------------
+    // Mode: PUBLISH — publish draft, transition to Done, post "Published" comment.
+    // -----------------------------------------------------------------------
+    if (mode === "publish") {
+      const pagesBeforePublish = getSessionPages(session)
+      const slugs = pagesBeforePublish.map((p) => p.slug).filter((s): s is string => typeof s === "string")
+
+      try {
+        await triggerPublish(session, siteId, logger)
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        logger.error({ issueKey, error: errorMsg }, "JIRA: publish failed")
+        const failureResult: JiraProcessingResult = {
+          issueKey,
+          status: "error",
+          summary: "",
+          changes: [],
+          durationMs: Date.now() - startedAt,
+          error: `publish_failed: ${errorMsg}`,
+        }
+        await client.addComment(issueKey, formatFailureComment(failureResult)).catch(() => {})
+        return finalizeEntry(entry, failureResult)
+      }
+
+      const comment = formatPublishedComment({ sitePublicOrigin, slugs })
+      await client.addComment(issueKey, comment).catch((err) => {
+        logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to post published comment")
+      })
+
+      if (config.doneStatus) {
+        const transitioned = await client.transitionIssue(issueKey, config.doneStatus).catch(() => false)
+        if (transitioned) logger.info({ issueKey, status: config.doneStatus }, "JIRA: transitioned to done")
+      }
+
+      const result: JiraProcessingResult = {
+        issueKey,
+        status: "success",
+        summary: `Published ${slugs.length} page(s).`,
+        changes: slugs,
+        durationMs: Date.now() - startedAt,
+        published: true,
+      }
+      return finalizeEntry(entry, result)
+    }
+
+    // 2. Process attachments (review + execute both need these)
     const attachmentResult = await processAttachments(
       client,
       issue.fields.attachment ?? [],
@@ -325,17 +426,86 @@ export async function processJiraTicket(options: {
     const provider: AgentProvider = process.env.ANTHROPIC_API_KEY?.trim() ? "anthropic" : "openai"
     const model = resolveAgentModel(provider)
 
-    // 5. Set up agent session
-    const sessionName = `${config.session}-${issueKey.toLowerCase()}`
-    const session = scopedSessionKey(sessionName, config.siteId)
+    // -----------------------------------------------------------------------
+    // Mode: REVIEW — dry-run planning pass, no tools, no transitions.
+    // -----------------------------------------------------------------------
+    if (mode === "review") {
+      const priorReviews = countAgentReviewComments(issue, config.agentAccountId)
+      if (priorReviews >= config.maxReviewPasses) {
+        logger.info({ issueKey, priorReviews, cap: config.maxReviewPasses }, "JIRA: review pass cap reached")
+        const comment = formatReviewCapComment(config.maxReviewPasses)
+        await client.addComment(issueKey, comment).catch((err) => {
+          logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to post cap comment")
+        })
+        const capped: JiraProcessingResult = {
+          issueKey,
+          status: "success",
+          summary: "review_cap_reached",
+          changes: [],
+          durationMs: Date.now() - startedAt,
+          modelUsed: model,
+        }
+        return finalizeEntry(entry, capped)
+      }
+
+      const reviewPrompt = buildReviewSystemPrompt()
+      const contextMsg = buildContextMessage(session, { slug: "/" })
+      const userMessage = `${contextMsg}\n\n---\n\nTicket to review:\n${instruction}`
+
+      logger.info({ issueKey, session, provider, model, priorReviews }, "JIRA: running review pass (no tools)")
+      let rawOutput = ""
+      for await (const event of runAgentLoop({
+        apiKey,
+        provider,
+        model,
+        systemPrompt: reviewPrompt,
+        tools: [],
+        userMessage,
+      })) {
+        if (event.type === "done") rawOutput = event.summary
+        else if (event.type === "error") throw new Error(event.message)
+      }
+
+      const decision = parseReviewDecision(rawOutput)
+      logger.info({ issueKey, decision: decision.decision, questions: decision.questions?.length ?? 0 }, "JIRA: review decision")
+
+      const comment = formatReviewComment(decision)
+      await client.addComment(issueKey, comment).catch((err) => {
+        logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to post review comment")
+      })
+
+      const reviewResult: JiraProcessingResult = {
+        issueKey,
+        status: "success",
+        summary: decision.decision === "proceed" ? decision.plan : `questions: ${(decision.questions ?? []).length}`,
+        changes: [],
+        durationMs: Date.now() - startedAt,
+        modelUsed: model,
+      }
+      return finalizeEntry(entry, reviewResult)
+    }
+
+    // -----------------------------------------------------------------------
+    // Mode: EXECUTE — run agent with tools, apply edits, transition to preview
+    // (or straight to done if autoPublish is on).
+    // -----------------------------------------------------------------------
     const tools = createAgentTools(session)
     const systemPrompt = buildAgentSystemPrompt()
     const contextMsg = buildContextMessage(session, { slug: "/" })
     const fullMessage = `${contextMsg}\n\n---\n\nUser request: ${instruction}`
 
+    // Transition to executeStatus up-front so the board reflects reality
+    // while the agent works.
+    if (config.executeStatus) {
+      await client.transitionIssue(issueKey, config.executeStatus).catch((err) => {
+        logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to transition to execute status")
+      })
+    }
+
     // 6. Run agent loop
     logger.info({ issueKey, session, provider, model }, "JIRA: starting agent loop")
     const changes: string[] = []
+    const touchedSlugs = new Set<string>()
     let summary = ""
     let toolCallCount = 0
 
@@ -357,12 +527,17 @@ export async function processJiraTicket(options: {
                 if (typeof desc === "string" && desc.length > 0) {
                   changes.push(desc)
                 }
+                if (Array.isArray(parsed.slugs)) {
+                  for (const s of parsed.slugs) {
+                    if (typeof s === "string" && s.length > 0) touchedSlugs.add(s)
+                  }
+                }
               }
             } catch { /* read-only tool result */ }
           }
           break
         case "done":
-          summary = event.summary
+          summary = cleanAgentSummary(event.summary)
           toolCallCount = event.toolCallCount
           break
         case "error":
@@ -373,11 +548,11 @@ export async function processJiraTicket(options: {
     const durationMs = Date.now() - startedAt
     logger.info({ issueKey, changes: changes.length, durationMs }, "JIRA: agent completed")
 
-    // 7. Auto-publish if enabled
+    // 7. Auto-publish if enabled (legacy single-stage flow)
     let published = false
     if (config.autoPublish) {
       try {
-        await triggerPublish(session, config.siteId, logger)
+        await triggerPublish(session, siteId, logger)
         published = true
         logger.info({ issueKey }, "JIRA: auto-published")
       } catch (err) {
@@ -385,7 +560,7 @@ export async function processJiraTicket(options: {
       }
     }
 
-    // 8. Post success comment to JIRA
+    // 8. Post completion comment
     const result: JiraProcessingResult = {
       issueKey,
       status: "success",
@@ -396,7 +571,14 @@ export async function processJiraTicket(options: {
       published,
     }
 
-    const comment = formatSuccessComment(result, orchestratorPublicOrigin, sessionName, config.siteId)
+    const comment = formatSuccessComment(result, {
+      orchestratorOrigin: orchestratorPublicOrigin,
+      sitePublicOrigin,
+      sessionName,
+      siteId,
+      touchedSlugs: Array.from(touchedSlugs),
+      toolCallCount,
+    })
     await client.addComment(issueKey, comment).catch((err) => {
       logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to post success comment")
     })
@@ -413,22 +595,18 @@ export async function processJiraTicket(options: {
       })
     }
 
-    // 10. Transition ticket to done
-    if (config.doneStatus) {
-      const transitioned = await client.transitionIssue(issueKey, config.doneStatus).catch(() => false)
+    // 10. Transition:
+    //  - autoPublish=1: go straight to Done (published already).
+    //  - otherwise: park in previewStatus so reporter can approve.
+    const targetStatus = published ? config.doneStatus : (config.previewStatus || config.doneStatus)
+    if (targetStatus) {
+      const transitioned = await client.transitionIssue(issueKey, targetStatus).catch(() => false)
       if (transitioned) {
-        logger.info({ issueKey, status: config.doneStatus }, "JIRA: transitioned issue")
+        logger.info({ issueKey, status: targetStatus }, "JIRA: transitioned issue")
       }
     }
 
-    // Track completion
-    entry.state = "done"
-    entry.completedAt = Date.now()
-    entry.result = result
-    recentResults.unshift(result)
-    if (recentResults.length > MAX_RECENT) recentResults.pop()
-
-    return result
+    return finalizeEntry(entry, result)
   } catch (err) {
     const durationMs = Date.now() - startedAt
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -454,13 +632,7 @@ export async function processJiraTicket(options: {
       await client.transitionIssue(issueKey, config.failedStatus).catch(() => {})
     }
 
-    entry.state = "error"
-    entry.completedAt = Date.now()
-    entry.result = result
-    recentResults.unshift(result)
-    if (recentResults.length > MAX_RECENT) recentResults.pop()
-
-    return result
+    return finalizeEntry(entry, result)
   } finally {
     // Clean up queue entry after a delay
     setTimeout(() => processingQueue.delete(issueKey), 60_000)
@@ -491,19 +663,35 @@ async function triggerPublish(session: string, _siteId: string, logger: FastifyB
 
 function formatSuccessComment(
   result: JiraProcessingResult,
-  orchestratorOrigin: string,
-  sessionName: string,
-  siteId: string
+  opts: {
+    orchestratorOrigin: string
+    sitePublicOrigin: string
+    sessionName: string
+    siteId: string
+    touchedSlugs: string[]
+    toolCallCount: number
+  }
 ): string {
+  void opts.orchestratorOrigin
+  const { sitePublicOrigin, sessionName, siteId, touchedSlugs } = opts
   const lines: string[] = [
-    "**Website updated successfully from this ticket.**",
+    EXECUTED_COMMENT_MARKER,
+    "**Draft updated. Ready for your review.**",
     "",
   ]
 
   if (result.changes.length > 0) {
     lines.push("**Changes made:**")
-    for (const change of result.changes) {
-      lines.push(`- ${change}`)
+    for (const change of result.changes) lines.push(`- ${change}`)
+    lines.push("")
+  }
+
+  if (touchedSlugs.length > 0) {
+    lines.push("**Preview:**")
+    for (const slug of touchedSlugs) {
+      const normalized = slug.startsWith("/") ? slug : `/${slug}`
+      const url = `${sitePublicOrigin}${normalized}?session=${encodeURIComponent(sessionName)}&siteId=${encodeURIComponent(siteId)}&__editor=1`
+      lines.push(`- [${normalized}](${url})`)
     }
     lines.push("")
   }
@@ -513,11 +701,11 @@ function formatSuccessComment(
     lines.push("")
   }
 
-  if (result.published) {
-    lines.push("**Status:** Published to live site")
-  }
+  lines.push(result.published
+    ? "**Status:** Published to live site."
+    : "**Next step:** Reply `approved` / `publish` / `lgtm` to publish, or send a follow-up instruction for more changes.")
 
-  lines.push(`**AI Model:** ${result.modelUsed ?? "unknown"} | **Duration:** ${(result.durationMs / 1000).toFixed(1)}s`)
+  lines.push(`**AI Model:** ${result.modelUsed ?? "unknown"} | **Duration:** ${(result.durationMs / 1000).toFixed(1)}s | **Tool calls:** ${opts.toolCallCount}`)
 
   return lines.join("\n")
 }
@@ -531,4 +719,256 @@ function formatFailureComment(result: JiraProcessingResult): string {
     "**Suggestion:** Please verify the instructions in the ticket description and retry, or check the orchestrator logs for details.",
   ]
   return lines.join("\n")
+}
+
+function formatSiteClarificationComment(candidates: Array<{ id: string; name?: string }>): string {
+  const lines: string[] = [
+    "**Which site should I update?**",
+    "",
+    "Multiple sites are configured and the ticket doesn't say which one to target. Please edit the ticket summary or description to include the site name or ID from this list, then re-trigger (change status again, or @mention me in a comment).",
+    "",
+    "**Available sites:**",
+  ]
+  for (const c of candidates) {
+    const label = c.name ? `${c.name} (\`${c.id}\`)` : `\`${c.id}\``
+    lines.push(`- ${label}`)
+  }
+  return lines.join("\n")
+}
+
+function formatReviewComment(decision: ReviewDecision): string {
+  if (decision.decision === "questions") {
+    const lines: string[] = [
+      REVIEW_COMMENT_MARKER,
+      "**Review — I need a bit more info before I make changes.**",
+      "",
+    ]
+    if (decision.plan && decision.plan.trim()) {
+      lines.push(`_What I think you want:_ ${decision.plan.trim()}`)
+      lines.push("")
+    }
+    lines.push("**Questions:**")
+    const questions = decision.questions && decision.questions.length > 0
+      ? decision.questions
+      : ["Please clarify the request in a follow-up comment."]
+    for (const q of questions) lines.push(`- ${q}`)
+    lines.push("")
+    lines.push("Reply with the answers and I'll re-review. Once everything's clear, reply `go` or move this ticket to In Progress and I'll apply the edits.")
+    return lines.join("\n")
+  }
+
+  // proceed
+  const lines: string[] = [
+    PROCEED_COMMENT_MARKER,
+    "**Review complete — ready to proceed.**",
+    "",
+  ]
+  if (decision.plan && decision.plan.trim()) {
+    lines.push(`**Plan:** ${decision.plan.trim()}`)
+    lines.push("")
+  }
+  lines.push("Reply `go` (or `proceed`, `lgtm`, `approved`, etc.) or move the ticket to In Progress and I'll apply the edits.")
+  return lines.join("\n")
+}
+
+function formatReviewCapComment(cap: number): string {
+  return [
+    REVIEW_COMMENT_MARKER,
+    "**I've asked for clarification several times.**",
+    "",
+    `Review attempts exhausted (max ${cap}). Please consolidate the request into a single, concrete instruction in the ticket description, then re-trigger by moving the ticket back to To Do or @mentioning me.`,
+  ].join("\n")
+}
+
+function formatPublishedComment(opts: { sitePublicOrigin: string; slugs: string[] }): string {
+  const lines: string[] = [
+    PUBLISHED_COMMENT_MARKER,
+    "**Published. Changes are live.**",
+    "",
+  ]
+  if (opts.slugs.length > 0) {
+    lines.push("**Live pages:**")
+    for (const slug of opts.slugs) {
+      const normalized = slug.startsWith("/") ? slug : `/${slug}`
+      const url = `${opts.sitePublicOrigin}${normalized === "/" ? "" : normalized}`
+      lines.push(`- [${normalized}](${url})`)
+    }
+  }
+  return lines.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Review-mode helpers
+// ---------------------------------------------------------------------------
+
+export type ReviewDecision = {
+  decision: "proceed" | "questions"
+  plan: string
+  questions?: string[]
+}
+
+/**
+ * System prompt used for the review-only pass. The agent has no tools — it
+ * reads the ticket + site context and returns a JSON verdict.
+ */
+function buildReviewSystemPrompt(): string {
+  return [
+    "You are reviewing a Jira ticket that requests changes to a website. You are in REVIEW MODE:",
+    "- You have NO tools. Do not attempt to call any tools.",
+    "- You will NOT be applying changes in this pass — a follow-up execution pass will do that after the reporter confirms.",
+    "- Your job: decide whether the ticket has enough information to proceed safely, and if so, outline the plan.",
+    "",
+    "Respond with ONLY a JSON object (no prose, no code fences, no markdown) in exactly this shape:",
+    '{',
+    '  "decision": "proceed" | "questions",',
+    '  "plan": "2-3 sentences describing what you would do, naming slugs and block types where relevant",',
+    '  "questions": ["short, specific question", "..."]',
+    '}',
+    "",
+    "Rules:",
+    '- Use "proceed" when the task is concrete enough to act on.',
+    '- Use "questions" when something essential is missing or ambiguous (target page, copy, images, counts, etc.).',
+    '- Always include "plan" — even with "questions" it should describe your best interpretation.',
+    "- Keep questions to at most 3. Prefer clarity over completeness.",
+    "- Do NOT ask about anything you can reasonably infer from the site context below.",
+  ].join("\n")
+}
+
+/**
+ * Extract the review JSON from raw agent output. Tolerant of: leading/trailing
+ * prose, ```json fences, and stray <thinking> tags.
+ */
+export function parseReviewDecision(raw: string): ReviewDecision {
+  const cleaned = cleanAgentSummary(raw)
+  const obj = tryParseJsonBlob(cleaned)
+  if (obj && typeof obj === "object") {
+    const rec = obj as Record<string, unknown>
+    const decision = rec.decision === "questions" ? "questions" : "proceed"
+    const plan = typeof rec.plan === "string" ? rec.plan : ""
+    const questions = Array.isArray(rec.questions)
+      ? rec.questions.filter((q): q is string => typeof q === "string" && q.trim().length > 0)
+      : []
+    return decision === "questions"
+      ? { decision, plan, questions }
+      : { decision, plan }
+  }
+  // Couldn't parse — fall back to "proceed" with the raw text as the plan so the
+  // reporter at least sees what the agent thought. Better than dropping info.
+  return { decision: "proceed", plan: cleaned || "Could not parse review output — proceeding with best effort." }
+}
+
+function tryParseJsonBlob(text: string): unknown {
+  if (!text) return null
+  // Try direct parse first
+  try { return JSON.parse(text) } catch { /* fall through */ }
+
+  // Strip ```json ... ``` fences
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (fenceMatch) {
+    try { return JSON.parse(fenceMatch[1]) } catch { /* fall through */ }
+  }
+
+  // Greedy extract: first "{" to last "}"
+  const first = text.indexOf("{")
+  const last = text.lastIndexOf("}")
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(text.slice(first, last + 1)) } catch { /* fall through */ }
+  }
+  return null
+}
+
+/**
+ * Count how many prior review-mode comments the agent has posted on this issue,
+ * so we can cap the number of review passes per ticket.
+ */
+export function countAgentReviewComments(issue: JiraIssue, agentAccountId: string | undefined): number {
+  const comments = issue.fields.comment?.comments ?? []
+  let count = 0
+  for (const c of comments) {
+    if (agentAccountId && c.author?.accountId !== agentAccountId) continue
+    const body = typeof c.body === "string" ? c.body : adfToPlainText(c.body)
+    if (body.includes(REVIEW_COMMENT_MARKER) || body.includes(PROCEED_COMMENT_MARKER)) count++
+  }
+  return count
+}
+
+// ---------------------------------------------------------------------------
+// Queue entry finalization — one place to update state for all mode outcomes
+// ---------------------------------------------------------------------------
+
+function finalizeEntry(entry: JiraProcessingEntry, result: JiraProcessingResult): JiraProcessingResult {
+  entry.state = result.status === "success" ? "done" : "error"
+  entry.completedAt = Date.now()
+  entry.result = result
+  recentResults.unshift(result)
+  if (recentResults.length > MAX_RECENT) recentResults.pop()
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Summary cleanup + site resolver
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip internal reasoning artifacts from an agent summary before posting to Jira.
+ * Claude occasionally emits <thinking>…</thinking> and similar XML-style reasoning
+ * tags as plain text, plus interstitial tool-calling narration accumulates across
+ * turns. Drop the noise, collapse whitespace.
+ */
+export function cleanAgentSummary(raw: string): string {
+  if (!raw) return ""
+  return raw
+    // Strip paired thinking/scratchpad blocks with their contents
+    .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<scratchpad\b[^>]*>[\s\S]*?<\/scratchpad>/gi, "")
+    // Strip any leftover open/close tags (unpaired — e.g. truncated responses)
+    .replace(/<\/?thinking\b[^>]*>/gi, "")
+    .replace(/<\/?scratchpad\b[^>]*>/gi, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * Decide which site a ticket targets.
+ *
+ * 1. If the ticket text (summary + description) uniquely names a registered site,
+ *    use it — this overrides defaults, so people can retarget without env changes.
+ * 2. If `JIRA_SITE_ID` was explicitly set via env, trust it.
+ * 3. If only one site is registered, use it.
+ * 4. Otherwise: ambiguous — return the list so the caller can ask for clarification.
+ */
+export function resolveSiteForTicket(
+  issue: JiraIssue,
+  config: JiraConfig
+): { siteId: string } | { ambiguous: true; candidates: Array<{ id: string; name?: string }> } {
+  const registered = listSitesForSession(config.session)
+  const summary = issue.fields.summary ?? ""
+  const description = typeof issue.fields.description === "string"
+    ? issue.fields.description
+    : adfToPlainText(issue.fields.description)
+  const text = `${summary}\n${description}`
+
+  const matches = registered.filter((s) => {
+    const idRe = new RegExp(`\\b${escapeRegex(s.id)}\\b`, "i")
+    if (idRe.test(text)) return true
+    if (s.name && s.name.trim()) {
+      const nameRe = new RegExp(`\\b${escapeRegex(s.name)}\\b`, "i")
+      if (nameRe.test(text)) return true
+    }
+    return false
+  })
+  if (matches.length === 1) return { siteId: matches[0].id }
+
+  const envExplicit = typeof process.env.JIRA_SITE_ID === "string" && process.env.JIRA_SITE_ID.trim() !== ""
+  if (envExplicit) return { siteId: config.siteId }
+
+  if (registered.length <= 1) return { siteId: config.siteId }
+
+  const candidates = matches.length > 1 ? matches : registered
+  return { ambiguous: true, candidates: candidates.map((c) => ({ id: c.id, name: c.name })) }
 }
