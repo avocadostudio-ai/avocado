@@ -139,8 +139,13 @@ export class JiraClient {
   // ---------------------------------------------------------------------------
 
   async searchJql(jql: string, maxResults = 20): Promise<JiraIssue[]> {
+    // Cloud deprecated `/search` in favor of `/search/jql` (changelog CHANGE-2046).
+    // The new endpoint keeps the same `issues[]` response shape; we don't need
+    // pagination (maxResults is capped at 100) so nextPageToken is ignored.
+    // Server/DC still uses the legacy `/search` on API v2.
+    const path = this.isCloud ? "/search/jql" : "/search"
     const res = await this.request<{ issues: JiraIssue[] }>(
-      `/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,labels,attachment,reporter,assignee,creator`
+      `${path}?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,labels,attachment,reporter,assignee,creator,comment`
     )
     return res.issues ?? []
   }
