@@ -8,7 +8,8 @@ import {
   shouldUseMinimalPlannerContext,
   shouldPreferFocusedTranslation,
   classifyMessageComplexity,
-  isRouterPlanTooShallow
+  isRouterPlanTooShallow,
+  shouldEnableReasoningForMessage
 } from "./chat-pipeline-context.js"
 import type { EditPlan, PageDoc } from "@ai-site-editor/shared"
 
@@ -441,4 +442,48 @@ test("isRouterPlanTooShallow: false when plan has rich content", () => {
     }]
   }
   assert.ok(!isRouterPlanTooShallow("add a compelling hero about our mission", plan))
+})
+
+
+// ---------------------------------------------------------------------------
+// shouldEnableReasoningForMessage
+// ---------------------------------------------------------------------------
+
+test("shouldEnableReasoningForMessage: false for simple edits", () => {
+  assert.ok(!shouldEnableReasoningForMessage("change the title"))
+  assert.ok(!shouldEnableReasoningForMessage("update the heading text"))
+  assert.ok(!shouldEnableReasoningForMessage("set the link text"))
+})
+
+test("shouldEnableReasoningForMessage: true for clarification follow-ups", () => {
+  const msg = "Make the hero more friendly\nClarification from user: keep the existing headline but soften the subheading"
+  assert.ok(shouldEnableReasoningForMessage(msg))
+})
+
+test("shouldEnableReasoningForMessage: true for structural/tone verbs", () => {
+  assert.ok(shouldEnableReasoningForMessage("restructure the FAQ section into two columns"))
+  assert.ok(shouldEnableReasoningForMessage("redesign the landing page layout"))
+  assert.ok(shouldEnableReasoningForMessage("overhaul the hero block"))
+  assert.ok(shouldEnableReasoningForMessage("rewrite the tone to be more persuasive"))
+  assert.ok(shouldEnableReasoningForMessage("convert into a narrative format"))
+})
+
+test("shouldEnableReasoningForMessage: true for compound multi-field requests", () => {
+  const msg = "set headline to 'Foo' and subheading to 'Bar' and CTA to 'Baz'"
+  assert.ok(shouldEnableReasoningForMessage(msg))
+})
+
+test("shouldEnableReasoningForMessage: false for plain translations and simple rewrites", () => {
+  assert.ok(!shouldEnableReasoningForMessage("translate to German"))
+  assert.ok(!shouldEnableReasoningForMessage("rewrite the heading"))
+})
+
+test("shouldEnableReasoningForMessage: true for long prompts with conditional language", () => {
+  const long = "We want to update the hero and CTA so that users on mobile see a shorter headline, but desktop visitors should still get the full tagline. If the user has already signed in, hide the signup prompt entirely."
+  assert.ok(shouldEnableReasoningForMessage(long))
+})
+
+test("shouldEnableReasoningForMessage: false for empty or whitespace-only", () => {
+  assert.ok(!shouldEnableReasoningForMessage(""))
+  assert.ok(!shouldEnableReasoningForMessage("   "))
 })

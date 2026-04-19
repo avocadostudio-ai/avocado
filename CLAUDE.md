@@ -186,6 +186,8 @@ Responsiveness optimizations — all default **on** (`1`). Set to `0` to disable
 | `CHAT_INCREMENTAL_APPLY` | `1` | Apply ops one-by-one with preview version bumps (progressive UI updates). |
 | `CHAT_INCREMENTAL_PLAN_STREAM` | `1` | Stream op candidates to the editor as they parse from the LLM JSON. |
 | `CHAT_STREAM_APPLY_MIN_STEP_MS` | `260` | Minimum ms between progressive op-applied events (paces UI animation). |
+| `CHAT_AUTO_REASONING` | `1` | Auto-enable Anthropic extended thinking (`thinking: { type: "enabled" }`) on complex/ambiguous prompts. Signals: multi-step, clarification follow-ups, structural verbs (restructure/rewrite tone/…), long prompts with conditional language. Only activates for the `anthropic` planner — OpenAI/Gemini ignore it. Emits `thinking_start` / `thinking_token` / `thinking_end` SSE events so the editor can render a collapsed "Thinking…" block. |
+| `CHAT_AUTO_REASONING_BUDGET` | `2048` | `budget_tokens` passed to Anthropic when extended thinking is enabled. Must be >= 1024. |
 
 Other chat flags (default **off**):
 

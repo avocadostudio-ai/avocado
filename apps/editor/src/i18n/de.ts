@@ -40,6 +40,13 @@ const de: LocaleDict = {
   "stream.updating": "Wird aktualisiert\u2026",
   "stream.thinking": "Denkt nach",
 
+  // -- Thinking (extended reasoning) block --
+  "chat.thinking.streaming": "Denkt nach\u2026",
+  "chat.thinking.doneSeconds": "{{seconds}} s nachgedacht",
+  "chat.thinking.done": "Gedankengang",
+  "chat.thinking.showMore": "Gedanken anzeigen",
+  "chat.thinking.showLess": "Gedanken ausblenden",
+
   // -- Chat messages --
   "chat.expandDetails": "Details anzeigen",
   "chat.copied": "Kopiert",

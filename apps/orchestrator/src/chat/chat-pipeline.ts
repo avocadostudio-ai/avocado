@@ -92,7 +92,7 @@ const isCancelError = _isCancelError
 import { isMultiStepCandidate, decomposeRequest } from "./decomposer.js"
 import { generatePlanWithAnthropic, parseIntentWithAnthropic, type DeferredNativeImageCall } from "./anthropic-planner.js"
 import { generatePlanWithGemini, parseIntentWithGemini } from "./gemini-planner.js"
-import { createPlannerRegistry } from "./planner-types.js"
+import { createPlannerRegistry, type ThinkingEvent } from "./planner-types.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import { executeToolCall } from "../tools/runtime.js"
 import { detectImageSourceAmbiguity } from "../nlp/intent-helpers.js"
@@ -102,7 +102,7 @@ import { detectImageSourceAmbiguity } from "../nlp/intent-helpers.js"
 // ---------------------------------------------------------------------------
 export { sentenceCase, firstUrlFromText, preferredImageAltText, collectMentionedSlugsFromPlan, collectMentionedSlugsFromOps, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
 export { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, isNonEmptyString, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
-export { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation } from "./chat-pipeline-context.js"
+export { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation, shouldEnableReasoningForMessage } from "./chat-pipeline-context.js"
 export { isRewriteLikeMessage, isPerformanceAwareMessage, isLikelyTextField, collectChangedTextFields, buildMetaChangeLogEntries, buildAiInsightChanges, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification, fmtSlug } from "./chat-pipeline-deterministic.js"
 export { blockHasImageUrlProp, parsePath, getValueAtPath, setValueAtPath, deleteValueAtPath, extractIndexedQueries, extractReferencedItemIndices, blockSupportsImageAtPath, detectImagePaths, imageQueryFromItem, shouldPopulateAllChildImages, findImageTargets, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, shouldResolveCreatePageHeroImage, resolveHeroImageForCreatePage, detectImageOps } from "./chat-pipeline-image.js"
 export { type ChatPipelineContext, type DeferredCreatePageImage, GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER, isGeneratingPlaceholder, cleanupImagePlaceholders, buildPageDirectory, resolveEffectiveSlug, CancelError, isCancelError, throwIfCanceled, raceCancel, sseWrite, sleepMs, suppressCancelOnly } from "./chat-pipeline-shared.js"
@@ -110,7 +110,7 @@ export { type ChatPipelineContext, type DeferredCreatePageImage, GENERATING_IMAG
 // Internal imports from extracted modules (used by this file)
 import { collectMentionedSlugsFromPlan, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
 import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
-import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation, classifyMessageComplexity, isRouterPlanTooShallow } from "./chat-pipeline-context.js"
+import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation, classifyMessageComplexity, isRouterPlanTooShallow, shouldEnableReasoningForMessage } from "./chat-pipeline-context.js"
 import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification, fmtSlug } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
@@ -240,6 +240,7 @@ export async function runChatPipeline(
   body: ChatRequestBody,
   options?: {
     onPlanningToken?: (token: string) => void
+    onThinking?: (event: ThinkingEvent) => void
     onFieldDraft?: (event: { blockId: string; editablePath: string; value: string }) => void
     onPlannedOp?: (event: { index: number; op: Operation }) => void
     onSummaryChunk?: (text: string) => void
@@ -476,6 +477,35 @@ export async function runChatPipeline(
       : baseModelKey
   const modelUsed = ctx.modelLookup[provider][modelKey]
   const plannerSource = resolvePlannerSource(provider)
+
+  // Auto-escalate to extended thinking for complex/ambiguous Anthropic prompts.
+  // Only applies when provider = anthropic (other providers ignore `thinking`).
+  // User can disable with CHAT_AUTO_REASONING=0.
+  const reasoningAutoEnabled = process.env.CHAT_AUTO_REASONING !== "0"
+  const parsedReasoningBudget = Number(process.env.CHAT_AUTO_REASONING_BUDGET ?? 2048)
+  const reasoningBudgetTokens = Math.max(
+    1024,
+    Number.isFinite(parsedReasoningBudget) ? parsedReasoningBudget : 2048
+  )
+  if (!Number.isFinite(parsedReasoningBudget)) {
+    ctx.log.warn({
+      event: "reasoning_budget_invalid",
+      raw: process.env.CHAT_AUTO_REASONING_BUDGET
+    }, "CHAT_AUTO_REASONING_BUDGET is not a number; falling back to 2048")
+  }
+  const reasoningEnabled =
+    reasoningAutoEnabled &&
+    plannerSource === "anthropic" &&
+    shouldEnableReasoningForMessage(plannerMessage)
+  const thinkingConfig = reasoningEnabled ? { budgetTokens: reasoningBudgetTokens } : undefined
+  if (reasoningEnabled) {
+    ctx.log.info({
+      event: "reasoning_auto_enabled",
+      model: modelUsed,
+      budgetTokens: reasoningBudgetTokens,
+      promptLength: plannerMessage.length
+    }, "Extended thinking auto-enabled for this request")
+  }
   const promptHash = ctx.chatTelemetry.promptHash(plannerMessage)
   const promptExcerpt = ctx.chatTelemetry.promptExcerpt(plannerMessage)
   const pipelineStartedAtMs = Date.now()
@@ -2844,6 +2874,7 @@ export async function runChatPipeline(
           : undefined,
         log: ctx.log,
         onToken: onPlanningToken,
+        onThinking: options?.onThinking,
         onFieldDraft: options?.onFieldDraft,
         onSummaryChunk: options?.onSummaryChunk,
         onChangeLogEntry: options?.onChangeLogEntry,
@@ -2855,7 +2886,10 @@ export async function runChatPipeline(
           : undefined,
         componentsManifest,
         lightweight: routerComplexity === "simple" || likelySimple,
-        signal: combinedSignal
+        signal: combinedSignal,
+        // Disable thinking on router-downgraded simple plans — thinking only makes
+        // sense on the full planner path.
+        thinking: routerComplexity === "simple" ? undefined : thinkingConfig
       }), combinedSignal)
       return result
     })()
@@ -3246,6 +3280,8 @@ export async function runChatPipeline(
           : undefined,
         log: ctx.log,
         onToken: onPlanningToken,
+        onThinking: options?.onThinking,
+        thinking: thinkingConfig,
         onFieldDraft: options?.onFieldDraft,
         onSummaryChunk: options?.onSummaryChunk,
         onChangeLogEntry: options?.onChangeLogEntry,
@@ -3592,6 +3628,8 @@ export async function runChatPipeline(
       forceFullSchemaContracts: true,
       siteContextBlock,
       onToken: onPlanningToken,
+      onThinking: options?.onThinking,
+      thinking: thinkingConfig,
       onFieldDraft: options?.onFieldDraft,
       onSummaryChunk: options?.onSummaryChunk,
       onChangeLogEntry: options?.onChangeLogEntry,

@@ -184,6 +184,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const setLatestStreamFocusBlockId = store.getState().setLatestStreamFocusBlockId
   const setStreamingText = store.getState().setStreamingText
   const setStreamingChanges = store.getState().setStreamingChanges
+  const setStreamingThinking = store.getState().setStreamingThinking
   const setStreamSteps = store.getState().setStreamSteps
   const setOpChecklist = store.getState().setOpChecklist
   const setFieldDraftDebug = store.getState().setFieldDraftDebug
@@ -201,7 +202,7 @@ export function useChatEngine(config: ChatEngineConfig) {
   const activeStreamIdRef = useRef<string | null>(null)
   const agentCancelRef = useRef<(() => void) | null>(null)
 
-  function applyChatResult(data: AssistantResponse) {
+  function applyChatResult(data: AssistantResponse, extras?: { thinking?: ChatEntry["thinking"] }) {
     if (data.plannerSource === "openai" || data.plannerSource === "anthropic" || data.plannerSource === "gemini" || data.plannerSource === "demo") {
       store.getState().setPlannerBadgeState(data.plannerSource)
     }
@@ -228,7 +229,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     const undoSlug = typeof data.undoSlug === "string" && data.undoSlug.length > 0
       ? data.undoSlug
       : currentSlugNow
-    pushAssistantFromResult(data, { canUndo: data.status === "applied", undoSlug })
+    pushAssistantFromResult(data, { canUndo: data.status === "applied", undoSlug, thinking: extras?.thinking })
     if (data.status === "applied") {
       const currentSlug = store.getState().slug
       const nextSlug = parseString(data.updatedSlug, currentSlug)
@@ -475,6 +476,9 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
       let sawFieldDraftThisRun = false
+      let thinkingBuf = ""
+      let thinkingStartedMs = 0
+      let thinkingDurationMs = 0
       let currentStepLabel: string | null = null
       let currentStepRank = 0
       const debugDraftEnabled = store.getState().fieldDraftDebugEnabled
@@ -821,6 +825,29 @@ export function useChatEngine(config: ChatEngineConfig) {
           }
         }
 
+        if (payload.type === "thinking_start") {
+          thinkingBuf = ""
+          thinkingStartedMs = Date.now()
+          thinkingDurationMs = 0
+          setStreamingThinking({ text: "", status: "streaming" })
+        }
+
+        if (payload.type === "thinking_token") {
+          const text = typeof payload.text === "string" ? payload.text : ""
+          if (text.length > 0) {
+            thinkingBuf += text
+            setStreamingThinking({ text: thinkingBuf, status: "streaming" })
+          }
+        }
+
+        if (payload.type === "thinking_end") {
+          const durationMs = typeof payload.durationMs === "number"
+            ? payload.durationMs
+            : thinkingStartedMs > 0 ? Date.now() - thinkingStartedMs : 0
+          thinkingDurationMs = durationMs
+          setStreamingThinking({ text: thinkingBuf, status: "done", durationMs })
+        }
+
         if (payload.type === "field_draft") {
           const blockId = typeof payload.blockId === "string" ? payload.blockId : ""
           const editablePath = typeof payload.editablePath === "string" ? payload.editablePath : ""
@@ -1034,7 +1061,11 @@ export function useChatEngine(config: ChatEngineConfig) {
             clearOpRefreshTimer()
             endLiveDraft()
             if (pendingFocusBlockId !== null) flushOpRefresh()
-            if (payload.result) applyChatResult(payload.result)
+            const thinkingExtras = thinkingBuf.length > 0
+              ? { thinking: { text: thinkingBuf, durationMs: thinkingDurationMs } as ChatEntry["thinking"] }
+              : undefined
+            setStreamingThinking(null)
+            if (payload.result) applyChatResult(payload.result, thinkingExtras)
             if (payload.result?.focusBlockId) setLatestStreamFocusBlockId(payload.result.focusBlockId)
             source.close()
             resolve(true)
@@ -1086,6 +1117,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setImageProgress(null)
           setStreamingText(null)
           setStreamingChanges([])
+          setStreamingThinking(null)
           setStreamSteps([])
           setOpChecklist([])
           flushFieldDraftDebug()
@@ -1108,6 +1140,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           setImageProgress(null)
           setStreamingText(null)
           setStreamingChanges([])
+          setStreamingThinking(null)
           setStreamSteps([])
           setOpChecklist([])
           flushFieldDraftDebug()
@@ -1280,6 +1313,7 @@ export function useChatEngine(config: ChatEngineConfig) {
     } finally {
       setStreamingText(null)
       setStreamingChanges([])
+      setStreamingThinking(null)
       setIsLoading(false)
     }
   }
@@ -1373,6 +1407,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       setStreamStatus(null)
       setStreamingText(null)
       setStreamingChanges([])
+      setStreamingThinking(null)
       setStreamSteps([])
       setOpChecklist([])
       setIsLoading(false)

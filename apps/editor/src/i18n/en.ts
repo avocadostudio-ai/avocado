@@ -38,6 +38,13 @@ const en = {
   "stream.updating": "Updating...",
   "stream.thinking": "Thinking",
 
+  // -- Thinking (extended reasoning) block --
+  "chat.thinking.streaming": "Thinking\u2026",
+  "chat.thinking.doneSeconds": "Thought for {{seconds}}s",
+  "chat.thinking.done": "Thought process",
+  "chat.thinking.showMore": "Show thinking",
+  "chat.thinking.showLess": "Hide thinking",
+
   // -- Chat messages --
   "chat.expandDetails": "Expand details",
   "chat.copied": "Copied",
