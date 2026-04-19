@@ -178,7 +178,7 @@ describe("loadJiraConfig", () => {
     assert.equal(config.previewStatus, "In Review")
     assert.equal(config.doneStatus, "Done")
     assert.equal(config.siteId, "avocado-stories")
-    assert.equal(config.session, "jira")
+    assert.equal(config.session, "dev")
     assert.equal(config.autoPublish, false)
     assert.equal(config.maxReviewPasses, 3)
     assert.equal(config.pollEnabled, false)
