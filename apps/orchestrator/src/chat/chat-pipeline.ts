@@ -108,7 +108,7 @@ export { blockHasImageUrlProp, parsePath, getValueAtPath, setValueAtPath, delete
 export { type ChatPipelineContext, type DeferredCreatePageImage, GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER, isGeneratingPlaceholder, cleanupImagePlaceholders, buildPageDirectory, resolveEffectiveSlug, CancelError, isCancelError, throwIfCanceled, raceCancel, sseWrite, sleepMs, suppressCancelOnly } from "./chat-pipeline-shared.js"
 
 // Internal imports from extracted modules (used by this file)
-import { collectMentionedSlugsFromPlan, normalizePlanCopyForUi, futureToPastTense } from "./chat-pipeline-ui.js"
+import { collectMentionedSlugsFromPlan, normalizePlanCopyForUi, futureToPastTense, pastToFutureTense } from "./chat-pipeline-ui.js"
 import { sanitizeMessageForPlanning, inferTranslationScopeFromMessage, findFullPageTranslationCoverageGap, findExplicitCtaTargetCoverageGap, type TranslationScope } from "./chat-pipeline-translation.js"
 import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlannerContextPack, minimalPlannerContextPack, shouldUseMinimalPlannerContext, shouldPreferFocusedTranslation, classifyMessageComplexity, isRouterPlanTooShallow, shouldEnableReasoningForMessage } from "./chat-pipeline-context.js"
 import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification, fmtSlug } from "./chat-pipeline-deterministic.js"
@@ -1215,18 +1215,14 @@ export async function runChatPipeline(
         // Phrasing differs: approval flow uses future tense ("Will ..."),
         // auto-apply uses present tense ("Adding ...") so the summary reads
         // sensibly even though the image arrives a moment later.
+        // Per prompt rule (prompts.ts: HERO_IMAGE_URL_BASE) we never mention
+        // the image source (Unsplash / AI) in user-facing copy — just "image".
         for (const imgOp of detectedImageOps) {
+          const query = imgOp.query && imgOp.query.trim().length > 0 ? imgOp.query.trim() : null
+          const subject = query ? `: "${query}"` : ""
           const pendingImageMessage = imageOnlyPlan
-            ? imgOp.provider === "unsplash"
-              ? `Finding an image on Unsplash for "${imgOp.query}"…`
-              : imgOp.provider === "openai"
-                ? `Generating an AI image for "${imgOp.query}"…`
-                : `Resolving an image for "${imgOp.query}"…`
-            : imgOp.provider === "unsplash"
-              ? `Will find an image on Unsplash: "${imgOp.query}".`
-              : imgOp.provider === "openai"
-                ? `Will generate an image with AI: "${imgOp.query}".`
-                : `Will resolve an image for: "${imgOp.query}".`
+            ? `Finding an image${subject}…`
+            : `Will find an image${subject}.`
           resolvedPlan.change_log = [...resolvedPlan.change_log, pendingImageMessage]
         }
 
@@ -1249,7 +1245,7 @@ export async function runChatPipeline(
           // "plan ready" feedback while images resolve in the background.
           options?.onPlanMeta?.({
             intent: resolvedPlan.intent,
-            summary: resolvedPlan.summary_for_user,
+            summary: effectiveApplyMode === "plan_only" ? pastToFutureTense(resolvedPlan.summary_for_user) : resolvedPlan.summary_for_user,
             estimatedOps: resolvedPlan.ops.length
           })
           markFirstStructuredProgress()
@@ -1386,7 +1382,7 @@ export async function runChatPipeline(
     if (!stageTimeline.some((item) => item.stage === "first_structured_progress")) {
       options?.onPlanMeta?.({
         intent: resolvedPlan.intent,
-        summary: resolvedPlan.summary_for_user,
+        summary: effectiveApplyMode === "plan_only" ? pastToFutureTense(resolvedPlan.summary_for_user) : resolvedPlan.summary_for_user,
         estimatedOps: resolvedPlan.ops.length
       })
     }
@@ -1523,6 +1519,11 @@ export async function runChatPipeline(
 
     if (effectiveApplyMode === "plan_only") {
       const pendingPlanId = randomUUID()
+      // Planner prompts instruct past tense on the assumption ops are applied
+      // immediately, but the approval gate holds the plan. Flip to future tense
+      // so the copy matches the "Approve plan" UX.
+      const approvalSummary = pastToFutureTense(resolvedPlan.summary_for_user)
+      const approvalChangeLog = resolvedPlan.change_log.map(pastToFutureTense)
       pendingApprovalPlanBySession.set(body.session!, {
         id: pendingPlanId,
         createdAt: new Date().toISOString(),
@@ -1564,8 +1565,8 @@ export async function runChatPipeline(
           code: 200,
           payload: withDebugPayload({
             status: "plan_ready",
-            summary: resolvedPlan.summary_for_user,
-            changes: resolvedPlan.change_log,
+            summary: approvalSummary,
+            changes: approvalChangeLog,
             mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug),
             previewVersion: versions.get(body.session!) ?? 0,
             plannerSource: source,

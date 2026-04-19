@@ -57,10 +57,17 @@ test("chat pending-plan lifecycle: plan_only -> apply_pending_plan applies mocke
     }
   })
   assert.equal(planReady.statusCode, 200)
-  const planPayload = planReady.json() as { status?: string; pendingPlanId?: string }
+  const planPayload = planReady.json() as { status?: string; pendingPlanId?: string; summary?: string; changes?: string[] }
   assert.equal(planPayload.status, "plan_ready")
   assert.equal(typeof planPayload.pendingPlanId, "string")
   assert.ok(planPayload.pendingPlanId)
+  // Approval-gate path must flip LLM past-tense copy to future tense so the
+  // summary reads consistently with the "Approve plan" button.
+  assert.match(String(planPayload.summary), /Will update hero heading/i)
+  assert.ok(
+    planPayload.changes?.every((line) => !/^Changed\b/.test(line)),
+    `expected change_log entries rewritten to future tense, got ${JSON.stringify(planPayload.changes)}`
+  )
 
   const applyPending = await app.inject({
     method: "POST",
