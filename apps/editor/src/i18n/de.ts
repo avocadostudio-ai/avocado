@@ -107,6 +107,7 @@ const de: LocaleDict = {
   "settings.nestedLabels": "Verschachtelte Labels",
   "settings.fieldDraftTelemetry": "Feld-Entwurfs-Telemetrie",
   "settings.darkMode": "Dunkler Modus",
+  "settings.autoScrollTracking": "Generiertem Inhalt folgen",
   "settings.debugMode": "Debug-Modus",
   "settings.model": "Modell",
   "settings.advanced": "Erweitert",
