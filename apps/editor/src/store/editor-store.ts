@@ -75,6 +75,11 @@ export type EditorState = {
   streamStatus: string | null
   streamingText: string | null
   streamingChanges: string[]
+  streamingThinking: {
+    text: string
+    status: "streaming" | "done"
+    durationMs?: number
+  } | null
   streamSteps: { label: string; done: boolean }[]
   opChecklist: { label: string; done: boolean }[]
   streamTokenCount: number
@@ -158,6 +163,11 @@ export type EditorActions = {
   setStreamStatus: (status: string | null) => void
   setStreamingText: (value: string | null | ((prev: string | null) => string | null)) => void
   setStreamingChanges: (value: string[] | ((prev: string[]) => string[])) => void
+  setStreamingThinking: (
+    value:
+      | EditorState["streamingThinking"]
+      | ((prev: EditorState["streamingThinking"]) => EditorState["streamingThinking"])
+  ) => void
   setStreamSteps: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
   setOpChecklist: (value: { label: string; done: boolean }[] | ((prev: { label: string; done: boolean }[]) => { label: string; done: boolean }[])) => void
   setStreamTokenCount: (value: number | ((prev: number) => number)) => void
@@ -209,7 +219,7 @@ export type EditorActions = {
   setFieldDraftDebug: (debug: EditorState["fieldDraftDebug"]) => void
 
   // composite actions
-  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string; imageSwap?: ChatEntry["imageSwap"] }) => void
+  pushAssistantFromResult: (data: AssistantResponse, options?: { canUndo?: boolean; undoSlug?: string; imageSwap?: ChatEntry["imageSwap"]; thinking?: ChatEntry["thinking"] }) => void
 }
 
 // ── Store creation ──────────────────────────────────────────────────
@@ -232,6 +242,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     streamStatus: null,
     streamingText: null,
     streamingChanges: [],
+    streamingThinking: null,
     streamSteps: [],
     opChecklist: [],
     streamTokenCount: 0,
@@ -325,6 +336,11 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       set((prev) => ({
         ...prev,
         streamingChanges: typeof value === "function" ? value(prev.streamingChanges) : value,
+      })),
+    setStreamingThinking: (value) =>
+      set((prev) => ({
+        ...prev,
+        streamingThinking: typeof value === "function" ? value(prev.streamingThinking) : value,
       })),
     setStreamSteps: (value) =>
       set((prev) => ({
@@ -428,6 +444,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined,
         continuation: data.continuation ?? undefined,
         imageSwap: options?.imageSwap,
+        thinking: options?.thinking,
       }
 
       set((prev) => {

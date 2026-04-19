@@ -38,6 +38,48 @@ function isSingleBlockPropEdit(lower: string) {
   return /\b(add|remove|strip|delete|drop|clear|change|update|put|set|replace)\b/.test(lower)
 }
 
+/**
+ * Returns true when the message is complex/ambiguous enough that we should
+ * auto-escalate to an Anthropic thinking-capable model with extended thinking
+ * enabled. Designed to complement `shouldPreferFastModelForMessage` (which
+ * downgrades simple edits) — this one upgrades.
+ *
+ * Positive signals:
+ *   - Multi-step / decomposable request
+ *   - Clarification follow-up (user is correcting an earlier result)
+ *   - Structural verbs suggesting site-level reasoning (restructure, redesign,
+ *     reorganize, rewrite tone, convert into, persuasive, narrative)
+ *   - Long request with multiple quoted values (compound multi-field)
+ */
+export function shouldEnableReasoningForMessage(message: string): boolean {
+  const normalized = message.trim()
+  if (normalized.length === 0) return false
+
+  // Strong positive signals (override the fast-model preference)
+  if (isClarificationFollowUp(message)) return true
+  if (isCompoundMultiFieldRequest(message)) return true
+
+  const lower = message.toLowerCase()
+  const structuralVerbs = /\b(restructure|redesign|reorganize|rethink|reimagine|overhaul|persuasive|narrative|convert\s+into|transform\s+into|tone\s+(of\s+voice|more|less))\b/
+  if (structuralVerbs.test(lower)) return true
+
+  // Explicit tone/voice/style directives — these benefit from reasoning even
+  // when the message looks like a plain rewrite.
+  if (/\b(rewrite|redo|rephrase|adjust)\b.*\b(tone|voice|style|mood|register)\b/.test(lower)) return true
+
+  // "rewrite X and Y" / multi-section rewrites
+  if (/\b(rewrite|redo)\b/.test(lower) && /\b(and|plus|also)\b/.test(lower)) return true
+
+  // Long prompts (> 200 chars) with conditional branching language suggest the
+  // user is describing a non-trivial transformation
+  if (normalized.length > 200 && /\b(if|when|so\s+that|in\s+order\s+to|but|however|unless)\b/.test(lower)) return true
+
+  // Fall back: don't escalate trivial edits
+  if (shouldPreferFastModelForMessage(message)) return false
+
+  return false
+}
+
 export function shouldUseLlmIntentRouter(message: string) {
   if (inferTranslationScopeFromMessage(message) !== "none") return false
   if (isStandalonePageOperation(message)) return false

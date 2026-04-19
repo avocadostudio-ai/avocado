@@ -42,6 +42,20 @@ const summaryTokenEvent = z.object({
   text: z.string(),
 })
 
+const thinkingStartEvent = z.object({
+  type: z.literal("thinking_start"),
+})
+
+const thinkingTokenEvent = z.object({
+  type: z.literal("thinking_token"),
+  text: z.string(),
+})
+
+const thinkingEndEvent = z.object({
+  type: z.literal("thinking_end"),
+  durationMs: z.number().optional(),
+})
+
 const changelogEntryEvent = z.object({
   type: z.literal("changelog_entry"),
   entry: z.string(),
@@ -117,6 +131,9 @@ export const chatStreamEventSchema = z.discriminatedUnion("type", [
   tokenEvent,
   fieldDraftEvent,
   summaryTokenEvent,
+  thinkingStartEvent,
+  thinkingTokenEvent,
+  thinkingEndEvent,
   changelogEntryEvent,
   opCandidateEvent,
   opSkippedEvent,

@@ -235,6 +235,7 @@ export async function generatePlanWithAnthropic(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
+  onThinking?: (event: { type: "start" } | { type: "token"; text: string } | { type: "end"; durationMs: number }) => void
   onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
@@ -252,6 +253,11 @@ export async function generatePlanWithAnthropic(args: {
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
+  /**
+   * When set, enables Anthropic extended thinking with the given budget.
+   * Only has effect on thinking-capable models (Sonnet 4+, Opus).
+   */
+  thinking?: { budgetTokens: number }
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
   const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
@@ -377,6 +383,38 @@ export async function generatePlanWithAnthropic(args: {
   let emittedChangeLogCount = 0
   const emittedFieldDraftByKey = new Map<string, string>()
   const maxToolTurns = 6
+
+  // Anthropic extended thinking — added to every messages.create/stream call when
+  // args.thinking is set. The budget is a hard cap on thinking tokens; Anthropic
+  // validates it is >= 1024 and < max_tokens.
+  const thinkingParam = args.thinking && args.thinking.budgetTokens >= 1024
+    ? { type: "enabled" as const, budget_tokens: args.thinking.budgetTokens }
+    : undefined
+
+  // When extended thinking is enabled with max_tokens=8192, ensure budget leaves
+  // headroom for the actual response; bump max_tokens if the budget is too tight.
+  const plannerMaxTokens = thinkingParam
+    ? Math.max(8192, thinkingParam.budget_tokens + 4096)
+    : 8192
+
+  // Track thinking lifecycle for callbacks (Path 1 tool-loop and Path 2 stream)
+  let thinkingStartedAt: number | null = null
+  const emitThinkingStart = () => {
+    if (!args.onThinking || thinkingStartedAt !== null) return
+    thinkingStartedAt = Date.now()
+    args.onThinking({ type: "start" })
+  }
+  const emitThinkingToken = (text: string) => {
+    if (!args.onThinking || !text) return
+    emitThinkingStart()
+    args.onThinking({ type: "token", text })
+  }
+  const emitThinkingEnd = () => {
+    if (!args.onThinking || thinkingStartedAt === null) return
+    const durationMs = Date.now() - thinkingStartedAt
+    thinkingStartedAt = null
+    args.onThinking({ type: "end", durationMs })
+  }
   const emitProgressFromToolJson = (toolJsonBuf: string) => {
     if (args.onFieldDraft) {
       const fieldDrafts = extractUpdatePropsFieldDraftsFromPlanBuffer(toolJsonBuf)
@@ -420,16 +458,18 @@ export async function generatePlanWithAnthropic(args: {
       if (client.messages.stream) {
         const stream = client.messages.stream({
           model: args.model,
-          max_tokens: 8192,
+          max_tokens: plannerMaxTokens,
           system: anthropicSystemPromptWithCache(system),
           tools: toolDefs,
           tool_choice: { type: "auto" },
-          messages: loopMessages
+          messages: loopMessages,
+          ...(thinkingParam ? { thinking: thinkingParam } : {})
         }, {
           headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS
         })
         const toolNameByIndex = new Map<number, string>()
         const submitToolJsonByIndex = new Map<number, string>()
+        const thinkingBlockIndexes = new Set<number>()
         let path1TextBuf = ""
         // Wrap stream iteration — SDK may throw on message_stop if tool JSON is malformed
         let path1StreamError: unknown
@@ -438,16 +478,33 @@ export async function generatePlanWithAnthropic(args: {
             type?: string
             index?: number
             content_block?: { type?: string; name?: string }
-            delta?: { type?: string; partial_json?: string; text?: string }
+            delta?: { type?: string; partial_json?: string; text?: string; thinking?: string }
           }>) {
             if (event.type === "content_block_start") {
               const idx = typeof event.index === "number" ? event.index : -1
               if (idx >= 0 && event.content_block?.type === "tool_use" && typeof event.content_block.name === "string") {
                 toolNameByIndex.set(idx, event.content_block.name)
               }
+              if (idx >= 0 && event.content_block?.type === "thinking") {
+                thinkingBlockIndexes.add(idx)
+                emitThinkingStart()
+              }
+              continue
+            }
+            if (event.type === "content_block_stop") {
+              const idx = typeof event.index === "number" ? event.index : -1
+              if (idx >= 0 && thinkingBlockIndexes.has(idx)) {
+                thinkingBlockIndexes.delete(idx)
+                if (thinkingBlockIndexes.size === 0) emitThinkingEnd()
+              }
               continue
             }
             if (event.type !== "content_block_delta") continue
+            if (event.delta?.type === "thinking_delta") {
+              const thinkingText = event.delta.thinking ?? ""
+              if (thinkingText.length > 0) emitThinkingToken(thinkingText)
+              continue
+            }
             if (event.delta?.type === "text_delta") {
               const text = event.delta.text ?? ""
               if (text.length > 0) {
@@ -492,6 +549,7 @@ export async function generatePlanWithAnthropic(args: {
           // Buffer repair failed. If we accumulated meaningful text, use it as
           // an info response rather than falling through to the hardcoded fallback.
           if (path1TextBuf.trim().length > MIN_MEANINGFUL_RESPONSE_LENGTH) {
+            emitThinkingEnd()
             return {
               plan: {
                 intent: "needs_clarification",
@@ -512,11 +570,12 @@ export async function generatePlanWithAnthropic(args: {
       } else {
         response = await client.messages.create({
           model: args.model,
-          max_tokens: 8192,
+          max_tokens: plannerMaxTokens,
           system: anthropicSystemPromptWithCache(system),
           tools: toolDefs,
           tool_choice: { type: "auto" },
-          messages: loopMessages
+          messages: loopMessages,
+          ...(thinkingParam ? { thinking: thinkingParam } : {})
         })
       }
       usage = sumTokenUsage(usage, extractUsage(response))
@@ -571,6 +630,7 @@ export async function generatePlanWithAnthropic(args: {
         // text content, treat it as an "info" response rather than discarding it.
         const trimmed = raw.trim()
         if (trimmed.length > MIN_MEANINGFUL_RESPONSE_LENGTH) {
+          emitThinkingEnd()
           return {
             plan: {
               intent: "needs_clarification",
@@ -582,6 +642,7 @@ export async function generatePlanWithAnthropic(args: {
             schemaContext: schemaContext.meta
           }
         }
+        emitThinkingEnd()
         return {
           plan: {
             intent: "needs_clarification",
@@ -690,28 +751,56 @@ export async function generatePlanWithAnthropic(args: {
     let toolJsonBuf = ""
     let textBuf = ""
     if (client.messages.stream) {
+      // NOTE: forced tool_choice is incompatible with extended thinking on Anthropic;
+      // when thinking is enabled we relax to `auto` so the model can think freely
+      // before emitting the tool call.
       const stream = client.messages.stream({
         model: args.model,
-        max_tokens: 8192,
+        max_tokens: plannerMaxTokens,
         system: anthropicSystemPromptWithCache(system),
         tools: [anthropicToolWithCache(submitPlanToolDef)],
-        tool_choice: { type: "tool", name: "submit_edit_plan" },
+        tool_choice: thinkingParam
+          ? { type: "auto" as const }
+          : { type: "tool" as const, name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
           { role: "user", content: userContent }
         ],
+        ...(thinkingParam ? { thinking: thinkingParam } : {})
       }, {
         headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS
       })
       // Wrap stream iteration — SDK may throw on message_stop if tool JSON is malformed
       let streamLoopError: unknown
+      const path2ThinkingBlockIndexes = new Set<number>()
       try {
         for await (const event of stream as AsyncIterable<{
           type?: string
-          delta?: { type?: string; partial_json?: string; text?: string }
+          index?: number
+          content_block?: { type?: string }
+          delta?: { type?: string; partial_json?: string; text?: string; thinking?: string }
         }>) {
+          if (event.type === "content_block_start") {
+            const idx = typeof event.index === "number" ? event.index : -1
+            if (idx >= 0 && event.content_block?.type === "thinking") {
+              path2ThinkingBlockIndexes.add(idx)
+              emitThinkingStart()
+            }
+            continue
+          }
+          if (event.type === "content_block_stop") {
+            const idx = typeof event.index === "number" ? event.index : -1
+            if (idx >= 0 && path2ThinkingBlockIndexes.has(idx)) {
+              path2ThinkingBlockIndexes.delete(idx)
+              if (path2ThinkingBlockIndexes.size === 0) emitThinkingEnd()
+            }
+            continue
+          }
           if (event.type === "content_block_delta") {
-            if (event.delta?.type === "input_json_delta") {
+            if (event.delta?.type === "thinking_delta") {
+              const thinkingText = event.delta.thinking ?? ""
+              if (thinkingText.length > 0) emitThinkingToken(thinkingText)
+            } else if (event.delta?.type === "input_json_delta") {
               toolJsonBuf += event.delta.partial_json ?? ""
               emitProgressFromToolJson(toolJsonBuf)
             } else if (event.delta?.type === "text_delta") {
@@ -791,14 +880,17 @@ export async function generatePlanWithAnthropic(args: {
     } else {
       const response = await client.messages.create({
         model: args.model,
-        max_tokens: 8192,
+        max_tokens: plannerMaxTokens,
         system: anthropicSystemPromptWithCache(system),
         tools: [anthropicToolWithCache(submitPlanToolDef)],
-        tool_choice: { type: "tool", name: "submit_edit_plan" },
+        tool_choice: thinkingParam
+          ? { type: "auto" as const }
+          : { type: "tool" as const, name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
           { role: "user", content: userContent }
         ],
+        ...(thinkingParam ? { thinking: thinkingParam } : {})
       })
       usage = extractUsage(response)
       if (response.stop_reason === "max_tokens") {
@@ -834,10 +926,12 @@ export async function generatePlanWithAnthropic(args: {
     // No runtime tools — try output_config.format for constrained decoding first,
     // then fall back to tool_choice if the model doesn't return parseable JSON
     // (some models like Haiku 4.5 may not reliably support output_config).
-    try {
+    // NOTE: output_config is incompatible with extended thinking. When thinking
+    // is requested, skip straight to the tool_choice fallback below.
+    if (!thinkingParam) try {
       const response = await client.messages.create({
         model: args.model,
-        max_tokens: 8192,
+        max_tokens: plannerMaxTokens,
         system: anthropicSystemPromptWithCache(system),
         output_config: {
           format: { type: "json_schema", schema: editPlanJsonSchema }
@@ -891,14 +985,17 @@ export async function generatePlanWithAnthropic(args: {
       }, "Anthropic planner: output_config returned no JSON, retrying with tool_choice")
       const fallbackResponse = await client.messages.create({
         model: args.model,
-        max_tokens: 8192,
+        max_tokens: plannerMaxTokens,
         system: anthropicSystemPromptWithCache(system),
         tools: [anthropicToolWithCache(submitPlanToolDef)],
-        tool_choice: { type: "tool", name: "submit_edit_plan" },
+        tool_choice: thinkingParam
+          ? { type: "auto" as const }
+          : { type: "tool" as const, name: "submit_edit_plan" },
         messages: [
           ...historyMessages,
           { role: "user", content: userContent }
         ],
+        ...(thinkingParam ? { thinking: thinkingParam } : {})
       })
       const fallbackUsage = extractUsage(fallbackResponse)
       usage = {
@@ -933,6 +1030,9 @@ export async function generatePlanWithAnthropic(args: {
       }
     }
   }
+
+  // Safety: close any dangling thinking event before exit paths
+  emitThinkingEnd()
 
   if (!parsed) {
     args.log?.warn({
