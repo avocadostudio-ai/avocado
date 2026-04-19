@@ -157,11 +157,15 @@ export class JiraClient {
 
 /**
  * Convert simple markdown text to Atlassian Document Format (ADF).
- * Handles paragraphs, bulletLists, bold (**text**), and links ([label](url)).
+ * Handles paragraphs, bulletLists, bold (**text**), italic (_text_), inline
+ * code (`text`), and links ([label](url)). Strips HTML comments.
  * Good enough for status/clarification comments.
  */
 export function markdownToAdf(markdown: string): object {
-  const lines = markdown.split("\n")
+  // HTML comments are not an ADF node type — they leak through as literal text.
+  // Strip them here so stray markers or annotations don't surface in Jira comments.
+  const normalized = markdown.replace(/<!--[\s\S]*?-->/g, "")
+  const lines = normalized.split("\n")
   const content: object[] = []
 
   let i = 0
@@ -218,6 +222,23 @@ function parseInlineMarkdown(text: string): object[] {
       }
     }
 
+    // Italic: _..._ (word-boundary aware — avoids matching snake_case identifiers)
+    if (text[i] === "_") {
+      const prev = i > 0 ? text[i - 1] : ""
+      if (!prev || !/\w/.test(prev)) {
+        const end = text.indexOf("_", i + 1)
+        if (end > i + 1) {
+          const next = text[end + 1] ?? ""
+          const inner = text.slice(i + 1, end)
+          if ((!next || !/\w/.test(next)) && inner.trim() === inner && inner.length > 0) {
+            pushText(inner, [{ type: "em" }])
+            i = end + 1
+            continue
+          }
+        }
+      }
+    }
+
     // Inline code: `...`
     if (text[i] === "`") {
       const end = text.indexOf("`", i + 1)
@@ -249,7 +270,7 @@ function parseInlineMarkdown(text: string): object[] {
 
     // Plain run up to the next special char
     let next = text.length
-    for (const marker of ["**", "[", "`"]) {
+    for (const marker of ["**", "[", "`", "_"]) {
       const idx = text.indexOf(marker, i)
       if (idx !== -1 && idx < next) next = idx
     }

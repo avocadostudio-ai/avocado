@@ -61,9 +61,19 @@ describe("routePollerIssue", () => {
   test("To Do with agent review already posted and no newer reporter comment → null (waiting)", () => {
     const i = issue("To Do", [
       comment("reporter", "Please update the hero.", "2026-01-01T10:00:00Z"),
-      comment("agent", "<!-- site-editor:proceed -->\n**Ready to proceed.**", "2026-01-01T10:05:00Z"),
+      comment("agent", "**Review complete — ready to proceed.**\n\nReply `go`.", "2026-01-01T10:05:00Z"),
     ])
     assert.equal(routePollerIssue(i, cfg()), null)
+  })
+
+  test("To Do with ADF-round-tripped agent review (no ** markers) → null (waiting)", () => {
+    // Jira Cloud stores comments as ADF; when read back, adfToPlainText strips
+    // bold markers. The prefix-based detection must still recognise our output.
+    const i = issue("To Do", [
+      comment("reporter", "Please update the hero.", "2026-01-01T10:00:00Z"),
+      comment("agent", "Review — I need a bit more info before I make changes.\n\nQuestions: ...", "2026-01-01T10:05:00Z"),
+    ])
+    assert.equal(routePollerIssue(i, cfg()), null, "plain-text-roundtripped review should still be recognised as agent output")
   })
 
   test("To Do with reporter approval comment newer than agent → execute", () => {
@@ -117,5 +127,27 @@ describe("routePollerIssue", () => {
   test("Done status → null", () => {
     const i = issue("Done", [])
     assert.equal(routePollerIssue(i, cfg()), null)
+  })
+
+  test("solo tenant: reporter and agent share accountId, plain reply triggers re-review", () => {
+    // Both comments authored by "agent" accountId, but the second body has no
+    // agent-headline → classified as reporter input, so the poller advances.
+    const i = issue("To Do", [
+      comment("agent", "**Review — I need a bit more info before I make changes.**\n\nQuestions: which page?", "2026-01-01T10:00:00Z"),
+      comment("agent", "Use the home page, insert image from Unsplash.", "2026-01-01T10:05:00Z"),
+    ])
+    const r = routePollerIssue(i, cfg())
+    assert.ok(r, "expected a route despite shared accountId")
+    assert.equal(r!.mode, "review", "non-approval reply → re-review")
+  })
+
+  test("solo tenant: reporter approval reply triggers execute even when accountId matches agent", () => {
+    const i = issue("To Do", [
+      comment("agent", "**Review complete — ready to proceed.**\n\nReply `go` to apply.", "2026-01-01T10:00:00Z"),
+      comment("agent", "go", "2026-01-01T10:05:00Z"),
+    ])
+    const r = routePollerIssue(i, cfg())
+    assert.ok(r)
+    assert.equal(r!.mode, "execute")
   })
 })
