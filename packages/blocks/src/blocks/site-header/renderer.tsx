@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useId } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { BlockImage } from "../_shared"
 
 type NavLink = { label: string; href?: string; children?: NavLink[] }
@@ -27,7 +27,7 @@ export function SiteHeader(props: Record<string, unknown>) {
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<HTMLButtonElement | null>(null)
-  const menuId = useId()
+  const menuId = "site-mobile-menu"
 
   const close = useCallback(() => { setIsOpen(false); setExpandedGroup(null) }, [])
   const toggle = useCallback(() => setIsOpen((v) => !v), [])
