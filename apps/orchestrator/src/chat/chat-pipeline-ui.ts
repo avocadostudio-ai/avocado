@@ -51,6 +51,50 @@ export function futureToPastTense(text: string): string {
     .replace(IMPERATIVE_RE, (verb) => toPastTense(verb))
 }
 
+/**
+ * Inverse of {@link futureToPastTense}. Used on the approval-gate path
+ * (executionMode=plan_only): the LLM emits past tense per prompt rules,
+ * but ops have NOT yet been applied — the user still has to click
+ * "Approve plan". Flip past → future so the copy matches the UX.
+ *
+ * Conservative: only rewrites past-tense verbs at sentence boundaries
+ * (start of string or after ". ") so we don't mangle mid-sentence prose
+ * like "was set to 5" or "updated copy" used as an adjective.
+ */
+const PAST_TO_FUTURE: Record<string, string> = {
+  added: "add",
+  updated: "update",
+  removed: "remove",
+  set: "set",
+  replaced: "replace",
+  created: "create",
+  moved: "move",
+  duplicated: "duplicate",
+  renamed: "rename",
+  deleted: "delete",
+  inserted: "insert",
+  changed: "change",
+  found: "find",
+  resolved: "resolve",
+  generated: "generate",
+  rewrote: "rewrite",
+  improved: "improve"
+}
+const SENTENCE_START_PAST_RE = new RegExp(
+  `(^|[.!?]\\s+|\\*\\*)(${Object.keys(PAST_TO_FUTURE).join("|")})\\b`,
+  "gi"
+)
+
+export function pastToFutureTense(text: string): string {
+  return text.replace(SENTENCE_START_PAST_RE, (_match, lead: string, verb: string) => {
+    const base = PAST_TO_FUTURE[verb.toLowerCase()]
+    if (!base) return `${lead}${verb}`
+    const capitalized = verb[0] === verb[0].toUpperCase()
+    const willed = capitalized ? `Will ${base}` : `will ${base}`
+    return `${lead}${willed}`
+  })
+}
+
 export function firstUrlFromText(text: string): string | undefined {
   const match = text.match(/https?:\/\/[^\s"']+/)
   return match ? match[0] : undefined
