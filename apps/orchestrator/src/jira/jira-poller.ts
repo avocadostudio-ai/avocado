@@ -21,7 +21,7 @@
 
 import type { FastifyBaseLogger } from "fastify"
 import { JiraClient } from "./jira-client.js"
-import { processJiraTicket, adfToPlainText, type JiraProcessingMode } from "./jira-processor.js"
+import { processJiraTicket, adfToPlainText, isAgentAuthoredComment, type JiraProcessingMode } from "./jira-processor.js"
 import { isApprovalComment } from "./jira-approval.js"
 import type { JiraConfig, JiraIssue, JiraComment } from "./jira-types.js"
 
@@ -56,8 +56,14 @@ export function routePollerIssue(issue: JiraIssue, config: JiraConfig): PollerRo
   const comments = issue.fields.comment?.comments ?? []
   const agentId = config.agentAccountId
 
-  const agentComments = comments.filter((c) => agentId && c.author?.accountId === agentId)
-  const nonAgentComments = comments.filter((c) => !agentId || c.author?.accountId !== agentId)
+  const bodyOf = (c: JiraComment): string =>
+    typeof c.body === "string" ? c.body : adfToPlainText(c.body)
+
+  // Classify by body shape too, not only accountId — solo Jira tenants have
+  // the same human acting as reporter + agent, and we must still see reporter
+  // replies to progress the workflow.
+  const agentComments = comments.filter((c) => isAgentAuthoredComment(bodyOf(c), c.author?.accountId, agentId))
+  const nonAgentComments = comments.filter((c) => !agentComments.includes(c))
   const latestAgent = agentComments.at(-1)
   const latestNonAgent = nonAgentComments.at(-1)
 
@@ -67,10 +73,7 @@ export function routePollerIssue(issue: JiraIssue, config: JiraConfig): PollerRo
     return latestNonAgent.created > latestAgent.created
   }
 
-  const latestBodyText = (c: JiraComment | undefined): string => {
-    if (!c) return ""
-    return typeof c.body === "string" ? c.body : adfToPlainText(c.body)
-  }
+  const latestBodyText = (c: JiraComment | undefined): string => c ? bodyOf(c) : ""
 
   // ---- Review stage ----
   if (statusEquals(status, config.reviewStatus) || statusEquals(status, config.triggerStatus)) {

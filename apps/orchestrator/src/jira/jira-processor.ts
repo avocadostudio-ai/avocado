@@ -33,12 +33,12 @@ import { scopedSessionKey, listSitesForSession, getSessionPages } from "../state
  */
 export type JiraProcessingMode = "review" | "execute" | "publish"
 
-// Markers embedded in the first line of agent comments so we can tell our own
-// review passes apart from user comments when counting attempts.
-const REVIEW_COMMENT_MARKER = "<!-- site-editor:review -->"
-const PROCEED_COMMENT_MARKER = "<!-- site-editor:proceed -->"
-const PUBLISHED_COMMENT_MARKER = "<!-- site-editor:published -->"
-const EXECUTED_COMMENT_MARKER = "<!-- site-editor:executed -->"
+// Agent-authored comments are identified by author accountId at the call site.
+// The *kind* of agent comment (review questions, proceed, executed, published)
+// is inferred from the distinctive bold headline each formatter emits — see
+// `reviewCommentHeadlineRe` in countAgentReviewComments. HTML-comment markers
+// were tried first but leak as literal text in ADF, so we rely on the
+// human-readable headline instead.
 
 // ---------------------------------------------------------------------------
 // Processing queue (in-memory)
@@ -258,7 +258,8 @@ function extractBasicPdfText(buffer: Buffer): string {
 
 function buildInstructionMessage(
   issue: JiraIssue,
-  attachments: ProcessedAttachments
+  attachments: ProcessedAttachments,
+  agentAccountId: string | undefined
 ): string {
   const parts: string[] = []
 
@@ -292,7 +293,45 @@ function buildInstructionMessage(
     parts.push(`\nNote: The following attachments could not be processed: ${attachments.skipped.join(", ")}`)
   }
 
+  // Conversation history — so reporter clarifications posted as comments
+  // reach the agent. Without this, a reply like "use this specific Unsplash
+  // URL" is silently dropped and the agent falls back to its own guess.
+  const history = buildCommentHistory(issue, agentAccountId)
+  if (history) {
+    parts.push(`\nConversation so far (oldest → newest). Treat the reporter's latest instructions as authoritative when they conflict with the description:\n${history}`)
+  }
+
   return parts.join("\n")
+}
+
+/**
+ * Render the ticket's comment thread as plain text labelled by role
+ * (Agent / Reporter). Returns "" when there are no comments.
+ *
+ * Long bodies are truncated to keep token usage bounded — the reporter's
+ * latest reply is what matters most, and we don't want old agent formatting
+ * boilerplate to crowd out the real task context.
+ */
+export function buildCommentHistory(issue: JiraIssue, agentAccountId: string | undefined): string {
+  const comments = issue.fields.comment?.comments ?? []
+  if (comments.length === 0) return ""
+
+  const MAX_BODY_CHARS = 1200
+  const lines: string[] = []
+  for (const c of comments) {
+    const body = typeof c.body === "string" ? c.body : adfToPlainText(c.body)
+    const trimmed = body.trim()
+    if (!trimmed) continue
+    const authorId = c.author?.accountId
+    const isAgent = isAgentAuthoredComment(trimmed, authorId, agentAccountId)
+    const role = isAgent ? "Agent" : "Reporter"
+    const when = c.created ?? ""
+    const truncated = trimmed.length > MAX_BODY_CHARS
+      ? `${trimmed.slice(0, MAX_BODY_CHARS)}… [truncated]`
+      : trimmed
+    lines.push(`[${when}] ${role}:\n${truncated}`)
+  }
+  return lines.join("\n\n")
 }
 
 // ---------------------------------------------------------------------------
@@ -414,8 +453,9 @@ export async function processJiraTicket(options: {
       logger
     )
 
-    // 3. Build instruction message
-    const instruction = buildInstructionMessage(issue, attachmentResult)
+    // 3. Build instruction message (includes comment history so reporter
+    //    clarifications posted as comments reach the agent).
+    const instruction = buildInstructionMessage(issue, attachmentResult, config.agentAccountId)
     logger.info({ issueKey, instructionLength: instruction.length }, "JIRA: built instruction")
 
     // 4. Determine AI provider and key from env
@@ -477,7 +517,7 @@ export async function processJiraTicket(options: {
       const reviewResult: JiraProcessingResult = {
         issueKey,
         status: "success",
-        summary: decision.decision === "proceed" ? decision.plan : `questions: ${(decision.questions ?? []).length}`,
+        summary: decision.decision === "proceed" ? decision.plan.join("; ") : `questions: ${(decision.questions ?? []).length}`,
         changes: [],
         durationMs: Date.now() - startedAt,
         modelUsed: model,
@@ -675,7 +715,6 @@ function formatSuccessComment(
   void opts.orchestratorOrigin
   const { sitePublicOrigin, sessionName, siteId, touchedSlugs } = opts
   const lines: string[] = [
-    EXECUTED_COMMENT_MARKER,
     "**Draft updated. Ready for your review.**",
     "",
   ]
@@ -690,8 +729,9 @@ function formatSuccessComment(
     lines.push("**Preview:**")
     for (const slug of touchedSlugs) {
       const normalized = slug.startsWith("/") ? slug : `/${slug}`
+      const pageLabel = normalized === "/" ? "Home" : normalized
       const url = `${sitePublicOrigin}${normalized}?session=${encodeURIComponent(sessionName)}&siteId=${encodeURIComponent(siteId)}&__editor=1`
-      lines.push(`- [${normalized}](${url})`)
+      lines.push(`- [Open preview → ${pageLabel}](${url})`)
     }
     lines.push("")
   }
@@ -739,12 +779,12 @@ function formatSiteClarificationComment(candidates: Array<{ id: string; name?: s
 function formatReviewComment(decision: ReviewDecision): string {
   if (decision.decision === "questions") {
     const lines: string[] = [
-      REVIEW_COMMENT_MARKER,
       "**Review — I need a bit more info before I make changes.**",
       "",
     ]
-    if (decision.plan && decision.plan.trim()) {
-      lines.push(`_What I think you want:_ ${decision.plan.trim()}`)
+    if (decision.plan.length > 0) {
+      lines.push("**What I think you want:**")
+      for (const item of decision.plan) lines.push(`- ${item}`)
       lines.push("")
     }
     lines.push("**Questions:**")
@@ -759,12 +799,12 @@ function formatReviewComment(decision: ReviewDecision): string {
 
   // proceed
   const lines: string[] = [
-    PROCEED_COMMENT_MARKER,
     "**Review complete — ready to proceed.**",
     "",
   ]
-  if (decision.plan && decision.plan.trim()) {
-    lines.push(`**Plan:** ${decision.plan.trim()}`)
+  if (decision.plan.length > 0) {
+    lines.push("**Plan:**")
+    for (const item of decision.plan) lines.push(`- ${item}`)
     lines.push("")
   }
   lines.push("Reply `go` (or `proceed`, `lgtm`, `approved`, etc.) or move the ticket to In Progress and I'll apply the edits.")
@@ -773,7 +813,6 @@ function formatReviewComment(decision: ReviewDecision): string {
 
 function formatReviewCapComment(cap: number): string {
   return [
-    REVIEW_COMMENT_MARKER,
     "**I've asked for clarification several times.**",
     "",
     `Review attempts exhausted (max ${cap}). Please consolidate the request into a single, concrete instruction in the ticket description, then re-trigger by moving the ticket back to To Do or @mentioning me.`,
@@ -782,7 +821,6 @@ function formatReviewCapComment(cap: number): string {
 
 function formatPublishedComment(opts: { sitePublicOrigin: string; slugs: string[] }): string {
   const lines: string[] = [
-    PUBLISHED_COMMENT_MARKER,
     "**Published. Changes are live.**",
     "",
   ]
@@ -790,8 +828,9 @@ function formatPublishedComment(opts: { sitePublicOrigin: string; slugs: string[
     lines.push("**Live pages:**")
     for (const slug of opts.slugs) {
       const normalized = slug.startsWith("/") ? slug : `/${slug}`
+      const pageLabel = normalized === "/" ? "Home" : normalized
       const url = `${opts.sitePublicOrigin}${normalized === "/" ? "" : normalized}`
-      lines.push(`- [${normalized}](${url})`)
+      lines.push(`- [Open live → ${pageLabel}](${url})`)
     }
   }
   return lines.join("\n")
@@ -803,7 +842,7 @@ function formatPublishedComment(opts: { sitePublicOrigin: string; slugs: string[
 
 export type ReviewDecision = {
   decision: "proceed" | "questions"
-  plan: string
+  plan: string[]
   questions?: string[]
 }
 
@@ -821,14 +860,15 @@ function buildReviewSystemPrompt(): string {
     "Respond with ONLY a JSON object (no prose, no code fences, no markdown) in exactly this shape:",
     '{',
     '  "decision": "proceed" | "questions",',
-    '  "plan": "2-3 sentences describing what you would do, naming slugs and block types where relevant",',
+    '  "plan": ["short bullet describing one concrete step", "…"],',
     '  "questions": ["short, specific question", "..."]',
     '}',
     "",
     "Rules:",
     '- Use "proceed" when the task is concrete enough to act on.',
     '- Use "questions" when something essential is missing or ambiguous (target page, copy, images, counts, etc.).',
-    '- Always include "plan" — even with "questions" it should describe your best interpretation.',
+    '- Always include "plan" — even with "questions" it should describe your best interpretation as an array of short bullets.',
+    '- Each plan item is ONE concrete step (e.g. "Update b_hero_home heading to …"). Keep 2-5 items. No run-on sentences.',
     "- Keep questions to at most 3. Prefer clarity over completeness.",
     "- Do NOT ask about anything you can reasonably infer from the site context below.",
   ].join("\n")
@@ -844,7 +884,7 @@ export function parseReviewDecision(raw: string): ReviewDecision {
   if (obj && typeof obj === "object") {
     const rec = obj as Record<string, unknown>
     const decision = rec.decision === "questions" ? "questions" : "proceed"
-    const plan = typeof rec.plan === "string" ? rec.plan : ""
+    const plan = normalizePlanItems(rec.plan)
     const questions = Array.isArray(rec.questions)
       ? rec.questions.filter((q): q is string => typeof q === "string" && q.trim().length > 0)
       : []
@@ -854,7 +894,33 @@ export function parseReviewDecision(raw: string): ReviewDecision {
   }
   // Couldn't parse — fall back to "proceed" with the raw text as the plan so the
   // reporter at least sees what the agent thought. Better than dropping info.
-  return { decision: "proceed", plan: cleaned || "Could not parse review output — proceeding with best effort." }
+  const fallback = cleaned || "Could not parse review output — proceeding with best effort."
+  return { decision: "proceed", plan: normalizePlanItems(fallback) }
+}
+
+/**
+ * Normalize whatever the LLM returned for `plan` into an array of short bullet
+ * strings. Accepts an array (preferred), a string (split on sentence/newline
+ * boundaries for back-compat), or anything else (returns []).
+ */
+function normalizePlanItems(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+    // Prefer newline splits, otherwise split on sentence boundaries (". ").
+    const lineParts = trimmed.split(/\n+/).map((s) => s.trim()).filter(Boolean)
+    const parts = lineParts.length > 1
+      ? lineParts
+      : trimmed.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).map((s) => s.trim()).filter(Boolean)
+    return parts.map((s) => s.replace(/^[-*•]\s+/, "").trim()).filter(Boolean)
+  }
+  return []
 }
 
 function tryParseJsonBlob(text: string): unknown {
@@ -878,6 +944,37 @@ function tryParseJsonBlob(text: string): unknown {
 }
 
 /**
+ * Prefixes every agent-written comment begins with. We match on these rather
+ * than `**…**` bold markup because Jira Cloud stores comments as ADF — when we
+ * read them back, `adfToPlainText` strips the bold markers. The same prefix
+ * check therefore works on both freshly-posted markdown and ADF-round-tripped
+ * plain text.
+ */
+const AGENT_COMMENT_PREFIXES = {
+  review: [
+    "Review — I need",
+    "Review complete — ready to proceed",
+    "I've asked for clarification several times",
+  ],
+  other: [
+    "Draft updated. Ready for your review",
+    "Published. Changes are live",
+    "Website update failed for this ticket",
+    "Which site should I update",
+  ],
+} as const
+
+const LEGACY_REVIEW_MARKER_RE = /<!--\s*site-editor:(?:review|proceed)\s*-->/
+const LEGACY_AGENT_MARKER_RE = /<!--\s*site-editor:(?:review|proceed|executed|published)\s*-->/
+
+function bodyStartsWithAny(body: string, prefixes: readonly string[]): boolean {
+  // Strip leading whitespace and any lingering `**` bold markers so markdown
+  // and ADF-plain-text bodies match the same prefix list.
+  const stripped = body.replace(/^[\s*]+/, "")
+  return prefixes.some((p) => stripped.startsWith(p))
+}
+
+/**
  * Count how many prior review-mode comments the agent has posted on this issue,
  * so we can cap the number of review passes per ticket.
  */
@@ -887,9 +984,28 @@ export function countAgentReviewComments(issue: JiraIssue, agentAccountId: strin
   for (const c of comments) {
     if (agentAccountId && c.author?.accountId !== agentAccountId) continue
     const body = typeof c.body === "string" ? c.body : adfToPlainText(c.body)
-    if (body.includes(REVIEW_COMMENT_MARKER) || body.includes(PROCEED_COMMENT_MARKER)) count++
+    if (bodyStartsWithAny(body, AGENT_COMMENT_PREFIXES.review) || LEGACY_REVIEW_MARKER_RE.test(body)) count++
   }
   return count
+}
+
+/**
+ * Decide whether a comment was authored by our agent.
+ *
+ * Looks at both the author's accountId AND the body shape. This matters because
+ * in solo/dev Jira tenants the reporter and agent share a single human's
+ * accountId — filtering by accountId alone would discard every reporter reply
+ * as a self-loop and the workflow would stall.
+ */
+export function isAgentAuthoredComment(
+  body: string,
+  authorAccountId: string | undefined,
+  agentAccountId: string | undefined
+): boolean {
+  if (!agentAccountId) return false
+  if (authorAccountId !== agentAccountId) return false
+  const allPrefixes = [...AGENT_COMMENT_PREFIXES.review, ...AGENT_COMMENT_PREFIXES.other]
+  return bodyStartsWithAny(body, allPrefixes) || LEGACY_AGENT_MARKER_RE.test(body)
 }
 
 // ---------------------------------------------------------------------------

@@ -109,7 +109,7 @@ describe("routeWebhook — comment events", () => {
     if (route.action === "process") assert.equal(route.mode, "execute")
   })
 
-  test("agent's own comment is always skipped (self-loop guard)", () => {
+  test("agent's own formatter-shaped comment is skipped (self-loop guard)", () => {
     const payload: JiraWebhookPayload = {
       webhookEvent: "comment_created",
       timestamp: 0,
@@ -117,12 +117,34 @@ describe("routeWebhook — comment events", () => {
       comment: {
         id: "c1",
         author: { accountId: "agent-id", displayName: "Agent" },
-        body: "proceed",
+        body: "**Review — I need a bit more info before I make changes.**\n\nQuestions: ...",
         created: "", updated: "",
       },
     }
     const route = routeWebhook(payload, cfg())
     assert.equal(route.action, "skip")
+  })
+
+  test("solo tenant: plain reply from agent's accountId is treated as reporter input", () => {
+    // Solo Jira tenants reuse one human accountId for both reporter and agent.
+    // Without body-shape detection, replies would be silently dropped and the
+    // workflow would stall.
+    const payload: JiraWebhookPayload = {
+      webhookEvent: "comment_created",
+      timestamp: 0,
+      issue: baseIssue("To Do") as never,
+      comment: {
+        id: "c1",
+        author: { accountId: "agent-id", displayName: "Solo user" },
+        body: "use the home page, insert an Unsplash image",
+        created: "", updated: "",
+      },
+    }
+    const route = routeWebhook(payload, cfg())
+    assert.equal(route.action, "process")
+    if (route.action === "process") {
+      assert.equal(route.mode, "review")
+    }
   })
 
   test("comment on Done skipped unless it @mentions agent", () => {
