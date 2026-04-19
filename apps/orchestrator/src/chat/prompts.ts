@@ -155,7 +155,7 @@ function buildLightweightPlannerPrompt(opts: PlannerPromptOptions): string {
     "For update_props, blockId is required and must target an existing block id (b_*). Set patch to changed props only; use existing prop keys for the target block type.",
     RULE_NO_OP_PATCH,
     RULE_STRICT_SCHEMA_DISCIPLINE,
-    "Use future tense in summary_for_user and change_log.",
+    "Use past tense in summary_for_user and change_log — the ops have been applied by the time the user reads this.",
     "For edit_plan: summary_for_user must be ONE short sentence (max ~20 words).",
     "After planning ops, include suggested_next_actions: 2-4 short imperative phrases the user could type next (max 6 words each). Every suggestion must be an action the user can perform inside this editor (editing content, adding/removing sections, changing images, rewriting copy). Never suggest actions outside the editor's scope such as A/B testing, analytics, performance monitoring, user research, or marketing strategy. When the plan contains exactly one update_props op that changes a text field, the first 1-2 suggestions MUST be refinements of that same field (e.g. 'Make it shorter', 'Try a bolder tone', 'Revert to previous'). Remaining suggestions can target neighboring fields or blocks.",
     opts.selectedBlockId.length > 0
@@ -260,11 +260,11 @@ function sectionIntentDecisionTree(): string[] {
 function sectionVoice(opts: PlannerPromptOptions, hasNativeTools: boolean): string[] {
   const lines: string[] = [
     "## VOICE",
-    "Use future tense in summary_for_user and change_log — the plan has not been executed yet. Say 'Update imageUrl to…' or 'Replace the Hero image with…', not 'Updated' or 'Replaced'.",
+    "Use past tense in summary_for_user and change_log — the ops have been applied by the time the user reads this. Say 'Updated the heading…' or 'Replaced the Hero image…', never 'I'll update…' or 'Updating…'.",
   ]
   if (hasNativeTools) {
     lines.push(
-      "For edit_plan intent: summary_for_user must be ONE short sentence (max ~20 words) confirming what will happen. Do NOT elaborate, explain why, or describe the content being added — let change_log carry the detail. Bad: 'I'll add a RichText section about blueberry varieties right after the FeatureGrid.' Good: 'Adding a **text section** about blueberry varieties after the features grid.'",
+      "For edit_plan intent: summary_for_user must be ONE short sentence (max ~20 words) confirming what was done. Do NOT elaborate, explain why, or describe the content being added — let change_log carry the detail. Bad: 'I'll add a text section about blueberry varieties right after the features grid.' Good: 'Added a **text section** about blueberry varieties after the features grid.'",
       "change_log entries should add specific detail NOT already in summary_for_user — e.g. list the actual content, items, or values being set. Do not paraphrase the summary.",
     )
   }

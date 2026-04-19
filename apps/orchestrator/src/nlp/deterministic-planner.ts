@@ -16,6 +16,7 @@ import {
 } from "./intent-helpers.js"
 import {
   isBatchAddRequest,
+  isFieldContentUpdateRequest,
   stripSiteContextEnvelope,
   extractMentionedBlockTypes
 } from "./intent-detection.js"
@@ -128,6 +129,9 @@ function inferActionFromMessage(message: string): ParsedIntent["action"] | null 
   const hasPageCreateCue = Boolean(parseCreatePageRequest(message))
   if (isHeroLayoutRequest(lower)) return "update"
   if (hasPageCreateCue) return "add"
+  // "add X in/to [the Y] heading/subheading/copy/..." → update to a field, not add.
+  // Must run before the generic verb-position pass so "add" does not win.
+  if (isFieldContentUpdateRequest(message)) return "update"
 
   // Use earliest-verb-position to resolve ambiguity (e.g., "add a delete button" → "add")
   const verbPatterns: Array<{ action: ParsedIntent["action"]; pattern: RegExp }> = [
