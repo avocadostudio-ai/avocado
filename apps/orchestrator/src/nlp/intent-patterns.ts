@@ -99,6 +99,21 @@ export const COUNTED_MULTI_BLOCK_ADD_PATTERN =
 export const ADD_ACTION_PATTERN = /\b(?:add|insert|include|create|generate|build)\b/
 
 // ---------------------------------------------------------------------------
+// Field-content update disguised as add — "add X in/to [the Y] heading"
+// "add numbers in the Hero subheading" is an update to Hero.subheading,
+// NOT a batch add (even when "numbers"/"copy"/etc. alias block-type keywords).
+// ---------------------------------------------------------------------------
+
+const FIELD_NAMES = String.raw`(?:heading|subheading|sub-?title|title|copy|body|description|caption|label|paragraph|button\s*text|cta\s*text)`
+
+export const FIELD_CONTENT_UPDATE_PATTERN = new RegExp(
+  String.raw`\b(?:add|insert|include|append|put)\b[\s\S]*?\b(?:in|into|to|within|inside)\s+(?:the\s+|a\s+|an\s+)?(?:\w+[\s-]+){0,3}` +
+    FIELD_NAMES +
+    String.raw`\b`,
+  "i"
+)
+
+// ---------------------------------------------------------------------------
 // Block-type keyword lookup — maps natural language to BlockType values
 // ---------------------------------------------------------------------------
 
