@@ -11,12 +11,13 @@ import { randomUUID } from "node:crypto"
 import type { FastifyBaseLogger } from "fastify"
 import { JiraClient } from "./jira-client.js"
 import type { JiraConfig, JiraIssue, JiraAttachment, JiraProcessingResult, JiraProcessingEntry, JiraUser } from "./jira-types.js"
-import { createAgentTools } from "../agent/agent-tools.js"
+import { createAgentTools, type AgentTool } from "../agent/agent-tools.js"
 import { runAgentLoop } from "../agent/agent-loop.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
 import type { AgentProvider } from "../agent/agent-provider.js"
 import { resolveAgentModel } from "../agent/agent-provider.js"
 import { scopedSessionKey, listSitesForSession, getSessionPages } from "../state/session-state.js"
+import { pushJiraTelemetry, redactToolInput, type JiraTelemetryEntry, type JiraToolCallTrace } from "../telemetry/jira-telemetry.js"
 
 // ---------------------------------------------------------------------------
 // Processing mode
@@ -334,6 +335,55 @@ export function buildCommentHistory(issue: JiraIssue, agentAccountId: string | u
   return lines.join("\n\n")
 }
 
+/**
+ * Wrap each tool's handler so we record inputs, outputs, and durations into a
+ * per-ticket trace. Also emits a structured pino line per call so tail -f on
+ * the orchestrator's stdout reads well during live testing.
+ *
+ * The agent-loop `tool_done` event only exposes the result string, not the
+ * input — so capturing input has to happen at handler-invocation time.
+ */
+function instrumentToolsForTrace(
+  tools: AgentTool[],
+  trace: JiraToolCallTrace[],
+  logger: FastifyBaseLogger,
+  issueKey: string
+): AgentTool[] {
+  return tools.map((t) => ({
+    definition: t.definition,
+    handler: async (input) => {
+      const startedMs = Date.now()
+      const result = await t.handler(input)
+      const durationMs = Date.now() - startedMs
+      const rawResult = typeof result.result === "string" ? result.result : JSON.stringify(result.result ?? null)
+      const resultExcerpt = rawResult.slice(0, 400)
+      const isError = Boolean(result.isError)
+
+      trace.push({
+        name: t.definition.name,
+        input: redactToolInput(input),
+        durationMs,
+        resultExcerpt,
+        isError,
+      })
+
+      logger.info(
+        {
+          issueKey,
+          tool: t.definition.name,
+          durationMs,
+          isError,
+          inputKeys: Object.keys((input ?? {}) as Record<string, unknown>),
+          resultExcerpt: resultExcerpt.slice(0, 180),
+        },
+        "JIRA: agent tool call"
+      )
+
+      return result
+    },
+  }))
+}
+
 // ---------------------------------------------------------------------------
 // Main processor
 // ---------------------------------------------------------------------------
@@ -362,6 +412,19 @@ export async function processJiraTicket(options: {
   }
   processingQueue.set(issueKey, entry)
 
+  // Telemetry scratchpad — assembled across branches so one entry is flushed
+  // per ticket regardless of which mode we ran or where we exited.
+  const telemetry: JiraTelemetryEntry = {
+    timestamp: new Date(startedAt).toISOString(),
+    issueKey,
+    mode,
+    siteId: "",
+    session: "",
+    status: "success",
+    durationMs: 0,
+    transitions: [],
+  }
+
   const client = new JiraClient(config)
 
   try {
@@ -386,6 +449,10 @@ export async function processJiraTicket(options: {
         durationMs: Date.now() - startedAt,
         error: "ambiguous_site",
       }
+      telemetry.status = "error"
+      telemetry.error = "ambiguous_site"
+      telemetry.durationMs = Date.now() - startedAt
+      pushJiraTelemetry(telemetry)
       entry.state = "error"
       entry.completedAt = Date.now()
       entry.result = result
@@ -398,6 +465,8 @@ export async function processJiraTicket(options: {
 
     const sessionName = `${config.session}-${issueKey.toLowerCase()}`
     const session = scopedSessionKey(sessionName, siteId)
+    telemetry.siteId = siteId
+    telemetry.session = session
 
     // -----------------------------------------------------------------------
     // Mode: PUBLISH — publish draft, transition to Done, post "Published" comment.
@@ -420,6 +489,11 @@ export async function processJiraTicket(options: {
           error: `publish_failed: ${errorMsg}`,
         }
         await client.addComment(issueKey, formatFailureComment(failureResult)).catch(() => {})
+        telemetry.status = "error"
+        telemetry.error = `publish_failed: ${errorMsg}`
+        telemetry.durationMs = failureResult.durationMs
+        telemetry.touchedSlugs = slugs
+        pushJiraTelemetry(telemetry)
         return finalizeEntry(entry, failureResult)
       }
 
@@ -430,7 +504,10 @@ export async function processJiraTicket(options: {
 
       if (config.doneStatus) {
         const transitioned = await client.transitionIssue(issueKey, config.doneStatus).catch(() => false)
-        if (transitioned) logger.info({ issueKey, status: config.doneStatus }, "JIRA: transitioned to done")
+        if (transitioned) {
+          logger.info({ issueKey, status: config.doneStatus }, "JIRA: transitioned to done")
+          telemetry.transitions?.push(config.doneStatus)
+        }
       }
 
       const result: JiraProcessingResult = {
@@ -441,6 +518,12 @@ export async function processJiraTicket(options: {
         durationMs: Date.now() - startedAt,
         published: true,
       }
+      telemetry.status = "success"
+      telemetry.durationMs = result.durationMs
+      telemetry.published = true
+      telemetry.changes = slugs
+      telemetry.touchedSlugs = slugs
+      pushJiraTelemetry(telemetry)
       return finalizeEntry(entry, result)
     }
 
@@ -457,6 +540,7 @@ export async function processJiraTicket(options: {
     //    clarifications posted as comments reach the agent).
     const instruction = buildInstructionMessage(issue, attachmentResult, config.agentAccountId)
     logger.info({ issueKey, instructionLength: instruction.length }, "JIRA: built instruction")
+    telemetry.instruction = instruction
 
     // 4. Determine AI provider and key from env
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim()
@@ -465,6 +549,8 @@ export async function processJiraTicket(options: {
     }
     const provider: AgentProvider = process.env.ANTHROPIC_API_KEY?.trim() ? "anthropic" : "openai"
     const model = resolveAgentModel(provider)
+    telemetry.provider = provider
+    telemetry.model = model
 
     // -----------------------------------------------------------------------
     // Mode: REVIEW — dry-run planning pass, no tools, no transitions.
@@ -522,6 +608,10 @@ export async function processJiraTicket(options: {
         durationMs: Date.now() - startedAt,
         modelUsed: model,
       }
+      telemetry.durationMs = reviewResult.durationMs
+      telemetry.reviewDecision = decision
+      telemetry.summary = reviewResult.summary
+      pushJiraTelemetry(telemetry)
       return finalizeEntry(entry, reviewResult)
     }
 
@@ -529,17 +619,21 @@ export async function processJiraTicket(options: {
     // Mode: EXECUTE — run agent with tools, apply edits, transition to preview
     // (or straight to done if autoPublish is on).
     // -----------------------------------------------------------------------
-    const tools = createAgentTools(session)
+    const toolTrace: JiraToolCallTrace[] = []
+    const tools = instrumentToolsForTrace(createAgentTools(session), toolTrace, logger, issueKey)
     const systemPrompt = buildAgentSystemPrompt()
     const contextMsg = buildContextMessage(session, { slug: "/" })
     const fullMessage = `${contextMsg}\n\n---\n\nUser request: ${instruction}`
+    telemetry.toolCalls = toolTrace
 
     // Transition to executeStatus up-front so the board reflects reality
     // while the agent works.
     if (config.executeStatus) {
-      await client.transitionIssue(issueKey, config.executeStatus).catch((err) => {
-        logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to transition to execute status")
-      })
+      await client.transitionIssue(issueKey, config.executeStatus)
+        .then((ok) => { if (ok) telemetry.transitions?.push(config.executeStatus) })
+        .catch((err) => {
+          logger.warn({ issueKey, error: err instanceof Error ? err.message : String(err) }, "JIRA: failed to transition to execute status")
+        })
     }
 
     // 6. Run agent loop
@@ -643,8 +737,18 @@ export async function processJiraTicket(options: {
       const transitioned = await client.transitionIssue(issueKey, targetStatus).catch(() => false)
       if (transitioned) {
         logger.info({ issueKey, status: targetStatus }, "JIRA: transitioned issue")
+        telemetry.transitions?.push(targetStatus)
       }
     }
+
+    telemetry.status = "success"
+    telemetry.durationMs = result.durationMs
+    telemetry.summary = summary
+    telemetry.changes = changes
+    telemetry.touchedSlugs = Array.from(touchedSlugs)
+    telemetry.toolCallCount = toolCallCount
+    telemetry.published = published
+    pushJiraTelemetry(telemetry)
 
     return finalizeEntry(entry, result)
   } catch (err) {
@@ -671,6 +775,11 @@ export async function processJiraTicket(options: {
     if (config.failedStatus) {
       await client.transitionIssue(issueKey, config.failedStatus).catch(() => {})
     }
+
+    telemetry.status = "error"
+    telemetry.durationMs = durationMs
+    telemetry.error = errorMsg
+    pushJiraTelemetry(telemetry)
 
     return finalizeEntry(entry, result)
   } finally {
@@ -853,9 +962,19 @@ export type ReviewDecision = {
 function buildReviewSystemPrompt(): string {
   return [
     "You are reviewing a Jira ticket that requests changes to a website. You are in REVIEW MODE:",
-    "- You have NO tools. Do not attempt to call any tools.",
+    "- You have NO tools in this pass. Do not attempt to call any tools.",
     "- You will NOT be applying changes in this pass — a follow-up execution pass will do that after the reporter confirms.",
     "- Your job: decide whether the ticket has enough information to proceed safely, and if so, outline the plan.",
+    "",
+    "## What the execute pass CAN do",
+    "You are not limited to what you can do here. The execute pass has the full editor toolset — don't claim capabilities are missing. In particular:",
+    "- Edit any block's text, props, or items (Hero, CTA, FeatureGrid, FAQ, etc.), add / remove / reorder blocks, create / duplicate / delete pages.",
+    "- Update site settings (name, logo, navigation labels, dropdown groups) and page SEO metadata.",
+    "- **Search Unsplash for stock photos** (`unsplash_search`) and pick a match — so if the reporter asks for a \"tropical hero image\", you DO NOT need to ask them for a URL.",
+    "- **Resolve Unsplash photo-page URLs** (`unsplash_get_by_id`) — if the reporter pastes `https://unsplash.com/photos/slug-PHOTOID`, the execute pass will resolve it to a direct image URL automatically. Do not ask for a \"direct image URL\" when a photo-page URL was given.",
+    "- **Generate AI images** (`image_generate`) via DALL-E / Gemini when no stock photo fits or the reporter wants something specific.",
+    "",
+    "Only ask clarifying questions about genuinely ambiguous *content* (which page, which section, what copy, what link target, how many items). Never ask about a capability you actually have.",
     "",
     "Respond with ONLY a JSON object (no prose, no code fences, no markdown) in exactly this shape:",
     '{',
@@ -866,11 +985,12 @@ function buildReviewSystemPrompt(): string {
     "",
     "Rules:",
     '- Use "proceed" when the task is concrete enough to act on.',
-    '- Use "questions" when something essential is missing or ambiguous (target page, copy, images, counts, etc.).',
+    '- Use "questions" when something essential is missing or ambiguous (target page, copy, link targets, counts, etc.).',
     '- Always include "plan" — even with "questions" it should describe your best interpretation as an array of short bullets.',
     '- Each plan item is ONE concrete step (e.g. "Update b_hero_home heading to …"). Keep 2-5 items. No run-on sentences.',
     "- Keep questions to at most 3. Prefer clarity over completeness.",
     "- Do NOT ask about anything you can reasonably infer from the site context below.",
+    "- Do NOT ask the reporter to provide an image URL just because a theme was requested — the execute pass will search Unsplash. Only ask about images when the request is genuinely ambiguous (e.g. \"use the brand mascot\" with no asset reference on file).",
   ].join("\n")
 }
 

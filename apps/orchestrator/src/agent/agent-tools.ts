@@ -13,6 +13,7 @@ import { type Operation, type PageDoc, type BlockManifest, defaultPropsForType, 
 import { applyOpsAtomically, pickFocusBlockId, type ApplyOpsOptions } from "../ops/ops-engine.js"
 import { getPage, getSessionDraft, bumpVersion, orderSlugsHomeFirst, getSiteConfig } from "../state/session-state.js"
 import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins/unsplash-search.js"
+import { unsplashGetByIdHandler, unsplashGetByIdManifest } from "../tools/builtins/unsplash-get-by-id.js"
 import { imageGenerateHandler, imageGenerateManifest } from "../tools/builtins/image-generate.js"
 import type { ToolCallContext } from "../tools/types.js"
 
@@ -610,6 +611,29 @@ export function createAgentTools(session: string, options?: { manifest?: BlockMa
     // ================================================================
     // IMAGE/MEDIA TOOLS
     // ================================================================
+
+    {
+      definition: {
+        name: "unsplash_get_by_id",
+        description: "Resolve an Unsplash photo page URL (e.g. https://unsplash.com/photos/slug-PHOTOID) or a bare photo ID to a direct image asset URL. ALWAYS call this when the user or reporter provides an unsplash.com/photos/... link — that link is an HTML page, not an image, and assigning it to imageUrl will break rendering. The returned imageUrl is safe to pass straight into batch_update_props.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            url: { type: "string", description: "Unsplash photo page URL" },
+            photoId: { type: "string", description: "Bare Unsplash photo ID (alternative to url)" },
+          },
+        },
+      },
+      handler: async (input) => {
+        try {
+          const ctx: ToolCallContext = { siteId: "", sessionId: session, traceId: "agent", plannerProvider: "anthropic" }
+          const result = await unsplashGetByIdHandler({ input, context: ctx, manifest: unsplashGetByIdManifest })
+          return { result: JSON.stringify(result) }
+        } catch (e: unknown) {
+          return { result: `Error: ${e instanceof Error ? e.message : String(e)}`, isError: true }
+        }
+      },
+    },
 
     {
       definition: {
