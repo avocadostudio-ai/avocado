@@ -12,14 +12,14 @@ import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
  *   - Server restart wiping the in-memory undo stack
  *
  * Tier 1 triggers (no toggle — always required):
- *   1. remove_page when the page has any blocks
+ *   1. remove_page (always — even empty pages represent structural site content)
  *   2. Multi-page AI plans (ops touch more than one slug)
  *   3. Bulk delete: >= BULK_REMOVE_BLOCK_THRESHOLD remove_block ops in a
  *      single plan, OR a plan that removes > HALF of the blocks on any page
  */
 
 export type DestructiveReason =
-  | { kind: "remove_page_with_content"; slug: string; blockCount: number }
+  | { kind: "remove_page"; slug: string; blockCount: number }
   | { kind: "multi_page_plan"; slugs: string[] }
   | { kind: "bulk_remove_blocks"; totalRemoveOps: number }
   | { kind: "majority_page_wipe"; slug: string; removing: number; total: number }
@@ -58,14 +58,12 @@ export function evaluateDestructiveActions(
   const reasons: DestructiveReason[] = []
   const ops = plan.ops
 
-  // 1. remove_page on a page that has content
+  // 1. remove_page — always destructive regardless of block count
   for (const op of ops) {
     if (op.op !== "remove_page") continue
     const page = getPage(op.pageSlug)
     const blockCount = page?.blocks?.length ?? 0
-    if (blockCount > 0) {
-      reasons.push({ kind: "remove_page_with_content", slug: op.pageSlug, blockCount })
-    }
+    reasons.push({ kind: "remove_page", slug: op.pageSlug, blockCount })
   }
 
   // 2. Multi-page plan (>1 slug touched in a single chat turn)
@@ -105,8 +103,10 @@ export function evaluateDestructiveActions(
 
 export function describeDestructiveReason(reason: DestructiveReason): string {
   switch (reason.kind) {
-    case "remove_page_with_content":
-      return `Delete page ${reason.slug} (${reason.blockCount} block${reason.blockCount === 1 ? "" : "s"} will be removed).`
+    case "remove_page":
+      return reason.blockCount > 0
+        ? `Delete page ${reason.slug} (${reason.blockCount} block${reason.blockCount === 1 ? "" : "s"} will be removed).`
+        : `Delete page ${reason.slug}.`
     case "multi_page_plan":
       return `Change ${reason.slugs.length} pages in one step (${reason.slugs.join(", ")}).`
     case "bulk_remove_blocks":
