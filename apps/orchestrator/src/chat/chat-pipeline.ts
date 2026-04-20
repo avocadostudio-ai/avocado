@@ -3317,9 +3317,15 @@ export async function runChatPipeline(
                     const existingPage = getPage(body.session!, opSlug)
                     streamApplyState.rollbackSnapshots.set(opSlug, existingPage ? structuredClone(existingPage) : null)
                   }
-                  // Skip structural ops (create_page, rename, etc.) — they need
-                  // the full plan context and can't be applied incrementally.
-                  const isStructural = op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
+                  // Skip ops that need the full plan context before applying:
+                  //   - Page-level structural ops (create_page, rename_page, etc.) can't
+                  //     be applied piecemeal because they affect navigation/history state.
+                  //   - remove_block requires the complete op list so the tier-1
+                  //     destructive-action gate (bulk deletes, majority-wipe) can evaluate
+                  //     the full scope before any blocks are deleted from the preview.
+                  //     Applying remove_block mid-stream would erase blocks before the gate
+                  //     runs, then surface an "Approve" card for already-deleted content.
+                  const isStructural = op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page" || op.op === "remove_block"
                   if (isStructural) {
                     streamApplyState.hasStructuralOps = true
                     return
