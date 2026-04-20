@@ -1382,8 +1382,10 @@ export async function runChatPipeline(
     // Tier-1 destructive-action gate. Hold any edit_plan containing destructive
     // ops (remove_page on a page with content, multi-page scope, bulk deletes)
     // for explicit approval — undo protects recovery but not accidental intent.
+    // Skip when preResolvedPlan is set: that flag means the plan came from
+    // apply_pending_plan (user already clicked Approve) and must not loop back.
     let destructiveReasons: string[] = []
-    if (resolvedPlan.intent === "edit_plan" && resolvedPlan.ops.length > 0) {
+    if (resolvedPlan.intent === "edit_plan" && resolvedPlan.ops.length > 0 && !optionsOverride?.preResolvedPlan) {
       const destructiveEval = evaluateDestructiveActions(resolvedPlan, (slug) => getPage(body.session!, slug))
       if (destructiveEval.requiresApproval) {
         effectiveApplyMode = "plan_only"
