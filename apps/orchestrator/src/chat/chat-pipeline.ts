@@ -74,6 +74,7 @@ import {
   pickFocusBlockId,
   pickUpdatedSlug
 } from "../ops/ops-engine.js"
+import { evaluateDestructiveActions } from "../ops/destructive-action-gate.js"
 import {
   clarificationSuggestions,
   postEditSuggestions,
@@ -1378,6 +1379,20 @@ export async function runChatPipeline(
     })
     if (explicitCtaCoverageGap) return { done: false as const, reason: explicitCtaCoverageGap }
 
+    // Tier-1 destructive-action gate. Hold any edit_plan containing destructive
+    // ops (remove_page on a page with content, multi-page scope, bulk deletes)
+    // for explicit approval — undo protects recovery but not accidental intent.
+    // Skip when preResolvedPlan is set: that flag means the plan came from
+    // apply_pending_plan (user already clicked Approve) and must not loop back.
+    let destructiveReasons: string[] = []
+    if (resolvedPlan.intent === "edit_plan" && resolvedPlan.ops.length > 0 && !optionsOverride?.preResolvedPlan) {
+      const destructiveEval = evaluateDestructiveActions(resolvedPlan, (slug) => getPage(body.session!, slug))
+      if (destructiveEval.requiresApproval) {
+        effectiveApplyMode = "plan_only"
+        destructiveReasons = destructiveEval.messages
+      }
+    }
+
     // Emit plan metadata if not already emitted (deferred image path and other branches skip the early emit above)
     if (!stageTimeline.some((item) => item.stage === "first_structured_progress")) {
       options?.onPlanMeta?.({
@@ -1536,7 +1551,8 @@ export async function runChatPipeline(
         modelKey,
         plan: structuredClone(resolvedPlan),
         originalMessage: plannerMessage,
-        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps } : {})
+        ...(detectedImageOps.length > 0 ? { pendingImageOps: detectedImageOps } : {}),
+        ...(destructiveReasons.length > 0 ? { destructiveReasons } : {})
       })
       ctx.chatTelemetry.push({
         id: chatRequestId,
@@ -1572,7 +1588,8 @@ export async function runChatPipeline(
             plannerSource: source,
             modelUsed,
             modelKey,
-            pendingPlanId
+            pendingPlanId,
+            ...(destructiveReasons.length > 0 ? { destructiveReasons } : {})
           } satisfies ChatResult, {
             outcome: "plan_ready_for_approval",
             intent: resolvedPlan.intent,
@@ -3302,9 +3319,15 @@ export async function runChatPipeline(
                     const existingPage = getPage(body.session!, opSlug)
                     streamApplyState.rollbackSnapshots.set(opSlug, existingPage ? structuredClone(existingPage) : null)
                   }
-                  // Skip structural ops (create_page, rename, etc.) — they need
-                  // the full plan context and can't be applied incrementally.
-                  const isStructural = op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page"
+                  // Skip ops that need the full plan context before applying:
+                  //   - Page-level structural ops (create_page, rename_page, etc.) can't
+                  //     be applied piecemeal because they affect navigation/history state.
+                  //   - remove_block requires the complete op list so the tier-1
+                  //     destructive-action gate (bulk deletes, majority-wipe) can evaluate
+                  //     the full scope before any blocks are deleted from the preview.
+                  //     Applying remove_block mid-stream would erase blocks before the gate
+                  //     runs, then surface an "Approve" card for already-deleted content.
+                  const isStructural = op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page" || op.op === "remove_block"
                   if (isStructural) {
                     streamApplyState.hasStructuralOps = true
                     return

@@ -1458,11 +1458,21 @@ function EditorPage({
               ) : null}
               {entry.status === "plan_ready" && entry.pendingPlanId ? (
                 <div className="msg-plan-actions">
+                  {entry.destructiveReasons && entry.destructiveReasons.length > 0 ? (
+                    <div className="msg-destructive-warning" role="alert">
+                      <div className="msg-destructive-warning-title">Review before applying</div>
+                      <ul className="msg-destructive-warning-list">
+                        {entry.destructiveReasons.map((reason, idx) => (
+                          <li key={idx}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   {(() => {
                     const currentPlanId = entry.pendingPlanId
                     const disabled = isLoading || pendingPlanId !== currentPlanId
                     return (
-                      <>
+                      <div className="msg-plan-btn-row">
                         <button
                           type="button"
                           className="primary-btn msg-plan-btn"
@@ -1479,7 +1489,7 @@ function EditorPage({
                         >
                           Stop
                         </button>
-                      </>
+                      </div>
                     )
                   })()}
                 </div>
