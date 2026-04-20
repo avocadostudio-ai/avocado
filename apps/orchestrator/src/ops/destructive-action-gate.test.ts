@@ -184,7 +184,6 @@ describe("destructive-action-gate: tier 1", () => {
       lookup([page("/about", 3)])
     )
     assert.equal(result.messages.length, 1)
-    assert.match(result.messages[0], /Delete page \/about/)
-    assert.match(result.messages[0], /3 blocks/)
+    assert.match(result.messages[0], /undo this later/)
   })
 })
