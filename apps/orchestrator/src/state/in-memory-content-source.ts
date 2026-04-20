@@ -10,6 +10,7 @@ import {
   setSiteConfig as _setSiteConfig,
   bumpVersion as _bumpVersion,
   pushUndo as _pushUndo,
+  pushCappedHistory,
   orderSlugsHomeFirst,
   versions,
   historyUndo,
@@ -66,7 +67,7 @@ export class InMemoryContentSource implements ContentSource {
   async pushRedo(session: string, slug: string, snapshot: PageDoc | null) {
     const redoMap = getHistoryMap(historyRedo, session)
     const list = redoMap.get(slug) ?? []
-    list.push(snapshot === null ? null : structuredClone(snapshot))
+    pushCappedHistory(list, snapshot)
     redoMap.set(slug, list)
   }
 

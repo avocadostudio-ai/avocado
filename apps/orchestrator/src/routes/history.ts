@@ -8,6 +8,7 @@ import {
   setPage,
   removePage,
   pushUndo,
+  pushCappedHistory,
   bumpVersion,
   pushVersionEntry,
   getVersionLog,
@@ -57,7 +58,7 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
 
     const redoList = redoMap.get(body.slug) ?? []
     // Push current state to redo: null means "page was deleted" (redo will re-delete)
-    redoList.push(current ? structuredClone(current) : null as any)
+    pushCappedHistory(redoList, current)
     redoMap.set(body.slug, redoList)
 
     // null entry means "page didn't exist before" — undo removes it
@@ -98,7 +99,7 @@ export async function historyRoutes(app: FastifyInstance, _ctx: RouteContext) {
     if (next === undefined) return reply.code(400).send({ error: "nothing to redo" })
 
     const undoList = undoMap.get(body.slug) ?? []
-    undoList.push(current ? structuredClone(current) : null as any)
+    pushCappedHistory(undoList, current)
     undoMap.set(body.slug, undoList)
 
     // null entry means "page was deleted" — redo re-deletes it
