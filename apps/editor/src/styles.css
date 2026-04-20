@@ -2279,13 +2279,43 @@ textarea {
 .msg-plan-actions {
   margin-top: 10px;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .msg-plan-btn {
   min-height: 32px;
   padding: 6px 12px;
+}
+
+.msg-plan-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.msg-destructive-warning {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #881337;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.msg-destructive-warning-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.msg-destructive-warning-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.msg-destructive-warning-list li + li {
+  margin-top: 2px;
 }
 
 .streaming-pill {
