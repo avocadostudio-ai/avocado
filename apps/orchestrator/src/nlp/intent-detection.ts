@@ -84,6 +84,13 @@ export type ChatResult = {
   modelUsed: string
   modelKey: ModelKey
   pendingPlanId?: string
+  /**
+   * Tier-1 destructive-action reasons, surfaced when the approval gate was
+   * triggered because the plan contains destructive ops (remove_page with
+   * content, multi-page scope, bulk deletes). Rendered as a warning in the
+   * approval card so the user sees what will be deleted before confirming.
+   */
+  destructiveReasons?: string[]
   continuation?: {
     chainId: string
     currentStep: number

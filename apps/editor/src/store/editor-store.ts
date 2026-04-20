@@ -464,6 +464,9 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         aiJustification: parsedChanges.aiJustification,
         aiPerformanceNote: parsedChanges.aiPerformanceNote,
         pendingPlanId: typeof data.pendingPlanId === "string" ? data.pendingPlanId : undefined,
+        destructiveReasons: Array.isArray(data.destructiveReasons)
+          ? data.destructiveReasons.filter((r): r is string => typeof r === "string")
+          : undefined,
         continuation: data.continuation ?? undefined,
         imageSwap: options?.imageSwap,
         thinking: options?.thinking,
