@@ -2279,8 +2279,8 @@ textarea {
 .msg-plan-actions {
   margin-top: 10px;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .msg-plan-btn {
@@ -2288,8 +2288,13 @@ textarea {
   padding: 6px 12px;
 }
 
+.msg-plan-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .msg-destructive-warning {
-  margin-top: 10px;
   padding: 10px 12px;
   border-radius: 10px;
   background: rgba(244, 63, 94, 0.08);

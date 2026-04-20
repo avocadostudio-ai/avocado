@@ -1457,7 +1457,7 @@ function EditorPage({
                 </div>
               ) : null}
               {entry.status === "plan_ready" && entry.pendingPlanId ? (
-                <>
+                <div className="msg-plan-actions">
                   {entry.destructiveReasons && entry.destructiveReasons.length > 0 ? (
                     <div className="msg-destructive-warning" role="alert">
                       <div className="msg-destructive-warning-title">Review before applying</div>
@@ -1468,33 +1468,31 @@ function EditorPage({
                       </ul>
                     </div>
                   ) : null}
-                  <div className="msg-plan-actions">
-                    {(() => {
-                      const currentPlanId = entry.pendingPlanId!
-                      const disabled = isLoading || pendingPlanId !== currentPlanId
-                      return (
-                        <>
-                          <button
-                            type="button"
-                            className="primary-btn msg-plan-btn"
-                            onClick={() => void chatEngine.approvePendingPlan(currentPlanId)}
-                            disabled={disabled}
-                          >
-                            Approve plan
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary-btn msg-plan-btn"
-                            onClick={() => void chatEngine.stopPendingPlan(currentPlanId)}
-                            disabled={disabled}
-                          >
-                            Stop
-                          </button>
-                        </>
-                      )
-                    })()}
-                  </div>
-                </>
+                  {(() => {
+                    const currentPlanId = entry.pendingPlanId
+                    const disabled = isLoading || pendingPlanId !== currentPlanId
+                    return (
+                      <div className="msg-plan-btn-row">
+                        <button
+                          type="button"
+                          className="primary-btn msg-plan-btn"
+                          onClick={() => void chatEngine.approvePendingPlan(currentPlanId)}
+                          disabled={disabled}
+                        >
+                          Approve plan
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-btn msg-plan-btn"
+                          onClick={() => void chatEngine.stopPendingPlan(currentPlanId)}
+                          disabled={disabled}
+                        >
+                          Stop
+                        </button>
+                      </div>
+                    )
+                  })()}
+                </div>
               ) : null}
               {entry.imageSwap ? (() => {
                 const swap = entry.imageSwap
