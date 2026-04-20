@@ -2295,27 +2295,15 @@ textarea {
 }
 
 .msg-destructive-warning {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(244, 63, 94, 0.08);
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  color: #881337;
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msg-destructive-warning-line {
+  font-size: 12px;
+  color: #92400e;
   line-height: 1.4;
-}
-
-.msg-destructive-warning-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.msg-destructive-warning-list {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.msg-destructive-warning-list li + li {
-  margin-top: 2px;
 }
 
 .streaming-pill {
