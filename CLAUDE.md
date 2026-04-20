@@ -136,13 +136,19 @@ Session state (draft pages, history, version log, chat history, site configs, is
 - `orchestrator-state.json.migrated-<iso-ts>` — one-shot archive of the legacy JSON writer's output, kept as a safety net and auto-swept after `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS` (default 14)
 
 **Env vars**
-- `ORCHESTRATOR_DB_FILE` — path; auto-switches to `:memory:` under `DEMO_MODE=1` or `NODE_ENV=test`
+- `ORCHESTRATOR_DB_FILE` — path (empty/unset = default). Auto-switches to `:memory:` under `DEMO_MODE=1` or `NODE_ENV=test`; set to the literal `:memory:` to force ephemeral in prod
 - `ORCHESTRATOR_STATE_FILE` — legacy JSON read on first boot; the file is renamed after migration, never rewritten
-- `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS` — retention for the archived JSON
+- `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS` — retention for the archived JSON (default 14)
+- `ORCHESTRATOR_DB_BACKUP_INTERVAL_HOURS` — periodic `VACUUM INTO` snapshot interval (default 24)
+- `ORCHESTRATOR_DB_BACKUP_LIMIT` — how many rolling `.db.backup-<ts>` snapshots to keep (default 14)
 
-**Caps** — undo/redo stacks are capped at 50 entries per slug + direction; version log at 100; recent edits at 10; chat history at 6 messages. Ephemeral in-memory maps (`pendingApprovalPlanBySession`, `continuationChainBySession`, `publishStatusBySession`, image-source preferences) are **not** persisted.
+**Caps** — undo/redo stacks are capped at 50 entries per slug + direction; version log at 100; recent edits at 10; chat history at 6 messages. Source of truth: `HISTORY_DEPTH_CAP` / `VERSION_LOG_CAP` / `RECENT_EDITS_CAP` / `CHAT_HISTORY_CAP` in `sqlite-store.ts`; `session-state.ts` re-exports them under the legacy `*_MAX` names. Ephemeral in-memory maps (`pendingApprovalPlanBySession`, `continuationChainBySession`, `publishStatusBySession`, image-source preferences) are **not** persisted.
 
-**Shutdown** — `SIGTERM`/`SIGINT` trigger a final `persistStateNow` → `app.close()` → `resetStore()` sequence so the WAL is checkpointed cleanly.
+**Writes** — `schedulePersistState` coalesces a single request's mutations with a 30 ms debounce, then snapshots every Map into SQLite inside one transaction. The per-snapshot writes reuse a WeakMap-cached set of prepared statements so each statement is parsed once per DB handle.
+
+**Shutdown** — `SIGTERM`/`SIGINT` trigger `app.close()` (drain in-flight handlers) → `persistStateNow` (flush any debounced write) → `resetStore()` (checkpoint the WAL) in that order.
+
+**Native dependency** — `better-sqlite3` ships prebuilt binaries for linux-x64 (glibc 2.28+), darwin-arm64, and darwin-x64 with Node 22. Render's default buildpack works out of the box. Custom Dockerfiles need `python3`, `make`, and `g++` on the build stage only if the prebuild is missing for your target glibc / musl.
 
 ## Demo mode (limited public playground)
 

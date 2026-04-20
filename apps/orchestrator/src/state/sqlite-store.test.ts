@@ -1,6 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { unlinkSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { resolve as resolvePath } from "node:path"
 import type { PageDoc } from "@ai-site-editor/shared"
 import {
   SqliteStore,
@@ -333,20 +335,8 @@ test("transaction: commits on success", () => {
 // ---------------------------------------------------------------------------
 // Schema bootstrap
 // ---------------------------------------------------------------------------
-test("schema: re-opening an existing DB preserves rows", () => {
-  const s1 = makeStore()
-  try {
-    s1.setPage("s1", makePage("/"))
-    assert.equal(s1.getPage("s1", "/")?.slug, "/")
-  } finally {
-    s1.close()
-  }
-  // :memory: DBs don't persist — use a file path for round-trip. Skipped here;
-  // covered by the sqlite-store file-backed round-trip below.
-})
-
 test("schema: file-backed DB survives close/reopen", () => {
-  const tmp = `${process.cwd()}/.data/test-sqlite-${process.pid}-${Date.now()}.db`
+  const tmp = resolvePath(tmpdir(), `sqlite-store-test-${process.pid}-${Date.now()}.db`)
   const s1 = new SqliteStore({ file: tmp, wal: false })
   s1.setPage("s1", makePage("/"))
   s1.bumpVersion("s1")

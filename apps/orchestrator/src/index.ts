@@ -15,7 +15,13 @@ import { createEvalCandidateStore } from "./telemetry/eval-candidate-store.js"
 import { normalizePlanCandidate } from "./nlp/plan-normalizer.js"
 import { buildCreatePagePlan, compileDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { type AIProvider, loadStateFromDisk, persistStateNow } from "./state/session-state.js"
-import { resetStore } from "./state/sqlite-store-singleton.js"
+import {
+  resetStore,
+  resolveBackupIntervalHours,
+  resolveBackupLimit,
+  resolveDbFile,
+  runSqliteBackup,
+} from "./state/sqlite-store-singleton.js"
 import { ensurePresetRestoreSessions } from "./publish/publish-helpers.js"
 import type { RouteContext } from "./routes/route-context.js"
 import { contentRoutes } from "./routes/content.js"
@@ -365,6 +371,25 @@ app.get("/favicon.ico", async (_request, reply) => {
 // Server startup
 // ---------------------------------------------------------------------------
 
+let backupTimer: NodeJS.Timeout | null = null
+
+function startSqliteBackupLoop() {
+  const dbFile = resolveDbFile()
+  if (dbFile === ":memory:") return
+  const limit = resolveBackupLimit()
+  const hours = resolveBackupIntervalHours()
+  const intervalMs = hours * 60 * 60 * 1000
+  const tick = () => {
+    void runSqliteBackup(dbFile, limit, app.log)
+  }
+  // Run once shortly after startup so a crashed process didn't skip
+  // today's backup, then on the configured interval.
+  const initial = setTimeout(tick, 60_000)
+  initial.unref?.()
+  backupTimer = setInterval(tick, intervalMs)
+  backupTimer.unref?.()
+}
+
 async function startServer() {
   const port = Number(process.env.PORT ?? 4200)
   await loadStateFromDisk(app.log)
@@ -373,6 +398,7 @@ async function startServer() {
   if (evalCandidates) await evalCandidates.loadFromDisk()
   await app.listen({ port, host: "0.0.0.0" })
   app.log.info(`Orchestrator listening on ${port}`)
+  startSqliteBackupLoop()
 
   // Start JIRA poller if configured
   if (process.env.JIRA_POLL_ENABLED === "1") {
@@ -388,25 +414,32 @@ async function startServer() {
 }
 
 // ---------------------------------------------------------------------------
-// Graceful shutdown — flush state, close the SQLite handle, stop Fastify.
-// Without this, Render / docker stop leaves behind a `.db-wal` that needs
-// a subsequent open to checkpoint.
+// Graceful shutdown — drain Fastify first so no new mutations can land, then
+// flush pending state, then close the SQLite handle so the WAL is
+// checkpointed cleanly. Render/docker otherwise leaves `.db-wal` behind.
 // ---------------------------------------------------------------------------
 let shuttingDown = false
 async function shutdown(signal: string) {
   if (shuttingDown) return
   shuttingDown = true
   app.log.info({ signal }, "Orchestrator shutting down")
-  try {
-    await persistStateNow(app.log)
-  } catch (err) {
-    app.log.error({ err }, "Final state flush failed")
-  }
+  if (backupTimer) clearInterval(backupTimer)
+  // 1. Stop accepting new requests + wait for in-flight handlers to finish.
+  //    Those finishing handlers call schedulePersistState against the still-
+  //    open store, so their mutations are already durable by the time
+  //    app.close() resolves.
   try {
     await app.close()
   } catch (err) {
     app.log.error({ err }, "Fastify close failed")
   }
+  // 2. Flush the final debounced write (if any) synchronously.
+  try {
+    await persistStateNow(app.log)
+  } catch (err) {
+    app.log.error({ err }, "Final state flush failed")
+  }
+  // 3. Close the DB handle — triggers a WAL checkpoint on exit.
   try {
     resetStore()
   } catch (err) {

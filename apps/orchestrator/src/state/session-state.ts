@@ -17,7 +17,19 @@ import {
   resolveJsonMigrationTtlDays,
   sweepStaleMigrations,
 } from "./sqlite-store-singleton.js"
+import {
+  CHAT_HISTORY_CAP,
+  HISTORY_DEPTH_CAP,
+  RECENT_EDITS_CAP,
+  VERSION_LOG_CAP,
+} from "./sqlite-store.js"
 import type { SqliteStore } from "./sqlite-store.js"
+
+// Single source of truth for these caps is `sqlite-store.ts`. Re-exported
+// under the legacy names so existing imports keep working.
+export const HISTORY_DEPTH_MAX = HISTORY_DEPTH_CAP
+export const VERSION_LOG_MAX = VERSION_LOG_CAP
+export const CHAT_HISTORY_MAX_TURNS = CHAT_HISTORY_CAP
 
 // ---------------------------------------------------------------------------
 // ModelKey inline type (avoids circular dependency with index.ts)
@@ -221,7 +233,7 @@ export function consumeRecentlyRestored(session: string): boolean { return recen
  * is renamed to `<path>.migrated-<ts>` and swept after
  * `ORCHESTRATOR_JSON_MIGRATION_TTL_DAYS`.
  */
-export function resolveStateFilePath(): string {
+function resolveStateFilePath(): string {
   return (
     process.env.ORCHESTRATOR_STATE_FILE ??
     resolve(process.cwd(), "../../.data/orchestrator-state.json")
@@ -415,13 +427,6 @@ export function removePage(session: string, slug: string) {
 }
 
 /**
- * Per-slug, per-direction cap on the in-memory undo/redo stacks. Matches
- * `HISTORY_DEPTH_CAP` in sqlite-store.ts so hydrating from SQLite never
- * over-fills the Maps. Push sites use `pushCappedHistory` to enforce it.
- */
-export const HISTORY_DEPTH_MAX = 50
-
-/**
  * Append `snapshot` to an undo/redo stack, evicting the oldest entries
  * once `HISTORY_DEPTH_MAX` is exceeded. Mutates `list` in place.
  */
@@ -453,10 +458,8 @@ export function bumpVersion(session: string) {
 export function pushRecentEdit(session: string, entry: { slug: string; summary: string; ops: Operation[] }) {
   const list = recentEdits.get(session) ?? []
   list.push({ ...entry, at: new Date().toISOString() })
-  recentEdits.set(session, list.slice(-10))
+  recentEdits.set(session, list.slice(-RECENT_EDITS_CAP))
 }
-
-const VERSION_LOG_MAX = 100
 
 export function pushVersionEntry(session: string, entry: Omit<VersionEntry, "at">) {
   const list = versionLog.get(session) ?? []
@@ -469,8 +472,6 @@ export function getVersionLog(session: string, slug?: string, limit = 50): Versi
   const filtered = slug ? list.filter((e) => e.slug === slug) : list
   return filtered.slice(-limit)
 }
-
-export const CHAT_HISTORY_MAX_TURNS = 6
 
 export function pushChatHistory(session: string, userMessage: string, assistantSummary: string) {
   const history = chatHistoryBySession.get(session) ?? []
@@ -621,7 +622,7 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
       const list = listRaw
         .filter((entry) => entry && typeof entry === "object")
         .map((entry) => entry as { slug: string; summary: string; ops: Operation[]; at: string })
-      recentEdits.set(session, list.slice(-10))
+      recentEdits.set(session, list.slice(-RECENT_EDITS_CAP))
     }
   }
 
@@ -681,36 +682,77 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
 // SQLite persistence (Phase 2+)
 // ---------------------------------------------------------------------------
 /**
+ * Prepared statements used by `writeAllStateToStore`, cached per-`SqliteStore`
+ * instance so each statement is parsed once for the lifetime of the DB handle
+ * (not every persist). The cache is keyed via WeakMap so `resetStore()`
+ * re-opening the DB transparently produces a fresh set.
+ */
+type PersistStmts = ReturnType<typeof buildPersistStmts>
+const persistStmtsCache = new WeakMap<SqliteStore, PersistStmts>()
+
+function buildPersistStmts(store: SqliteStore) {
+  const db = store.db
+  return {
+    deletePages: db.prepare("DELETE FROM pages"),
+    insertPage: db.prepare(
+      "INSERT INTO pages(session, slug, kind, doc) VALUES (?, ?, ?, ?)"
+    ),
+    deleteHistory: db.prepare("DELETE FROM history"),
+    insertHistory: db.prepare(
+      "INSERT INTO history(session, slug, direction, seq, snapshot) VALUES (?, ?, ?, ?, ?)"
+    ),
+    deleteSessions: db.prepare("DELETE FROM sessions"),
+    deleteVersionLog: db.prepare("DELETE FROM version_log"),
+    insertVersionLog: db.prepare(
+      "INSERT INTO version_log(session, seq, entry) VALUES (?, ?, ?)"
+    ),
+    deleteRecentEdits: db.prepare("DELETE FROM recent_edits"),
+    insertRecentEdit: db.prepare(
+      "INSERT INTO recent_edits(session, seq, entry) VALUES (?, ?, ?)"
+    ),
+    deleteChatHistory: db.prepare("DELETE FROM chat_history"),
+    insertChatMessage: db.prepare(
+      "INSERT INTO chat_history(session, seq, role, content) VALUES (?, ?, ?, ?)"
+    ),
+    deleteSiteConfigs: db.prepare("DELETE FROM site_configs"),
+    deleteIssueTouched: db.prepare("DELETE FROM issue_touched"),
+  }
+}
+
+function getPersistStmts(store: SqliteStore): PersistStmts {
+  let stmts = persistStmtsCache.get(store)
+  if (!stmts) {
+    stmts = buildPersistStmts(store)
+    persistStmtsCache.set(store, stmts)
+  }
+  return stmts
+}
+
+/**
  * Snapshot every in-memory Map into SQLite inside a single transaction.
- * Callers are `schedulePersistState` (hot path) and one-shot migrations.
- *
- * Tradeoff: this writes every session every call, not just the mutated one.
- * Because SQLite in WAL mode wraps the whole thing in one fsync and our
- * state is small (<1 MB typical), it stays sub-millisecond. Per-session
- * write-through is a future optimization if writes ever become hot.
+ * Writes all sessions on every call, not just the mutated one — acceptable
+ * at current scale (state typically well under 1 MB). Per-session
+ * write-through is the first optimization if this becomes a hot spot.
  */
 function writeAllStateToStore(store: SqliteStore) {
+  const s = getPersistStmts(store)
   store.transaction(() => {
-    // Pages — drop-all-then-reinsert so deletes propagate. Cheap for our sizes.
-    store.db.prepare("DELETE FROM pages").run()
+    // Pages — drop-all-then-reinsert so deletes propagate.
+    s.deletePages.run()
     for (const [slug, page] of publishedPages) {
-      store.db.prepare(
-        "INSERT INTO pages(session, slug, kind, doc) VALUES (?, ?, 'published', ?)"
-      ).run(PUBLISHED_GLOBAL_KEY, slug, JSON.stringify(page))
+      s.insertPage.run(PUBLISHED_GLOBAL_KEY, slug, "published", JSON.stringify(page))
     }
     for (const [session, bySlug] of draftPages) {
       for (const [slug, page] of bySlug) {
-        store.db.prepare(
-          "INSERT INTO pages(session, slug, kind, doc) VALUES (?, ?, 'draft', ?)"
-        ).run(session, slug, JSON.stringify(page))
+        s.insertPage.run(session, slug, "draft", JSON.stringify(page))
       }
     }
-    // History — drop + reinsert so pops propagate. Trim to HISTORY_DEPTH_MAX
-    // on write as a defense-in-depth (legacy JSON imports could be deeper).
-    store.db.prepare("DELETE FROM history").run()
-    const insertHist = store.db.prepare(
-      "INSERT INTO history(session, slug, direction, seq, snapshot) VALUES (?, ?, ?, ?, ?)"
-    )
+
+    // History — drop + reinsert so pops propagate. Trim locally to
+    // HISTORY_DEPTH_MAX as defense-in-depth (legacy JSON imports could be
+    // deeper). We slice but intentionally DO NOT mutate the caller's Map —
+    // pushCappedHistory already bounds new writes in-memory.
+    s.deleteHistory.run()
     const writeHistory = (
       map: Map<string, Map<string, (PageDoc | null)[]>>,
       direction: "undo" | "redo"
@@ -720,52 +762,43 @@ function writeAllStateToStore(store: SqliteStore) {
           const trimmed = list.length > HISTORY_DEPTH_MAX
             ? list.slice(list.length - HISTORY_DEPTH_MAX)
             : list
-          if (trimmed !== list) bySlug.set(slug, trimmed) // keep memory in sync
           trimmed.forEach((snap, i) =>
-            insertHist.run(session, slug, direction, i + 1, snap === null ? null : JSON.stringify(snap))
+            s.insertHistory.run(session, slug, direction, i + 1, snap === null ? null : JSON.stringify(snap))
           )
         }
       }
     }
     writeHistory(historyUndo, "undo")
     writeHistory(historyRedo, "redo")
-    // Versions
-    store.db.prepare("DELETE FROM sessions").run()
+
+    // Version counters
+    s.deleteSessions.run()
     for (const [session, v] of versions) store.setVersion(session, v)
 
     // Version log
-    store.db.prepare("DELETE FROM version_log").run()
-    const insertVLog = store.db.prepare(
-      "INSERT INTO version_log(session, seq, entry) VALUES (?, ?, ?)"
-    )
+    s.deleteVersionLog.run()
     for (const [session, list] of versionLog) {
-      list.forEach((entry, i) => insertVLog.run(session, i + 1, JSON.stringify(entry)))
+      list.forEach((entry, i) => s.insertVersionLog.run(session, i + 1, JSON.stringify(entry)))
     }
 
     // Recent edits
-    store.db.prepare("DELETE FROM recent_edits").run()
-    const insertEdit = store.db.prepare(
-      "INSERT INTO recent_edits(session, seq, entry) VALUES (?, ?, ?)"
-    )
+    s.deleteRecentEdits.run()
     for (const [session, list] of recentEdits) {
-      list.forEach((entry, i) => insertEdit.run(session, i + 1, JSON.stringify(entry)))
+      list.forEach((entry, i) => s.insertRecentEdit.run(session, i + 1, JSON.stringify(entry)))
     }
 
     // Chat history
-    store.db.prepare("DELETE FROM chat_history").run()
-    const insertChat = store.db.prepare(
-      "INSERT INTO chat_history(session, seq, role, content) VALUES (?, ?, ?, ?)"
-    )
+    s.deleteChatHistory.run()
     for (const [session, list] of chatHistoryBySession) {
-      list.forEach((m, i) => insertChat.run(session, i + 1, m.role, m.content))
+      list.forEach((m, i) => s.insertChatMessage.run(session, i + 1, m.role, m.content))
     }
 
     // Site configs
-    store.db.prepare("DELETE FROM site_configs").run()
+    s.deleteSiteConfigs.run()
     for (const [session, cfg] of siteConfigs) store.setSiteConfig(session, cfg)
 
     // Issue-touched
-    store.db.prepare("DELETE FROM issue_touched").run()
+    s.deleteIssueTouched.run()
     for (const [key, row] of issueTouchedSlugsByKey) store.setIssueTouched(key, row)
   })
 }
@@ -860,11 +893,16 @@ function hydrateMapsFromStore(store: SqliteStore) {
 }
 
 /**
- * Persist the current in-memory state to SQLite. Synchronous internally
- * (better-sqlite3 is sync) but async-compatible for callers that want to
- * `await` it (publish flow does).
+ * Persist the current in-memory state to SQLite. Always flushes any pending
+ * debounced write first, then runs synchronously (better-sqlite3 is sync).
+ * Async signature preserved for callers that want to `await` (publish flow
+ * does). Errors are logged and rethrown.
  */
 export async function persistStateNow(logger: FastifyBaseLogger) {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
   try {
     writeAllStateToStore(getStore())
   } catch (error) {
@@ -877,19 +915,33 @@ export async function persistStateNow(logger: FastifyBaseLogger) {
 }
 
 /**
- * Same semantics as before: schedule a persist. The 80ms debounce is gone
- * (SQLite+WAL handles per-call writes fine), so this is now synchronous
- * best-effort — any write error is logged, not propagated.
+ * Schedule a persist with a short debounce so a single request's sync
+ * mutation burst coalesces into one transaction — chat turns, agent runs,
+ * and /ops calls that land N mutations followed by schedulePersistState
+ * write-through exactly once. The window is narrow enough that the worst
+ * crash-loss is tens of ms of mutations.
+ *
+ * Any write error is logged, not propagated — the caller has already
+ * returned its response by the time the timer fires.
  */
+let persistTimer: NodeJS.Timeout | null = null
+const PERSIST_DEBOUNCE_MS = 30
+
 export function schedulePersistState(logger: FastifyBaseLogger) {
-  try {
-    writeAllStateToStore(getStore())
-  } catch (error) {
-    logger.error(
-      { err: toErrorDetail(error) },
-      "Failed to persist orchestrator state to SQLite"
-    )
-  }
+  if (persistTimer) return // Already scheduled; coalesce.
+  persistTimer = setTimeout(() => {
+    persistTimer = null
+    try {
+      writeAllStateToStore(getStore())
+    } catch (error) {
+      logger.error(
+        { err: toErrorDetail(error) },
+        "Failed to persist orchestrator state to SQLite"
+      )
+    }
+  }, PERSIST_DEBOUNCE_MS)
+  // Don't let the debounce timer keep the process alive on its own.
+  if (typeof persistTimer.unref === "function") persistTimer.unref()
 }
 
 export async function loadStateFromDisk(logger: FastifyBaseLogger) {
