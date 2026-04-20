@@ -1536,6 +1536,7 @@ function EditorPage({
                 </div>
               ) : null}
               {(() => {
+                if (entry.wasUndone) return null
                 const routes = (entry.mentionedSlugs ?? []).filter((route) => route !== slug)
                 if (routes.length === 0) return null
                 return (
