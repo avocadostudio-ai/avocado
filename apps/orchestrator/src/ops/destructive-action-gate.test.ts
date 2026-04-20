@@ -44,19 +44,23 @@ describe("destructive-action-gate: tier 1", () => {
     )
     assert.equal(result.requiresApproval, true)
     assert.equal(result.reasons.length, 1)
-    assert.equal(result.reasons[0].kind, "remove_page_with_content")
-    if (result.reasons[0].kind === "remove_page_with_content") {
+    assert.equal(result.reasons[0].kind, "remove_page")
+    if (result.reasons[0].kind === "remove_page") {
       assert.equal(result.reasons[0].slug, "/about")
       assert.equal(result.reasons[0].blockCount, 4)
     }
   })
 
-  it("does not flag remove_page for empty pages", () => {
+  it("flags remove_page even for empty pages", () => {
     const result = evaluateDestructiveActions(
       plan([{ op: "remove_page", pageSlug: "/empty" }]),
       lookup([page("/empty", 0)])
     )
-    assert.equal(result.requiresApproval, false)
+    assert.equal(result.requiresApproval, true)
+    assert.equal(result.reasons[0].kind, "remove_page")
+    if (result.reasons[0].kind === "remove_page") {
+      assert.equal(result.reasons[0].blockCount, 0)
+    }
   })
 
   it("flags multi-page plans (>1 slug touched)", () => {
@@ -160,7 +164,7 @@ describe("destructive-action-gate: tier 1", () => {
       lookup([page("/old", 2), page("/about", 1)])
     )
     assert.equal(result.requiresApproval, true)
-    assert.ok(result.reasons.some((r) => r.kind === "remove_page_with_content"))
+    assert.ok(result.reasons.some((r) => r.kind === "remove_page"))
     assert.ok(result.reasons.some((r) => r.kind === "multi_page_plan"))
     assert.equal(result.messages.length, result.reasons.length)
   })
