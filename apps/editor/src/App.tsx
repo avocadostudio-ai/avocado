@@ -1476,7 +1476,7 @@ function EditorPage({
                           onClick={() => void chatEngine.approvePendingPlan(currentPlanId)}
                           disabled={disabled}
                         >
-                          Approve plan
+                          Approve
                         </button>
                         <button
                           type="button"
