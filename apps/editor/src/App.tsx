@@ -1460,12 +1460,9 @@ function EditorPage({
                 <div className="msg-plan-actions">
                   {entry.destructiveReasons && entry.destructiveReasons.length > 0 ? (
                     <div className="msg-destructive-warning" role="alert">
-                      <div className="msg-destructive-warning-title">Review before applying</div>
-                      <ul className="msg-destructive-warning-list">
-                        {entry.destructiveReasons.map((reason, idx) => (
-                          <li key={idx}>{reason}</li>
-                        ))}
-                      </ul>
+                      {entry.destructiveReasons.map((reason, idx) => (
+                        <div key={idx} className="msg-destructive-warning-line">⚠ {reason}</div>
+                      ))}
                     </div>
                   ) : null}
                   {(() => {

@@ -104,14 +104,12 @@ export function evaluateDestructiveActions(
 export function describeDestructiveReason(reason: DestructiveReason): string {
   switch (reason.kind) {
     case "remove_page":
-      return reason.blockCount > 0
-        ? `Delete page ${reason.slug} (${reason.blockCount} block${reason.blockCount === 1 ? "" : "s"} will be removed).`
-        : `Delete page ${reason.slug}.`
+      return `You can still undo this later if you change your mind.`
     case "multi_page_plan":
-      return `Change ${reason.slugs.length} pages in one step (${reason.slugs.join(", ")}).`
+      return `This will apply changes across ${reason.slugs.length} pages at once (${reason.slugs.join(", ")}).`
     case "bulk_remove_blocks":
-      return `Delete ${reason.totalRemoveOps} blocks in one step.`
+      return `This will remove ${reason.totalRemoveOps} blocks at once.`
     case "majority_page_wipe":
-      return `Remove ${reason.removing} of ${reason.total} blocks on ${reason.slug}.`
+      return `This will remove most of the content on ${reason.slug} (${reason.removing} of ${reason.total} blocks).`
   }
 }
