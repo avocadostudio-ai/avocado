@@ -938,3 +938,224 @@
     height: 48px;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Image Picker Modal                                                  */
+/* ------------------------------------------------------------------ */
+
+.iw-image-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.iw-image-picker-modal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 680px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.iw-image-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.iw-image-picker-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.iw-image-picker-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.iw-image-picker-close:hover { background: #f5f5f5; color: #111; }
+
+.iw-image-picker-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 16px 0;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.iw-image-picker-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: color 0.15s;
+  margin-bottom: -1px;
+}
+.iw-image-picker-tab:hover { color: #333; }
+.iw-image-picker-tab.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+}
+
+.iw-image-picker-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.iw-image-picker-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.iw-image-picker-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.iw-image-picker-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.iw-image-picker-input:focus { border-color: #6366f1; }
+
+.iw-image-picker-btn-primary {
+  padding: 8px 16px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: background 0.15s, opacity 0.15s;
+}
+.iw-image-picker-btn-primary:hover:not(:disabled) { background: #4f46e5; }
+.iw-image-picker-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.iw-image-picker-error {
+  font-size: 13px;
+  color: #dc2626;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.iw-image-picker-hint {
+  font-size: 13px;
+  color: #999;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.iw-image-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.iw-image-picker-thumb {
+  position: relative;
+  background: #f5f5f5;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 4/3;
+  padding: 0;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.iw-image-picker-thumb:hover {
+  border-color: #6366f1;
+  transform: scale(1.02);
+}
+.iw-image-picker-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.iw-image-picker-author {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.5));
+  color: #fff;
+  font-size: 10px;
+  padding: 12px 6px 4px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.iw-image-picker-generated {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.iw-image-picker-generated-img {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.iw-image-picker-url-preview {
+  margin-top: 4px;
+}
+.iw-image-picker-url-preview img {
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+@media (max-width: 480px) {
+  .iw-image-picker-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

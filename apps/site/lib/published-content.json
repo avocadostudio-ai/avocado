@@ -234,88 +234,25 @@
       ]
     },
     {
-      "slug": "/test",
-      "title": "Test Page",
+      "id": "p_for_another_topic",
+      "slug": "/for-another-topic",
+      "title": "For Another Topic",
+      "updatedAt": "2026-04-21T20:17:31.731Z",
       "blocks": [
         {
-          "id": "b_hero_test_001",
+          "id": "b_hero_for-another-topic",
           "type": "Hero",
           "props": {
-            "heading": "Discover the Power of Avocados",
-            "subheading": "From heart health to sustained energy — explore the science, recipes, and community behind the world's most beloved superfood.",
-            "ctaText": "Explore Recipes",
-            "ctaHref": "/recipes",
-            "secondaryCtaText": "Join the Community",
-            "secondaryCtaHref": "/community",
-            "imageUrl": "https://images.unsplash.com/photo-1758696233586-6d2350a70f0c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxmcmVzaCUyMGF2b2NhZG8lMjBoZWFsdGh5JTIwZm9vZCUyMGxpZmVzdHlsZXxlbnwxfDB8fHwxNzc2NjE2OTM4fDA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-            "imageAlt": "Fresh fruits and vegetables at a vibrant market",
-            "imagePosition": "right",
-            "textAlign": "left"
-          }
-        },
-        {
-          "id": "b_stats_test_001",
-          "type": "Stats",
-          "props": {
-            "title": "Avocado by the Numbers",
-            "items": [
-              {
-                "value": "50K+",
-                "label": "Community Members"
-              },
-              {
-                "value": "300+",
-                "label": "Curated Recipes"
-              },
-              {
-                "value": "40+",
-                "label": "Countries Reached"
-              },
-              {
-                "value": "5",
-                "label": "Proven Health Benefits"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_faqaccordion_test_001",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Frequently Asked Questions",
-            "items": [
-              {
-                "q": "Are avocados really good for your heart?",
-                "a": "Yes! Avocados are rich in monounsaturated fats, particularly oleic acid, which has been shown to reduce LDL (bad) cholesterol and lower the risk of heart disease. They also contain potassium, which helps regulate blood pressure."
-              },
-              {
-                "q": "How many avocados should I eat per week?",
-                "a": "Most nutritionists recommend 3–5 servings per week. One serving is typically half an avocado. This provides a healthy dose of good fats, fiber, and essential vitamins without excess calorie intake."
-              },
-              {
-                "q": "Can avocados help with weight management?",
-                "a": "Absolutely. Despite being calorie-dense, avocados are high in fiber and healthy fats that promote satiety — helping you feel full longer and reducing overall calorie consumption throughout the day."
-              },
-              {
-                "q": "What's the best way to store a ripe avocado?",
-                "a": "Once ripe, store avocados in the refrigerator to slow further ripening — they'll keep for 2–3 days. If you've cut one open, sprinkle lemon or lime juice on the flesh and wrap tightly in plastic wrap to prevent browning."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_cta_test_001",
-          "type": "CTA",
-          "props": {
-            "title": "Ready to Start Your Avocado Journey?",
-            "description": "Join 50,000+ food lovers, wellness enthusiasts, and home cooks who are transforming their health one avocado at a time.",
-            "ctaText": "Join Free Today",
-            "ctaHref": "/community"
+            "heading": "For Another Topic",
+            "subheading": "Use this page to introduce For Another Topic.",
+            "ctaText": "Get started",
+            "ctaHref": "/",
+            "imageUrl": "/hero-generated.svg",
+            "imageAlt": "Abstract generated illustration",
+            "imagePosition": "right"
           }
         }
-      ],
-      "id": "p_test",
-      "updatedAt": "2026-04-19T19:38:26.695Z"
+      ]
     },
     {
       "id": "p_blueberries",
