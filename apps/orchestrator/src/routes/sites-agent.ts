@@ -19,6 +19,7 @@ import { triageWithHaiku, SITES_AGENT_MODELS } from "../agent/sites-agent-shared
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 import { pushMigrationTelemetry } from "../telemetry/migration-telemetry.js"
 import { logAgent } from "../agent/agent-logger.js"
+import type { AgentLogger } from "../agent/agent-loop.js"
 import { runCliAgent, type CliStreamEntry } from "./sites-agent-cli.js"
 
 type SitesAgentRequestBody = {
@@ -905,7 +906,7 @@ type SSEEvent =
   | { type: "tool_use"; toolName: string; agentType?: string }
   | { type: "error"; result: { status: string; summary: string } }
 
-type SdkLogger = { info(msg: string): void }
+type SdkLogger = Pick<AgentLogger, "info">
 
 /** Log SDK messages for debugging with elapsed time from stream start. */
 function logSdkMessage(streamId: string, message: SDKMessage, log: SdkLogger, startedAt?: number) {

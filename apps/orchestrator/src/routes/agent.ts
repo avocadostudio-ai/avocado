@@ -10,7 +10,7 @@ import type { FastifyInstance, FastifyReply } from "fastify"
 import { scopedSessionKey } from "../state/session-state.js"
 import { createAgentTools } from "../agent/agent-tools.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "../agent/agent-context.js"
-import { runAgentLoop, type AgentEvent, type AgentTokenUsage } from "../agent/agent-loop.js"
+import { runAgentLoop, type AgentLogger, type AgentEvent, type AgentTokenUsage } from "../agent/agent-loop.js"
 import { type AgentProvider, detectProviderFromKey, resolveAgentModel } from "../agent/agent-provider.js"
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 
@@ -192,7 +192,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
       const body = entry.body
       const session = scopedSessionKey(body.session ?? "dev", body.siteId ?? "")
-      const tools = createAgentTools(session)
+      const tools = createAgentTools(session, { logger: request.log as unknown as AgentLogger })
       const systemPrompt = buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
       const contextMsg = buildContextMessage(session, {
         slug: body.slug ?? "/",
@@ -325,7 +325,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     if (!body.siteId) return reply.code(400).send({ error: "siteId is required" })
 
     const session = scopedSessionKey(body.session ?? "dev", body.siteId)
-    const tools = createAgentTools(session)
+    const tools = createAgentTools(session, { logger: request.log as unknown as AgentLogger })
     const systemPrompt = buildAgentSystemPrompt({ locale: body.locale, sitePurpose: body.sitePurpose })
     const contextMsg = buildContextMessage(session, { slug: body.slug ?? "/", activeBlockId: body.activeBlockId, activeEditablePath: body.activeEditablePath })
     const fullMessage = `${contextMsg}\n\n---\n\nUser request: ${body.message}`

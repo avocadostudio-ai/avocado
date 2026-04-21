@@ -10,7 +10,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from "openai/reso
 import { openAIChatOptionsForModel } from "../chat/planner.js"
 import type { AgentTool } from "./agent-tools.js"
 import { AGENT_MAX_TOOL_CALLS, AGENT_MAX_TOKENS } from "./agent-provider.js"
-import type { AgentEvent, AgentLoopOptions, AgentTokenUsage } from "./agent-loop.js"
+import { consoleAgentLogger, type AgentLogger, type AgentEvent, type AgentLoopOptions, type AgentTokenUsage } from "./agent-loop.js"
 
 type ToolCallAccumulator = {
   id: string
@@ -40,7 +40,7 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
     signal,
     logger,
   } = options
-  const log = logger ?? { info: (m: string) => console.log(m), warn: (m: string) => console.warn(m), error: (m: string) => console.error(m) }
+  const log: AgentLogger = logger ?? consoleAgentLogger
 
   const client = new OpenAI({ apiKey })
 

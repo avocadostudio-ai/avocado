@@ -3,6 +3,10 @@ import { Component, type ErrorInfo, type ReactNode } from "react"
 type Props = {
   children: ReactNode
   fallbackLabel?: string
+  /** Called before re-rendering children. Use to clear upstream state or call window.location.reload(). */
+  onReset?: () => void
+  /** Called when a child throws — wire to a telemetry sink if needed. */
+  onError?: (error: Error, info: ErrorInfo) => void
 }
 
 type State = {
@@ -18,9 +22,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[editor] Uncaught error in component tree:", error, info.componentStack)
+    this.props.onError?.(error, info)
   }
 
-  reset = () => this.setState({ error: null })
+  reset = () => {
+    this.props.onReset?.()
+    this.setState({ error: null })
+  }
 
   render() {
     if (this.state.error) {

@@ -13,9 +13,15 @@ import { runOpenAIAgentLoop } from "./agent-loop-openai.js"
 import { anthropicSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "../chat/anthropic-cache.js"
 
 export type AgentLogger = {
-  info(msg: string): void
-  warn(msg: string): void
-  error(msg: string): void
+  info(obj: object | string, msg?: string): void
+  warn(obj: object | string, msg?: string): void
+  error(obj: object | string, msg?: string): void
+}
+
+export const consoleAgentLogger: AgentLogger = {
+  info: (obj, msg) => msg ? console.log(msg, obj) : console.log(obj),
+  warn: (obj, msg) => msg ? console.warn(msg, obj) : console.warn(obj),
+  error: (obj, msg) => msg ? console.error(msg, obj) : console.error(obj),
 }
 
 export type AgentTokenUsage = {
@@ -76,7 +82,7 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
     signal,
     logger,
   } = options
-  const log: AgentLogger = logger ?? { info: (m) => console.log(m), warn: (m) => console.warn(m), error: (m) => console.error(m) }
+  const log: AgentLogger = logger ?? consoleAgentLogger
 
   const client = new Anthropic({ apiKey })
 

@@ -1395,7 +1395,7 @@ function EditorPage({
           </div>
         ) : null}
 
-        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing">
+        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing" onReset={() => window.location.reload()}>
         <ChatThreadCore
           ref={chatThreadRef}
           className="chat-thread"

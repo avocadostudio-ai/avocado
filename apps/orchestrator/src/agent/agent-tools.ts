@@ -16,7 +16,7 @@ import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins
 import { unsplashGetByIdHandler, unsplashGetByIdManifest } from "../tools/builtins/unsplash-get-by-id.js"
 import { imageGenerateHandler, imageGenerateManifest } from "../tools/builtins/image-generate.js"
 import type { ToolCallContext } from "../tools/types.js"
-import type { AgentLogger } from "./agent-loop.js"
+import { consoleAgentLogger, type AgentLogger } from "./agent-loop.js"
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<{ result: string; isError?: boolean }>
 
@@ -30,7 +30,7 @@ export type AgentTool = {
  */
 export function createAgentTools(session: string, options?: { manifest?: BlockManifest; logger?: AgentLogger }): AgentTool[] {
   const applyOpts: ApplyOpsOptions = options?.manifest ? { componentsManifest: options.manifest } : {}
-  const log: AgentLogger = options?.logger ?? { info: (m) => console.log(m), warn: (m) => console.warn(m), error: (m) => console.error(m) }
+  const log: AgentLogger = options?.logger ?? consoleAgentLogger
 
   // Helper: apply ops and return result
   async function applyOps(ops: Operation[]): Promise<{ result: string; isError?: boolean }> {
