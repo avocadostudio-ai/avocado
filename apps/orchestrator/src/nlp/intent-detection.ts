@@ -35,39 +35,45 @@ export const siteCapabilitiesSchema = z.object({
 
 export type SiteCapabilities = z.infer<typeof siteCapabilitiesSchema>
 
-export type ChatRequestBody = {
-  session?: string
-  siteId?: string
-  componentsManifest?: BlockManifest | string
-  siteCapabilities?: SiteCapabilities | string
-  sitePurpose?: string
-  siteHosting?: string
-  businessContext?: {
-    purpose?: string
-    tone?: string
-    constraints?: string[]
-  } | string
-  siteContext?: {
-    siteId?: string
-    siteName?: string
-    purpose?: string
-    hosting?: string
-    tone?: string
-    constraints?: string[]
-    gdriveFolderId?: string
-  } | string
-  locale?: string
-  slug?: string
-  message?: string
-  modelKey?: ModelKey
-  provider?: AIProvider
-  activeBlockId?: string
-  activeBlockType?: string
-  activeEditablePath?: string
-  executionMode?: "auto" | "plan_only" | "apply_pending_plan" | "discard_pending_plan" | "continue_chain"
-  pendingPlanId?: string
-  continuationChainId?: string
-}
+const businessContextObjectSchema = z.object({
+  purpose: z.string().optional(),
+  tone: z.string().optional(),
+  constraints: z.array(z.string()).optional(),
+})
+
+const siteContextObjectSchema = z.object({
+  siteId: z.string().optional(),
+  siteName: z.string().optional(),
+  purpose: z.string().optional(),
+  hosting: z.string().optional(),
+  tone: z.string().optional(),
+  constraints: z.array(z.string()).optional(),
+  gdriveFolderId: z.string().optional(),
+})
+
+export const chatRequestBodySchema = z.object({
+  session: z.string().optional(),
+  siteId: z.string().optional(),
+  componentsManifest: z.union([z.record(z.unknown()), z.string()]).optional(),
+  siteCapabilities: z.union([siteCapabilitiesSchema, z.string()]).optional(),
+  sitePurpose: z.string().optional(),
+  siteHosting: z.string().optional(),
+  businessContext: z.union([businessContextObjectSchema, z.string()]).optional(),
+  siteContext: z.union([siteContextObjectSchema, z.string()]).optional(),
+  locale: z.string().optional(),
+  slug: z.string().optional(),
+  message: z.string().optional(),
+  modelKey: z.enum(["fast", "balanced", "reasoning", "codex"]).optional(),
+  provider: z.enum(["openai", "anthropic", "gemini"]).optional(),
+  activeBlockId: z.string().optional(),
+  activeBlockType: z.string().optional(),
+  activeEditablePath: z.string().optional(),
+  executionMode: z.enum(["auto", "plan_only", "apply_pending_plan", "discard_pending_plan", "continue_chain"]).optional(),
+  pendingPlanId: z.string().optional(),
+  continuationChainId: z.string().optional(),
+})
+
+export type ChatRequestBody = z.infer<typeof chatRequestBodySchema>
 
 export type ChatResult = {
   status: string

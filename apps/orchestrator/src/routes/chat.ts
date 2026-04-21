@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
+import { z } from "zod"
 import type { FastifyInstance } from "fastify"
-import type { ChatRequestBody } from "../nlp/intent-detection.js"
+import { chatRequestBodySchema, type ChatRequestBody } from "../nlp/intent-detection.js"
 import {
   type ChatPipelineContext,
   CancelError,
@@ -10,6 +11,7 @@ import {
   runChatPipeline
 } from "../chat/chat-pipeline.js"
 import {
+  variationRequestBodySchema,
   type VariationRequestBody,
   runVariationPipeline
 } from "../chat/variation-pipeline.js"
@@ -159,13 +161,21 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
   }
 
   app.post("/chat", async (request, reply) => {
-    const body = request.body as ChatRequestBody
+    const parsed = chatRequestBodySchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsed.error.issues })
+    }
+    const body: ChatRequestBody = parsed.data
     const result = await runChatPipeline(pipelineCtx, { ...body, session: scopedSessionKey(body.session, body.siteId) })
     return reply.code(result.code).send(result.payload)
   })
 
   app.post("/chat/variations", async (request, reply) => {
-    const body = request.body as VariationRequestBody
+    const parsed = variationRequestBodySchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsed.error.issues })
+    }
+    const body: VariationRequestBody = parsed.data
     const result = await runVariationPipeline(pipelineCtx, { ...body, session: scopedSessionKey(body.session, body.siteId) })
     return reply.code(result.code).send(result.payload)
   })
@@ -176,8 +186,14 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
   // request is likely deterministic and an estimated latency so the UI can
   // show "This edit will be instant" vs "This will take a few seconds".
   // -------------------------------------------------------------------------
+  const prefetchBodySchema = chatRequestBodySchema.pick({ session: true, siteId: true, slug: true, message: true, activeBlockId: true, activeEditablePath: true })
+
   app.post("/chat/prefetch", async (request, reply) => {
-    const body = request.body as { session?: string; siteId?: string; slug?: string; message?: string; activeBlockId?: string; activeEditablePath?: string }
+    const parsed = prefetchBodySchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsed.error.issues })
+    }
+    const body = parsed.data
     if (!body.session || !body.slug || !body.message) {
       return reply.code(400).send({ error: "session, slug, and message are required" })
     }
@@ -228,7 +244,11 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       return reply.code(413).send({ error: "Request body too large" })
     }
 
-    const body = request.body as ChatRequestBody
+    const parsed = chatRequestBodySchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsed.error.issues })
+    }
+    const body: ChatRequestBody = parsed.data
     if (!body.session) {
       return reply.code(400).send({ error: "session is required" })
     }
@@ -258,8 +278,11 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
   // POST /chat/cancel
   // -------------------------------------------------------------------------
 
+  const cancelBodySchema = z.object({ streamId: z.string().optional(), session: z.string().optional(), siteId: z.string().optional() })
+
   app.post("/chat/cancel", async (request, reply) => {
-    const body = request.body as { streamId?: string; session?: string; siteId?: string }
+    const parsed = cancelBodySchema.safeParse(request.body)
+    const body = parsed.success ? parsed.data : ({} as { streamId?: string; session?: string; siteId?: string })
     const reqOrigin = request.headers.origin ?? "*"
 
     let streamId: string | undefined
