@@ -49,6 +49,10 @@ import {
 
 const LLM_TIMEOUT_MS = 120_000
 
+// Note: the Gemini SDK's generateContent/generateContentStream has no abort hook,
+// so the underlying HTTP request keeps running after the signal fires. The response
+// is discarded and the caller gets an AbortError, but the in-flight request leaks
+// until the server responds or the connection drops.
 function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     if (signal.aborted) { reject(signal.reason); return }

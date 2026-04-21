@@ -1395,11 +1395,11 @@ function EditorPage({
           </div>
         ) : null}
 
-        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing" onReset={() => window.location.reload()} style={{ display: activeTab === "chat" ? "" : "none" }}>
+        <div style={{ display: activeTab === "chat" ? "" : "none" }}>
+        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing" onReset={() => window.location.reload()}>
         <ChatThreadCore
           ref={chatThreadRef}
           className="chat-thread"
-          style={{ display: activeTab === "chat" ? "" : "none" }}
           streamStatusLabel={streamTextLabel}
           undoInFlightEntryId={chatEngine.undoInFlightEntryId}
           onSuggestionClick={(line) => void chatEngine.submitChat(line)}
@@ -1753,10 +1753,11 @@ function EditorPage({
           )}
         />
         </ErrorBoundary>
+        </div>
 
-        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing" style={{ display: activeTab === "properties" ? "" : "none" }}>
+        <div style={{ display: activeTab === "properties" ? "" : "none" }}>
+        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing">
         <PropertyPanel
-          style={{ display: activeTab === "properties" ? "" : "none" }}
           props={blockProps.props}
           status={blockProps.status}
           pageName={slugLabel(slug)}
@@ -1812,6 +1813,7 @@ function EditorPage({
           siteOrigin={activeSiteOrigin}
         />
         </ErrorBoundary>
+        </div>
 
         <div style={{ display: activeTab === "history" ? "" : "none", flex: 1, minHeight: 0, overflow: "hidden" }}>
           <VersionHistoryPanel
