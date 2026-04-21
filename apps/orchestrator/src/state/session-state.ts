@@ -993,7 +993,6 @@ export function evictStaleEphemeralMaps() {
   }
 }
 
-
 export async function loadStateFromDisk(logger: FastifyBaseLogger) {
   let store: SqliteStore
   try {

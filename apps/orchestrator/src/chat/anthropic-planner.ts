@@ -186,10 +186,10 @@ export async function parseIntentWithAnthropic(args: {
 
 export type PlannerAnthropicClient = {
   messages: {
-    create: (args: unknown) => Promise<Anthropic.Messages.Message>
+    create: (args: unknown, options?: { signal?: AbortSignal }) => Promise<Anthropic.Messages.Message>
     stream?: (
       args: unknown,
-      options?: { headers?: Record<string, string> }
+      options?: { headers?: Record<string, string>; signal?: AbortSignal }
     ) => AsyncIterable<unknown> & { finalMessage: () => Promise<unknown> }
   }
 }

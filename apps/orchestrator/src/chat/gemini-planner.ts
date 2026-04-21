@@ -50,7 +50,7 @@ import {
 const LLM_TIMEOUT_MS = 120_000
 
 function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     if (signal.aborted) { reject(signal.reason); return }
     signal.addEventListener("abort", () => reject(signal.reason), { once: true })
     promise.then(resolve, reject)
@@ -356,7 +356,7 @@ export async function generatePlanWithGemini(args: {
         temperature: 0,
         safetySettings: PERMISSIVE_SAFETY_SETTINGS,
       }
-    }), effectiveSignal)
+    }), effectiveSignal) as AsyncIterable<unknown>
 
     for await (const chunk of stream) {
       const text = extractGeminiText(chunk)

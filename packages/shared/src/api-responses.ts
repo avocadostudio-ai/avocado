@@ -18,7 +18,7 @@ const variationOptionSchema = z.object({
   id: z.string(),
   title: z.string(),
   summary: z.string(),
-  patch: z.record(z.unknown()),
+  patch: z.record(z.string(), z.unknown()),
   changedKeys: z.array(z.string()),
 }).passthrough()
 
@@ -26,7 +26,7 @@ const variationsSchema = z.object({
   blockId: z.string(),
   blockType: z.string(),
   pageSlug: z.string(),
-  baseProps: z.record(z.unknown()),
+  baseProps: z.record(z.string(), z.unknown()),
   options: z.array(variationOptionSchema),
 }).passthrough()
 
@@ -39,7 +39,7 @@ export const assistantResponseSchema = z.object({
   validationErrors: z.union([
     z.array(z.string()),
     z.object({
-      fieldErrors: z.record(z.array(z.string())).optional(),
+      fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
       formErrors: z.array(z.string()).optional(),
     }).passthrough(),
   ]).optional(),
@@ -54,7 +54,7 @@ export const assistantResponseSchema = z.object({
   undoSlug: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
   variations: variationsSchema.optional(),
-  debug: z.record(z.unknown()).optional(),
+  debug: z.record(z.string(), z.unknown()).optional(),
   error: z.string().optional(),
 }).passthrough()
 

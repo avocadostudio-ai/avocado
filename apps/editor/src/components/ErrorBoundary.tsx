@@ -1,8 +1,10 @@
-import { Component, type ErrorInfo, type ReactNode } from "react"
+import { Component, type CSSProperties, type ErrorInfo, type ReactNode } from "react"
 
 type Props = {
   children: ReactNode
   fallbackLabel?: string
+  /** Applied to the fallback container — use to control visibility (e.g. display:none for tab panels). */
+  style?: CSSProperties
   /** Called before re-rendering children. Use to clear upstream state or call window.location.reload(). */
   onReset?: () => void
   /** Called when a child throws — wire to a telemetry sink if needed. */
@@ -33,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground h-full">
+        <div style={this.props.style} className="flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground h-full">
           <p className="font-medium text-foreground">
             {this.props.fallbackLabel ?? "Something went wrong"}
           </p>

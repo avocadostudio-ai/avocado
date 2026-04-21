@@ -25,7 +25,7 @@ import type { RouteContext } from "./route-context.js"
 const applyOpsBodySchema = z.object({
   session: z.string().optional(),
   siteId: z.string().optional(),
-  componentsManifest: z.union([z.record(z.unknown()), z.string()]).optional(),
+  componentsManifest: z.union([z.record(z.string(), z.unknown()), z.string()]).optional(),
   siteCapabilities: z.union([siteCapabilitiesSchema, z.string()]).optional(),
   ops: z.unknown(),
 })

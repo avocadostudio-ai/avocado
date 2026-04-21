@@ -361,11 +361,11 @@ export function buildPlannerSchemaContext(args: {
 export type PlannerOpenAIClient = {
   chat: {
     completions: {
-      create: (args: unknown) => any
+      create: (args: unknown, options?: { signal?: AbortSignal }) => any
     }
   }
   responses: {
-    create: (args: unknown) => any
+    create: (args: unknown, options?: { signal?: AbortSignal }) => any
   }
 }
 

@@ -1395,7 +1395,7 @@ function EditorPage({
           </div>
         ) : null}
 
-        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing" onReset={() => window.location.reload()}>
+        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing" onReset={() => window.location.reload()} style={{ display: activeTab === "chat" ? "" : "none" }}>
         <ChatThreadCore
           ref={chatThreadRef}
           className="chat-thread"
@@ -1754,7 +1754,7 @@ function EditorPage({
         />
         </ErrorBoundary>
 
-        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing">
+        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing" style={{ display: activeTab === "properties" ? "" : "none" }}>
         <PropertyPanel
           style={{ display: activeTab === "properties" ? "" : "none" }}
           props={blockProps.props}
