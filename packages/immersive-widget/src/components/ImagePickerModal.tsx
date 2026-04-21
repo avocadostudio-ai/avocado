@@ -16,6 +16,19 @@ type ImageItem = {
   author?: string
 }
 
+type GenModel = {
+  id: string
+  label: string
+  provider: "openai" | "gemini"
+  model: string
+}
+
+const GEN_MODELS: GenModel[] = [
+  { id: "gemini-flash", label: "Google Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash-image" },
+  { id: "openai-gpt-image-2", label: "OpenAI GPT Image 2", provider: "openai", model: "gpt-image-2" },
+  { id: "openai-gpt-image-1", label: "OpenAI GPT Image 1", provider: "openai", model: "gpt-image-1" }
+]
+
 export type ImagePickerTarget = {
   slug: string
   blockId: string
@@ -68,6 +81,7 @@ export function ImagePickerModal({ target, orchestratorUrl, accessToken, onSelec
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+  const [genModelId, setGenModelId] = useState<string>(GEN_MODELS[0].id)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const urlInputRef = useRef<HTMLInputElement>(null)
 
@@ -141,11 +155,12 @@ export function ImagePickerModal({ target, orchestratorUrl, accessToken, onSelec
     setGenerating(true)
     setGenerateError(null)
     setGeneratedUrl(null)
+    const selected = GEN_MODELS.find((m) => m.id === genModelId) ?? GEN_MODELS[0]
     try {
       const res = await fetch(`${orchestratorUrl}/image/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, provider: selected.provider, model: selected.model }),
       })
       const data = await res.json() as { url?: string; error?: string }
       if (!res.ok || !data.url) {
@@ -158,7 +173,7 @@ export function ImagePickerModal({ target, orchestratorUrl, accessToken, onSelec
     } finally {
       setGenerating(false)
     }
-  }, [generatePrompt, orchestratorUrl, authHeaders])
+  }, [generatePrompt, orchestratorUrl, authHeaders, genModelId])
 
   if (!open) return null
 
@@ -269,6 +284,20 @@ export function ImagePickerModal({ target, orchestratorUrl, accessToken, onSelec
                 >
                   {generating ? "…" : "Generate"}
                 </button>
+              </div>
+              <div className="iw-image-picker-gen-model-row">
+                <label className="iw-image-picker-gen-model-label" htmlFor="iw-image-picker-gen-model">Model</label>
+                <select
+                  id="iw-image-picker-gen-model"
+                  className="iw-image-picker-gen-model-select"
+                  value={genModelId}
+                  onChange={(e) => setGenModelId(e.target.value)}
+                  disabled={generating}
+                >
+                  {GEN_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
               </div>
               {generateError && <p className="iw-image-picker-error">{generateError}</p>}
               {generating && (

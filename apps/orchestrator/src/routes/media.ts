@@ -283,27 +283,36 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
 
   // Image generation proxy for the editor image picker
   app.post("/image/generate", async (request, reply) => {
-    const provider = (process.env.IMAGE_GEN_PROVIDER?.trim().toLowerCase()) || "openai"
     const hasOpenAI = !!process.env.OPENAI_API_KEY
     const hasGemini = !!process.env.GOOGLE_GENAI_API_KEY
     if (!hasOpenAI && !hasGemini) {
       return reply.code(503).send({ error: "No image generation API key configured (OPENAI_API_KEY or GOOGLE_GENAI_API_KEY)" })
     }
-    const body = (request.body ?? {}) as { prompt?: string; aspectRatio?: string }
+    const body = (request.body ?? {}) as { prompt?: string; aspectRatio?: string; provider?: string; model?: string }
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
     if (!prompt) return reply.code(400).send({ error: "prompt is required" })
 
+    const requestedProvider = typeof body.provider === "string" ? body.provider.trim().toLowerCase() : ""
+    const requestedModel = typeof body.model === "string" ? body.model.trim() : ""
+    const envProvider = (process.env.IMAGE_GEN_PROVIDER?.trim().toLowerCase()) || "openai"
+    const provider = requestedProvider || envProvider
+
     try {
       if (provider === "gemini" && hasGemini) {
-        const result = await generateVariationImageWithGemini({ prompt, altText: prompt.slice(0, 200), aspectRatio: body.aspectRatio })
+        const result = await generateVariationImageWithGemini({
+          prompt,
+          altText: prompt.slice(0, 200),
+          aspectRatio: body.aspectRatio,
+          model: requestedModel || undefined
+        })
         if (!result) return reply.code(502).send({ error: "Gemini image generation returned no data" })
         return { url: result.url, alt: result.alt }
       }
       // Default: OpenAI
-      if (!hasOpenAI) return reply.code(503).send({ error: "OPENAI_API_KEY not configured and IMAGE_GEN_PROVIDER is not gemini" })
+      if (!hasOpenAI) return reply.code(503).send({ error: "OPENAI_API_KEY not configured and provider is not gemini" })
       const aspectSizes: Record<string, string> = { landscape: "1536x1024", square: "1024x1024", portrait: "1024x1536" }
       const size = aspectSizes[body.aspectRatio ?? "landscape"] ?? "1536x1024"
-      const model = process.env.OPENAI_IMAGE_MODEL_DRAFT?.trim() || "gpt-image-1-mini"
+      const model = requestedModel || process.env.OPENAI_IMAGE_MODEL_DRAFT?.trim() || "gpt-image-1-mini"
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
       const result = await client.images.generate({ model, prompt, size: size as "1536x1024" })
       const image = result.data?.[0]
