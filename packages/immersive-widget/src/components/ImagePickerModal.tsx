@@ -270,7 +270,16 @@ export function ImagePickerModal({ target, orchestratorUrl, accessToken, onSelec
                 </button>
               </div>
               {generateError && <p className="iw-image-picker-error">{generateError}</p>}
-              {generating && <p className="iw-image-picker-hint">Generating image, please wait…</p>}
+              {generating && (
+                <p className="iw-image-picker-hint iw-image-picker-generating">
+                  <span>Generating image</span>
+                  <span className="iw-image-picker-dots" aria-hidden="true">
+                    <span className="iw-image-picker-dot" />
+                    <span className="iw-image-picker-dot" />
+                    <span className="iw-image-picker-dot" />
+                  </span>
+                </p>
+              )}
               {generatedUrl && !generating && (
                 <div className="iw-image-picker-generated">
                   <img src={generatedUrl} alt={generatePrompt} className="iw-image-picker-generated-img" />
