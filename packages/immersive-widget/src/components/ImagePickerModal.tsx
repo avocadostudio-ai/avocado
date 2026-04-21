@@ -259,6 +259,7 @@ export function ImagePickerModal({ target, orchestratorUrl, accessToken, onSelec
                   onChange={(e) => setGeneratePrompt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !generating) void handleGenerate() }}
                   placeholder="Describe the image to generate..."
+                  disabled={generating}
                 />
                 <button
                   type="button"
