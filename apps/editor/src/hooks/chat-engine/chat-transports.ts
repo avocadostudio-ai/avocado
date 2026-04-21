@@ -197,6 +197,9 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       return false
     }
 
+    const IDLE_TIMEOUT_MS = 30_000
+    const HARD_TIMEOUT_MS = 180_000
+
     return await new Promise<boolean>((resolve) => {
       const source = new EventSource(`${args.orchestrator}/chat/stream?streamId=${streamId}`)
       let settled = false
@@ -215,6 +218,36 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       let currentStepLabel: string | null = null
       let currentStepStartedAt = 0
       const MIN_STEP_DURATION_MS = 800
+
+      // SSE idle watchdog + hard timeout (mirrors agent-transport.ts pattern)
+      let lastEventAt = Date.now()
+      let idleWatchdogTimer: number | null = null
+      let hardTimeoutTimer: number | null = null
+
+      const clearSseTimers = () => {
+        if (idleWatchdogTimer !== null) { clearInterval(idleWatchdogTimer); idleWatchdogTimer = null }
+        if (hardTimeoutTimer !== null) { clearTimeout(hardTimeoutTimer); hardTimeoutTimer = null }
+      }
+
+      idleWatchdogTimer = setInterval(() => {
+        if (settled) { clearSseTimers(); return }
+        if (Date.now() - lastEventAt > IDLE_TIMEOUT_MS) {
+          args.setStreamStatus("Thinking… (this is taking longer than usual)")
+        }
+      }, 4_000) as unknown as number
+
+      hardTimeoutTimer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        source.close()
+        clearSseTimers()
+        args.setStreamStatus(null)
+        args.setStreamSteps([])
+        args.setOpChecklist([])
+        args.setStreamTokenCount(0)
+        args.pushAssistantFromResult({ status: "error", summary: "Request timed out after 3 minutes. Please try again.", changes: [] })
+        resolve(false)
+      }, HARD_TIMEOUT_MS) as unknown as number
 
       const normalizeStepLabel = (s: string) =>
         s.replace(/[\u2026.]+$/, "").replace(/\s*\([\d/,\s]+\)$/, "").trim()
@@ -329,6 +362,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         }) | null
         if (!payload) return
         gotAnyEvent = true
+        lastEventAt = Date.now()
 
         if (payload.type === "status") {
           const msg = payload.message ?? "Working..."
@@ -499,6 +533,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
             if (pendingFocusBlockId !== null) flushOpRefresh()
             if (payload.result) applyChatOrVariationResult(payload.result, finalMessage)
             if (payload.result?.focusBlockId) args.setLatestStreamFocusBlockId(payload.result.focusBlockId)
+            clearSseTimers()
             source.close()
             resolve(true)
           }
@@ -534,6 +569,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           } else {
             args.pushAssistantFromResult({ status: "error", summary: "Streaming request failed.", changes: [] })
           }
+          clearSseTimers()
           source.close()
           resolve(true)
         }
@@ -549,6 +585,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           endLiveDraft()
           if (pendingFocusBlockId !== null) flushOpRefresh()
           pendingFocusBlockId = null
+          clearSseTimers()
           source.close()
           resolve(true)
           return
@@ -559,6 +596,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         endLiveDraft()
         pendingFocusBlockId = null
         settled = true
+        clearSseTimers()
         source.close()
         resolve(false)
       }

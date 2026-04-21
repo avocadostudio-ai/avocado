@@ -951,6 +951,49 @@ export function schedulePersistState(logger: FastifyBaseLogger) {
   if (typeof persistTimer.unref === "function") persistTimer.unref()
 }
 
+// ---------------------------------------------------------------------------
+// Ephemeral map eviction — prevents unbounded growth in long-running processes
+// ---------------------------------------------------------------------------
+const APPROVAL_PLAN_TTL_MS = 60 * 60 * 1000      // 1 hour — approvals expire if user abandons
+const PUBLISH_STATUS_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+const EPHEMERAL_MAP_CAP = 500                      // max entries for maps without timestamps
+
+/**
+ * Evict stale/excess entries from ephemeral in-memory maps.
+ * Called on a periodic timer (see index.ts). Safe to call at any time.
+ */
+export function evictStaleEphemeralMaps() {
+  const now = Date.now()
+
+  // pendingApprovalPlanBySession: has createdAt — evict by age
+  for (const [key, plan] of pendingApprovalPlanBySession) {
+    if (now - new Date(plan.createdAt).getTime() > APPROVAL_PLAN_TTL_MS) {
+      pendingApprovalPlanBySession.delete(key)
+    }
+  }
+
+  // publishStatusBySession: has updatedAt — evict by age
+  for (const [key, tracker] of publishStatusBySession) {
+    if (now - new Date(tracker.updatedAt).getTime() > PUBLISH_STATUS_TTL_MS) {
+      publishStatusBySession.delete(key)
+    }
+  }
+
+  // Maps without timestamps — cap at EPHEMERAL_MAP_CAP, drop oldest-inserted entries
+  for (const map of [continuationChainBySession, pendingClarificationBySession, imageSourcePreferenceBySession] as Array<Map<string, unknown>>) {
+    if (map.size > EPHEMERAL_MAP_CAP) {
+      const excess = map.size - EPHEMERAL_MAP_CAP
+      let dropped = 0
+      for (const key of map.keys()) {
+        if (dropped >= excess) break
+        map.delete(key)
+        dropped++
+      }
+    }
+  }
+}
+
+
 export async function loadStateFromDisk(logger: FastifyBaseLogger) {
   let store: SqliteStore
   try {
