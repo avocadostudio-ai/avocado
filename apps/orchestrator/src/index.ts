@@ -14,7 +14,7 @@ import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
 import { createEvalCandidateStore } from "./telemetry/eval-candidate-store.js"
 import { normalizePlanCandidate } from "./nlp/plan-normalizer.js"
 import { buildCreatePagePlan, compileDeterministicPlan } from "./nlp/deterministic-planner.js"
-import { type AIProvider, loadStateFromDisk, persistStateNow } from "./state/session-state.js"
+import { type AIProvider, loadStateFromDisk, persistStateNow, evictStaleEphemeralMaps } from "./state/session-state.js"
 import {
   resetStore,
   resolveBackupIntervalHours,
@@ -388,6 +388,10 @@ function startSqliteBackupLoop() {
   initial.unref?.()
   backupTimer = setInterval(tick, intervalMs)
   backupTimer.unref?.()
+
+  // Evict stale ephemeral maps every 30 minutes to prevent unbounded growth
+  const evictTimer = setInterval(evictStaleEphemeralMaps, 30 * 60 * 1000)
+  evictTimer.unref?.()
 }
 
 async function startServer() {

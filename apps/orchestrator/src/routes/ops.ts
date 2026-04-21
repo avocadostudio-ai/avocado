@@ -22,21 +22,27 @@ import { collectMentionedSlugsFromOps } from "../chat/chat-pipeline.js"
 import { siteCapabilitiesSchema, type SiteCapabilities } from "../nlp/intent-detection.js"
 import type { RouteContext } from "./route-context.js"
 
-type ApplyOpsRequestBody = {
-  session?: string
-  siteId?: string
-  componentsManifest?: BlockManifest | string
-  siteCapabilities?: SiteCapabilities | string
-  ops?: unknown
-}
+const applyOpsBodySchema = z.object({
+  session: z.string().optional(),
+  siteId: z.string().optional(),
+  componentsManifest: z.union([z.record(z.string(), z.unknown()), z.string()]).optional(),
+  siteCapabilities: z.union([siteCapabilitiesSchema, z.string()]).optional(),
+  ops: z.unknown(),
+})
+
+type ApplyOpsRequestBody = z.infer<typeof applyOpsBodySchema>
 
 export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
   app.post("/ops", async (request, reply) => {
-    const body = request.body as ApplyOpsRequestBody
+    const parsedBody = applyOpsBodySchema.safeParse(request.body)
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsedBody.error.issues })
+    }
+    const body: ApplyOpsRequestBody = parsedBody.data
     const session = scopedSessionKey(body.session, body.siteId)
     const parsedOps = z.array(operationSchema).safeParse(body.ops)
     if (!parsedOps.success) {
-      console.error("[ops] invalid ops payload:", JSON.stringify(parsedOps.error.issues, null, 2), "raw ops:", JSON.stringify(body.ops))
+      request.log.error({ issues: parsedOps.error.issues, rawOps: body.ops }, "[ops] invalid ops payload")
       return reply.code(400).send({ error: "invalid ops payload", details: parsedOps.error.issues })
     }
     if (parsedOps.data.length === 0) return reply.code(400).send({ error: "ops must not be empty" })

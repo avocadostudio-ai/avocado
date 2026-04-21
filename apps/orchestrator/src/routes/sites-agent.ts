@@ -19,6 +19,7 @@ import { triageWithHaiku, SITES_AGENT_MODELS } from "../agent/sites-agent-shared
 import { sseWrite, parseSuggestionsFromSummary } from "../chat/chat-pipeline-shared.js"
 import { pushMigrationTelemetry } from "../telemetry/migration-telemetry.js"
 import { logAgent } from "../agent/agent-logger.js"
+import type { AgentLogger } from "../agent/agent-loop.js"
 import { runCliAgent, type CliStreamEntry } from "./sites-agent-cli.js"
 
 type SitesAgentRequestBody = {
@@ -219,7 +220,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
 
     pending.resolve(answers)
     pendingApprovals.delete(streamId)
-    console.log(`[sites-agent] Stream ${streamId}: received user response for AskUserQuestion`)
+    request.log.info(`[sites-agent] Stream ${streamId}: received user response for AskUserQuestion`)
     return { ok: true }
   })
 
@@ -256,12 +257,14 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
     entry.subscribers.add(reply)
     request.raw.on("close", () => entry.subscribers.delete(reply))
 
+    const log = request.log
+
     if (entry.state === "pending") {
       entry.state = "active"
 
       const body = entry.body
       const session = body.session ?? "dev"
-      console.log(`[sites-agent] Stream ${streamId}: INIT mode=${body.mode ?? "migrate"} cli=${!!body.useCliAgent} message="${body.message?.slice(0, 100)}"`)
+      log.info(`[sites-agent] Stream ${streamId}: INIT mode=${body.mode ?? "migrate"} cli=${!!body.useCliAgent} message="${body.message?.slice(0, 100)}"`)
       logAgent(streamId, "init", { mode: body.mode ?? "migrate", message: body.message?.slice(0, 100) })
 
       // ── Haiku triage — classify intent, extract params, short-circuit questions ──
@@ -309,7 +312,7 @@ export async function registerSitesAgentRoutes(app: FastifyInstance, ctx: RouteC
           else if (triage.intent === "create") body.mode = "create"
           else if (triage.intent === "migrate") body.mode = "migrate"
         } catch (err: unknown) {
-          console.log(`[sites-agent] Triage failed, continuing without: ${err instanceof Error ? err.message : String(err)}`)
+          log.info(`[sites-agent] Triage failed, continuing without: ${err instanceof Error ? err.message : String(err)}`)
         }
       }
 
@@ -692,7 +695,7 @@ Key patterns to follow:
                 if (toolName === "AskUserQuestion") {
                   // Emit questions to frontend via SSE
                   emitEvent(streamId, { type: "approval_required", input })
-                  console.log(`[sites-agent] Stream ${streamId}: AskUserQuestion from ${agentID ?? "main"} — waiting for user response`)
+                  log.info(`[sites-agent] Stream ${streamId}: AskUserQuestion from ${agentID ?? "main"} — waiting for user response`)
 
                   // Wait for user response via POST /sites-agent/respond
                   const answers = await new Promise<Record<string, string>>((resolve) => {
@@ -711,7 +714,7 @@ Key patterns to follow:
                     }, 10 * 60 * 1000)
                   })
 
-                  console.log(`[sites-agent] Stream ${streamId}: User responded to AskUserQuestion`)
+                  log.info(`[sites-agent] Stream ${streamId}: User responded to AskUserQuestion`)
                   return { behavior: "allow" as const, updatedInput: { ...input, answers } }
                 }
                 // Auto-approve all other tools
@@ -735,7 +738,7 @@ Key patterns to follow:
           let lastPhaseChangeAt = startedAt
           let stallWarningEmitted = false
 
-          console.log(`[sites-agent] Stream ${streamId}: agent loop started at +${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
+          log.info(`[sites-agent] Stream ${streamId}: agent loop started at +${((Date.now() - startedAt) / 1000).toFixed(1)}s`)
           logAgent(streamId, "loop_started", {}, startedAt)
 
           for await (const message of result) {
@@ -762,7 +765,7 @@ Key patterns to follow:
             }
 
             // Log every SDK message for debugging (with elapsed time)
-            logSdkMessage(streamId, message, startedAt)
+            logSdkMessage(streamId, message, log, startedAt)
 
             const events = translateSdkMessage(message)
             for (const event of events) {
@@ -798,7 +801,7 @@ Key patterns to follow:
                 if (!stallWarningEmitted && stallToolCalls >= STALL_TOOL_THRESHOLD && Date.now() - lastPhaseChangeAt >= STALL_THRESHOLD_MS) {
                   stallWarningEmitted = true
                   const elapsedMin = ((Date.now() - lastPhaseChangeAt) / 60_000).toFixed(1)
-                  console.warn(`[sites-agent] Stream ${streamId}: STALL DETECTED — ${stallToolCalls} tool calls without phase progress in ${elapsedMin}m`)
+                  log.warn(`[sites-agent] Stream ${streamId}: STALL DETECTED — ${stallToolCalls} tool calls without phase progress in ${elapsedMin}m`)
                   emitEvent(streamId, { type: "warning", code: "stall_detected", message: `Agent has made ${stallToolCalls} tool calls without phase progress in ${elapsedMin}m` })
                 }
               }
@@ -810,11 +813,11 @@ Key patterns to follow:
               const isSuccess = message.subtype === "success"
               const usage = message.usage
               const totalDuration = ((Date.now() - startedAt) / 1000).toFixed(1)
-              console.log(`[sites-agent] Stream ${streamId}: result subtype=${message.subtype} turns=${isSuccess ? message.num_turns : "?"} cost=$${message.total_cost_usd?.toFixed(4) ?? "?"} duration=${totalDuration}s`)
+              log.info(`[sites-agent] Stream ${streamId}: result subtype=${message.subtype} turns=${isSuccess ? message.num_turns : "?"} cost=$${message.total_cost_usd?.toFixed(4) ?? "?"} duration=${totalDuration}s`)
               logAgent(streamId, "result", { subtype: message.subtype, turns: isSuccess ? message.num_turns : undefined, costUsd: message.total_cost_usd, durationS: +totalDuration, toolCalls: toolCallCount }, startedAt)
-              console.log(`[sites-agent] Stream ${streamId}: USAGE in=${usage.input_tokens} out=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens} cache_create=${usage.cache_creation_input_tokens}`)
+              log.info(`[sites-agent] Stream ${streamId}: USAGE in=${usage.input_tokens} out=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens} cache_create=${usage.cache_creation_input_tokens}`)
               if (isSuccess && message.permission_denials?.length > 0) {
-                console.log(`[sites-agent] Stream ${streamId}: permission denials:`, message.permission_denials)
+                log.info(`[sites-agent] Stream ${streamId}: permission denials: ${JSON.stringify(message.permission_denials)}`)
               }
               const resultText = isSuccess ? message.result : summaryText
               const { summary: cleanSummary, suggestions } = parseSuggestionsFromSummary(cleanAgentSummary(resultText))
@@ -871,13 +874,12 @@ Key patterns to follow:
             }
           }
 
-          console.log(`[sites-agent] Stream ${streamId}: loop ended normally, ${toolCallCount} tool calls, ${((Date.now() - startedAt) / 1000).toFixed(1)}s total`)
+          log.info(`[sites-agent] Stream ${streamId}: loop ended normally, ${toolCallCount} tool calls, ${((Date.now() - startedAt) / 1000).toFixed(1)}s total`)
           logAgent(streamId, "loop_ended", { toolCalls: toolCallCount }, startedAt)
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err)
           const stack = err instanceof Error ? err.stack : undefined
-          console.error(`[sites-agent] Stream ${streamId}: ERROR:`, msg)
-          if (stack) console.error(`[sites-agent] Stack:`, stack)
+          log.error(`[sites-agent] Stream ${streamId}: ERROR: ${msg}${stack ? `\n${stack}` : ""}`)
           emitEvent(streamId, { type: "error", result: { status: "error", summary: msg } })
         } finally {
           clearInterval(heartbeatTimer)
@@ -904,8 +906,10 @@ type SSEEvent =
   | { type: "tool_use"; toolName: string; agentType?: string }
   | { type: "error"; result: { status: string; summary: string } }
 
+type SdkLogger = Pick<AgentLogger, "info">
+
 /** Log SDK messages for debugging with elapsed time from stream start. */
-function logSdkMessage(streamId: string, message: SDKMessage, startedAt?: number) {
+function logSdkMessage(streamId: string, message: SDKMessage, log: SdkLogger, startedAt?: number) {
   const elapsed = startedAt ? `+${((Date.now() - startedAt) / 1000).toFixed(1)}s` : ""
   const prefix = `[sites-agent] ${streamId.slice(0, 8)} ${elapsed}`
   const isSubagent = "parent_tool_use_id" in message && message.parent_tool_use_id
@@ -921,25 +925,24 @@ function logSdkMessage(streamId: string, message: SDKMessage, startedAt?: number
           const name = "name" in tu ? tu.name : "?"
           const input = "input" in tu ? tu.input as Record<string, unknown> : undefined
           const paramSummary = input ? summarizeToolInput(name, input) : ""
-          console.log(`${prefix}${ctx} tool_use: ${name}${paramSummary}`)
+          log.info(`${prefix}${ctx} tool_use: ${name}${paramSummary}`)
           logAgent(streamId, "tool_use", { tool: name, agent: isSubagent ? "sub" : "main", params: paramSummary.slice(0, 200) }, startedAt)
         }
       }
       if (textBlocks.length > 0) {
         const totalChars = textBlocks.reduce((sum, b) => sum + ("text" in b ? (b.text as string).length : 0), 0)
-        if (totalChars > 0) console.log(`${prefix}${ctx} text: ${totalChars} chars`)
+        if (totalChars > 0) log.info(`${prefix}${ctx} text: ${totalChars} chars`)
       }
       break
     }
     case "result":
-      console.log(`${prefix} result: ${message.subtype}`)
+      log.info(`${prefix} result: ${message.subtype}`)
       break
     case "system":
-      if ("subtype" in message) console.log(`${prefix} system: ${message.subtype}`)
+      if ("subtype" in message) log.info(`${prefix} system: ${message.subtype}`)
       break
     default:
-      // Log other message types at debug level
-      if ("type" in message) console.log(`${prefix} ${message.type}`)
+      if ("type" in message) log.info(`${prefix} ${message.type}`)
   }
 }
 
