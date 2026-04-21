@@ -27,7 +27,8 @@ import { findBlockNode, findEditableNode, supportsInlineEditablePath, applyAiFie
 import { submitChatStream, applyOps, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
 import type { BlockManifest } from "@ai-site-editor/shared"
-import { defaultPropsForType, allowedBlockTypes, getAllBlockMeta } from "@ai-site-editor/shared"
+import { defaultPropsForType, allowedBlockTypes, getAllBlockMeta, toAltPath } from "@ai-site-editor/shared"
+import { ImagePickerModal, type ImagePickerTarget } from "./components/ImagePickerModal"
 
 export type SiteContext = {
   siteName?: string
@@ -94,6 +95,7 @@ export function ImmersiveWidget({
   const [isLoading, setIsLoading] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [selectedBlock, setSelectedBlock] = useState<BlockSelectionState>({ blockId: null, blockType: null, editablePath: null })
+  const [imagePickerTarget, setImagePickerTarget] = useState<ImagePickerTarget | null>(null)
   const [editCounter, setEditCounter] = useState(0)
   const cancelRef = useRef<(() => void) | null>(null)
 
@@ -155,6 +157,25 @@ export function ImmersiveWidget({
     })
   }, [config, refresh])
 
+  const handleImageSelect = useCallback((imageUrl: string, alt: string) => {
+    if (!imagePickerTarget) return
+    const { slug: targetSlug, blockId, editablePath } = imagePickerTarget
+    const altPath = toAltPath(editablePath)
+    const listMatch = editablePath.match(/^([a-zA-Z_]+)\[(\d+)\]\.(.+)$/)
+    if (listMatch) {
+      const [, listKey, indexStr, fieldKey] = listMatch
+      const patch: Record<string, string> = { [fieldKey]: imageUrl }
+      const altMatch = altPath !== editablePath ? altPath.match(/^([a-zA-Z_]+)\[(\d+)\]\.(.+)$/) : null
+      if (altMatch) patch[altMatch[3]] = alt
+      applyOp({ op: "update_item", pageSlug: targetSlug, blockId, listKey, index: Number(indexStr), patch })
+    } else {
+      const patch: Record<string, string> = { [editablePath]: imageUrl }
+      if (altPath !== editablePath) patch[altPath] = alt
+      applyOp({ op: "update_props", pageSlug: targetSlug, blockId, patch })
+    }
+    setImagePickerTarget(null)
+  }, [imagePickerTarget, applyOp])
+
   const { focusBlock, renderLiveDraft, discardLiveDraftOriginals, triggerRefresh } = useBlockSelection({
     slug,
     pathname,
@@ -185,6 +206,9 @@ export function ImmersiveWidget({
     onListItemAddRequested: useCallback((p: { slug: string; blockId: string; blockType: string; listKey: string; afterIndex: number }) => {
       applyOp({ op: "add_item", pageSlug: p.slug, blockId: p.blockId, listKey: p.listKey, afterIndex: p.afterIndex })
     }, [applyOp]),
+    onOpenImagePicker: useCallback((p: { slug: string; blockId: string; editablePath: string; currentUrl?: string }) => {
+      setImagePickerTarget(p)
+    }, []),
   })
 
   // Text selection
@@ -490,6 +514,15 @@ export function ImmersiveWidget({
           hidden={panelOpen}
         />
       )}
+
+      {/* Image picker modal */}
+      <ImagePickerModal
+        target={imagePickerTarget}
+        orchestratorUrl={config.orchestratorUrl}
+        accessToken={accessToken}
+        onSelect={handleImageSelect}
+        onClose={() => setImagePickerTarget(null)}
+      />
 
       {/* FAB */}
       <ChatFab
