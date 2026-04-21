@@ -16,6 +16,7 @@ import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins
 import { unsplashGetByIdHandler, unsplashGetByIdManifest } from "../tools/builtins/unsplash-get-by-id.js"
 import { imageGenerateHandler, imageGenerateManifest } from "../tools/builtins/image-generate.js"
 import type { ToolCallContext } from "../tools/types.js"
+import type { AgentLogger } from "./agent-loop.js"
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<{ result: string; isError?: boolean }>
 
@@ -27,15 +28,16 @@ export type AgentTool = {
 /**
  * Create all agent tools bound to a specific session.
  */
-export function createAgentTools(session: string, options?: { manifest?: BlockManifest }): AgentTool[] {
+export function createAgentTools(session: string, options?: { manifest?: BlockManifest; logger?: AgentLogger }): AgentTool[] {
   const applyOpts: ApplyOpsOptions = options?.manifest ? { componentsManifest: options.manifest } : {}
+  const log: AgentLogger = options?.logger ?? { info: (m) => console.log(m), warn: (m) => console.warn(m), error: (m) => console.error(m) }
 
   // Helper: apply ops and return result
   async function applyOps(ops: Operation[]): Promise<{ result: string; isError?: boolean }> {
     try {
-      console.log("[agent-tools] Applying ops:", JSON.stringify(ops.map(o => o.op)))
+      log.info(`[agent-tools] Applying ops: ${JSON.stringify(ops.map(o => o.op))}`)
       const result = await applyOpsAtomically(session, ops, applyOpts)
-      console.log("[agent-tools] Applied successfully:", result.appliedCount)
+      log.info(`[agent-tools] Applied successfully: ${result.appliedCount}`)
       const version = bumpVersion(session)
       const focusBlockId = pickFocusBlockId(ops)
       return {

@@ -397,7 +397,7 @@ export async function mediaRoutes(app: FastifyInstance, ctx: RouteContext) {
 
         if (desiredRatio !== session.aspectRatio) {
           // Aspect ratio changed — must create a new Gemini session (config is immutable)
-          console.log(`[image/chat] Aspect ratio changed ${session.aspectRatio} → ${desiredRatio}, creating new session`)
+          request.log.info(`[image/chat] Aspect ratio changed ${session.aspectRatio} → ${desiredRatio}, creating new session`)
           geminiChatSessions.delete(chatId)
           chatId = randomUUID()
           chat = ai.chats.create({

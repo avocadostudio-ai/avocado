@@ -19,6 +19,7 @@ import { useMediaInput } from "./hooks/useMediaInput"
 import { useBlockProps } from "./hooks/useBlockProps"
 import { usePageMeta } from "./hooks/usePageMeta"
 import { PropertyPanel } from "./components/PropertyPanel"
+import { ErrorBoundary } from "./components/ErrorBoundary"
 import { useBlockManifest } from "./hooks/useBlockManifest"
 import { resolveStreamingIndicatorStyle } from "./config/streaming-indicator"
 import { allowedBlockTypes, getAllBlockMeta, toAltPath, type BlockInstance } from "@ai-site-editor/shared"
@@ -1394,6 +1395,7 @@ function EditorPage({
           </div>
         ) : null}
 
+        <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing">
         <ChatThreadCore
           ref={chatThreadRef}
           className="chat-thread"
@@ -1750,7 +1752,9 @@ function EditorPage({
             </div>
           )}
         />
+        </ErrorBoundary>
 
+        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing">
         <PropertyPanel
           style={{ display: activeTab === "properties" ? "" : "none" }}
           props={blockProps.props}
@@ -1807,6 +1811,7 @@ function EditorPage({
           manifestByType={componentManifest.byType}
           siteOrigin={activeSiteOrigin}
         />
+        </ErrorBoundary>
 
         <div style={{ display: activeTab === "history" ? "" : "none", flex: 1, minHeight: 0, overflow: "hidden" }}>
           <VersionHistoryPanel

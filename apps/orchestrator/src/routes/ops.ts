@@ -36,7 +36,7 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
     const session = scopedSessionKey(body.session, body.siteId)
     const parsedOps = z.array(operationSchema).safeParse(body.ops)
     if (!parsedOps.success) {
-      console.error("[ops] invalid ops payload:", JSON.stringify(parsedOps.error.issues, null, 2), "raw ops:", JSON.stringify(body.ops))
+      request.log.error({ issues: parsedOps.error.issues, rawOps: body.ops }, "[ops] invalid ops payload")
       return reply.code(400).send({ error: "invalid ops payload", details: parsedOps.error.issues })
     }
     if (parsedOps.data.length === 0) return reply.code(400).send({ error: "ops must not be empty" })
