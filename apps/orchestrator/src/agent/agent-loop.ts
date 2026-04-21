@@ -12,6 +12,18 @@ import { AGENT_MAX_TOOL_CALLS, AGENT_MAX_TOKENS, AGENT_TEMPERATURE, AGENT_THINKI
 import { runOpenAIAgentLoop } from "./agent-loop-openai.js"
 import { anthropicSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "../chat/anthropic-cache.js"
 
+export type AgentLogger = {
+  info(obj: object | string, msg?: string): void
+  warn(obj: object | string, msg?: string): void
+  error(obj: object | string, msg?: string): void
+}
+
+export const consoleAgentLogger: AgentLogger = {
+  info: (obj, msg) => msg ? console.log(msg, obj) : console.log(obj),
+  warn: (obj, msg) => msg ? console.warn(msg, obj) : console.warn(obj),
+  error: (obj, msg) => msg ? console.error(msg, obj) : console.error(obj),
+}
+
 export type AgentTokenUsage = {
   inputTokens: number
   outputTokens: number
@@ -35,6 +47,7 @@ export type AgentLoopOptions = {
   userMessage: string
   maxToolCalls?: number
   signal?: AbortSignal
+  logger?: AgentLogger
 }
 
 /** Provider-agnostic entry point — dispatches to Anthropic or OpenAI loop. */
@@ -67,7 +80,9 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
     userMessage,
     maxToolCalls = AGENT_MAX_TOOL_CALLS,
     signal,
+    logger,
   } = options
+  const log: AgentLogger = logger ?? consoleAgentLogger
 
   const client = new Anthropic({ apiKey })
 
@@ -101,9 +116,9 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
       // Enable thinking on first turn only for complex requests
       const useThinking = toolCallCount === 0 && shouldUseThinking(userMessage)
       if (useThinking) {
-        console.log("[agent-loop] Extended thinking enabled (budget:", AGENT_THINKING_BUDGET, ")")
+        log.info(`[agent-loop] Extended thinking enabled (budget: ${AGENT_THINKING_BUDGET})`)
       }
-      console.log("[agent-loop] Calling Anthropic API (streaming), turn", toolCallCount + 1)
+      log.info(`[agent-loop] Calling Anthropic API (streaming), turn ${toolCallCount + 1}`)
 
       const stream = client.messages.stream({
         model,
@@ -160,13 +175,11 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
         totalUsage.cacheCreationTokens += (u as unknown as Record<string, number>).cache_creation_input_tokens ?? 0
       }
 
-      console.log("[agent-loop] Stream complete, stop_reason:", response.stop_reason,
-        "content blocks:", response.content.length,
-        "tools:", toolUseBlocks.map(b => b.name))
+      log.info(`[agent-loop] Stream complete, stop_reason: ${response.stop_reason} content blocks: ${response.content.length} tools: ${toolUseBlocks.map(b => b.name).join(",")}`)
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error("[agent-loop] API error:", msg)
+      log.error(`[agent-loop] API error: ${msg}`)
       yield { type: "error", message: msg }
       return
     }
@@ -185,7 +198,7 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
     for (const toolUse of toolUseBlocks) {
       toolCallCount++
 
-      console.log("[agent-loop] Executing tool:", toolUse.name, "input:", JSON.stringify(toolUse.input).slice(0, 200))
+      log.info(`[agent-loop] Executing tool: ${toolUse.name} input: ${JSON.stringify(toolUse.input).slice(0, 200)}`)
       const handler = handlerMap.get(toolUse.name)
       if (!handler) {
         const errorResult = `Unknown tool: ${toolUse.name}`

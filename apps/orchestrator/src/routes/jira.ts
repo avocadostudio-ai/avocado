@@ -12,6 +12,7 @@
  */
 
 import { timingSafeEqual } from "node:crypto"
+import { z } from "zod"
 import type { FastifyInstance } from "fastify"
 import { loadJiraConfig, type JiraConfig, type JiraWebhookPayload, type JiraUser } from "../jira/jira-types.js"
 import { processJiraTicket, getProcessingStatus, adfToPlainText, isAgentAuthoredComment, type JiraProcessingMode } from "../jira/jira-processor.js"
@@ -172,6 +173,25 @@ export function routeWebhook(payload: JiraWebhookPayload, config: JiraConfig): W
 }
 
 // ---------------------------------------------------------------------------
+// Request schemas
+// ---------------------------------------------------------------------------
+
+const jiraWebhookBodySchema = z.object({
+  webhookEvent: z.string().optional(),
+  issue_event_type_name: z.string().optional(),
+  timestamp: z.number().optional(),
+  issue: z.object({ key: z.string().optional() }).passthrough().optional(),
+  comment: z.unknown().optional(),
+  changelog: z.unknown().optional(),
+  user: z.unknown().optional(),
+}).passthrough()
+
+const jiraProcessBodySchema = z.object({
+  issueKey: z.string().optional(),
+  mode: z.string().optional(),
+})
+
+// ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
 
@@ -189,7 +209,11 @@ export async function jiraRoutes(app: FastifyInstance, ctx: RouteContext) {
       return reply.code(401).send({ error: "Invalid webhook secret" })
     }
 
-    const payload = request.body as JiraWebhookPayload
+    const parsedPayload = jiraWebhookBodySchema.safeParse(request.body)
+    if (!parsedPayload.success) {
+      return reply.code(400).send({ error: "Invalid webhook payload", details: parsedPayload.error.issues })
+    }
+    const payload = parsedPayload.data as unknown as JiraWebhookPayload
     if (!payload?.issue?.key) {
       return reply.code(400).send({ error: "Invalid webhook payload: missing issue key" })
     }
@@ -231,13 +255,17 @@ export async function jiraRoutes(app: FastifyInstance, ctx: RouteContext) {
       return reply.code(401).send({ error: "Invalid webhook secret" })
     }
 
-    const body = request.body as { issueKey?: string; mode?: JiraProcessingMode }
+    const parsedBody = jiraProcessBodySchema.safeParse(request.body)
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsedBody.error.issues })
+    }
+    const body = parsedBody.data
     if (!body?.issueKey?.trim()) {
       return reply.code(400).send({ error: "issueKey is required" })
     }
 
     const issueKey = body.issueKey.trim()
-    const mode: JiraProcessingMode = body.mode ?? "review"
+    const mode: JiraProcessingMode = (body.mode as JiraProcessingMode | undefined) ?? "review"
     request.log.info({ issueKey, mode }, "JIRA manual process: starting")
 
     const result = await processJiraTicket({

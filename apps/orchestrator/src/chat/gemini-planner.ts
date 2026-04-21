@@ -47,6 +47,16 @@ import {
   DEFERRABLE_IMAGE_TOOLS
 } from "./chat-pipeline-shared.js"
 
+const LLM_TIMEOUT_MS = 120_000
+
+function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) { reject(signal.reason); return }
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+    promise.then(resolve, reject)
+  })
+}
+
 const geminiEditPlanSchema = {
   ...editPlanJsonSchema,
   propertyOrdering: ["intent", "summary_for_user", "change_log", "ops", "suggested_next_actions"]
@@ -138,7 +148,7 @@ export async function parseIntentWithGemini(args: {
     blocks: args.currentPage.blocks.map((b) => ({ id: b.id, type: b.type, props: Object.keys(b.props) }))
   }
 
-  const response = await ai.models.generateContent({
+  const response = await raceWithAbort(ai.models.generateContent({
     model: args.model,
     contents: JSON.stringify(user),
     config: {
@@ -148,7 +158,7 @@ export async function parseIntentWithGemini(args: {
       temperature: 0,
       safetySettings: PERMISSIVE_SAFETY_SETTINGS,
     }
-  })
+  }), AbortSignal.timeout(LLM_TIMEOUT_MS))
 
   const raw = extractGeminiText(response)
   if (!raw.trim()) throw new Error("Intent parser did not return JSON")
@@ -201,6 +211,9 @@ export async function generatePlanWithGemini(args: {
   locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const ai = await getGeminiClient()
+  const effectiveSignal = args.signal
+    ? AbortSignal.any([args.signal, AbortSignal.timeout(LLM_TIMEOUT_MS)])
+    : AbortSignal.timeout(LLM_TIMEOUT_MS)
   const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
@@ -309,6 +322,7 @@ export async function generatePlanWithGemini(args: {
       onImageProgress: args.onImageProgress,
       deferredNativeImageCalls,
       log: args.log,
+      signal: effectiveSignal,
     })
 
     const result = parseAndValidatePlan(raw, args, chatStrictPrimaryOpMode, schemaContext)
@@ -332,7 +346,7 @@ export async function generatePlanWithGemini(args: {
     let emittedChangeLogCount = 0
     const emittedFieldDraftByKey = new Map<string, string>()
 
-    const stream = await ai.models.generateContentStream({
+    const stream = await raceWithAbort(ai.models.generateContentStream({
       model: args.model,
       contents,
       config: {
@@ -342,7 +356,7 @@ export async function generatePlanWithGemini(args: {
         temperature: 0,
         safetySettings: PERMISSIVE_SAFETY_SETTINGS,
       }
-    })
+    }), effectiveSignal) as AsyncIterable<unknown>
 
     for await (const chunk of stream) {
       const text = extractGeminiText(chunk)
@@ -394,7 +408,7 @@ export async function generatePlanWithGemini(args: {
     }
   } else {
     // Non-streaming path
-    const response = await ai.models.generateContent({
+    const response = await raceWithAbort(ai.models.generateContent({
       model: args.model,
       contents,
       config: {
@@ -404,7 +418,7 @@ export async function generatePlanWithGemini(args: {
         temperature: 0,
         safetySettings: PERMISSIVE_SAFETY_SETTINGS,
       }
-    })
+    }), effectiveSignal)
 
     raw = extractGeminiText(response)
     usage = extractGeminiUsage(response)
@@ -437,6 +451,7 @@ async function runToolLoop(args: {
   onImageProgress?: (event: { percent: number; stage: string }) => void
   deferredNativeImageCalls: DeferredNativeImageCall[]
   log?: { warn: (obj: Record<string, unknown>, msg: string) => void }
+  signal?: AbortSignal
 }): Promise<string> {
   // Build function declarations from tool registry + submit_edit_plan
   const runtimeManifests = args.toolRuntime.registry.listManifests()
@@ -463,7 +478,8 @@ async function runToolLoop(args: {
   let submitPlanJson = ""
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-    const response = await args.ai.models.generateContent({
+    const callSignal = args.signal ?? AbortSignal.timeout(LLM_TIMEOUT_MS)
+    const response = await raceWithAbort(args.ai.models.generateContent({
       model: args.model,
       contents: messages,
       config: {
@@ -473,7 +489,7 @@ async function runToolLoop(args: {
         tools: [{ functionDeclarations }],
         toolConfig: { functionCallingConfig: { mode: "ANY" } },
       }
-    })
+    }), callSignal)
 
     const text = extractGeminiText(response)
     if (text && args.onToken) args.onToken(text)

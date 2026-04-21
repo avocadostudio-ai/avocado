@@ -14,6 +14,7 @@ import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./promp
 // ---------------------------------------------------------------------------
 // Singleton OpenAI client — reuses connection pool across requests.
 // ---------------------------------------------------------------------------
+const LLM_TIMEOUT_MS = 120_000
 let _openaiSingleton: OpenAI | null = null
 function getOpenAIClient(): OpenAI {
   if (!_openaiSingleton) {
@@ -360,11 +361,11 @@ export function buildPlannerSchemaContext(args: {
 export type PlannerOpenAIClient = {
   chat: {
     completions: {
-      create: (args: unknown) => any
+      create: (args: unknown, options?: { signal?: AbortSignal }) => any
     }
   }
   responses: {
-    create: (args: unknown) => any
+    create: (args: unknown, options?: { signal?: AbortSignal }) => any
   }
 }
 
@@ -804,7 +805,7 @@ export async function parseIntentWithOpenAI(args: {
       { role: "system", content: system },
       { role: "user", content: JSON.stringify(user) }
     ]
-  })
+  }, { signal: AbortSignal.timeout(LLM_TIMEOUT_MS) })
 
   const raw = completion.choices[0]?.message?.content ?? ""
   if (!raw.trim()) throw new Error("Intent parser did not return JSON")
@@ -851,6 +852,9 @@ export async function generatePlanWithOpenAI(args: {
   locale?: string
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
+  const effectiveSignal = args.signal
+    ? AbortSignal.any([args.signal, AbortSignal.timeout(LLM_TIMEOUT_MS)])
+    : AbortSignal.timeout(LLM_TIMEOUT_MS)
   const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
@@ -948,7 +952,7 @@ export async function generatePlanWithOpenAI(args: {
       model: args.model,
       instructions: system,
       input: JSON.stringify(user)
-    })
+    }, { signal: effectiveSignal })
     const responsesOutcome = extractResponsesOutcome(response)
     if (responsesOutcome.refusal) {
       throw toPlannerError("planner_refusal", `Model refused planning output: ${responsesOutcome.refusal}`)
@@ -970,7 +974,7 @@ export async function generatePlanWithOpenAI(args: {
         ...(args.history ?? []),
         { role: "user", content: openaiUserContent }
       ],
-    })
+    }, { signal: effectiveSignal })
     let sawRefusal = false
     for await (const chunk of stream) {
       const deltaRefusal = (chunk as { choices?: Array<{ delta?: { refusal?: unknown } }> })?.choices?.[0]?.delta?.refusal
@@ -1029,7 +1033,7 @@ export async function generatePlanWithOpenAI(args: {
         ...(args.history ?? []),
         { role: "user", content: openaiUserContent }
       ],
-    })
+    }, { signal: effectiveSignal })
     const refusal = extractCompletionRefusal(completion)
     if (refusal) {
       throw toPlannerError("planner_refusal", `Model refused planning output: ${refusal}`)
