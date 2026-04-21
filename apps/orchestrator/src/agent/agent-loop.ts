@@ -19,9 +19,9 @@ export type AgentLogger = {
 }
 
 export const consoleAgentLogger: AgentLogger = {
-  info: (obj, msg) => msg ? console.log(msg, obj) : console.log(obj),
-  warn: (obj, msg) => msg ? console.warn(msg, obj) : console.warn(obj),
-  error: (obj, msg) => msg ? console.error(msg, obj) : console.error(obj),
+  info: (obj, msg) => msg ? console.log(obj, msg) : console.log(obj),
+  warn: (obj, msg) => msg ? console.warn(obj, msg) : console.warn(obj),
+  error: (obj, msg) => msg ? console.error(obj, msg) : console.error(obj),
 }
 
 export type AgentTokenUsage = {
