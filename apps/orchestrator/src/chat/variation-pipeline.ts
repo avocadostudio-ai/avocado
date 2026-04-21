@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
 import type { FastifyBaseLogger } from "fastify"
+import { z } from "zod"
 import { type BlockType, type PageDoc, validateBlockProps } from "@ai-site-editor/shared"
 import { buildVariationSystemPrompt } from "./prompts.js"
 import { type AIProvider, type ModelKey, getPage } from "../state/session-state.js"
@@ -25,33 +26,30 @@ import { resolveDistinctUnsplashImage } from "../variation-images.js"
 // Types
 // ---------------------------------------------------------------------------
 
-export type VariationRequestBody = {
-  session?: string
-  siteId?: string
-  sitePurpose?: string
-  siteHosting?: string
-  businessContext?: {
-    purpose?: string
-    tone?: string
-    constraints?: string[]
-  } | string
-  siteContext?: {
-    siteId?: string
-    siteName?: string
-    purpose?: string
-    hosting?: string
-    tone?: string
-    constraints?: string[]
-  } | string
-  slug?: string
-  message?: string
-  modelKey?: ModelKey
-  provider?: AIProvider
-  activeBlockId?: string
-  activeBlockType?: string
-  activeEditablePath?: string
-  locale?: string
-}
+export const variationRequestBodySchema = z.object({
+  session: z.string().optional(),
+  siteId: z.string().optional(),
+  sitePurpose: z.string().optional(),
+  siteHosting: z.string().optional(),
+  businessContext: z.union([
+    z.object({ purpose: z.string().optional(), tone: z.string().optional(), constraints: z.array(z.string()).optional() }),
+    z.string()
+  ]).optional(),
+  siteContext: z.union([
+    z.object({ siteId: z.string().optional(), siteName: z.string().optional(), purpose: z.string().optional(), hosting: z.string().optional(), tone: z.string().optional(), constraints: z.array(z.string()).optional() }),
+    z.string()
+  ]).optional(),
+  slug: z.string().optional(),
+  message: z.string().optional(),
+  modelKey: z.enum(["fast", "balanced", "reasoning", "codex"]).optional(),
+  provider: z.enum(["openai", "anthropic", "gemini"]).optional(),
+  activeBlockId: z.string().optional(),
+  activeBlockType: z.string().optional(),
+  activeEditablePath: z.string().optional(),
+  locale: z.string().optional(),
+})
+
+export type VariationRequestBody = z.infer<typeof variationRequestBodySchema>
 
 export type VariationOption = {
   id: string

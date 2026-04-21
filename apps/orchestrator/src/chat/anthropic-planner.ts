@@ -48,6 +48,7 @@ export type { DeferredNativeImageCall }
 // Minimum text length to treat a text-only model response as meaningful
 // content (rather than discarding it in favor of the hardcoded fallback).
 const MIN_MEANINGFUL_RESPONSE_LENGTH = 20
+const LLM_TIMEOUT_MS = 120_000
 
 /** Detect API-level errors (rate limits, auth failures, quota exhaustion) that
  *  should NOT be treated as recoverable stream parse errors. */
@@ -140,7 +141,7 @@ export async function parseIntentWithAnthropic(args: {
     messages: [
       { role: "user", content: JSON.stringify(user) }
     ],
-  })
+  }, { signal: AbortSignal.timeout(LLM_TIMEOUT_MS) })
 
   if (response.stop_reason === "max_tokens") {
     const textBlock = response.content.find((b) => b.type === "text")
@@ -185,10 +186,10 @@ export async function parseIntentWithAnthropic(args: {
 
 export type PlannerAnthropicClient = {
   messages: {
-    create: (args: unknown) => Promise<Anthropic.Messages.Message>
+    create: (args: unknown, options?: { signal?: AbortSignal }) => Promise<Anthropic.Messages.Message>
     stream?: (
       args: unknown,
-      options?: { headers?: Record<string, string> }
+      options?: { headers?: Record<string, string>; signal?: AbortSignal }
     ) => AsyncIterable<unknown> & { finalMessage: () => Promise<unknown> }
   }
 }
@@ -261,6 +262,9 @@ export async function generatePlanWithAnthropic(args: {
   thinking?: { budgetTokens: number }
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const client = args.client ?? (getAnthropicClient() as unknown as PlannerAnthropicClient)
+  const effectiveSignal = args.signal
+    ? AbortSignal.any([args.signal, AbortSignal.timeout(LLM_TIMEOUT_MS)])
+    : AbortSignal.timeout(LLM_TIMEOUT_MS)
   const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
   const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
@@ -466,7 +470,8 @@ export async function generatePlanWithAnthropic(args: {
           messages: loopMessages,
           ...(thinkingParam ? { thinking: thinkingParam } : {})
         }, {
-          headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS
+          headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS,
+          signal: effectiveSignal,
         })
         const toolNameByIndex = new Map<number, string>()
         const submitToolJsonByIndex = new Map<number, string>()
@@ -577,7 +582,7 @@ export async function generatePlanWithAnthropic(args: {
           tool_choice: { type: "auto" },
           messages: loopMessages,
           ...(thinkingParam ? { thinking: thinkingParam } : {})
-        })
+        }, { signal: effectiveSignal })
       }
       usage = sumTokenUsage(usage, extractUsage(response))
 
@@ -769,7 +774,8 @@ export async function generatePlanWithAnthropic(args: {
         ],
         ...(thinkingParam ? { thinking: thinkingParam } : {})
       }, {
-        headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS
+        headers: ANTHROPIC_FINE_GRAINED_STREAM_HEADERS,
+        signal: effectiveSignal,
       })
       // Wrap stream iteration — SDK may throw on message_stop if tool JSON is malformed
       let streamLoopError: unknown
@@ -892,7 +898,7 @@ export async function generatePlanWithAnthropic(args: {
           { role: "user", content: userContent }
         ],
         ...(thinkingParam ? { thinking: thinkingParam } : {})
-      })
+      }, { signal: effectiveSignal })
       usage = extractUsage(response)
       if (response.stop_reason === "max_tokens") {
         args.log?.warn({
@@ -941,7 +947,7 @@ export async function generatePlanWithAnthropic(args: {
           ...historyMessages,
           { role: "user", content: userContent }
         ],
-      })
+      }, { signal: effectiveSignal })
       usage = extractUsage(response)
 
       if (response.stop_reason === "max_tokens") {
@@ -997,7 +1003,7 @@ export async function generatePlanWithAnthropic(args: {
           { role: "user", content: userContent }
         ],
         ...(thinkingParam ? { thinking: thinkingParam } : {})
-      })
+      }, { signal: effectiveSignal })
       const fallbackUsage = extractUsage(fallbackResponse)
       usage = {
         inputTokens: usage.inputTokens + fallbackUsage.inputTokens,

@@ -10,7 +10,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from "openai/reso
 import { openAIChatOptionsForModel } from "../chat/planner.js"
 import type { AgentTool } from "./agent-tools.js"
 import { AGENT_MAX_TOOL_CALLS, AGENT_MAX_TOKENS } from "./agent-provider.js"
-import type { AgentEvent, AgentLoopOptions, AgentTokenUsage } from "./agent-loop.js"
+import { consoleAgentLogger, type AgentLogger, type AgentEvent, type AgentLoopOptions, type AgentTokenUsage } from "./agent-loop.js"
 
 type ToolCallAccumulator = {
   id: string
@@ -38,7 +38,9 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
     userMessage,
     maxToolCalls = AGENT_MAX_TOOL_CALLS,
     signal,
+    logger,
   } = options
+  const log: AgentLogger = logger ?? consoleAgentLogger
 
   const client = new OpenAI({ apiKey })
 
@@ -66,7 +68,7 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
     let finishReason: string | null = null
 
     try {
-      console.log("[agent-loop-openai] Calling OpenAI API (streaming), turn", toolCallCount + 1)
+      log.info(`[agent-loop-openai] Calling OpenAI API (streaming), turn ${toolCallCount + 1}`)
 
       const stream = await client.chat.completions.create({
         model,
@@ -123,7 +125,7 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
         return
       }
       const msg = err instanceof Error ? err.message : String(err)
-      console.error("[agent-loop-openai] API error:", msg)
+      log.error(`[agent-loop-openai] API error: ${msg}`)
       yield { type: "error", message: msg }
       return
     }
@@ -180,13 +182,13 @@ export async function* runOpenAIAgentLoop(options: AgentLoopOptions): AsyncGener
         input = JSON.parse(acc.args || "{}")
       } catch {
         const errorResult = `Failed to parse tool arguments for ${acc.name}`
-        console.error("[agent-loop-openai]", errorResult, "raw:", acc.args.slice(0, 200))
+        log.error(`[agent-loop-openai] ${errorResult} raw: ${acc.args.slice(0, 200)}`)
         toolResults.push({ role: "tool", tool_call_id: acc.id, content: errorResult })
         yield { type: "tool_done", toolName: acc.name, toolUseId: acc.id, result: errorResult, isError: true }
         continue
       }
 
-      console.log("[agent-loop-openai] Executing tool:", acc.name, "input:", JSON.stringify(input).slice(0, 200))
+      log.info(`[agent-loop-openai] Executing tool: ${acc.name} input: ${JSON.stringify(input).slice(0, 200)}`)
 
       const handler = handlerMap.get(acc.name)
       if (!handler) {

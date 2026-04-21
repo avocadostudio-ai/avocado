@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react"
 import { useT } from "../i18n"
 import {
   parseChatStreamFrame,
+  assistantResponseSchema,
+  chatStartResponseSchema,
+  slugsResponseSchema,
+  bootstrapResponseSchema,
+  cancelResponseSchema,
   type BlockManifest,
   type ChatStreamFrame,
   type Operation
@@ -282,7 +287,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         })
       })
       if (!bootstrapRes.ok) return { slugs: [], synced: false }
-      const bootstrapData = (await bootstrapRes.json()) as { slugs?: string[] }
+      const parsedBootstrap = bootstrapResponseSchema.safeParse(await bootstrapRes.json())
+      const bootstrapData = parsedBootstrap.success ? parsedBootstrap.data : {}
       return { slugs: bootstrapData.slugs ?? [], synced: true }
     } catch {
       return { slugs: [], synced: false }
@@ -335,7 +341,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         }
         return store.getState().availableSlugs
       }
-      const data = (await res.json()) as { slugs?: unknown }
+      const parsed = slugsResponseSchema.safeParse(await res.json())
+      const data = parsed.success ? parsed.data : {}
       const list = Array.isArray(data.slugs)
         ? data.slugs.filter((item): item is string => typeof item === "string" && item.length > 0)
         : []
@@ -403,8 +410,12 @@ export function useChatEngine(config: ChatEngineConfig) {
       }, componentManifest, siteCapabilities))
     })
 
-    const data = (await res.json()) as AssistantResponse
-    applyChatResult(data)
+    const parsed = assistantResponseSchema.safeParse(await res.json())
+    if (!parsed.success) {
+      console.warn("[useChatEngine] Unexpected /chat response shape:", parsed.error.issues)
+      return
+    }
+    applyChatResult(parsed.data as AssistantResponse)
   }
 
   async function submitChatStream(finalMessage: string, extraParams?: Record<string, string>) {
@@ -440,9 +451,9 @@ export function useChatEngine(config: ChatEngineConfig) {
         body: JSON.stringify(payload)
       })
       if (!res.ok) return false
-      const data = await res.json() as { streamId?: string }
-      if (!data.streamId) return false
-      streamId = data.streamId
+      const parsed = chatStartResponseSchema.safeParse(await res.json())
+      if (!parsed.success || !parsed.data.streamId) return false
+      streamId = parsed.data.streamId
       activeStreamIdRef.current = streamId
     } catch {
       return false
@@ -1264,7 +1275,8 @@ export function useChatEngine(config: ChatEngineConfig) {
         body: JSON.stringify({ streamId: currentStreamId })
       })
       if (res.ok) {
-        const data = await res.json() as { status?: string }
+        const parsed = cancelResponseSchema.safeParse(await res.json())
+        const data = parsed.success ? parsed.data : {}
         if (data.status === "not_found" || data.status === "already_terminal") {
           // Nothing to cancel — let the stream finish naturally
           return
