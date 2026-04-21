@@ -188,7 +188,7 @@ const jiraWebhookBodySchema = z.object({
 
 const jiraProcessBodySchema = z.object({
   issueKey: z.string().optional(),
-  mode: z.string().optional(),
+  mode: z.enum(["review", "execute", "publish"]).optional(),
 })
 
 // ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ export async function jiraRoutes(app: FastifyInstance, ctx: RouteContext) {
     }
 
     const issueKey = body.issueKey.trim()
-    const mode: JiraProcessingMode = (body.mode as JiraProcessingMode | undefined) ?? "review"
+    const mode: JiraProcessingMode = body.mode ?? "review"
     request.log.info({ issueKey, mode }, "JIRA manual process: starting")
 
     const result = await processJiraTicket({

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type BlockManifest, type PageDoc } from "@ai-site-editor/shared"
+import { allowedBlockTypes, blockManifestSchema, getBlockMeta, type BlockType, type EditPlan, type BlockManifest, type PageDoc } from "@ai-site-editor/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
 import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
 import { type GuardrailErrorCategory } from "../errors.js"
@@ -54,7 +54,7 @@ const siteContextObjectSchema = z.object({
 export const chatRequestBodySchema = z.object({
   session: z.string().optional(),
   siteId: z.string().optional(),
-  componentsManifest: z.union([z.record(z.string(), z.unknown()), z.string()]).optional(),
+  componentsManifest: z.union([blockManifestSchema, z.string()]).optional(),
   siteCapabilities: z.union([siteCapabilitiesSchema, z.string()]).optional(),
   sitePurpose: z.string().optional(),
   siteHosting: z.string().optional(),

@@ -1395,6 +1395,8 @@ function EditorPage({
           </div>
         ) : null}
 
+        {/* ErrorBoundary.style applies only to the error fallback; ChatThreadCore
+            carries its own style for the happy-path. Both guards are needed. */}
         <ErrorBoundary fallbackLabel="Chat unavailable — try refreshing" onReset={() => window.location.reload()} style={{ display: activeTab === "chat" ? "" : "none" }}>
         <ChatThreadCore
           ref={chatThreadRef}
@@ -1754,9 +1756,10 @@ function EditorPage({
         />
         </ErrorBoundary>
 
-        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing" style={{ display: activeTab === "properties" ? "" : "none" }}>
+        <div style={{ display: activeTab === "properties" ? "" : "none" }}>
+        <ErrorBoundary fallbackLabel="Properties panel unavailable — try refreshing">
         <PropertyPanel
-          style={{ display: activeTab === "properties" ? "" : "none" }}
+          style={{ height: "100%" }}
           props={blockProps.props}
           status={blockProps.status}
           pageName={slugLabel(slug)}
@@ -1812,6 +1815,7 @@ function EditorPage({
           siteOrigin={activeSiteOrigin}
         />
         </ErrorBoundary>
+        </div>
 
         <div style={{ display: activeTab === "history" ? "" : "none", flex: 1, minHeight: 0, overflow: "hidden" }}>
           <VersionHistoryPanel

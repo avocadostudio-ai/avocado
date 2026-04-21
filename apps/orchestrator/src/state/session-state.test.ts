@@ -27,10 +27,14 @@ import {
   getRecentEdits,
   issueTouchedSlugsByKey,
   setIssueTouchedSlugs,
-  getIssueTouchedSlugs
+  getIssueTouchedSlugs,
+  evictStaleEphemeralMaps,
+  pendingApprovalPlanBySession,
+  publishStatusBySession,
+  continuationChainBySession,
 } from "./session-state.js"
 import type { PageDoc } from "@ai-site-editor/shared"
-import type { PersistedState } from "./session-state.js"
+import type { PersistedState, PendingApprovalPlan, PublishTracker } from "./session-state.js"
 
 // ---------------------------------------------------------------------------
 // normalizeSiteId
@@ -371,4 +375,86 @@ test("applyPersistedState: skips malformed issueTouchedSlugs entries", () => {
   assert.equal(issueTouchedSlugsByKey.has("BAD-NO-SLUGS"), false)
   assert.equal(issueTouchedSlugsByKey.has("BAD-WRONG-TYPE"), false)
   assert.deepEqual(getIssueTouchedSlugs("BAD-NON-STRING-SLUG"), ["/real"])
+})
+
+// ---------------------------------------------------------------------------
+// evictStaleEphemeralMaps
+// ---------------------------------------------------------------------------
+
+function makeStalePlan(id: string): PendingApprovalPlan {
+  return {
+    id,
+    createdAt: new Date(0).toISOString(), // epoch — always older than 1hr TTL
+    promptHash: "hash",
+    requestedSlug: "/",
+    effectiveSlug: "/",
+    summary: "test plan",
+    source: "openai",
+    modelUsed: "gpt-4o",
+    modelKey: "fast",
+    plan: { intent: "edit_plan", ops: [] },
+    stepLabels: [],
+    currentStep: 0,
+    totalSteps: 0,
+    originalMessage: "test",
+    siteContextBlock: null,
+  } as unknown as PendingApprovalPlan
+}
+
+function makeStalePublishTracker(session: string): PublishTracker {
+  return {
+    session,
+    status: "triggered",
+    startedAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(), // epoch — always older than 24hr TTL
+    slugs: ["/"],
+  }
+}
+
+test("evictStaleEphemeralMaps: evicts approval plan older than TTL", () => {
+  pendingApprovalPlanBySession.clear()
+  pendingApprovalPlanBySession.set("stale-session", makeStalePlan("plan-1"))
+  evictStaleEphemeralMaps()
+  assert.equal(pendingApprovalPlanBySession.has("stale-session"), false)
+  pendingApprovalPlanBySession.clear()
+})
+
+test("evictStaleEphemeralMaps: retains approval plan within TTL", () => {
+  pendingApprovalPlanBySession.clear()
+  const freshPlan = { ...makeStalePlan("plan-fresh"), createdAt: new Date().toISOString() }
+  pendingApprovalPlanBySession.set("fresh-session", freshPlan as unknown as PendingApprovalPlan)
+  evictStaleEphemeralMaps()
+  assert.equal(pendingApprovalPlanBySession.has("fresh-session"), true)
+  pendingApprovalPlanBySession.clear()
+})
+
+test("evictStaleEphemeralMaps: evicts publish status older than TTL", () => {
+  publishStatusBySession.clear()
+  publishStatusBySession.set("stale-pub", makeStalePublishTracker("stale-pub"))
+  evictStaleEphemeralMaps()
+  assert.equal(publishStatusBySession.has("stale-pub"), false)
+  publishStatusBySession.clear()
+})
+
+test("evictStaleEphemeralMaps: retains publish status within TTL", () => {
+  publishStatusBySession.clear()
+  const freshTracker = { ...makeStalePublishTracker("fresh-pub"), updatedAt: new Date().toISOString() }
+  publishStatusBySession.set("fresh-pub", freshTracker)
+  evictStaleEphemeralMaps()
+  assert.equal(publishStatusBySession.has("fresh-pub"), true)
+  publishStatusBySession.clear()
+})
+
+test("evictStaleEphemeralMaps: caps size-only maps at EPHEMERAL_MAP_CAP (500)", () => {
+  continuationChainBySession.clear()
+  for (let i = 0; i < 502; i++) {
+    continuationChainBySession.set(`session-${i}`, {} as any)
+  }
+  evictStaleEphemeralMaps()
+  assert.equal(continuationChainBySession.size, 500)
+  // Oldest entries (lowest i) are dropped; newest survive
+  assert.equal(continuationChainBySession.has("session-0"), false)
+  assert.equal(continuationChainBySession.has("session-1"), false)
+  assert.equal(continuationChainBySession.has("session-501"), true)
+  continuationChainBySession.clear()
 })
