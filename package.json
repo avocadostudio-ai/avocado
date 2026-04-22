@@ -39,11 +39,6 @@
     "test": "pnpm -r --if-present test",
     "test:unit": "pnpm --filter @ai-site-editor/orchestrator test:unit && pnpm --filter @ai-site-editor/blocks test",
     "test:e2e": "pnpm --filter @ai-site-editor/orchestrator test:e2e",
-    "render:whoami": "render whoami",
-    "render:workspace": "render workspace current",
-    "render:services": "render services --output text",
-    "render:deploys:orchestrator": "render deploys list srv-d6glb0paae7s73bf0itg --output text",
-    "render:deploy:orchestrator": "render deploys create srv-d6glb0paae7s73bf0itg --wait --confirm",
     "vercel:env:check": "./scripts/vercel-env-check.sh all",
     "vercel:env:site": "./scripts/vercel-env-check.sh site",
     "vercel:env:editor": "./scripts/vercel-env-check.sh editor"

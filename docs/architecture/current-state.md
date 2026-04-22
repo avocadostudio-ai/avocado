@@ -1,7 +1,6 @@
 # Current State Snapshot
 
 Date: 2026-02-26
-Repo: /Users/yury/Projects/ai-site-editor
 
 ## Live deployment status
 - Public site is deployed on Vercel (static build output from committed published content).
