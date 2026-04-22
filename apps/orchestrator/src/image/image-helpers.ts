@@ -212,12 +212,18 @@ export function deriveVariationImageIntent(args: { message: string; block: PageD
     )
   ).slice(0, 5)
 
+  const envDefault = (process.env.VARIATION_DEFAULT_IMAGE_SOURCE?.trim().toLowerCase() ?? "unsplash")
+  const resolvedDefault: "unsplash" | "llm" =
+    envDefault === "ai" || envDefault === "llm" || envDefault === "gemini" || envDefault === "openai"
+      ? "llm"
+      : "unsplash"
+
   const provider: "unsplash" | "llm" =
     /\bunsplash\b/.test(lowerMessage)
       ? "unsplash"
-      : /\b(llm|openai|ai[-\s]?generated|generated backgrounds?|synthetic backgrounds?)\b/.test(lowerMessage)
+      : /\b(llm|openai|gemini|nano[-\s]?banana|gpt[-\s]?image(?:[-\s]?\d)?|ai[-\s]?generated|generated backgrounds?|synthetic backgrounds?)\b/.test(lowerMessage)
         ? "llm"
-        : "unsplash"
+        : resolvedDefault
 
   return {
     baseQuery,

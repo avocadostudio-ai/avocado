@@ -204,13 +204,23 @@ in order:
 
 1. If the message contains a URL, every variant uses that URL.
 2. If `deriveVariationImageIntent` classifies the message as wanting AI-
-   generated images (`imageIntent.provider === "llm"`), the pipeline calls
-   `generateVariationImageWithOpenAI` with a per-variant prompt built from
-   the block type, heading, and subheading.
+   generated images, the pipeline dispatches to either Gemini
+   (`generateVariationImageWithGemini`, default) or OpenAI
+   (`generateVariationImageWithOpenAI`) based on `IMAGE_GEN_PROVIDER`. The
+   per-variant prompt is built from the block type, heading, and subheading.
 3. Otherwise it calls Unsplash via `resolveUnsplashImage`. With uniqueness
    enforced (the default), it uses `resolveDistinctUnsplashImage` which
    retries against a `usedImageUrls` set — up to 5 attempts, or 8 if the
    user explicitly asked for no duplicates.
+
+**Picking the provider.** The message wins when it's explicit — `unsplash`
+forces Unsplash; `gemini`, `openai`, `ai-generated`, `llm`, `gpt-image-2`,
+`gpt-image-1`, or `nano-banana` force AI generation. When the message has
+no hint, `VARIATION_DEFAULT_IMAGE_SOURCE` decides — set to `unsplash`
+(default) or `ai` / `gemini` / `openai` / `llm` to route to AI gen. Once in
+the AI branch, `IMAGE_GEN_PROVIDER` (default `gemini`) picks the actual
+backend, and `OPENAI_IMAGE_MODEL` (e.g. `gpt-image-2`) selects the OpenAI
+model when that backend is chosen.
 
 Failed images don't kill the variant — the patch just keeps whatever image
 it had (or none).
@@ -382,6 +392,15 @@ All in `variation-pipeline.ts` unless noted:
 | Unsplash uniqueness retries (default) | `5` | Inside `resolveDistinctUnsplashImage` |
 | Unsplash uniqueness retries (explicit "no duplicates") | `8` | Same function, when the message opts in |
 | `validateBlockProps` | — | Hard gate — invalid patches are dropped, not fixed |
+
+### Env vars
+
+| Variable | Default | Values | Notes |
+|---|---|---|---|
+| `VARIATION_DEFAULT_IMAGE_SOURCE` | `unsplash` | `unsplash` \| `ai` (aliases: `llm`, `gemini`, `openai`) | Which branch runs in `withDefaultImageVariations` when the user's message has no image-provider hint. `ai` routes to AI generation; the actual backend is then chosen by `IMAGE_GEN_PROVIDER`. Explicit message keywords (e.g. `"unsplash"`, `"gemini"`, `"ai-generated"`) always override this. |
+| `IMAGE_GEN_PROVIDER` | `gemini` | `gemini` \| `openai` | Which AI backend handles image gen once the AI branch is selected (for variations, the `image.generate` tool, and `/image/generate`). Falls back to the other provider if the chosen one has no API key. |
+| `OPENAI_IMAGE_MODEL` | `gpt-image-1-mini` (variations), `gpt-image-1` (final-quality tool calls) | any OpenAI image model (e.g. `gpt-image-2`) | Model used when `IMAGE_GEN_PROVIDER=openai`. |
+| `GOOGLE_GENAI_IMAGE_MODEL` | `gemini-2.5-flash-image` | any Gemini image model | Model used when `IMAGE_GEN_PROVIDER=gemini`. |
 
 ## Testing
 

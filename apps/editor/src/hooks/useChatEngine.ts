@@ -525,6 +525,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       // unchanged because they carry user-visible counts.
       const classifyServerStep = (raw: string): { label: string; rank: number } => {
         const lower = raw.toLowerCase()
+        if (/wrapping up|finalizing the response|almost done/.test(lower)) return { label: "Wrapping up…", rank: 5 }
         if (/resolving image|collecting image|preparing image/.test(lower)) return { label: "Resolving images…", rank: 4 }
         if (/^applying/.test(lower) || /updating draft/.test(lower)) return { label: raw, rank: 3 }
         if (/^plan ready/.test(lower)) return { label: raw, rank: 2 }

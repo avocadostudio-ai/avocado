@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import {
   withDefaultImageVariations,
   setResolveUnsplashImageForTests,
+  setGenerateVariationImageForTests,
   requestedVariationCount,
   type VariationOption
 } from "./variation-pipeline.js"
@@ -51,6 +52,71 @@ test("withDefaultImageVariations keeps images unique by default", async (t) => {
   const urls = out.map((entry) => String(entry.patch.imageUrl))
   assert.equal(new Set(urls).size, 3)
   assert.ok(seenIndices.length > 3)
+})
+
+test("withDefaultImageVariations routes to AI gen when message mentions gemini", async (t) => {
+  setResolveUnsplashImageForTests(async () => {
+    throw new Error("should not call Unsplash when AI gen is selected")
+  })
+  let aiCallCount = 0
+  setGenerateVariationImageForTests(async ({ altText }) => {
+    aiCallCount++
+    return { url: `https://ai.example/${aiCallCount}.png`, alt: altText, query: "ai" }
+  })
+  t.after(() => {
+    setResolveUnsplashImageForTests()
+    setGenerateVariationImageForTests()
+  })
+
+  const baseVariations: VariationOption[] = [
+    { id: "a", title: "A", summary: "A", patch: { heading: "A" }, changedKeys: ["heading"] },
+    { id: "b", title: "B", summary: "B", patch: { heading: "B" }, changedKeys: ["heading"] }
+  ]
+
+  const out = await withDefaultImageVariations({
+    block: heroBlock(),
+    message: "Generate 2 variations with gemini images",
+    variations: baseVariations
+  })
+
+  assert.equal(out.length, 2)
+  assert.equal(aiCallCount, 2)
+  for (const entry of out) {
+    assert.ok(String(entry.patch.imageUrl).startsWith("https://ai.example/"))
+  }
+})
+
+test("withDefaultImageVariations honors VARIATION_DEFAULT_IMAGE_SOURCE=ai env default", async (t) => {
+  const prev = process.env.VARIATION_DEFAULT_IMAGE_SOURCE
+  process.env.VARIATION_DEFAULT_IMAGE_SOURCE = "ai"
+  setResolveUnsplashImageForTests(async () => {
+    throw new Error("should not call Unsplash when env default is ai")
+  })
+  let aiCallCount = 0
+  setGenerateVariationImageForTests(async ({ altText }) => {
+    aiCallCount++
+    return { url: `https://ai.example/env-${aiCallCount}.png`, alt: altText, query: "ai" }
+  })
+  t.after(() => {
+    if (prev === undefined) delete process.env.VARIATION_DEFAULT_IMAGE_SOURCE
+    else process.env.VARIATION_DEFAULT_IMAGE_SOURCE = prev
+    setResolveUnsplashImageForTests()
+    setGenerateVariationImageForTests()
+  })
+
+  const baseVariations: VariationOption[] = [
+    { id: "a", title: "A", summary: "A", patch: { heading: "A" }, changedKeys: ["heading"] },
+    { id: "b", title: "B", summary: "B", patch: { heading: "B" }, changedKeys: ["heading"] }
+  ]
+
+  const out = await withDefaultImageVariations({
+    block: heroBlock(),
+    message: "Generate 2 variations of this banner",
+    variations: baseVariations
+  })
+
+  assert.equal(out.length, 2)
+  assert.equal(aiCallCount, 2)
 })
 
 test("requestedVariationCount parses numeric and word forms across synonyms", () => {

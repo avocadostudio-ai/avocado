@@ -33,46 +33,92 @@ export function useVariations(deps: VariationsDeps) {
     const session = getSessionId()
     const siteId = getSiteId()
     const contextPayload = buildSiteContextPayload(siteId, deps.activeSiteConfig)
-    const res = await fetch(`${orchestrator}/chat/variations`, {
+    const requestBody = withIntegrationContext({
+      session,
+      siteId,
+      ...contextPayload,
+      slug,
+      message: finalMessage,
+      modelKey,
+      provider,
+      activeBlockId,
+      activeBlockType,
+      activeEditablePath
+    }, deps.componentManifest, deps.siteCapabilities)
+
+    const res = await fetch(`${orchestrator}/chat/variations/stream`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(withIntegrationContext({
-        session,
-        siteId,
-        ...contextPayload,
-        slug,
-        message: finalMessage,
-        modelKey,
-        provider,
-        activeBlockId,
-        activeBlockType,
-        activeEditablePath
-      }, deps.componentManifest, deps.siteCapabilities))
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: JSON.stringify(requestBody)
     })
 
-    const data = (await res.json()) as VariationResponse
-    if (!res.ok || data.status !== "ok" || !Array.isArray(data.variations) || data.variations.length === 0) {
+    if (!res.ok || !res.body) {
       store.getState().pushAssistantFromResult({
         status: "error",
-        summary: data.error ?? data.summary ?? "Could not generate variations.",
+        summary: `Could not generate variations (HTTP ${res.status}).`,
         changes: []
       })
       return
     }
 
-    store.getState().setVariationModal({
-      requestText: finalMessage,
-      blockId: data.blockId ?? activeBlockId,
-      blockType: data.blockType ?? activeBlockType,
-      pageSlug: data.pageSlug ?? slug,
-      baseProps: (data.baseProps && typeof data.baseProps === "object" ? data.baseProps : {}) as Record<string, unknown>,
-      options: data.variations
-    })
-    store.getState().pushAssistantFromResult({
-      status: "info",
-      summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
-      changes: [`Block: ${data.blockType ?? activeBlockType}`, `Options: ${data.variations.length}`]
-    })
+    let modalOpened = false
+    let announced = false
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let eolIndex: number
+      while ((eolIndex = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, eolIndex)
+        buffer = buffer.slice(eolIndex + 2)
+        const line = frame.split("\n").find((l) => l.startsWith("data: "))
+        if (!line) continue
+        const payload = JSON.parse(line.slice(6)) as { event?: string } & Record<string, unknown>
+        if (payload.event === "variations_ready") {
+          const data = payload as unknown as VariationResponse & { imagesPending?: boolean }
+          if (!Array.isArray(data.variations) || data.variations.length === 0) continue
+          const imagesPending = data.imagesPending === true
+          store.getState().setVariationModal({
+            requestText: finalMessage,
+            blockId: data.blockId ?? activeBlockId,
+            blockType: data.blockType ?? activeBlockType,
+            pageSlug: data.pageSlug ?? slug,
+            baseProps: (data.baseProps && typeof data.baseProps === "object" ? data.baseProps : {}) as Record<string, unknown>,
+            options: data.variations.map((v) => ({ ...v, imagePending: imagesPending }))
+          })
+          modalOpened = true
+          if (!announced) {
+            announced = true
+            store.getState().pushAssistantFromResult({
+              status: "info",
+              summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
+              changes: data.variations.map((v, i) => v.title?.trim() ? v.title.trim() : `Variation ${i + 1}`)
+            })
+          }
+        } else if (payload.event === "image_resolved") {
+          const update = payload as unknown as { variationId: string; patch: Record<string, unknown>; changedKeys: string[] }
+          if (update.variationId && update.patch) {
+            store.getState().patchVariationOption(update.variationId, {
+              patch: update.patch,
+              changedKeys: update.changedKeys ?? Object.keys(update.patch)
+            })
+          }
+        } else if (payload.event === "error") {
+          if (!modalOpened) {
+            store.getState().pushAssistantFromResult({
+              status: "error",
+              summary: (payload.error as string) ?? "Could not generate variations.",
+              changes: []
+            })
+          }
+        }
+        // "done" is a no-op — final option state already arrived via image_resolved events.
+      }
+    }
   }
 
   async function applyVariation(option: VariationOption) {

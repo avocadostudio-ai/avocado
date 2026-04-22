@@ -54,10 +54,12 @@ export function setOrchestratorUrl(url: string): void {
 
 // ── Bootstrap ───────────────────────────────────────────────────────
 export function initSession(opts: {
+  sessionId: string
   siteId: string
   editorOrigin: string
   orchestratorUrl: string
 }): void {
+  SESSION.sessionId = opts.sessionId
   SESSION.siteId = opts.siteId
   SESSION.editorOrigin = opts.editorOrigin
   SESSION.orchestratorUrl = opts.orchestratorUrl

@@ -47,6 +47,7 @@ import {
   resolveDefaultModelKey,
   resolveDefaultProvider,
   resolveEditorSiteId,
+  resolveEditorSession,
   resolveAnchoredComposerEnabled,
   resolveDevOptionsEnabled,
   slugLabel
@@ -158,7 +159,7 @@ export function App() {
   const isSitesPage = pathName === "/sites" || pathName === "/sites/"
   const chatDarkMode = useEditorStore((s) => s.chatDarkMode)
   const setChatDarkMode = useEditorStore((s) => s.setChatDarkMode)
-  const session = "dev"
+  const session = useMemo(() => resolveEditorSession(), [])
   const siteId = useMemo(() => resolveEditorSiteId(), [])
 
   // Initialize session singleton once
@@ -167,6 +168,7 @@ export function App() {
     sessionInitRef.current = true
     const editorOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4100"
     initSession({
+      sessionId: session,
       siteId,
       editorOrigin,
       orchestratorUrl: orchestrator as string,
@@ -1408,7 +1410,7 @@ function EditorPage({
           undoneLabel={t("chat.undone")}
           renderEntryExtras={(entry) => (
             <>
-              {entry.variations && entry.variations.options.length > 0 ? (
+              {entry.variations && Array.isArray(entry.variations.options) && entry.variations.options.length > 0 ? (
                 <div className="msg-variations">
                   {entry.variations.options.map((option, idx) => (
                     <button
@@ -1696,16 +1698,7 @@ function EditorPage({
           renderStreamStatusFallback={() => (
             <div className={`streaming-pill ${streamIsError ? "is-error" : "is-active"} ${STREAMING_INDICATOR_STYLE === "text" ? "is-text" : "is-legacy"}`}>
               {STREAMING_INDICATOR_STYLE === "text" ? (
-                <>
-                  {streamSteps.filter((s) => s.done).length > 0 ? (
-                    <ul className="stream-steps">
-                      {streamSteps.filter((s) => s.done).map((step, idx) => (
-                        <li key={idx} className="stream-step is-done">{step.label}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  <span className="streaming-pill-status streaming-pill-status-text">{streamTextLabel}</span>
-                </>
+                <span className="streaming-pill-status streaming-pill-status-text">{streamTextLabel}</span>
               ) : (
                 <>
                   <span className="streaming-pill-title">
@@ -1989,6 +1982,12 @@ function EditorPage({
                         props: mergedVariationProps(vm.baseProps, option.patch)
                       }}
                     />
+                    {option.imagePending ? (
+                      <div className="variation-card-image-pending" aria-live="polite">
+                        <span className="variation-card-image-pending-spinner" aria-hidden="true" />
+                        <span className="variation-card-image-pending-label">Generating image…</span>
+                      </div>
+                    ) : null}
                   </div>
                   <h3 className="variation-card-title">{option.title}</h3>
                   <p className="variation-card-summary">{option.summary}</p>

@@ -121,6 +121,13 @@ export function resolveEditorSiteId() {
   return fromQuery || fallback
 }
 
+export function resolveEditorSession(): string {
+  const fallback = "dev"
+  if (typeof window === "undefined") return fallback
+  const fromQuery = new URLSearchParams(window.location.search).get("session")?.trim()
+  return fromQuery && fromQuery.length > 0 ? fromQuery : fallback
+}
+
 /** Read ?previewUrl= from the query string (used when opening a non-preset site). */
 export function resolveEditorPreviewUrl(): string | undefined {
   if (typeof window === "undefined") return undefined

@@ -4538,6 +4538,73 @@ textarea {
   pointer-events: none;
 }
 
+.variation-card-image-pending {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background:
+    linear-gradient(
+      100deg,
+      rgba(241, 245, 249, 0.9) 30%,
+      rgba(226, 232, 240, 0.95) 50%,
+      rgba(241, 245, 249, 0.9) 70%
+    );
+  background-size: 200% 100%;
+  animation: variation-card-shimmer 1.6s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+  backdrop-filter: blur(1px);
+}
+
+.variation-card-image-pending-spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(15, 23, 42, 0.25);
+  border-top-color: rgba(15, 23, 42, 0.75);
+  animation: variation-card-pending-spin 0.9s linear infinite;
+}
+
+.variation-card-image-pending-label {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.7);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+@keyframes variation-card-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes variation-card-pending-spin {
+  to { transform: rotate(360deg); }
+}
+
+.editor-dark .variation-card-image-pending {
+  background:
+    linear-gradient(
+      100deg,
+      rgba(30, 41, 59, 0.9) 30%,
+      rgba(51, 65, 85, 0.95) 50%,
+      rgba(30, 41, 59, 0.9) 70%
+    );
+  background-size: 200% 100%;
+}
+
+.editor-dark .variation-card-image-pending-spinner {
+  border-color: rgba(226, 232, 240, 0.25);
+  border-top-color: rgba(226, 232, 240, 0.85);
+}
+
+.editor-dark .variation-card-image-pending-label {
+  color: rgba(226, 232, 240, 0.75);
+}
+
 .variation-card-badge {
   position: absolute;
   top: 8px;
@@ -4551,7 +4618,7 @@ textarea {
   font-size: 13px;
   display: grid;
   place-items: center;
-  z-index: 1;
+  z-index: 3;
 }
 
 .variation-card-title {
