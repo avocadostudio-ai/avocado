@@ -76,7 +76,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       args.pushAssistantFromResult({
         status: "info",
         summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
-        changes: [`Block: ${data.blockType ?? selectedBlockType}`, `Options: ${data.variations.length}`]
+        changes: data.variations.map((v, i) => v?.title?.trim() ? v.title.trim() : `Variation ${i + 1}`)
       })
       return
     }

@@ -57,12 +57,11 @@ Tests use Node's built-in test runner (`node:test`) with `tsx`. Test files live 
 
 ## Architecture
 
-pnpm monorepo — chat-driven website editor with live preview. Four apps + eight packages:
+pnpm monorepo — chat-driven website editor with live preview. Three apps + eight packages:
 
 - **apps/orchestrator** (Fastify :4200) — brain: in-memory session state, AI planning, operations engine, publishing
 - **apps/editor** (Vite+React :4100) — chat UI, model selection, iframe communication via postMessage
 - **apps/site** (Next.js :3000) — renders `BlockInstance` pages, fetches drafts from orchestrator, editor overlay via preview-adapter
-- **apps/paintball-bern** — demo/test site
 - **packages/shared** — Zod schemas (PageDoc, BlockInstance, Operation, EditPlan), block registry
 - **packages/blocks** — built-in block renderers (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, and more)
 - **packages/preview-adapter** — PreviewBridge component, postMessage protocol (`site-editor/v1`), CSS overlay system
@@ -126,6 +125,10 @@ Copy `.env.example` to `.env` before running. Key variables:
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — at least one required for AI planning; omit both for demo mode
 - `OPENAI_MODEL_*` / `ANTHROPIC_MODEL_*` — override model names per tier (fast/balanced/reasoning/codex)
 - `ORCHESTRATOR_URL` — defaults to `http://localhost:4200`
+- `VARIATION_DEFAULT_IMAGE_SOURCE` — default image branch for `withDefaultImageVariations` when the user's message has no image-provider hint. `unsplash` (default) or `ai` / `llm` / `gemini` / `openai` to route to AI gen. Explicit message keywords (e.g. `"gemini"`, `"unsplash"`, `"ai-generated"`) always override this.
+- `IMAGE_GEN_PROVIDER` — which AI backend handles image generation once the AI branch is selected (variations, `image.generate` tool, `/image/generate` route). `gemini` (default) or `openai`; falls back if the chosen provider has no API key.
+- `OPENAI_IMAGE_MODEL` — OpenAI image model (e.g. `gpt-image-2`, `gpt-image-1`, default `gpt-image-1-mini` for variations). Used when `IMAGE_GEN_PROVIDER=openai`.
+- `GOOGLE_GENAI_IMAGE_MODEL` — Gemini image model (default `gemini-2.5-flash-image`).
 
 ## Orchestrator persistence
 

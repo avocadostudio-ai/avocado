@@ -234,27 +234,6 @@
       ]
     },
     {
-      "id": "p_for_another_topic",
-      "slug": "/for-another-topic",
-      "title": "For Another Topic",
-      "updatedAt": "2026-04-21T20:17:31.731Z",
-      "blocks": [
-        {
-          "id": "b_hero_for-another-topic",
-          "type": "Hero",
-          "props": {
-            "heading": "For Another Topic",
-            "subheading": "Use this page to introduce For Another Topic.",
-            "ctaText": "Get started",
-            "ctaHref": "/",
-            "imageUrl": "/hero-generated.svg",
-            "imageAlt": "Abstract generated illustration",
-            "imagePosition": "right"
-          }
-        }
-      ]
-    },
-    {
       "id": "p_blueberries",
       "slug": "/blueberries",
       "title": "Blueberries",

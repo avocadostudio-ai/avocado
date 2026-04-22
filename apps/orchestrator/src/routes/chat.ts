@@ -13,7 +13,8 @@ import {
 import {
   variationRequestBodySchema,
   type VariationRequestBody,
-  runVariationPipeline
+  runVariationPipeline,
+  runVariationPipelineStreaming
 } from "../chat/variation-pipeline.js"
 import { scopedSessionKey, getPage } from "../state/session-state.js"
 import { inferDeterministicIntent, isHighConfidenceDeterministicCase } from "../nlp/deterministic-planner.js"
@@ -178,6 +179,52 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
     const body: VariationRequestBody = parsed.data
     const result = await runVariationPipeline(pipelineCtx, { ...body, session: scopedSessionKey(body.session, body.siteId) })
     return reply.code(result.code).send(result.payload)
+  })
+
+  // Streaming variant: returns initial variations immediately (with
+  // imagesPending=true if the block supports images), then streams one
+  // `image_resolved` SSE event per variant as each image finishes generating.
+  // Client consumes via fetch + ReadableStream (POST + SSE body).
+  app.post("/chat/variations/stream", async (request, reply) => {
+    const parsed = variationRequestBodySchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid request body", details: parsed.error.issues })
+    }
+    const body: VariationRequestBody = parsed.data
+
+    const reqOrigin = (request.headers.origin as string | undefined) ?? "*"
+    reply.raw.setHeader("Content-Type", "text/event-stream")
+    reply.raw.setHeader("Cache-Control", "no-cache, no-transform")
+    reply.raw.setHeader("Connection", "keep-alive")
+    reply.raw.setHeader("X-Accel-Buffering", "no")
+    reply.raw.setHeader("Access-Control-Allow-Origin", reqOrigin)
+    reply.raw.setHeader("Vary", "Origin")
+    reply.raw.writeHead(200)
+
+    const write = (event: string, payload: unknown) => {
+      sseWrite(reply as unknown as { raw: NodeJS.WritableStream }, { event, ...payload as Record<string, unknown> })
+    }
+
+    try {
+      const result = await runVariationPipelineStreaming(
+        pipelineCtx,
+        { ...body, session: scopedSessionKey(body.session, body.siteId) },
+        {
+          onInitial: (initial) => write("variations_ready", initial),
+          onImageResolved: (update) => write("image_resolved", update)
+        }
+      )
+      if (result.code !== 200) {
+        write("error", { error: "error" in result.payload ? result.payload.error : "unknown" })
+      } else {
+        write("done", result.payload)
+      }
+    } catch (err) {
+      app.log.warn({ err }, "variations stream failed")
+      write("error", { error: err instanceof Error ? err.message : "stream failed" })
+    } finally {
+      reply.raw.end()
+    }
   })
 
   // -------------------------------------------------------------------------
@@ -459,6 +506,20 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       })
     }, 1000)
 
+    // When an op streams in and applies, we set the label to "Applying (N/N)".
+    // The true total is unknown during streaming (set to index each time), so
+    // the label reads "complete" even while the LLM is still generating the
+    // JSON tail (suggested_next_actions, closing braces). Flip to a more
+    // accurate "Wrapping up…" after a short idle window so users don't see a
+    // stuck "(3/3)" counter.
+    let applyingIdleTimer: NodeJS.Timeout | null = null
+    const clearApplyingIdleTimer = () => {
+      if (applyingIdleTimer) {
+        clearTimeout(applyingIdleTimer)
+        applyingIdleTimer = null
+      }
+    }
+
     const abortSignal = streamEntry?.abortController.signal
 
     try {
@@ -521,6 +582,12 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
             focusBlockId: event.focusBlockId ?? null,
             ...(event.updatedSlug ? { updatedSlug: event.updatedSlug } : {})
           })
+          clearApplyingIdleTimer()
+          applyingIdleTimer = setTimeout(() => {
+            applyingIdleTimer = null
+            heartbeatLabel = "Wrapping up…"
+            emit("status", { type: "status", message: heartbeatLabel })
+          }, 1500)
         },
         onRollbackStarted: (event) =>
           emit("rollback_started", {
@@ -535,6 +602,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
           }),
         onStatusUpdate: (message) => {
           heartbeatLabel = message
+          clearApplyingIdleTimer()
           emit("status", { type: "status", message })
         },
         onImageProgress: (event) => emit("image_progress", { type: "image_progress", ...event })
@@ -559,6 +627,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
       }
     } finally {
       clearInterval(heartbeatTimer)
+      clearApplyingIdleTimer()
 
       // Close all subscriber connections for terminal runs
       if (streamEntry) {

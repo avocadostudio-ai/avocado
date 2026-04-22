@@ -140,9 +140,10 @@ function describeUpdatePropsFields(patch: Record<string, unknown>): { hasImage: 
   return { hasImage, textFields }
 }
 
-/** Format a page slug for display — avoids double-slash for home page "/" */
+/** Format a page slug for display — avoids double-slash for home page "/" or slugs that already start with "/" */
 export function fmtSlug(slug: string): string {
-  return slug === "/" ? "/" : `/${slug}`
+  if (!slug) return "/"
+  return slug.startsWith("/") ? slug : `/${slug}`
 }
 
 export function buildOpChangeLogEntries(

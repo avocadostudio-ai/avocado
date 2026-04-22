@@ -96,6 +96,7 @@ export type VariationOption = {
   summary: string
   patch: Record<string, unknown>
   changedKeys: string[]
+  imagePending?: boolean
 }
 
 export type VariationResponse = {

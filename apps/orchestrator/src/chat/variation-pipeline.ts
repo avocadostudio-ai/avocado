@@ -17,8 +17,10 @@ import {
   buildVariationImageQuery,
   buildVariationImagePrompt,
   generateVariationImageWithOpenAI,
+  generateVariationImageWithGemini,
   resolveUnsplashImage
 } from "../image/image-helpers.js"
+import type { UnsplashImage } from "../variation-images.js"
 import { firstUrlFromText, resolveEffectiveSlug } from "./chat-pipeline.js"
 import { resolveDistinctUnsplashImage } from "../variation-images.js"
 
@@ -93,6 +95,66 @@ export type VariationPipelineContext = {
 let resolveUnsplashImageImpl = resolveUnsplashImage
 export function setResolveUnsplashImageForTests(fn?: typeof resolveUnsplashImage) {
   resolveUnsplashImageImpl = fn ?? resolveUnsplashImage
+}
+
+type GenerateVariationImageFn = (args: {
+  prompt: string
+  altText: string
+}) => Promise<UnsplashImage | null>
+
+let generateVariationImageForTests: GenerateVariationImageFn | null = null
+export function setGenerateVariationImageForTests(fn?: GenerateVariationImageFn) {
+  generateVariationImageForTests = fn ?? null
+}
+
+type AiImageProvider = "openai" | "gemini"
+
+function resolveAiImageProvider(): AiImageProvider {
+  const raw = process.env.IMAGE_GEN_PROVIDER?.trim().toLowerCase()
+  if (raw === "openai") return "openai"
+  // Default: gemini. Falls back to openai at call time if Gemini key is missing.
+  return "gemini"
+}
+
+async function generateVariationImage(args: {
+  prompt: string
+  altText: string
+  log?: FastifyBaseLogger
+}): Promise<UnsplashImage | null> {
+  if (generateVariationImageForTests) {
+    return generateVariationImageForTests({ prompt: args.prompt, altText: args.altText })
+  }
+  const provider = resolveAiImageProvider()
+  const hasGemini = !!process.env.GOOGLE_GENAI_API_KEY?.trim()
+  const hasOpenAI = !!process.env.OPENAI_API_KEY?.trim()
+
+  if (provider === "gemini" && hasGemini) {
+    return generateVariationImageWithGemini({
+      prompt: args.prompt,
+      altText: args.altText,
+      aspectRatio: "landscape",
+      quality: "draft",
+      log: args.log
+    })
+  }
+  if (hasOpenAI) {
+    return generateVariationImageWithOpenAI({
+      prompt: args.prompt,
+      altText: args.altText,
+      model: process.env.OPENAI_IMAGE_MODEL?.trim() || undefined,
+      log: args.log
+    })
+  }
+  if (hasGemini) {
+    return generateVariationImageWithGemini({
+      prompt: args.prompt,
+      altText: args.altText,
+      aspectRatio: "landscape",
+      quality: "draft",
+      log: args.log
+    })
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +240,107 @@ function prefersSameImageAcrossVariations(message: string) {
   )
 }
 
+type VariationImageContext = {
+  explicitUrl: string | null
+  imageIntent: ReturnType<typeof deriveVariationImageIntent>
+  enforceUniqueImages: boolean
+  noDuplicateRequested: boolean
+}
+
+function buildVariationImageContext(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+}): VariationImageContext {
+  const explicitUrl = firstUrlFromText(args.message)
+  const imageIntent = deriveVariationImageIntent({ message: args.message, block: args.block })
+  const noDuplicateRequested =
+    /\bno\s+duplicates?\b/i.test(args.message) ||
+    /\bdo\s+not\s+reuse\b/i.test(args.message) ||
+    /\bunique\s+images?\b/i.test(args.message)
+  const enforceUniqueImages = !explicitUrl && !prefersSameImageAcrossVariations(args.message)
+  return { explicitUrl: explicitUrl ?? null, imageIntent, enforceUniqueImages, noDuplicateRequested }
+}
+
+async function resolveVariationImage(args: {
+  block: PageDoc["blocks"][number]
+  imageCtx: VariationImageContext
+  variationIndex: number
+  usedImageUrls: Set<string>
+  page?: PageDoc
+  log?: FastifyBaseLogger
+}): Promise<UnsplashImage | null> {
+  const { imageCtx, variationIndex } = args
+  if (imageCtx.explicitUrl) {
+    return { url: imageCtx.explicitUrl, alt: `Image for ${args.block.type} variation`, query: "" }
+  }
+  if (imageCtx.imageIntent.provider === "llm") {
+    const blockProps = args.block.props as Record<string, unknown>
+    const heading = typeof blockProps.heading === "string" ? blockProps.heading : ""
+    const subheading = typeof blockProps.subheading === "string" ? blockProps.subheading : ""
+    const sectionContext = [args.block.type, heading, subheading].filter(Boolean).join(" — ")
+    const pageContext = args.page ? `${args.page.title} (${args.page.slug})` : undefined
+    const prompt = buildVariationImagePrompt({
+      intent: imageCtx.imageIntent,
+      blockType: args.block.type,
+      variationIndex,
+      sectionContext,
+      pageContext
+    })
+    return generateVariationImage({
+      prompt,
+      altText: `AI-generated ${args.block.type} image variation ${variationIndex + 1}`,
+      log: args.log
+    })
+  }
+  const query = buildVariationImageQuery(imageCtx.imageIntent, variationIndex)
+  if (imageCtx.enforceUniqueImages) {
+    return resolveDistinctUnsplashImage({
+      query,
+      variationIndex,
+      usedImageUrls: args.usedImageUrls,
+      resolveImage: async (queryValue, options) =>
+        resolveUnsplashImageImpl(queryValue, {
+          variationIndex: options?.variationIndex,
+          subjectKeywords: imageCtx.imageIntent.subjectKeywords,
+          usedImageUrls: args.usedImageUrls
+        }, { logger: args.log }),
+      maxAttempts: imageCtx.noDuplicateRequested ? 8 : 5
+    })
+  }
+  return resolveUnsplashImageImpl(
+    query,
+    {
+      variationIndex,
+      subjectKeywords: imageCtx.imageIntent.subjectKeywords,
+      usedImageUrls: imageCtx.noDuplicateRequested ? args.usedImageUrls : undefined
+    },
+    { logger: args.log }
+  )
+}
+
+function applyResolvedImageToPatch(args: {
+  patch: Record<string, unknown>
+  resolved: UnsplashImage | null
+  llmAuthoredImageUrl: boolean
+}): Record<string, unknown> {
+  const patch = { ...args.patch }
+  if (args.resolved) {
+    patch.imageUrl = args.resolved.url
+    if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
+      patch.imageAlt = args.resolved.alt
+    }
+  } else if (
+    args.llmAuthoredImageUrl &&
+    !Object.prototype.hasOwnProperty.call(patch, "imageUrl") &&
+    Object.prototype.hasOwnProperty.call(patch, "imageAlt")
+  ) {
+    // LLM authored a fake imageUrl + matching alt; real resolution failed, so
+    // drop the orphan alt too to avoid describing the wrong (existing) image.
+    delete patch.imageAlt
+  }
+  return patch
+}
+
 export async function withDefaultImageVariations(args: {
   block: PageDoc["blocks"][number]
   message: string
@@ -186,97 +349,32 @@ export async function withDefaultImageVariations(args: {
   log?: FastifyBaseLogger
 }): Promise<VariationOption[]> {
   if (!supportsImageVariation(args.block)) return args.variations
-  const explicitUrl = firstUrlFromText(args.message)
-  const imageIntent = deriveVariationImageIntent({ message: args.message, block: args.block })
-  const noDuplicateRequested =
-    /\bno\s+duplicates?\b/i.test(args.message) ||
-    /\bdo\s+not\s+reuse\b/i.test(args.message) ||
-    /\bunique\s+images?\b/i.test(args.message)
-  const enforceUniqueImages = !explicitUrl && !prefersSameImageAcrossVariations(args.message)
+  const imageCtx = buildVariationImageContext({ block: args.block, message: args.message })
   const usedImageUrls = new Set<string>()
 
   const out: VariationOption[] = []
   for (const [variationIndex, variation] of args.variations.entries()) {
-    const patch = { ...variation.patch }
-    // LLMs frequently hallucinate imageUrl values (fake Unsplash-style URLs or
-    // descriptive strings). The pipeline is the single source of truth for
-    // variation image URLs, so drop any LLM-authored value here and let the
-    // branches below set a real one. imageAlt is kept as a hint.
-    const llmAuthoredImageUrl = Object.prototype.hasOwnProperty.call(patch, "imageUrl")
-    if (llmAuthoredImageUrl && !explicitUrl) {
-      delete patch.imageUrl
-    }
-    if (explicitUrl) {
-      patch.imageUrl = explicitUrl
-      if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
-        patch.imageAlt = `Image for ${args.block.type} variation`
-      }
-    } else if (imageIntent.provider === "llm") {
-      const blockProps = args.block.props as Record<string, unknown>
-      const heading = typeof blockProps.heading === "string" ? blockProps.heading : ""
-      const subheading = typeof blockProps.subheading === "string" ? blockProps.subheading : ""
-      const sectionContext = [args.block.type, heading, subheading].filter(Boolean).join(" — ")
-      const pageContext = args.page ? `${args.page.title} (${args.page.slug})` : undefined
-      const prompt = buildVariationImagePrompt({
-        intent: imageIntent,
-        blockType: args.block.type,
-        variationIndex,
-        sectionContext,
-        pageContext
-      })
-      const generated = await generateVariationImageWithOpenAI({
-        prompt,
-        altText: `AI-generated ${args.block.type} image variation ${variationIndex + 1}`
-      })
-      if (generated) {
-        patch.imageUrl = generated.url
-        if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
-          patch.imageAlt = generated.alt
-        }
-      }
-    } else {
-      const query = buildVariationImageQuery(imageIntent, variationIndex)
-      const resolved = enforceUniqueImages
-        ? await resolveDistinctUnsplashImage({
-            query,
-            variationIndex,
-            usedImageUrls,
-            resolveImage: async (queryValue, options) =>
-              resolveUnsplashImageImpl(queryValue, {
-                variationIndex: options?.variationIndex,
-                subjectKeywords: imageIntent.subjectKeywords,
-                usedImageUrls
-              }, { logger: args.log }),
-            maxAttempts: noDuplicateRequested ? 8 : 5
-          })
-        : await resolveUnsplashImageImpl(
-            query,
-            {
-              variationIndex,
-              subjectKeywords: imageIntent.subjectKeywords,
-              usedImageUrls: noDuplicateRequested ? usedImageUrls : undefined
-            },
-            { logger: args.log }
-          )
-      if (resolved) {
-        patch.imageUrl = resolved.url
-        usedImageUrls.add(resolved.url)
-        if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
-          patch.imageAlt = resolved.alt
-        }
-      }
+    const patchWithoutLlmImage = { ...variation.patch }
+    const llmAuthoredImageUrl = Object.prototype.hasOwnProperty.call(patchWithoutLlmImage, "imageUrl")
+    if (llmAuthoredImageUrl && !imageCtx.explicitUrl) {
+      delete patchWithoutLlmImage.imageUrl
     }
 
-    // If the pipeline couldn't produce a real imageUrl and the LLM had only
-    // authored one (now stripped), drop any paired imageAlt too — otherwise the
-    // existing image keeps a new, unrelated alt description.
-    if (
-      llmAuthoredImageUrl &&
-      !Object.prototype.hasOwnProperty.call(patch, "imageUrl") &&
-      Object.prototype.hasOwnProperty.call(patch, "imageAlt")
-    ) {
-      delete patch.imageAlt
-    }
+    const resolved = await resolveVariationImage({
+      block: args.block,
+      imageCtx,
+      variationIndex,
+      usedImageUrls,
+      page: args.page,
+      log: args.log
+    })
+    if (resolved) usedImageUrls.add(resolved.url)
+
+    const patch = applyResolvedImageToPatch({
+      patch: patchWithoutLlmImage,
+      resolved,
+      llmAuthoredImageUrl
+    })
 
     const sanitized = sanitizeVariationPatch(args.block, patch)
     if (!sanitized) continue
@@ -287,6 +385,111 @@ export async function withDefaultImageVariations(args: {
     })
   }
   return out
+}
+
+// ---------------------------------------------------------------------------
+// Streaming variation images — open modal immediately, fill images as each
+// generation completes. Used by the /chat/variations/stream SSE route so the
+// user sees variants within ~1s instead of waiting for the slowest image.
+// ---------------------------------------------------------------------------
+
+export type VariationImageUpdate = {
+  variationId: string
+  index: number
+  patch: Record<string, unknown>
+  changedKeys: string[]
+  imageUrl?: string
+  imageAlt?: string
+}
+
+export type StreamingVariationsPlan = {
+  initial: VariationOption[]
+  run: (onProgress: (update: VariationImageUpdate) => void) => Promise<VariationOption[]>
+}
+
+export function planDefaultImageVariations(args: {
+  block: PageDoc["blocks"][number]
+  message: string
+  variations: VariationOption[]
+  page?: PageDoc
+  log?: FastifyBaseLogger
+}): StreamingVariationsPlan {
+  if (!supportsImageVariation(args.block)) {
+    return {
+      initial: args.variations,
+      run: async () => args.variations
+    }
+  }
+
+  const imageCtx = buildVariationImageContext({ block: args.block, message: args.message })
+
+  type PreparedVariation = {
+    source: VariationOption
+    variationIndex: number
+    basePatch: Record<string, unknown>  // patch with any LLM-authored imageUrl stripped, no real image yet
+    llmAuthoredImageUrl: boolean
+    initial: VariationOption | null  // sanitized version without image (for skeleton modal)
+  }
+
+  const prepared: PreparedVariation[] = args.variations.map((variation, variationIndex) => {
+    const basePatch = { ...variation.patch }
+    const llmAuthoredImageUrl = Object.prototype.hasOwnProperty.call(basePatch, "imageUrl")
+    if (llmAuthoredImageUrl && !imageCtx.explicitUrl) {
+      delete basePatch.imageUrl
+    }
+    const initialSanitized = sanitizeVariationPatch(args.block, basePatch)
+    const initial: VariationOption | null = initialSanitized
+      ? { ...variation, patch: initialSanitized, changedKeys: Object.keys(initialSanitized) }
+      : { ...variation, patch: basePatch, changedKeys: Object.keys(basePatch) }
+    // Note: when the text-only patch fails sanitization (e.g. it becomes empty
+    // after stripping imageUrl), we still keep the variation so the modal can
+    // show it while the image resolves. Final sanitization happens in run().
+    return { source: variation, variationIndex, basePatch, llmAuthoredImageUrl, initial }
+  })
+
+  const initial = prepared.map((p) => p.initial!).filter(Boolean) as VariationOption[]
+
+  const run: StreamingVariationsPlan["run"] = async (onProgress) => {
+    const usedImageUrls = new Set<string>()
+    const results = await Promise.all(prepared.map(async (p) => {
+      const resolved = await resolveVariationImage({
+        block: args.block,
+        imageCtx,
+        variationIndex: p.variationIndex,
+        usedImageUrls,
+        page: args.page,
+        log: args.log
+      }).catch((err) => {
+        args.log?.warn({ err, variationIndex: p.variationIndex }, "variation image resolution failed")
+        return null
+      })
+      if (resolved) usedImageUrls.add(resolved.url)
+
+      const patch = applyResolvedImageToPatch({
+        patch: p.basePatch,
+        resolved,
+        llmAuthoredImageUrl: p.llmAuthoredImageUrl
+      })
+      const sanitized = sanitizeVariationPatch(args.block, patch)
+      const finalOption: VariationOption | null = sanitized
+        ? { ...p.source, patch: sanitized, changedKeys: Object.keys(sanitized) }
+        : null
+
+      if (finalOption) {
+        onProgress({
+          variationId: p.source.id,
+          index: p.variationIndex,
+          patch: finalOption.patch,
+          changedKeys: finalOption.changedKeys,
+          ...(resolved ? { imageUrl: resolved.url, imageAlt: resolved.alt } : {})
+        })
+      }
+      return finalOption
+    }))
+    return results.filter((r): r is VariationOption => r !== null)
+  }
+
+  return { initial, run }
 }
 
 // ---------------------------------------------------------------------------
@@ -592,10 +795,23 @@ async function generateVariationsWithAnthropic(args: {
 // Variation pipeline
 // ---------------------------------------------------------------------------
 
-export async function runVariationPipeline(
+type PreparedVariationsContext = {
+  contextualMessage: string
+  effectiveSlug: string
+  page: PageDoc
+  selected: PageDoc["blocks"][number]
+  plannerSource: "openai" | "anthropic" | "gemini" | "demo"
+  modelUsed: string
+  modelKey: ModelKey
+  variations: VariationOption[]
+  generatorUsage?: TokenUsage
+  count: number
+}
+
+async function prepareTextVariations(
   ctx: VariationPipelineContext,
   body: VariationRequestBody
-): Promise<{ code: number; payload: VariationResult | { error: string } }> {
+): Promise<{ code: number; payload?: { error: string }; prepared?: PreparedVariationsContext }> {
   if (!body.session || !body.slug || !body.message) {
     return { code: 400, payload: { error: "session, slug, and message are required" } }
   }
@@ -691,48 +907,127 @@ export async function runVariationPipeline(
     variations = [...variations, ...fallback].slice(0, count)
   }
 
-  variations = await withDefaultImageVariations({
-    block: selected,
-    message: contextualMessage,
+  return {
+    code: 200,
+    prepared: {
+      contextualMessage,
+      effectiveSlug,
+      page,
+      selected,
+      plannerSource,
+      modelUsed,
+      modelKey,
+      variations,
+      generatorUsage,
+      count
+    }
+  }
+}
+
+function buildVariationResult(args: {
+  prepared: PreparedVariationsContext
+  variations: VariationOption[]
+}): VariationResult {
+  const { prepared, variations } = args
+  const { selected, effectiveSlug, plannerSource, modelUsed, modelKey, generatorUsage } = prepared
+  return {
+    status: "ok",
+    summary: `Generated ${variations.length} variations for ${selected.type}.`,
+    blockId: selected.id,
+    blockType: selected.type,
+    pageSlug: effectiveSlug,
+    baseProps: structuredClone(selected.props as Record<string, unknown>),
     variations,
-    page,
+    plannerSource,
+    modelUsed,
+    modelKey,
+    ...(generatorUsage ? {
+      usage: {
+        inputTokens: generatorUsage.inputTokens,
+        outputTokens: generatorUsage.outputTokens,
+        totalTokens: generatorUsage.totalTokens,
+        ...(typeof generatorUsage.cacheCreationInputTokens === "number"
+          ? { cacheCreationInputTokens: generatorUsage.cacheCreationInputTokens }
+          : {}),
+        ...(typeof generatorUsage.cacheReadInputTokens === "number"
+          ? { cacheReadInputTokens: generatorUsage.cacheReadInputTokens }
+          : {}),
+        estimatedUsd: estimateUsd(modelUsed, generatorUsage)
+      }
+    } : {})
+  }
+}
+
+export async function runVariationPipeline(
+  ctx: VariationPipelineContext,
+  body: VariationRequestBody
+): Promise<{ code: number; payload: VariationResult | { error: string } }> {
+  const prep = await prepareTextVariations(ctx, body)
+  if (prep.code !== 200 || !prep.prepared) {
+    return { code: prep.code, payload: prep.payload ?? { error: "unknown error" } }
+  }
+  const { prepared } = prep
+  const variations = await withDefaultImageVariations({
+    block: prepared.selected,
+    message: prepared.contextualMessage,
+    variations: prepared.variations,
+    page: prepared.page,
     log: ctx.log
   })
-
   if (variations.length === 0) {
     return {
       code: 400,
       payload: { error: "Could not generate valid variations for this block. Try a more specific instruction." }
     }
   }
+  return { code: 200, payload: buildVariationResult({ prepared, variations }) }
+}
 
-  return {
-    code: 200,
-    payload: {
-      status: "ok",
-      summary: `Generated ${variations.length} variations for ${selected.type}.`,
-      blockId: selected.id,
-      blockType: selected.type,
-      pageSlug: effectiveSlug,
-      baseProps: structuredClone(selected.props as Record<string, unknown>),
-      variations,
-      plannerSource,
-      modelUsed,
-      modelKey,
-      ...(generatorUsage ? {
-        usage: {
-          inputTokens: generatorUsage.inputTokens,
-          outputTokens: generatorUsage.outputTokens,
-          totalTokens: generatorUsage.totalTokens,
-          ...(typeof generatorUsage.cacheCreationInputTokens === "number"
-            ? { cacheCreationInputTokens: generatorUsage.cacheCreationInputTokens }
-            : {}),
-          ...(typeof generatorUsage.cacheReadInputTokens === "number"
-            ? { cacheReadInputTokens: generatorUsage.cacheReadInputTokens }
-            : {}),
-          estimatedUsd: estimateUsd(modelUsed, generatorUsage)
-        }
-      } : {})
+export type VariationStreamPipelineHooks = {
+  onInitial: (result: VariationResult & { imagesPending: boolean }) => void
+  onImageResolved: (update: VariationImageUpdate) => void
+}
+
+export async function runVariationPipelineStreaming(
+  ctx: VariationPipelineContext,
+  body: VariationRequestBody,
+  hooks: VariationStreamPipelineHooks
+): Promise<{ code: number; payload: VariationResult | { error: string } }> {
+  const prep = await prepareTextVariations(ctx, body)
+  if (prep.code !== 200 || !prep.prepared) {
+    return { code: prep.code, payload: prep.payload ?? { error: "unknown error" } }
+  }
+  const { prepared } = prep
+
+  const plan = planDefaultImageVariations({
+    block: prepared.selected,
+    message: prepared.contextualMessage,
+    variations: prepared.variations,
+    page: prepared.page,
+    log: ctx.log
+  })
+
+  if (plan.initial.length === 0) {
+    return {
+      code: 400,
+      payload: { error: "Could not generate valid variations for this block. Try a more specific instruction." }
     }
   }
+
+  const imagesPending = supportsImageVariation(prepared.selected)
+  hooks.onInitial({
+    ...buildVariationResult({ prepared, variations: plan.initial }),
+    imagesPending
+  })
+
+  const finalVariations = await plan.run((update) => hooks.onImageResolved(update))
+
+  if (finalVariations.length === 0) {
+    return {
+      code: 400,
+      payload: { error: "Could not generate valid variations for this block. Try a more specific instruction." }
+    }
+  }
+  return { code: 200, payload: buildVariationResult({ prepared, variations: finalVariations }) }
 }
+

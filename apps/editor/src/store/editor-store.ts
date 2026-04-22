@@ -190,6 +190,7 @@ export type EditorActions = {
   // variation
   setVariationModal: (modal: VariationModalState | null) => void
   setIsApplyingVariation: (applying: boolean) => void
+  patchVariationOption: (optionId: string, next: { patch: Record<string, unknown>; changedKeys: string[] }) => void
 
   // ui
   setComposerHeight: (value: number | ((prev: number) => number)) => void
@@ -384,6 +385,16 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     // ── variation actions ─────────────────────────────────────────
     setVariationModal: (modal) => set({ variationModal: modal }),
     setIsApplyingVariation: (applying) => set({ isApplyingVariation: applying }),
+    patchVariationOption: (optionId, next) =>
+      set((prev) => {
+        if (!prev.variationModal) return prev
+        const options = prev.variationModal.options.map((opt) =>
+          opt.id === optionId
+            ? { ...opt, patch: next.patch, changedKeys: next.changedKeys, imagePending: false }
+            : opt
+        )
+        return { ...prev, variationModal: { ...prev.variationModal, options } }
+      }),
 
     // ── ui actions ────────────────────────────────────────────────
     setComposerHeight: (value) =>

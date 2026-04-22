@@ -11,6 +11,7 @@ export {
   AUTO_SITE_PRESETS,
   siteNameFromId,
   resolveEditorSiteId,
+  resolveEditorSession,
   resolveEditorPreviewUrl,
   defaultSiteList,
   loadSiteListFromStorage

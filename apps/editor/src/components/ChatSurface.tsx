@@ -64,7 +64,6 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
   const streamingChanges = streamingChangesProp ?? storeStreamingChanges
   const streamingThinking = storeStreamingThinking
   const opChecklist = useEditorStore((s) => s.opChecklist)
-  const doneStreamSteps = streamSteps.filter((s) => s.done)
   const fallbackStatusLabel = streamStatusLabel ?? streamStatus
   const [clickedSuggestion, setClickedSuggestion] = useState<{ entryId: string; idx: number } | null>(null)
   const handleSuggestionClick = useCallback((entryId: string, idx: number, line: string) => {
@@ -201,13 +200,6 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
       ))}
       {streamingText ? (
         <article className="msg msg-assistant msg-streaming">
-          {doneStreamSteps.length > 0 ? (
-            <ul className="stream-steps stream-steps-in-bubble">
-              {doneStreamSteps.map((step, idx) => (
-                <li key={idx} className="stream-step is-done">{step.label}</li>
-              ))}
-            </ul>
-          ) : null}
           {streamingThinking ? (
             <ThinkingBlock
               text={streamingThinking.text}
@@ -237,13 +229,6 @@ export const ChatThreadCore = React.memo(forwardRef<HTMLDivElement, ChatThreadCo
         <article className="msg msg-assistant msg-streaming">
           {renderStreamStatusFallback ? renderStreamStatusFallback() : (
             <>
-              {doneStreamSteps.length > 0 ? (
-                <ul className="stream-steps stream-steps-in-bubble">
-                  {doneStreamSteps.map((step, idx) => (
-                    <li key={idx} className="stream-step is-done">{step.label}</li>
-                  ))}
-                </ul>
-              ) : null}
               {streamingThinking ? (
                 <ThinkingBlock
                   text={streamingThinking.text}

@@ -643,9 +643,9 @@ export async function runChatPipeline(
       "Updating draft..."
     ],
     validating: [
-      "Validating plan...",
-      "Checking plan integrity...",
-      "Reviewing plan safety..."
+      "Wrapping up…",
+      "Finalizing the response…",
+      "Almost done…"
     ],
     repairing: [
       "Repairing plan and retrying...",
