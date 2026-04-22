@@ -241,7 +241,11 @@ describe("cleanAgentSummary", () => {
 // resolveSiteForTicket — multi-site disambiguation
 // ---------------------------------------------------------------------------
 
-function makeIssue(summary: string, description = ""): JiraIssue {
+function makeIssue(
+  summary: string,
+  description = "",
+  comments: Array<{ author: string; body: string }> = []
+): JiraIssue {
   return {
     key: "TEST-1",
     id: "1",
@@ -251,6 +255,15 @@ function makeIssue(summary: string, description = ""): JiraIssue {
       status: { name: "Open", id: "1" },
       labels: [],
       attachment: [],
+      comment: comments.length === 0 ? undefined : {
+        comments: comments.map((c, i) => ({
+          id: String(i),
+          author: { accountId: c.author, displayName: c.author },
+          body: c.body,
+          created: "2026-04-22T13:42:00Z",
+          updated: "2026-04-22T13:42:00Z",
+        })),
+      },
     },
   }
 }
@@ -361,6 +374,55 @@ describe("resolveSiteForTicket", () => {
       makeConfig({ siteId: "avocado-stories" })
     )
     assert.deepEqual(result, { siteId: "avocado-stories", via: "env-fallback" })
+  })
+
+  test("resolves by site id mentioned in a reporter comment (reply to clarification)", () => {
+    siteConfigs.clear()
+    siteConfigs.set("avocado-stories::dev", { name: "Avocado Stories" })
+    siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub" })
+    delete process.env.JIRA_SITE_ID
+
+    const issue = makeIssue(
+      "Create Test page",
+      "Create a new page /test-jira with some sample content",
+      [
+        {
+          author: "agent-id",
+          body: "**Which site should I update?**\n\nMultiple sites are configured…\n\n**Available sites:**\n- The Avocado Hub (`avocado-hub`)\n- Avocado Stories (`avocado-stories`)",
+        },
+        { author: "reporter-id", body: "avocado-hub" },
+      ]
+    )
+
+    const result = resolveSiteForTicket(
+      issue,
+      makeConfig({ session: "dev", agentAccountId: "agent-id" })
+    )
+    assert.deepEqual(result, { siteId: "avocado-hub", via: "text-match" })
+  })
+
+  test("agent clarification comment alone does NOT resolve ambiguity (it lists all sites)", () => {
+    siteConfigs.clear()
+    siteConfigs.set("avocado-stories::dev", { name: "Avocado Stories" })
+    siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub" })
+    delete process.env.JIRA_SITE_ID
+
+    const issue = makeIssue(
+      "Create Test page",
+      "Create a new page",
+      [
+        {
+          author: "agent-id",
+          body: "**Which site should I update?**\n\n**Available sites:**\n- The Avocado Hub (`avocado-hub`)\n- Avocado Stories (`avocado-stories`)",
+        },
+      ]
+    )
+
+    const result = resolveSiteForTicket(
+      issue,
+      makeConfig({ session: "dev", agentAccountId: "agent-id" })
+    )
+    assert.ok("ambiguous" in result && result.ambiguous === true)
   })
 
   test("falls back to config.siteId with default when nothing is registered and no env (via default-fallback)", () => {

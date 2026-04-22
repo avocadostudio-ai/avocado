@@ -1213,7 +1213,10 @@ export type SiteResolution =
  * Decide which site a ticket targets.
  *
  * Priority:
- * 1. Ticket text (summary + description) uniquely names a registered site → use it.
+ * 1. Ticket text (summary + description + reporter comments) uniquely names a
+ *    registered site → use it. Reporter comments are included so that a reply
+ *    to the "Which site?" clarification comment ("use avocado-stories") is
+ *    honoured instead of looping the same question.
  * 2. Multiple registered sites → ambiguous, ask the reporter.
  *    (JIRA_SITE_ID is intentionally NOT consulted here — it's a fallback, not a lock,
  *    so adding a second site doesn't silently keep editing the first one.)
@@ -1229,7 +1232,19 @@ export function resolveSiteForTicket(
   const description = typeof issue.fields.description === "string"
     ? issue.fields.description
     : adfToPlainText(issue.fields.description)
-  const text = `${summary}\n${description}`
+
+  // Include reporter-authored comments so clarification replies ("use
+  // avocado-stories") count as a text match. Agent comments are excluded —
+  // the clarification comment lists every candidate site id, which would
+  // match everything and permanently jam the ticket as "ambiguous".
+  const reporterComments = (issue.fields.comment?.comments ?? [])
+    .filter((c) => {
+      const body = typeof c.body === "string" ? c.body : adfToPlainText(c.body)
+      return !isAgentAuthoredComment(body.trim(), c.author?.accountId, config.agentAccountId)
+    })
+    .map((c) => typeof c.body === "string" ? c.body : adfToPlainText(c.body))
+    .join("\n")
+  const text = `${summary}\n${description}\n${reporterComments}`
 
   const matches = registered.filter((s) => {
     const idRe = new RegExp(`\\b${escapeRegex(s.id)}\\b`, "i")
