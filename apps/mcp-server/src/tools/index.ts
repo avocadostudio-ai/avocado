@@ -8,6 +8,7 @@ import { registerMediaTools } from "./media.ts"
 import { registerPublishingTools } from "./publishing.ts"
 import { registerHistoryTools } from "./history.ts"
 import { registerChatTools } from "./chat.ts"
+import { registerPreviewTools } from "./preview.ts"
 
 export function registerAllTools(server: McpServer, client: OrchestratorClient) {
   registerDiscoveryTools(server)
@@ -18,4 +19,5 @@ export function registerAllTools(server: McpServer, client: OrchestratorClient) 
   registerPublishingTools(server, client)
   registerHistoryTools(server, client)
   registerChatTools(server, client)
+  registerPreviewTools(server, client)
 }

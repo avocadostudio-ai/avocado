@@ -4,15 +4,23 @@ Exposes Avocado Studio's page, block, and discovery tools over the [Model Contex
 
 Each install is scoped to **one site**: `(session, siteId)` are bound at launch via env vars. The server is a thin wrapper over the orchestrator HTTP API — the orchestrator remains the source of truth for validation, persistence, undo history, and demo-mode gating.
 
-## Phase 1 scope
+## Tool catalog (40 tools)
 
 | Group | Tools |
 |------|-------|
 | Discovery | `avocado-list-block-types`, `avocado-get-block-schema` |
 | Pages | `avocado-get-page`, `avocado-list-pages`, `avocado-create-page`, `avocado-rename-page`, `avocado-duplicate-page`, `avocado-remove-page`, `avocado-update-page-meta` |
 | Blocks | `avocado-add-block`, `avocado-update-block-props`, `avocado-remove-block`, `avocado-move-block`, `avocado-duplicate-block`, `avocado-add-list-item`, `avocado-update-list-item`, `avocado-remove-list-item`, `avocado-move-list-item` |
+| Sites | `avocado-register-site`, `avocado-list-sites`, `avocado-get-site-config`, `avocado-update-site-config` |
+| Media | `avocado-upload-image`, `avocado-generate-image`, `avocado-search-unsplash`, `avocado-transcribe-audio`, `avocado-interpret-image` |
+| Publishing | `avocado-compute-publish-diff`, `avocado-publish-content`, `avocado-get-publish-status`, `avocado-list-snapshots`, `avocado-restore-snapshot` |
+| History | `avocado-undo-edit`, `avocado-redo-edit`, `avocado-restore-version` |
+| Planner | `avocado-chat-plan`, `avocado-preview-plan`, `avocado-approve-pending-plan`, `avocado-discard-pending-plan` |
+| Preview | `avocado-screenshot-page` — returns a full-page JPEG inline (visual feedback channel for chat-only hosts like Claude Desktop) |
 
-Transport: **stdio** (the MCP host spawns the server as a subprocess).
+Two transports, same tool registry:
+- **stdio** — `src/index.ts`. MCP host spawns the server as a subprocess. Best for local dev / Claude Code.
+- **HTTP (streamable)** — `src/http.ts`. Runs on a port; MCP hosts connect via URL + bearer token. Required for Claude Desktop's "Add custom connector" flow and remote deployments.
 
 ## Install — Claude Code
 
@@ -46,6 +54,36 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Restart Claude Desktop. Tools appear under `avocado-studio` and can be individually set to **Always allow / Ask / Never allow**.
 
+## Install — HTTP / custom connector
+
+Start the HTTP server:
+
+```bash
+AVOCADO_SITE_ID=avocado-stories \
+AVOCADO_MCP_BEARER_TOKEN=$(openssl rand -hex 32) \
+pnpm --filter @ai-site-editor/mcp-server start:http
+# → avocado-studio MCP server listening on http://localhost:4300/mcp
+```
+
+Health probe (no auth): `curl http://localhost:4300/healthz`
+
+In Claude Desktop → **Settings → Connectors → Add custom connector**:
+
+- **URL:** `http://localhost:4300/mcp` (or a public HTTPS URL once deployed)
+- **Auth:** Bearer — paste the token you generated above
+
+Raw JSON-RPC example:
+
+```bash
+curl -X POST http://localhost:4300/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -H "accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+The HTTP transport runs in **stateless mode** — each request is independent, no session state on the server. POST only (GET/DELETE return 405).
+
 ## Env vars
 
 | Var | Required | Default | Notes |
@@ -53,6 +91,9 @@ Restart Claude Desktop. Tools appear under `avocado-studio` and can be individua
 | `AVOCADO_SITE_ID` | **yes** | — | Which site this install edits (e.g. `avocado-stories`). |
 | `ORCHESTRATOR_URL` | no | `http://localhost:4200` | Points at the Avocado Studio orchestrator. |
 | `AVOCADO_SESSION` | no | `dev` | Session key that scopes draft state. |
+| `AVOCADO_PUBLISH_TOKEN` | no | — | Required only for `avocado-publish-content`. Must match the orchestrator's `DRAFT_MODE_SECRET`. Omit to disable publish through MCP. |
+| `AVOCADO_MCP_BEARER_TOKEN` | **yes (HTTP mode)** | — | Shared secret clients must send as `Authorization: Bearer <token>`. Generate with `openssl rand -hex 32`. Only read by `src/http.ts`. |
+| `AVOCADO_MCP_PORT` | no | `4300` | Port for HTTP mode. |
 
 ## Design notes
 
@@ -72,22 +113,14 @@ Tests stub `fetch` to assert HTTP call shape. They don't start a real orchestrat
 
 ## Forward plan
 
-### Phase 2 — more tool groups
-- **Sites**: `avocado-register-site`, `avocado-list-sites`, `avocado-get-site-config`, `avocado-update-site-config`.
-- **Media**: `avocado-upload-image`, `avocado-generate-image`, `avocado-search-unsplash`, `avocado-transcribe-audio`, `avocado-interpret-image`.
-- **Publishing**: `avocado-compute-publish-diff`, `avocado-publish-content`, `avocado-get-publish-status`, `avocado-list-snapshots`, `avocado-restore-snapshot`.
-- **History**: `avocado-undo-edit`, `avocado-redo-edit`, `avocado-restore-version`.
-- **Chat planner shortcut**: `avocado-chat-plan` — accepts natural language, runs the full planner, returns applied ops. The "easy button" for hosts that don't want to wire 30 granular tools.
+### Phase 3a — HTTP transport ✅ shipped
+`StreamableHTTPServerTransport` mounted in `src/http.ts` with bearer auth (`AVOCADO_MCP_BEARER_TOKEN`). Stateless mode, POST-only, `/healthz` probe. Testable locally; ready to deploy.
 
-### Phase 3 — Claude connector (remote transport)
-Goal: publish a hosted MCP server that Claude Desktop users install via **Settings → Connectors → Add custom connector** (the flow AEM uses for "AEM Content MCP Service").
-
-Work:
-1. **HTTP + SSE transport** — swap `StdioServerTransport` for `StreamableHTTPServerTransport`. Mount at `/mcp` inside the orchestrator Fastify app or run as a separate service on Render.
-2. **OAuth gateway** — AEM uses "Complete the Adobe login flow" after the user enters the connector URL. Implement OAuth 2.1 with PKCE in front of `/mcp` so users authenticate to Avocado Studio once; token binds the session + siteId to each request. Reuse the existing `ACCESS_PASSWORD_HASH` flow as a dev fallback.
-3. **Scoping per install** — `siteId` encoded into the OAuth token claims. One connector install → one site, matching our Phase 1 model.
-4. **Claude connector registration** — submit to Anthropic's connector directory so it shows up as "Avocado Studio Content MCP Service" in Claude Desktop's built-in list (the AEM pattern). Requires: public HTTPS URL, OAuth endpoints, logo, description, per-tool permission matrix screenshot.
-5. **Safety additions** the AEM docs hint at: per-tool "read-only" flag so Claude auto-allows read tools; audit log of tool calls per session (we can piggyback on the existing orchestrator telemetry); rate limit on `/mcp` (reuse demo-mode's per-IP limiter).
+### Phase 3b — hosted deployment + OAuth
+1. **Deploy** `apps/mcp-server` HTTP process to Render alongside the orchestrator. Public HTTPS URL required by Claude Desktop's connector flow.
+2. **OAuth gateway** — AEM uses "Complete the Adobe login flow". Add OAuth 2.1 with PKCE in front of `/mcp` so bearer tokens are minted via an auth code exchange rather than shared-secret copy/paste. Token claims encode `siteId` (keeps per-site scoping).
+3. **Claude connector directory submission** — public HTTPS URL, OAuth endpoints, logo, description, per-tool permission matrix screenshot. Lands "Avocado Studio Content MCP Service" in Claude Desktop's built-in connector list.
+4. **Safety** — per-tool `readOnlyHint` annotations so Claude auto-allows reads; audit log piggybacking on existing orchestrator telemetry; rate limit on `/mcp` (reuse demo-mode's per-IP limiter).
 
 ### Phase 4 — nice-to-haves
 - MCP resources (not just tools) for page + site-config, so hosts can pin them as context without a tool call.
