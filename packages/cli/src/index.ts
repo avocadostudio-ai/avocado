@@ -13,6 +13,10 @@ import { statusCommand } from "./commands/status.js"
 import { diffCommand } from "./commands/diff.js"
 import { restoreCommand, restoreListCommand } from "./commands/restore.js"
 import { healthCommand } from "./commands/health.js"
+import { newCommand } from "./commands/new.js"
+import { registerCommand } from "./commands/register.js"
+import { sitesListCommand } from "./commands/sites.js"
+import { devCommand } from "./commands/dev.js"
 
 const program = new Command()
 
@@ -63,6 +67,39 @@ addCommonConfigFlags(restore.command("list").description("List recent publish sn
 
 addCommonConfigFlags(restore.command("commit <sha>").description("Roll the draft back to a snapshot."))
   .action((sha, opts) => restoreCommand({ ...opts, commit: sha }))
+
+program
+  .command("dev")
+  .description("Start the orchestrator + editor (and optionally the site) with unified logs.")
+  .option("--no-orchestrator", "skip the orchestrator")
+  .option("--no-editor", "skip the editor")
+  .option("--site", "also start the bundled demo site (apps/site)")
+  .option("--only <list>", "comma-separated list of services to run (orchestrator,editor,site)")
+  .action(devCommand)
+
+program
+  .command("new")
+  .description("Scaffold a new AI-site-editor integration (delegates to create-ai-site-editor).")
+  .action(newCommand)
+
+program
+  .command("register")
+  .description("Register the current Next.js site with a running orchestrator.")
+  .option("--name <name>", "human-readable site name")
+  .option("--id <id>", "kebab-case site ID")
+  .option("--port <n>", "dev server port", (v) => Number(v))
+  .option("--orchestrator <url>", "orchestrator URL")
+  .option("--secret <secret>", "draft mode secret (auto-generated if missing)")
+  .option("--session <name>", "orchestrator session", "dev")
+  .option("--purpose <text>", "one-line site description for AI context")
+  .option("--preview-url <url>", "preview URL (default: http://localhost:<port>)")
+  .option("--cwd <path>", "project directory")
+  .action(registerCommand)
+
+const sites = program.command("sites").description("Inspect sites registered with the orchestrator.")
+addCommonConfigFlags(sites.command("list").description("List all sites for the current session."))
+  .option("--json", "emit raw JSON")
+  .action(sitesListCommand)
 
 program
   .command("health")
