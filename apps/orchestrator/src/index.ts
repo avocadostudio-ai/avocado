@@ -35,6 +35,7 @@ import { gdriveRoutes } from "./routes/gdrive.js"
 import { registerAgentRoutes } from "./routes/agent.js"
 import { registerSitesAgentRoutes } from "./routes/sites-agent.js"
 import { sitesRoutes } from "./routes/sites.js"
+import { previewRoutes } from "./routes/preview.js"
 import { jiraRoutes } from "./routes/jira.js"
 import { createToolRuntime } from "./tools/runtime.js"
 import {
@@ -245,6 +246,7 @@ await app.register((instance) => gdriveRoutes(instance, ctx))
 await app.register((instance) => registerAgentRoutes(instance))
 await app.register((instance) => registerSitesAgentRoutes(instance, ctx))
 await app.register((instance) => sitesRoutes(instance, ctx))
+await app.register((instance) => previewRoutes(instance, ctx))
 await app.register((instance) => jiraRoutes(instance, ctx))
 
 // ---------------------------------------------------------------------------

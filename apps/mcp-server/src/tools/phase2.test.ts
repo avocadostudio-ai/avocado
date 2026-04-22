@@ -142,11 +142,12 @@ describe("Phase 2 tools — HTTP call shape", () => {
     assert.equal(url.searchParams.get("limit"), "10")
   })
 
-  it("avocado-restore-snapshot validates commit sha format", async () => {
+  it("avocado-restore-snapshot POSTs /restore/snapshot with commit", async () => {
     const { server, calls } = buildServer()
-    const res = await callTool(server, "avocado-restore-snapshot", { commit: "not-a-sha" })
-    assert.equal(res.isError, true)
-    assert.equal(calls.length, 0)
+    await callTool(server, "avocado-restore-snapshot", { commit: "abc1234" })
+    const url = new URL(calls[0].url)
+    assert.equal(url.pathname, "/restore/snapshot")
+    assert.deepEqual(calls[0].body, { session: "sess", siteId: "avocado-stories", commit: "abc1234" })
   })
 
   it("avocado-undo-edit POSTs /history/undo with slug+session+siteId", async () => {
@@ -168,5 +169,63 @@ describe("Phase 2 tools — HTTP call shape", () => {
       message: "make the hero bolder",
       slug: "/",
     })
+  })
+
+  it("avocado-preview-plan sends executionMode=plan_only", async () => {
+    const { server, calls } = buildServer()
+    await callTool(server, "avocado-preview-plan", { message: "add a pricing section" })
+    const body = calls[0].body as Record<string, unknown>
+    assert.equal(body.executionMode, "plan_only")
+    assert.equal(body.message, "add a pricing section")
+  })
+
+  it("avocado-approve-pending-plan sends executionMode=apply_pending_plan + pendingPlanId", async () => {
+    const { server, calls } = buildServer()
+    await callTool(server, "avocado-approve-pending-plan", { pendingPlanId: "plan-abc" })
+    const body = calls[0].body as Record<string, unknown>
+    assert.equal(body.executionMode, "apply_pending_plan")
+    assert.equal(body.pendingPlanId, "plan-abc")
+  })
+
+  it("avocado-discard-pending-plan sends executionMode=discard_pending_plan", async () => {
+    const { server, calls } = buildServer()
+    await callTool(server, "avocado-discard-pending-plan", {})
+    const body = calls[0].body as Record<string, unknown>
+    assert.equal(body.executionMode, "discard_pending_plan")
+  })
+
+  it("avocado-screenshot-page POSTs /preview/screenshot and returns image content", async () => {
+    const tinyJpegB64 = "/9j/4AAQSkZJRgABAQAAAQABAAD//gA7Q1JFQVRPUjogZ2QtanBlZyB2MS4wIChVc2luZyBJSkcgSlBFRyB2ODApLCBxdWFsaXR5ID0gNzUK"
+    const { fetcher, calls } = (() => {
+      const calls: Array<{ url: string; method: string; body?: unknown }> = []
+      const fetcher = (async (input: string | URL, init?: RequestInit) => {
+        calls.push({
+          url: typeof input === "string" ? input : input.toString(),
+          method: init?.method ?? "GET",
+          body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+        })
+        return new Response(JSON.stringify({
+          url: "http://localhost:3000/",
+          slug: "/",
+          mimeType: "image/jpeg",
+          base64: tinyJpegB64,
+          width: 1440,
+          height: 900,
+        }), { status: 200, headers: { "content-type": "application/json" } })
+      }) as typeof fetch
+      return { fetcher, calls }
+    })()
+    const client = new OrchestratorClient({ orchestratorUrl: "http://test.local:4200", session: "sess", siteId: "avocado-stories" }, fetcher)
+    const server = new McpServer({ name: "test", version: "0.0.0" })
+    registerAllTools(server, client)
+    const res = await callTool(server, "avocado-screenshot-page", { slug: "/" }) as unknown as { content: Array<{ type: string; data?: string; mimeType?: string; text?: string }> }
+    const url = new URL(calls[0].url)
+    assert.equal(url.pathname, "/preview/screenshot")
+    assert.deepEqual(calls[0].body, { session: "sess", siteId: "avocado-stories", slug: "/" })
+    assert.equal(res.content.length, 2)
+    assert.equal(res.content[0].type, "text")
+    assert.equal(res.content[1].type, "image")
+    assert.equal(res.content[1].mimeType, "image/jpeg")
+    assert.equal(res.content[1].data, tinyJpegB64)
   })
 })
