@@ -40,6 +40,10 @@ async function poll(
   let last: PublishStatus = {}
   let spinFrame = 0
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+  const isTTY = Boolean(process.stdout.isTTY)
+  const clearSpinner = () => {
+    if (isTTY) process.stdout.write("\r\x1b[K")
+  }
 
   while (Date.now() < deadline) {
     try {
@@ -58,20 +62,24 @@ async function poll(
 
     const state = last.vercelState ?? last.status ?? ""
     const label = last.status ?? last.vercelState ?? "pending"
-    process.stdout.write(`\r  ${pc.cyan(frames[spinFrame++ % frames.length])} ${pc.dim(label)}  `)
+    if (isTTY) {
+      process.stdout.write(`\r  ${pc.cyan(frames[spinFrame++ % frames.length])} ${pc.dim(label)}  `)
+    } else {
+      process.stdout.write(`  ${label}\n`)
+    }
 
     if (TERMINAL_OK.has(state)) {
-      process.stdout.write("\r\x1b[K")
+      clearSpinner()
       return last
     }
     if (TERMINAL_FAIL.has(state)) {
-      process.stdout.write("\r\x1b[K")
+      clearSpinner()
       throw new Error(last.error ?? `publish failed: ${state}`)
     }
 
     await new Promise((r) => setTimeout(r, 2000))
   }
-  process.stdout.write("\r\x1b[K")
+  clearSpinner()
   throw new Error(`Timed out after ${timeoutSec}s waiting for publish to go live`)
 }
 

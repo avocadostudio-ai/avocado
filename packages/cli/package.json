@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "bin": {
-    "avc": "src/index.ts"
+    "avc": "bin/avc.mjs"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "test": "tsx --test 'src/**/*.test.ts' 'src/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

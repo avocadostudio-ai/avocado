@@ -8,11 +8,17 @@ Product spec: `docs/ideas/avocado-cli.md`.
 
 ## Install
 
+The CLI is published to GitHub Packages (not public npm). You will need an
+`.npmrc` with a GitHub token that has `read:packages` scope — see
+[npmjs auth for GitHub Packages](https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-npm-registry).
+
 ```bash
+# in your site's repo, with a configured .npmrc:
 pnpm add -D @ai-site-editor/cli
-# or run on-the-fly:
-npx @ai-site-editor/cli <command>
 ```
+
+Inside the Avocado monorepo, the CLI is already linked as a workspace package —
+just run `pnpm exec avc` (or `pnpm --filter @ai-site-editor/cli dev`).
 
 ## Commands
 

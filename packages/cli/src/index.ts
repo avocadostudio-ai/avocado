@@ -5,6 +5,9 @@
  * Unified terminal entrypoint for the Avocado Studio developer workflow.
  * Commands are thin wrappers around the orchestrator HTTP API so nothing here
  * needs to stay in sync with orchestrator internals — only the endpoints.
+ *
+ * Locally, `pnpm exec avc` runs this file via bin/avc.mjs (which shells to
+ * tsx). The published binary runs dist/index.js directly.
  */
 
 import { Command } from "commander"

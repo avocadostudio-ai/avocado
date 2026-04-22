@@ -1,5 +1,4 @@
-import { spawn } from "node:child_process"
-import { fail } from "../format.js"
+import { delegate } from "../delegate.js"
 
 type RegisterOptions = {
   name?: string
@@ -19,7 +18,7 @@ type RegisterOptions = {
  * which is already battle-tested there.
  */
 export async function registerCommand(opts: RegisterOptions): Promise<void> {
-  const args: string[] = ["--yes", "@ai-site-editor/site-sdk", "register"]
+  const args: string[] = []
   if (opts.name) args.push("--name", opts.name)
   if (opts.id) args.push("--id", opts.id)
   if (opts.port !== undefined) args.push("--port", String(opts.port))
@@ -30,12 +29,14 @@ export async function registerCommand(opts: RegisterOptions): Promise<void> {
   if (opts.previewUrl) args.push("--preview-url", opts.previewUrl)
   if (opts.cwd) args.push("--cwd", opts.cwd)
 
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn("npx", args, { stdio: "inherit" })
-    child.on("error", reject)
-    child.on("exit", (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(`avocado-register exited with code ${code}`))
-    })
-  }).catch((err) => fail((err as Error).message))
+  await delegate(
+    {
+      label: "avocado-register",
+      siblingEntry: "../../site-sdk/src/cli/register.ts",
+      npmPackage: "@ai-site-editor/site-sdk",
+      // The npx fallback calls the `register` subcommand of the site-sdk bin.
+      extraArgs: ["register"],
+    },
+    args,
+  )
 }

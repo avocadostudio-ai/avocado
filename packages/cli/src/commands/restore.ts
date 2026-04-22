@@ -30,7 +30,7 @@ type RestoreResponse = {
   previewVersion?: number
 }
 
-function formatRelative(iso?: string): string {
+export function formatRelative(iso?: string): string {
   if (!iso) return ""
   const then = new Date(iso).getTime()
   if (!Number.isFinite(then)) return ""

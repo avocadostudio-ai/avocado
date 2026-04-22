@@ -108,8 +108,7 @@
             "group": "Specifications",
             "pages": [
               "specs/ai-website-editor-poc-spec",
-              "specs/block-schema-contracts",
-              "specs/avocado-cli-spec"
+              "specs/block-schema-contracts"
             ]
           },
           {

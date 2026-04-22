@@ -18,7 +18,12 @@ export type ConfigOptions = {
   cwd?: string
 }
 
-function parseEnvFile(content: string): Record<string, string> {
+/**
+ * Minimal `.env.local` parser — handles comments, blank lines, and quoted
+ * values. Does NOT handle escaped quotes or multi-line values; fine for the
+ * shape of the files `avocado-register` writes. Exported for testing.
+ */
+export function parseEnvFile(content: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const line of content.split("\n")) {
     const trimmed = line.trim()
