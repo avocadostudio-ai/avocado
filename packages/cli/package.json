@@ -1,0 +1,35 @@
+{
+  "name": "@ai-site-editor/cli",
+  "version": "0.0.1",
+  "description": "Avocado Studio CLI — manage, publish, and develop your Avocado-powered sites from the terminal.",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "avc": "src/index.ts"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted",
+    "main": "dist/index.js",
+    "bin": {
+      "avc": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.3"
+  }
+}
