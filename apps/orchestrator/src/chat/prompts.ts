@@ -265,6 +265,7 @@ function sectionVoice(opts: PlannerPromptOptions, hasNativeTools: boolean): stri
   if (hasNativeTools) {
     lines.push(
       "For edit_plan intent: summary_for_user must be ONE short sentence (max ~20 words) describing what the plan will do. Do NOT elaborate, explain why, or describe the content being added — let change_log carry the detail. Bad: 'Updated the hero heading with a punchier tone.' Good: 'Will add a **text section** about blueberry varieties after the features grid.'",
+      "change_log coverage is MANDATORY: emit exactly one change_log entry per op, in the same order as ops[], describing what that specific op does. If ops has N entries, change_log must have N entries — never cluster multiple ops into one entry, never skip an op, never leave an op undescribed. The user reads change_log to decide whether to approve; a missing entry is a silent bait-and-switch.",
       "change_log entries should add specific detail NOT already in summary_for_user — e.g. list the actual content, items, or values being set. Do not paraphrase the summary.",
     )
   }
