@@ -1,9 +1,4 @@
----
-title: "Avocado CLI (avc) — Product Spec"
-description: "Specification for a unified developer CLI that wraps the Avocado Studio orchestrator API surface, inspired by Adobe Helix CLI."
----
-
-# Avocado CLI (`avc`) — Product Spec
+# Avocado CLI (`avc`) — Product Idea
 
 _Last updated: 2026-04-22_
 
@@ -20,13 +15,9 @@ Avocado Studio already has strong server-side infrastructure:
 
 The gap: none of this is accessible without the editor UI or manual `curl`. Developers who expect a `<tool> publish` workflow have no path.
 
----
-
 ## 2. Goal
 
 Ship a single `avc` binary that makes every core Avocado workflow available from the terminal, requiring no browser and no manual HTTP calls.
-
----
 
 ## 3. Command Surface
 
@@ -88,8 +79,6 @@ avc restore --commit abc1234 --session dev --site my-site
 | `avc sites list` | List all sites registered with the orchestrator |
 | `avc config get/set` | Read/write CLI config (orchestrator URL, default session, etc.) |
 
----
-
 ## 4. `avc dev` — Unified Dev Server
 
 The most user-facing command. Helix's `aem up` is a single-command dev server; `avc dev` does the equivalent for our three-service architecture.
@@ -118,8 +107,6 @@ $ avc dev
 [editor]       HMR update
 ```
 
----
-
 ## 5. `avc publish` — CLI Publishing
 
 Thin wrapper around `POST /publish`. Key flags:
@@ -134,8 +121,6 @@ Thin wrapper around `POST /publish`. Key flags:
 
 Exit codes: `0` = success, `1` = publish error, `2` = timeout.
 
----
-
 ## 6. Configuration
 
 The CLI reads config from (in precedence order):
@@ -146,8 +131,6 @@ The CLI reads config from (in precedence order):
 4. `~/.config/avocado/config.json` (global defaults)
 
 No new config format is introduced — the existing `.env.local` convention used by `avocado-register` is the source of truth.
-
----
 
 ## 7. Implementation Plan
 
@@ -176,19 +159,17 @@ packages/cli/
 
 ### Dependencies
 
-- **[`commander`](https://github.com/tj/commander.js)** or **`yargs`** — argument parsing
+- **`commander`** or **`yargs`** — argument parsing
 - **`@clack/prompts`** — already used by `create-ai-site-editor`, consistent UX
 - **`execa`** — child process management for `avc dev`
 - No new runtime dependencies for `publish`, `status`, `diff`, `restore` — pure `fetch` calls
 
-### Approach
+### Build order
 
-1. Start with `avc publish` and `avc status` — zero new infrastructure, highest day-to-day value.
-2. Add `avc diff` and `avc restore` — also pure API wrappers.
-3. Migrate `create-ai-site-editor` → `avc new` and `avocado-register` → `avc register` by re-exporting their entry points.
-4. `avc dev` last — process management is the most complex piece.
-
----
+1. `avc publish` and `avc status` — zero new infrastructure, highest day-to-day value
+2. `avc diff` and `avc restore` — pure API wrappers
+3. Migrate `create-ai-site-editor` → `avc new` and `avocado-register` → `avc register`
+4. `avc dev` last — process management is the most complex piece
 
 ## 8. Comparison with Helix CLI
 
@@ -196,7 +177,7 @@ packages/cli/
 |---|---|---|
 | Scaffold new project | `aem import` (content-focused) | `avc new` (app integration) |
 | Local dev server | `aem up` | `avc dev` |
-| Publish content | via `aem content push` (to da.live) | `avc publish` (to git / Vercel / site contract) |
+| Publish content | `aem content push` (to da.live) | `avc publish` (git / Vercel / site contract) |
 | Show diff | `aem content diff` | `avc diff` |
 | Content versioning | `aem content clone/commit/status` | `avc restore list/restore` |
 | Authentication | site token (header) | `PUBLISH_TOKEN` env var |
@@ -205,11 +186,9 @@ packages/cli/
 
 Key difference: Helix is tightly coupled to Adobe's cloud. `avc` is infrastructure-agnostic — the publish target registry already supports git, Vercel deploy hooks, and any site that implements the publish contract.
 
----
-
 ## 9. Open Questions
 
 - **Binary name**: `avc` vs. `avocado` — `avc` is shorter; `avocado` is clearer for first-time users.
 - **`avc dev` scope**: Should it manage the user's own Next.js site, or only the orchestrator + editor (leaving `pnpm dev` in their site to the user)?
 - **Auth for publish**: Should `avc publish` automatically inject `x-publish-token` from `.env.local`, or require explicit `--token` flag?
-- **`avc new` vs. keeping `create-ai-site-editor` separate**: `npx create-ai-site-editor` is the standard `npm init`-style pattern; we may want to keep both (the standalone for `npm create` and `avc new` for existing users).
+- **`avc new` vs. keeping `create-ai-site-editor` separate**: `npx create-ai-site-editor` follows the standard `npm init` pattern; we may want to keep both.
