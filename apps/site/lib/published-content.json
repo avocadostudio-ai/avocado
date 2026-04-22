@@ -377,42 +377,48 @@
       "id": "p_community",
       "slug": "/community",
       "title": "Community",
-      "updatedAt": "2026-03-17T18:20:06.593Z",
+      "updatedAt": "2026-04-22T11:51:55.879Z",
       "blocks": [
         {
           "id": "b_hero_new-page",
           "type": "Hero",
           "props": {
-            "heading": "Join Our Community Today",
-            "subheading": "Sign up in seconds and start exploring. No credit card required.",
-            "ctaText": "Create Free Account",
-            "ctaHref": "/",
-            "imageUrl": "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwxfHxDb21tdW5pdHl8ZW58MXwwfHx8MTc3Mzc2NzIyNHww&ixlib=rb-4.1.0&q=80&w=1080",
-            "imageAlt": "person in red sweater holding babys hand",
-            "imagePosition": "right"
+            "heading": "Welcome to the Avocado Lovers Community",
+            "subheading": "Connect with passionate avocado enthusiasts, share recipes, learn sustainability tips, and celebrate our favorite green fruit together.",
+            "ctaText": "Join Our Community",
+            "ctaHref": "#join",
+            "imageUrl": "/generated-images/var_1776858715876_iuu72w.jpg",
+            "imageAlt": "Cartoon illustration of a diverse community of avocado lovers gathering together outdoors. Show people of different ages and backgrounds smiling and socializing, surrounded by fresh avocados, colorful healthy foods like fruits and vegetables, natural green landscapes with trees, and vibrant gardens. Everyone is happy and celebrating their shared love of avocados. Warm, welcoming, and inclusive atmosphere. Cartoon art style with bright, cheerful colors.",
+            "imagePosition": "right",
+            "textAlign": "left"
           }
         },
         {
           "id": "b_featuregrid_1773767196470",
           "type": "FeatureGrid",
           "props": {
-            "title": "Why Join Us",
+            "title": "Why Join Our Avocado Community",
+            "columns": "3",
             "features": [
               {
-                "title": "Instant Setup",
-                "description": "Get started in under 60 seconds. No complicated forms or lengthy verification."
+                "icon": "🥑",
+                "title": "Recipe & Tip Sharing",
+                "description": "Access thousands of avocado recipes, preparation techniques, and wellness tips from members worldwide."
               },
               {
-                "title": "Free Forever",
-                "description": "Access core features at no cost. Upgrade anytime to unlock premium benefits."
+                "icon": "🌱",
+                "title": "Sustainability First",
+                "description": "Learn about ethical sourcing, composting, and growing your own avocados with expert guidance."
               },
               {
-                "title": "Your Data, Your Control",
-                "description": "Complete privacy and security. We never sell your data to third parties."
+                "icon": "🎉",
+                "title": "Exclusive Events",
+                "description": "Join virtual tastings, cooking workshops, and seasonal celebrations exclusive to our community."
               },
               {
-                "title": "24/7 Support",
-                "description": "Our support team is always here to help you succeed on your journey."
+                "icon": "👥",
+                "title": "Member Network",
+                "description": "Connect with fellow avocado lovers, find local growers, and build lasting friendships around shared passion."
               }
             ]
           }
@@ -421,23 +427,31 @@
           "id": "b_stats_1773767196470",
           "type": "Stats",
           "props": {
-            "title": "Trusted by Members Worldwide",
+            "title": "Our Growing Avocado Community",
             "stats": [
               {
+                "icon": "👥",
                 "value": "50K+",
-                "label": "Active Members"
+                "label": "Active Members",
+                "description": "Avocado enthusiasts from 120+ countries"
               },
               {
-                "value": "99%",
-                "label": "Satisfaction Rate"
+                "icon": "⭐",
+                "value": "98%",
+                "label": "Member Satisfaction",
+                "description": "Love our community and resources"
               },
               {
-                "value": "150+",
-                "label": "Countries"
+                "icon": "🌍",
+                "value": "120+",
+                "label": "Countries",
+                "description": "A truly global avocado family"
               },
               {
-                "value": "4.9★",
-                "label": "Average Rating"
+                "icon": "❤️",
+                "value": "4.9/5",
+                "label": "Community Rating",
+                "description": "Based on member reviews"
               }
             ]
           }
@@ -446,19 +460,22 @@
           "id": "b_testimonials_1773767196470",
           "type": "Testimonials",
           "props": {
-            "title": "What Members Say",
+            "title": "What Our Community Members Say",
             "items": [
               {
-                "quote": "Signing up was so easy. I was exploring the platform within minutes. Highly recommend!",
-                "author": "Sarah Chen"
+                "quote": "This community completely changed how I experience avocados. The recipe ideas are endless, and I've made lifelong friends who share my passion for sustainable living.",
+                "author": "Sarah M.",
+                "role": "Home Cook, California"
               },
               {
-                "quote": "The free tier is incredibly generous. I've been using it for 6 months without spending a dime.",
-                "author": "Marcus Rodriguez"
+                "quote": "As a small avocado farmer, connecting with this community has been invaluable. The sustainability tips and market insights have transformed my business.",
+                "author": "Diego R.",
+                "role": "Organic Farmer, Mexico"
               },
               {
-                "quote": "Best decision I made. The community and support team are amazing.",
-                "author": "Emily Watson"
+                "quote": "The events and webinars are fantastic. I never knew there was so much to learn about something I thought I already understood. Highly recommend!",
+                "author": "Emma T.",
+                "role": "Wellness Coach, UK"
               }
             ]
           }
@@ -467,23 +484,23 @@
           "id": "b_faqaccordion_1773767196470",
           "type": "FAQAccordion",
           "props": {
-            "title": "Signup Questions",
+            "title": "Community Questions Answered",
             "items": [
               {
-                "q": "Is my credit card required to sign up?",
-                "a": "No. You can create a free account and explore all core features without entering payment information. Only when you upgrade to premium will we ask for billing details."
+                "q": "How do I join the avocado community?",
+                "a": "Signing up is free and takes less than 2 minutes! Just click the join button, create your profile, and start connecting. No credit card required — ever."
               },
               {
-                "q": "How long does signup take?",
-                "a": "Less than a minute. Just provide your email, create a password, and verify your email address. You'll be ready to go in seconds."
+                "q": "What benefits do members get?",
+                "a": "Members enjoy access to exclusive recipes, sustainability guides, monthly events, member forums, expert Q&As, and a vibrant global network of avocado lovers."
               },
               {
-                "q": "What happens to my data after I sign up?",
-                "a": "Your data is encrypted and stored securely. We never share or sell your information to third parties. You own your data and can export or delete it anytime."
+                "q": "Are there in-person events or just online?",
+                "a": "We host both virtual and regional in-person events. Virtual events include recipe challenges, sustainability webinars, and guest chef talks. Regional meetups happen throughout the year in major cities."
               },
               {
-                "q": "Can I cancel my account?",
-                "a": "Yes. You can cancel anytime with one click. No questions asked, no cancellation fees."
+                "q": "Can I share my own recipes and tips?",
+                "a": "Absolutely! Sharing is the heart of our community. Post your recipes, growing tips, sustainability ideas, and photos. Our community loves to feature member creations on our social channels."
               }
             ]
           }
@@ -492,10 +509,10 @@
           "id": "b_cta_1773767196470",
           "type": "CTA",
           "props": {
-            "title": "Ready to Get Started?",
-            "description": "Join thousands of members who are already part of our community. Sign up now and unlock exclusive features.",
-            "ctaText": "Sign Up Free",
-            "ctaHref": "/community"
+            "title": "Ready to Join the Avocado Lovers Community?",
+            "description": "Connect with passionate members, discover new recipes, and be part of a global movement toward sustainable, delicious living.",
+            "ctaText": "Join Free Today",
+            "ctaHref": "#join"
           }
         }
       ]
@@ -900,10 +917,43 @@
           }
         }
       ]
+    },
+    {
+      "slug": "/test-jira",
+      "title": "Test Jira",
+      "blocks": [
+        {
+          "id": "b_hero_test_jira",
+          "type": "Hero",
+          "props": {
+            "heading": "Welcome to the Test Jira Page",
+            "subheading": "This is a sample page created to verify Jira integration with The Avocado Hub site. Everything looks great!",
+            "ctaText": "Explore Recipes",
+            "ctaHref": "/recipes",
+            "secondaryCtaText": "Join the Community",
+            "secondaryCtaHref": "/community",
+            "imagePosition": "right",
+            "textAlign": "left",
+            "imageUrl": "/hero-generated.svg",
+            "imageAlt": "Abstract generated illustration for the hero section"
+          }
+        },
+        {
+          "id": "b_richtext_test_jira",
+          "type": "RichText",
+          "props": {
+            "title": "Sample Content Block",
+            "body": "This page was automatically generated as part of a Jira task workflow test. It demonstrates that new pages can be created with structured content — including headings, body text, and call-to-action buttons — directly from a ticket. Feel free to update or delete this page once testing is complete."
+          }
+        }
+      ],
+      "id": "p_test_jira",
+      "updatedAt": "2026-04-22T12:01:15.586Z"
     }
   ],
   "siteConfig": {
     "name": "The Avocado Hub",
-    "logo": "/logos/avocado-hub.svg"
+    "logo": "/logos/avocado-hub.svg",
+    "previewUrl": "http://localhost:3000"
   }
 }
