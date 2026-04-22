@@ -114,9 +114,11 @@ export function parseJsonMaybe(text: string): unknown {
 const DEFAULT_VARIATION_COUNT = 3
 const MAX_VARIATION_COUNT = 12
 
-function requestedVariationCount(message: string): number {
+const VARIATION_NOUN_PATTERN = "(?:variations?|variants?|alternatives?|options)"
+
+export function requestedVariationCount(message: string): number {
   const normalized = message.toLowerCase().replace(/-/g, " ")
-  const numberMatch = normalized.match(/\b(\d{1,2})\s+variations?\b/)
+  const numberMatch = normalized.match(new RegExp(`\\b(\\d{1,2})\\s+${VARIATION_NOUN_PATTERN}\\b`))
   if (numberMatch) {
     const parsed = Number.parseInt(numberMatch[1], 10)
     if (Number.isFinite(parsed) && parsed > 0) return Math.min(parsed, MAX_VARIATION_COUNT)
@@ -137,7 +139,7 @@ function requestedVariationCount(message: string): number {
     twelve: 12
   }
   for (const [word, value] of Object.entries(wordsToNumbers)) {
-    const re = new RegExp(`\\b${word}\\s+variations?\\b`, "i")
+    const re = new RegExp(`\\b${word}\\s+${VARIATION_NOUN_PATTERN}\\b`, "i")
     if (re.test(normalized)) return value
   }
   return DEFAULT_VARIATION_COUNT
@@ -196,6 +198,14 @@ export async function withDefaultImageVariations(args: {
   const out: VariationOption[] = []
   for (const [variationIndex, variation] of args.variations.entries()) {
     const patch = { ...variation.patch }
+    // LLMs frequently hallucinate imageUrl values (fake Unsplash-style URLs or
+    // descriptive strings). The pipeline is the single source of truth for
+    // variation image URLs, so drop any LLM-authored value here and let the
+    // branches below set a real one. imageAlt is kept as a hint.
+    const llmAuthoredImageUrl = Object.prototype.hasOwnProperty.call(patch, "imageUrl")
+    if (llmAuthoredImageUrl && !explicitUrl) {
+      delete patch.imageUrl
+    }
     if (explicitUrl) {
       patch.imageUrl = explicitUrl
       if (!Object.prototype.hasOwnProperty.call(patch, "imageAlt")) {
@@ -255,6 +265,17 @@ export async function withDefaultImageVariations(args: {
           patch.imageAlt = resolved.alt
         }
       }
+    }
+
+    // If the pipeline couldn't produce a real imageUrl and the LLM had only
+    // authored one (now stripped), drop any paired imageAlt too — otherwise the
+    // existing image keeps a new, unrelated alt description.
+    if (
+      llmAuthoredImageUrl &&
+      !Object.prototype.hasOwnProperty.call(patch, "imageUrl") &&
+      Object.prototype.hasOwnProperty.call(patch, "imageAlt")
+    ) {
+      delete patch.imageAlt
     }
 
     const sanitized = sanitizeVariationPatch(args.block, patch)
@@ -632,7 +653,11 @@ export async function runVariationPipeline(
       })
       variations = result.variations
       generatorUsage = result.usage
-    } catch {
+    } catch (err) {
+      ctx.log.warn(
+        { err, provider: "anthropic", model: modelUsed, blockType: selected.type },
+        "variation pipeline: anthropic generation failed; falling back to deterministic"
+      )
       variations = []
     }
   } else if (plannerSource === "openai") {
@@ -647,7 +672,11 @@ export async function runVariationPipeline(
       })
       variations = result.variations
       generatorUsage = result.usage
-    } catch {
+    } catch (err) {
+      ctx.log.warn(
+        { err, provider: "openai", model: modelUsed, blockType: selected.type },
+        "variation pipeline: openai generation failed; falling back to deterministic"
+      )
       variations = []
     }
   }
