@@ -364,9 +364,8 @@ function EditorPage({
         return a.site.name.localeCompare(b.site.name)
       })
   }, [reachableSiteIds, sites.siteList, siteId])
-  const { onlineEntries, offlineEntries, activeEntry } = useMemo(() => ({
+  const { onlineEntries, activeEntry } = useMemo(() => ({
     onlineEntries: dropdownEntries.filter((e) => e.online),
-    offlineEntries: dropdownEntries.filter((e) => !e.online),
     activeEntry: dropdownEntries.find((e) => e.site.id === siteId),
   }), [dropdownEntries, siteId])
 
@@ -1217,9 +1216,6 @@ function EditorPage({
                     </a>
                   </div>
                   <div className="site-switcher-list">
-                    {onlineEntries.length > 0 && offlineEntries.length > 0 ? (
-                      <div className="site-switcher-section-label">Online</div>
-                    ) : null}
                     {onlineEntries.map((entry) => (
                       <SiteSwitcherRow
                         key={entry.site.id}
@@ -1229,24 +1225,6 @@ function EditorPage({
                         active={entry.site.id === siteId}
                         onSelect={() => {
                           if (entry.site.id !== siteId) sites.openEditorForSite(entry.site.id)
-                          setShowSiteSwitcher(false)
-                        }}
-                      />
-                    ))}
-                    {offlineEntries.length > 0 ? (
-                      <div className="site-switcher-section-label">
-                        {t("sites.offlineSiteCount", { count: offlineEntries.length })}
-                      </div>
-                    ) : null}
-                    {offlineEntries.map((entry) => (
-                      <SiteSwitcherRow
-                        key={entry.site.id}
-                        name={entry.site.name}
-                        origin={entry.origin}
-                        statusClass="offline"
-                        dimmed
-                        onSelect={() => {
-                          sites.openEditorForSite(entry.site.id)
                           setShowSiteSwitcher(false)
                         }}
                       />

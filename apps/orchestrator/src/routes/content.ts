@@ -121,7 +121,16 @@ export async function contentRoutes(app: FastifyInstance, ctx: RouteContext) {
     const draft = getSessionDraft(session)
     await autoBootstrapIfEmpty(session, query.siteId, draft, request.log)
     const slugs = orderSlugsHomeFirst(Array.from(draft.keys()))
-    return { slugs }
+    const pages = slugs.map((slug) => {
+      const page = draft.get(slug)
+      return {
+        slug,
+        title: page?.title ?? "",
+        updatedAt: page?.updatedAt ?? "",
+        blockCount: page?.blocks?.length ?? 0,
+      }
+    })
+    return { slugs, pages }
   })
 
   app.post("/draft/bootstrap", async (request, reply) => {

@@ -560,5 +560,15 @@
     "tags": ["regression", "cross_block", "core"],
     "expectedStatus": "applied",
     "expectedOpTypes": ["update_props"]
+  },
+  {
+    "id": "home-sweeping-playful-multi-block",
+    "category": "text_edit",
+    "slug": "/",
+    "message": "Make this page more playful. Add emojis to headings and CTA text, and rewrite the copy to match.",
+    "tags": ["regression", "page_wide", "breadth", "core"],
+    "expectedStatus": "applied",
+    "expectedOpTypes": ["update_props"],
+    "expectedOpCount": { "min": 3, "max": 20 }
   }
 ]

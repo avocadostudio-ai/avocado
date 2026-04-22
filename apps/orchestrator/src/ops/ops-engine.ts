@@ -180,8 +180,90 @@ export function isDeterministicRepairEligible(reason: string) {
   return classifyGuardrailError(reason) === "schema_violation"
 }
 
+/**
+ * Extracts structured fields from a planner schema_violation reason so the
+ * repair prompt can tell the LLM exactly which path to fix and what kind of
+ * violation it was. The reason format produced by planner.ts is:
+ *   `<zodMessage> at <path>. Parsed sample: <truncated json>`
+ *
+ * Falls back gracefully when fields are missing (e.g. non-zod failures that
+ * still classify as schema_violation via the keyword matcher).
+ */
+export function parseSchemaViolationReason(reason: string): {
+  path: string | null
+  zodMessage: string
+  kind:
+    | "unknown_key"
+    | "missing_required"
+    | "type_mismatch"
+    | "invalid_enum"
+    | "invalid_discriminator"
+    | "out_of_range"
+    | "string_constraint"
+    | "unknown"
+} {
+  const sampleStripped = reason.replace(/\.\s*Parsed sample:.*$/s, "").trim()
+  const pathMatch = /\s+at\s+([^\s.]+(?:\.[^\s.]+)*)\s*$/.exec(sampleStripped)
+  const path = pathMatch ? pathMatch[1].trim() : null
+  const zodMessage = (path ? sampleStripped.slice(0, pathMatch!.index).trim() : sampleStripped)
+    .replace(/\.$/, "")
+    .trim()
+  const lower = zodMessage.toLowerCase()
+
+  let kind: ReturnType<typeof parseSchemaViolationReason>["kind"] = "unknown"
+  if (lower.startsWith("unrecognized key") || lower.includes("unknown props")) kind = "unknown_key"
+  else if (lower === "required" || lower.startsWith("required") || lower.includes("is required") || lower.includes("missing"))
+    kind = "missing_required"
+  else if (lower.startsWith("invalid discriminator")) kind = "invalid_discriminator"
+  else if (lower.startsWith("invalid enum")) kind = "invalid_enum"
+  else if (lower.startsWith("expected ") && lower.includes("received ")) kind = "type_mismatch"
+  else if (lower.includes("out of range") || lower.includes("greater than") || lower.includes("less than")) kind = "out_of_range"
+  else if (
+    lower.includes("must contain at least") ||
+    lower.includes("must contain at most") ||
+    lower.includes("too short") ||
+    lower.includes("too long")
+  )
+    kind = "string_constraint"
+
+  return { path, zodMessage, kind }
+}
+
 export function buildDeterministicRepairFeedback(reason: string) {
-  return `Repair strictly for schema compliance only: ${reason}. Do not change user intent or rewrite copy semantics.`
+  const parsed = parseSchemaViolationReason(reason)
+  const pathLine = parsed.path ? `Violation path: ${parsed.path}.` : ""
+  const messageLine = parsed.zodMessage ? `Validator said: ${parsed.zodMessage}.` : ""
+
+  const kindGuidance = (() => {
+    switch (parsed.kind) {
+      case "unknown_key":
+        return "Action: remove the unknown key from the op's patch. Only use prop keys defined in that block type's blockContract. Do NOT invent new props (e.g. no 'color', 'colorful', 'style' unless they appear in the contract)."
+      case "missing_required":
+        return "Action: add the missing required field. If the op is update_props, required fields you omitted must either stay absent (no-op for that field) or be provided with a concrete value — do not set them to null or empty string unless the contract allows it."
+      case "invalid_discriminator":
+        return "Action: fix the op type. Use one of the allowed operation names exactly: create_page, add_block, update_props, remove_block, move_block, duplicate_block, add_item, update_item, remove_item, move_item, rename_page, remove_page, move_page, duplicate_page, update_page_meta, update_site_config."
+      case "invalid_enum":
+        return "Action: replace the invalid value with one of the allowed enum values. Check the blockContract for the set of permitted values."
+      case "type_mismatch":
+        return "Action: fix the type. Strings must be quoted strings, numbers bare numbers, booleans true/false. Do not wrap primitives in objects, do not pass arrays where strings are expected."
+      case "out_of_range":
+        return "Action: adjust the index/number to be within bounds. Indices are zero-based and must be < array length. For insertions, use afterIndex = array.length - 1 to append."
+      case "string_constraint":
+        return "Action: adjust the string length to satisfy the constraint. Most required text fields reject empty strings — provide actual content."
+      default:
+        return "Action: re-read the block's contract and re-emit the plan with strictly valid shapes."
+    }
+  })()
+
+  return [
+    "Repair strictly for schema compliance only. Do not change user intent, drop ops the user asked for, or rewrite copy semantics.",
+    pathLine,
+    messageLine,
+    kindGuidance,
+    "Keep every op the original plan had and every field/patch the user asked for — only fix the specific violation above.",
+  ]
+    .filter((line) => line.length > 0)
+    .join(" ")
 }
 
 export type SkippedOperation = {
@@ -426,6 +508,7 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
   const deletedSlugs = new Set<string>()
   const skippedOps: SkippedOperation[] = []
   const fuzzyMatches: FuzzyMatch[] = []
+  const duplicatedPages: Array<{ slug: string; blockIdMap: Record<string, string> }> = []
   let orderChanged = false
   let configChanged = false
   const originalSiteConfig = cs ? await cs.getSiteConfig(session) : getSiteConfig(session)
@@ -493,18 +576,34 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
       const nextSlug = normalizeRouteCandidate(op.newPageSlug) ?? _nextDuplicateSlug(staged, op.pageSlug)
       if (staged.has(nextSlug)) throw new OperationError(`Target page slug already exists: ${nextSlug}`, { category: "schema_violation" })
       op.newPageSlug = nextSlug
+      const explicitNewTitle = typeof op.newTitle === "string" && op.newTitle.trim().length > 0 ? op.newTitle.trim() : undefined
+      const blockIdMap: Record<string, string> = {}
+      const nextBlocks = source.blocks.map((block) => {
+        const newId = _nextUniqueBlockId(source.blocks, `${block.id}_copy`)
+        blockIdMap[block.id] = newId
+        return { ...block, id: newId }
+      })
       // source was already deep-cloned at entry into `staged`; spread is sufficient
       // since all later mutations replace blocks/props wholesale rather than mutating in-place.
       const copy: PageDoc = {
         ...source,
         id: pageIdFromSlug(nextSlug),
         slug: nextSlug,
-        title: typeof op.newTitle === "string" && op.newTitle.trim().length > 0 ? op.newTitle.trim() : `${source.title} Copy`,
+        title: explicitNewTitle ?? `${source.title} Copy`,
         updatedAt: new Date().toISOString(),
-        blocks: source.blocks.map((block) => ({ ...block, id: _nextUniqueBlockId(source.blocks, `${block.id}_copy`) }))
+        blocks: nextBlocks,
+        // When caller passes newTitle, keep meta.title in sync so SEO doesn't show
+        // the source page's English title on a translated copy. Other meta fields
+        // (description, ogImage) stay — caller can patch them with update_page_meta.
+        meta: explicitNewTitle && source.meta
+          ? { ...source.meta, title: explicitNewTitle }
+          : explicitNewTitle
+            ? { title: explicitNewTitle }
+            : source.meta
       }
       staged.set(nextSlug, copy)
       touchedSlugs.add(nextSlug)
+      duplicatedPages.push({ slug: nextSlug, blockIdMap })
 
       const finalOrder = _rebuildOrderWithInserted(staged, nextSlug, op.afterPageSlug ?? op.pageSlug)
       const reordered = new Map<string, PageDoc>()
@@ -910,7 +1009,8 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
   return {
     appliedCount: Math.max(0, ops.length - skippedOps.length),
     skippedOps,
-    fuzzyMatches
+    fuzzyMatches,
+    duplicatedPages
   }
 }
 

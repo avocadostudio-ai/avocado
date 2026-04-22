@@ -194,6 +194,94 @@ describe("Phase 2 tools — HTTP call shape", () => {
     assert.equal(body.executionMode, "discard_pending_plan")
   })
 
+  it("avocado-batch-apply POSTs the whole ops array to /ops in one call", async () => {
+    const { server, calls } = buildServer()
+    const ops = [
+      { op: "update_props", pageSlug: "/test-de", blockId: "hero-1_copy", patch: { title: "Willkommen" } },
+      { op: "update_item", pageSlug: "/test-de", blockId: "features-1_copy", listKey: "features", index: 0, patch: { label: "Schnell" } },
+      { op: "update_page_meta", pageSlug: "/test-de", patch: { title: "Willkommen", description: "Eine deutsche Seite" } },
+    ]
+    await callTool(server, "avocado-batch-apply", { ops })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].method, "POST")
+    const url = new URL(calls[0].url)
+    assert.equal(url.pathname, "/ops")
+    const body = calls[0].body as { session: string; siteId: string; ops: unknown[] }
+    assert.equal(body.session, "sess")
+    assert.equal(body.siteId, "avocado-stories")
+    assert.deepEqual(body.ops, ops)
+  })
+
+  it("avocado-batch-apply rejects an empty ops array client-side", async () => {
+    const { server, calls } = buildServer()
+    const res = await callTool(server, "avocado-batch-apply", { ops: [] })
+    assert.equal(res.isError, true)
+    assert.equal(calls.length, 0)
+  })
+
+  it("avocado-chat-plan degrades to a text note when the screenshot fetch is aborted", async () => {
+    const chatResponse = { status: "applied", summary: "done", undoSlug: "/", mentionedSlugs: ["/"] }
+    const calls: Array<{ url: string }> = []
+    const fetcher = (async (input: string | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString()
+      calls.push({ url })
+      if (url.endsWith("/chat")) {
+        return new Response(JSON.stringify(chatResponse), { status: 200, headers: { "content-type": "application/json" } })
+      }
+      if (url.includes("/preview/screenshot")) {
+        // Simulate the client aborting: reject with AbortError as fetch() would.
+        await new Promise<void>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))
+        })
+      }
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } })
+    }) as typeof fetch
+    const client = new OrchestratorClient({ orchestratorUrl: "http://test.local:4200", session: "sess", siteId: "avocado-stories" }, fetcher)
+    const server = new McpServer({ name: "test", version: "0.0.0" })
+    registerAllTools(server, client)
+
+    // Pre-fire an abort on the next screenshot call by swapping AbortController with a quick-timer version.
+    const OriginalAbortController = globalThis.AbortController
+    class FastAbort extends OriginalAbortController {
+      constructor() {
+        super()
+        setImmediate(() => this.abort())
+      }
+    }
+    globalThis.AbortController = FastAbort as unknown as typeof AbortController
+    try {
+      const res = await callTool(server, "avocado-chat-plan", { message: "translate to Spanish" }) as { content: Array<{ type: string; text?: string }> }
+      const texts = res.content.filter((c) => c.type === "text").map((c) => c.text ?? "")
+      assert.ok(texts.some((t) => t.includes("screenshot skipped")), `expected skip note, got: ${JSON.stringify(texts)}`)
+      assert.ok(!res.content.some((c) => c.type === "image"), "should not attach image when screenshot aborted")
+    } finally {
+      globalThis.AbortController = OriginalAbortController
+    }
+  })
+
+  it("avocado-list-pages passes through the enriched pages summary from /draft/slugs", async () => {
+    const enriched = {
+      slugs: ["/", "/pricing"],
+      pages: [
+        { slug: "/", title: "Home", updatedAt: "2026-04-22T10:00:00.000Z", blockCount: 4 },
+        { slug: "/pricing", title: "Pricing", updatedAt: "2026-04-20T09:00:00.000Z", blockCount: 2 },
+      ],
+    }
+    const calls: Array<{ url: string; method: string }> = []
+    const fetcher = (async (input: string | URL, init?: RequestInit) => {
+      calls.push({ url: typeof input === "string" ? input : input.toString(), method: init?.method ?? "GET" })
+      return new Response(JSON.stringify(enriched), { status: 200, headers: { "content-type": "application/json" } })
+    }) as typeof fetch
+    const client = new OrchestratorClient({ orchestratorUrl: "http://test.local:4200", session: "sess", siteId: "avocado-stories" }, fetcher)
+    const server = new McpServer({ name: "test", version: "0.0.0" })
+    registerAllTools(server, client)
+    const res = await callTool(server, "avocado-list-pages", {}) as { content: Array<{ text: string }> }
+    const url = new URL(calls[0].url)
+    assert.equal(url.pathname, "/draft/slugs")
+    const payload = JSON.parse(res.content[0].text) as typeof enriched
+    assert.deepEqual(payload, enriched)
+  })
+
   it("avocado-screenshot-page POSTs /preview/screenshot and returns image content", async () => {
     const tinyJpegB64 = "/9j/4AAQSkZJRgABAQAAAQABAAD//gA7Q1JFQVRPUjogZ2QtanBlZyB2MS4wIChVc2luZyBJSkcgSlBFRyB2ODApLCBxdWFsaXR5ID0gNzUK"
     const { fetcher, calls } = (() => {

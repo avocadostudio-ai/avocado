@@ -239,6 +239,25 @@ export function isBatchRemoveRequest(message: string) {
   return false
 }
 
+/**
+ * Detects duplicate/copy/clone requests targeting a block on the current
+ * page. The fast LLM intent router's schema has no "duplicate" action
+ * (only add|move|update|remove|info|clarify), so these requests must
+ * bypass the router and go straight to the full planner, which supports
+ * the `duplicate_block` op.
+ */
+export function isDuplicateBlockRequest(message: string) {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  // "duplicate X", "clone X", "copy X", "make a copy of X" — where X is any
+  // block reference. Guard against "copy" matching unrelated phrases like
+  // "the copy" (RichText body) by requiring a verb-y context.
+  if (/\b(?:duplicate|clone)\b/.test(m)) return true
+  if (/\bmake\s+(?:a|another)\s+copy\b/.test(m)) return true
+  // "copy the <block>", "copy this block" — verb use
+  if (/\bcopy\s+(?:this|that|the|a|an|another)\s+/.test(m)) return true
+  return false
+}
+
 export function isInfoQuery(message: string) {
   const m = normalizeForIntent(message)
   return (

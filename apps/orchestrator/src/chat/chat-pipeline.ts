@@ -27,6 +27,7 @@ import {
   type ChatResult,
   siteCapabilitiesSchema,
   isBatchAddRequest,
+  isDuplicateBlockRequest,
   isBlockCatalogQuery,
   isInfoQuery,
   isAdviceQuery,
@@ -2733,9 +2734,14 @@ export async function runChatPipeline(
   // compile can't generate meaningful content for "add 3 blocks" without specific
   // block types, so go straight to the full planner which can handle it.
   const batchAddSkipsRouter = isBatchAddRequest(plannerMessage)
+  // The router schema has no "duplicate" action (only add|move|update|remove|
+  // info|clarify), so duplicate/clone/copy requests get misrouted to update_props.
+  // Full planner supports `duplicate_block` natively.
+  const duplicateSkipsRouter = isDuplicateBlockRequest(plannerMessage)
   const shouldTryLlmIntentRouter =
     !contentQuery &&
     !batchAddSkipsRouter &&
+    !duplicateSkipsRouter &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")

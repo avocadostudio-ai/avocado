@@ -182,6 +182,16 @@ export const PAGE_WIDE_REWRITE_PATTERNS: RegExp[] = [
   /\b(?:populate|fill)\b.*\b(?:with|using)\b.*\bcontent\b/,
   // Structural audit requests — "review heading hierarchy", "fix heading structure", "review Grapefruits page heading tag hierarchy"
   /\b(?:review|audit|fix|check)\b[\s\w]*\bheadings?\s*(?:tags?\s*)?(?:hierarchy|structure|levels?|order)\b/,
+  // Tonal / stylistic sweeps — "make this page more playful", "make /about more professional"
+  // Any "make (this|the|/slug) (whole|entire)? page more|less <adjective>" triggers page-wide treatment.
+  /\bmake\s+(?:this|the|our|my)\s+(?:whole\s+|entire\s+)?page\s+(?:more|less|feel|sound|look)\s+\w+/,
+  /\bmake\s+\/\w[\w/-]*\s+(?:more|less|feel|sound|look)\s+\w+/,
+  // Emoji sweeps across many blocks — "add emojis to headings, card titles, and CTA text"
+  // Require a breadth signal (multiple targets or all/every/everything) to avoid catching narrow single-field asks.
+  /\badd\s+emoji(?:s)?\b[\s\S]*\b(?:all|every|everything|headings?|titles?|labels?)\b/,
+  /\badd\s+emoji(?:s)?\b[\s\S]*,[\s\S]*\band\b/,
+  // Multi-part sweeping edits — "<change X>, <change Y>, and <change Z>" combined with a tonal/sweeping verb
+  /\bmake\s+(?:this|the)\s+page\s+more\s+\w+[\s\S]*\b(?:add|insert|include|update|rewrite|refresh)\b/,
 ]
 
 // ---------------------------------------------------------------------------

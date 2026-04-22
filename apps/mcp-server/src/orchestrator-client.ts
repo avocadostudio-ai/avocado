@@ -19,6 +19,8 @@ export type RequestOptions = {
   formData?: FormData
   /** Bearer token for endpoints that require auth (e.g. /publish). */
   bearer?: string
+  /** Abort the fetch when this signal fires — lets callers enforce per-request timeouts. */
+  signal?: AbortSignal
 }
 
 export class OrchestratorClient {
@@ -40,7 +42,7 @@ export class OrchestratorClient {
     }
     if (opts.bearer) headers.authorization = `Bearer ${opts.bearer}`
 
-    const res = await this.fetcher(url.toString(), { method, headers, body })
+    const res = await this.fetcher(url.toString(), { method, headers, body, signal: opts.signal })
     if (!res.ok) {
       const text = await res.text().catch(() => "")
       throw new Error(`orchestrator ${method} ${path} failed: ${res.status} ${text}`)
@@ -67,8 +69,8 @@ export class OrchestratorClient {
     return this.request<PageDoc>("GET", "/draft/pages", { query: this.scoped({ slug }) })
   }
 
-  listSlugs(): Promise<{ slugs: string[] }> {
-    return this.request<{ slugs: string[] }>("GET", "/draft/slugs", { query: this.scoped() })
+  listSlugs(): Promise<PagesIndexResponse> {
+    return this.request<PagesIndexResponse>("GET", "/draft/slugs", { query: this.scoped() })
   }
 
   getSiteConfig(): Promise<SiteConfig> {
@@ -80,6 +82,18 @@ export class OrchestratorClient {
   }
 }
 
+export type PagesIndexEntry = {
+  slug: string
+  title: string
+  updatedAt: string
+  blockCount: number
+}
+
+export type PagesIndexResponse = {
+  slugs: string[]
+  pages: PagesIndexEntry[]
+}
+
 export type ApplyOpsResponse = {
   status: string
   summary: string
@@ -88,4 +102,10 @@ export type ApplyOpsResponse = {
   previewVersion: number
   focusBlockId?: string
   updatedSlug?: string
+  /**
+   * Only present when the batch contained at least one duplicate_page op.
+   * Each entry maps the new page's slug to a { oldBlockId: newBlockId } table
+   * so callers can target the copied blocks without a follow-up get-page.
+   */
+  duplicatedPages?: Array<{ slug: string; blockIdMap: Record<string, string> }>
 }

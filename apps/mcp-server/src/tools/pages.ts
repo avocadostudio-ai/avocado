@@ -21,7 +21,7 @@ export function registerPageTools(server: McpServer, client: OrchestratorClient)
 
   server.tool(
     "avocado-list-pages",
-    "List every page slug in the current draft (home page first, then others in order).",
+    "List every page in the current draft (home page first). Returns both `slugs: string[]` and a richer `pages: [{ slug, title, updatedAt, blockCount }]` summary — use `pages` to plan multi-page work without needing a follow-up avocado-get-page per slug.",
     {},
     async () => {
       try {
@@ -92,7 +92,7 @@ export function registerPageTools(server: McpServer, client: OrchestratorClient)
 
   server.tool(
     "avocado-duplicate-page",
-    "Duplicate a page, optionally under a new slug/title and inserted after a specific page in the nav order.",
+    "Duplicate a page, optionally under a new slug/title and inserted after a specific page in the nav order. When `newTitle` is passed, `meta.title` is synced to the new title too (so SEO doesn't show the source page's title). Response includes `duplicatedPages: [{ slug, blockIdMap: { [oldId]: newId } }]` — use the map to target copied blocks directly without a follow-up avocado-get-page.",
     {
       slug: pageSlug,
       newSlug: z.string().min(1).optional(),

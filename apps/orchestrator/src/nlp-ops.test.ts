@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery, isContentQuery } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isDuplicateBlockRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery, isContentQuery } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath, tryCompoundDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage, isRewriteLikeMessage } from "./chat/chat-pipeline.js"
@@ -2374,6 +2374,26 @@ test("isBatchAddRequest treats multi-page create prompts as batch overrides", ()
   assert.equal(isBatchAddRequest("Create only Water Explorers and Wilderness Survivalists pages"), true)
 })
 
+test("isDuplicateBlockRequest detects duplicate/clone/copy verbs on block references", () => {
+  assert.equal(isDuplicateBlockRequest("Duplicate the features grid on this page"), true)
+  assert.equal(isDuplicateBlockRequest("duplicate this block"), true)
+  assert.equal(isDuplicateBlockRequest("clone the hero"), true)
+  assert.equal(isDuplicateBlockRequest("copy this block"), true)
+  assert.equal(isDuplicateBlockRequest("copy the CTA"), true)
+  assert.equal(isDuplicateBlockRequest("make a copy of the testimonials"), true)
+  assert.equal(isDuplicateBlockRequest("make another copy of the faq"), true)
+})
+
+test("isDuplicateBlockRequest ignores unrelated uses of 'copy'", () => {
+  // "copy" as noun (RichText body) — not a duplicate request
+  assert.equal(isDuplicateBlockRequest("rewrite the copy in the hero"), false)
+  assert.equal(isDuplicateBlockRequest("make the copy more playful"), false)
+  assert.equal(isDuplicateBlockRequest("improve readability of the copy"), false)
+  // Unrelated edit verbs
+  assert.equal(isDuplicateBlockRequest("update the hero heading"), false)
+  assert.equal(isDuplicateBlockRequest("add a cta section"), false)
+})
+
 test("isBatchAddRequest treats explicit multi-block add prompts as batch overrides", () => {
   assert.equal(isBatchAddRequest("add 3 blocks: hero, cardgrid and CTA"), true)
   // Typo tolerance: "blocka", "blockss" should still be detected as batch add
@@ -2501,6 +2521,24 @@ test("isPageWideRewriteRequest detects page-wide rewrite patterns", () => {
   assert.equal(isPageWideRewriteRequest("rewrite the CTA text"), false)
   assert.equal(isPageWideRewriteRequest("change the heading to something better"), false)
   assert.equal(isPageWideRewriteRequest("redesign my logo"), false)
+
+  // Tonal / stylistic page-wide edits (issue #9)
+  assert.equal(isPageWideRewriteRequest("Make this page more playful"), true)
+  assert.equal(isPageWideRewriteRequest("make the page more professional"), true)
+  assert.equal(isPageWideRewriteRequest("make /about more friendly"), true)
+  assert.equal(isPageWideRewriteRequest("make the entire page less formal"), true)
+  assert.equal(isPageWideRewriteRequest("make the page feel bolder"), true)
+  assert.equal(isPageWideRewriteRequest("Make /test more playful. Insert Unsplash images where possible, add emojis."), true)
+  assert.equal(
+    isPageWideRewriteRequest("Make this page more playful. Add relevant Unsplash images to the hero and all three cards in the CardGrid. Add emojis to headings, card titles, and CTA text."),
+    true,
+  )
+  // Emoji sweep across multiple targets
+  assert.equal(isPageWideRewriteRequest("Add emojis to every heading"), true)
+  assert.equal(isPageWideRewriteRequest("add emojis to headings, card titles, and CTA text"), true)
+  // Negative: single-field ask, no sweeping signal
+  assert.equal(isPageWideRewriteRequest("make the hero heading more playful"), false)
+  assert.equal(isPageWideRewriteRequest("add an emoji to the CTA"), false)
 })
 
 test("extractMentionedBlockTypes returns all block types in order", () => {

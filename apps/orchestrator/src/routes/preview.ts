@@ -1,13 +1,14 @@
 /**
  * Preview-utility HTTP API.
  *
- *   POST /preview/screenshot — capture a full-page screenshot of a draft URL.
+ *   POST /preview/screenshot — capture a full-page screenshot of a page.
  *
- * The registered site config stores `previewUrl` (e.g. http://localhost:3000).
- * Given a slug, we build `<previewUrl><slug>`, launch a headless browser, and
- * return a base64 JPEG. Primarily consumed by the MCP server so chat-only hosts
- * (Claude Desktop) have a visual feedback channel; the editor iframe remains the
- * real-time preview for the editor UI.
+ * The site exposes `/preview-draft/[[...slug]]?session=X&siteId=Y` which
+ * renders the orchestrator's draft content directly (no cookie dance — the
+ * route reads session + siteId from query params). We target that route by
+ * default so screenshots reflect in-progress edits, not just the last
+ * published snapshot. Callers can pass `published: true` to screenshot the
+ * public route instead (useful for before/after comparisons).
  */
 
 import type { FastifyInstance } from "fastify"
@@ -22,6 +23,8 @@ type ScreenshotBody = {
   slug?: string
   /** Override the preview URL from the registered site config. */
   previewUrl?: string
+  /** Screenshot the published route instead of the draft preview. Defaults to false. */
+  published?: boolean
 }
 
 export async function previewRoutes(app: FastifyInstance, _ctx: RouteContext) {
@@ -46,22 +49,36 @@ export async function previewRoutes(app: FastifyInstance, _ctx: RouteContext) {
     }
 
     const normalizedSlug = slug.startsWith("/") ? slug : `/${slug}`
-    const fullUrl = previewUrl.replace(/\/+$/, "") + normalizedSlug
+    const base = previewUrl.replace(/\/+$/, "")
+
+    // Draft mode: target the site's /preview-draft route so the orchestrator's
+    // draft content is rendered directly, without needing a signed cookie.
+    // Published mode: hit the plain public route.
+    const fullUrl = body.published === true
+      ? base + normalizedSlug
+      : base
+        + "/preview-draft"
+        + (normalizedSlug === "/" ? "" : normalizedSlug)
+        + `?session=${encodeURIComponent(body.session)}&siteId=${encodeURIComponent(body.siteId)}`
 
     try {
       const result = await takeScreenshot(fullUrl)
       return {
         url: fullUrl,
         slug: normalizedSlug,
+        mode: body.published === true ? "published" : "draft",
         mimeType: "image/jpeg" as const,
         base64: result.base64,
         width: result.viewport.width,
         height: result.viewport.height,
       }
     } catch (err) {
-      request.log.warn({ err: String(err), fullUrl }, "preview screenshot failed")
+      const message = err instanceof Error ? err.message : String(err)
+      request.log.warn({ err: message, fullUrl }, "preview screenshot failed")
       return reply.code(502).send({
-        error: `failed to capture screenshot for ${fullUrl}: ${err instanceof Error ? err.message : String(err)}`,
+        error: message,
+        url: fullUrl,
+        mode: body.published === true ? "published" : "draft",
       })
     }
   })
