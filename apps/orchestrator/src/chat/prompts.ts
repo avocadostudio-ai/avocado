@@ -44,7 +44,7 @@ export function buildVariationSystemPrompt(opts: {
     "For copy in German or similar long-compound languages, insert soft hyphen opportunities in long compounds where helpful for responsive line wrapping. Use the Unicode soft hyphen character (U+00AD), never HTML entities like &shy; or &amp;shy;.",
     ...(opts.keepTitle ? ["Keep the existing block title exactly unchanged."] : []),
     ...(opts.cardsOnly && opts.blockType === "CardGrid" ? ["Patch must include only the 'cards' key."] : []),
-    "If selected props include imageUrl, include an image variation (imageUrl and imageAlt) where relevant.",
+    "Never include imageUrl in any patch — the orchestrator resolves image URLs itself (Unsplash or AI generation). You may include imageAlt as a short descriptive hint when relevant.",
     ...localeInstruction(opts.locale)
   ].join("\n")
 }

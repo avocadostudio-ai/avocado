@@ -31,7 +31,8 @@
             "group": "Features",
             "pages": [
               "features/asset-picker",
-              "features/immersive-mode"
+              "features/immersive-mode",
+              "features/variants"
             ]
           }
         ]
