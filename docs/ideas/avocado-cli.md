@@ -192,3 +192,38 @@ Key difference: Helix is tightly coupled to Adobe's cloud. `avc` is infrastructu
 - **`avc dev` scope**: Should it manage the user's own Next.js site, or only the orchestrator + editor (leaving `pnpm dev` in their site to the user)?
 - **Auth for publish**: Should `avc publish` automatically inject `x-publish-token` from `.env.local`, or require explicit `--token` flag?
 - **`avc new` vs. keeping `create-ai-site-editor` separate**: `npx create-ai-site-editor` follows the standard `npm init` pattern; we may want to keep both.
+
+## 10. Status & Next Steps
+
+_Implementation landed in `packages/cli/` across phases 0-4. What's shipped, and what's still pending._
+
+### Shipped (phases 0-4)
+
+- `avc publish [--wait]`, `avc status`, `avc diff` — thin wrappers over `/publish`, `/publish/status`, `/publish/diff`
+- `avc restore list`, `avc restore commit <sha>` — snapshot listing + roll-back via `/restore/snapshots` and `/restore/snapshot`
+- `avc health` — probes orchestrator, editor, and site with timeout; non-zero exit if any are down
+- `avc new`, `avc register` — delegate to sibling workspace packages via package-local `tsx`, with `npx` fallback + clear GitHub-Packages auth error
+- `avc sites list` — lists registered sites from `/sites`
+- `avc dev [--site] [--only <list>]` — multiplexes `pnpm --filter` children with colour-coded prefixes and two-stage Ctrl-C shutdown (SIGTERM → SIGKILL)
+- Dev bin wrapper at `packages/cli/bin/avc.mjs` so `pnpm exec avc` works in-monorepo without a build step
+- 18 unit tests covering `parseEnvFile`, `resolveConfig` precedence, `request` (query stripping, token-header gating, HttpError vs. network error), and `formatRelative`
+
+### Pending — blockers before broad rollout
+
+1. **CI job for the CLI package.** Today only Vercel's preview check runs on CLI PRs. Add a workflow step that runs `pnpm --filter @ai-site-editor/cli typecheck` and `pnpm --filter @ai-site-editor/cli test` on every PR so regressions surface before merge.
+2. **Publish the binary.** `@ai-site-editor/cli` is in the workspace with `publishConfig.registry = npm.pkg.github.com` but has never been published. Wire up the release flow (tag-triggered or manual dispatch) and confirm the `dist/index.js` bin + shebang work end-to-end from a fresh install.
+3. **External-mode `avc dev`.** Currently spawns `pnpm --filter` children, which only resolves inside the monorepo. For users of an installed `@ai-site-editor/cli`, we'd need orchestrator + editor as separately installable npm packages — or a Docker image — before `avc dev` is useful outside the repo. Call this out in the README until that's sorted.
+
+### Pending — nice-to-have followups
+
+4. **`restore list` session scoping.** The orchestrator route (`GET /restore/snapshots`) accepts only `limit` + `siteId`; the git-grep in `listRestoreSnapshots` does filter by the scoped-session commit-message format but ignores session-name specifically. If a site has multiple sessions, snapshots mix. Add `session` to the query param on the orchestrator, then update the CLI.
+5. **`avc logs`.** Sketched in the original spec (phase 3); deferred. Would tail logs from `scripts/devctl.sh` log files or from running `avc dev` children.
+6. **`avc config get/set`.** Also sketched; deferred. Would write to `~/.config/avocado/config.json` for global defaults (orchestrator URL, session, site ID).
+7. **`avc sites remove`.** `GET /sites` exists; there's no CLI-equivalent for `DELETE /sites/:id` yet. Mirror it once the orchestrator route exists.
+8. **Telemetry / error reporting.** Currently the CLI prints errors locally and exits. Consider emitting structured events to the orchestrator so failed-publish metrics aggregate with UI-triggered publishes.
+9. **Cross-platform smoke.** All process-management in `avc dev` uses POSIX signals. Verify on Windows (SIGTERM semantics differ; spawn likely needs `shell: true` for `pnpm`).
+
+### Won't-do (yet)
+
+- **Plugin system.** Helix doesn't have one either; not needed until we have third parties asking for extension points.
+- **Offline content editing** (Helix's `aem content clone/commit/status`). The Avocado model is chat-first with server-authoritative state; dragging git semantics onto content would complicate more than it simplifies.
