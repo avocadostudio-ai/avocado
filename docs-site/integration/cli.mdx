@@ -1,0 +1,128 @@
+---
+title: "Avocado CLI (`avc`)"
+sidebarTitle: "CLI (avc)"
+description: "Terminal-first access to the Avocado orchestrator — publish, roll back, scaffold, and run the stack locally without the editor UI."
+---
+
+The **`avc`** CLI wraps the orchestrator HTTP API so every day-to-day workflow (publishing a draft, checking deploy status, rolling back, scaffolding a new site, starting the local stack) is available from the terminal. It's designed for three audiences:
+
+1. **Developers** who want to script publish + roll-back in their own workflows.
+2. **CI/CD pipelines** — e.g. `avc publish --wait` in a GitHub Action.
+3. **Coding agents** (Claude Code, Cursor, Codex) that can call the CLI as a tool without touching a browser.
+
+## Install
+
+The CLI is published to GitHub Packages. Configure an `.npmrc` with a GitHub token that has `read:packages` scope, then:
+
+```bash
+pnpm add -D @ai-site-editor/cli
+# or, once in .npmrc:
+pnpm exec avc --help
+```
+
+See [GitHub's npm registry auth guide](https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-npm-registry) if you haven't set up auth before.
+
+## Command reference
+
+### Publishing
+
+| Command | Description |
+|---|---|
+| `avc publish [--wait] [--timeout <s>]` | Publish the current draft to its configured target (git / Vercel / site contract). `--wait` polls `/publish/status` until the deployment is live or failed. |
+| `avc status` | Show current publish status — Vercel state, deploy URL, inspect URL, commit SHA. |
+| `avc diff [--json]` | Show what would change between the draft and what's currently published. |
+
+### History
+
+| Command | Description |
+|---|---|
+| `avc restore list [--limit <n>]` | List recent publish snapshots with relative timestamps and home-page heading. |
+| `avc restore commit <sha>` | Roll the draft back to a historical snapshot. Does not publish — run `avc publish` afterwards to make the roll-back live. |
+
+### Onboarding
+
+| Command | Description |
+|---|---|
+| `avc new` | Interactive scaffolder for a new Next.js integration. Delegates to [`create-ai-site-editor`](/integration/nextjs-integration). |
+| `avc register --name "My Site"` | Register the current Next.js site with a running orchestrator. Generates `DRAFT_MODE_SECRET`, merges `.env.local`, POSTs to `/sites/register`. |
+| `avc sites list [--json]` | List all sites registered under the current session. |
+
+### Operations
+
+| Command | Description |
+|---|---|
+| `avc health` | Probe orchestrator, editor, and site. Exits non-zero if any are unreachable. |
+| `avc dev [--site] [--only <list>]` | Start orchestrator + editor (+ optional site) in one terminal, with colour-prefixed log multiplex. Press Ctrl-C once for graceful shutdown, twice to force-kill. _Monorepo-only for now._ |
+
+## Shared flags
+
+Every command that talks to the orchestrator accepts:
+
+| Flag | Env | Default |
+|---|---|---|
+| `--orchestrator <url>` | `ORCHESTRATOR_URL` | `http://localhost:4200` |
+| `--session <name>` | `AVC_SESSION` | `dev` |
+| `--site <id>` | `AVC_SITE_ID` / `NEXT_PUBLIC_DEFAULT_SITE_ID` | _required for most commands_ |
+| `--site-origin <url>` | `SITE_ORIGIN` / `NEXT_PUBLIC_SITE_ORIGIN` | _unset_ |
+| `--token <token>` | `PUBLISH_TOKEN` | _unset_ |
+
+Values are resolved in this order: CLI flags → `process.env` → `.env.local` in the current directory → defaults. No new config format — the existing `.env.local` written by `avc register` is the source of truth.
+
+## Example workflows
+
+**First-time setup of a new site:**
+
+```bash
+avc new                                   # scaffold integration files
+avc register --name "Marketing Site"      # link to orchestrator, write .env.local
+avc health                                # confirm all three services are up
+```
+
+**Day-to-day publishing:**
+
+```bash
+avc diff                                  # preview what would change
+avc publish --wait                        # publish and block until live
+```
+
+**Inside a CI job:**
+
+```bash
+avc publish --site my-site --wait --timeout 300
+# Exit 0 = live. Exit 1 = failed or rejected. Exit 2 = timed out.
+```
+
+**Rolling back:**
+
+```bash
+avc restore list                          # find the snapshot you want
+avc restore commit abc1234                # draft now reflects the snapshot
+avc diff                                  # review what the rollback changes
+avc publish --wait                        # make the rollback live
+```
+
+## Authentication
+
+`avc publish` automatically sends `PUBLISH_TOKEN` as the `x-publish-token` header when the env var is set (or the `--token` flag is passed). For any target that requires auth (Git push targets, Vercel deploy hooks, or site-contract endpoints that gate on the header), set `PUBLISH_TOKEN` in your `.env.local`.
+
+## Under the hood
+
+Every command except `dev`, `new`, and `register` is a single `fetch` call to the orchestrator:
+
+| CLI | Orchestrator endpoint |
+|---|---|
+| `avc publish` | `POST /publish` + optional polling on `GET /publish/status` |
+| `avc status` | `GET /publish/status` |
+| `avc diff` | `GET /publish/diff` |
+| `avc restore list` | `GET /restore/snapshots` |
+| `avc restore commit` | `POST /restore/snapshot` |
+| `avc sites list` | `GET /sites` |
+| `avc health` | `GET /health` + editor/site reachability |
+
+This means the CLI never needs to stay in lockstep with orchestrator internals — only with the public endpoints. See the [API reference](/api-reference) for the full orchestrator surface.
+
+## Exit codes
+
+- `0` — success
+- `1` — command failed (bad input, orchestrator rejected the request, service down, etc.)
+- `2` — timed out waiting for an async deploy (only from `publish --wait`)
