@@ -101,7 +101,7 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
     }
 
     try {
-      await applyOpsAtomically(session, parsedOps.data, { componentsManifest: parsedManifest.data })
+      const applyResult = await applyOpsAtomically(session, parsedOps.data, { componentsManifest: parsedManifest.data })
       for (const [slug, snapshot] of snapshots) pushUndo(session, slug, snapshot)
       for (const slug of createPageSlugs) pushUndo(session, slug, null)
       const firstSlugOp = parsedOps.data.find((op) => "pageSlug" in op && typeof op.pageSlug === "string")
@@ -131,7 +131,8 @@ export async function opsRoutes(app: FastifyInstance, _ctx: RouteContext) {
         mentionedSlugs: collectMentionedSlugsFromOps(parsedOps.data, updatedSlug ?? firstSlug),
         previewVersion,
         focusBlockId,
-        updatedSlug
+        updatedSlug,
+        ...(applyResult.duplicatedPages.length > 0 ? { duplicatedPages: applyResult.duplicatedPages } : {})
       }
     } catch (error) {
       const reason = toErrorDetail(error)

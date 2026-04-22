@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
+import type { Operation } from "@ai-site-editor/shared"
 import type { OrchestratorClient } from "../orchestrator-client.ts"
 import { jsonResult, errorResult } from "./_helpers.ts"
 
@@ -8,6 +9,27 @@ const blockId = z.string().min(1).describe("Block instance id (from avocado-get-
 const listKey = z.string().min(1).describe("List-field name on the block (e.g. 'features', 'items', 'cards').")
 
 export function registerBlockTools(server: McpServer, client: OrchestratorClient) {
+  server.tool(
+    "avocado-batch-apply",
+    "Apply an array of ops in a single atomic transaction. All ops commit together or none do, and `previewVersion` only bumps once for the whole batch. Use for multi-op flows (e.g. translating every field on a page, bulk list-item edits) instead of chaining single-op tools — avoids N round-trips and N version bumps. Each op is the same shape the single-op tools produce: `{ op: 'update_props' | 'update_item' | 'add_block' | 'add_item' | 'remove_block' | 'move_block' | 'duplicate_block' | 'remove_item' | 'move_item' | 'create_page' | 'rename_page' | 'remove_page' | 'move_page' | 'duplicate_page' | 'update_page_meta' | 'update_site_config', ...opFields }`. Orchestrator validates each op; the whole call rejects on any invalid entry.",
+    {
+      ops: z
+        .array(z.record(z.string(), z.unknown()))
+        .min(1)
+        .describe("Array of ops to apply atomically. Each must include an `op` discriminator and the fields required for that op type."),
+    },
+    async ({ ops }) => {
+      if (!Array.isArray(ops) || ops.length === 0) {
+        return errorResult(new Error("ops must be a non-empty array."))
+      }
+      try {
+        return jsonResult(await client.applyOps(ops as Operation[]))
+      } catch (err) {
+        return errorResult(err)
+      }
+    }
+  )
+
   server.tool(
     "avocado-add-block",
     "Insert a new block into a page. Call avocado-get-block-schema first to learn the required prop shape for the block type.",

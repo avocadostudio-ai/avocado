@@ -117,7 +117,11 @@ export async function takeScreenshot(
     const height = 900
     const page = await browser.newPage()
     await page.setViewportSize({ width, height })
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 })
+    const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 })
+    const status = response?.status() ?? 0
+    if (status < 200 || status >= 400) {
+      throw new Error(`HTTP ${status} from ${url} — refusing to screenshot an error page`)
+    }
     const buffer = await page.screenshot({ fullPage: true, type: "jpeg", quality: 75 })
     return { base64: buffer.toString("base64"), viewport: { width, height } }
   } finally {

@@ -150,7 +150,6 @@ const de: LocaleDict = {
   "sites.confirmDeleteBody": "Damit wird \"{{name}}\" aus deiner lokalen Siteliste entfernt. Die Site selbst wird nicht gelöscht.",
   "sites.switchingTo": "Wechsle zu",
   "sites.switchInFlight": "Eine Chat-Anfrage läuft noch. Trotzdem die Site wechseln und sie verwerfen?",
-  "sites.offlineSiteCount": "{{count}} offline",
   "sites.allOffline": "Keine erreichbaren Sites",
   "sites.allOfflineHint": "Alle Sites in deiner Liste haben den Erreichbarkeitstest nicht bestanden. Aktiviere \"Offline-Sites anzeigen\" oder prüfe, ob die Sites laufen.",
   "sites.previewUrlOverride": "Wird durch ?previewUrl= in der aktuellen URL überschrieben.",

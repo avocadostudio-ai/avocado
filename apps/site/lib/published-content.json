@@ -917,38 +917,6 @@
           }
         }
       ]
-    },
-    {
-      "slug": "/test-jira",
-      "title": "Test Jira",
-      "blocks": [
-        {
-          "id": "b_hero_test_jira",
-          "type": "Hero",
-          "props": {
-            "heading": "Welcome to the Test Jira Page",
-            "subheading": "This is a sample page created to verify Jira integration with The Avocado Hub site. Everything looks great!",
-            "ctaText": "Explore Recipes",
-            "ctaHref": "/recipes",
-            "secondaryCtaText": "Join the Community",
-            "secondaryCtaHref": "/community",
-            "imagePosition": "right",
-            "textAlign": "left",
-            "imageUrl": "/hero-generated.svg",
-            "imageAlt": "Abstract generated illustration for the hero section"
-          }
-        },
-        {
-          "id": "b_richtext_test_jira",
-          "type": "RichText",
-          "props": {
-            "title": "Sample Content Block",
-            "body": "This page was automatically generated as part of a Jira task workflow test. It demonstrates that new pages can be created with structured content — including headings, body text, and call-to-action buttons — directly from a ticket. Feel free to update or delete this page once testing is complete."
-          }
-        }
-      ],
-      "id": "p_test_jira",
-      "updatedAt": "2026-04-22T12:01:15.586Z"
     }
   ],
   "siteConfig": {

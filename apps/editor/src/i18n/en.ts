@@ -148,7 +148,6 @@ const en = {
   "sites.confirmDeleteBody": "This removes \"{{name}}\" from your local site list. The site itself is not deleted.",
   "sites.switchingTo": "Switching to",
   "sites.switchInFlight": "A chat request is still in progress. Switch sites anyway and discard it?",
-  "sites.offlineSiteCount": "{{count}} offline",
   "sites.allOffline": "No reachable sites",
   "sites.allOfflineHint": "All sites in your list failed a quick reachability check. Toggle \"Show offline sites\" to see them, or check that the sites are running.",
   "sites.previewUrlOverride": "Overridden by ?previewUrl= in the current URL.",

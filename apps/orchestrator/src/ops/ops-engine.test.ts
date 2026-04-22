@@ -10,7 +10,9 @@ import {
   classifyGuardrailError,
   isNoEffectiveChangeError,
   isDeterministicRepairEligible,
-  toErrorDetail
+  toErrorDetail,
+  parseSchemaViolationReason,
+  buildDeterministicRepairFeedback
 } from "./ops-engine.js"
 import {
   makeHomePage as makePage,
@@ -461,6 +463,37 @@ describe("ops-engine: duplicate_page", () => {
     assert.ok(page)
     assert.equal(page!.title, "Enterprise")
   })
+
+  it("syncs meta.title with newTitle and returns a blockIdMap", async () => {
+    const sourceWithMeta = {
+      ...makePricingPage(),
+      meta: { title: "Old SEO Title", description: "Old SEO description", ogImage: "/og.png" },
+    }
+    seedSession(makePage(), sourceWithMeta)
+    const result = await applyOpsAtomically(TEST_SESSION, [
+      { op: "duplicate_page", pageSlug: "/pricing", newPageSlug: "/enterprise", newTitle: "Enterprise" }
+    ])
+    const page = getDraft("/enterprise")!
+    assert.equal(page.meta?.title, "Enterprise", "meta.title should sync with newTitle")
+    assert.equal(page.meta?.description, "Old SEO description", "non-title meta fields should be preserved")
+    assert.equal(page.meta?.ogImage, "/og.png", "ogImage should be preserved")
+    assert.equal(result.duplicatedPages.length, 1)
+    assert.equal(result.duplicatedPages[0].slug, "/enterprise")
+    assert.equal(result.duplicatedPages[0].blockIdMap["b_hero_pricing"], page.blocks[0].id)
+    assert.notEqual(page.blocks[0].id, "b_hero_pricing")
+  })
+
+  it("preserves source meta unchanged when newTitle is not passed", async () => {
+    const sourceWithMeta = {
+      ...makePricingPage(),
+      meta: { title: "Pricing SEO", description: "Our plans" },
+    }
+    seedSession(makePage(), sourceWithMeta)
+    await applyOpsAtomically(TEST_SESSION, [{ op: "duplicate_page", pageSlug: "/pricing" }])
+    const page = getDraft("/pricing-copy")!
+    assert.equal(page.meta?.title, "Pricing SEO")
+    assert.equal(page.meta?.description, "Our plans")
+  })
 })
 
 describe("ops-engine: move_page", () => {
@@ -850,6 +883,81 @@ describe("isDeterministicRepairEligible", () => {
 
   it("is not eligible for not_found", () => {
     assert.equal(isDeterministicRepairEligible("Page not found"), false)
+  })
+})
+
+describe("parseSchemaViolationReason", () => {
+  it("extracts path + classifies unknown_key violation", () => {
+    const r = parseSchemaViolationReason(
+      "Unrecognized key(s) in object: 'color' at ops.0.patch. Parsed sample: {\"intent\":\"edit_plan\"}"
+    )
+    assert.equal(r.path, "ops.0.patch")
+    assert.equal(r.kind, "unknown_key")
+    assert.match(r.zodMessage, /Unrecognized key/)
+  })
+
+  it("classifies missing_required", () => {
+    const r = parseSchemaViolationReason("Required at ops.1.blockId. Parsed sample: {}")
+    assert.equal(r.path, "ops.1.blockId")
+    assert.equal(r.kind, "missing_required")
+  })
+
+  it("classifies invalid_discriminator", () => {
+    const r = parseSchemaViolationReason("Invalid discriminator value at ops.0.op. Parsed sample: {}")
+    assert.equal(r.kind, "invalid_discriminator")
+  })
+
+  it("classifies type_mismatch", () => {
+    const r = parseSchemaViolationReason("Expected string, received number at ops.0.patch.heading. Parsed sample: {}")
+    assert.equal(r.kind, "type_mismatch")
+    assert.equal(r.path, "ops.0.patch.heading")
+  })
+
+  it("classifies invalid_enum", () => {
+    const r = parseSchemaViolationReason("Invalid enum value at ops.0.op. Parsed sample: {}")
+    assert.equal(r.kind, "invalid_enum")
+  })
+
+  it("classifies string_constraint", () => {
+    const r = parseSchemaViolationReason("String must contain at least 1 character(s) at ops.0.patch.heading. Parsed sample: {}")
+    assert.equal(r.kind, "string_constraint")
+  })
+
+  it("returns nulls for reasons without a path", () => {
+    const r = parseSchemaViolationReason("Invalid props for Hero")
+    assert.equal(r.path, null)
+    assert.equal(r.kind, "unknown")
+  })
+})
+
+describe("buildDeterministicRepairFeedback", () => {
+  it("cites violation path + gives unknown_key guidance", () => {
+    const fb = buildDeterministicRepairFeedback(
+      "Unrecognized key(s) in object: 'color' at ops.0.patch. Parsed sample: {}"
+    )
+    assert.match(fb, /Violation path: ops\.0\.patch/)
+    assert.match(fb, /remove the unknown key/i)
+    assert.match(fb, /Do not change user intent/)
+  })
+
+  it("gives missing_required guidance", () => {
+    const fb = buildDeterministicRepairFeedback("Required at ops.1.blockId. Parsed sample: {}")
+    assert.match(fb, /missing required field/i)
+  })
+
+  it("gives discriminator guidance listing operation names", () => {
+    const fb = buildDeterministicRepairFeedback("Invalid discriminator value at ops.0.op. Parsed sample: {}")
+    assert.match(fb, /update_props/)
+  })
+
+  it("falls back to generic guidance when reason is unparseable", () => {
+    const fb = buildDeterministicRepairFeedback("something weird")
+    assert.match(fb, /re-read the block's contract/)
+  })
+
+  it("tells the LLM to keep every op the original plan had", () => {
+    const fb = buildDeterministicRepairFeedback("Required at ops.1.blockId. Parsed sample: {}")
+    assert.match(fb, /Keep every op the original plan had/)
   })
 })
 

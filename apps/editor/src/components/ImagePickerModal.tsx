@@ -200,7 +200,7 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     finally { if (id === requestIdRef.current) { if (page === 1) setLoading(false); else setLoadingMore(false) } }
   }, [cmsMedia])
 
-  // Reset state on open / tab switch
+  // Reset state when the modal opens
   useEffect(() => {
     if (!open) return
     setSelectedId(null)
@@ -223,9 +223,20 @@ export function ImagePickerModal({ open, features, currentUrl: rawCurrentUrl, gd
     if (hasEditableImage && currentUrl) {
       void detectImageAspectRatio(currentUrl).then(r => { if (r) setDetectedAspectRatio(r) })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Fetch tab-specific data when the active tab changes
+  useEffect(() => {
+    if (!open) return
+    setItems([])
+    setCurrentPage(1)
+    setHasMore(false)
     if (activeTab === "drive" && features.googleDrive) void fetchDriveImages()
-    if ((activeTab === "contentful" || activeTab === "sanity" || activeTab === "strapi") && cmsMedia) void fetchCmsMediaAssets()
-  }, [open, activeTab, features.googleDrive, cmsMedia, fetchDriveImages, fetchCmsMediaAssets])
+    else if (activeTab === "unsplash" && features.unsplash && searchQuery) void fetchUnsplashImages(searchQuery, 1)
+    else if ((activeTab === "contentful" || activeTab === "sanity" || activeTab === "strapi") && cmsMedia) void fetchCmsMediaAssets()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeTab, features.googleDrive, features.unsplash, cmsMedia, fetchDriveImages, fetchUnsplashImages, fetchCmsMediaAssets])
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
