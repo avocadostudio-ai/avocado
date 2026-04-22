@@ -429,7 +429,7 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
             aria-modal="true"
             aria-labelledby="confirm-delete-title"
             onClick={(event) => event.stopPropagation()}
-            style={{ maxWidth: 440 }}
+            style={{ maxWidth: 440, height: "auto" }}
           >
             <header className="sites-modal-header">
               <h2 id="confirm-delete-title">{t("sites.confirmDeleteTitle")}</h2>
