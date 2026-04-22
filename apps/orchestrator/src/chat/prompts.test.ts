@@ -198,14 +198,11 @@ describe("conditional prompt blocks", () => {
 
   test("content_answer scopes to selected block on deictic reference", () => {
     const prompt = buildPlannerSystemPrompt({ ...baseOpts, selectedBlockId: "b_hero_1" })
-    // Regression: "describe this" with a block selected must describe the selected
-    // block, not the whole page. The planner prompt must tell the LLM to narrow
-    // content_answer scope when the user uses deictic words.
     assert.ok(prompt.includes("content_answer"), "mentions content_answer intent")
     assert.ok(/describe this/i.test(prompt), "treats 'describe this' as a read-only trigger")
     assert.ok(
-      /SCOPE:[^.]*deictic[\s\S]*selected\.blockId/i.test(prompt),
-      "includes scope rule keyed on deictic words and selected.blockId"
+      /deictic[\s\S]{0,200}selected\.blockId/i.test(prompt),
+      "scope rule ties deictic words to selected.blockId"
     )
     assert.ok(
       /this page|whole page/i.test(prompt),
