@@ -254,6 +254,19 @@ export function buildOpChangeLogEntries(
 // Deterministic create page shortcut
 // ---------------------------------------------------------------------------
 
+export function looksLikeDetailedPageSpec(message: string) {
+  const stripped = message.replace(/\n?\[site context\][\s\S]*?\[\/site context\]\s*$/i, "")
+  const lower = stripped.toLowerCase()
+  if (/\bblocks\s*\(\s*in\s*order\s*\)/i.test(stripped)) return true
+  if (/\bbuild\s+(?:the\s+)?page\s+to\s+match\b/i.test(lower)) return true
+  if (/\bmatch\s+this\s+spec\b/i.test(lower)) return true
+  if (/\bpage\s+spec\s*:/i.test(lower)) return true
+  // Numbered block list like "1. Hero", "2. CardGrid" — two or more numbered items
+  const numbered = stripped.match(/(?:^|\n|\s)\d+[.)]\s*[A-Z][A-Za-z]+/g) ?? []
+  if (numbered.length >= 2) return true
+  return false
+}
+
 export function deterministicCreatePagePlan(args: { session: string; message: string; hasPageTemplates?: boolean }) {
   const requestedSlug = parseCreatePageRequest(args.message)
   if (!requestedSlug) return null
@@ -268,9 +281,25 @@ export function deterministicCreatePagePlan(args: { session: string; message: st
   // defer to the AI planner which can produce meaningful content.
   if (requestsContentGeneration(args.message)) return null
 
+  // When the message looks like a detailed page spec (numbered block list,
+  // "blocks (in order)", "build page to match", etc.), defer to LLM so it can
+  // honor the full structure — deterministic keyword matching misses types
+  // like CardGrid/FeatureGrid/FAQAccordion and can't read per-block content.
+  if (looksLikeDetailedPageSpec(args.message)) return null
+
   // When the slug is the generic fallback, defer to the LLM so it can derive
   // a meaningful slug from the page name (e.g. "Mountain Climbers" → /mountain-climbers).
   if (requestedSlug === "/new-page") return null
+
+  // When the target slug already exists, this is almost certainly an EDIT
+  // request phrased like a create ("make page /test have: 1. Hero 2. CTA" or
+  // "Apply ALL of the following changes to /test … 1. Hero …"). The old
+  // behavior returned a "Page X already exists" clarification, which hides
+  // the user's real intent. Defer to the LLM so it can plan edits on the
+  // existing page instead.
+  const draft = getSessionDraft(args.session)
+  const normalizedSlug = normalizeRouteCandidate(requestedSlug)
+  if (normalizedSlug && draft.has(normalizedSlug)) return null
 
   return buildCreatePagePlan({ session: args.session, requestedSlug, userMessage: args.message })
 }

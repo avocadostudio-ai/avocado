@@ -117,6 +117,7 @@ import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAt
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
 import { runVariationPipeline } from "./variation-pipeline.js"
 import { validateAndStripHallucinatedProps } from "./hallucination-validator.js"
+import { validateChangelogCoverage } from "./changelog-coverage-validator.js"
 
 /**
  * Parses an image-source chip answer ("Use Unsplash photo", "Generate with AI",
@@ -1116,6 +1117,30 @@ export async function runChatPipeline(
             "Planner generated an unsupported prop; stripped before apply"
           )
         }
+      }
+
+      // Ensure change_log has one entry per op. When the planner clusters
+      // ops into fewer entries, synthesize generic fallbacks so the user
+      // sees the correct count instead of silently approving uncovered ops.
+      const changelogResult = validateChangelogCoverage({
+        plan: resolvedPlan,
+        draft: getSessionDraft(body.session!)
+      })
+      if (changelogResult.missingCount > 0) {
+        ctx.log.warn(
+          {
+            event: "planner_incomplete_changelog",
+            chatRequestId,
+            session: body.session!,
+            slug: effectiveSlug,
+            opCount: resolvedPlan.ops.length,
+            missingCount: changelogResult.missingCount,
+            plannerSource: source,
+            modelKey,
+            modelUsed
+          },
+          "Planner returned fewer change_log entries than ops; synthesized fallbacks"
+        )
       }
 
       // Detect image ops synchronously before making any API calls

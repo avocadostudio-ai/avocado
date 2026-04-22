@@ -311,6 +311,25 @@ test("deterministicCreatePagePlan: does NOT defer when templates exist but messa
   assert.equal(result!.ops[0].op, "create_page")
 })
 
+test("deterministicCreatePagePlan: defers to LLM on detailed page spec (numbered block list + 'blocks in order')", () => {
+  const message = `Create a new page at /test titled Test Page with playful sample content. Build page to match this spec: Page /test — blocks (in order): 1. Hero — heading 🎉 Welcome to the Playground 2. CardGrid with 3 cards 3. FAQAccordion 4. CTA`
+  const result = deterministicCreatePagePlan({ session: "test-detailed-spec", message, hasPageTemplates: false })
+  assert.equal(result, null, "should defer detailed specs to the LLM planner so all blocks are honored")
+})
+
+test("deterministicCreatePagePlan: defers on 'build page to match'", () => {
+  const message = "Create /foo. Build page to match the screenshot"
+  const result = deterministicCreatePagePlan({ session: "test-build-to-match", message, hasPageTemplates: false })
+  assert.equal(result, null)
+})
+
+test("deterministicCreatePagePlan: defers when target slug already exists (edit-phrased-as-create)", () => {
+  // "test-suite" session is auto-seeded from demoPublishedPages — /pricing exists.
+  const message = "make page /pricing have: 1. Hero 2. RichText 3. CardGrid 4. CTA"
+  const result = deterministicCreatePagePlan({ session: "test-suite", message, hasPageTemplates: false })
+  assert.equal(result, null, "existing-slug creates should defer to the LLM so it can plan edits instead of clarifying")
+})
+
 // ---------------------------------------------------------------------------
 // buildOpChangeLogEntries
 // ---------------------------------------------------------------------------
