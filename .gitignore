@@ -12,6 +12,8 @@ coverage
 *.tsbuildinfo
 .data
 .vercel
+.run-logs/
+output/
 
 # Local AI assistant metadata
 CLAUDE.md
