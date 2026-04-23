@@ -12,6 +12,8 @@ import {
 import { plannerMessageWithPendingContext } from "./nlp/intent-detection.js"
 import { createChatTelemetryStore } from "./telemetry/chat-telemetry.js"
 import { createEvalCandidateStore } from "./telemetry/eval-candidate-store.js"
+import { createFeedbackStore, type FeedbackRating } from "./telemetry/feedback-store.js"
+import { randomUUID } from "node:crypto"
 import { normalizePlanCandidate } from "./nlp/plan-normalizer.js"
 import { buildCreatePagePlan, compileDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { type AIProvider, loadStateFromDisk, persistStateNow, evictStaleEphemeralMaps } from "./state/session-state.js"
@@ -182,6 +184,14 @@ const evalCandidates = evalCandidatesEnabled
       logger: app.log
     })
   : undefined
+
+const feedbackFilePath = process.env.FEEDBACK_FILE ?? resolve(process.cwd(), "../../.data/chat-feedback.ndjson")
+const feedbackLimit = Number(process.env.FEEDBACK_LIMIT ?? 1000)
+const feedback = createFeedbackStore({
+  filePath: feedbackFilePath,
+  limit: feedbackLimit,
+  logger: app.log
+})
 
 const chatTelemetry = createChatTelemetryStore({
   filePath: chatTelemetryFilePath,
@@ -356,6 +366,36 @@ app.get("/telemetry/chat/review", async (request) => {
     session: raw.session
   })
 })
+app.post("/telemetry/chat/feedback", async (request, reply) => {
+  const body = (request.body ?? {}) as { traceId?: unknown; session?: unknown; rating?: unknown; note?: unknown }
+  const traceId = typeof body.traceId === "string" ? body.traceId.trim() : ""
+  const session = typeof body.session === "string" ? body.session.trim() : ""
+  const rating = body.rating === "up" || body.rating === "down" ? (body.rating as FeedbackRating) : null
+  const note = typeof body.note === "string" ? body.note.trim().slice(0, 2000) : undefined
+  if (!traceId || !session || !rating) {
+    reply.code(400)
+    return { error: "traceId, session, and rating ('up' | 'down') are required" }
+  }
+  const entry = {
+    id: randomUUID(),
+    at: new Date().toISOString(),
+    traceId,
+    session,
+    rating,
+    ...(note ? { note } : {})
+  }
+  feedback.push(entry)
+  return { ok: true, id: entry.id }
+})
+app.get("/telemetry/chat/feedback", async (request) => {
+  const raw = request.query as { session?: string; rating?: string; traceId?: string; limit?: string }
+  return feedback.list({
+    session: raw.session,
+    rating: raw.rating,
+    traceId: raw.traceId,
+    limit: raw.limit !== undefined ? Number(raw.limit) : undefined
+  })
+})
 app.get("/favicon.ico", async (_request, reply) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="14" fill="#0f172a"/>
@@ -401,6 +441,7 @@ async function startServer() {
   await loadStateFromDisk(app.log)
   await ensurePresetRestoreSessions(app.log)
   await chatTelemetry.loadFromDisk()
+  await feedback.loadFromDisk()
   if (evalCandidates) await evalCandidates.loadFromDisk()
   await app.listen({ port, host: "0.0.0.0" })
   app.log.info(`Orchestrator listening on ${port}`)
@@ -444,6 +485,11 @@ async function shutdown(signal: string) {
     await persistStateNow(app.log)
   } catch (err) {
     app.log.error({ err }, "Final state flush failed")
+  }
+  try {
+    await feedback.flushNow()
+  } catch (err) {
+    app.log.error({ err }, "Feedback flush failed")
   }
   // 3. Close the DB handle — triggers a WAL checkpoint on exit.
   try {

@@ -71,6 +71,14 @@ export type CommonGeneratePlanArgs = {
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
+  /**
+   * True iff the planner is allowed to return needs_clarification asking the
+   * user whether a new image should come from Unsplash or AI generation. Set
+   * only when both sources are configured server-side AND no session-level
+   * preference is in effect. See chat-pipeline.ts for the computation and
+   * sectionImageSourceChoice in prompts.ts for how the rule is phrased.
+   */
+  imageSourceChoiceOpen?: boolean
   /** Enable extended thinking (Anthropic). Ignored by providers that don't support it. */
   thinking?: { budgetTokens: number }
 }
