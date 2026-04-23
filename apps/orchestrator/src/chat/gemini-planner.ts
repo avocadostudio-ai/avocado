@@ -209,6 +209,7 @@ export async function generatePlanWithGemini(args: {
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
+  imageSourceChoiceOpen?: boolean
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta; deferredNativeImageCalls?: DeferredNativeImageCall[] }> {
   const ai = await getGeminiClient()
   const effectiveSignal = args.signal
@@ -242,6 +243,7 @@ export async function generatePlanWithGemini(args: {
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
     locale: args.locale,
+    imageSourceChoiceOpen: args.imageSourceChoiceOpen,
   })
 
   const includeContracts =

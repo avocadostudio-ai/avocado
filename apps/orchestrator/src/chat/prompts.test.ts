@@ -181,6 +181,23 @@ describe("conditional prompt blocks", () => {
     assert.ok(withVision.includes("b_hero_1"))
   })
 
+  test("imageSourceChoiceOpen adds image-source clarification rule with exact chip strings", () => {
+    const without = buildPlannerSystemPrompt(baseOpts)
+    const withOpen = buildPlannerSystemPrompt({ ...baseOpts, imageSourceChoiceOpen: true })
+    assert.ok(!without.includes("IMAGE SOURCE CHOICE"))
+    assert.ok(withOpen.includes("## IMAGE SOURCE CHOICE"))
+    assert.ok(withOpen.includes("Where should this image come from?"))
+    assert.ok(withOpen.includes("Use Unsplash photo"))
+    assert.ok(withOpen.includes("Generate with AI"))
+    assert.ok(withOpen.includes("Either's fine — pick for me"))
+    assert.ok(withOpen.includes("move image to left"))
+  })
+
+  test("imageSourceChoiceOpen=false omits the image-source clarification rule", () => {
+    const explicitlyFalse = buildPlannerSystemPrompt({ ...baseOpts, imageSourceChoiceOpen: false })
+    assert.ok(!explicitlyFalse.includes("IMAGE SOURCE CHOICE"))
+  })
+
   test("siteContextBlock injects site context", () => {
     const without = buildPlannerSystemPrompt(baseOpts)
     const withContext = buildPlannerSystemPrompt({ ...baseOpts, siteContextBlock: "site: Acme Corp" })

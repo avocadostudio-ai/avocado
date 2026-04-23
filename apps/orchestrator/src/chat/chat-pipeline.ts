@@ -97,7 +97,6 @@ import { generatePlanWithGemini, parseIntentWithGemini } from "./gemini-planner.
 import { createPlannerRegistry, type ThinkingEvent } from "./planner-types.js"
 import { type TokenUsage, estimateUsd } from "../telemetry/usage.js"
 import { executeToolCall } from "../tools/runtime.js"
-import { detectImageSourceAmbiguity } from "../nlp/intent-helpers.js"
 
 // ---------------------------------------------------------------------------
 // Re-exports from extracted modules (for backwards compat with external importers)
@@ -406,6 +405,15 @@ export async function runChatPipeline(
   const activeImageSourcePreference: ImageSourcePreference | undefined =
     capturedImageSourceChoice ?? imageSourcePreferenceBySession.get(body.session)
   plannerMessage = applyImageSourceHint(plannerMessage, sanitizedMessage, activeImageSourcePreference)
+
+  // Let the LLM decide whether a prompt is genuinely ambiguous about image
+  // source (Unsplash vs AI). This flag only opens the option when both sources
+  // are configured AND no session-level preference is in effect — otherwise the
+  // planner must proceed without asking. See sectionImageSourceChoice in
+  // prompts.ts for the full rule the LLM receives.
+  const hasUnsplashConfigured = Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
+  const hasGenAIConfigured = Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim())
+  const imageSourceChoiceOpen = hasUnsplashConfigured && hasGenAIConfigured && !activeImageSourcePreference
 
   const inferredTranslationScope = inferTranslationScopeFromMessage(plannerMessage)
   const translationScope = shouldPreferFocusedTranslation({
@@ -789,39 +797,6 @@ export async function runChatPipeline(
     const looksLikeCreatePage = body.message && /\b(create|add|make|build|generate|new)\b.*\b(page|homepage|landing)\b/i.test(body.message)
     if (!looksLikeCreatePage) return { code: 404, payload: { error: "page not found" } }
     current = { id: effectiveSlug, slug: effectiveSlug, title: "", updatedAt: new Date().toISOString(), blocks: [] }
-  }
-
-  // Layer 3: upfront image-source choice. Ask once when the prompt is a
-  // generic image intent and both Unsplash + GenAI are configured. Choice is
-  // remembered for the session (imageSourcePreferenceBySession) so subsequent
-  // prompts skip the question.
-  if (!activeImageSourcePreference && body.message) {
-    const hasUnsplash = Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim())
-    const hasGenAI = Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GOOGLE_GENAI_API_KEY?.trim())
-    if (detectImageSourceAmbiguity(sanitizedMessage, { hasUnsplash, hasGenAI })) {
-      pendingClarificationBySession.set(body.session, {
-        baseRequest: sanitizedMessage,
-        updatedAt: new Date().toISOString()
-      })
-      return {
-        code: 200,
-        payload: withDebugPayload({
-          status: "needs_clarification",
-          summary: "Where should this image come from?",
-          changes: [],
-          suggestions: [
-            "Use Unsplash photo",
-            "Generate with AI",
-            "Either's fine — pick for me"
-          ],
-          mentionedSlugs: [effectiveSlug],
-          previewVersion: versions.get(body.session) ?? 0,
-          plannerSource,
-          modelUsed,
-          modelKey
-        } satisfies ChatResult, { outcome: "needs_clarification", reasonCategory: "ambiguity" })
-      }
-    }
   }
 
   // "describe this image" on an image field — return the current image URL and suggest alt text
@@ -2880,6 +2855,7 @@ export async function runChatPipeline(
         contextPack: plannerContext,
         model: plannerModel,
         locale: body.locale,
+        imageSourceChoiceOpen,
         history: isLightweightEdit ? [] : sessionChatHistory,
         siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
         toolRuntime: supportsNativeTools && !isLightweightEdit ? ctx.toolRuntime : undefined,
@@ -3286,6 +3262,7 @@ export async function runChatPipeline(
         contextPack: plannerContext,
         model: modelUsed,
         locale: body.locale,
+        imageSourceChoiceOpen,
         history: isLightweightEdit ? [] : sessionChatHistory,
         siteContextBlock: isLightweightEdit ? undefined : siteContextBlock,
         toolRuntime: supportsNativeTools && !isLightweightEdit ? ctx.toolRuntime : undefined,
@@ -3678,6 +3655,7 @@ export async function runChatPipeline(
       contextPack: plannerContext,
       model: modelUsed,
       locale: body.locale,
+      imageSourceChoiceOpen,
       history: sessionChatHistory,
       feedback: repairFeedback,
       forceFullSchemaContracts: true,

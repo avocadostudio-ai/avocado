@@ -98,6 +98,15 @@ export interface PlannerPromptOptions {
   editablePath?: string | null | undefined
   blockId?: string | null | undefined
   locale?: string
+  /**
+   * True iff BOTH Unsplash and an AI image provider are configured on the server
+   * AND no session-level image source preference has been captured yet. When
+   * true, the planner is allowed to return needs_clarification asking the user
+   * which source to use for genuinely ambiguous new-image requests. When false
+   * (only one source, or preference already set), the planner must proceed
+   * without asking.
+   */
+  imageSourceChoiceOpen?: boolean
 }
 
 const LOCALE_NAMES: Record<string, string> = {
@@ -208,6 +217,7 @@ function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
     sectionSchemaDiscipline(),
     sectionTargeting(opts),
     sectionImages(hasNativeTools),
+    sectionImageSourceChoice(opts),
     sectionConditionalModes(opts),
     sectionContext(opts),
   ]
@@ -337,6 +347,20 @@ function sectionImages(hasNativeTools: boolean): string[] {
     lines.push(...ANTHROPIC_IMAGE_TOOL_LINES)
   }
   return lines
+}
+
+function sectionImageSourceChoice(opts: PlannerPromptOptions): string[] {
+  if (!opts.imageSourceChoiceOpen) return []
+  return [
+    "## IMAGE SOURCE CHOICE",
+    "Both Unsplash (real photos) and AI image generation are available on this server, and the user has not yet expressed a preference this session. When the user's request would add, replace, set, or find a NEW image AND does not name a source (no mention of 'unsplash', 'stock photo', 'royalty-free', 'generate', 'ai', 'ai-generated', 'dall-e', 'midjourney', 'drive', 'brand asset'), return intent=needs_clarification with:",
+    "- summary_for_user: \"Where should this image come from?\"",
+    "- ops: []",
+    "- suggested_next_actions: exactly these three strings in this order: [\"Use Unsplash photo\", \"Generate with AI\", \"Either's fine — pick for me\"]",
+    "Do NOT ask when the request is about an EXISTING image's layout, position, alignment, crop, size, rotation, or other non-source property (e.g. 'move image to left', 'make the photo smaller', 'align image right', 'crop the hero image') — these are update_props edits, proceed normally.",
+    "Do NOT ask when the user names a source or clearly implies one (e.g. 'add a stock photo of sunsets', 'generate an AI image of avocados', 'use an image from our drive').",
+    "Do NOT ask for image edits that don't change the source (alt text, caption, describing the image).",
+  ]
 }
 
 function sectionConditionalModes(opts: PlannerPromptOptions): string[] {

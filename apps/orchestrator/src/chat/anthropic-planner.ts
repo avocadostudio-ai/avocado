@@ -255,6 +255,7 @@ export async function generatePlanWithAnthropic(args: {
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
+  imageSourceChoiceOpen?: boolean
   /**
    * When set, enables Anthropic extended thinking with the given budget.
    * Only has effect on thinking-capable models (Sonnet 4+, Opus).
@@ -293,6 +294,7 @@ export async function generatePlanWithAnthropic(args: {
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
     locale: args.locale,
+    imageSourceChoiceOpen: args.imageSourceChoiceOpen,
   })
 
   const lowerMsg = args.message.toLowerCase()

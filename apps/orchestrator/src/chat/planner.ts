@@ -850,6 +850,7 @@ export async function generatePlanWithOpenAI(args: {
   lightweight?: boolean
   signal?: AbortSignal
   locale?: string
+  imageSourceChoiceOpen?: boolean
 }): Promise<{ plan: EditPlan; usage: TokenUsage; schemaContext: PlannerSchemaContextMeta }> {
   const client = args.client ?? (getOpenAIClient() as unknown as PlannerOpenAIClient)
   const effectiveSignal = args.signal
@@ -883,6 +884,7 @@ export async function generatePlanWithOpenAI(args: {
     editablePath: args.contextPack.selected?.editablePath,
     blockId: args.contextPack.selected?.blockId,
     locale: args.locale,
+    imageSourceChoiceOpen: args.imageSourceChoiceOpen,
   })
 
   const lowerMsg = args.message.toLowerCase()
