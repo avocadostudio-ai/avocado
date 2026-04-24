@@ -11,12 +11,36 @@ const listKey = z.string().min(1).describe("List-field name on the block (e.g. '
 export function registerBlockTools(server: McpServer, client: OrchestratorClient) {
   server.tool(
     "avocado-batch-apply",
-    "Apply an array of ops in a single atomic transaction. All ops commit together or none do, and `previewVersion` only bumps once for the whole batch. Use for multi-op flows (e.g. translating every field on a page, bulk list-item edits) instead of chaining single-op tools — avoids N round-trips and N version bumps. Each op is the same shape the single-op tools produce: `{ op: 'update_props' | 'update_item' | 'add_block' | 'add_item' | 'remove_block' | 'move_block' | 'duplicate_block' | 'remove_item' | 'move_item' | 'create_page' | 'rename_page' | 'remove_page' | 'move_page' | 'duplicate_page' | 'update_page_meta' | 'update_site_config', ...opFields }`. Orchestrator validates each op; the whole call rejects on any invalid entry.",
+    [
+      "Apply an array of ops in a single atomic transaction. All ops commit together or none do, and `previewVersion` only bumps once for the whole batch. Use for multi-op flows (e.g. translating every field on a page, bulk list-item edits) instead of chaining single-op tools — avoids N round-trips and N version bumps.",
+      "",
+      "IMPORTANT: batch ops use the wire-format Operation schema, NOT the single-op MCP tool parameter names. Field names differ: single-op tools like `avocado-rename-page` take `slug`/`newSlug` and `avocado-update-page-meta` takes flat `title`/`description`/`ogImage`, but their batch equivalents take `pageSlug`/`newPageSlug` and `patch: { title?, description?, ogImage? }` respectively. Tip: if you're unsure about an op's exact shape, probe with a minimal 1–2 op batch before constructing a large payload.",
+      "",
+      "Required fields per op type:",
+      "- { op: 'create_page', page: { id, slug, title, updatedAt, blocks: [{id,type,props}], meta? } }",
+      "- { op: 'add_block', pageSlug, block: { id, type, props }, afterBlockId? }",
+      "- { op: 'update_props', pageSlug, blockId, patch }",
+      "- { op: 'remove_block', pageSlug, blockId }",
+      "- { op: 'move_block', pageSlug, blockId, afterBlockId? }",
+      "- { op: 'duplicate_block', pageSlug, blockId, toPageSlug?, newBlockId?, afterBlockId? }",
+      "- { op: 'add_item', pageSlug, blockId, listKey, item, afterIndex? }",
+      "- { op: 'update_item', pageSlug, blockId, listKey, index, patch }",
+      "- { op: 'remove_item', pageSlug, blockId, listKey, index }",
+      "- { op: 'move_item', pageSlug, blockId, listKey, index, afterIndex? }",
+      "- { op: 'rename_page', pageSlug, newPageSlug?, newTitle? } — provide at least one of newPageSlug (different from current) or newTitle (different from current). Omit newPageSlug for title-only rename.",
+      "- { op: 'remove_page', pageSlug }",
+      "- { op: 'move_page', pageSlug, afterPageSlug? }",
+      "- { op: 'duplicate_page', pageSlug, newPageSlug?, newTitle?, afterPageSlug? }",
+      "- { op: 'update_page_meta', pageSlug, patch: { title?, description?, ogImage? } } — patch must contain at least one field whose value differs from the current meta.",
+      "- { op: 'update_site_config', patch: { name?, logo?, navLabels?, navGroups? } }",
+      "",
+      "The whole call rejects atomically if any op fails validation. For a multi-step edit where one op is finicky, consider running the reliable bulk as a batch and the finicky one as a follow-up single-op call so a rejection on the hard op doesn't roll back the good work.",
+    ].join("\n"),
     {
       ops: z
         .array(z.record(z.string(), z.unknown()))
         .min(1)
-        .describe("Array of ops to apply atomically. Each must include an `op` discriminator and the fields required for that op type."),
+        .describe("Array of ops to apply atomically. Each must include an `op` discriminator and the wire-format fields required for that op type (see tool description for the per-op shape list)."),
     },
     async ({ ops }) => {
       if (!Array.isArray(ops) || ops.length === 0) {

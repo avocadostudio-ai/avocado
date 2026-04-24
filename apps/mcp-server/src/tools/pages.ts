@@ -21,7 +21,7 @@ export function registerPageTools(server: McpServer, client: OrchestratorClient)
 
   server.tool(
     "avocado-list-pages",
-    "List every page in the current draft (home page first). Returns both `slugs: string[]` and a richer `pages: [{ slug, title, updatedAt, blockCount }]` summary — use `pages` to plan multi-page work without needing a follow-up avocado-get-page per slug.",
+    "List every page in the current draft (home page first). Returns both `slugs: string[]` and a richer `pages: [{ slug, title, updatedAt, blockCount }]` summary — use `pages` to plan multi-page work without needing a follow-up avocado-get-page per slug. Note: `title` is the page's internal/display title (the one shown in the editor nav and settable via `avocado-rename-page`). It is distinct from the SEO `<title>` tag (`meta.title`) which is set via `avocado-update-page-meta` and only visible through `avocado-get-page`.",
     {},
     async () => {
       try {
@@ -72,17 +72,17 @@ export function registerPageTools(server: McpServer, client: OrchestratorClient)
 
   server.tool(
     "avocado-rename-page",
-    "Rename a page — change its slug and/or title. Internal links to the old slug are rewritten automatically.",
+    "Rename a page — change its slug and/or its display/internal title. Provide either `newSlug`, `newTitle`, or both. A pure title change leaves the URL and all internal links untouched; a slug change rewrites internal links to the old slug automatically. Note: this tool changes the page's display title (shown in the editor and in `avocado-list-pages`), which is separate from SEO `meta.title` — use `avocado-update-page-meta` for that.",
     {
       slug: pageSlug,
-      newSlug: z.string().min(1).describe("New slug (starts with '/').").optional(),
-      newTitle: z.string().min(1).optional(),
+      newSlug: z.string().min(1).describe("New slug (starts with '/'). Omit for a title-only rename.").optional(),
+      newTitle: z.string().min(1).describe("New display/internal title. Omit for a slug-only rename.").optional(),
     },
     async ({ slug, newSlug, newTitle }) => {
       if (!newSlug && !newTitle) return errorResult(new Error("Provide newSlug or newTitle."))
       try {
         return jsonResult(await client.applyOps([
-          { op: "rename_page", pageSlug: slug, newPageSlug: newSlug ?? slug, newTitle },
+          { op: "rename_page", pageSlug: slug, newPageSlug: newSlug, newTitle },
         ]))
       } catch (err) {
         return errorResult(err)

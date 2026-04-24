@@ -219,7 +219,12 @@ export function buildOpChangeLogEntries(
         break
       }
       case "rename_page": {
-        const label = op.newTitle ? `"${op.newTitle}" (${fmtSlug(op.newPageSlug)})` : fmtSlug(op.newPageSlug)
+        const targetSlug = op.newPageSlug ?? op.pageSlug
+        const label = op.newTitle
+          ? (op.newPageSlug && op.newPageSlug !== op.pageSlug
+              ? `"${op.newTitle}" (${fmtSlug(targetSlug)})`
+              : `"${op.newTitle}"`)
+          : fmtSlug(targetSlug)
         lines.push(`Renamed page ${fmtSlug(op.pageSlug)} → ${label}`)
         break
       }

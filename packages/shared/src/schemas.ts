@@ -132,10 +132,15 @@ const moveItemSchema = z.object({
   index: z.number().int().min(0),
   afterIndex: z.number().int().min(0).optional()
 })
+// newPageSlug and newTitle are both optional here, but the ops-engine handler
+// requires at least one of them to produce an effective change. Enforcing that
+// with .refine() would turn this into ZodEffects and break the discriminated
+// union below, so the check lives in ops-engine.ts alongside the value-level
+// comparisons (current vs incoming).
 const renamePageSchema = z.object({
   op: z.literal("rename_page"),
   pageSlug: z.string().min(1),
-  newPageSlug: z.string().min(1),
+  newPageSlug: z.string().min(1).optional(),
   newTitle: z.string().min(1).optional()
 })
 const removePageSchema = z.object({

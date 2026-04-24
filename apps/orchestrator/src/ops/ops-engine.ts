@@ -618,39 +618,71 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
     }
 
     if (op.op === "rename_page") {
-      const nextSlug = normalizeRouteCandidate(op.newPageSlug)
-      if (!nextSlug) throw new OperationError(`Invalid newPageSlug ${op.newPageSlug}`, { category: "schema_violation" })
-      if (op.pageSlug === nextSlug) throw new OperationError(`No effective page change for ${op.pageSlug}`, { category: "no_effective_change" })
       const page = staged.get(op.pageSlug)
       if (!page) throw new OperationError(`Page not found for slug ${op.pageSlug}`, { category: "not_found" })
-      if (staged.has(nextSlug)) throw new OperationError(`Target page slug already exists: ${nextSlug}`, { category: "schema_violation" })
-      deletedSlugs.add(op.pageSlug)
-      const renamedPage = {
-        ...page,
-        id: pageIdFromSlug(nextSlug),
-        slug: nextSlug,
-        title: typeof op.newTitle === "string" && op.newTitle.trim().length > 0 ? op.newTitle.trim() : pageTitleFromSlug(nextSlug),
-        updatedAt: new Date().toISOString()
-      }
-      touchedSlugs.add(nextSlug)
 
-      // Rebuild the map to preserve the renamed page's position in nav order.
-      const entries = Array.from(staged.entries())
-      staged.clear()
-      for (const [slug, p] of entries) {
-        if (slug === op.pageSlug) {
-          staged.set(nextSlug, renamedPage)
-        } else {
-          staged.set(slug, p)
+      const incomingSlug = op.newPageSlug !== undefined ? normalizeRouteCandidate(op.newPageSlug) : undefined
+      if (op.newPageSlug !== undefined && !incomingSlug) {
+        throw new OperationError(`Invalid newPageSlug ${op.newPageSlug}`, { category: "schema_violation" })
+      }
+
+      const trimmedTitle = typeof op.newTitle === "string" ? op.newTitle.trim() : undefined
+      const slugChanged = incomingSlug !== undefined && incomingSlug !== op.pageSlug
+      const titleChanged = trimmedTitle !== undefined && trimmedTitle.length > 0 && trimmedTitle !== page.title
+
+      if (!slugChanged && !titleChanged) {
+        const slugSegment = incomingSlug !== undefined
+          ? `newPageSlug=${JSON.stringify(incomingSlug)} matches current`
+          : "newPageSlug not provided"
+        const titleSegment = trimmedTitle !== undefined
+          ? `newTitle=${JSON.stringify(trimmedTitle)} matches current title ${JSON.stringify(page.title)}`
+          : `newTitle not provided (current title ${JSON.stringify(page.title)})`
+        throw new OperationError(
+          `No effective page change for ${op.pageSlug}: ${slugSegment}; ${titleSegment}. Provide newPageSlug different from ${JSON.stringify(op.pageSlug)} and/or newTitle different from ${JSON.stringify(page.title)}.`,
+          { category: "no_effective_change" }
+        )
+      }
+
+      if (slugChanged) {
+        const nextSlug = incomingSlug!
+        if (staged.has(nextSlug)) throw new OperationError(`Target page slug already exists: ${nextSlug}`, { category: "schema_violation" })
+        deletedSlugs.add(op.pageSlug)
+        const renamedPage = {
+          ...page,
+          id: pageIdFromSlug(nextSlug),
+          slug: nextSlug,
+          title: titleChanged ? trimmedTitle! : pageTitleFromSlug(nextSlug),
+          updatedAt: new Date().toISOString()
         }
-      }
+        touchedSlugs.add(nextSlug)
 
-      // Keep route references consistent after a slug change.
-      for (const [slug, candidate] of staged) {
-        const rewritten = rewriteLinksToRenamedPage(candidate, op.pageSlug, nextSlug)
-        if (!rewritten.changed) continue
-        staged.set(slug, rewritten.page)
-        touchedSlugs.add(slug)
+        // Rebuild the map to preserve the renamed page's position in nav order.
+        const entries = Array.from(staged.entries())
+        staged.clear()
+        for (const [slug, p] of entries) {
+          if (slug === op.pageSlug) {
+            staged.set(nextSlug, renamedPage)
+          } else {
+            staged.set(slug, p)
+          }
+        }
+
+        // Keep route references consistent after a slug change.
+        for (const [slug, candidate] of staged) {
+          const rewritten = rewriteLinksToRenamedPage(candidate, op.pageSlug, nextSlug)
+          if (!rewritten.changed) continue
+          staged.set(slug, rewritten.page)
+          touchedSlugs.add(slug)
+        }
+      } else {
+        // Title-only rename: same slug, new display title. No link rewriting needed.
+        const renamedPage = {
+          ...page,
+          title: trimmedTitle!,
+          updatedAt: new Date().toISOString()
+        }
+        staged.set(op.pageSlug, renamedPage)
+        touchedSlugs.add(op.pageSlug)
       }
       continue
     }
@@ -705,7 +737,12 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
       if (!page) throw new OperationError(`Page not found for slug ${op.pageSlug}`, { category: "not_found" })
       const patch = op.patch as Record<string, unknown>
       const patchKeys = Object.keys(patch).filter((k) => patch[k] !== undefined)
-      if (patchKeys.length === 0) throw new OperationError(`No effective meta change for ${op.pageSlug}`, { category: "no_effective_change" })
+      if (patchKeys.length === 0) {
+        throw new OperationError(
+          `No effective meta change for ${op.pageSlug}: patch contained no defined keys. Provide at least one of title, description, ogImage with a non-undefined value.`,
+          { category: "no_effective_change" }
+        )
+      }
       const current = page.meta ?? {}
       const next: Record<string, unknown> = { ...current }
       let changed = false
@@ -723,7 +760,18 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
           }
         }
       }
-      if (!changed) throw new OperationError(`No effective meta change for ${op.pageSlug}`, { category: "no_effective_change" })
+      if (!changed) {
+        const incomingSummary = patchKeys
+          .map((k) => `${k}=${JSON.stringify(patch[k])}`)
+          .join(", ")
+        const currentSummary = patchKeys
+          .map((k) => `${k}=${JSON.stringify((current as Record<string, unknown>)[k])}`)
+          .join(", ")
+        throw new OperationError(
+          `No effective meta change for ${op.pageSlug}: provided ${incomingSummary} already matches current ${currentSummary}.`,
+          { category: "no_effective_change" }
+        )
+      }
       page.meta = Object.keys(next).length > 0 ? (next as PageDoc["meta"]) : undefined
       page.updatedAt = new Date().toISOString()
       touchedSlugs.add(page.slug)
@@ -1046,7 +1094,7 @@ export function pickUpdatedSlug(session: string, currentSlug: string, ops: Opera
   const duplicate = ops.find((op) => op.op === "duplicate_page" && op.pageSlug === currentSlug)
   if (duplicate && duplicate.op === "duplicate_page") return duplicate.newPageSlug
   const rename = ops.find((op) => op.op === "rename_page" && op.pageSlug === currentSlug)
-  if (rename && rename.op === "rename_page") return rename.newPageSlug
+  if (rename && rename.op === "rename_page") return rename.newPageSlug ?? rename.pageSlug
   const current = getPage(session, currentSlug)
   if (current) return undefined
   const draft = getSessionDraft(session)
