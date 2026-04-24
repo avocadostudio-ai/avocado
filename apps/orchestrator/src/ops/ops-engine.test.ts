@@ -416,15 +416,60 @@ describe("ops-engine: rename_page", () => {
     )
   })
 
-  it("rejects rename to same slug", async () => {
+  it("rejects rename to same slug with no title change", async () => {
     seedSession(makePage(), makePricingPage())
     await assert.rejects(
       () =>
         applyOpsAtomically(TEST_SESSION, [
           { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/pricing" }
         ]),
-      /No effective page change/
+      /No effective page change.*matches current/
     )
+  })
+
+  it("rejects rename with no newPageSlug and no newTitle", async () => {
+    seedSession(makePage(), makePricingPage())
+    await assert.rejects(
+      () => applyOpsAtomically(TEST_SESSION, [{ op: "rename_page", pageSlug: "/pricing" }]),
+      /No effective page change.*newPageSlug not provided/
+    )
+  })
+
+  it("rejects rename when newTitle matches current title", async () => {
+    seedSession(makePage(), makePricingPage())
+    const currentTitle = getDraft("/pricing")!.title
+    await assert.rejects(
+      () =>
+        applyOpsAtomically(TEST_SESSION, [
+          { op: "rename_page", pageSlug: "/pricing", newTitle: currentTitle }
+        ]),
+      /No effective page change.*matches current title/
+    )
+  })
+
+  it("performs a title-only rename when newPageSlug is omitted", async () => {
+    seedSession(makePage(), makePricingPage())
+    await applyOpsAtomically(TEST_SESSION, [
+      { op: "rename_page", pageSlug: "/pricing", newTitle: "Plans & Pricing" }
+    ])
+    const page = getDraft("/pricing")
+    assert.ok(page, "page should still exist at /pricing after title-only rename")
+    assert.equal(page!.title, "Plans & Pricing")
+    assert.equal(page!.slug, "/pricing")
+
+    // Internal links to /pricing should NOT be rewritten since slug didn't change.
+    const hero = getDraft("/")!.blocks.find((b) => b.id === "b_hero")!
+    assert.equal((hero.props as Record<string, unknown>).ctaHref, "/pricing")
+  })
+
+  it("performs a title-only rename when newPageSlug matches current slug", async () => {
+    seedSession(makePage(), makePricingPage())
+    await applyOpsAtomically(TEST_SESSION, [
+      { op: "rename_page", pageSlug: "/pricing", newPageSlug: "/pricing", newTitle: "Our Plans" }
+    ])
+    const page = getDraft("/pricing")
+    assert.ok(page)
+    assert.equal(page!.title, "Our Plans")
   })
 
   it("preserves page position in nav order after rename", async () => {

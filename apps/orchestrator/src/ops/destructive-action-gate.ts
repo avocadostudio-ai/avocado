@@ -46,7 +46,7 @@ function slugsTouchedByOps(ops: readonly Operation[]): string[] {
     if ("pageSlug" in op && typeof op.pageSlug === "string") set.add(op.pageSlug)
     if (op.op === "duplicate_block" && typeof op.toPageSlug === "string") set.add(op.toPageSlug)
     if (op.op === "duplicate_page" && typeof op.newPageSlug === "string") set.add(op.newPageSlug)
-    if (op.op === "rename_page") set.add(op.newPageSlug)
+    if (op.op === "rename_page" && typeof op.newPageSlug === "string") set.add(op.newPageSlug)
   }
   return Array.from(set)
 }
