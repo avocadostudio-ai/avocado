@@ -9,16 +9,16 @@ Restart dev servers. The user may specify which server(s) to restart via `$ARGUM
 
 | Name | Port | Dir | Command |
 |------|------|-----|---------|
-| orchestrator | 4200 | `/Users/yury/Projects/ai-site-editor` | `pnpm dev:orchestrator` |
-| editor | 4100 | `/Users/yury/Projects/ai-site-editor` | `pnpm dev:editor` |
-| avocado | 3000 | `/Users/yury/Projects/ai-site-editor` | `pnpm dev:site` |
-| widget | 3000 | `/Users/yury/Projects/ai-site-editor` | clears `apps/site/.next`, then `pnpm dev:site` (picks up `@ai-site-editor/immersive-widget` changes) |
-| sample | 3002 | `/Users/yury/Projects/ai-site-editor/examples/sample-site` | `pnpm dev` |
-| contentful | 3003 | `/Users/yury/Projects/ai-site-editor/examples/contentful-site` | `pnpm dev` |
-| sanity | 3004 | `/Users/yury/Projects/ai-site-editor/examples/sanity-site` | `pnpm dev` |
-| strapi | 3005 | `/Users/yury/Projects/ai-site-editor/examples/strapi-site` | `pnpm dev` |
-| strapi-backend | 1337 | `/Users/yury/Projects/strapi-backend` | `source ~/.nvm/nvm.sh && nvm use 22 && npm run develop` |
-| docs | 5555 | `/Users/yury/Projects/ai-site-editor/docs-site` | `mintlify dev --port 5555` |
+| orchestrator | 4200 | `<repo-root>` | `pnpm dev:orchestrator` |
+| editor | 4100 | `<repo-root>` | `pnpm dev:editor` |
+| avocado | 3000 | `<repo-root>` | `pnpm dev:site` |
+| widget | 3000 | `<repo-root>` | clears `apps/site/.next`, then `pnpm dev:site` (picks up `@ai-site-editor/immersive-widget` changes) |
+| sample | 3002 | `<repo-root>/examples/sample-site` | `pnpm dev` |
+| contentful | 3003 | `<repo-root>/examples/contentful-site` | `pnpm dev` |
+| sanity | 3004 | `<repo-root>/examples/sanity-site` | `pnpm dev` |
+| strapi | 3005 | `<repo-root>/examples/strapi-site` | `pnpm dev` |
+| strapi-backend | 1337 | `<sibling: strapi-backend>` (separate clone, outside this repo) | `source ~/.nvm/nvm.sh && nvm use 22 && npm run develop` |
+| docs | 5555 | `<repo-root>/docs-site` | `mintlify dev --port 5555` |
 
 ## Important: Minimize concurrent servers
 

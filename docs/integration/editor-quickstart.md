@@ -8,7 +8,7 @@ Use this when integrating the editor with any existing Next.js site.
 
 - Next.js 15+ site running locally (App Router)
 - `@ai-site-editor/site-sdk` installed as a dependency
-- AI Site Editor monorepo running (`pnpm dev`)
+- Avocado Studio monorepo running (`pnpm dev`)
 - `DRAFT_MODE_SECRET` set in both site and editor `.env`
 
 ## Quick setup with `@ai-site-editor/site-sdk`

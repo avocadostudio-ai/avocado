@@ -10,7 +10,7 @@
 
 ## Terminology
 
-- **Site owner / adopter**: external developer integrating AI Site Editor with their website
+- **Site owner / adopter**: external developer integrating Avocado Studio with their website
 - **Editor**: the Vite+React chat UI app (`apps/editor`)
 - **Orchestrator**: the Fastify backend that handles AI planning, operations, and state (`apps/orchestrator`)
 - **Block**: a typed content component (Hero, FeatureGrid, etc.) with validated props

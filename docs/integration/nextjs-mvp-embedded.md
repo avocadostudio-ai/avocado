@@ -8,7 +8,7 @@ This is the default onboarding path for any Next.js site. Estimated time: **~30 
 
 - Next.js 15+ with App Router
 - `@ai-site-editor/site-sdk` installed as a dependency
-- AI Site Editor monorepo running locally (`pnpm dev`)
+- Avocado Studio monorepo running locally (`pnpm dev`)
 - A shared secret string for draft mode (any random value — set as `DRAFT_MODE_SECRET`)
 
 ## Goal

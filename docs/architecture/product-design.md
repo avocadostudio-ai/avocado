@@ -1,4 +1,4 @@
-# AI Site Editor: Product Design and Architecture Summary
+# Avocado Studio: Product Design and Architecture Summary
 
 _Last updated: 2026-03-03_
 

@@ -1,6 +1,6 @@
-# Contributing to AI Site Editor
+# Contributing to Avocado Studio
 
-Thanks for your interest in contributing! AI Site Editor is an open-source project and we welcome pull requests of all kinds — bug fixes, new block types, documentation improvements, and feature additions.
+Thanks for your interest in contributing! Avocado Studio is an open-source project and we welcome pull requests of all kinds — bug fixes, new block types, documentation improvements, and feature additions.
 
 ## Development Setup
 
@@ -8,8 +8,8 @@ Thanks for your interest in contributing! AI Site Editor is an open-source proje
 
 ```bash
 # 1. Fork and clone the repository
-git clone https://github.com/<your-username>/ai-site-editor.git
-cd ai-site-editor
+git clone https://github.com/<your-username>/avocado.git
+cd avocado
 
 # 2. Enable corepack (provides pnpm at the pinned version)
 corepack enable

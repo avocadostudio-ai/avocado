@@ -1,6 +1,6 @@
 # Integration Docs (Start Here)
 
-Use this page as the entry point for connecting the AI Site Editor to your website.
+Use this page as the entry point for connecting the Avocado Studio to your website.
 
 ## Who is this for?
 
@@ -12,7 +12,7 @@ Use this page as the entry point for connecting the AI Site Editor to your websi
 
 - A running Next.js site (App Router, Next.js 15+)
 - Node.js >= 20 and pnpm >= 9
-- The AI Site Editor monorepo cloned and running locally (see [root README](../../README.md))
+- The Avocado Studio monorepo cloned and running locally (see [root README](../../README.md))
 - An OpenAI or Anthropic API key (optional — deterministic demo mode works without one)
 
 ## What's supported now (MVP)
@@ -41,8 +41,8 @@ If your team uses Claude Code, Codex, Cursor, or similar LLM-based coding agents
 
 | Guide | Purpose |
 |---|---|
-| [Adoption guide for AI agents](ai-coding-agents-adoption.md) | Paste into your agent's context to have it integrate AI Site Editor into your Next.js site |
-| [Contributing guide for AI agents](ai-coding-agents.md) | For agents working on the AI Site Editor codebase itself |
+| [Adoption guide for AI agents](ai-coding-agents-adoption.md) | Paste into your agent's context to have it integrate Avocado Studio into your Next.js site |
+| [Contributing guide for AI agents](ai-coding-agents.md) | For agents working on the Avocado Studio codebase itself |
 
 ## Recommended reading order
 

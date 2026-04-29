@@ -1,4 +1,4 @@
-# Contributing to AI Site Editor Docs
+# Contributing to Avocado Studio Docs
 
 Thank you for your interest in improving the documentation.
 

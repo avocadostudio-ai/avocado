@@ -1,6 +1,6 @@
 # @ai-site-editor/site-sdk
 
-SDK for integrating any Next.js site with the AI Site Editor. Provides the contract between your site and the editor — handles draft mode, block rendering, editor overlay, and publishing.
+SDK for integrating any Next.js site with the Avocado Studio. Provides the contract between your site and the editor — handles draft mode, block rendering, editor overlay, and publishing.
 
 ## Quick Start
 

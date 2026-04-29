@@ -1,12 +1,12 @@
-# AI Site Editor — Adoption Guide for AI Coding Agents
+# Avocado Studio — Adoption Guide for AI Coding Agents
 
-Paste this into your AI coding agent's context (Claude Code, Codex, Cursor, Copilot, etc.) when it's helping you integrate AI Site Editor into your Next.js site.
+Paste this into your AI coding agent's context (Claude Code, Codex, Cursor, Copilot, etc.) when it's helping you integrate Avocado Studio into your Next.js site.
 
 ---
 
 ## What you're integrating
 
-AI Site Editor adds a chat-driven editing experience to your existing Next.js site. Users describe changes in natural language, and the system applies them as validated operations with live preview. Your site runs in an iframe inside the editor — no separate preview route needed.
+Avocado Studio adds a chat-driven editing experience to your existing Next.js site. Users describe changes in natural language, and the system applies them as validated operations with live preview. Your site runs in an iframe inside the editor — no separate preview route needed.
 
 **Requirements:** Next.js 15+ with App Router. The SDK package `@ai-site-editor/site-sdk` handles all integration plumbing.
 

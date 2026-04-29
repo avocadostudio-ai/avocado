@@ -161,13 +161,13 @@
     "links": [
       {
         "label": "GitHub",
-        "href": "https://github.com/yu7321/avocado"
+        "href": "https://github.com/avocadostudio-ai/avocado"
       }
     ]
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/yu7321/avocado"
+      "github": "https://github.com/avocadostudio-ai/avocado"
     }
   }
 }

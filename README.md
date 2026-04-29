@@ -48,7 +48,7 @@ Built for **developers** and **agencies** integrating AI editing into client sit
 **Prerequisites:** Node.js 22+.
 
 ```bash
-git clone https://github.com/yu7321/avocado.git && cd avocado
+git clone https://github.com/avocadostudio-ai/avocado.git && cd avocado
 ./start
 ```
 

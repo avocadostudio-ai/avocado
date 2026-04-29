@@ -1,6 +1,6 @@
 # Netlify Deployment
 
-This guide covers deploying AI Site Editor to Netlify.
+This guide covers deploying Avocado Studio to Netlify.
 
 ## Architecture overview
 

@@ -6,7 +6,7 @@ Who uses what, and how the systems connect.
 
 ```mermaid
 C4Context
-    title System Context — AI Site Editor
+    title System Context — Avocado Studio
 
     Person(visitor, "Site Visitor", "Views the published website")
     Person(editor_user, "Editor User", "Edits site content via chat")

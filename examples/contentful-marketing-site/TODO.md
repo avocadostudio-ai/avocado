@@ -2,7 +2,7 @@
 
 This workspace is a validation integration: take Contentful's own marketing
 webapp template (contentful/template-marketing-webapp-nextjs) and make it
-editable via the AI Site Editor. It proves the integration contract
+editable via the Avocado Studio. It proves the integration contract
 generalizes beyond examples we wrote ourselves.
 
 ## What's implemented
