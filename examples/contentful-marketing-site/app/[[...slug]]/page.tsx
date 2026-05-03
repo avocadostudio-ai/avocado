@@ -14,6 +14,7 @@ import "@/src/blocks/register"
 void getContentfulPages // keep tree-shaking honest; referenced by editor API
 
 const { Page, generateStaticParams } = createSitePage({
+  mode: "static",
   siteId: "contentful-marketing-site",
   getPage: getContentfulPage,
   getSlugs: getContentfulSlugs,

@@ -1,8 +1,10 @@
 import { createSitePage } from "@ai-site-editor/site-sdk/page"
-import { getSanityPage, getSanitySlugs, getSanitySiteConfig } from "../../lib/sanity.fetch"
+import { getSanityPage, getSanitySlugs, getSanitySiteConfig } from "../../../lib/sanity.fetch"
 
-const { Page, generateStaticParams } = createSitePage({
-  mode: "static",
+export const dynamic = "force-dynamic"
+
+const { Page } = createSitePage({
+  mode: "preview",
   siteId: "sanity-site",
   getPage: getSanityPage,
   getSlugs: getSanitySlugs,
@@ -21,4 +23,3 @@ const { Page, generateStaticParams } = createSitePage({
 })
 
 export default Page
-export { generateStaticParams }

@@ -1,8 +1,10 @@
 import { createSitePage } from "@ai-site-editor/site-sdk/page"
-import { getContentfulPage, getContentfulSlugs, getContentfulSiteConfig } from "../../lib/contentful"
+import { getContentfulPage, getContentfulSlugs, getContentfulSiteConfig } from "../../../lib/contentful"
 
-const { Page, generateStaticParams } = createSitePage({
-  mode: "static",
+export const dynamic = "force-dynamic"
+
+const { Page } = createSitePage({
+  mode: "preview",
   siteId: "contentful-site",
   getPage: getContentfulPage,
   getSlugs: getContentfulSlugs,
@@ -21,4 +23,3 @@ const { Page, generateStaticParams } = createSitePage({
 })
 
 export default Page
-export { generateStaticParams }

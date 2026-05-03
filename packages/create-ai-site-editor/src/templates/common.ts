@@ -70,12 +70,23 @@ export const { imageFields, listImageFields, listFieldNames } = getManifestImage
 `
 }
 
-export function pageFile(config: ScaffoldConfig): string {
-  const c = CMS_CONFIGS[config.cms]
+function adjustImportDepth(pageImport: string, mode: "static" | "preview"): string {
+  // CMS config encodes import paths for the static layout (`app/[[...slug]]/page.tsx`).
+  // Preview pages live one directory deeper (`app/preview-draft/[[...slug]]/page.tsx`),
+  // so prefix one extra `../` on every relative import.
+  if (mode === "static") return pageImport
+  return pageImport.replace(/from "\.\.\//g, `from "../../`)
+}
 
-  if (config.cms === "none") {
-    return `import { createSitePage } from "@ai-site-editor/site-sdk/page"
-${c.pageImport}
+function pageFileNone(config: ScaffoldConfig, mode: "static" | "preview"): string {
+  const c = CMS_CONFIGS[config.cms]
+  const pageImport = adjustImportDepth(c.pageImport, mode)
+  const factoryReturn = mode === "static" ? "{ Page, generateStaticParams }" : "{ Page }"
+  const dynamicLine = mode === "preview" ? `\nexport const dynamic = "force-dynamic"\n` : ""
+  const exports = mode === "static" ? "\nexport default Page\nexport { generateStaticParams }\n" : "\nexport default Page\n"
+
+  return `import { createSitePage } from "@ai-site-editor/site-sdk/page"
+${pageImport}
 
 const PAGES_PATH = resolve(process.cwd(), "content/pages.json")
 
@@ -85,8 +96,9 @@ async function loadPages(): Promise<PageDoc[]> {
     return JSON.parse(raw) as PageDoc[]
   } catch { return [] }
 }
-
-const { Page, generateStaticParams } = createSitePage({
+${dynamicLine}
+const ${factoryReturn} = createSitePage({
+  mode: "${mode}",
   siteId: "${config.siteId}",
   getPage: async (slug) => {
     const pages = await loadPages()
@@ -96,25 +108,36 @@ const { Page, generateStaticParams } = createSitePage({
     const pages = await loadPages()
     return pages.map((p) => p.slug)
   },
-})
+})${exports}`
+}
 
-export default Page
-export { generateStaticParams }
-`
-  }
+function pageFileCms(config: ScaffoldConfig, mode: "static" | "preview"): string {
+  const c = CMS_CONFIGS[config.cms]
+  const pageImport = adjustImportDepth(c.pageImport, mode)
+  const factoryReturn = mode === "static" ? "{ Page, generateStaticParams }" : "{ Page }"
+  const dynamicLine = mode === "preview" ? `\nexport const dynamic = "force-dynamic"\n` : ""
+  const exports = mode === "static" ? "\nexport default Page\nexport { generateStaticParams }\n" : "\nexport default Page\n"
 
   return `import { createSitePage } from "@ai-site-editor/site-sdk/page"
-${c.pageImport}
-
-const { Page, generateStaticParams } = createSitePage({
+${pageImport}
+${dynamicLine}
+const ${factoryReturn} = createSitePage({
+  mode: "${mode}",
   siteId: "${config.siteId}",
   getPage: ${c.getPage},
   getSlugs: ${c.getSlugs},
   ${c.getSiteConfig ? `getSiteConfig: ${c.getSiteConfig},` : ""}
-})
+})${exports}`
+}
 
-export default Page
-export { generateStaticParams }
+export function pageFile(config: ScaffoldConfig, mode: "static" | "preview" = "static"): string {
+  return config.cms === "none" ? pageFileNone(config, mode) : pageFileCms(config, mode)
+}
+
+export function middlewareFile(): string {
+  return `import { createEditorMiddleware } from "@ai-site-editor/site-sdk/middleware"
+
+export const { middleware, config } = createEditorMiddleware()
 `
 }
 

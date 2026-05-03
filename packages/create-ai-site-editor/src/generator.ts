@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { ScaffoldConfig, GeneratedFile } from "./types.js"
-import { editorApiRoute, revalidateRoute, manifestFile, pageFile, envExample } from "./templates/common.js"
+import { editorApiRoute, revalidateRoute, manifestFile, pageFile, middlewareFile, envExample } from "./templates/common.js"
 import { sanityTemplates } from "./templates/sanity.js"
 import { contentfulTemplates } from "./templates/contentful.js"
 import { strapiTemplates } from "./templates/strapi.js"
@@ -16,7 +16,9 @@ export function collectFiles(config: ScaffoldConfig): GeneratedFile[] {
   if (revalidate) files.push({ path: "app/api/revalidate/route.ts", content: revalidate })
 
   files.push({ path: "lib/manifest.ts", content: manifestFile(config) })
-  files.push({ path: "app/[[...slug]]/page.tsx", content: pageFile(config) })
+  files.push({ path: "app/[[...slug]]/page.tsx", content: pageFile(config, "static") })
+  files.push({ path: "app/preview-draft/[[...slug]]/page.tsx", content: pageFile(config, "preview") })
+  files.push({ path: "middleware.ts", content: middlewareFile() })
   files.push({ path: ".env.local.example", content: envExample(config) })
 
   switch (config.cms) {

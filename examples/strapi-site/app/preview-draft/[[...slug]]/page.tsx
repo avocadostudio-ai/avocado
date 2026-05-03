@@ -1,8 +1,10 @@
 import { createSitePage } from "@ai-site-editor/site-sdk/page"
-import { getStrapiPage, getStrapiSlugs, getStrapiSiteConfig } from "../../lib/strapi.fetch"
+import { getStrapiPage, getStrapiSlugs, getStrapiSiteConfig } from "../../../lib/strapi.fetch"
 
-const { Page, generateStaticParams } = createSitePage({
-  mode: "static",
+export const dynamic = "force-dynamic"
+
+const { Page } = createSitePage({
+  mode: "preview",
   siteId: "strapi-site",
   getPage: getStrapiPage,
   getSlugs: getStrapiSlugs,
@@ -21,4 +23,3 @@ const { Page, generateStaticParams } = createSitePage({
 })
 
 export default Page
-export { generateStaticParams }

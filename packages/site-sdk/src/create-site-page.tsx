@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache"
 import { draftMode } from "next/headers"
+import type { JSX } from "react"
 import { SharedBlockRenderer, BlocksHydrator } from "@ai-site-editor/blocks"
 import { buildSlug } from "./index.ts"
 import type { BlockInstance } from "./types.ts"
@@ -19,7 +20,7 @@ import type { PageDoc } from "@ai-site-editor/shared"
  * - Static params generation for build-time rendering
  * - 404 and draft-unavailable fallbacks
  *
- * @example
+ * @example Single-route ("auto") setup — everything in one [[...slug]] route
  * ```ts
  * // app/[[...slug]]/page.tsx
  * import { createSitePage } from "@ai-site-editor/site-sdk/page"
@@ -34,6 +35,23 @@ import type { PageDoc } from "@ai-site-editor/shared"
  *
  * export default Page
  * export { generateStaticParams }
+ * ```
+ *
+ * @example Split-route setup — fully static published path + dynamic preview path
+ * ```ts
+ * // middleware.ts
+ * import { createEditorMiddleware } from "@ai-site-editor/site-sdk/middleware"
+ * export const { middleware, config } = createEditorMiddleware()
+ *
+ * // app/[[...slug]]/page.tsx (statically generated)
+ * const { Page, generateStaticParams } = createSitePage({ mode: "static", ... })
+ * export default Page
+ * export { generateStaticParams }
+ *
+ * // app/preview-draft/[[...slug]]/page.tsx (dynamic editor route)
+ * export const dynamic = "force-dynamic"
+ * const { Page } = createSitePage({ mode: "preview", ... })
+ * export default Page
  * ```
  */
 export type SitePageConfig = {
@@ -53,122 +71,212 @@ export type SitePageConfig = {
   footer?: BlockInstance
   /** Render site header/footer chrome. Set false when the host layout provides its own. Defaults to true. */
   chrome?: boolean
+  /**
+   * Rendering mode. Defaults to `"auto"`.
+   *
+   * - `"auto"`: single-route — handles published and editor modes in one file. Works without middleware.
+   * - `"static"`: published-only — no searchParams, no editor logic, fully static. Pair with `createEditorMiddleware()` and a separate `mode: "preview"` route.
+   * - `"preview"`: editor-only — always reads searchParams + draft content. Set `export const dynamic = "force-dynamic"` on the route file.
+   */
+  mode?: "auto" | "static" | "preview"
 }
 
-type PageProps = {
+type StaticPageProps = {
   params: Promise<{ slug?: string[] }>
+}
+
+type DynamicPageProps = StaticPageProps & {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-/**
- * Create a Next.js page component with full editor integration.
- *
- * Returns `{ Page, generateStaticParams }` — export them from your
- * `app/[[...slug]]/page.tsx` route.
- */
-export function createSitePage(config: SitePageConfig) {
-  const {
-    siteId,
-    session: defaultSession = "dev",
-    getPage: cmsGetPage,
-    getSlugs: cmsGetSlugs,
-    getSiteConfig: cmsGetSiteConfig,
-    defaultLogo = "/logo.svg",
-    footer,
-    chrome = true,
-  } = config
+type ResolvedConfig = {
+  siteId: string
+  defaultSession: string
+  cmsGetPage: SitePageConfig["getPage"]
+  cmsGetSlugs: SitePageConfig["getSlugs"]
+  cmsGetSiteConfig: SitePageConfig["getSiteConfig"]
+  defaultLogo: string
+  footer: BlockInstance | undefined
+  chrome: boolean
+}
 
-  async function generateStaticParams() {
+function resolve(config: SitePageConfig): ResolvedConfig {
+  return {
+    siteId: config.siteId,
+    defaultSession: config.session ?? "dev",
+    cmsGetPage: config.getPage,
+    cmsGetSlugs: config.getSlugs,
+    cmsGetSiteConfig: config.getSiteConfig,
+    defaultLogo: config.defaultLogo ?? "/logo.svg",
+    footer: config.footer,
+    chrome: config.chrome ?? true,
+  }
+}
+
+function makeGenerateStaticParams(cmsGetSlugs: SitePageConfig["getSlugs"]) {
+  return async function generateStaticParams() {
     const slugs = await cmsGetSlugs()
     return slugs.map((slug) => ({
       slug: slug === "/" ? undefined : slug.replace(/^\//, "").split("/"),
     }))
   }
+}
 
-  async function Page({ params, searchParams }: PageProps) {
-    const resolvedParams = await params
-    const resolvedSearch = await searchParams
-    const slug = buildSlug(resolvedParams.slug)
+async function renderStatic(slug: string, c: ResolvedConfig): Promise<JSX.Element> {
+  const [page, navSlugs, siteConfig] = await Promise.all([
+    c.cmsGetPage(slug),
+    c.cmsGetSlugs(),
+    c.cmsGetSiteConfig ? c.cmsGetSiteConfig() : Promise.resolve({} as SiteConfig),
+  ])
 
-    const editorCtx = await resolveEditorContext(resolvedSearch, {
-      defaultSession,
-      defaultSiteId: siteId,
-    })
+  const { navItems, siteName, siteLogo } = buildNavItems({
+    navSlugs,
+    currentSlug: slug,
+    siteConfig,
+    siteId: c.siteId,
+    editorQuery: "",
+    defaultLogo: c.defaultLogo,
+  })
+  const chromeHeader = buildSiteHeaderBlock({ navItems, siteName, siteLogo, activePath: slug })
 
-    const draft = await draftMode()
-    const editorMode = draft.isEnabled || !!editorCtx
-
-    const session = editorCtx?.session ?? defaultSession
-    const currentSiteId = editorCtx?.siteId ?? siteId
-
-    if (editorMode) noStore()
-
-    const [pageResult, navSlugs, siteConfig] = await Promise.all([
-      editorMode
-        ? fetchEditorPage(slug, session, currentSiteId).then((p) => p ?? cmsGetPage(slug))
-        : cmsGetPage(slug),
-      editorMode
-        ? fetchEditorSlugs(session, currentSiteId).then((s) => s.length > 0 ? s : cmsGetSlugs())
-        : cmsGetSlugs(),
-      cmsGetSiteConfig ? cmsGetSiteConfig() : Promise.resolve({}),
-    ])
-
-    const editorOrigin = editorCtx?.editorOrigin ?? ""
-    const editorQuery = editorMode
-      ? (() => {
-          const p = new URLSearchParams({ session, siteId: currentSiteId })
-          if (editorOrigin) p.set("editorOrigin", editorOrigin)
-          return `?${p.toString()}`
-        })()
-      : ""
-
-    const { navItems, siteName, siteLogo } = buildNavItems({
-      navSlugs,
-      currentSlug: slug,
-      siteConfig,
-      siteId,
-      editorQuery,
-      defaultLogo,
-    })
-    const chromeHeader = buildSiteHeaderBlock({ navItems, siteName, siteLogo, activePath: slug })
-
-    if (!pageResult) {
-      return (
-        <>
-          {chrome && <SharedBlockRenderer block={chromeHeader} />}
-          <main style={{ padding: "4rem", textAlign: "center" }}>
-            <h1>{editorMode ? "Draft unavailable" : "404"}</h1>
-            <p>{editorMode ? `Could not load draft content for ${slug}.` : "Page not found."}</p>
-          </main>
-          {chrome && footer ? <SharedBlockRenderer block={footer} /> : null}
-        </>
-      )
-    }
-
-    if (editorMode) {
-      return (
-        <>
-          {chrome && <SharedBlockRenderer block={chromeHeader} />}
-          <main className="editor-mode">
-            {renderBlocks(pageResult.blocks, { editable: true })}
-          </main>
-          {chrome && footer ? <SharedBlockRenderer block={footer} /> : null}
-          <EditorOverlay slug={slug} editorOrigin={editorOrigin} />
-        </>
-      )
-    }
-
+  if (!page) {
     return (
       <>
-        {chrome && <SharedBlockRenderer block={chromeHeader} />}
-        <main>
-          {renderBlocks(pageResult.blocks)}
-          <BlocksHydrator />
+        {c.chrome && <SharedBlockRenderer block={chromeHeader} />}
+        <main style={{ padding: "4rem", textAlign: "center" }}>
+          <h1>404</h1>
+          <p>Page not found.</p>
         </main>
-        {chrome && footer ? <SharedBlockRenderer block={footer} /> : null}
+        {c.chrome && c.footer ? <SharedBlockRenderer block={c.footer} /> : null}
       </>
     )
   }
 
+  return (
+    <>
+      {c.chrome && <SharedBlockRenderer block={chromeHeader} />}
+      <main>
+        {renderBlocks(page.blocks)}
+        <BlocksHydrator />
+      </main>
+      {c.chrome && c.footer ? <SharedBlockRenderer block={c.footer} /> : null}
+    </>
+  )
+}
+
+async function renderPreview(
+  slug: string,
+  search: Record<string, string | string[] | undefined>,
+  c: ResolvedConfig,
+): Promise<JSX.Element> {
+  noStore()
+
+  const editorCtx = await resolveEditorContext(search, {
+    defaultSession: c.defaultSession,
+    defaultSiteId: c.siteId,
+  })
+
+  const session = editorCtx?.session ?? c.defaultSession
+  const currentSiteId = editorCtx?.siteId ?? c.siteId
+
+  const [page, navSlugs, siteConfig] = await Promise.all([
+    fetchEditorPage(slug, session, currentSiteId).then((p) => p ?? c.cmsGetPage(slug)),
+    fetchEditorSlugs(session, currentSiteId).then((s) => (s.length > 0 ? s : c.cmsGetSlugs())),
+    c.cmsGetSiteConfig ? c.cmsGetSiteConfig() : Promise.resolve({} as SiteConfig),
+  ])
+
+  const editorOrigin = editorCtx?.editorOrigin ?? ""
+  const editorQuery = (() => {
+    const p = new URLSearchParams({ session, siteId: currentSiteId })
+    if (editorOrigin) p.set("editorOrigin", editorOrigin)
+    return `?${p.toString()}`
+  })()
+
+  const { navItems, siteName, siteLogo } = buildNavItems({
+    navSlugs,
+    currentSlug: slug,
+    siteConfig,
+    siteId: c.siteId,
+    editorQuery,
+    defaultLogo: c.defaultLogo,
+  })
+  const chromeHeader = buildSiteHeaderBlock({ navItems, siteName, siteLogo, activePath: slug })
+
+  if (!page) {
+    return (
+      <>
+        {c.chrome && <SharedBlockRenderer block={chromeHeader} />}
+        <main style={{ padding: "4rem", textAlign: "center" }}>
+          <h1>Draft unavailable</h1>
+          <p>Could not load draft content for {slug}.</p>
+        </main>
+        {c.chrome && c.footer ? <SharedBlockRenderer block={c.footer} /> : null}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {c.chrome && <SharedBlockRenderer block={chromeHeader} />}
+      <main className="editor-mode">{renderBlocks(page.blocks, { editable: true })}</main>
+      {c.chrome && c.footer ? <SharedBlockRenderer block={c.footer} /> : null}
+      <EditorOverlay slug={slug} editorOrigin={editorOrigin} />
+    </>
+  )
+}
+
+async function renderAuto(
+  slug: string,
+  search: Record<string, string | string[] | undefined>,
+  c: ResolvedConfig,
+): Promise<JSX.Element> {
+  const editorCtx = await resolveEditorContext(search, {
+    defaultSession: c.defaultSession,
+    defaultSiteId: c.siteId,
+  })
+
+  const draft = await draftMode()
+  const editorMode = draft.isEnabled || !!editorCtx
+
+  if (editorMode) {
+    return renderPreview(slug, search, c)
+  }
+  return renderStatic(slug, c)
+}
+
+/**
+ * Create a Next.js page component with full editor integration.
+ *
+ * Returns `{ Page, generateStaticParams }` — export them from your route file.
+ * See {@link SitePageConfig.mode} for the three rendering modes.
+ */
+export function createSitePage(config: SitePageConfig) {
+  const c = resolve(config)
+  const mode = config.mode ?? "auto"
+  const generateStaticParams = makeGenerateStaticParams(c.cmsGetSlugs)
+
+  if (mode === "static") {
+    async function Page({ params }: StaticPageProps) {
+      const { slug: slugParts } = await params
+      const slug = buildSlug(slugParts)
+      return renderStatic(slug, c)
+    }
+    return { Page, generateStaticParams }
+  }
+
+  if (mode === "preview") {
+    async function Page({ params, searchParams }: DynamicPageProps) {
+      const [{ slug: slugParts }, search] = await Promise.all([params, searchParams])
+      const slug = buildSlug(slugParts)
+      return renderPreview(slug, search, c)
+    }
+    return { Page, generateStaticParams }
+  }
+
+  async function Page({ params, searchParams }: DynamicPageProps) {
+    const [{ slug: slugParts }, search] = await Promise.all([params, searchParams])
+    const slug = buildSlug(slugParts)
+    return renderAuto(slug, search, c)
+  }
   return { Page, generateStaticParams }
 }
