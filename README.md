@@ -79,7 +79,7 @@ Open the **Content Studio** at `http://localhost:4100` to start editing your sit
 `pnpm dev:setup` copies `.env.example` to `.env` and walks you through the required + common-optional keys. You need **at least one** LLM provider:
 
 - `ANTHROPIC_API_KEY` — for Claude models (recommended, best-tested)
-- `OPENAI_API_KEY` — for OpenAI models (also powers `gpt-image-1` image generation)
+- `OPENAI_API_KEY` — for OpenAI models (also powers `gpt-image-2` / `gpt-image-1` image generation)
 
 The script then prompts for these **optional** asset-manager integrations (press Enter to skip any):
 

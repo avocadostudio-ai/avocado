@@ -157,7 +157,7 @@ export const imageGenerateHandler: ToolHandler = async ({ input, context, signal
 
   const model =
     quality === "final"
-      ? (process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1")
+      ? (process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2")
       : (process.env.OPENAI_IMAGE_MODEL_DRAFT?.trim() || "gpt-image-1-mini")
 
   // Enrich prompt with block/page context when available

@@ -328,7 +328,7 @@ fi
 
 # --- Step 3: image generation (optional) -----------------------------------
 # Image gen is independent of the planner LLM. If the user chose OpenAI it's
-# already enabled (same key powers gpt-image-1). If they chose Anthropic there
+# already enabled (same key powers gpt-image-2 / gpt-image-1). If they chose Anthropic there
 # is *no* image generation until they add a second key. Gemini is also the
 # only provider for the conversational image-editor chat feature.
 
@@ -341,7 +341,7 @@ echo -e "${BOLD}🎨 Image generation${NC} ${DIM}(optional)${NC}"
 if [[ -n "$has_env_gemini" ]]; then
   echo -e "${GREEN}✓${NC} Gemini already configured"
 elif [[ -n "$openai_available" ]]; then
-  echo -e "  ${DIM}→ Your OpenAI key already enables image gen via gpt-image-1.${NC}"
+  echo -e "  ${DIM}→ Your OpenAI key already enables image gen (gpt-image-2 / gpt-image-1).${NC}"
   echo -e "  ${DIM}  Add Gemini too for conversational image editing (Gemini-only feature)?${NC}"
   read -rp "  Add Gemini? [y/N]: " img_ans
   if [[ "$img_ans" =~ ^[Yy]$ ]]; then
@@ -355,7 +355,7 @@ elif [[ -n "$openai_available" ]]; then
 else
   echo -e "  ${DIM}→ Anthropic does not generate images. Add a separate provider?${NC}"
   echo "    1) Gemini  (recommended — also powers conversational image editing)"
-  echo "    2) OpenAI  (gpt-image-1 only; separate key from your Anthropic planner)"
+  echo "    2) OpenAI  (gpt-image-2 / gpt-image-1; separate key from your Anthropic planner)"
   echo "    3) Skip"
   read -rp "  Choose [1-3] (default: 3): " img_choice
   case "${img_choice:-3}" in
