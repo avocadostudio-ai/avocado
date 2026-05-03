@@ -173,6 +173,15 @@ export function isVariationRequestMessage(message: string) {
   )
 }
 
+// Disambiguate "show me the variations again" from "generate new variations".
+// "fresh" verbs always mean regenerate even when paired with "show".
+export function variationVerbIntent(message: string): "show" | "generate" {
+  const normalized = normalizeVariationTypos(message.toLowerCase())
+  if (/\b(new|different|another|more|fresh|regenerate|again)\b/.test(normalized)) return "generate"
+  if (/\b(show|see|view|reopen|reshow|display)\b/.test(normalized)) return "show"
+  return "generate"
+}
+
 // ---------------------------------------------------------------------------
 // Effective slug resolution
 // ---------------------------------------------------------------------------

@@ -69,6 +69,7 @@ export type VariationResult = {
   pageSlug: string
   baseProps: Record<string, unknown>
   variations: VariationOption[]
+  suggestions?: string[]
   plannerSource: "openai" | "anthropic" | "gemini" | "demo"
   modelUsed: string
   modelKey: ModelKey
@@ -80,6 +81,33 @@ export type VariationResult = {
     cacheReadInputTokens?: number
     estimatedUsd: number | null
   }
+}
+
+export type VariationIntent = "generate" | "regenerate" | "show"
+
+// Ephemeral per-(session, blockId) cache so a "show variations" follow-up
+// can return the previously-generated set instead of burning another LLM call.
+type CachedVariations = { result: VariationResult; storedAt: number }
+const VARIATION_CACHE_TTL_MS = 5 * 60_000
+const lastVariationBySessionBlock = new Map<string, CachedVariations>()
+const variationCacheKey = (session: string, blockId: string) => `${session}::${blockId}`
+
+export function getCachedVariations(session: string, blockId: string): VariationResult | null {
+  const key = variationCacheKey(session, blockId)
+  const entry = lastVariationBySessionBlock.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.storedAt > VARIATION_CACHE_TTL_MS) {
+    lastVariationBySessionBlock.delete(key)
+    return null
+  }
+  return entry.result
+}
+
+function rememberVariations(session: string, result: VariationResult) {
+  lastVariationBySessionBlock.set(variationCacheKey(session, result.blockId), {
+    result,
+    storedAt: Date.now()
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -924,20 +952,35 @@ async function prepareTextVariations(
   }
 }
 
+function summaryForIntent(intent: VariationIntent, count: number, blockType: string): string {
+  if (intent === "regenerate") return `Generated ${count} fresh variations for ${blockType}.`
+  if (intent === "show") return `Showing your ${count} variations for ${blockType}.`
+  return `Generated ${count} variations for ${blockType}.`
+}
+
+const POST_VARIATION_SUGGESTIONS = [
+  "Generate different variations",
+  "Try a more playful tone",
+  "Try a more formal tone"
+]
+
 function buildVariationResult(args: {
   prepared: PreparedVariationsContext
   variations: VariationOption[]
+  intent?: VariationIntent
 }): VariationResult {
   const { prepared, variations } = args
+  const intent: VariationIntent = args.intent ?? "generate"
   const { selected, effectiveSlug, plannerSource, modelUsed, modelKey, generatorUsage } = prepared
   return {
     status: "ok",
-    summary: `Generated ${variations.length} variations for ${selected.type}.`,
+    summary: summaryForIntent(intent, variations.length, selected.type),
     blockId: selected.id,
     blockType: selected.type,
     pageSlug: effectiveSlug,
     baseProps: structuredClone(selected.props as Record<string, unknown>),
     variations,
+    suggestions: POST_VARIATION_SUGGESTIONS,
     plannerSource,
     modelUsed,
     modelKey,
@@ -958,9 +1001,16 @@ function buildVariationResult(args: {
   }
 }
 
+function resolveLlmIntent(session: string | undefined, blockId: string, explicit: VariationIntent | undefined): VariationIntent {
+  if (explicit && explicit !== "show") return explicit
+  if (session && getCachedVariations(session, blockId)) return "regenerate"
+  return "generate"
+}
+
 export async function runVariationPipeline(
   ctx: VariationPipelineContext,
-  body: VariationRequestBody
+  body: VariationRequestBody,
+  options?: { intent?: VariationIntent }
 ): Promise<{ code: number; payload: VariationResult | { error: string } }> {
   const prep = await prepareTextVariations(ctx, body)
   if (prep.code !== 200 || !prep.prepared) {
@@ -980,7 +1030,10 @@ export async function runVariationPipeline(
       payload: { error: "Could not generate valid variations for this block. Try a more specific instruction." }
     }
   }
-  return { code: 200, payload: buildVariationResult({ prepared, variations }) }
+  const intent = resolveLlmIntent(body.session, prepared.selected.id, options?.intent)
+  const result = buildVariationResult({ prepared, variations, intent })
+  if (body.session) rememberVariations(body.session, result)
+  return { code: 200, payload: result }
 }
 
 export type VariationStreamPipelineHooks = {
@@ -991,7 +1044,8 @@ export type VariationStreamPipelineHooks = {
 export async function runVariationPipelineStreaming(
   ctx: VariationPipelineContext,
   body: VariationRequestBody,
-  hooks: VariationStreamPipelineHooks
+  hooks: VariationStreamPipelineHooks,
+  options?: { intent?: VariationIntent }
 ): Promise<{ code: number; payload: VariationResult | { error: string } }> {
   const prep = await prepareTextVariations(ctx, body)
   if (prep.code !== 200 || !prep.prepared) {
@@ -1014,9 +1068,10 @@ export async function runVariationPipelineStreaming(
     }
   }
 
+  const intent = resolveLlmIntent(body.session, prepared.selected.id, options?.intent)
   const imagesPending = supportsImageVariation(prepared.selected)
   hooks.onInitial({
-    ...buildVariationResult({ prepared, variations: plan.initial }),
+    ...buildVariationResult({ prepared, variations: plan.initial, intent }),
     imagesPending
   })
 
@@ -1028,6 +1083,8 @@ export async function runVariationPipelineStreaming(
       payload: { error: "Could not generate valid variations for this block. Try a more specific instruction." }
     }
   }
-  return { code: 200, payload: buildVariationResult({ prepared, variations: finalVariations }) }
+  const result = buildVariationResult({ prepared, variations: finalVariations, intent })
+  if (body.session) rememberVariations(body.session, result)
+  return { code: 200, payload: result }
 }
 

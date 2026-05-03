@@ -107,6 +107,7 @@ export type VariationResponse = {
   pageSlug?: string
   baseProps?: Record<string, unknown>
   variations?: VariationOption[]
+  suggestions?: string[]
   plannerSource?: PlannerSource
   modelUsed?: string
   modelKey?: string

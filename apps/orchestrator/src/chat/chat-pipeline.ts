@@ -15,6 +15,7 @@ import {
   cleanupImagePlaceholders,
   buildPageDirectory,
   isVariationRequestMessage,
+  variationVerbIntent,
   resolveEffectiveSlug,
   throwIfCanceled,
   raceCancel,
@@ -115,7 +116,7 @@ import { shouldPreferFastModelForMessage, shouldUseLlmIntentRouter, compactPlann
 import { buildAiInsightChanges, buildMetaChangeLogEntries, buildOpChangeLogEntries, deterministicCreatePagePlan, deterministicDuplicatePagePlan, deterministicSelectedTextRewritePlan, shouldReturnDeterministicClarification, fmtSlug } from "./chat-pipeline-deterministic.js"
 import { getValueAtPath, setValueAtPath, deleteValueAtPath, blockSupportsImageAtPath, detectImageOps, rewriteAddBlockToChildImageUpdate, withUnsplashHeroImage, resolveHeroImageForCreatePage } from "./chat-pipeline-image.js"
 import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSource } from "./provider-routing.js"
-import { runVariationPipeline } from "./variation-pipeline.js"
+import { runVariationPipeline, getCachedVariations, type VariationIntent } from "./variation-pipeline.js"
 import { validateAndStripHallucinatedProps } from "./hallucination-validator.js"
 import { validateChangelogCoverage } from "./changelog-coverage-validator.js"
 
@@ -866,6 +867,21 @@ export async function runChatPipeline(
       // Route to the dedicated variation pipeline and return its result directly.
       // The editor detects the VariationResult shape (status "ok" + variations array)
       // and opens the variation modal, same as it does for /chat/variations responses.
+      // Disambiguate "show me the variations again" (cached, no LLM) from
+      // "generate new variations" (fresh LLM call). When the user clearly wants
+      // to re-display an existing set and we have one cached, return it immediately.
+      const verbIntent = variationVerbIntent(body.message)
+      if (verbIntent === "show") {
+        const cached = getCachedVariations(body.session, body.activeBlockId)
+        if (cached) {
+          const shown: typeof cached = {
+            ...cached,
+            summary: `Showing your ${cached.variations.length} variations for ${cached.blockType}.`
+          }
+          return { code: 200, payload: shown as unknown as ChatResult }
+        }
+      }
+      const intent: VariationIntent = verbIntent === "show" ? "show" : "generate"
       const variationResult = await runVariationPipeline(ctx, {
         session: body.session,
         slug: effectiveSlug,
@@ -878,7 +894,7 @@ export async function runChatPipeline(
         siteHosting: body.siteHosting,
         businessContext: body.businessContext,
         siteContext: body.siteContext
-      })
+      }, { intent })
       return variationResult as { code: number; payload: ChatResult | { error: string } }
     }
     // No block selected — ask which block

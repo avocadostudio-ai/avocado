@@ -96,7 +96,8 @@ export function useVariations(deps: VariationsDeps) {
             store.getState().pushAssistantFromResult({
               status: "info",
               summary: data.summary ?? `Generated ${data.variations.length} variations. Choose one from the modal.`,
-              changes: data.variations.map((v, i) => v.title?.trim() ? v.title.trim() : `Variation ${i + 1}`)
+              changes: data.variations.map((v, i) => v.title?.trim() ? v.title.trim() : `Variation ${i + 1}`),
+              suggestions: data.suggestions
             })
           }
         } else if (payload.event === "image_resolved") {
