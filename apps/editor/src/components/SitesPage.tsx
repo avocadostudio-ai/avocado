@@ -43,7 +43,21 @@ export function SitesPage({ sites, session }: { sites: UseSiteListReturn; sessio
     }), [sites.siteList])
 
   const [showAllSites, setShowAllSites] = useState(false)
-  const [agentOpen, setAgentOpen] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(() => {
+    if (typeof window === "undefined") return false
+    return new URLSearchParams(window.location.search).get("agent") === "1"
+  })
+
+  // Strip the ?agent=1 hint from the URL once consumed so reloads don't re-open it.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("agent") !== "1") return
+    params.delete("agent")
+    const search = params.toString()
+    const next = window.location.pathname + (search ? `?${search}` : "") + window.location.hash
+    window.history.replaceState({}, "", next)
+  }, [])
   const [pendingDeleteSiteId, setPendingDeleteSiteId] = useState<string | null>(null)
   const pendingDeleteSite = dedupedSites.find((s) => s.id === pendingDeleteSiteId) ?? null
 

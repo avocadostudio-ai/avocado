@@ -1346,7 +1346,7 @@ function EditorPage({
           <div className="preset-banner" role="note" aria-label="Demo site onboarding notice">
             <div className="preset-banner-title">{t("presetBanner.title")}</div>
             <div className="preset-banner-body">{t("presetBanner.body")}</div>
-            <a className="preset-banner-cta" href="/sites">
+            <a className="preset-banner-cta" href="/sites?agent=1">
               {t("presetBanner.cta")} →
             </a>
           </div>
