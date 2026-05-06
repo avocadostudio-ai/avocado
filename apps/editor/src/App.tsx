@@ -1352,7 +1352,7 @@ function EditorPage({
               </a>
               <a
                 className="preset-banner-link"
-                href="https://docs.avocadostudio.ai/sites/manual"
+                href="https://docs.avocadostudio.dev/sites/manual"
                 target="_blank"
                 rel="noreferrer"
               >

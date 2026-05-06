@@ -92,9 +92,9 @@ Open the **Content Studio** at `http://localhost:4100` to start editing your sit
 
 The site you see at `:3000` is a **demo** — sample content so you can try the editor immediately. When you're ready to use Avocado Studio on a real site, pick one of two paths:
 
-**🤖 Agentic — let our AI do it.** Use the in-editor **Onboarding agent**. Describe your site, paste a public URL, or point at a GitHub repo; it migrates / integrates / scaffolds end-to-end. Fastest path (~5–15 min). → [Onboarding agent docs](https://docs.avocadostudio.ai/sites/site-agent). Or just click the **"✨ Onboard with AI agent"** button on the demo banner inside the editor.
+**🤖 Agentic — let our AI do it.** Use the in-editor **Onboarding agent**. Describe your site, paste a public URL, or point at a GitHub repo; it migrates / integrates / scaffolds end-to-end. Fastest path (~5–15 min). → [Onboarding agent docs](https://docs.avocadostudio.dev/sites/site-agent). Or just click the **"✨ Onboard with AI agent"** button on the demo banner inside the editor.
 
-**🔧 Manual — code it yourself.** Wire `@ai-site-editor/site-sdk` into your existing Next.js 15 project by hand (~30 min) or hand the work to your own coding agent (Codex / Claude Code / Cursor). → [Manual integration](https://docs.avocadostudio.ai/sites/manual) · [Bring your own coding agent](https://docs.avocadostudio.ai/sites/coding-agent).
+**🔧 Manual — code it yourself.** Wire `@ai-site-editor/site-sdk` into your existing Next.js 15 project by hand (~30 min) or hand the work to your own coding agent (Codex / Claude Code / Cursor). → [Manual integration](https://docs.avocadostudio.dev/sites/manual) · [Bring your own coding agent](https://docs.avocadostudio.dev/sites/coding-agent).
 
 ### Environment
 
