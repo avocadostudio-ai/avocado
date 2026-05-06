@@ -377,7 +377,7 @@ const en = {
   // -- Sites agent --
   "sitesAgent.title": "Onboarding agent",
   "sitesAgent.clear": "Clear chat",
-  "sitesAgent.welcome": "I can create a new site from scratch, migrate an existing website from its URL, or integrate the editor into your Next.js project. What would you like to do?",
+  "sitesAgent.welcome": "I can create a new site from scratch, migrate an existing website from its URL, or integrate the editor into your Next.js project. Heads up: this is early — treat my first pass as a draft you'll refine in the editor, especially for migrations of complex sites. What would you like to do?",
   "sitesAgent.placeholder": "Ask me anything...",
   "sitesAgent.suggestion1": "Create a new site from scratch",
   "sitesAgent.suggestion1Desc": "Describe your site's purpose and I'll scaffold it",

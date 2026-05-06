@@ -1356,7 +1356,7 @@ function EditorPage({
                 target="_blank"
                 rel="noreferrer"
               >
-                {t("presetBanner.ctaManual")} →
+                {t("presetBanner.ctaManual")}
               </a>
             </div>
           </div>

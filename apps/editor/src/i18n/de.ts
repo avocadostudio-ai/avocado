@@ -379,7 +379,7 @@ const de: LocaleDict = {
   // -- Sites agent --
   "sitesAgent.title": "Onboarding-Agent",
   "sitesAgent.clear": "Chat leeren",
-  "sitesAgent.welcome": "Ich kann eine neue Seite erstellen, eine bestehende Website von ihrer URL migrieren oder den Editor in dein Next.js-Projekt integrieren. Was möchtest du tun?",
+  "sitesAgent.welcome": "Ich kann eine neue Seite erstellen, eine bestehende Website von ihrer URL migrieren oder den Editor in dein Next.js-Projekt integrieren. Hinweis: Das ist noch früh — behandle meinen ersten Wurf als Entwurf, den du im Editor verfeinerst, besonders bei Migrationen komplexer Seiten. Was möchtest du tun?",
   "sitesAgent.placeholder": "Frag mich etwas...",
   "sitesAgent.suggestion1": "Neue Seite von Grund auf erstellen",
   "sitesAgent.suggestion1Desc": "Beschreibe den Zweck deiner Seite und ich erstelle sie",
