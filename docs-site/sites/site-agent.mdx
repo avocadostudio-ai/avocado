@@ -8,6 +8,12 @@ The **Onboarding agent** is an AI agent built into the editor's *Sites* page. Yo
 
 Three modes (Migrate / Integrate / Create), one chat UI, two execution backends (your Claude subscription via the CLI, or pay-per-token via API key). Same end state regardless of which combination you pick.
 
+<Warning>
+**Set expectations: this is early.** Treat the agent's first pass as a **draft you'll refine in the editor**, not a finished site. It works best on simple landing pages, marketing sites, and small Next.js repos. Complex sites — heavy interactivity, custom CMS schemas, deep routing, dynamic data, design systems with non-standard tokens — will require manual cleanup after the initial run, and sometimes a few iterations. The editor's chat is designed for exactly that follow-up work; the agent gets you to ~80%, then you finish in the editor or by hand.
+
+If you need pixel-perfect output on the first run, the **[Manual integration](/sites/manual)** or **[Bring Your Own Coding Agent](/sites/coding-agent)** paths give you full control instead.
+</Warning>
+
 <Note>
 **Claude only — for now.** The Onboarding agent runs exclusively on **Anthropic Claude**, on both backends. There is no OpenAI / Gemini / local-model code path: the CLI backend shells out to the official `claude` CLI, and the SDK backend uses `@anthropic-ai/claude-agent-sdk` against your `ANTHROPIC_API_KEY`. If you only have an `OPENAI_API_KEY`, the assistant will not run — you'll need a Claude subscription (free for the CLI backend) or an Anthropic API key.
 
