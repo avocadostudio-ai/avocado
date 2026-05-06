@@ -9,7 +9,7 @@
 
 FROM node:22-alpine AS base
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.33.3 --activate
 WORKDIR /app
 
 # ---- Dependencies ---------------------------------------------------------
