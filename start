@@ -87,7 +87,19 @@ fi
 
 if ! command -v pnpm >/dev/null 2>&1; then
   say "enabling corepack (provides pnpm)..."
-  corepack enable >/dev/null 2>&1 || die "corepack enable failed. Try: sudo corepack enable"
+  if ! corepack enable >/dev/null 2>&1; then
+    # Node installed via the official .pkg lives under /usr/local and is
+    # root-owned, so corepack can't write its shims there without sudo.
+    # Fall back to a user-writable directory and add it to PATH for this run.
+    user_bin="$HOME/.local/bin"
+    mkdir -p "$user_bin"
+    if corepack enable --install-directory "$user_bin" >/dev/null 2>&1; then
+      export PATH="$user_bin:$PATH"
+      say "corepack shims installed to $user_bin (add it to your PATH in ~/.zshrc)"
+    else
+      die "corepack enable failed. Try: sudo corepack enable"
+    fi
+  fi
 fi
 
 # Verify pnpm resolves to the pinned version (from packageManager field).
