@@ -25,7 +25,7 @@ const de: LocaleDict = {
   "presetBanner.title": "Du bist auf einer Demo-Site",
   "presetBanner.body": "Bring deine eigene mit — migriere von einer URL, integriere ein Next.js-Repo oder erstelle eine neue.",
   "presetBanner.ctaAgent": "✨ Site onboarden",
-  "presetBanner.ctaManual": "oder ohne unseren Agent",
+  "presetBanner.ctaManual": "oder selbst einrichten",
   "demo.placeholder": "Versuch: ändere die Hero-Überschrift zu \u2026",
   "header.moreOptions": "Weitere Optionen",
   "header.publish": "Veröffentlichen",
