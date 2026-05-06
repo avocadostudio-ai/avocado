@@ -22,10 +22,10 @@ const de: LocaleDict = {
   "demo.tryExample3": "Aktualisiere den Hero-CTA zu \"Jetzt starten\"",
 
   // -- Preset-/Demo-Site-Onboarding-Banner (lokale Installation) --
-  "presetBanner.title": "Du bearbeitest eine Demo-Site",
-  "presetBanner.body": "Beispielinhalt zum Ausprobieren. Bereit für deine eigene?",
-  "presetBanner.ctaAgent": "✨ Mit KI-Agent onboarden",
-  "presetBanner.ctaManual": "oder selbst programmieren",
+  "presetBanner.title": "Du bist auf einer Demo-Site",
+  "presetBanner.body": "Bring deine eigene mit — migriere von einer URL, integriere ein Next.js-Repo oder erstelle eine neue.",
+  "presetBanner.ctaAgent": "✨ Site onboarden",
+  "presetBanner.ctaManual": "oder ohne unseren Agent",
   "demo.placeholder": "Versuch: ändere die Hero-Überschrift zu \u2026",
   "header.moreOptions": "Weitere Optionen",
   "header.publish": "Veröffentlichen",

@@ -21,10 +21,10 @@ const en = {
   "demo.placeholder": "Try: change the hero headline to \u2026",
 
   // -- Preset/demo site onboarding banner (local install) --
-  "presetBanner.title": "You're editing a demo site",
-  "presetBanner.body": "Sample content to play with. Ready to bring in your own?",
-  "presetBanner.ctaAgent": "\u2728 Onboard with AI agent",
-  "presetBanner.ctaManual": "or code it yourself",
+  "presetBanner.title": "You're in a demo site",
+  "presetBanner.body": "Bring in your own \u2014 migrate from a URL, integrate a Next.js repo, or create from scratch.",
+  "presetBanner.ctaAgent": "\u2728 Onboard your site",
+  "presetBanner.ctaManual": "or do it without our agent",
   "header.moreOptions": "More options",
   "header.publish": "Publish",
   "header.publishing": "Publishing",

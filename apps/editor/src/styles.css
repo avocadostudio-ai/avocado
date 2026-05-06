@@ -263,7 +263,7 @@ body.panel-resizing iframe {
 .preset-banner {
   align-self: start;
   margin: 10px 16px 0;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 10px;
   background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
   color: #064e3b;
@@ -273,12 +273,13 @@ body.panel-resizing iframe {
 .preset-banner-title {
   font-size: 12px;
   font-weight: 700;
-  margin-bottom: 2px;
+  line-height: 1.35;
+  margin-bottom: 3px;
 }
 .preset-banner-body {
   font-size: 11px;
   line-height: 1.4;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
   color: #065f46;
 }
 .preset-banner-actions {
@@ -291,24 +292,26 @@ body.panel-resizing iframe {
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 6px 11px;
   border-radius: 7px;
-  background: #ffffff;
-  color: #047857;
-  border: 1px solid rgba(16, 185, 129, 0.45);
+  background: #047857;
+  color: #ffffff;
+  border: 1px solid #047857;
   text-decoration: none;
-  transition: background 0.15s, transform 0.1s, border-color 0.15s;
+  box-shadow: 0 1px 2px rgba(4, 120, 87, 0.25);
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 .preset-banner-cta:hover {
-  background: #f0fdf4;
-  border-color: #10b981;
+  background: #065f46;
+  border-color: #065f46;
   transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(4, 120, 87, 0.35);
 }
 .preset-banner-link {
   font-size: 11px;
   color: #047857;
   text-decoration: none;
-  opacity: 0.85;
+  opacity: 0.8;
 }
 .preset-banner-link:hover {
   text-decoration: underline;
