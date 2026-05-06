@@ -1,6 +1,6 @@
 # Docker Deployment (Orchestrator)
 
-The whole stack is MIT-licensed and source-available in the [public repo](https://github.com/avocadostudio-ai/avocado). For self-hosting the orchestrator, Docker is the recommended path — a single reproducible artifact with its Node.js runtime and dependencies baked in. The site and Content Studio apps don't need Docker and can run on any Node.js host.
+The whole stack is Apache 2.0-licensed and source-available in the [public repo](https://github.com/avocadostudio-ai/avocado). For self-hosting the orchestrator, Docker is the recommended path — a single reproducible artifact with its Node.js runtime and dependencies baked in. The site and Content Studio apps don't need Docker and can run on any Node.js host.
 
 ## Why Docker for the orchestrator?
 

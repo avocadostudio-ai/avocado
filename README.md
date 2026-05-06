@@ -2,7 +2,7 @@
 
 **AI-powered content operations for websites.** Manage site content through natural language — the system plans, validates, and applies structured edits with live preview, undo/redo, and one-click publishing.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -39,7 +39,7 @@ Opens the Content Studio at `http://localhost:4100`. Full prerequisites, environ
 - **Any CMS** — JSON files, Contentful, Sanity, and Strapi adapters out of the box (see [`examples/`](examples/)). Implement one interface to wire up your own.
 - **Custom React blocks** — register your components alongside the 20 built-ins. The AI planner reads their Zod schemas and edits them like any built-in block.
 - **Pluggable publishing** — Git-based snapshots and Vercel deploy hooks ship by default. Implement the `PublishTarget` interface for any other deploy workflow (Netlify, S3, push-to-CMS, etc.).
-- **Self-hosted, MIT-licensed** — run on Render, Vercel, Docker, or your own infra. No per-seat pricing. Optional demo mode for locked-down public playgrounds.
+- **Self-hosted, Apache 2.0-licensed** — run on Render, Vercel, Docker, or your own infra. No per-seat pricing. Optional demo mode for locked-down public playgrounds.
 - **Durable sessions** — SQLite-backed state with WAL, transactional writes, capped undo/redo + version log, and rolling backups. No data loss on restart.
 
 ### AI Content Studio
@@ -193,4 +193,4 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instr
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)
