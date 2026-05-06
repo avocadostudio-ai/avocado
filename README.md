@@ -90,15 +90,11 @@ Open the **Content Studio** at `http://localhost:4100` to start editing your sit
 
 ### What's next: bring in your own site
 
-The site you see at `:3000` is a **demo** — sample content so you can try the editor immediately. When you're ready to use Avocado Studio on a real site, you have three paths:
+The site you see at `:3000` is a **demo** — sample content so you can try the editor immediately. When you're ready to use Avocado Studio on a real site, pick one of two paths:
 
-| Path | Best for | Time | Docs |
-|---|---|---|---|
-| **Site Assistant** (in-editor AI agent) | Fastest result. Migrate from a public URL, integrate an existing Next.js repo, or scaffold from a description | ~5–15 min | [Site Assistant guide](https://docs.avocadostudio.ai/sites/site-agent) |
-| **Manual integration** | You want to understand every change yourself | ~30 min | [Manual integration](https://docs.avocadostudio.ai/sites/manual) |
-| **Bring your own coding agent** | You already use Codex / Claude Code / Cursor in your IDE | ~15 min | [BYO agent](https://docs.avocadostudio.ai/sites/coding-agent) |
+**🤖 Agentic — let our AI do it.** Use the in-editor Site Assistant. Describe your site, paste a public URL, or point at a GitHub repo; it migrates / integrates / scaffolds end-to-end. Fastest path (~5–15 min). → [Site Assistant docs](https://docs.avocadostudio.ai/sites/site-agent). Or just click the **"✨ Add with AI agent"** button on the demo banner inside the editor.
 
-In the editor, click **Sites → Add site** to start the Site Assistant flow, or follow the manual docs to wire `@ai-site-editor/site-sdk` into your existing Next.js project.
+**🔧 Manual — code it yourself.** Wire `@ai-site-editor/site-sdk` into your existing Next.js 15 project by hand (~30 min) or hand the work to your own coding agent (Codex / Claude Code / Cursor). → [Manual integration](https://docs.avocadostudio.ai/sites/manual) · [Bring your own coding agent](https://docs.avocadostudio.ai/sites/coding-agent).
 
 ### Environment
 

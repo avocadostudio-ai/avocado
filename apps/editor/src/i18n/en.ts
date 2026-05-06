@@ -22,8 +22,9 @@ const en = {
 
   // -- Preset/demo site onboarding banner (local install) --
   "presetBanner.title": "You're editing a demo site",
-  "presetBanner.body": "This is sample content to show you how Avocado Studio works. When you're ready, bring in your own site \u2014 migrate from a public URL, integrate an existing Next.js repo, or scaffold a new one.",
-  "presetBanner.cta": "Add your own site",
+  "presetBanner.body": "Sample content to play with. Ready to bring in your own?",
+  "presetBanner.ctaAgent": "\u2728 Add with AI agent",
+  "presetBanner.ctaManual": "or code it yourself",
   "header.moreOptions": "More options",
   "header.publish": "Publish",
   "header.publishing": "Publishing",
@@ -131,7 +132,7 @@ const en = {
   "sites.addSiteTitle": "Add Site",
   "sites.close": "Close",
   "sites.siteName": "Site name",
-  "sites.siteNamePlaceholder": "Adventure Arena",
+  "sites.siteNamePlaceholder": "My Site",
   "sites.previewUrl": "Preview URL",
   "sites.previewUrlPlaceholder": "http://localhost:3000",
   "sites.enablePuck": "Use visual editor (Puck)",

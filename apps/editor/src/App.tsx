@@ -1346,9 +1346,19 @@ function EditorPage({
           <div className="preset-banner" role="note" aria-label="Demo site onboarding notice">
             <div className="preset-banner-title">{t("presetBanner.title")}</div>
             <div className="preset-banner-body">{t("presetBanner.body")}</div>
-            <a className="preset-banner-cta" href="/sites?agent=1">
-              {t("presetBanner.cta")} →
-            </a>
+            <div className="preset-banner-actions">
+              <a className="preset-banner-cta" href="/sites?agent=1">
+                {t("presetBanner.ctaAgent")}
+              </a>
+              <a
+                className="preset-banner-link"
+                href="https://docs.avocadostudio.ai/sites/manual"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t("presetBanner.ctaManual")} →
+              </a>
+            </div>
           </div>
         ) : null}
 

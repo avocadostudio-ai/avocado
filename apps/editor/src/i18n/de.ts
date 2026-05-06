@@ -23,8 +23,9 @@ const de: LocaleDict = {
 
   // -- Preset-/Demo-Site-Onboarding-Banner (lokale Installation) --
   "presetBanner.title": "Du bearbeitest eine Demo-Site",
-  "presetBanner.body": "Das ist Beispielinhalt, damit du sehen kannst, wie Avocado Studio funktioniert. Wenn du bereit bist, bring deine eigene Site mit — migriere von einer öffentlichen URL, integriere ein bestehendes Next.js-Repo oder erstelle eine neue.",
-  "presetBanner.cta": "Eigene Site hinzufügen",
+  "presetBanner.body": "Beispielinhalt zum Ausprobieren. Bereit für deine eigene?",
+  "presetBanner.ctaAgent": "✨ Mit KI-Agent hinzufügen",
+  "presetBanner.ctaManual": "oder selbst programmieren",
   "demo.placeholder": "Versuch: ändere die Hero-Überschrift zu \u2026",
   "header.moreOptions": "Weitere Optionen",
   "header.publish": "Veröffentlichen",
@@ -133,7 +134,7 @@ const de: LocaleDict = {
   "sites.addSiteTitle": "Website hinzufügen",
   "sites.close": "Schließen",
   "sites.siteName": "Seitenname",
-  "sites.siteNamePlaceholder": "Adventure Arena",
+  "sites.siteNamePlaceholder": "Meine Website",
   "sites.previewUrl": "Vorschau-URL",
   "sites.previewUrlPlaceholder": "http://localhost:3000",
   "sites.enablePuck": "Visuellen Editor (Puck) verwenden",
