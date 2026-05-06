@@ -4,7 +4,7 @@ sidebarTitle: "Introduction"
 description: "OpenAPI 3.0 reference for the orchestrator's HTTP API. Auto-generated from the running Fastify routes — currently a skeleton without request/response schemas (placeholder spec, see notes below)."
 ---
 
-This tab documents the **Orchestrator HTTP API** — the brain that runs editor sessions, calls the LLMs, and serves draft state to integrated sites. The same API is what the editor app, the `avocado-register` CLI, the Site Assistant, and any [Bring Your Own Coding Agent](/sites/coding-agent) workflow all talk to.
+This tab documents the **Orchestrator HTTP API** — the brain that runs editor sessions, calls the LLMs, and serves draft state to integrated sites. The same API is what the editor app, the `avocado-register` CLI, the Onboarding agent, and any [Bring Your Own Coding Agent](/sites/coding-agent) workflow all talk to.
 
 ## Status
 
@@ -36,7 +36,7 @@ The public surface groups into nine areas, mirroring the OpenAPI tags:
 |---|---|---|
 | **Sites** | Site registration and listing — `POST /sites/register`, `GET /sites` | The editor on mount, `avocado-register` CLI |
 | **Chat** | AI chat / planning — `POST /chat`, `POST /chat/start`, `GET /chat/stream`, `POST /chat/cancel` | Editor's per-edit chat panel |
-| **Sites Agent** | Site onboarding agent (migrate / integrate / create modes) — `POST /sites-agent/start`, `GET /sites-agent/stream`, `POST /sites-agent/respond`, `POST /sites-agent/cancel` | Editor's Site Assistant FAB |
+| **Sites Agent** | Site onboarding agent (migrate / integrate / create modes) — `POST /sites-agent/start`, `GET /sites-agent/stream`, `POST /sites-agent/respond`, `POST /sites-agent/cancel` | Editor's Onboarding agent FAB |
 | **Draft** | Draft content read endpoints — `GET /draft/pages`, `GET /draft/slugs`, `GET /draft/site-config`, `POST /draft/bootstrap` | The integrated site (called from `fetchEditorPage` / `createSitePage`) |
 | **Publish** | Publishing endpoints — `POST /publish`, `GET /publish/status`, `GET /publish/content` | Editor's publish flow |
 | **History** | Undo / redo / version log — `GET /history/log`, `GET /history/status`, `POST /history/undo`, `POST /history/redo`, `POST /history/restore` | Editor's history panel |

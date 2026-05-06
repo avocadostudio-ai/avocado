@@ -129,10 +129,10 @@ Both modes use the same block schemas, operation pipeline, and orchestrator back
   <Card title="Architecture" icon="sitemap" href="/architecture">
     How the three services, packages, and data flow fit together.
   </Card>
-  <Card title="Add a site — with the AI Site Agent" icon="robot" href="/sites/site-agent">
+  <Card title="Onboard a site — with the AI agent" icon="robot" href="/sites/site-agent">
     The agentic path. Describe your site or paste a URL / GitHub repo; the in-editor agent migrates, integrates, or scaffolds it for you.
   </Card>
-  <Card title="Add a site — code it yourself" icon="screwdriver-wrench" href="/sites/manual">
+  <Card title="Onboard a site — code it yourself" icon="screwdriver-wrench" href="/sites/manual">
     The manual path. Wire `@ai-site-editor/site-sdk` into your existing Next.js 15 project by hand (~30 min) or hand the work to your own coding agent (Codex / Claude Code / Cursor).
   </Card>
   <Card title="Visual editor" icon="hand-pointer" href="/integration/puck-mode">
@@ -144,7 +144,7 @@ Both modes use the same block schemas, operation pipeline, and orchestrator back
 
 - **Self-hostable, no license fees** — Run the entire stack on your own infrastructure. The smallest paid tier on any modern container host is enough for early use.
 - **Natural-language editing** — Describe changes in plain English. The AI generates structured, schema-validated operations you can preview and approve.
-- **Multi-model AI** — Anthropic, OpenAI, and Google Gemini for the per-edit chat. Most battle-tested with Claude (Haiku / Sonnet / Opus). The Site Assistant (full-site onboarding) is Claude-only today.
+- **Multi-model AI** — Anthropic, OpenAI, and Google Gemini for the per-edit chat. Most battle-tested with Claude (Haiku / Sonnet / Opus). The Onboarding agent (full-site onboarding) is Claude-only today.
 - **20 built-in block types** — Hero, CTA, FAQ, Testimonials, Gallery, Stats, Carousel, Table, and more. Bring your own React components via [Custom Blocks](/integration/custom-blocks).
 - **Type-safe operations** — Zod schemas validate every edit. Malformed AI output is rejected before it touches your content.
 - **Live preview + streaming** — See edits applied progressively as the AI generates the plan. No wait-and-pray.
@@ -158,7 +158,7 @@ Both modes use the same block schemas, operation pipeline, and orchestrator back
 1. [Core concepts](/concepts) — pages, blocks, operations, draft mode
 2. [How it works](/how-it-works) — the editing pipeline from chat to preview
 3. [Architecture](/architecture) — services, packages, data flow
-4. [Add a site](/sites) — bring an existing website into Avocado Studio (Site Assistant or by hand)
+4. [Add a site](/sites) — bring an existing website into Avocado Studio (Onboarding agent or by hand)
 5. [Next.js Integration](/integration/nextjs-integration) — canonical onboarding path for Next.js sites
 6. [Custom Blocks](/integration/custom-blocks) — register your own component types
 7. [Native Tools](/integration/tools-mvp) — connect PIM, DAM, search, AI image generators

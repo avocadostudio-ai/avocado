@@ -24,7 +24,7 @@ const de: LocaleDict = {
   // -- Preset-/Demo-Site-Onboarding-Banner (lokale Installation) --
   "presetBanner.title": "Du bearbeitest eine Demo-Site",
   "presetBanner.body": "Beispielinhalt zum Ausprobieren. Bereit für deine eigene?",
-  "presetBanner.ctaAgent": "✨ Mit KI-Agent hinzufügen",
+  "presetBanner.ctaAgent": "✨ Mit KI-Agent onboarden",
   "presetBanner.ctaManual": "oder selbst programmieren",
   "demo.placeholder": "Versuch: ändere die Hero-Überschrift zu \u2026",
   "header.moreOptions": "Weitere Optionen",
@@ -377,7 +377,7 @@ const de: LocaleDict = {
   "theme.dark": "Dunkler Modus",
 
   // -- Sites agent --
-  "sitesAgent.title": "Site Agent",
+  "sitesAgent.title": "Onboarding-Agent",
   "sitesAgent.clear": "Chat leeren",
   "sitesAgent.welcome": "Ich kann eine neue Seite erstellen, eine bestehende Website von ihrer URL migrieren oder den Editor in dein Next.js-Projekt integrieren. Was möchtest du tun?",
   "sitesAgent.placeholder": "Frag mich etwas...",

@@ -1,22 +1,22 @@
 ---
-title: "Site Assistant"
-sidebarTitle: "Site Assistant"
+title: "Onboarding agent"
+sidebarTitle: "Onboarding agent"
 description: "The AI agent built into the editor that brings sites into Avocado Studio. How to use it, what you need before you start, and how it runs under the hood."
 ---
 
-The **Site Assistant** is an AI agent built into the editor's *Sites* page. You describe what you want — *"migrate https&#x3A;//example.com"*, *"integrate the repo at ~/code/marketing-site"*, *"create a landing page for my coffee roastery"* — and it executes the full workflow end-to-end: scraping, analysis, scaffolding, image downloads, theme extraction, SDK wiring, and registration with the orchestrator.
+The **Onboarding agent** is an AI agent built into the editor's *Sites* page. You describe what you want — *"migrate https&#x3A;//example.com"*, *"integrate the repo at ~/code/marketing-site"*, *"create a landing page for my coffee roastery"* — and it executes the full workflow end-to-end: scraping, analysis, scaffolding, image downloads, theme extraction, SDK wiring, and registration with the orchestrator.
 
 Three modes (Migrate / Integrate / Create), one chat UI, two execution backends (your Claude subscription via the CLI, or pay-per-token via API key). Same end state regardless of which combination you pick.
 
 <Note>
-**Claude only — for now.** The Site Assistant runs exclusively on **Anthropic Claude**, on both backends. There is no OpenAI / Gemini / local-model code path: the CLI backend shells out to the official `claude` CLI, and the SDK backend uses `@anthropic-ai/claude-agent-sdk` against your `ANTHROPIC_API_KEY`. If you only have an `OPENAI_API_KEY`, the assistant will not run — you'll need a Claude subscription (free for the CLI backend) or an Anthropic API key.
+**Claude only — for now.** The Onboarding agent runs exclusively on **Anthropic Claude**, on both backends. There is no OpenAI / Gemini / local-model code path: the CLI backend shells out to the official `claude` CLI, and the SDK backend uses `@anthropic-ai/claude-agent-sdk` against your `ANTHROPIC_API_KEY`. If you only have an `OPENAI_API_KEY`, the assistant will not run — you'll need a Claude subscription (free for the CLI backend) or an Anthropic API key.
 
-This is *only* a constraint for the Site Assistant. The editor's per-edit chat (the AI you talk to *after* a site exists) already supports OpenAI and Anthropic — see [model selection](/integration/editor-quickstart). Multi-provider support for the Site Assistant is on the roadmap but not implemented today; if it matters to you, the **[Bring Your Own Coding Agent](/sites/coding-agent)** path lets you use any agent (Codex, Cursor, Aider, …) regardless of which model it runs on.
+This is *only* a constraint for the Onboarding agent. The editor's per-edit chat (the AI you talk to *after* a site exists) already supports OpenAI and Anthropic — see [model selection](/integration/editor-quickstart). Multi-provider support for the Onboarding agent is on the roadmap but not implemented today; if it matters to you, the **[Bring Your Own Coding Agent](/sites/coding-agent)** path lets you use any agent (Codex, Cursor, Aider, …) regardless of which model it runs on.
 </Note>
 
 ## Prerequisites
 
-Before you can run the Site Assistant for the first time, you need three layers of prerequisites: **base stack**, **mode-specific**, and **backend-specific**.
+Before you can run the Onboarding agent for the first time, you need three layers of prerequisites: **base stack**, **mode-specific**, and **backend-specific**.
 
 ### Base stack (always required)
 
@@ -43,7 +43,7 @@ If you only ever ran `pnpm dev`, you already have all of this.
 
 ### Backend-specific prerequisites
 
-The Site Assistant runs through one of two backends. Pick **one** and configure it before you start.
+The Onboarding agent runs through one of two backends. Pick **one** and configure it before you start.
 
 <Tabs>
   <Tab title="CLI backend (subscription, $0/token)">
@@ -95,7 +95,7 @@ The Site Assistant runs through one of two backends. Pick **one** and configure 
   </Tab>
 </Tabs>
 
-If neither backend is configured, the Site Assistant will still appear in the editor UI but every run will fail immediately. The error message tells you which one is missing.
+If neither backend is configured, the Onboarding agent will still appear in the editor UI but every run will fail immediately. The error message tells you which one is missing.
 
 ## How to use it
 
@@ -106,7 +106,7 @@ Once the prerequisites are in place, the actual usage flow is short.
     Visit `http://localhost:4100`. You should land on the **Sites** page (the editor's home screen).
   </Step>
 
-  <Step title="Open the Site Assistant">
+  <Step title="Open the Onboarding agent">
     Click the **floating action button** in the bottom-right corner of the Sites page. The chat panel slides open and shows three suggestion cards:
 
     - **Create a new site from scratch** — describe your site's purpose
@@ -204,7 +204,7 @@ The orchestrator launches `npx tsx <orchestrator>/src/migration/mcp-server-stdio
 **Vite env change isn't picked up**
 Restart `pnpm dev:editor`. Vite snapshots `import.meta.env.*` at startup; HMR doesn't re-evaluate `.env`.
 
-**The Site Assistant button isn't there**
+**The Onboarding agent button isn't there**
 You might be in a non-default editor route. Make sure you're on the **Sites** page (the editor's home, `http://localhost:4100`). The FAB only appears there.
 
 **The agent says "I need a URL" but I gave it one**

@@ -53,7 +53,7 @@ which one is running when you're debugging.
 | Path | Runs when | Where it lives | What it's good at |
 |---|---|---|---|
 | **REST variation pipeline** | Classic chat pipeline (`/chat` + intent detection) | `apps/orchestrator/src/chat/variation-pipeline.ts` | Dedicated LLM prompt, built-in image variation (Unsplash per-card + uniqueness enforcement), deterministic fallback when the LLM fails |
-| **Agent tool (`generate_variations`)** | Site Agent / agent SDK loop | `apps/orchestrator/src/agent/agent-tools.ts` (lines ~699-768) | Claude authors the variants *inside* its reasoning loop — no separate LLM call. Fast, tool-use-native, no image variation |
+| **Agent tool (`generate_variations`)** | Onboarding agent / agent SDK loop | `apps/orchestrator/src/agent/agent-tools.ts` (lines ~699-768) | Claude authors the variants *inside* its reasoning loop — no separate LLM call. Fast, tool-use-native, no image variation |
 
 Both surface to the user through the same React component, so end-user
 experience is consistent.
@@ -117,7 +117,7 @@ And for image-bearing blocks (`supportsImageVariation` = block has an
 
 ## Triggering variants (agent tool)
 
-When the Site Agent is active, Claude calls the `generate_variations` tool
+When the Onboarding agent is active, Claude calls the `generate_variations` tool
 directly. The prompt tells Claude to call `get_page` first to read current
 props, then author 2-4 materially different variations, each with a `title`,
 `summary`, and `patch`.

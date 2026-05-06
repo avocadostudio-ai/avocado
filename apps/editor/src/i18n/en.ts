@@ -23,7 +23,7 @@ const en = {
   // -- Preset/demo site onboarding banner (local install) --
   "presetBanner.title": "You're editing a demo site",
   "presetBanner.body": "Sample content to play with. Ready to bring in your own?",
-  "presetBanner.ctaAgent": "\u2728 Add with AI agent",
+  "presetBanner.ctaAgent": "\u2728 Onboard with AI agent",
   "presetBanner.ctaManual": "or code it yourself",
   "header.moreOptions": "More options",
   "header.publish": "Publish",
@@ -375,7 +375,7 @@ const en = {
   "theme.dark": "Dark mode",
 
   // -- Sites agent --
-  "sitesAgent.title": "Site Agent",
+  "sitesAgent.title": "Onboarding agent",
   "sitesAgent.clear": "Clear chat",
   "sitesAgent.welcome": "I can create a new site from scratch, migrate an existing website from its URL, or integrate the editor into your Next.js project. What would you like to do?",
   "sitesAgent.placeholder": "Ask me anything...",

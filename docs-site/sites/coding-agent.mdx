@@ -5,14 +5,14 @@ description: "Hand the integration to your own coding agent — Codex, Claude Co
 
 If you're already using a coding agent in your IDE (Codex, Claude Code, Cursor, Aider, Continue, etc.), you don't need to switch to ours. Hand it the prompt below, point it at the Avocado docs, and let it execute the integration in your existing workflow.
 
-**Why you might prefer this over our [Site Agent](/sites/site-agent)**:
+**Why you might prefer this over our [Onboarding agent](/sites/site-agent)**:
 
 - The agent already has full context on your codebase, conventions, and history
 - You want changes to flow through your existing review process (PRs, commit conventions, CI)
 - Your project has unusual structure (monorepo, custom build, non-standard routing) where our agent would struggle to land changes in the right place
 - Compliance / data residency reasons — the work happens in your environment, not ours
 
-**Why you might *not*** — see [Site Agent](/sites/site-agent) instead if you want:
+**Why you might *not*** — see [Onboarding agent](/sites/site-agent) instead if you want:
 
 - A single-click experience inside the editor with a live progress UI
 - Multi-agent execution (orchestrator + structure-analyzer + block-coder) for thorough URL migration
@@ -30,7 +30,7 @@ an open-source AI content operations platform. The full docs are at https://docs
 Add the @ai-site-editor/site-sdk to my project so the Avocado Content Studio
 can edit my content via Draft Mode, then register the site with the orchestrator
 so it appears in the editor's dashboard. Same end state as if I had used the
-built-in Site Agent.
+built-in Onboarding agent.
 
 ## Required reading (in order)
 1. https://docs.avocado.studio/concepts — page model, blocks, operations, draft mode
@@ -145,7 +145,7 @@ If your agent reports it can't proceed, the most common reasons:
 | Generates a `/preview` route | Confused embedded mode with old preview-route mode | Re-emphasize: **embedded mode, no `/preview` route**, Draft Mode cookies only |
 | Refactors your components into a Puck-style layout | Read too far ahead | Tell it to ignore Puck mode for this pass — that's a separate opt-in |
 
-If you're still stuck after that, fall back to the **[Site Agent](/sites/site-agent)** (which has Avocado-specific MCP tools and won't get confused by docs ambiguity) or the **[manual path](/sites/manual)**.
+If you're still stuck after that, fall back to the **[Onboarding agent](/sites/site-agent)** (which has Avocado-specific MCP tools and won't get confused by docs ambiguity) or the **[manual path](/sites/manual)**.
 
 ## After the agent finishes
 

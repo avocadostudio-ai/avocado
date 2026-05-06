@@ -1,7 +1,7 @@
 ---
 title: "Add a Site"
 sidebarTitle: "Overview"
-description: "Two ways to bring a website into Avocado Studio: let our Site Assistant do it for you, or code it yourself (by hand or with your own coding agent). Currently supports Next.js."
+description: "Two ways to bring a website into Avocado Studio: let our Onboarding agent do it for you, or code it yourself (by hand or with your own coding agent). Currently supports Next.js."
 ---
 
 <Note>
@@ -13,7 +13,7 @@ Avocado Studio manages websites as **sites** — each one has its own pages, blo
 There are **two ways** to get a site in — an **agentic** path (let our AI do it) and a **manual** path (write the integration yourself):
 
 <CardGroup cols={2}>
-  <Card title="Agentic — Site Assistant" icon="robot" href="/sites/site-agent">
+  <Card title="Agentic — Onboarding agent" icon="robot" href="/sites/site-agent">
     A built-in AI agent that runs end-to-end inside the editor. You describe what you want and it does the work — scraping, scaffolding, wiring the SDK, registering the site. **Three modes:** migrate from a public website URL, integrate a Next.js GitHub repo, or create from scratch.
   </Card>
   <Card title="Manual — code it yourself" icon="screwdriver-wrench" href="/sites/manual">
@@ -27,17 +27,17 @@ Both approaches produce the same end state: a Next.js site registered with the o
 
 | If you… | Use this |
 |---|---|
-| Want the fastest possible result | **Site Assistant** |
-| Have a **public website URL** (any tech) and want AI to scrape it and rebuild it as a Next.js site | **Site Assistant → Migrate** |
-| Have an **existing Next.js project on GitHub** and want AI to clone it and wire the SDK in | **Site Assistant → Integrate** |
-| Have just an idea and want AI to scaffold a fresh Next.js site for you | **Site Assistant → Create** |
+| Want the fastest possible result | **Onboarding agent** |
+| Have a **public website URL** (any tech) and want AI to scrape it and rebuild it as a Next.js site | **Onboarding agent → Migrate** |
+| Have an **existing Next.js project on GitHub** and want AI to clone it and wire the SDK in | **Onboarding agent → Integrate** |
+| Have just an idea and want AI to scaffold a fresh Next.js site for you | **Onboarding agent → Create** |
 | Want to understand every change yourself | **Code it yourself → Manual** |
 | Have a coding agent in your IDE already (Codex, Claude Code, Cursor…) | **Code it yourself → Bring your own agent** |
 | Have an unusual Next.js setup our agent might not understand | **Code it yourself → Bring your own agent** |
 
-## Use our Site Assistant
+## Use our Onboarding agent
 
-The Site Assistant is an AI agent in the editor's *Sites* page. Pick one of three modes from your first message:
+The Onboarding agent is an AI agent in the editor's *Sites* page. Pick one of three modes from your first message:
 
 | Mode | Starting point | What it does |
 |---|---|---|
@@ -45,9 +45,9 @@ The Site Assistant is an AI agent in the editor's *Sites* page. Pick one of thre
 | **Integrate** | An **existing Next.js project on GitHub** (public or private repo URL, or a local clone) | Clones the repo, analyzes the codebase, wires `@ai-site-editor/site-sdk` into your existing Next.js app, registers the site |
 | **Create** | A **natural-language description** of the site you want | Scaffolds a fresh Next.js site with starter blocks, theme, and pages from your description |
 
-**Heads up: Claude only.** The Site Assistant runs exclusively on Anthropic Claude (via your Claude subscription or an `ANTHROPIC_API_KEY`). An OpenAI key alone won't work for *this* path — though the editor's per-edit chat supports OpenAI or Anthropic once a site exists. If you need a different model, use the **[Bring Your Own Coding Agent](/sites/coding-agent)** path with any agent you like.
+**Heads up: Claude only.** The Onboarding agent runs exclusively on Anthropic Claude (via your Claude subscription or an `ANTHROPIC_API_KEY`). An OpenAI key alone won't work for *this* path — though the editor's per-edit chat supports OpenAI or Anthropic once a site exists. If you need a different model, use the **[Bring Your Own Coding Agent](/sites/coding-agent)** path with any agent you like.
 
-→ Full reference: **[Site Assistant](/sites/site-agent)** (modes, prerequisites, CLI vs SDK billing, troubleshooting)
+→ Full reference: **[Onboarding agent](/sites/site-agent)** (modes, prerequisites, CLI vs SDK billing, troubleshooting)
 
 ## Code it yourself
 
