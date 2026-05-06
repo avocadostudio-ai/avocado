@@ -32,6 +32,32 @@ ok()   { echo -e "${GREEN}✓${NC} $*"; }
 warn() { echo -e "${YELLOW}!${NC} $*" >&2; }
 die()  { echo -e "${RED}✗${NC} $*" >&2; exit 1; }
 
+# Run a command while showing a spinner + label, so the user sees progress
+# during otherwise-silent steps (e.g. corepack's first-time pnpm download).
+# Usage: spin "label" cmd args...
+spin() {
+  local label="$1"; shift
+  if [[ ! -t 1 ]]; then
+    "$@"
+    return $?
+  fi
+  local tmp; tmp="$(mktemp)"
+  "$@" >"$tmp" 2>&1 &
+  local pid=$!
+  local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  local i=0 start=$SECONDS
+  while kill -0 "$pid" 2>/dev/null; do
+    local f="${frames:i++%${#frames}:1}"
+    printf "\r${DIM}%s${NC} %s ${DIM}(%ss)${NC}   " "$f" "$label" "$((SECONDS - start))"
+    sleep 0.1
+  done
+  wait "$pid"; local rc=$?
+  printf "\r\033[K"
+  if (( rc != 0 )); then cat "$tmp" >&2; fi
+  rm -f "$tmp"
+  return $rc
+}
+
 # --- Args -----------------------------------------------------------------
 
 for arg in "$@"; do
@@ -103,8 +129,9 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # Verify pnpm resolves to the pinned version (from packageManager field).
-# Corepack handles this transparently; this just confirms the binary works.
-if ! pnpm --version >/dev/null 2>&1; then
+# Corepack handles this transparently; on first invocation it silently
+# downloads the pinned pnpm (~10-30s), so wrap it in a spinner.
+if ! spin "fetching pinned pnpm via corepack" pnpm --version; then
   die "pnpm not usable. Try: corepack prepare --activate"
 fi
 ok "pnpm $(pnpm --version)"
