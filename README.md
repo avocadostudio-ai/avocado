@@ -14,34 +14,48 @@ Teams spend too much time on routine content updates — tweaking copy, adding s
 
 Built for **developers** and **agencies** integrating AI editing into client sites, and **site owners** who want to manage content without touching code. Self-hosted, no vendor lock-in, no per-seat pricing.
 
+**Try it locally in 30 seconds** (Node 22+, one LLM API key):
+
+```bash
+git clone https://github.com/avocadostudio-ai/avocado.git && cd avocado
+./start
+```
+
+Opens the Content Studio at `http://localhost:4100`. Full prerequisites, environment variables, and CMS examples are in [Quick Start](#quick-start) below.
+
 ## Key Features
+
+### Works with any LLM
+
+- **Anthropic, OpenAI, and Google Gemini** — pick the planner per request, per environment, or per model tier. No vendor lock-in; the same prompts and operations run unchanged across providers. Anthropic Claude (Haiku / Sonnet / Opus) is the most battle-tested.
+- **Tiered model routing** — fast models for intent detection, balanced for routine edits, reasoning models for restructuring. Override per provider via `OPENAI_MODEL_*` / `ANTHROPIC_MODEL_*` env vars.
+- **Extended thinking** auto-enabled on Anthropic for complex prompts. SSE-streamed `thinking_token` events let the Content Studio render a collapsible "Thinking…" block.
+- **Streaming end-to-end** — operations stream back as the LLM produces them, validate against Zod schemas, and apply incrementally. Users see progress at ~800 ms intervals, not a single final dump.
+- **MCP server bundled** — drive Avocado Studio from Claude Desktop, Claude Code, Cursor, or any [Model Context Protocol](https://modelcontextprotocol.io/) host. 40 tools cover pages, blocks, media, publishing, history, and the planner itself. Both stdio and streamable-HTTP transports. See [`apps/mcp-server/`](apps/mcp-server/).
+
+### Works with your website stack
+
+- **Next.js 15+** via the [Site SDK](packages/site-sdk/) — drop in a few API routes and your existing site becomes editable. App Router and React Server Components compatible.
+- **Any CMS** — JSON files, Contentful, Sanity, and Strapi adapters out of the box (see [`examples/`](examples/)). Implement one interface to wire up your own.
+- **Custom React blocks** — register your components alongside the 20 built-ins. The AI planner reads their Zod schemas and edits them like any built-in block.
+- **Pluggable publishing** — Git-based snapshots and Vercel deploy hooks ship by default. Implement the `PublishTarget` interface for any other deploy workflow (Netlify, S3, push-to-CMS, etc.).
+- **Self-hosted, MIT-licensed** — run on Render, Vercel, Docker, or your own infra. No per-seat pricing. Optional demo mode for locked-down public playgrounds.
+- **Durable sessions** — SQLite-backed state with WAL, transactional writes, capped undo/redo + version log, and rolling backups. No data loss on restart.
 
 ### AI Content Studio
 
-- **Visual AI workspace** — Split-pane UI with your live site on the left and a chat interface on the right. Describe changes in natural language, see them applied in real time
-- **Plan review + approval** — Every change is presented as a reviewable plan before it's applied. Nothing ships without your sign-off
-- **Undo/redo** — Full operation history. Roll back any change instantly
-- **Streaming UX** — Progressive updates as the AI generates the plan, not a loading spinner followed by a wall of changes
-- **AI image handling** — Generate images with DALL-E, search Unsplash, or browse Google Drive — all from within the content studio
-
-### Multi-Model AI
-
-- **Anthropic, OpenAI, Google Gemini** — Choose your AI provider per request. Switch models without changing code. While all three providers are supported, the system is most battle-tested with Anthropic models (Haiku, Sonnet, and Opus)
-- **Tiered model selection** — Fast models for simple edits, reasoning models for complex restructuring
+- **Visual AI workspace** — split-pane UI with your live site on the left, chat on the right. Describe changes in natural language; watch them apply in real time.
+- **Plan review + approval** — every change is presented as a reviewable plan before it's applied. Nothing ships without your sign-off.
+- **Undo / redo** — full operation history. Roll back any change instantly.
+- **Streaming UX** — progressive op application as the AI generates the plan; no loading spinner followed by a wall of changes.
+- **AI image handling** — generate with Gemini or DALL-E, search Unsplash, or browse Google Drive — all from inside the studio.
+- **i18n** — Content Studio UI and AI responses support multiple languages (English + German today; adding a locale is a few-line change).
 
 ### Blocks & Type Safety
 
-- **20 built-in block types** — Production-ready content blocks that cover the most common website patterns: Hero banners, CTAs, FAQ accordions, Testimonials, Feature grids, Image galleries, Stats counters, Carousels, Data tables, Tabbed content, Video embeds, and more. Each block has a typed schema, responsive rendering, and AI-ready field metadata so the planner knows exactly what it can edit
-- **Custom blocks** — Register your own React components alongside built-in blocks. The AI planner automatically picks up their schemas and can operate on them like any built-in block
-- **Zod-validated operations** — Every edit operation is type-checked at runtime. Malformed edits are rejected before they touch your content
-
-### Integration & Deployment
-
-- **Site SDK** — Add AI editing to any Next.js 15+ site with a few API routes
-- **CMS integrations** — Working examples for Sanity, Strapi, and Contentful
-- **Publishing pipeline** — Pluggable publish targets. Ships with Git + Vercel deploy hook support out of the box; implement the `PublishTarget` interface to connect your own deployment workflow
-- **i18n** — Multi-language Content Studio UI and AI responses (currently English and German; extensible)
-- **Self-hosted** — Run the entire stack on your own infrastructure
+- **20 built-in block types** — Hero banners, CTAs, FAQ accordions, Testimonials, Feature grids, Image galleries, Stats counters, Carousels, Data tables, Tabbed content, Video embeds, and more. Each block ships with a typed schema, responsive rendering, and AI-ready field metadata so the planner knows exactly what it can edit.
+- **Zod-validated operations** — every edit is type-checked at runtime. Malformed edits are rejected before they touch your content.
+- **Atomic op application** — multi-op plans apply or roll back as a unit. No half-applied state.
 
 ## Quick Start
 
@@ -73,6 +87,18 @@ pnpm dev:start           # start all 3 services (backgrounded)
 | Orchestrator     | http://localhost:4200   | Backend API that plans and executes edits          |
 
 Open the **Content Studio** at `http://localhost:4100` to start editing your site through chat.
+
+### What's next: bring in your own site
+
+The site you see at `:3000` is a **demo** — sample content so you can try the editor immediately. When you're ready to use Avocado Studio on a real site, you have three paths:
+
+| Path | Best for | Time | Docs |
+|---|---|---|---|
+| **Site Assistant** (in-editor AI agent) | Fastest result. Migrate from a public URL, integrate an existing Next.js repo, or scaffold from a description | ~5–15 min | [Site Assistant guide](https://docs.avocadostudio.ai/sites/site-agent) |
+| **Manual integration** | You want to understand every change yourself | ~30 min | [Manual integration](https://docs.avocadostudio.ai/sites/manual) |
+| **Bring your own coding agent** | You already use Codex / Claude Code / Cursor in your IDE | ~15 min | [BYO agent](https://docs.avocadostudio.ai/sites/coding-agent) |
+
+In the editor, click **Sites → Add site** to start the Site Assistant flow, or follow the manual docs to wire `@ai-site-editor/site-sdk` into your existing Next.js project.
 
 ### Environment
 

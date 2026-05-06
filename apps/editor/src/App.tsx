@@ -1342,6 +1342,16 @@ function EditorPage({
           </div>
         </header>
 
+        {!IS_DEMO_MODE && PRESET_SITE_IDS.has(siteId) && activeTab === "chat" ? (
+          <div className="preset-banner" role="note" aria-label="Demo site onboarding notice">
+            <div className="preset-banner-title">{t("presetBanner.title")}</div>
+            <div className="preset-banner-body">{t("presetBanner.body")}</div>
+            <a className="preset-banner-cta" href="/sites">
+              {t("presetBanner.cta")} →
+            </a>
+          </div>
+        ) : null}
+
         {IS_DEMO_MODE && activeTab === "chat" ? (
           <div className="demo-banner" role="note" aria-label="Demo mode notice">
             <div className="demo-banner-title">{t("demo.bannerTitle")}</div>

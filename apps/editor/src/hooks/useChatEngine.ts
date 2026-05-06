@@ -40,6 +40,8 @@ import { useEditorStore } from "../store"
 import { getSessionId, getSiteId } from "../store/session"
 import type { PreviewBridgeFns } from "./chat-engine/types"
 
+const PRESET_SITE_IDS = new Set(["avocado-hub", "avocado-stories", "avocado-magic", "avocado-odyssey"])
+
 export type ChatEngineConfig = PreviewBridgeFns & {
   activeSiteConfig: SiteConfig
   componentManifest?: BlockManifest | null
@@ -151,8 +153,9 @@ export function useChatEngine(config: ChatEngineConfig) {
     return suggestions.slice(0, 4)
   }
 
+  const isPresetDemoSite = PRESET_SITE_IDS.has(siteId)
   const welcomeText = activeSiteConfig.name
-    ? t("welcome.greeting", { name: activeSiteConfig.name })
+    ? t(isPresetDemoSite ? "welcome.greetingDemo" : "welcome.greeting", { name: activeSiteConfig.name })
     : t("welcome.greetingFallback")
 
   const buildWelcomeEntry = (slugs?: string[], blocks?: Array<{ type: string }>): ChatEntry => ({

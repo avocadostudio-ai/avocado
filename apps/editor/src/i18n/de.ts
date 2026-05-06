@@ -20,6 +20,11 @@ const de: LocaleDict = {
   "demo.tryExample1": "Ändere die Hero-Überschrift zu \"Willkommen auf meiner neuen Seite\"",
   "demo.tryExample2": "Lass die Hero-Unterzeile verspielter klingen",
   "demo.tryExample3": "Aktualisiere den Hero-CTA zu \"Jetzt starten\"",
+
+  // -- Preset-/Demo-Site-Onboarding-Banner (lokale Installation) --
+  "presetBanner.title": "Du bearbeitest eine Demo-Site",
+  "presetBanner.body": "Das ist Beispielinhalt, damit du sehen kannst, wie Avocado Studio funktioniert. Wenn du bereit bist, bring deine eigene Site mit — migriere von einer öffentlichen URL, integriere ein bestehendes Next.js-Repo oder erstelle eine neue.",
+  "presetBanner.cta": "Eigene Site hinzufügen",
   "demo.placeholder": "Versuch: ändere die Hero-Überschrift zu \u2026",
   "header.moreOptions": "Weitere Optionen",
   "header.publish": "Veröffentlichen",
@@ -311,6 +316,7 @@ const de: LocaleDict = {
   // -- Welcome & suggestions --
   "welcome.greeting": "Willkommen bei {{name}}! Sag mir, was du ändern möchtest \u2014 ich kann Bereiche hinzufügen, Texte umschreiben, neue Seiten erstellen und mehr.",
   "welcome.greetingFallback": "Lass uns deine Seite in etwas Besonderes verwandeln. Ich kann Bereiche hinzuf\u00FCgen, Texte umschreiben, Bl\u00F6cke umordnen, neue Seiten erstellen und mehr. Klicke auf etwas in der Vorschau oder sag mir, was du \u00E4ndern m\u00F6chtest.",
+  "welcome.greetingDemo": "Willkommen bei {{name}} \u2014 das ist eine Demo-Site zum Ausprobieren. Bearbeite, was du willst; wenn du bereit bist, bring deine eigene Site auf der **Sites**-Seite an.",
   "suggestion.rewriteHero": "Hero-Überschrift umschreiben",
   "suggestion.addTestimonials": "Einen Testimonial-Bereich hinzufügen",
   "suggestion.addFaq": "Einen FAQ-Bereich hinzufügen",
