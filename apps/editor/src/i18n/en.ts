@@ -20,11 +20,6 @@ const en = {
   "demo.tryExample3": "Update the hero CTA to \"Get Started\"",
   "demo.placeholder": "Try: change the hero headline to \u2026",
 
-  // -- Preset/demo site onboarding banner (local install) --
-  "presetBanner.title": "You're in a demo site",
-  "presetBanner.body": "Bring in your own \u2014 migrate from a URL, integrate a Next.js repo, or create from scratch.",
-  "presetBanner.ctaAgent": "\u2728 Onboard your site",
-  "presetBanner.ctaManual": "or set it up myself",
   "header.moreOptions": "More options",
   "header.publish": "Publish",
   "header.publishing": "Publishing",
@@ -315,7 +310,7 @@ const en = {
   // -- Welcome & suggestions --
   "welcome.greeting": "Welcome to {{name}}! Tell me what you'd like to change \u2014 I can add sections, rewrite copy, create new pages, and more.",
   "welcome.greetingFallback": "Let's shape your site into something people remember. Tell me what you'd like to change.",
-  "welcome.greetingDemo": "Welcome to {{name}} \u2014 this is a demo site so you can try things out. Edit anything you like; when you're ready, bring in your own site from the **Sites** page.",
+  "welcome.greetingDemo": "Welcome to {{name}} \u2014 this is a demo site so you can try things out. Edit anything you like; when you're ready, [onboard your own site](https://docs.avocadostudio.dev/sites).",
   "suggestion.rewriteHero": "Rewrite the hero headline",
   "suggestion.addTestimonials": "Add a testimonials section",
   "suggestion.addFaq": "Add an FAQ section",
