@@ -9,9 +9,10 @@ Avocado Studio is a pnpm monorepo with four apps and eight packages:
 
 ```mermaid
 graph TD
-    subgraph Editor["Content Studio (:4100) — Vite + React"]
-        Chat["Chat Panel<br/>User types 'add a hero'"]
-        Preview["Site iframe<br/>Live preview of your website"]
+    subgraph Clients["Clients — pick any (or both)"]
+        direction TB
+        Editor["<b>Content Studio (:4100)</b><br/>Vite + React<br/>Chat panel · live preview iframe"]
+        MCP["<b>MCP Server</b><br/>stdio + streamable HTTP<br/>Claude Desktop · Claude Code · any MCP host"]
     end
 
     subgraph Orchestrator["Orchestrator (:4200) — Fastify API"]
@@ -27,10 +28,13 @@ graph TD
         S3["Block manifest API"]
     end
 
-    Chat -->|"HTTP (REST + SSE)"| Orchestrator
-    Preview <-->|"postMessage"| Site
+    Editor -->|"HTTP (REST + SSE)"| Orchestrator
+    MCP -->|"HTTP (REST)"| Orchestrator
+    Editor <-->|"postMessage"| Site
     Orchestrator <-->|"HTTP"| Site
 ```
+
+The orchestrator has **two parallel front doors**: the Content Studio web app for humans, and the MCP server for AI assistants. Both go through the same operation pipeline — Zod validation, undo history, version log, demo-mode gating — so anything you can do in the web editor, you can do from Claude Desktop or Claude Code (and vice versa). See [MCP Server](/integration/mcp-server) for the tool catalog and host setup.
 
 ## Data Flow: From Chat to Preview
 

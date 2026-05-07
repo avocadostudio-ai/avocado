@@ -55,6 +55,12 @@
         "tab": "Integration",
         "groups": [
           {
+            "group": "Connect from AI Assistants",
+            "pages": [
+              "integration/mcp-server"
+            ]
+          },
+          {
             "group": "Getting Started",
             "pages": [
               "integration/index",
@@ -70,8 +76,7 @@
             "pages": [
               "integration/non-nextjs",
               "integration/tools-mvp",
-              "integration/jira",
-              "integration/mcp-server"
+              "integration/jira"
             ]
           }
         ]
