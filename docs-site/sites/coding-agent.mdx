@@ -24,7 +24,7 @@ Copy this into your coding agent's chat. Replace the bracketed placeholders with
 
 ````markdown
 You are integrating my Next.js project at [PROJECT_PATH] with Avocado Studio,
-an open-source AI content operations platform. The full docs are at https://docs.avocado.studio (or run locally — see below).
+an open-source AI content operations platform. The full docs are at https://docs.avocadostudio.dev (or run locally — see below).
 
 ## Goal
 Add the @ai-site-editor/site-sdk to my project so the Avocado Content Studio
@@ -33,10 +33,10 @@ so it appears in the editor's dashboard. Same end state as if I had used the
 built-in Onboarding agent.
 
 ## Required reading (in order)
-1. https://docs.avocado.studio/concepts — page model, blocks, operations, draft mode
-2. https://docs.avocado.studio/integration/nextjs-integration — the canonical contract
-3. https://docs.avocado.studio/integration/custom-blocks — only if my project has custom React components I want editable
-4. https://docs.avocado.studio/integration/non-nextjs — only if I'm not on Next.js
+1. https://docs.avocadostudio.dev/concepts — page model, blocks, operations, draft mode
+2. https://docs.avocadostudio.dev/integration/nextjs-integration — the canonical contract
+3. https://docs.avocadostudio.dev/integration/custom-blocks — only if my project has custom React components I want editable
+4. https://docs.avocadostudio.dev/integration/non-nextjs — only if I'm not on Next.js
 
 Read these pages BEFORE writing any code. Do not skim. The contract is exact.
 
@@ -121,10 +121,10 @@ When you're done, tell me:
 
 ## Reading the docs offline
 
-If you'd rather have your agent read the docs from your local checkout instead of fetching them from the internet, point it at the `docs-site/` directory of the [Avocado repo](https://github.com/yu7321/avocado):
+If you'd rather have your agent read the docs from your local checkout instead of fetching them from the internet, point it at the `docs-site/` directory of the [Avocado repo](https://github.com/avocadostudio-ai/avocado):
 
 ```bash
-git clone https://github.com/yu7321/avocado.git /tmp/avocado
+git clone https://github.com/avocadostudio-ai/avocado.git /tmp/avocado
 # then in your prompt:
 # "Required reading: read these files in order:
 #   /tmp/avocado/docs-site/concepts.mdx

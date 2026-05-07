@@ -1,13 +1,13 @@
 ---
 title: "Docker Deployment"
-description: "Deploy the orchestrator as a self-contained Docker image. The orchestrator is the one part of Avocado Studio that isn't open source today — Docker is the supported self-hosting path."
+description: "Deploy the orchestrator as a self-contained Docker image. Avocado Studio is Apache 2.0 — the orchestrator source lives in the public repo and Docker is the supported self-hosting path."
 ---
 
 <Note>
-**The orchestrator is not open source today.** Avocado Studio is built from three layers: the **site templates**, the **editor app**, and the **`@ai-site-editor/site-sdk`** are all source-distributed and live in the public repo — you can read, fork, and self-host them directly. The **orchestrator** (the brain that runs sessions, calls the LLMs, and serves draft state) is the one component that we don't currently release under an open-source license. Docker is the supported path for running it on your own infrastructure. If you need access to the orchestrator image or source for self-hosting, [open an issue](https://github.com/yu7321/avocado/issues) or reach out — we'll work with you.
+The full Avocado Studio stack — site templates, editor app, `@ai-site-editor/site-sdk`, and the orchestrator — is open source under Apache 2.0 and lives in [`avocadostudio-ai/avocado`](https://github.com/avocadostudio-ai/avocado). The orchestrator (the brain that runs sessions, calls the LLMs, and serves draft state) is the only stateful service in the stack — Docker is the supported path for running it on your own infrastructure. If you need help self-hosting, [open an issue](https://github.com/avocadostudio-ai/avocado/issues).
 </Note>
 
-For self-hosted deployments of the orchestrator, you run it as a Docker container on any host that supports long-lived containers with a persistent volume. The site templates and editor app remain source-distributed and deploy as static / serverless apps to Vercel, Netlify, or any other host that runs Next.js / Vite.
+For self-hosted deployments of the orchestrator, you run it as a Docker container on any host that supports long-lived containers with a persistent volume. The site templates and editor app deploy as static / serverless apps to Vercel, Netlify, or any other host that runs Next.js / Vite.
 
 ## Where to host the orchestrator
 

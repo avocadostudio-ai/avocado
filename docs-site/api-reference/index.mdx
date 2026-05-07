@@ -25,7 +25,7 @@ This tab documents the **Orchestrator HTTP API** — the brain that runs editor 
 2. The editor's network calls — open browser devtools, perform an action, and inspect what the editor sends to the orchestrator.
 3. The [`avocado-register` CLI source](/integration/nextjs-integration#walkthrough) for a complete worked example of `POST /sites/register`.
 
-We plan to upgrade this spec to a real, complete OpenAPI document by attaching Zod schemas to the most-used routes via [`fastify-type-provider-zod`](https://github.com/turkerdev/fastify-type-provider-zod) — which would also add runtime validation as a side benefit. There's no timeline for that work; if you need it sooner, [open an issue](https://github.com/yu7321/avocado/issues) describing your use case so we can prioritize.
+We plan to upgrade this spec to a real, complete OpenAPI document by attaching Zod schemas to the most-used routes via [`fastify-type-provider-zod`](https://github.com/turkerdev/fastify-type-provider-zod) — which would also add runtime validation as a side benefit. There's no timeline for that work; if you need it sooner, [open an issue](https://github.com/avocadostudio-ai/avocado/issues) describing your use case so we can prioritize.
 </Warning>
 
 ## What the orchestrator exposes (high level)
@@ -69,6 +69,6 @@ Run this any time after adding, removing, or renaming a route on the orchestrato
 
 If an operation here is missing, mislabeled, or you need a request/response shape that isn't documented:
 
-- For **missing schemas** (the placeholder situation above): file an issue at [github.com/yu7321/avocado](https://github.com/yu7321/avocado/issues) describing which route you need and your use case. This helps prioritize the Zod-schema upgrade work.
+- For **missing schemas** (the placeholder situation above): file an issue at [github.com/avocadostudio-ai/avocado](https://github.com/avocadostudio-ai/avocado/issues) describing which route you need and your use case. This helps prioritize the Zod-schema upgrade work.
 - For **outright bugs** (an endpoint listed here doesn't exist on the running orchestrator): the spec is stale — either the orchestrator changed without re-running `export-openapi`, or there's a bug in the route filter. Open an issue with `[api-reference]` in the title.
 - For **internal routes that shouldn't be public**: the route filter at `apps/orchestrator/src/index.ts` (`INTERNAL_ROUTE_PREFIXES`) decides what's filtered. Add your prefix there and re-run the export.
