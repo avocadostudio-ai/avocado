@@ -6,6 +6,10 @@ description: "Three ways to bring a website into Avocado Studio: let our Onboard
 
 Avocado Studio manages websites as **sites** — each with its own pages, blocks, theme, and publishing target. Before you can edit anything, you need at least one site registered with the orchestrator. There are three ways to get there. Pick whichever matches your trust level for AI and your appetite for hands-on integration work.
 
+<Note>
+**Next.js only (officially tested).** Avocado Studio is currently built and tested against **Next.js 15+ (App Router)**. Every path on this page assumes your site is — or will be — a Next.js project. If you're on Astro / Remix / SvelteKit / Hono / etc., the SDK ships framework-agnostic `/core` primitives you can wire up by hand — see [Non-Next.js Integration](/integration/non-nextjs). The patterns are real and the primitives work, but you'll be a first mover and should expect to file bugs.
+</Note>
+
 <CardGroup cols={3}>
   <Card title="Use our Onboarding agent" icon="robot" href="/sites/site-agent">
     A built-in AI agent that runs end-to-end inside the editor. Three modes: **Migrate** a public URL, **Integrate** an existing Next.js repo, or **Create** from a description. Fastest path; early-stage — treat its first pass as a draft.
@@ -17,10 +21,6 @@ Avocado Studio manages websites as **sites** — each with its own pages, blocks
     Skip AI entirely. Follow our integration docs, write the code yourself. ~30 minutes for a vanilla Next.js 15 App Router site. Every line is yours, no surprises.
   </Card>
 </CardGroup>
-
-<Note>
-**Next.js only (officially tested).** Avocado Studio is currently built and tested against **Next.js 15+ (App Router)**. Every path on this page assumes your site is — or will be — a Next.js project. If you're on Astro / Remix / SvelteKit / Hono / etc., the SDK ships framework-agnostic `/core` primitives you can wire up by hand — see [Non-Next.js Integration](/integration/non-nextjs). The patterns are real and the primitives work, but you'll be a first mover and should expect to file bugs.
-</Note>
 
 All three paths produce the same end state: a Next.js site registered with the orchestrator, with pages, theme, and a wired-in [Site SDK](/integration/nextjs-integration), editable from the Content Studio.
 
