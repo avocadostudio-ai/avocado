@@ -4,6 +4,13 @@ import { useT } from "@/i18n"
 
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1"
 
+function formatRecordingTime(ms: number) {
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`
+}
+
 type Props = {
   message: string
   isLoading: boolean
@@ -24,6 +31,7 @@ export default function ClaudeStyleChatInput(props: Props) {
   const { message, isLoading, onMessageChange, onSubmit, onCancel, onTranscribeAudio, onInterpretImage, onUploadImage, onAutoHeightChange, selectionModeEnabled, onToggleSelectionMode, compact } = props
   const { t } = useT()
   const [isRecording, setIsRecording] = useState(false)
+  const [recordingElapsedMs, setRecordingElapsedMs] = useState(0)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false)
@@ -38,14 +46,21 @@ export default function ClaudeStyleChatInput(props: Props) {
   const stopActionRef = useRef<"cancel" | "confirm" | null>(null)
 
   function syncComposerHeight() {
-    const textarea = textareaRef.current
     const shell = shellRef.current
-    if (!textarea || !shell) return
+    if (!shell) return
+    const textarea = textareaRef.current
 
-    // Temporarily collapse so scrollHeight reflects only content, not available space
-    textarea.style.height = "0px"
-    textarea.style.overflowY = "hidden"
-    const naturalHeight = textarea.scrollHeight
+    let target = 0
+    if (textarea) {
+      // Temporarily collapse so scrollHeight reflects only content, not available space
+      textarea.style.height = "0px"
+      textarea.style.overflowY = "hidden"
+      const naturalHeight = textarea.scrollHeight
+      const maxTextareaHeight = 220
+      target = Math.min(maxTextareaHeight, Math.max(20, naturalHeight))
+      textarea.style.height = `${target}px`
+      textarea.style.overflowY = naturalHeight > target ? "auto" : "hidden"
+    }
 
     const shellStyle = getComputedStyle(shell)
     const shellPaddingTop = parseFloat(shellStyle.paddingTop) || 0
@@ -67,12 +82,6 @@ export default function ClaudeStyleChatInput(props: Props) {
         }
       }
     }
-
-    // Hard cap on textarea growth (absolute max before scrolling)
-    const maxTextareaHeight = 220
-    const target = Math.min(maxTextareaHeight, Math.max(20, naturalHeight))
-    textarea.style.height = `${target}px`
-    textarea.style.overflowY = naturalHeight > target ? "auto" : "hidden"
 
     // Report the ideal total height to the parent so the grid row can grow.
     const shellBorderV = (parseFloat(shellStyle.borderTopWidth) || 0) + (parseFloat(shellStyle.borderBottomWidth) || 0)
@@ -118,6 +127,19 @@ export default function ClaudeStyleChatInput(props: Props) {
     window.addEventListener("resize", onResize)
     return () => window.removeEventListener("resize", onResize)
   }, [])
+
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingElapsedMs(0)
+      return
+    }
+    const startedAt = performance.now()
+    setRecordingElapsedMs(0)
+    const id = window.setInterval(() => {
+      setRecordingElapsedMs(performance.now() - startedAt)
+    }, 250)
+    return () => window.clearInterval(id)
+  }, [isRecording])
 
   function supportsRecording() {
     return typeof window !== "undefined" && typeof window.MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia
@@ -277,36 +299,44 @@ export default function ClaudeStyleChatInput(props: Props) {
         }}
       />
       <div className="composer-input-area">
-        <textarea
-          ref={textareaRef}
-          placeholder={IS_DEMO_MODE ? t("demo.placeholder") : t("chatInput.placeholder")}
-          value={message}
-          onChange={(e) => {
-            onMessageChange(e.target.value)
-            syncComposerHeight()
-          }}
-          onInput={() => syncComposerHeight()}
-          onPaste={(e) => {
-            const items = e.clipboardData?.items
-            if (!items) return
-            for (const item of items) {
-              if (!item.type?.startsWith("image/")) continue
-              const file = item.getAsFile()
-              if (!file) continue
-              e.preventDefault()
-              void handleImagePaste(file, file.type || "image/png")
-              return
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !micBusy && !isUploadingImage && !isAnalyzingImage) {
-              e.preventDefault()
-              onSubmit()
-            }
-          }}
-          rows={1}
-        />
-        {isRecording ? <div className="composer-input-note">{t("chatInput.listening")}</div> : null}
+        {!isRecording && (
+          <textarea
+            ref={textareaRef}
+            placeholder={IS_DEMO_MODE ? t("demo.placeholder") : t("chatInput.placeholder")}
+            value={message}
+            onChange={(e) => {
+              onMessageChange(e.target.value)
+              syncComposerHeight()
+            }}
+            onInput={() => syncComposerHeight()}
+            onPaste={(e) => {
+              const items = e.clipboardData?.items
+              if (!items) return
+              for (const item of items) {
+                if (!item.type?.startsWith("image/")) continue
+                const file = item.getAsFile()
+                if (!file) continue
+                e.preventDefault()
+                void handleImagePaste(file, file.type || "image/png")
+                return
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !micBusy && !isUploadingImage && !isAnalyzingImage) {
+                e.preventDefault()
+                onSubmit()
+              }
+            }}
+            rows={1}
+          />
+        )}
+        {isRecording ? (
+          <div className="composer-input-note composer-input-note-listening">
+            <span className="composer-rec-dot" aria-hidden="true" />
+            <span className="composer-rec-label">{t("chatInput.listening")}</span>
+            <span className="composer-rec-timer" aria-hidden="true">{formatRecordingTime(recordingElapsedMs)}</span>
+          </div>
+        ) : null}
         {isTranscribing ? <div className="composer-input-note">{t("chatInput.transcribing")}</div> : null}
         {isUploadingImage ? <div className="composer-input-note">{t("chatInput.uploadingImage")}</div> : null}
         {isAnalyzingImage ? <div className="composer-input-note">{t("chatInput.analyzingImage")}</div> : null}
@@ -343,7 +373,7 @@ export default function ClaudeStyleChatInput(props: Props) {
         <div className="composer-actions-right" role="group" aria-label={t("chatInput.voiceActions")}>
           {!compact && isRecording ? (
             <>
-              <button type="button" className="composer-ghost-btn" onClick={cancelRecording} disabled={isLoading || isTranscribing} aria-label={t("chatInput.cancelVoice")}>
+              <button type="button" className="composer-ghost-btn composer-cancel-btn" onClick={cancelRecording} disabled={isLoading || isTranscribing} aria-label={t("chatInput.cancelVoice")}>
                 <X size={16} />
               </button>
               <button type="button" className="composer-send-btn" onClick={confirmRecording} disabled={isLoading || isTranscribing} aria-label={t("chatInput.sendRecorded")}>

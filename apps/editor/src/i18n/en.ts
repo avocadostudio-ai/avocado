@@ -220,7 +220,7 @@ const en = {
 
   // -- Chat input --
   "chatInput.placeholder": "Ask anything",
-  "chatInput.listening": "Listening... click \u2713 to send or X to cancel.",
+  "chatInput.listening": "Listening",
   "chatInput.transcribing": "Transcribing...",
   "chatInput.uploadingImage": "Uploading pasted image...",
   "chatInput.analyzingImage": "Analyzing pasted image...",
@@ -310,7 +310,7 @@ const en = {
   // -- Welcome & suggestions --
   "welcome.greeting": "Welcome to {{name}}! Tell me what you'd like to change \u2014 I can add sections, rewrite copy, create new pages, and more.",
   "welcome.greetingFallback": "Let's shape your site into something people remember. Tell me what you'd like to change.",
-  "welcome.greetingDemo": "Welcome to {{name}} \u2014 this is a demo site so you can try things out. Edit anything you like; when you're ready, [onboard your own site](https://docs.avocadostudio.dev/sites).",
+  "welcome.greetingDemo": "Welcome to {{name}} \u2014 this is a demo site so you can try things out. Edit anything you like; when you're ready, [onboard your own site](https://docs.avocadostudio.dev/sites/site-agent).",
   "suggestion.rewriteHero": "Rewrite the hero headline",
   "suggestion.addTestimonials": "Add a testimonials section",
   "suggestion.addFaq": "Add an FAQ section",
