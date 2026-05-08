@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, type 
 import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, type BlockDefinition, type BlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
-import { WandSparkles, Sparkles, Pencil, Replace, Trash2, ImagePlus } from "lucide-react"
+import { WandSparkles, Sparkles, Pencil, Replace, Trash2, ImagePlus, MousePointerClick } from "lucide-react"
 import { useT } from "@/i18n"
 import { useEditorStore } from "../store"
 import { RichTextEditorField } from "./RichTextEditorField"
@@ -78,9 +78,13 @@ type Props = {
   manifestByType?: Map<string, BlockDefinition>
   /** Origin of the active site — used to resolve relative image URLs for thumbnails. */
   siteOrigin?: string
+  /** Whether canvas selection mode is currently armed. */
+  selectionModeEnabled?: boolean
+  /** Toggles canvas selection mode (mirror of the chat composer's selector button). */
+  onToggleSelectionMode?: () => void
 }
 
-export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId: blockIdProp, blockType: blockTypeProp, props, status, onFieldChange, onImageClick, onAiAssist, slug: slugProp, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading: aiLoadingProp, aiLoadingPath: aiLoadingPathProp, onAddListItem, highlightPath: highlightPathProp, manifestByType, siteOrigin }: Props) {
+export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId: blockIdProp, blockType: blockTypeProp, props, status, onFieldChange, onImageClick, onAiAssist, slug: slugProp, pageName, navLabel, onNavLabelChange, pageMeta, onPageMetaChange, onDeselectBlock, onPageAiAssist, onAiQuickAction, onPageAiQuickAction, aiLoading: aiLoadingProp, aiLoadingPath: aiLoadingPathProp, onAddListItem, highlightPath: highlightPathProp, manifestByType, siteOrigin, selectionModeEnabled, onToggleSelectionMode }: Props) {
   // Read from store — props take precedence when provided
   const storeBlockId = useEditorStore((s) => s.activeBlockId)
   const storeBlockType = useEditorStore((s) => s.activeBlockType)
@@ -94,9 +98,22 @@ export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId:
   const aiLoadingPath = aiLoadingPathProp ?? storeEditablePath
   const highlightPath = highlightPathProp ?? storeEditablePath
   const { t } = useT()
+  const pickerButton = onToggleSelectionMode ? (
+    <button
+      type="button"
+      className={`composer-ghost-btn composer-selector-btn property-panel-picker-btn${selectionModeEnabled ? " is-active" : ""}`}
+      onClick={onToggleSelectionMode}
+      aria-label={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
+      aria-pressed={Boolean(selectionModeEnabled)}
+      title={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
+    >
+      <MousePointerClick size={16} />
+    </button>
+  ) : null
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
+        {pickerButton ? <div className="property-panel-toolbar">{pickerButton}</div> : null}
         {slug && slug !== "/" && onNavLabelChange ? (
           <NavLabelField slug={slug} navLabel={navLabel ?? ""} onNavLabelChange={onNavLabelChange} onAiAssist={onPageAiAssist} onAiQuickAction={onPageAiQuickAction} aiLoading={aiLoading} fieldShimmer={aiLoading === true && aiLoadingPath === "Nav label"} />
         ) : null}
@@ -163,6 +180,7 @@ export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId:
   if (!meta) {
     return (
       <div className="property-panel" style={style}>
+        {pickerButton ? <div className="property-panel-toolbar">{pickerButton}</div> : null}
         <div className="property-panel-empty">{t("propertyPanel.unknownBlock")}: {blockType}</div>
       </div>
     )
@@ -184,6 +202,7 @@ export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId:
             <span className="property-panel-context-breadcrumb-current">{meta.displayName}</span>
           </span>
         </div>
+        {pickerButton}
       </div>
       {(status === "loading" || (status === "idle" && !props)) && !props ? (
         <div className="property-panel-empty">{t("propertyPanel.loading")}</div>
@@ -495,32 +514,29 @@ function ImageFieldWidget({
     <div className="property-field">
       <div className="property-field-label"><span>{label}</span></div>
       <div className="property-field-image-widget">
-        <div className="property-field-image-preview">
-          {imageUrl && !imgBroken ? (
+        {imageUrl && !imgBroken ? (
+          <div className="property-field-image-preview">
             <img
               className="property-field-image-thumb"
               src={resolveImageUrl(imageUrl, siteOrigin)}
               alt=""
               onError={() => setImgBroken(true)}
             />
-          ) : (
-            <div className="property-field-image-thumb property-field-image-placeholder">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="m21 15-5-5L5 21" />
-              </svg>
+            <div className="property-field-image-actions">
+              <button type="button" className="property-field-image-change" onClick={onChangeClick}>
+                <Replace size={13} /> {t("propertyPanel.change")}
+              </button>
+              {onRemove ? (
+                <button type="button" className="property-field-image-remove" onClick={onRemove}><Trash2 size={13} /> {t("propertyPanel.remove")}</button>
+              ) : null}
             </div>
-          )}
-          <div className="property-field-image-actions">
-            <button type="button" className="property-field-image-change" onClick={onChangeClick}>
-              {imageUrl ? <><Replace size={13} /> {t("propertyPanel.change")}</> : <><ImagePlus size={13} /> {t("propertyPanel.chooseImage")}</>}
-            </button>
-            {imageUrl && onRemove ? (
-              <button type="button" className="property-field-image-remove" onClick={onRemove}><Trash2 size={13} /> {t("propertyPanel.remove")}</button>
-            ) : null}
           </div>
-        </div>
+        ) : (
+          <button type="button" className="property-field-image-empty" onClick={onChangeClick}>
+            <ImagePlus size={18} aria-hidden="true" />
+            <span>{t("propertyPanel.chooseImage")}</span>
+          </button>
+        )}
         {onAltCommit !== undefined && (
           <div className="property-field-image-alt-group">
             <div className="property-field-image-alt-label">

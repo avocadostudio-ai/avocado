@@ -1731,6 +1731,8 @@ function EditorPage({
           props={blockProps.props}
           status={blockProps.status}
           pageName={slugLabel(slug)}
+          selectionModeEnabled={selectionModeEnabled}
+          onToggleSelectionMode={() => toggleSelectionMode()}
           onDeselectBlock={() => { setActiveBlockId(undefined); setActiveBlockType(undefined) }}
           navLabel={sites.headerConfig.navLabels?.[slug] ?? ""}
           onNavLabelChange={(s, label) => {
@@ -1852,7 +1854,6 @@ function EditorPage({
             title={t("tabs.properties")}
           >
             <SlidersHorizontal size={22} />
-            {activeBlockId ? <span className="panel-tab-dot" /> : null}
           </button>
           <button
             type="button"

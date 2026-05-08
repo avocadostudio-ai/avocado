@@ -376,6 +376,14 @@ body.panel-resizing iframe {
   padding: 14px 20px 12px;
   background: var(--bg-200);
 }
+.property-panel-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 0;
+}
+.property-panel-context .property-panel-picker-btn {
+  margin-left: auto;
+}
 .property-panel-context-icon {
   flex-shrink: 0;
   color: var(--muted);
@@ -862,11 +870,32 @@ body.panel-resizing iframe {
   object-fit: cover;
 }
 
-.property-field-image-placeholder {
+.property-field-image-empty {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 84px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--bg-100, #fff);
   color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.property-field-image-empty:hover {
+  border-color: var(--accent, #15803d);
+  color: var(--accent, #15803d);
+  background: var(--bg-200);
+}
+
+.property-field-image-empty svg {
+  flex-shrink: 0;
 }
 
 .property-field-image-actions {
@@ -876,6 +905,7 @@ body.panel-resizing iframe {
   transform: translateX(-50%);
   display: flex;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .property-field-image-change,
@@ -893,6 +923,7 @@ body.panel-resizing iframe {
   padding: 3px 10px;
   border-radius: 5px;
   transition: background 0.15s;
+  white-space: nowrap;
 }
 
 .property-field-image-change:hover {
@@ -6106,6 +6137,18 @@ textarea {
 
 .editor-dark .property-field-image-thumb {
   background: #0f172a;
+}
+
+.editor-dark .property-field-image-empty {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.editor-dark .property-field-image-empty:hover {
+  background: #1e293b;
+  border-color: #34d399;
+  color: #34d399;
 }
 
 
