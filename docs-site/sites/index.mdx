@@ -1,45 +1,43 @@
 ---
 title: "Add a Site"
 sidebarTitle: "Overview"
-description: "Two ways to bring a website into Avocado Studio: let our Onboarding agent do it for you, or code it yourself (by hand or with your own coding agent). Currently supports Next.js."
+description: "Three ways to bring a website into Avocado Studio: let our Onboarding agent do it, hand it to your own coding agent, or wire it up by hand. All paths produce the same end state — a Next.js site registered with the orchestrator and editable from the Content Studio."
 ---
+
+Avocado Studio manages websites as **sites** — each with its own pages, blocks, theme, and publishing target. Before you can edit anything, you need at least one site registered with the orchestrator. There are three ways to get there. Pick whichever matches your trust level for AI and your appetite for hands-on integration work.
+
+<CardGroup cols={3}>
+  <Card title="Use our Onboarding agent" icon="robot" href="/sites/site-agent">
+    A built-in AI agent that runs end-to-end inside the editor. Three modes: **Migrate** a public URL, **Integrate** an existing Next.js repo, or **Create** from a description. Fastest path; early-stage — treat its first pass as a draft.
+  </Card>
+  <Card title="Use your own coding agent" icon="terminal" href="/sites/coding-agent">
+    Hand the integration to **Codex, Claude Code, Cursor, Aider,** or any agent in your IDE. We provide a copy-paste prompt and a verification checklist; the agent already knows your codebase.
+  </Card>
+  <Card title="Do it by hand" icon="screwdriver-wrench" href="/sites/manual">
+    Skip AI entirely. Follow our integration docs, write the code yourself. ~30 minutes for a vanilla Next.js 15 App Router site. Every line is yours, no surprises.
+  </Card>
+</CardGroup>
 
 <Note>
 **Next.js only (officially tested).** Avocado Studio is currently built and tested against **Next.js 15+ (App Router)**. Every path on this page assumes your site is — or will be — a Next.js project. If you're on Astro / Remix / SvelteKit / Hono / etc., the SDK ships framework-agnostic `/core` primitives you can wire up by hand — see [Non-Next.js Integration](/integration/non-nextjs). The patterns are real and the primitives work, but you'll be a first mover and should expect to file bugs.
 </Note>
 
-Avocado Studio manages websites as **sites** — each one has its own pages, blocks, theme, and publishing target. Before you can edit anything, you need at least one site registered with the orchestrator.
-
-There are **two ways** to get a site in — an **agentic** path (let our AI do it) and a **manual** path (write the integration yourself):
-
-<CardGroup cols={2}>
-  <Card title="Agentic — Onboarding agent" icon="robot" href="/sites/site-agent">
-    A built-in AI agent that runs end-to-end inside the editor. You describe what you want and it does the work — scraping, scaffolding, wiring the SDK, registering the site. **Three modes:** migrate from a public website URL, integrate a Next.js GitHub repo, or create from scratch.
-  </Card>
-  <Card title="Manual — code it yourself" icon="screwdriver-wrench" href="/sites/manual">
-    Skip the AI and follow our integration docs directly. **Two flavors:** do it by hand, or hand the work to your own coding agent (Codex, Claude Code, Cursor, etc.) with a copy-paste prompt.
-  </Card>
-</CardGroup>
-
-Both approaches produce the same end state: a Next.js site registered with the orchestrator, with pages, theme, and a wired-in [Site SDK](/integration/nextjs-integration). Pick whichever matches your trust level for AI and the complexity of your codebase.
-
-<Note>
-**Heads up on the agentic path.** The Onboarding agent is early — treat its first pass as a draft you'll refine in the editor, not a finished site. It works well for simple landing pages and small Next.js repos; complex sites usually need a few iterations of cleanup. If you need pixel-perfect output on the first run, the manual paths give you full control instead.
-</Note>
+All three paths produce the same end state: a Next.js site registered with the orchestrator, with pages, theme, and a wired-in [Site SDK](/integration/nextjs-integration), editable from the Content Studio.
 
 ## Which approach should I pick?
 
 | If you… | Use this |
 |---|---|
-| Want the fastest possible result | **Onboarding agent** |
-| Have a **public website URL** (any tech) and want AI to scrape it and rebuild it as a Next.js site | **Onboarding agent → Migrate** |
-| Have an **existing Next.js project on GitHub** and want AI to clone it and wire the SDK in | **Onboarding agent → Integrate** |
-| Have just an idea and want AI to scaffold a fresh Next.js site for you | **Onboarding agent → Create** |
-| Want to understand every change yourself | **Code it yourself → Manual** |
-| Have a coding agent in your IDE already (Codex, Claude Code, Cursor…) | **Code it yourself → Bring your own agent** |
-| Have an unusual Next.js setup our agent might not understand | **Code it yourself → Bring your own agent** |
+| Want the fastest possible result | **[Onboarding agent](/sites/site-agent)** |
+| Have a **public website URL** (any tech) and want AI to scrape it and rebuild it as a Next.js site | **[Onboarding agent → Migrate](/sites/site-agent)** |
+| Have an **existing Next.js project on GitHub** and want AI to clone it and wire the SDK in | **[Onboarding agent → Integrate](/sites/site-agent)** |
+| Have just an idea and want AI to scaffold a fresh Next.js site for you | **[Onboarding agent → Create](/sites/site-agent)** |
+| Have a coding agent in your IDE already (Codex, Claude Code, Cursor…) | **[Bring your own coding agent](/sites/coding-agent)** |
+| Have an unusual Next.js setup our agent might not understand | **[Bring your own coding agent](/sites/coding-agent)** |
+| Want full control and to understand every change yourself | **[Manual integration](/sites/manual)** |
+| Need pixel-perfect output on the first run | **[Manual integration](/sites/manual)** |
 
-## Use our Onboarding agent
+## Option 1 — Onboarding agent
 
 The Onboarding agent is an AI agent in the editor's *Sites* page. Pick one of three modes from your first message:
 
@@ -49,26 +47,45 @@ The Onboarding agent is an AI agent in the editor's *Sites* page. Pick one of th
 | **Integrate** | An **existing Next.js project on GitHub** (public or private repo URL, or a local clone) | Clones the repo, analyzes the codebase, wires `@ai-site-editor/site-sdk` into your existing Next.js app, registers the site |
 | **Create** | A **natural-language description** of the site you want | Scaffolds a fresh Next.js site with starter blocks, theme, and pages from your description |
 
-**Heads up: Claude only.** The Onboarding agent runs exclusively on Anthropic Claude (via your Claude subscription or an `ANTHROPIC_API_KEY`). An OpenAI key alone won't work for *this* path — though the editor's per-edit chat supports OpenAI or Anthropic once a site exists. If you need a different model, use the **[Bring Your Own Coding Agent](/sites/coding-agent)** path with any agent you like.
+<Warning>
+**This is early — set expectations.** The Onboarding agent works well for simple landing pages and small Next.js repos. Complex sites (heavy interactivity, custom CMS schemas, deep routing, design systems with non-standard tokens) usually need a few iterations of cleanup in the editor or by hand. Treat the first pass as a **draft you'll refine**, not a finished site. If you need pixel-perfect output on the first run, choose option 2 or 3.
+</Warning>
+
+<Note>
+**Claude only.** The Onboarding agent runs exclusively on Anthropic Claude — either through your Claude subscription (CLI backend, $0/token) or an `ANTHROPIC_API_KEY` (SDK backend, pay-per-token). An OpenAI key alone won't work for *this* path. The editor's per-edit chat (the AI you talk to *after* a site exists) supports OpenAI or Anthropic. If you need a different model for onboarding, use **[Bring your own coding agent](/sites/coding-agent)** with any agent you like.
+</Note>
 
 → Full reference: **[Onboarding agent](/sites/site-agent)** (modes, prerequisites, CLI vs SDK billing, troubleshooting)
 
-## Code it yourself
+## Option 2 — Bring your own coding agent
 
-If you'd rather skip the AI — or use your own — pick one of two flavors:
+If you're already running a coding agent in your IDE (Codex, Claude Code, Cursor, Aider, Continue, …), you don't need to switch to ours. We provide a copy-paste prompt and a verification checklist; your agent does the work in your existing review flow.
 
-<CardGroup cols={2}>
-  <Card title="Manual integration" icon="screwdriver-wrench" href="/sites/manual">
-    Follow our docs, write the code yourself in your existing Next.js project. ~30 minutes for a vanilla Next.js 15 App Router site. Every line is yours, no surprises.
-  </Card>
-  <Card title="Bring your own coding agent" icon="terminal" href="/sites/coding-agent">
-    Hand the integration to Codex, Claude Code, Cursor, Aider, or any agent in your IDE. We provide the prompt template and a verification checklist.
-  </Card>
-</CardGroup>
+**When this beats the Onboarding agent:**
+
+- Your agent already has full context on your codebase, conventions, and history
+- You want changes to flow through your existing PR / commit / CI process
+- Your project has unusual structure (monorepo, custom build, non-standard routing) where our agent might land changes in the wrong place
+- Compliance / data residency reasons — work happens in your environment, not ours
+
+→ Full reference: **[Bring your own coding agent](/sites/coding-agent)** (prompt template, verification checklist, troubleshooting)
+
+## Option 3 — Manual integration
+
+No AI involved. You read the integration guides, write the code, register the site. ~30 minutes for a vanilla Next.js 15 App Router project. The two SDK helpers (`createEditorApiHandler` and `createSitePage`) do most of the heavy lifting; you wire them in.
+
+**When this is the right call:**
+
+- You want to understand every change yourself
+- You need pixel-perfect output on the first run
+- Your project is unusual enough that an AI agent would likely make a mess
+- You're building muscle memory for the SDK and want to read the contracts directly
+
+→ Full reference: **[Manual integration](/sites/manual)** (prerequisites, step-by-step, custom blocks, Puck mode)
 
 ## After your site is in
 
-Once a site exists in the orchestrator, the rest of the docs apply:
+Once a site exists in the orchestrator, the rest of the docs apply regardless of which path you took:
 
 - **[Editor quickstart](/integration/editor-quickstart)** — connect a Next.js site to the Content Studio
 - **[Custom blocks](/integration/custom-blocks)** — extend the block library
