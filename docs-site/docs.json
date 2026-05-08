@@ -45,8 +45,8 @@
             "pages": [
               "sites/index",
               "sites/site-agent",
-              "sites/manual",
-              "sites/coding-agent"
+              "sites/coding-agent",
+              "sites/manual"
             ]
           }
         ]
