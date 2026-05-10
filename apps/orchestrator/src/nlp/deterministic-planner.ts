@@ -89,7 +89,7 @@ export const intentSchema = z.object({
   patch: z.record(z.string(), z.unknown()).nullish(),
   summary: z.string().min(1).nullish(),
   assumption: z.string().min(1).nullish(),
-  complexity: z.enum(["simple", "standard"]).nullish()
+  complexity: z.enum(["simple", "standard", "complex"]).nullish()
 })
 export type ParsedIntent = z.infer<typeof intentSchema>
 

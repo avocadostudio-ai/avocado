@@ -88,7 +88,7 @@ export const intentJsonSchema = {
     anchor_block_ref: nullable({ type: "string" as const }),
     summary: nullable({ type: "string" as const }),
     assumption: nullable({ type: "string" as const }),
-    complexity: nullable({ type: "string" as const, enum: ["simple", "standard"] })
+    complexity: nullable({ type: "string" as const, enum: ["simple", "standard", "complex"] })
   },
   required: ["action", "target_block_ref", "target_block_type", "new_block_type",
     "position", "anchor_block_ref", "summary", "assumption", "complexity"] as string[]

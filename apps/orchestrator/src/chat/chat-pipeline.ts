@@ -528,6 +528,10 @@ export async function runChatPipeline(
   let planningStartedAtMs: number | null = null
   let planningFinishedAtMs: number | null = null
   let firstPlanningTokenMs: number | null = null
+  // Auto-routing decision tracker. Populated by the parallel-router branch
+  // when it observes a complexity signal worth acting on (or shadow-logging).
+  // Threaded into `debug.routingDecision` via `withDebugPayload`.
+  let routingDecision: NonNullable<ChatResult["debug"]>["routingDecision"] | undefined
   let planningAttempts = 0
   let imageResolutionDurationMs = 0
   let applyDurationMs: number | undefined
@@ -713,6 +717,7 @@ export async function runChatPipeline(
       activeBlockId: planningActiveBlockId || undefined,
       activeEditablePath: planningActiveEditablePath || undefined,
       ...(planningAttempts > 1 ? { planningAttempts } : {}),
+      ...(routingDecision ? { routingDecision } : {}),
       timeline: (() => {
         if (!doneStageMarked) {
           doneStageMarked = true
@@ -2795,7 +2800,7 @@ export async function runChatPipeline(
       : fullPlannerAbort.signal
 
     // Track router completion for complexity downgrade
-    let routerComplexity: "simple" | "standard" | null = null
+    let routerComplexity: "simple" | "standard" | "complex" | null = null
 
     // Intent router promise
     emitStatusTone("understanding")
@@ -2860,6 +2865,38 @@ export async function runChatPipeline(
       if (routerComplexity === "simple" && ctx.modelLookup[provider]?.fast) {
         plannerModel = ctx.modelLookup[provider].fast
         ctx.log.info({ event: "complexity_downgrade", from: modelUsed, to: plannerModel }, "Router signaled simple — downgrading planner to fast model")
+        routingDecision = {
+          from: modelKey,
+          to: "fast",
+          reason: "simple_downgrade",
+          complexity: "simple"
+        }
+      } else if (routerComplexity === "complex") {
+        // PHASE 1: shadow-only. Log what we *would* upgrade to but don't
+        // change the model. Gated behind CHAT_AUTO_UPGRADE_COMPLEX in a
+        // follow-up PR. Lets us validate router accuracy before paying for
+        // the reasoning tier.
+        const reasoningModel = ctx.modelLookup[provider]?.reasoning
+        if (reasoningModel) {
+          ctx.log.info(
+            {
+              event: "complexity_upgrade_shadow",
+              from: modelUsed,
+              wouldUpgradeTo: reasoningModel,
+              modelKey,
+              wouldUpgradeToKey: "reasoning",
+              provider,
+              promptLength: plannerMessage.length
+            },
+            "Router signaled complex — shadow-logging would-be upgrade to reasoning model (PR1: not applied)"
+          )
+          routingDecision = {
+            from: modelKey,
+            to: "reasoning",
+            reason: "shadow",
+            complexity: "complex"
+          }
+        }
       }
 
       markPlanningStart()

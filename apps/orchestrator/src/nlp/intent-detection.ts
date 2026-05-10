@@ -140,6 +140,18 @@ export type ChatResult = {
     siteId?: string
     activeBlockId?: string
     activeEditablePath?: string
+    /**
+     * Auto-routing decision. Populated when the chat pipeline considered an
+     * automatic model-tier change (up- or downgrade). `reason: "shadow"` means
+     * the upgrade was logged but not applied — used while validating the
+     * router's complexity signal before flipping `CHAT_AUTO_UPGRADE_COMPLEX`.
+     */
+    routingDecision?: {
+      from: "fast" | "balanced" | "reasoning" | "codex"
+      to: "fast" | "balanced" | "reasoning" | "codex"
+      reason: "simple_downgrade" | "complex_upgrade" | "shadow" | "user_override"
+      complexity?: "simple" | "standard" | "complex"
+    }
   }
 }
 

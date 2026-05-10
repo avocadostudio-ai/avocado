@@ -2142,3 +2142,168 @@ test("chat unsplash hero request: LLM placeholder matching current value still a
   )
   assert.doesNotMatch(String(payload.summary ?? ""), /already up to date/i)
 })
+
+// ---------------------------------------------------------------------------
+// PHASE-1 auto-routing shadow tests
+// Validates that when the LLM intent router emits complexity: "complex" we
+// log a shadow event and stamp `debug.routingDecision` WITHOUT actually
+// switching to the reasoning model. Flipping the behaviour live is gated
+// behind CHAT_AUTO_UPGRADE_COMPLEX in a follow-up PR.
+// ---------------------------------------------------------------------------
+
+test("auto-routing: complex router signal stamps routingDecision in shadow mode and does NOT swap model", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    setParseIntentWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const targetHeading = `Complex shadow run ${Date.now()}`
+
+  // Router returns "complex" via clarify so its compile yields no usable plan
+  // → full planner runs, which is when the routing decision is stamped.
+  setParseIntentWithOpenAIForTests(async () => ({
+    action: "clarify",
+    target_block_ref: null,
+    target_block_type: null,
+    new_block_type: null,
+    position: null,
+    anchor_block_ref: null,
+    summary: null,
+    assumption: null,
+    complexity: "complex"
+  }))
+
+  let plannerModelSeen: string | undefined
+  setGeneratePlanWithOpenAIForTests(async (args) => {
+    plannerModelSeen = args.model
+    return {
+      plan: {
+        intent: "edit_plan",
+        summary_for_user: "Rewrote hero heading.",
+        change_log: ["Changed hero heading."],
+        ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
+      },
+      usage: { ...ZERO_USAGE },
+      schemaContext: STUB_SCHEMA_CONTEXT
+    }
+  })
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      // "rewrite" makes shouldPreferFastModelForMessage true → likelySimple true
+      // so the full planner awaits the router (deterministic; no race).
+      message: "rewrite this copy",
+      activeBlockId: "b_hero_home",
+      // Explicit modelKey blocks the regex downgrade path so alreadyFastModel = false
+      // and the await-router branch fires.
+      modelKey: "balanced"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as {
+    status?: string
+    modelUsed?: string
+    debug?: {
+      modelUsed?: string
+      routingDecision?: {
+        from?: string
+        to?: string
+        reason?: string
+        complexity?: string
+      }
+    }
+  }
+  assert.equal(payload.status, "applied")
+
+  // SHADOW assertion #1: routingDecision is stamped with reason "shadow".
+  assert.ok(
+    payload.debug?.routingDecision,
+    `expected debug.routingDecision to be set, got: ${JSON.stringify(payload.debug)}`
+  )
+  assert.equal(payload.debug?.routingDecision?.reason, "shadow")
+  assert.equal(payload.debug?.routingDecision?.complexity, "complex")
+  assert.equal(payload.debug?.routingDecision?.from, "balanced")
+  assert.equal(payload.debug?.routingDecision?.to, "reasoning")
+
+  // SHADOW assertion #2: the planner was NOT actually called with the reasoning model.
+  // It must still be the model resolved for modelKey "balanced".
+  assert.ok(plannerModelSeen, "planner was not called")
+  assert.ok(
+    !/reasoning|opus|gpt-5|o[13]/i.test(String(plannerModelSeen)),
+    `planner should not run on reasoning tier in shadow mode, got: ${plannerModelSeen}`
+  )
+})
+
+test("auto-routing: simple router signal still downgrades AND stamps routingDecision", async (t) => {
+  const previousKey = process.env.OPENAI_API_KEY
+  process.env.OPENAI_API_KEY = previousKey || "test-key"
+  t.after(() => {
+    setGeneratePlanWithOpenAIForTests()
+    setParseIntentWithOpenAIForTests()
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousKey
+  })
+
+  const session = newSession()
+  const targetHeading = `Simple downgrade run ${Date.now()}`
+
+  setParseIntentWithOpenAIForTests(async () => ({
+    action: "clarify",
+    target_block_ref: null,
+    target_block_type: null,
+    new_block_type: null,
+    position: null,
+    anchor_block_ref: null,
+    summary: null,
+    assumption: null,
+    complexity: "simple"
+  }))
+
+  setGeneratePlanWithOpenAIForTests(async () => ({
+    plan: {
+      intent: "edit_plan",
+      summary_for_user: "Rewrote hero heading.",
+      change_log: ["Changed hero heading."],
+      ops: [{ op: "update_props", pageSlug: "/", blockId: "b_hero_home", patch: { heading: targetHeading } }]
+    },
+    usage: { ...ZERO_USAGE },
+    schemaContext: STUB_SCHEMA_CONTEXT
+  }))
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/chat",
+    headers: { "content-type": "application/json" },
+    payload: {
+      session,
+      slug: "/",
+      message: "rewrite this copy",
+      activeBlockId: "b_hero_home",
+      modelKey: "balanced"
+    }
+  })
+
+  assert.equal(response.statusCode, 200)
+  const payload = response.json() as {
+    status?: string
+    debug?: {
+      routingDecision?: { from?: string; to?: string; reason?: string; complexity?: string }
+    }
+  }
+  assert.equal(payload.status, "applied")
+  assert.equal(payload.debug?.routingDecision?.reason, "simple_downgrade")
+  assert.equal(payload.debug?.routingDecision?.complexity, "simple")
+  assert.equal(payload.debug?.routingDecision?.from, "balanced")
+  assert.equal(payload.debug?.routingDecision?.to, "fast")
+})

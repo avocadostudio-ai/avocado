@@ -19,7 +19,7 @@ export function buildIntentParserSystemPrompt(): string {
     "Use explicit block references when present (id/type words like hero/faq/cta).",
     "For move/add with placement words, set position to top/bottom/before/after and anchor_block_ref when relevant.",
     "For update, include patch with only requested fields.",
-    'Set complexity to "simple" when the request targets a single block with a straightforward edit (add/remove emoji, change a label, update one field). Set complexity to "standard" for multi-block edits, page creation, translation, content generation, or anything requiring creative judgment.'
+    'Set complexity to "simple" when the request targets a single block with a straightforward edit (add/remove emoji, change a label, update one field). Set complexity to "standard" for multi-block edits, page creation, translation, or content generation that requires some creative judgment but is otherwise mechanical. Set complexity to "complex" only when the request demands deep reasoning: multi-step transformations with conflicting constraints, structural redesigns ("rethink the page", "reorganize for conversions"), narrative rewrites that must hold a tone across many sections, or prompts where the user describes trade-offs the planner has to resolve. Default to "standard" when uncertain — "complex" should be rare.'
   ].join("\n")
 }
 
