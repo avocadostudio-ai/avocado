@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isDuplicateBlockRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery, isContentQuery } from "./nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isDuplicateBlockRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery, isContentQuery, isDuplicateAndModifyRequest } from "./nlp/intent-detection.js"
 import { extractAudienceTarget, extractAudienceTargets, inferAddedBlockTypeFromMessage, inferDeterministicIntent, isHighConfidenceDeterministicCase, childSuggestions, clarificationSuggestions, postEditSuggestions, humanizeArrayPath, tryCompoundDeterministicPlan } from "./nlp/deterministic-planner.js"
 import { inferBlockTypeFromText, defaultPropsForType as plannerDefaultProps } from "./nlp/plan-normalizer.js"
 import { blockSupportsImageAtPath, findFullPageTranslationCoverageGap, inferTranslationScopeFromMessage, sanitizeMessageForPlanning, shouldPreferFastModelForMessage, isRewriteLikeMessage } from "./chat/chat-pipeline.js"
@@ -652,6 +652,28 @@ test("requestsContentGeneration detects content-generation requests", () => {
   for (const prompt of positives) assert.equal(requestsContentGeneration(prompt), true, prompt)
   for (const prompt of topicWithBlocks) assert.equal(requestsContentGeneration(prompt), true, prompt)
   for (const prompt of negatives) assert.equal(requestsContentGeneration(prompt), false, prompt)
+})
+
+test("isDuplicateAndModifyRequest bypasses strict-primary-op mode for duplicate-then-edit prompts", () => {
+  const positives = [
+    "duplicate this page into a new one called season recipes. suggest components and populate them. make a plan first",
+    "duplicate /recipes into /season-recipes and populate it with seasonal content",
+    "clone /about and update the hero",
+    "copy this page and rewrite the FAQs",
+    "duplicate the pricing page and adjust the headline",
+    "clone this page and tailor it for first-time founders",
+    "copy /faq and refresh the answers",
+  ]
+  const negatives = [
+    "duplicate this page",
+    "clone /about to /backup",
+    "copy this hero block",
+    "duplicate the FAQ section",
+    "make a copy of this block",
+    "rewrite the hero headline",
+  ]
+  for (const prompt of positives) assert.equal(isDuplicateAndModifyRequest(prompt), true, prompt)
+  for (const prompt of negatives) assert.equal(isDuplicateAndModifyRequest(prompt), false, prompt)
 })
 
 test("isLikelyClarificationFollowUp prompt matrix", () => {

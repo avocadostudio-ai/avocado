@@ -313,6 +313,12 @@ export function deterministicDuplicatePagePlan(args: { session: string; message:
   const parsed = parseDuplicatePageRequest(args.message, { currentSlug: args.effectiveSlug })
   if (!parsed?.targetSlug) return null
 
+  // When the user asks for content generation, suggestions, or population alongside
+  // the duplicate (e.g. "duplicate this and suggest components and populate them"),
+  // defer to the LLM so it can produce a multi-op plan (duplicate_page + add_block +
+  // update_props) instead of just the bare duplicate_page op.
+  if (requestsContentGeneration(args.message)) return null
+
   const sourceSlug = normalizeRouteCandidate(parsed.sourceSlug ?? args.effectiveSlug)
   const targetSlug = normalizeRouteCandidate(parsed.targetSlug)
   if (!sourceSlug || !targetSlug) return null

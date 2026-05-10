@@ -169,13 +169,41 @@ describe("destructive-action-gate: tier 1", () => {
     assert.equal(result.messages.length, result.reasons.length)
   })
 
-  it("treats duplicate_page with newPageSlug as multi-page", () => {
+  it("does NOT treat bare duplicate_page as multi-page (source is read-only)", () => {
     const result = evaluateDestructiveActions(
       plan([{ op: "duplicate_page", pageSlug: "/about", newPageSlug: "/about-copy" }]),
       lookup([page("/about", 1)])
     )
-    // /about + /about-copy = 2 slugs touched
-    assert.ok(result.reasons.some((r) => r.kind === "multi_page_plan"))
+    // Only /about-copy is being modified; /about is the read-only source.
+    assert.equal(result.requiresApproval, false, "bare duplicate of one page should not require approval")
+    assert.equal(result.reasons.filter((r) => r.kind === "multi_page_plan").length, 0)
+  })
+
+  it("does NOT treat duplicate-and-modify on the new page as multi-page", () => {
+    const result = evaluateDestructiveActions(
+      plan([
+        { op: "duplicate_page", pageSlug: "/recipes", newPageSlug: "/season-recipes" },
+        { op: "update_props", pageSlug: "/season-recipes", blockId: "b_hero", patch: { heading: "Cook with the Seasons" } },
+        { op: "update_props", pageSlug: "/season-recipes", blockId: "b_cta", patch: { title: "Browse" } }
+      ]),
+      lookup([page("/recipes", 5)])
+    )
+    // Only /season-recipes is mutated by the plan; /recipes is the read-only
+    // source for the duplicate. The multi-page gate must not fire here.
+    assert.equal(result.requiresApproval, false, "duplicate-and-modify on the new page should not trigger multi-page approval")
+    assert.equal(result.reasons.filter((r) => r.kind === "multi_page_plan").length, 0)
+  })
+
+  it("DOES treat duplicate_page + edits to a different existing page as multi-page", () => {
+    const result = evaluateDestructiveActions(
+      plan([
+        { op: "duplicate_page", pageSlug: "/recipes", newPageSlug: "/season-recipes" },
+        { op: "update_props", pageSlug: "/about", blockId: "b_hero", patch: { heading: "About us" } }
+      ]),
+      lookup([page("/recipes", 5), page("/about", 1)])
+    )
+    // /season-recipes (new) + /about (touched) = 2 distinct mutated pages.
+    assert.ok(result.reasons.some((r) => r.kind === "multi_page_plan"), "should flag genuine multi-page mutation")
   })
 
   it("messages are non-empty and readable", () => {

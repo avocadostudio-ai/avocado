@@ -217,6 +217,13 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
       let liveDraftFlushTimer: number | null = null
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
+      // Track if the current plan stream has already emitted a duplicate_page or
+      // create_page op for a page OTHER than the user's current view. When true,
+      // any subsequent op WITHOUT an explicit pageSlug should be assumed to
+      // target the newly-created page (the LLM often omits pageSlug after a
+      // duplicate_page, expecting it to "carry over"), NOT the current page.
+      // Without this, those ops leak update_props overlays onto the live preview.
+      let planMutatesOtherPage = false
       let currentStepLabel: string | null = null
       let currentStepStartedAt = 0
       const MIN_STEP_DURATION_MS = 800
@@ -247,6 +254,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         args.setStreamSteps([])
         args.setOpChecklist([])
         args.setStreamTokenCount(0)
+        args.postToSite("removeSkeleton", {})
         args.pushAssistantFromResult({ status: "error", summary: "Request timed out after 3 minutes. Please try again.", changes: [] })
         resolve(false)
       }, HARD_TIMEOUT_MS) as unknown as number
@@ -383,7 +391,19 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           const blockId = typeof payload.blockId === "string" ? payload.blockId : ""
           const editablePath = typeof payload.editablePath === "string" ? payload.editablePath : ""
           const value = typeof payload.value === "string" ? payload.value : ""
-          if (blockId && editablePath) {
+          const draftPageSlug = typeof payload.pageSlug === "string" ? payload.pageSlug : null
+          // Only overlay when the draft targets the user's currently-viewed page.
+          // Two ways an op can target a different page:
+          //   - explicit pageSlug !== current view
+          //   - no pageSlug, but the plan already emitted a duplicate_page /
+          //     create_page for a different slug (planMutatesOtherPage flag)
+          // Without this, a duplicate-and-modify plan emitting update_props on the
+          // new slug would type the new content into the source page's preview
+          // before the user has approved.
+          const draftTargetsCurrentPage = draftPageSlug
+            ? draftPageSlug === args.slugRef.current
+            : !planMutatesOtherPage
+          if (blockId && editablePath && draftTargetsCurrentPage) {
             liveDraftBlockId = blockId
             args.setLatestStreamFocusBlockId(blockId)
             liveDraftFields = { [editablePath]: value }
@@ -403,52 +423,82 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
 
         if (payload.type === "op_candidate") {
           const idx = Number(payload.index ?? 0)
-          if (!liveDraftBlockId) {
-            const derived = args.blockIdFromOperation(payload.op)
-            if (derived) {
-              liveDraftBlockId = derived
-              if (liveDraftText.trim().length > 0) {
-                liveDraftActive = true
-                sendLiveDraft(true)
-              }
+          // Suppress preview-iframe overlays (live-draft text, add_block skeleton)
+          // when the streamed op targets a different page than the user is viewing.
+          // Two ways an op can target a different page:
+          //   - explicit pageSlug !== current view
+          //   - no pageSlug, but the plan already emitted a duplicate_page /
+          //     create_page for a different slug (planMutatesOtherPage flag)
+          const opRecordEarly = (payload.op && typeof payload.op === "object")
+            ? (payload.op as Record<string, unknown>)
+            : null
+          const opPageSlug = typeof opRecordEarly?.pageSlug === "string" ? opRecordEarly.pageSlug : null
+          const opType = opRecordEarly?.op ?? opRecordEarly?.type
+          // Latch the flag when we see a duplicate_page / create_page targeting a
+          // page other than the user's current view. Subsequent ops in the same
+          // stream then default to "not for current page" when pageSlug is absent.
+          if (opType === "duplicate_page" || opType === "create_page") {
+            const newSlug = typeof opRecordEarly?.newPageSlug === "string"
+              ? opRecordEarly.newPageSlug
+              : (typeof (opRecordEarly?.page as { slug?: unknown } | undefined)?.slug === "string"
+                  ? (opRecordEarly!.page as { slug: string }).slug
+                  : null)
+            if (newSlug && newSlug !== args.slugRef.current) {
+              planMutatesOtherPage = true
             }
           }
+          const opTargetsCurrentPage = opPageSlug
+            ? opPageSlug === args.slugRef.current
+            : !planMutatesOtherPage
 
-          // Extract editable field values from operation for live typing
-          // update_props → patch contains field values; add_block → block.props contains field values
-          const op = payload.op
-          if (op && typeof op === "object") {
-            const opRecord = op as Record<string, unknown>
-            const rawFields =
-              (opRecord.patch && typeof opRecord.patch === "object" ? opRecord.patch :
-               opRecord.block && typeof (opRecord.block as Record<string, unknown>).props === "object"
-                 ? (opRecord.block as Record<string, unknown>).props : null) as Record<string, unknown> | null
-
-            if (rawFields) {
-              const fields: Record<string, string> = {}
-              for (const [key, value] of Object.entries(rawFields)) {
-                if (typeof value === "string" && value.trim()) {
-                  fields[key] = value
-                }
-              }
-              if (Object.keys(fields).length > 0) {
-                liveDraftFields = fields
-                if (liveDraftBlockId) {
+          if (opTargetsCurrentPage) {
+            if (!liveDraftBlockId) {
+              const derived = args.blockIdFromOperation(payload.op)
+              if (derived) {
+                liveDraftBlockId = derived
+                if (liveDraftText.trim().length > 0) {
                   liveDraftActive = true
                   sendLiveDraft(true)
                 }
               }
             }
 
-            // Send skeleton for add_block operations
-            const opType = opRecord.op ?? opRecord.type
-            if (opType === "add_block") {
-              const blockObj = opRecord.block as Record<string, unknown> | undefined
-              const afterBlockId = opRecord.afterBlockId
-              args.postToSite("showSkeleton", {
-                afterBlockId: typeof afterBlockId === "string" ? afterBlockId : null,
-                blockType: typeof blockObj?.type === "string" ? blockObj.type : "Block"
-              })
+            // Extract editable field values from operation for live typing
+            // update_props → patch contains field values; add_block → block.props contains field values
+            const op = payload.op
+            if (op && typeof op === "object") {
+              const opRecord = op as Record<string, unknown>
+              const rawFields =
+                (opRecord.patch && typeof opRecord.patch === "object" ? opRecord.patch :
+                 opRecord.block && typeof (opRecord.block as Record<string, unknown>).props === "object"
+                   ? (opRecord.block as Record<string, unknown>).props : null) as Record<string, unknown> | null
+
+              if (rawFields) {
+                const fields: Record<string, string> = {}
+                for (const [key, value] of Object.entries(rawFields)) {
+                  if (typeof value === "string" && value.trim()) {
+                    fields[key] = value
+                  }
+                }
+                if (Object.keys(fields).length > 0) {
+                  liveDraftFields = fields
+                  if (liveDraftBlockId) {
+                    liveDraftActive = true
+                    sendLiveDraft(true)
+                  }
+                }
+              }
+
+              // Send skeleton for add_block operations
+              const opType = opRecord.op ?? opRecord.type
+              if (opType === "add_block") {
+                const blockObj = opRecord.block as Record<string, unknown> | undefined
+                const afterBlockId = opRecord.afterBlockId
+                args.postToSite("showSkeleton", {
+                  afterBlockId: typeof afterBlockId === "string" ? afterBlockId : null,
+                  blockType: typeof blockObj?.type === "string" ? blockObj.type : "Block"
+                })
+              }
             }
           }
 
@@ -532,6 +582,10 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
             args.setStreamTokenCount(0)
             clearOpRefreshTimer()
             endLiveDraft()
+            // Clear any add_block skeleton placeholders that op_applied didn't
+            // remove — happens on plan_only (approval gate) finals where no ops
+            // ever apply, and as a defensive sweep after error/cancellation.
+            args.postToSite("removeSkeleton", {})
             if (pendingFocusBlockId !== null) flushOpRefresh()
             if (payload.result) applyChatOrVariationResult(payload.result, finalMessage)
             if (payload.result?.focusBlockId) args.setLatestStreamFocusBlockId(payload.result.focusBlockId)
@@ -565,6 +619,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           args.setStreamTokenCount(0)
           clearOpRefreshTimer()
           endLiveDraft()
+          args.postToSite("removeSkeleton", {})
           pendingFocusBlockId = null
           if (payload.result) {
             applyChatOrVariationResult(payload.result, finalMessage)
@@ -585,6 +640,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
           args.setStreamTokenCount(0)
           clearOpRefreshTimer()
           endLiveDraft()
+          args.postToSite("removeSkeleton", {})
           if (pendingFocusBlockId !== null) flushOpRefresh()
           pendingFocusBlockId = null
           clearSseTimers()
@@ -596,6 +652,7 @@ export function createChatTransports(args: CreateChatTransportsArgs) {
         args.setStreamTokenCount(0)
         clearOpRefreshTimer()
         endLiveDraft()
+        args.postToSite("removeSkeleton", {})
         pendingFocusBlockId = null
         settled = true
         clearSseTimers()

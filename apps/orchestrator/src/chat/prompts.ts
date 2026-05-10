@@ -144,10 +144,27 @@ const RULE_STRICT_SCHEMA_DISCIPLINE =
   "STRICT SCHEMA DISCIPLINE: Only promise changes to props that exist in the block's contract. When a request has some supported parts AND some unsupported parts (e.g. 'add icons and colors' on a block with icon but no color), APPLY the supported parts and mention in summary_for_user that the unsupported part isn't available — don't bail out. Only return needs_clarification when NOTHING in the request maps to the schema. Do NOT generate summary_for_user or change_log text that describes changes your ops don't actually make."
 
 export function buildPlannerSystemPrompt(opts: PlannerPromptOptions): string {
+  const { stable, dynamic } = buildPlannerSystemPromptSegments(opts)
+  return dynamic ? `${stable}\n\n${dynamic}` : stable
+}
+
+/**
+ * Returns the planner system prompt split into a `stable` prefix (provider- and
+ * site-stable rules — safe to cache) and a `dynamic` suffix (per-request flags
+ * like selected block, conditional modes, locale — not cacheable).
+ *
+ * Anthropic prompt caching matches the cached prefix byte-for-byte; if dynamic
+ * content is interleaved into the cached block, every request that flips a
+ * flag (e.g. user clicks a different block) misses the cache. Splitting at
+ * this boundary lets the stable prefix stay cached across requests.
+ */
+export function buildPlannerSystemPromptSegments(
+  opts: PlannerPromptOptions
+): { stable: string; dynamic: string } {
   if (opts.lightweight) {
-    return buildLightweightPlannerPrompt(opts)
+    return { stable: buildLightweightPlannerPrompt(opts), dynamic: "" }
   }
-  return buildFullPlannerPrompt(opts)
+  return buildFullPlannerSegments(opts)
 }
 
 // ---------------------------------------------------------------------------
@@ -205,27 +222,44 @@ const BLOCK_NAME_PRIVACY_ANTHROPIC =
 // anchor on structure rather than scanning a flat bullet list.
 // ---------------------------------------------------------------------------
 
-function buildFullPlannerPrompt(opts: PlannerPromptOptions): string {
+function joinSections(sections: string[][]): string {
+  return sections
+    .filter((lines) => lines.length > 0)
+    .map((lines) => lines.join("\n"))
+    .join("\n\n")
+}
+
+function buildFullPlannerSegments(opts: PlannerPromptOptions): { stable: string; dynamic: string } {
   const hasNativeTools = opts.provider === "anthropic" || opts.provider === "gemini"
 
-  const sections: string[][] = [
+  // Stable sections — depend only on provider (fixed for a given planner) and
+  // static rule constants. These bytes are identical across requests and are
+  // the part Anthropic caches. IMAGES is here too; it depends on hasNativeTools
+  // but that's stable per provider.
+  const stableSections: string[][] = [
     sectionRole(),
     sectionOutputContract(),
     sectionIntentDecisionTree(),
     sectionVoice(opts, hasNativeTools),
     sectionOperationCatalog(),
     sectionSchemaDiscipline(),
-    sectionTargeting(opts),
     sectionImages(hasNativeTools),
+  ]
+
+  // Dynamic sections — depend on per-request state (selected block, conditional
+  // mode flags, site context, locale). Kept out of the cached block so the
+  // stable prefix above stays a cache hit.
+  const dynamicSections: string[][] = [
+    sectionTargeting(opts),
     sectionImageSourceChoice(opts),
     sectionConditionalModes(opts),
     sectionContext(opts),
   ]
 
-  return sections
-    .filter((lines) => lines.length > 0)
-    .map((lines) => lines.join("\n"))
-    .join("\n\n")
+  return {
+    stable: joinSections(stableSections),
+    dynamic: joinSections(dynamicSections),
+  }
 }
 
 function sectionRole(): string[] {
@@ -253,6 +287,7 @@ function sectionIntentDecisionTree(): string[] {
     "   - 'improve readability', 'tighten the copy'",
     "   - 'optimize this', 'optimize the copy'",
     "   - 'create page showing all block types' (even with typos like 'blockzs') → generate a create_page op containing one block of each allowed block type, with themed sample content matching the user's topic",
+    "   - 'make a plan first', 'plan it before doing anything', 'show me a plan', 'draft a plan', 'propose a plan' — the user wants to review before applying. STILL emit intent=edit_plan with the full set of ops; the system automatically holds plan-first requests behind an Apply / Discard approval gate. Do NOT respond with prose-only intent=needs_clarification asking 'shall I proceed?' — there is no chat-driven yes/no flow, only the approval gate, so a prose-only reply leaves the user stuck.",
     "   For rewrite-copy without a named field: if a block is selected, rewrite all text props on that block. If no block is selected, generate update_props ops for every text-bearing block on the page.",
     "",
     "2. READ-ONLY QUESTION → intent=content_answer with empty ops[]. Trigger: user asks about page content (e.g. 'list all CTA buttons', 'what images are on this page', 'show me all links and their URLs', 'how many sections are there', 'describe this'). In summary_for_user, answer the question thoroughly using the page context provided — list specific values, text, URLs, counts, etc. Use markdown tables or bullet lists for clarity. In change_log, include one entry per item found. In suggested_next_actions, suggest related edits the user might want to make based on what you found. SCOPE: if the user uses deictic words like 'this', 'this block', 'this section', 'here', 'it' AND contextPack.selected.blockId is set, answer about the selected block only — describe its type, props, and content, not the whole page. If the user explicitly says 'this page', 'the whole page', or names a different section, ignore the selection and answer page-wide.",
@@ -286,7 +321,7 @@ function sectionVoice(opts: PlannerPromptOptions, hasNativeTools: boolean): stri
     opts.provider !== "openai" ? BLOCK_NAME_PRIVACY_ANTHROPIC : BLOCK_NAME_PRIVACY_OPENAI,
     "",
     "### suggested_next_actions",
-    "2-4 short imperative phrases the user could type next (max 6 words each). Each MUST be a logical follow-up to the specific change just made — not a generic action. Ask yourself: 'what would the user likely want to do next given THIS edit?' When the plan contains exactly one update_props op that changes a text field, the first 1-2 suggestions MUST be refinements of that same field (e.g. 'Make it shorter', 'Try a bolder tone', 'Revert to previous'). For example, after rewriting stats labels, suggest refining the same section ('Make the numbers bigger', 'Add a stat about X') — not unrelated actions like 'Change title' or 'Add a Testimonials section'. For needs_clarification, suggest the most likely concrete answers. Omit suggested_next_actions entirely if no contextual follow-up is obvious. Every suggestion must be an action the user can perform inside this editor — restricted to the block types in blockContracts / blockCatalogue (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, TwoColumn, Banner, Carousel, Embed, Footer, Gallery, Quote, SiteHeader, Stats, Table, Tabs, Video) or SEO/site-config edits. NEVER suggest unsupported features: no forms, no email capture, no contact forms, no subscribe boxes, no newsletter signups, no popups/modals, no chat widgets, no live video, no payment/checkout — these require custom code the editor cannot produce. Never suggest actions outside the editor's scope such as A/B testing, analytics, performance monitoring, user research, or marketing strategy.",
+    "2-4 short imperative phrases the user could type next (max 6 words each). Each MUST be a logical follow-up to the specific change just made — not a generic action. NEVER suggest 'Open /X' or any navigation to a page that the current plan is creating, duplicating, or otherwise still pending — the page won't exist until the user approves the plan, and there is no special navigation chip handler (suggestions are sent verbatim as the next chat command). Suggest plan refinements instead (e.g. 'Use a punchier hero headline', 'Add a card grid for spotlights', 'Drop the FAQ section'). Ask yourself: 'what would the user likely want to do next given THIS edit?' When the plan contains exactly one update_props op that changes a text field, the first 1-2 suggestions MUST be refinements of that same field (e.g. 'Make it shorter', 'Try a bolder tone', 'Revert to previous'). For example, after rewriting stats labels, suggest refining the same section ('Make the numbers bigger', 'Add a stat about X') — not unrelated actions like 'Change title' or 'Add a Testimonials section'. For needs_clarification, suggest the most likely concrete answers. Omit suggested_next_actions entirely if no contextual follow-up is obvious. Every suggestion must be an action the user can perform inside this editor — restricted to the block types in blockContracts / blockCatalogue (Hero, FeatureGrid, Testimonials, FAQAccordion, CTA, Card, CardGrid, RichText, TwoColumn, Banner, Carousel, Embed, Footer, Gallery, Quote, SiteHeader, Stats, Table, Tabs, Video) or SEO/site-config edits. NEVER suggest unsupported features: no forms, no email capture, no contact forms, no subscribe boxes, no newsletter signups, no popups/modals, no chat widgets, no live video, no payment/checkout — these require custom code the editor cannot produce. Never suggest actions outside the editor's scope such as A/B testing, analytics, performance monitoring, user research, or marketing strategy.",
   )
   return lines
 }
@@ -302,7 +337,11 @@ function sectionOperationCatalog(): string[] {
     "remove_page: when the user asks to delete a page path.",
     "move_page: reorder nav pages (pageSlug + optional afterPageSlug). Home (/) must stay first.",
     "duplicate_block: blockId is required; use optional toPageSlug when duplicating into a different page.",
-    "create_page: derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page. If the user asks to create a page for an audience, use audience-specific Hero/benefits/CTA content. If the user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page — do not ask which page to create first.",
+    "duplicate_page: clones an existing page (with all its blocks and content) into a new slug. Use this — NOT create_page — whenever the user says duplicate / clone / copy a page, even when they also ask to populate or modify the new page. Subsequent ops in the same plan can target the duplicated page using `pageSlug=<newPageSlug>` and the SOURCE page's original block IDs (e.g. `b_hero`, not `b_hero_copy`); the engine maps them to the duplicated blocks. Pattern for 'duplicate /X into /Y and adjust content': [duplicate_page /X→/Y, update_props on /Y for each block whose content changes, add_block on /Y for new sections, remove_block on /Y for sections that don't fit]. NEVER substitute create_page for duplicate_page — the user is asking to inherit the source page's structure.",
+    "create_page: derive the slug from the page name (e.g. 'Mountain Climbers' → /mountain-climbers). Never use generic slugs like /new-page. If the user asks to create a page for an audience, use audience-specific Hero/benefits/CTA content. If the user asks to create multiple pages (for multiple audiences or a list), include one create_page operation per requested page — do not ask which page to create first. Do NOT use create_page when the user asked to duplicate/clone/copy an existing page — use duplicate_page instead.",
+    "",
+    "### Link / href hygiene",
+    "When generating href / ctaHref / button URLs on a block, NEVER point a link to the same page that the block lives on — a self-referencing CTA does nothing when clicked. For a Hero/CTA on /season-recipes, link to a related page (e.g. /recipes, /community, /) or an external URL — not back to /season-recipes. If no obvious destination exists, prefer the homepage (/) or omit the href.",
     "",
     "### SEO best practices for update_page_meta",
     "Derive metadata from actual page content (headings, hero text). title: 50-60 chars, keyword-forward, relate to the H1. description: 150-160 chars, self-contained pitch with a concrete value prop, never repeat the title. ogImage: HTTPS URL, 1200x630px recommended. Never promise content that doesn't exist on the page. Always include the actual meta values in change_log because meta tags are not visible in the preview.",

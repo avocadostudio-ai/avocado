@@ -278,7 +278,7 @@ export type FuzzyMatch = {
   requestedId: string
   resolvedId: string
   resolvedIndex: number
-  strategy: "strip_copy_suffix" | "type_prefix"
+  strategy: "strip_copy_suffix" | "append_copy_suffix" | "type_prefix"
 }
 
 export type ApplyOpsOptions = {
@@ -315,7 +315,9 @@ function _nextUniqueBlockId(blocks: Array<{ id: string }>, preferred: string) {
  * Resolve a blockId to its index in the blocks array.
  * Exact match first, then fuzzy fallback:
  *  1. Strip trailing `_copy`, `_copy_N` suffix and retry exact match
- *  2. Match by block-type prefix — only when a single block matches (rejects ambiguous)
+ *  2. Append `_copy` suffix and retry — supports update_props on a freshly
+ *     duplicated page within the same atomic plan (LLM uses original IDs)
+ *  3. Match by block-type prefix — only when a single block matches (rejects ambiguous)
  *
  * Pushes a FuzzyMatch entry when a fallback strategy succeeds.
  */
@@ -330,6 +332,20 @@ function _resolveBlockIndex(blocks: Array<{ id: string; type?: string }>, blockI
     const idx = blocks.findIndex((b) => b.id === stripped)
     if (idx !== -1) {
       fuzzyMatches?.push({ requestedId: blockId, resolvedId: blocks[idx].id, resolvedIndex: idx, strategy: "strip_copy_suffix" })
+      return idx
+    }
+  }
+
+  // Fuzzy 1.5: append `_copy` suffix and retry. Symmetric with strategy 1 — when
+  // the LLM emits update_props against a duplicated page using the source page's
+  // block IDs (e.g. `b_hero` instead of `b_hero_copy`), match the duplicated
+  // block deterministically. Works even when multiple blocks of the same type
+  // exist (where the type-prefix fallback would reject as ambiguous).
+  if (!/_copy(?:_\d+)?$/.test(blockId)) {
+    const appended = `${blockId}_copy`
+    const idx = blocks.findIndex((b) => b.id === appended)
+    if (idx !== -1) {
+      fuzzyMatches?.push({ requestedId: blockId, resolvedId: blocks[idx].id, resolvedIndex: idx, strategy: "append_copy_suffix" })
       return idx
     }
   }

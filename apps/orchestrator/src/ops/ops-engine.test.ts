@@ -539,6 +539,20 @@ describe("ops-engine: duplicate_page", () => {
     assert.equal(page.meta?.title, "Pricing SEO")
     assert.equal(page.meta?.description, "Our plans")
   })
+
+  it("update_props in same atomic plan resolves source block IDs to duplicated blocks via fuzzy match", async () => {
+    seedSession(makePage(), makePricingPage())
+    const result = await applyOpsAtomically(TEST_SESSION, [
+      { op: "duplicate_page", pageSlug: "/pricing", newPageSlug: "/enterprise", newTitle: "Enterprise" },
+      // LLM emits update_props using the SOURCE block id `b_hero_pricing`; the
+      // engine should resolve it to the duplicated `b_hero_pricing_copy` on /enterprise.
+      { op: "update_props", pageSlug: "/enterprise", blockId: "b_hero_pricing", patch: { heading: "Enterprise Plans" } }
+    ])
+    const page = getDraft("/enterprise")!
+    assert.equal(page.blocks[0].id, "b_hero_pricing_copy")
+    assert.equal((page.blocks[0].props as Record<string, unknown>).heading, "Enterprise Plans")
+    assert.ok(result.fuzzyMatches.some((m) => m.strategy === "append_copy_suffix" && m.requestedId === "b_hero_pricing"), "fuzzy match should record append_copy_suffix strategy")
+  })
 })
 
 describe("ops-engine: move_page", () => {

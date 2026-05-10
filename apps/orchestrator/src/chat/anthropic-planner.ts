@@ -7,7 +7,7 @@ import {
   type Operation,
   type PageDoc
 } from "@ai-site-editor/shared"
-import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./prompts.js"
+import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt, buildPlannerSystemPromptSegments } from "./prompts.js"
 import { GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER } from "./chat-pipeline.js"
 import {
   type ParsedIntent,
@@ -16,7 +16,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, isDuplicateAndModifyRequest } from "../nlp/intent-detection.js"
 import type { ThinkingEvent } from "./planner-types.js"
 import {
   extractJsonObject,
@@ -37,7 +37,7 @@ import {
 } from "./planner.js"
 import { editPlanJsonSchema, intentJsonSchema } from "./plan-json-schema.js"
 import { type TokenUsage, extractUsage, ZERO_USAGE } from "../telemetry/usage.js"
-import { anthropicSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "./anthropic-cache.js"
+import { anthropicSystemPromptWithCache, anthropicSegmentedSystemPromptWithCache, anthropicToolWithCache, ANTHROPIC_FINE_GRAINED_STREAM_HEADERS } from "./anthropic-cache.js"
 import { executeToolCall, type ToolRuntime } from "../tools/runtime.js"
 import type { ToolExecutionEvent } from "../tools/types.js"
 
@@ -238,7 +238,7 @@ export async function generatePlanWithAnthropic(args: {
   feedback?: string
   onToken?: (token: string) => void
   onThinking?: (event: ThinkingEvent) => void
-  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
+  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string; pageSlug?: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
   onChangeLogEntry?: (entry: string) => void
@@ -267,7 +267,7 @@ export async function generatePlanWithAnthropic(args: {
     ? AbortSignal.any([args.signal, AbortSignal.timeout(LLM_TIMEOUT_MS)])
     : AbortSignal.timeout(LLM_TIMEOUT_MS)
   const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
-  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message) || isDuplicateAndModifyRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
@@ -280,7 +280,7 @@ export async function generatePlanWithAnthropic(args: {
       (entry) => entry && typeof entry === "object" && "id" in entry && (entry as { id?: unknown }).id !== selectedBlockId
     )
 
-  const system = buildPlannerSystemPrompt({
+  const systemSegments = buildPlannerSystemPromptSegments({
     provider: "anthropic",
     lightweight: !!args.lightweight,
     selectedBlockId,
@@ -296,6 +296,9 @@ export async function generatePlanWithAnthropic(args: {
     locale: args.locale,
     imageSourceChoiceOpen: args.imageSourceChoiceOpen,
   })
+  // Stable prefix carries cache_control; dynamic tail is sent as a second
+  // text block without it, so per-request flags don't bust the cached prefix.
+  const cachedSystem = anthropicSegmentedSystemPromptWithCache(systemSegments)
 
   const lowerMsg = args.message.toLowerCase()
   const includeContracts =
@@ -376,11 +379,15 @@ export async function generatePlanWithAnthropic(args: {
           }
         })
       : []
-  // Anthropic allows max 4 cache_control breakpoints total. Apply only to the last tool
-  // (system prompt already uses one breakpoint via anthropicSystemPromptWithCache).
-  const toolDefs: Anthropic.Messages.Tool[] = [submitPlanToolDef, ...runtimeTools].map((tool, i, arr) =>
-    i === arr.length - 1 ? anthropicToolWithCache(tool) : tool
-  )
+  // Anthropic allows max 4 cache_control breakpoints. Cache the *first* tool
+  // (submitPlanToolDef) — it carries the large editPlanJsonSchema and is
+  // present on every request. Caching the first tool means the cached prefix
+  // stays a hit even when runtime tools (gdrive, unsplash, image.generate)
+  // come and go between requests.
+  const toolDefs: Anthropic.Messages.Tool[] = [
+    anthropicToolWithCache(submitPlanToolDef),
+    ...runtimeTools,
+  ]
 
   let parsed: Record<string, unknown> | undefined
   let usage: TokenUsage = { ...ZERO_USAGE }
@@ -430,7 +437,7 @@ export async function generatePlanWithAnthropic(args: {
         const prev = emittedFieldDraftByKey.get(key)
         if (prev === draft.value) continue
         emittedFieldDraftByKey.set(key, draft.value)
-        args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value })
+        args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value, ...(draft.pageSlug ? { pageSlug: draft.pageSlug } : {}) })
       }
     }
     if (args.onSummaryChunk || args.onChangeLogEntry) {
@@ -466,7 +473,7 @@ export async function generatePlanWithAnthropic(args: {
         const stream = client.messages.stream({
           model: args.model,
           max_tokens: plannerMaxTokens,
-          system: anthropicSystemPromptWithCache(system),
+          system: cachedSystem,
           tools: toolDefs,
           tool_choice: { type: "auto" },
           messages: loopMessages,
@@ -579,7 +586,7 @@ export async function generatePlanWithAnthropic(args: {
         response = await client.messages.create({
           model: args.model,
           max_tokens: plannerMaxTokens,
-          system: anthropicSystemPromptWithCache(system),
+          system: cachedSystem,
           tools: toolDefs,
           tool_choice: { type: "auto" },
           messages: loopMessages,
@@ -765,7 +772,7 @@ export async function generatePlanWithAnthropic(args: {
       const stream = client.messages.stream({
         model: args.model,
         max_tokens: plannerMaxTokens,
-        system: anthropicSystemPromptWithCache(system),
+        system: cachedSystem,
         tools: [anthropicToolWithCache(submitPlanToolDef)],
         tool_choice: thinkingParam
           ? { type: "auto" as const }
@@ -890,7 +897,7 @@ export async function generatePlanWithAnthropic(args: {
       const response = await client.messages.create({
         model: args.model,
         max_tokens: plannerMaxTokens,
-        system: anthropicSystemPromptWithCache(system),
+        system: cachedSystem,
         tools: [anthropicToolWithCache(submitPlanToolDef)],
         tool_choice: thinkingParam
           ? { type: "auto" as const }
@@ -941,7 +948,7 @@ export async function generatePlanWithAnthropic(args: {
       const response = await client.messages.create({
         model: args.model,
         max_tokens: plannerMaxTokens,
-        system: anthropicSystemPromptWithCache(system),
+        system: cachedSystem,
         output_config: {
           format: { type: "json_schema", schema: editPlanJsonSchema }
         },
@@ -995,7 +1002,7 @@ export async function generatePlanWithAnthropic(args: {
       const fallbackResponse = await client.messages.create({
         model: args.model,
         max_tokens: plannerMaxTokens,
-        system: anthropicSystemPromptWithCache(system),
+        system: cachedSystem,
         tools: [anthropicToolWithCache(submitPlanToolDef)],
         tool_choice: thinkingParam
           ? { type: "auto" as const }

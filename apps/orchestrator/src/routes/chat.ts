@@ -540,7 +540,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
             type: "field_draft",
             blockId: event.blockId,
             editablePath: event.editablePath,
-            value: event.value
+            value: event.value,
+            ...(event.pageSlug ? { pageSlug: event.pageSlug } : {})
           }),
         onSummaryChunk: (text) => emit("summary_token", { type: "summary_token", text }),
         onChangeLogEntry: (entry) => emit("changelog_entry", { type: "changelog_entry", entry }),

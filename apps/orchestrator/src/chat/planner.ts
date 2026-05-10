@@ -36,7 +36,7 @@ import {
   intentSchema,
   plannerContextPack
 } from "../nlp/deterministic-planner.js"
-import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest } from "../nlp/intent-detection.js"
+import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isPageWideRewriteRequest, isDuplicateAndModifyRequest } from "../nlp/intent-detection.js"
 import {
   extractJsonObject,
   inferBlockTypeFromText,
@@ -563,6 +563,13 @@ export type StreamedFieldDraft = {
   blockId: string
   editablePath: string
   value: string
+  /**
+   * Optional target page slug parsed from the partial op object. When the
+   * planner emits multi-page plans (e.g. duplicate_page → update_props on a
+   * new slug), the editor uses this to suppress live-draft overlays whose
+   * pageSlug doesn't match the user's currently-viewed page.
+   */
+  pageSlug?: string
 }
 
 function decodeJsonStringFragment(fragment: string) {
@@ -659,6 +666,11 @@ function extractUpdatePropsDraftsFromPartialOp(raw: string, opIndex: number) {
   const blockId = parseJsonStringValueFragment(blockIdMatch[1] ?? "", blockIdClosed).trim()
   if (!blockId) return [] as StreamedFieldDraft[]
 
+  const pageSlugMatch = /"pageSlug"\s*:\s*"((?:\\.|[^"\\])*)"/.exec(raw)
+  const pageSlug = pageSlugMatch
+    ? parseJsonStringValueFragment(pageSlugMatch[1] ?? "", true).trim() || undefined
+    : undefined
+
   const patchKeyIdx = raw.indexOf('"patch"')
   if (patchKeyIdx < 0) return [] as StreamedFieldDraft[]
   const patchObj = findFirstObjectLiteral(raw, patchKeyIdx)
@@ -673,7 +685,7 @@ function extractUpdatePropsDraftsFromPartialOp(raw: string, opIndex: number) {
     const fullMatch = match[0] ?? ""
     const valueClosed = fullMatch.endsWith('"')
     const value = parseJsonStringValueFragment(match[2] ?? "", valueClosed)
-    drafts.push({ opIndex, blockId, editablePath, value })
+    drafts.push({ opIndex, blockId, editablePath, value, ...(pageSlug ? { pageSlug } : {}) })
   }
   return drafts
 }
@@ -686,9 +698,12 @@ function extractUpdatePropsDraftsFromCompleteOp(raw: string, opIndex: number) {
     if (!blockId) return [] as StreamedFieldDraft[]
     const patch = parsed.patch && typeof parsed.patch === "object" ? parsed.patch as Record<string, unknown> : null
     if (!patch) return [] as StreamedFieldDraft[]
+    const pageSlug = typeof parsed.pageSlug === "string" && parsed.pageSlug.trim().length > 0
+      ? parsed.pageSlug.trim()
+      : undefined
     return Object.entries(patch)
       .filter(([, value]) => typeof value === "string")
-      .map(([editablePath, value]) => ({ opIndex, blockId, editablePath, value: value as string }))
+      .map(([editablePath, value]) => ({ opIndex, blockId, editablePath, value: value as string, ...(pageSlug ? { pageSlug } : {}) }))
   } catch {
     return [] as StreamedFieldDraft[]
   }
@@ -836,7 +851,7 @@ export async function generatePlanWithOpenAI(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
-  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
+  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string; pageSlug?: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
   onChangeLogEntry?: (entry: string) => void
@@ -857,7 +872,7 @@ export async function generatePlanWithOpenAI(args: {
     ? AbortSignal.any([args.signal, AbortSignal.timeout(LLM_TIMEOUT_MS)])
     : AbortSignal.timeout(LLM_TIMEOUT_MS)
   const effectiveBlockTypes = args.componentsManifest ? args.componentsManifest.blocks.map(c => c.type) : allowedBlockTypes
-  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message)
+  const batchOverride = isBatchAddRequest(args.message) || isBatchRemoveRequest(args.message) || isBatchReorderRequest(args.message) || isPageWideRewriteRequest(args.message) || isDuplicateAndModifyRequest(args.message)
   const pageWideRewrite = isPageWideRewriteRequest(args.message)
   const pageWideTranslation = isPageWideTranslationRequest(args.message)
   const chatStrictPrimaryOpMode = isChatStrictPrimaryOpMode() && !batchOverride && !pageWideTranslation
@@ -996,7 +1011,7 @@ export async function generatePlanWithOpenAI(args: {
           const prev = emittedFieldDraftByKey.get(key)
           if (prev === draft.value) continue
           emittedFieldDraftByKey.set(key, draft.value)
-          args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value })
+          args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value, ...(draft.pageSlug ? { pageSlug: draft.pageSlug } : {}) })
         }
       }
       if (args.onSummaryChunk || args.onChangeLogEntry) {

@@ -18,7 +18,7 @@ test("extractUpdatePropsFieldDraftsFromPlanBuffer returns partial update_props s
   const raw = '{"intent":"edit_plan","ops":[{"op":"update_props","pageSlug":"/","blockId":"b_hero_home","patch":{"heading":"Hel'
   const drafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
   assert.deepEqual(drafts, [
-    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Hel" }
+    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Hel", pageSlug: "/" }
   ])
 })
 
@@ -26,7 +26,7 @@ test("extractUpdatePropsFieldDraftsFromPlanBuffer decodes escaped and unicode va
   const raw = '{"intent":"edit_plan","ops":[{"op":"update_props","pageSlug":"/","blockId":"b_hero_home","patch":{"heading":"Line\\nBreak \\u00fc"}}]}'
   const drafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
   assert.deepEqual(drafts, [
-    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Line\nBreak ü" }
+    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Line\nBreak ü", pageSlug: "/" }
   ])
 })
 
@@ -34,9 +34,9 @@ test("extractUpdatePropsFieldDraftsFromPlanBuffer includes multiple update_props
   const raw = '{"intent":"edit_plan","ops":[{"op":"update_props","pageSlug":"/","blockId":"b_hero_home","patch":{"heading":"Alpha"}},{"op":"move_block","pageSlug":"/","blockId":"b_features_home","afterBlockId":"b_hero_home"},{"op":"update_props","pageSlug":"/","blockId":"b_cta_home","patch":{"title":"Bravo","body":"Call now"}}]}'
   const drafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
   assert.deepEqual(drafts, [
-    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Alpha" },
-    { opIndex: 3, blockId: "b_cta_home", editablePath: "title", value: "Bravo" },
-    { opIndex: 3, blockId: "b_cta_home", editablePath: "body", value: "Call now" }
+    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Alpha", pageSlug: "/" },
+    { opIndex: 3, blockId: "b_cta_home", editablePath: "title", value: "Bravo", pageSlug: "/" },
+    { opIndex: 3, blockId: "b_cta_home", editablePath: "body", value: "Call now", pageSlug: "/" }
   ])
 })
 
@@ -44,7 +44,7 @@ test("extractUpdatePropsFieldDraftsFromPlanBuffer ignores non-string patch value
   const raw = '{"intent":"edit_plan","ops":[{"op":"update_props","pageSlug":"/","blockId":"b_hero_home","patch":{"heading":123,"meta":{"foo":"bar"},"subheading":"Visible"}}]}'
   const drafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
   assert.deepEqual(drafts, [
-    { opIndex: 1, blockId: "b_hero_home", editablePath: "subheading", value: "Visible" }
+    { opIndex: 1, blockId: "b_hero_home", editablePath: "subheading", value: "Visible", pageSlug: "/" }
   ])
 })
 
@@ -52,7 +52,15 @@ test("extractUpdatePropsFieldDraftsFromPlanBuffer streams even before op key arr
   const raw = '{"intent":"edit_plan","ops":[{"pageSlug":"/","blockId":"b_hero_home","patch":{"heading":"Hel'
   const drafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
   assert.deepEqual(drafts, [
-    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Hel" }
+    { opIndex: 1, blockId: "b_hero_home", editablePath: "heading", value: "Hel", pageSlug: "/" }
+  ])
+})
+
+test("extractUpdatePropsFieldDraftsFromPlanBuffer surfaces pageSlug from cross-page duplicate-and-modify plans", () => {
+  const raw = '{"intent":"edit_plan","ops":[{"op":"duplicate_page","pageSlug":"/recipes","newPageSlug":"/season-recipes"},{"op":"update_props","pageSlug":"/season-recipes","blockId":"b_hero_recipes","patch":{"heading":"Cook with the Seasons"}}]}'
+  const drafts = extractUpdatePropsFieldDraftsFromPlanBuffer(raw)
+  assert.deepEqual(drafts, [
+    { opIndex: 2, blockId: "b_hero_recipes", editablePath: "heading", value: "Cook with the Seasons", pageSlug: "/season-recipes" }
   ])
 })
 

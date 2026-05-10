@@ -270,6 +270,50 @@ export function isDuplicateBlockRequest(message: string) {
   return false
 }
 
+/**
+ * Detects "duplicate this page and modify the content" patterns — duplicate /
+ * clone / copy a page combined with a modification verb (populate, fill,
+ * suggest, update, modify, change, adjust, replace, rewrite). Used to bypass
+ * `chatStrictPrimaryOpMode` so the planner can emit `duplicate_page` plus
+ * follow-on `update_props` / `add_block` / `remove_block` ops in one plan.
+ *
+ * Without this, strict mode truncates duplicate-and-modify plans to just the
+ * `duplicate_page` op, leaving the user with an unmodified clone.
+ */
+export function isDuplicateAndModifyRequest(message: string) {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  // Must mention a duplicate verb in a page context (not a block-level dup).
+  const duplicateVerb = /\b(?:duplicate|clone|copy)\b/.test(m)
+  if (!duplicateVerb) return false
+  // Page context: explicit "page", "this", "current", "selected", or a route mention.
+  const pageContext = /\b(?:page|this|current|selected)\b/.test(m) || /\/[a-z0-9/_-]+/i.test(m)
+  if (!pageContext) return false
+  // Modification verbs that imply additional ops beyond the bare duplicate.
+  const modifyVerb =
+    /\b(?:populate|fill|suggest|propose|recommend|generate|write|draft|describe)\b/.test(m) ||
+    /\b(?:modify|adjust|tweak|customi[sz]e|tailor|adapt|repurpose|reskin|rebrand|refresh|refocus)\b/.test(m) ||
+    /\b(?:update|change|replace|rewrite|swap|edit|repopulate)\b/.test(m) ||
+    /\b(?:and\s+(?:then\s+)?)?(?:make|turn|convert|transform)\s+it\s+(?:into|about|for)\b/.test(m)
+  return modifyVerb
+}
+
+/**
+ * Detects "show me a plan first" / "plan it before doing" phrasing — the user
+ * wants the planner to assemble ops but hold them behind the approval gate
+ * instead of auto-applying. Used by the chat pipeline to override
+ * `executionMode` to `plan_only` when the message asks for review-before-apply.
+ */
+export function requestsPlanFirst(message: string) {
+  const m = normalizeForIntent(stripSiteContextEnvelope(message))
+  // "make a plan first", "plan it first", "draft a plan", "show me a plan",
+  // "propose a plan", "plan before applying", "plan before doing", "plan it before"
+  if (/\b(?:make|draft|propose|prepare|create|show)\s+(?:me\s+)?(?:a|the)?\s*plan\b/.test(m)) return true
+  if (/\bplan\s+(?:it|this|first|before)\b/.test(m)) return true
+  if (/\bbefore\s+(?:doing|applying|making|executing|building)\b.*\bplan\b/.test(m)) return true
+  if (/\bplan\b.*\bbefore\s+(?:doing|applying|making|executing|building)\b/.test(m)) return true
+  return false
+}
+
 export function isInfoQuery(message: string) {
   const m = normalizeForIntent(message)
   return (

@@ -35,6 +35,7 @@ import {
   adviceResponse,
   isContentQuery,
   isPageListQuery,
+  requestsPlanFirst,
   plannerMessageWithPendingContext,
   buildSiteContextBlock,
   infoResponse
@@ -244,7 +245,7 @@ export async function runChatPipeline(
   options?: {
     onPlanningToken?: (token: string) => void
     onThinking?: (event: ThinkingEvent) => void
-    onFieldDraft?: (event: { blockId: string; editablePath: string; value: string }) => void
+    onFieldDraft?: (event: { blockId: string; editablePath: string; value: string; pageSlug?: string }) => void
     onPlannedOp?: (event: { index: number; op: Operation }) => void
     onSummaryChunk?: (text: string) => void
     onChangeLogEntry?: (entry: string) => void
@@ -262,6 +263,12 @@ export async function runChatPipeline(
   const requiresMessage = executionMode === "auto" || executionMode === "plan_only"
   if (!body.session || !body.slug || (requiresMessage && !body.message)) {
     return { code: 400, payload: { error: "session and slug are required; message is required for planning" } }
+  }
+  // Honor in-message "make a plan first" / "plan it before doing" phrasing by
+  // upgrading auto → plan_only so the orchestrator holds the resulting plan
+  // behind the approval gate (Apply / Discard) instead of auto-applying.
+  if (executionMode === "auto" && body.message && requestsPlanFirst(body.message)) {
+    executionMode = "plan_only"
   }
   const manifestPayload = (() => {
     if (!body.componentsManifest) return undefined
@@ -1597,6 +1604,12 @@ export async function runChatPipeline(
         ...plannerContextTelemetryFields,
         ...timingFields()
       })
+      // Filter out slugs that don't exist yet — for plan_only the page hasn't
+      // been applied, so an "Open /season-recipes" navigation chip would 404.
+      // The full mentioned list is restored after the user approves the plan.
+      const planOnlyDraft = getSessionDraft(body.session!)
+      const planOnlyMentionedSlugs = collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug)
+        .filter((slug) => planOnlyDraft.has(slug))
       return {
         done: true as const,
         response: {
@@ -1605,7 +1618,7 @@ export async function runChatPipeline(
             status: "plan_ready",
             summary: approvalSummary,
             changes: approvalChangeLog,
-            mentionedSlugs: collectMentionedSlugsFromPlan(resolvedPlan, effectiveSlug),
+            mentionedSlugs: planOnlyMentionedSlugs,
             previewVersion: versions.get(body.session!) ?? 0,
             plannerSource: source,
             modelUsed,
@@ -3391,6 +3404,17 @@ export async function runChatPipeline(
                   const isStructural = op.op === "create_page" || op.op === "rename_page" || op.op === "remove_page" || op.op === "move_page" || op.op === "duplicate_page" || op.op === "remove_block"
                   if (isStructural) {
                     streamApplyState.hasStructuralOps = true
+                    return
+                  }
+                  // Once a page-affecting structural op (create/duplicate/rename/remove/move
+                  // on a page) has been deferred earlier in this stream, defer ALL subsequent
+                  // ops too. Downstream update_props/add_block ops may target a page slug that
+                  // hasn't materialized yet (e.g. update_props on /season-recipes after a
+                  // deferred duplicate_page /recipes → /season-recipes); applying them
+                  // mid-stream would throw "Page not found", trigger a costly rollback +
+                  // full re-apply + repair loop, and frequently leave only the structural op
+                  // surviving the LLM's repair attempt.
+                  if (streamApplyState.hasStructuralOps) {
                     return
                   }
                   validateOperations([op])

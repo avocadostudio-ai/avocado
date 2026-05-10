@@ -9,6 +9,7 @@ import {
   buildAiInsightChanges,
   buildOpChangeLogEntries,
   deterministicCreatePagePlan,
+  deterministicDuplicatePagePlan,
   shouldReturnDeterministicClarification
 } from "./chat-pipeline-deterministic.js"
 import type { Operation, EditPlan } from "@ai-site-editor/shared"
@@ -328,6 +329,25 @@ test("deterministicCreatePagePlan: defers when target slug already exists (edit-
   const message = "make page /pricing have: 1. Hero 2. RichText 3. CardGrid 4. CTA"
   const result = deterministicCreatePagePlan({ session: "test-suite", message, hasPageTemplates: false })
   assert.equal(result, null, "existing-slug creates should defer to the LLM so it can plan edits instead of clarifying")
+})
+
+// ---------------------------------------------------------------------------
+// deterministicDuplicatePagePlan — content-generation deferral
+// ---------------------------------------------------------------------------
+
+test("deterministicDuplicatePagePlan: bare duplicate stays deterministic", () => {
+  // /pricing is auto-seeded into test-suite from demoPublishedPages.
+  const message = "duplicate this page into a new one called pricing copy"
+  const result = deterministicDuplicatePagePlan({ session: "test-suite", message, effectiveSlug: "/pricing" })
+  assert.ok(result, "bare duplicate should produce a deterministic plan")
+  assert.equal(result!.ops.length, 1)
+  assert.equal(result!.ops[0]?.op, "duplicate_page")
+})
+
+test("deterministicDuplicatePagePlan: defers to LLM when message also asks to suggest/populate components", () => {
+  const message = "duplicate this page into a new one called season recipes. suggest components and populate them. make a plan first"
+  const result = deterministicDuplicatePagePlan({ session: "test-suite", message, effectiveSlug: "/pricing" })
+  assert.equal(result, null, "should defer to LLM so it can plan duplicate_page + add_block + update_props together")
 })
 
 // ---------------------------------------------------------------------------

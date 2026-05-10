@@ -193,7 +193,7 @@ export async function generatePlanWithGemini(args: {
   history?: Array<{ role: "user" | "assistant"; content: string }>
   feedback?: string
   onToken?: (token: string) => void
-  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string }) => void
+  onFieldDraft?: (draft: { blockId: string; editablePath: string; value: string; pageSlug?: string }) => void
   onPlannedOp?: (op: Operation, index: number) => void
   onSummaryChunk?: (text: string) => void
   onChangeLogEntry?: (entry: string) => void
@@ -374,7 +374,7 @@ export async function generatePlanWithGemini(args: {
           const prev = emittedFieldDraftByKey.get(key)
           if (prev === draft.value) continue
           emittedFieldDraftByKey.set(key, draft.value)
-          args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value })
+          args.onFieldDraft({ blockId: draft.blockId, editablePath: draft.editablePath, value: draft.value, ...(draft.pageSlug ? { pageSlug: draft.pageSlug } : {}) })
         }
       }
 

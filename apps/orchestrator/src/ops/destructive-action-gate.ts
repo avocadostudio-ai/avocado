@@ -43,9 +43,22 @@ function slugsTouchedByOps(ops: readonly Operation[]): string[] {
       continue
     }
     if (op.op === "update_site_config") continue
+    // duplicate_page: pageSlug is the SOURCE (read-only); newPageSlug is the
+    // only page being modified. Skip the generic pageSlug add below so the
+    // source isn't counted as "touched" and a duplicate-and-modify plan
+    // doesn't trip the multi-page approval gate spuriously.
+    if (op.op === "duplicate_page") {
+      if (typeof op.newPageSlug === "string") set.add(op.newPageSlug)
+      continue
+    }
+    // duplicate_block to a different page: pageSlug is the SOURCE; toPageSlug
+    // is the only page being modified. Same rationale as duplicate_page.
+    if (op.op === "duplicate_block" && typeof op.toPageSlug === "string" && op.toPageSlug !== op.pageSlug) {
+      set.add(op.toPageSlug)
+      continue
+    }
     if ("pageSlug" in op && typeof op.pageSlug === "string") set.add(op.pageSlug)
     if (op.op === "duplicate_block" && typeof op.toPageSlug === "string") set.add(op.toPageSlug)
-    if (op.op === "duplicate_page" && typeof op.newPageSlug === "string") set.add(op.newPageSlug)
     if (op.op === "rename_page" && typeof op.newPageSlug === "string") set.add(op.newPageSlug)
   }
   return Array.from(set)

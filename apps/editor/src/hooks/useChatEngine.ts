@@ -500,6 +500,12 @@ export function useChatEngine(config: ChatEngineConfig) {
       let liveDraftActive = false
       let liveDraftFields: Record<string, string> | null = null
       let sawFieldDraftThisRun = false
+      // Latched true once the current stream emits a duplicate_page or
+      // create_page op for a slug other than the user's current view. After
+      // that, ops without an explicit pageSlug are assumed to target the new
+      // page, NOT the current page — preventing live-draft text from leaking
+      // into the source page's preview during a duplicate-and-modify plan.
+      let planMutatesOtherPage = false
       let thinkingBuf = ""
       let thinkingStartedMs = 0
       let thinkingDurationMs = 0
@@ -877,7 +883,16 @@ export function useChatEngine(config: ChatEngineConfig) {
           const blockId = typeof payload.blockId === "string" ? payload.blockId : ""
           const editablePath = typeof payload.editablePath === "string" ? payload.editablePath : ""
           const value = typeof payload.value === "string" ? payload.value : ""
-          if (blockId && editablePath) {
+          const draftPageSlug = typeof payload.pageSlug === "string" ? payload.pageSlug : null
+          // Only overlay when the draft targets the user's currently-viewed page.
+          // Two ways an op can target a different page:
+          //   - explicit pageSlug !== current view
+          //   - no pageSlug, but the plan already emitted a duplicate_page /
+          //     create_page for a different slug (planMutatesOtherPage flag)
+          const draftTargetsCurrentPage = draftPageSlug
+            ? draftPageSlug === store.getState().slug
+            : !planMutatesOtherPage
+          if (blockId && editablePath && draftTargetsCurrentPage) {
             sawFieldDraftThisRun = true
             if (debugDraftEnabled) {
               const now = Date.now()
@@ -910,9 +925,33 @@ export function useChatEngine(config: ChatEngineConfig) {
 
         if (payload.type === "op_candidate") {
           const idx = Number(payload.index ?? 0)
+          // Suppress preview-iframe overlays (live-draft text, add_block skeleton)
+          // when the streamed op targets a different page than the user is viewing.
+          // Two ways an op can target a different page:
+          //   - explicit pageSlug !== current view
+          //   - no pageSlug, but the plan already emitted a duplicate_page /
+          //     create_page for a different slug (planMutatesOtherPage flag)
+          const opRecordEarly = (payload.op && typeof payload.op === "object")
+            ? (payload.op as Record<string, unknown>)
+            : null
+          const opPageSlug = typeof opRecordEarly?.pageSlug === "string" ? opRecordEarly.pageSlug : null
+          const opType = opRecordEarly?.op ?? opRecordEarly?.type
+          if (opType === "duplicate_page" || opType === "create_page") {
+            const newSlug = typeof opRecordEarly?.newPageSlug === "string"
+              ? opRecordEarly.newPageSlug
+              : (typeof (opRecordEarly?.page as { slug?: unknown } | undefined)?.slug === "string"
+                  ? (opRecordEarly!.page as { slug: string }).slug
+                  : null)
+            if (newSlug && newSlug !== store.getState().slug) {
+              planMutatesOtherPage = true
+            }
+          }
+          const opTargetsCurrentPage = opPageSlug
+            ? opPageSlug === store.getState().slug
+            : !planMutatesOtherPage
           const candidateBlockId = blockIdFromOperation(payload.op)
-          if (candidateBlockId) setLatestStreamFocusBlockId(candidateBlockId)
-          if (!liveDraftBlockId) {
+          if (opTargetsCurrentPage && candidateBlockId) setLatestStreamFocusBlockId(candidateBlockId)
+          if (opTargetsCurrentPage && !liveDraftBlockId) {
             if (candidateBlockId) {
               liveDraftBlockId = candidateBlockId
               if (liveDraftText.trim().length > 0) {
@@ -925,7 +964,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           // Extract editable field values from operation for live typing
           // update_props → patch contains field values; add_block → block.props contains field values
           const op = payload.op
-          if (op && typeof op === "object") {
+          if (opTargetsCurrentPage && op && typeof op === "object") {
             const opRecord = op as Record<string, unknown>
             const rawFields =
               (opRecord.patch && typeof opRecord.patch === "object" ? opRecord.patch :
@@ -1088,6 +1127,10 @@ export function useChatEngine(config: ChatEngineConfig) {
             clearDebugFlushTimer()
             clearOpRefreshTimer()
             endLiveDraft()
+            // Clear any add_block skeleton placeholders that op_applied didn't
+            // remove — happens on plan_only (approval gate) finals where no ops
+            // ever apply, and as a defensive sweep after error/cancellation.
+            postToSite("removeSkeleton", {})
             if (pendingFocusBlockId !== null) flushOpRefresh()
             const thinkingExtras = thinkingBuf.length > 0
               ? { thinking: { text: thinkingBuf, durationMs: thinkingDurationMs } as ChatEntry["thinking"] }
@@ -1152,6 +1195,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           clearDebugFlushTimer()
           clearOpRefreshTimer()
           endLiveDraft()
+          postToSite("removeSkeleton", {})
           pendingFocusBlockId = null
           // Refresh preview to clear any image placeholders
           postToSite("draftUpdated", { focusBlockId: null })
@@ -1175,6 +1219,7 @@ export function useChatEngine(config: ChatEngineConfig) {
           clearDebugFlushTimer()
           clearOpRefreshTimer()
           endLiveDraft()
+          postToSite("removeSkeleton", {})
           pendingFocusBlockId = null
           if (payload.result) {
             applyChatResult(payload.result)
