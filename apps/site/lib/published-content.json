@@ -4,7 +4,7 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-04-19T07:39:03.238Z",
+      "updatedAt": "2026-05-11T12:58:01.264Z",
       "meta": {
         "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
         "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -18,8 +18,8 @@
             "subheading": "Dive into 100+ delicious recipes, 50+ wellness tips, and expert guidance—totally free, no card required.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
-            "imageUrl": "/generated-images/gen_1776458726798_77k5l3.jpg",
-            "imageAlt": "turn the image add more greens",
+            "imageUrl": "/generated-images/gen_1778479033608_tkyset.jpg",
+            "imageAlt": "Avocado toast topped with crumbled feta cheese, fresh cilantro, and microgreens served on a speckled beige plate with marble surface.",
             "imagePosition": "right",
             "textAlign": "left",
             "secondaryCtaText": "Read Research Studies"
@@ -229,6 +229,119 @@
                 "imageAlt": "Healthy meal with fresh vegetables and nutrients"
               }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "p_season_recipes",
+      "slug": "/season-recipes",
+      "title": "Season Recipes",
+      "updatedAt": "2026-05-10T09:46:35.644Z",
+      "meta": {
+        "title": "Season Recipes"
+      },
+      "blocks": [
+        {
+          "id": "b_hero_for-recipes_copy",
+          "type": "Hero",
+          "props": {
+            "heading": "Fresh Picks for Every Season",
+            "subheading": "Celebrate what's in season — discover vibrant recipes built around the freshest ingredients nature has to offer, all year round.",
+            "ctaText": "Explore Seasonal Recipes",
+            "ctaHref": "/recipes",
+            "imageUrl": "/generated-images/gen_1774991902955_0p1i2o.jpg",
+            "imageAlt": "A colourful spread of seasonal fruits and vegetables",
+            "imagePosition": "right",
+            "textAlign": "left"
+          }
+        },
+        {
+          "id": "b_stats_1773947687526_copy",
+          "type": "Stats",
+          "props": {
+            "title": "Seasonal Cooking by the Numbers",
+            "stats": [
+              {
+                "icon": "🥗",
+                "value": "200+",
+                "label": "Seasonal Recipes"
+              },
+              {
+                "icon": "🍂",
+                "value": "4",
+                "label": "Seasons Covered"
+              },
+              {
+                "icon": "⭐",
+                "value": "4.9★",
+                "label": "Average Rating"
+              }
+            ]
+          }
+        },
+        {
+          "id": "b_featuregrid_1773947612365_copy",
+          "type": "FeatureGrid",
+          "props": {
+            "title": "Why Cook Seasonally",
+            "columns": "3",
+            "features": [
+              {
+                "icon": "🌿",
+                "title": "Peak-Flavour Ingredients",
+                "description": "Seasonal produce is harvested at its prime — meaning better taste, more nutrients, and a more satisfying plate."
+              },
+              {
+                "icon": "💰",
+                "title": "Budget-Friendly Choices",
+                "description": "When ingredients are in season locally, they're abundant and affordable. Great food doesn't have to cost a fortune."
+              },
+              {
+                "icon": "♻️",
+                "title": "Sustainable Eating",
+                "description": "Choosing seasonal and local reduces food miles and supports farming practices that are kinder to the planet."
+              }
+            ]
+          }
+        },
+        {
+          "id": "b_faqaccordion_1773947679848_copy",
+          "type": "FAQAccordion",
+          "props": {
+            "title": "Seasonal Cooking Q&A",
+            "items": [
+              {
+                "q": "What does it mean to eat seasonally?",
+                "a": "Eating seasonally means choosing fruits and vegetables that are naturally harvested at this time of year in your region. These ingredients are at their flavour and nutrition peak — and often more affordable too."
+              },
+              {
+                "q": "How do I know what's in season where I live?",
+                "a": "A great starting point is your local farmers' market — vendors only sell what's growing now. You can also check regional seasonal produce guides online, or simply notice what's plentiful and affordable at your grocery store."
+              },
+              {
+                "q": "Can I substitute out-of-season ingredients?",
+                "a": "Absolutely. Frozen vegetables are picked and frozen at peak ripeness, making them an excellent substitute. Tinned options work well in cooked dishes too. Our recipes always suggest seasonal swaps where possible."
+              },
+              {
+                "q": "How should I store seasonal produce to keep it fresh?",
+                "a": "Storage varies by ingredient:\n\n- **Root vegetables** (carrots, beets): cool, dark place or fridge crisper drawer\n- **Berries & stone fruit**: fridge, eaten within a few days\n- **Herbs**: treat like flowers — trim stems and store upright in a glass of water\n\nWhen in doubt, refrigerate and consume within a week."
+              },
+              {
+                "q": "How do I get started with seasonal cooking?",
+                "a": "Pick one or two seasonal ingredients you love and search our recipe collection for dishes that feature them. Start simple — a roasted vegetable tray bake or a fresh fruit salad is all it takes to begin cooking with the seasons."
+              }
+            ]
+          }
+        },
+        {
+          "id": "b_cta_1773947706826_copy",
+          "type": "CTA",
+          "props": {
+            "title": "Start Cooking with the Season",
+            "description": "Embrace the freshest flavours nature has to offer. Browse our full collection of seasonal recipes and find your next favourite dish.",
+            "ctaText": "Browse All Recipes",
+            "ctaHref": "/recipes"
           }
         }
       ]
