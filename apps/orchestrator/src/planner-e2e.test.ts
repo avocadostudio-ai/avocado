@@ -374,3 +374,83 @@ describe("planner-e2e: create_page with enumerated blocks", { timeout: 60_000 },
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// Anthropic prompt-cache E2E — proves the segmented-system / cached-tool fix
+// actually produces cache hits against the live API.
+//
+// Two back-to-back calls with *different* selectedBlockId values share the
+// same stable system prefix and the same submit_edit_plan tool, so the second
+// call must report cacheReadInputTokens > 0. Pre-fix, this number was 0 (see
+// dashboard at platform.claude.com/usage/cache, Sonnet 4.6 row).
+// ---------------------------------------------------------------------------
+describe("planner-e2e: Anthropic prompt cache (cacheReadInputTokens)", { timeout: 60_000 }, () => {
+  const hasKey = !!process.env.ANTHROPIC_API_KEY
+
+  before(() => {
+    if (!hasKey) {
+      console.log("⏭  Skipping Anthropic cache E2E test — ANTHROPIC_API_KEY not set")
+    }
+  })
+
+  it("second call with different selectedBlockId hits cache", { skip: !hasKey }, async () => {
+    const previousCache = process.env.ANTHROPIC_PROMPT_CACHE
+    const previousTtl = process.env.ANTHROPIC_PROMPT_CACHE_TTL
+    process.env.ANTHROPIC_PROMPT_CACHE = "1"
+    process.env.ANTHROPIC_PROMPT_CACHE_TTL = "5m"
+
+    try {
+      const { generatePlanWithAnthropic } = await import("./chat/anthropic-planner.js")
+
+      const twoBlockPage: PageDoc = {
+        id: "p_cache_test",
+        slug: "/",
+        title: "Cache Test",
+        updatedAt: new Date().toISOString(),
+        blocks: [
+          { id: "b_hero_alpha", type: "Hero", props: { heading: "Alpha", subheading: "S1", imageUrl: "/x.svg", imageAlt: "x" } },
+          { id: "b_hero_bravo", type: "Hero", props: { heading: "Bravo", subheading: "S2", imageUrl: "/y.svg", imageAlt: "y" } }
+        ]
+      }
+
+      const model = process.env.ANTHROPIC_MODEL_FAST ?? "claude-haiku-4-5-20251001"
+      const ctxAlpha = buildTestContextPack(twoBlockPage, "b_hero_alpha")
+      const ctxBravo = buildTestContextPack(twoBlockPage, "b_hero_bravo")
+
+      // First call writes the cache.
+      const first = await generatePlanWithAnthropic({
+        message: "shorten the heading",
+        slug: "/",
+        currentPage: twoBlockPage,
+        contextPack: ctxAlpha as ReturnType<typeof import("./nlp/deterministic-planner.js").plannerContextPack>,
+        model
+      })
+      console.log(`  first call — usage: ${JSON.stringify(first.usage)}`)
+
+      // Second call with a *different* selectedBlockId. The dynamic suffix
+      // changes (b_hero_alpha → b_hero_bravo), but the cached prefix
+      // (system stable + submit_edit_plan tool) is identical. Without the
+      // segmented split, this call would have cacheReadInputTokens = 0.
+      const second = await generatePlanWithAnthropic({
+        message: "shorten the heading",
+        slug: "/",
+        currentPage: twoBlockPage,
+        contextPack: ctxBravo as ReturnType<typeof import("./nlp/deterministic-planner.js").plannerContextPack>,
+        model
+      })
+      console.log(`  second call — usage: ${JSON.stringify(second.usage)}`)
+
+      const cacheRead = second.usage.cacheReadInputTokens ?? 0
+      assert.ok(
+        cacheRead > 0,
+        `Expected cacheReadInputTokens > 0 on second call (different selectedBlockId, same stable prefix). Got ${cacheRead}. ` +
+        `Usage: ${JSON.stringify(second.usage)}`
+      )
+    } finally {
+      if (previousCache === undefined) delete process.env.ANTHROPIC_PROMPT_CACHE
+      else process.env.ANTHROPIC_PROMPT_CACHE = previousCache
+      if (previousTtl === undefined) delete process.env.ANTHROPIC_PROMPT_CACHE_TTL
+      else process.env.ANTHROPIC_PROMPT_CACHE_TTL = previousTtl
+    }
+  })
+})

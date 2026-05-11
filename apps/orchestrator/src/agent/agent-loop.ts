@@ -86,10 +86,12 @@ async function* runAnthropicAgentLoop(options: AgentLoopOptions): AsyncGenerator
 
   const client = new Anthropic({ apiKey })
 
-  // Apply prompt caching to system prompt and last tool (cache breakpoints)
+  // Apply prompt caching to system prompt and the *first* tool. Caching the
+  // first tool (rather than rotating to the last) keeps the cached tool prefix
+  // stable when callers pass tools in a different order or subset.
   const cachedSystem = anthropicSystemPromptWithCache(systemPrompt)
   const toolDefs: Anthropic.Messages.Tool[] = tools.map((t, i) =>
-    i === tools.length - 1 ? anthropicToolWithCache(t.definition) : t.definition
+    i === 0 ? anthropicToolWithCache(t.definition) : t.definition
   )
   const handlerMap = new Map(tools.map((t) => [t.definition.name, t.handler]))
 
