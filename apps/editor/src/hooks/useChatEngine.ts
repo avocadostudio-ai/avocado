@@ -202,7 +202,11 @@ export function useChatEngine(config: ChatEngineConfig) {
   const setStreamSteps = store.getState().setStreamSteps
   const setOpChecklist = store.getState().setOpChecklist
   const setFieldDraftDebug = store.getState().setFieldDraftDebug
-  const setActiveBlockId = (id: string | undefined) => store.getState().setActiveBlock(id)
+  const setActiveBlockId = (id: string | undefined) => {
+    const state = store.getState()
+    if (id === state.activeBlockId) return
+    state.setActiveBlock(id)
+  }
   const setActiveBlockType = (_type: string | undefined) => { /* absorbed into setActiveBlock */ }
   const setActiveEditablePath = store.getState().setActiveEditablePath
   const setSlug = store.getState().setSlug
@@ -254,7 +258,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       }
       const navigateTo = nextSlug !== currentSlug ? nextSlug : undefined
       postToSite("draftUpdated", { focusBlockId: data.focusBlockId ?? null, navigateTo })
-      if (data.focusBlockId) {
+      if (data.focusBlockId && data.focusBlockId !== store.getState().activeBlockId) {
         store.getState().setActiveBlock(data.focusBlockId)
       }
       setActiveEditablePath(undefined)
@@ -797,7 +801,7 @@ export function useChatEngine(config: ChatEngineConfig) {
       const flushOpRefresh = () => {
         const focusId = pendingFocusBlockId
         postToSite("draftUpdated", { focusBlockId: focusId })
-        if (focusId) {
+        if (focusId && focusId !== store.getState().activeBlockId) {
           store.getState().setActiveBlock(focusId)
         }
         store.getState().setActiveEditablePath(undefined)
@@ -1451,7 +1455,11 @@ export function useChatEngine(config: ChatEngineConfig) {
           applyChatResult,
           pushAssistantFromResult,
           postToSite,
-          setActiveBlockId: (id: string | undefined) => store.getState().setActiveBlock(id),
+          setActiveBlockId: (id: string | undefined) => {
+            const s = store.getState()
+            if (id === s.activeBlockId) return
+            s.setActiveBlock(id)
+          },
           shouldAutoScrollFollow,
         })
         agentCancelRef.current = handle.cancel

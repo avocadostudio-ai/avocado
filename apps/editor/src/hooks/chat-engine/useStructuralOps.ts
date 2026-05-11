@@ -139,7 +139,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      store.getState().setActiveBlock(focusBlockId)
+      if (focusBlockId !== store.getState().activeBlockId) {
+        store.getState().setActiveBlock(focusBlockId)
+      }
       store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
@@ -419,7 +421,9 @@ export function useStructuralOps(config: StructuralOpsConfig) {
       }
 
       const focusBlockId = data.focusBlockId ?? blockId
-      store.getState().setActiveBlock(focusBlockId)
+      if (focusBlockId !== store.getState().activeBlockId) {
+        store.getState().setActiveBlock(focusBlockId)
+      }
       store.getState().setActiveEditablePath(editablePath)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion

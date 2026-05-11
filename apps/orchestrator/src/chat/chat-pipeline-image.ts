@@ -20,7 +20,7 @@ import {
   recordImageGenDuration
 } from "../image/image-helpers.js"
 import { isGdriveConfigured } from "../image/gdrive-client.js"
-import { firstUrlFromText, preferredImageAltText } from "./chat-pipeline-ui.js"
+import { firstUrlFromText, looksLikeUserInstruction, preferredImageAltText } from "./chat-pipeline-ui.js"
 import { isDemoModeEnabled, isDemoImageGenDisabled } from "../demo-mode.js"
 
 /** Is demo mode active AND image gen disabled for demo? Memoized per call. */
@@ -216,8 +216,13 @@ function patchContainsResolvedImageUrl(patch: Record<string, unknown>) {
 }
 
 export function imageQueryFromItem(item: Record<string, unknown>, sectionContext?: string) {
+  // Skip imageAlt when it looks like a user instruction ("add white feta…",
+  // "change the image…") — those phrases pollute the search query.
+  const cleanAlt = typeof item.imageAlt === "string" && !looksLikeUserInstruction(item.imageAlt)
+    ? item.imageAlt
+    : undefined
   const candidate = [
-    item.imageAlt,
+    cleanAlt,
     item.title,
     item.heading,
     item.name,
@@ -350,7 +355,7 @@ export function rewriteAddBlockToChildImageUpdate(args: { plan: EditPlan; messag
             return {
               ...item,
               imageUrl: typeof item.imageUrl === "string" && item.imageUrl.trim().length > 0 ? item.imageUrl : "pending",
-              imageAlt: typeof item.imageAlt === "string" && item.imageAlt.trim().length > 0 ? item.imageAlt : `Image for ${titleLike}`
+              imageAlt: typeof item.imageAlt === "string" && item.imageAlt.trim().length > 0 && !looksLikeUserInstruction(item.imageAlt) ? item.imageAlt : `Image for ${titleLike}`
             }
           })
           patch[key] = nextItems

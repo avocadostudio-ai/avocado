@@ -86,7 +86,8 @@ import {
   compileDeterministicPlan,
   inferDeterministicIntent,
   isHighConfidenceDeterministicCase,
-  tryCompoundDeterministicPlan
+  tryCompoundDeterministicPlan,
+  resolveImageUrlForAltField
 } from "../nlp/deterministic-planner.js"
 import { generatePlanWithOpenAI, isPlannerOutputError, isStrictJsonResponseEnabled, parseIntentWithOpenAI, type PlannerSchemaContextMeta } from "./planner.js"
 import { isDemoModeEnabled, splitDemoOps, getDemoAllowedBlockTypes } from "../demo-mode.js"
@@ -120,6 +121,7 @@ import { resolveEffectiveProvider, resolveModelKeyForProvider, resolvePlannerSou
 import { runVariationPipeline, getCachedVariations, type VariationIntent } from "./variation-pipeline.js"
 import { validateAndStripHallucinatedProps } from "./hallucination-validator.js"
 import { validateChangelogCoverage } from "./changelog-coverage-validator.js"
+import { generateAltTextFromVision, parseAltPathForOp } from "./vision-alt-generator.js"
 
 /**
  * Parses an image-source chip answer ("Use Unsplash photo", "Generate with AI",
@@ -162,6 +164,29 @@ export function applyImageSourceHint(
   if (preference === "unsplash") return `${plannerMessage} unsplash`
   if (preference === "genai") return `${plannerMessage} generate image`
   return plannerMessage
+}
+
+/**
+ * Quick-action prompts the inline AI wand on imageAlt fields sends ("Generate
+ * alt text", "Improve accessibility", "Make more descriptive", "Describe this
+ * image"). When one of these arrives with an alt-text field active and a
+ * companion image URL on disk, we must route to the full vision-aware planner —
+ * the fast JSON-only intent router can't see images.
+ */
+const VISION_ALT_PROMPT_RE = /\b(generate\s+alt(?:\s+text)?|improve\s+accessibility|make\s+(?:it\s+|this\s+)?more\s+descriptive|describe\s+(?:this|the|that)\s+(?:image|photo|picture|icon|logo|illustration)|write\s+alt(?:\s+text)?)\b/i
+
+export function isVisionAltGenerationRequest(args: {
+  message: string
+  activeEditablePath?: string
+  activeBlockId?: string
+  currentPage: PageDoc
+}): boolean {
+  if (!args.message || !args.activeEditablePath || !args.activeBlockId) return false
+  if (!/(^|[.])imageAlt$/.test(args.activeEditablePath) && !/(^|[.])alt$/.test(args.activeEditablePath)) return false
+  if (!VISION_ALT_PROMPT_RE.test(args.message)) return false
+  const block = args.currentPage.blocks.find((b) => b.id === args.activeBlockId)
+  if (!block) return false
+  return Boolean(resolveImageUrlForAltField(block.props as Record<string, unknown>, args.activeEditablePath))
 }
 
 /**
@@ -2636,6 +2661,67 @@ export async function runChatPipeline(
     }
   }
 
+  // --- Vision alt-text short-circuit ---
+  // Inline "Generate alt text" / "Improve accessibility" / "Make more descriptive"
+  // wand on imageAlt fields. The full planner reliably misroutes this to
+  // needs_clarification when the existing alt-text value is empty or looks like a
+  // user instruction (a frequent shape of "previously corrupted" alt). Bypass the
+  // planner with a direct vision call to get clean alt text deterministically.
+  if (
+    !contentQuery &&
+    planningActiveBlockId &&
+    planningActiveEditablePath &&
+    isVisionAltGenerationRequest({
+      message: plannerMessage,
+      activeEditablePath: planningActiveEditablePath,
+      activeBlockId: planningActiveBlockId,
+      currentPage: current
+    })
+  ) {
+    const block = current.blocks.find((b) => b.id === planningActiveBlockId)
+    const pathParse = parseAltPathForOp(planningActiveEditablePath)
+    const imageUrl = block
+      ? resolveImageUrlForAltField(block.props as Record<string, unknown>, planningActiveEditablePath)
+      : undefined
+    if (block && pathParse && imageUrl) {
+      emitStatusTone("planning")
+      markPlanningStart()
+      const altText = await generateAltTextFromVision({
+        imageUrl,
+        preferredProvider: plannerSource,
+        log: ctx.log
+      })
+      markPlanningFinish()
+      if (altText) {
+        const op: Operation =
+          pathParse.kind === "props"
+            ? {
+                op: "update_props",
+                pageSlug: effectiveSlug,
+                blockId: planningActiveBlockId,
+                patch: { [pathParse.key]: altText }
+              }
+            : {
+                op: "update_item",
+                pageSlug: effectiveSlug,
+                blockId: planningActiveBlockId,
+                listKey: pathParse.listKey,
+                index: pathParse.index,
+                patch: { [pathParse.itemKey]: altText }
+              }
+        const visionPlan: EditPlan = {
+          intent: "edit_plan",
+          summary_for_user: "Generated alt text from the image.",
+          change_log: ["Updated the image alt text."],
+          ops: [op]
+        }
+        const visionOutcome = await respondFromPlan(visionPlan, plannerSource, applyMode, undefined, "deterministic")
+        if (visionOutcome.done) return visionOutcome.response
+      }
+      // Fall through to the regular planner if the direct vision call failed.
+    }
+  }
+
   const isHighConfidence = !contentQuery && isHighConfidenceDeterministicCase({
     message: plannerMessage,
     currentPage: current,
@@ -2747,10 +2833,21 @@ export async function runChatPipeline(
   // info|clarify), so duplicate/clone/copy requests get misrouted to update_props.
   // Full planner supports `duplicate_block` natively.
   const duplicateSkipsRouter = isDuplicateBlockRequest(plannerMessage)
+  // Vision alt-text generation (inline "Generate alt text" / "Improve accessibility"
+  // wand on imageAlt fields) needs the full planner so the LLM can actually look
+  // at the companion image. The fast router is JSON-only and can't see images —
+  // it would hallucinate alt text or echo the user's prompt verbatim.
+  const visionAltSkipsRouter = isVisionAltGenerationRequest({
+    message: plannerMessage,
+    activeEditablePath: planningActiveEditablePath,
+    activeBlockId: planningActiveBlockId,
+    currentPage: current
+  })
   const shouldTryLlmIntentRouter =
     !contentQuery &&
     !batchAddSkipsRouter &&
     !duplicateSkipsRouter &&
+    !visionAltSkipsRouter &&
     llmIntentRouterEnabled &&
     shouldUseLlmIntentRouter(plannerMessage) &&
     (plannerSource === "openai" || plannerSource === "anthropic" || plannerSource === "gemini")

@@ -555,7 +555,7 @@ function ImageFieldWidget({
                   flushAltCommit()
                 }}
               />
-              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} fieldKind="imageAlt" fieldLabel={t("propertyPanel.altText")} blockType={blockType ?? ""} currentValue={altText ?? ""} onQuickAction={onAltAiQuickAction} onCustomPrompt={onAltAiAssist} aiLoading={aiLoading} /> : null}
+              {onAltAiAssist ? <SparkleButton onClick={onAltAiAssist} fieldKind="imageAlt" fieldLabel={t("propertyPanel.altText")} blockType={blockType ?? ""} currentValue={altText ?? ""} onQuickAction={onAltAiQuickAction} onCustomPrompt={onAltAiAssist} aiLoading={fieldShimmer} /> : null}
             </div>
           </div>
         )}
@@ -800,7 +800,7 @@ function FieldEditor({
             onFocus={handleFocus}
             onBlur={handleBlur}
           />
-          {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={field.kind} fieldLabel={field.label ?? fieldKey} blockType={blockType ?? ""} currentValue={stringValue} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={aiLoading} /> : null}
+          {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={field.kind} fieldLabel={field.label ?? fieldKey} blockType={blockType ?? ""} currentValue={stringValue} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={fieldShimmer} /> : null}
         </div>
       </div>
     )
@@ -829,7 +829,7 @@ function FieldEditor({
         ) : (
           <input type={inputType} className="property-field-input" {...sharedProps} />
         )}
-        {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={field.kind} fieldLabel={field.label ?? fieldKey} blockType={blockType ?? ""} currentValue={stringValue} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={aiLoading} /> : null}
+        {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={field.kind} fieldLabel={field.label ?? fieldKey} blockType={blockType ?? ""} currentValue={stringValue} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={fieldShimmer} /> : null}
       </div>
     </div>
   )
@@ -858,7 +858,7 @@ function NavLabelField({ slug, navLabel, onNavLabelChange, onAiAssist, onAiQuick
             onChange={(e) => { setLocal(e.target.value); debouncedCommit(e.target.value) }}
             onBlur={() => { setFocused(false); flushCommit() }}
           />
-          {onAiAssist ? <SparkleButton onClick={() => onAiAssist("Nav label", "text", navLabel)} fieldKind="text" fieldLabel="Nav label" blockType="Page" currentValue={navLabel} onQuickAction={onAiQuickAction ? (actionText: string) => onAiQuickAction("Nav label", "text", navLabel, actionText) : undefined} onCustomPrompt={() => onAiAssist("Nav label", "text", navLabel)} aiLoading={aiLoading} /> : null}
+          {onAiAssist ? <SparkleButton onClick={() => onAiAssist("Nav label", "text", navLabel)} fieldKind="text" fieldLabel="Nav label" blockType="Page" currentValue={navLabel} onQuickAction={onAiQuickAction ? (actionText: string) => onAiQuickAction("Nav label", "text", navLabel, actionText) : undefined} onCustomPrompt={() => onAiAssist("Nav label", "text", navLabel)} aiLoading={fieldShimmer} /> : null}
         </div>
       </div>
     </div>
@@ -1024,7 +1024,7 @@ function PageMetaField({
         ) : (
           <input type="text" className="property-field-input" {...shared} />
         )}
-        {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={fieldKind} fieldLabel={label} blockType={blockType} currentValue={focused ? local : value} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={aiLoading} /> : null}
+        {onAiAssist ? <SparkleButton onClick={onAiAssist} fieldKind={fieldKind} fieldLabel={label} blockType={blockType} currentValue={focused ? local : value} onQuickAction={onAiQuickAction} onCustomPrompt={onAiAssist} aiLoading={fieldShimmer} /> : null}
       </div>
       {recommendedMax != null && (
         <span className={`property-field-char-count${charLen > recommendedMax ? " property-field-char-count--over" : ""}`}>

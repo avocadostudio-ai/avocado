@@ -36,6 +36,26 @@ import {
 
 const _passthroughSchemaCache = new Map<string, z.ZodObject<any>>()
 
+// Defensive sanitizer: imageAlt should be a description, never an imperative
+// user instruction. Matches phrases like "add feta crumbles", "change the
+// photo", "make it brighter". Keep in sync with looksLikeUserInstruction in
+// chat-pipeline-ui.ts.
+const _ALT_INSTRUCTION_PATTERN = /^\s*(add|change|turn|make|replace|swap|remove|update|set|use|show|put|insert|generate|create|find|search|pick|choose|give|need|want|please|let'?s|can you|could you|i want|i need)\b/i
+
+function _looksLikeUserInstruction(value: string): boolean {
+  return _ALT_INSTRUCTION_PATTERN.test(value)
+}
+
+function _sanitizeListItemImageAlt(item: unknown): unknown {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return item
+  const obj = item as Record<string, unknown>
+  if (typeof obj.imageAlt === "string" && _looksLikeUserInstruction(obj.imageAlt)) {
+    const { imageAlt: _drop, ...rest } = obj
+    return rest
+  }
+  return obj
+}
+
 function _getPassthroughSchema(blockType: string): z.ZodObject<any> | undefined {
   const cached = _passthroughSchemaCache.get(blockType)
   if (cached) return cached
@@ -972,14 +992,20 @@ async function _applyOpsAtomicallyUnsafe(session: string, ops: Operation[], opti
       for (const key of patchKeys) {
         const oldVal = prevProps[key]
         const newVal = (patchCandidate as Record<string, unknown>)[key]
+        // Reject prompt-style imageAlt values (e.g. "add white feta crumbles",
+        // "change the photo") — these are user instructions, not alt text.
+        // Keep the previous alt instead of overwriting with junk.
+        if (key === "imageAlt" && typeof newVal === "string" && _looksLikeUserInstruction(newVal)) {
+          continue
+        }
         // Deep-merge arrays of objects by index so partial items inherit existing fields
         if (Array.isArray(oldVal) && Array.isArray(newVal)) {
           nextProps[key] = newVal.map((item, i) => {
             const prev = oldVal[i]
             if (prev && typeof prev === "object" && !Array.isArray(prev) && item && typeof item === "object" && !Array.isArray(item)) {
-              return { ...prev, ...item }
+              return _sanitizeListItemImageAlt({ ...prev, ...item })
             }
-            return item
+            return _sanitizeListItemImageAlt(item)
           })
         } else {
           nextProps[key] = newVal

@@ -320,8 +320,14 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     // ── selection actions ─────────────────────────────────────────
     setActiveBlock: (id, type) =>
       set((prev) => {
-        if (prev.activeBlockId === id && prev.activeBlockType === type) return prev
-        return { ...prev, activeBlockId: id, activeBlockType: type }
+        // When the caller passes id without type and the block id is the same,
+        // preserve the existing type. Many post-apply paths know the focus
+        // block id but not its type; without this, every applied chat result
+        // would wipe activeBlockType and collapse the property panel to the
+        // page-level fallback.
+        const nextType = type === undefined && id === prev.activeBlockId ? prev.activeBlockType : type
+        if (prev.activeBlockId === id && prev.activeBlockType === nextType) return prev
+        return { ...prev, activeBlockId: id, activeBlockType: nextType }
       }),
     setActiveEditablePath: (path) =>
       set((prev) => (prev.activeEditablePath === path ? prev : { ...prev, activeEditablePath: path })),

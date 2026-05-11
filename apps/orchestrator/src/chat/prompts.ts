@@ -381,6 +381,7 @@ function sectionImages(hasNativeTools: boolean): string[] {
   const lines: string[] = [
     "## IMAGES",
     hasNativeTools ? HERO_IMAGE_URL_BASE : HERO_IMAGE_URL_BASE + HERO_IMAGE_URL_OPENAI_EXT,
+    "imageAlt is accessibility alt text — a short noun-phrase description of what is depicted (e.g. 'Avocado toast topped with feta and microgreens', 'Sunset over a mountain lake'). It is NOT a copy of the user's chat message and NOT an instruction. Never produce imperative or request-style alt text such as 'add white feta crumbles', 'turn the image, add more greens', 'change the photo', 'make it brighter', 'replace this image' — these are user prompts, not alt text. If the user did not supply an explicit caption, OMIT imageAlt from the patch entirely and let the image resolver derive it from the resolved image.",
   ]
   if (hasNativeTools) {
     lines.push(...ANTHROPIC_IMAGE_TOOL_LINES)
@@ -447,8 +448,10 @@ function sectionConditionalModes(opts: PlannerPromptOptions): string[] {
     lines.push(
       "",
       "### Vision alt-text mode",
-      "An image is attached for the field being edited. Describe its visual content accurately for the alt text. Be specific about what's depicted (objects, people, actions, setting) in 1-2 concise sentences. Do not mention 'AI-generated' or image metadata.",
-      `Return an update_props operation setting the "${opts.editablePath}" field on block "${opts.blockId}" to your generated alt text description. This is an edit_plan, not needs_clarification.`,
+      "An image is attached for the field being edited. The user is explicitly asking you to GENERATE alt text from this image (e.g. 'Generate alt text', 'Improve accessibility', 'Describe this image'). This overrides the IMAGES section's 'omit imageAlt' rule and the TARGETING section's 'rewrite from selectedEditableValue' rule.",
+      "Describe the image's visual content accurately. Be specific about what's depicted (objects, people, actions, setting) in 1-2 concise noun-phrase sentences. Do not mention 'AI-generated' or image metadata.",
+      "IGNORE the current value of the alt-text field — it may be stale or unrelated to the actual image (e.g. a leftover user instruction). Look only at the attached image.",
+      `Return an update_props operation setting "${opts.editablePath}" on block "${opts.blockId}" to your generated alt text. This is an edit_plan, not needs_clarification.`,
     )
   }
 

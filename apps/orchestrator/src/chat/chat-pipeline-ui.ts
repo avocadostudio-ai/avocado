@@ -100,8 +100,19 @@ export function firstUrlFromText(text: string): string | undefined {
   return match ? match[0] : undefined
 }
 
+// Detect alt-text values that are actually user instructions / chat prompts
+// rather than image descriptions. The planner occasionally copies the user's
+// message verbatim into imageAlt; treat those as missing so we fall back to
+// a real description.
+const ALT_INSTRUCTION_PATTERN = /^\s*(add|change|turn|make|replace|swap|remove|update|set|use|show|put|insert|generate|create|find|search|pick|choose|give|need|want|please|let'?s|can you|could you|i want|i need)\b/i
+
+export function looksLikeUserInstruction(value: string): boolean {
+  return ALT_INSTRUCTION_PATTERN.test(value)
+}
+
 export function preferredImageAltText(args: { query: string; resolvedAlt?: string; existingAlt?: string }) {
-  const existingAlt = typeof args.existingAlt === "string" ? args.existingAlt.trim() : ""
+  const existingAltRaw = typeof args.existingAlt === "string" ? args.existingAlt.trim() : ""
+  const existingAlt = existingAltRaw.length > 0 && !looksLikeUserInstruction(existingAltRaw) ? existingAltRaw : ""
   if (existingAlt.length > 0) return existingAlt
 
   const resolvedAlt = typeof args.resolvedAlt === "string" ? args.resolvedAlt.trim() : ""

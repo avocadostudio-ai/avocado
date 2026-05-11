@@ -156,7 +156,9 @@ export function useVariations(deps: VariationsDeps) {
       }
 
       const focusBlockId = data.focusBlockId ?? variationModal.blockId
-      store.getState().setActiveBlock(focusBlockId)
+      if (focusBlockId !== store.getState().activeBlockId) {
+        store.getState().setActiveBlock(focusBlockId)
+      }
       store.getState().setActiveEditablePath(undefined)
       if (enablePatchTransport && typeof data.previewVersion === "number") {
         const toVersion = data.previewVersion
