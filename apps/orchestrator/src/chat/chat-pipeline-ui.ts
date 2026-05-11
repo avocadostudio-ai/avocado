@@ -176,12 +176,6 @@ export function collectMentionedSlugsFromPlan(plan: EditPlan, fallbackSlug?: str
       push(op.afterPageSlug)
       continue
     }
-    if (op.op === "duplicate_block" && typeof op.toPageSlug === "string" && op.toPageSlug !== op.pageSlug) {
-      // Cross-page block duplicate: only the destination page is "touched"
-      // in a navigation-chip sense. Source page is read-only.
-      push(op.toPageSlug)
-      continue
-    }
     if (op.op === "update_site_config") continue
     push(op.pageSlug)
   }
