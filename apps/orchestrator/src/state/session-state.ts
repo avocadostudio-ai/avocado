@@ -526,8 +526,13 @@ export function listSitesForSession(
 
   for (const [key, config] of siteConfigs.entries()) {
     const sep = key.indexOf("::")
-    const siteId = sep === -1 ? DEFAULT_SITE_ID : key.slice(0, sep)
-    const session = sep === -1 ? key : key.slice(sep + 2)
+    // Skip bare-session keys (no `::`). They're the internal legacy routing
+    // convention for the avocado-stories JSON-file site; surfacing them here
+    // would re-add a phantom site in the editor dashboard every time the user
+    // tries to delete it.
+    if (sep === -1) continue
+    const siteId = key.slice(0, sep)
+    const session = key.slice(sep + 2)
     const matchesSession = session === wantedSession
 
     const existing = byId.get(siteId)
