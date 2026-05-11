@@ -499,32 +499,54 @@
 }
 
 .iw-send {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  border: none;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 0;
+  background: #111827;
   color: #fff;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: opacity 0.15s, transform 0.15s;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.15s ease;
 }
 
 .iw-send:hover:not(:disabled) {
-  transform: scale(1.05);
-}
-
-.iw-send:active:not(:disabled) {
-  transform: scale(0.95);
+  background: #000;
 }
 
 .iw-send:disabled {
-  opacity: 0.35;
+  background: #d1d5db;
   cursor: default;
 }
+
+.iw-send.is-stop,
+.iw-send.is-stop:disabled {
+  background: #dc2626;
+  cursor: pointer;
+}
+
+.iw-send.is-stop:hover {
+  background: #b91c1c;
+}
+
+.iw-send .icon-send,
+.iw-send .icon-stop {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.iw-send .icon-send { opacity: 1; transform: scale(1); }
+.iw-send .icon-stop { opacity: 0; transform: scale(0.6); }
+.iw-send.is-stop .icon-send { opacity: 0; transform: scale(0.6); }
+.iw-send.is-stop .icon-stop { opacity: 1; transform: scale(1); }
 
 /* ------------------------------------------------------------------ */
 /* Inline Field Prompt                                                */
@@ -653,40 +675,54 @@
 }
 
 .iw-field-prompt-send {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: none;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 0;
+  background: #111827;
   color: #fff;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: opacity 0.15s, transform 0.15s;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.15s ease;
 }
 
 .iw-field-prompt-send:hover:not(:disabled) {
-  transform: scale(1.05);
+  background: #000;
 }
 
 .iw-field-prompt-send:disabled {
-  opacity: 0.35;
+  background: #d1d5db;
   cursor: default;
 }
 
-.iw-field-prompt-send.iw-loading {
-  opacity: 1;
-  background: conic-gradient(from 0deg, #6366f1, #a855f7, #ec4899, #f59e0b, #10b981, #6366f1);
-  background-size: 100% 100%;
-  animation: iw-rainbow-spin 1.5s linear infinite;
+.iw-field-prompt-send.is-stop,
+.iw-field-prompt-send.is-stop:disabled {
+  background: #dc2626;
+  cursor: pointer;
 }
 
-@keyframes iw-rainbow-spin {
-  from { filter: hue-rotate(0deg); }
-  to { filter: hue-rotate(360deg); }
+.iw-field-prompt-send.is-stop:hover {
+  background: #b91c1c;
 }
+
+.iw-field-prompt-send .icon-send,
+.iw-field-prompt-send .icon-stop {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.iw-field-prompt-send .icon-send { opacity: 1; transform: scale(1); }
+.iw-field-prompt-send .icon-stop { opacity: 0; transform: scale(0.6); }
+.iw-field-prompt-send.is-stop .icon-send { opacity: 0; transform: scale(0.6); }
+.iw-field-prompt-send.is-stop .icon-stop { opacity: 1; transform: scale(1); }
 
 .iw-field-prompt-suggestions {
   display: flex;

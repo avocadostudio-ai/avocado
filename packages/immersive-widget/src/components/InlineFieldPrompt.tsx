@@ -21,6 +21,8 @@ type InlineFieldPromptProps = {
   isLoading: boolean
   onSubmit: (message: string) => void
   onClose: () => void
+  /** When provided, the send button becomes a stop button while loading. */
+  onCancel?: () => void
 }
 
 const SUGGESTIONS = [
@@ -31,7 +33,7 @@ const SUGGESTIONS = [
   { label: "Casual", prompt: "Rewrite in a more casual, friendly tone" },
 ]
 
-export function InlineFieldPrompt({ field, isLoading, onSubmit, onClose }: InlineFieldPromptProps) {
+export function InlineFieldPrompt({ field, isLoading, onSubmit, onClose, onCancel }: InlineFieldPromptProps) {
   const [input, setInput] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -150,14 +152,21 @@ export function InlineFieldPrompt({ field, isLoading, onSubmit, onClose }: Inlin
         />
         <button
           type="button"
-          className={`iw-field-prompt-send${isLoading ? " iw-loading" : ""}`}
-          onClick={() => handleSubmit(input)}
-          disabled={!input.trim() || isLoading}
-          aria-label="Send"
+          className={`iw-field-prompt-send${isLoading && onCancel ? " is-stop" : ""}`}
+          onClick={isLoading && onCancel ? onCancel : () => handleSubmit(input)}
+          disabled={!(isLoading && onCancel) && (!input.trim() || isLoading)}
+          aria-label={isLoading && onCancel ? "Stop" : "Send"}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m5 12 7-7 7 7" /><path d="M12 19V5" />
-          </svg>
+          <span className="icon-send">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 12 7-7 7 7" /><path d="M12 19V5" />
+            </svg>
+          </span>
+          <span className="icon-stop">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="1" />
+            </svg>
+          </span>
         </button>
       </div>
 

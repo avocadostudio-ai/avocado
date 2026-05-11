@@ -13,6 +13,8 @@ type ChatPanelProps = {
   streamStatus: string | null
   onSubmit: (message: string) => void
   onClose: () => void
+  /** When provided, the send button becomes a stop button while loading. */
+  onCancel?: () => void
   /** Pre-filled input text (e.g. from + button) */
   initialInput?: string
   /** Quick action suggestions shown at the top */
@@ -25,7 +27,7 @@ type ChatPanelProps = {
   onRedo?: () => void
 }
 
-export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose, initialInput, quickActions, selectedBlockLabel, canUndo, canRedo, onUndo, onRedo }: ChatPanelProps) {
+export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose, onCancel, initialInput, quickActions, selectedBlockLabel, canUndo, canRedo, onUndo, onRedo }: ChatPanelProps) {
   const [input, setInput] = useState(initialInput ?? "")
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -174,15 +176,22 @@ export function ChatPanel({ chatLog, isLoading, streamStatus, onSubmit, onClose,
         />
         <button
           type="button"
-          className="iw-send"
-          onClick={handleSubmit}
-          disabled={!input.trim() || isLoading}
-          aria-label="Send"
+          className={`iw-send${isLoading && onCancel ? " is-stop" : ""}`}
+          onClick={isLoading && onCancel ? onCancel : handleSubmit}
+          disabled={!(isLoading && onCancel) && (!input.trim() || isLoading)}
+          aria-label={isLoading && onCancel ? "Stop" : "Send"}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m5 12 7-7 7 7" />
-            <path d="M12 19V5" />
-          </svg>
+          <span className="icon-send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 12 7-7 7 7" />
+              <path d="M12 19V5" />
+            </svg>
+          </span>
+          <span className="icon-stop">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="1" />
+            </svg>
+          </span>
         </button>
       </div>
     </div>

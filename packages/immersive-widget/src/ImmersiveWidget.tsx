@@ -390,6 +390,23 @@ export function ImmersiveWidget({
     cancelRef.current = cancel
   }, [activeField, config, slug, manifest, siteContext, accessToken, focusBlock, renderLiveDraft, triggerRefresh])
 
+  const handleChatCancel = useCallback(() => {
+    cancelRef.current?.()
+    cancelRef.current = null
+    setIsLoading(false)
+    setStreamStatus(null)
+    discardLiveDraftOriginals()
+  }, [discardLiveDraftOriginals])
+
+  const handleFieldCancel = useCallback(() => {
+    cancelRef.current?.()
+    cancelRef.current = null
+    setFieldLoading(false)
+    applyAiFieldLoading("", "", false)
+    renderLiveDraft("", "", false)
+    discardLiveDraftOriginals()
+  }, [renderLiveDraft, discardLiveDraftOriginals])
+
   const handleTextSelectionAskAI = useCallback((ctx: TextSelectionContext) => {
     clearSelection()
     setSelectedBlock({ blockId: ctx.blockId, blockType: ctx.blockType, editablePath: ctx.editablePath })
@@ -471,6 +488,7 @@ export function ImmersiveWidget({
           field={activeField}
           isLoading={fieldLoading}
           onSubmit={handleFieldSubmit}
+          onCancel={handleFieldCancel}
           onClose={() => setActiveField(null)}
         />
       )}
@@ -490,6 +508,7 @@ export function ImmersiveWidget({
           isLoading={isLoading}
           streamStatus={streamStatus}
           onSubmit={handleSubmit}
+          onCancel={handleChatCancel}
           onClose={() => setPanelOpen(false)}
           selectedBlockLabel={selectedBlockLabel}
           canUndo={undoHistory.canUndo}
