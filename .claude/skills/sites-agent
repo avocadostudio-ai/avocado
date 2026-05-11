@@ -1,0 +1,84 @@
+# Sites Agent Architecture
+
+The sites agent handles site creation, migration, and integration. It runs in two modes controlled by `VITE_AGENT_USE_CLI` in `apps/editor/.env`.
+
+## Modes
+
+### SDK mode (`useCliAgent: false`) — default
+
+Uses `@anthropic-ai/agent-sdk` `query()` in-process. Pay-per-token via `ANTHROPIC_API_KEY`.
+
+- **Entry:** `apps/orchestrator/src/routes/sites-agent.ts` → `query()` call (line ~340)
+- **Tools:** `apps/orchestrator/src/agent/sites-agent-tools.ts` (~1100 lines)
+- **Multi-agent:** Main orchestrator + `structure-analyzer` + `block-coder` subagents
+- **Model:** Configurable via `SITES_AGENT_MODEL` env (default `claude-sonnet-4-6`)
+- **Token tracking:** Full usage from SDK response
+- **Budget:** `SITES_AGENT_MAX_BUDGET_USD` (default $2)
+
+### CLI mode (`useCliAgent: true`)
+
+Spawns `claude` CLI process with `--print --output-format stream-json`. Uses the user's Claude subscription ($0 API cost).
+
+- **Entry:** `apps/orchestrator/src/routes/sites-agent-cli.ts` → `runCliAgent()`
+- **Tools:** `apps/orchestrator/src/migration/mcp-server-stdio.ts` (MCP stdio server, ~500 lines)
+- **Single agent:** CLI doesn't support subagents
+- **Model:** Hardcoded `sonnet`
+- **Token tracking:** Not available (always reports 0)
+- **Permission:** `--permission-mode bypassPermissions`
+
+## Shared code
+
+Both modes share:
+
+| Component | File |
+|-----------|------|
+| System prompt | `apps/orchestrator/src/agent/sites-agent-context.ts` (`buildSitesAgentSystemPrompt`) |
+| Integration prompt | `apps/orchestrator/src/agent/integration-prompt.ts` |
+| Phase detection | `sites-agent.ts` — `TOOL_PHASE_MAP`, `PHASES`, `INTEGRATION_PHASES` |
+| Tool labels | `sites-agent.ts` — `describeToolUse()` |
+| SSE events | `emitEvent()` — types: `status`, `phase`, `tool_use`, `summary_token`, `final`, `site_created`, `error` |
+| Telemetry | `src/telemetry/migration-telemetry.ts` — `pushMigrationTelemetry()` |
+| Dev server spawn | `src/agent/sites-agent-shared.ts` — `startAndWaitForDevServer()` |
+
+## Key difference: tool duplication
+
+The tools are **duplicated** across modes:
+
+- SDK tools: `sites-agent-tools.ts` — direct function implementations
+- CLI tools: `mcp-server-stdio.ts` — reimplemented as MCP request handlers
+
+They implement the same operations (`create_site`, `bootstrap_pages`, `discover_site_structure`, `scrape_url`, `download_remote_image`, `apply_theme`, etc.) but can drift apart. Any tool-level fix must be applied in **both** files.
+
+### Tools available per mode
+
+| Tool | SDK | CLI (MCP) |
+|------|-----|-----------|
+| `discover_site_structure` | yes | yes |
+| `generate_page_specs` | yes | yes |
+| `scrape_url` | yes | yes |
+| `extract_design_tokens` | yes | yes |
+| `create_site` | yes | yes |
+| `bootstrap_pages` | yes | yes |
+| `download_remote_image` | yes | yes |
+| `download_remote_images` | yes | no |
+| `apply_theme` | yes | yes |
+| `launch_site` | yes | no |
+| `register_site` | yes | no |
+| `list_sites` | yes | no |
+| `Write/Edit/Bash` | no | yes (claude built-ins) |
+
+## Client-side flow
+
+1. `apps/editor/src/hooks/useSitesAgent.ts` — `sendMessage()` POSTs to `/sites-agent/start` with `useCliAgent` flag
+2. Opens SSE connection to `/sites-agent/stream?streamId=...`
+3. Parses events into `messages`, `streamPhases`, `streamSteps`, `streamingText`
+4. On `site_created` event: calls `addSiteFromConfig()` to add/update site in the editor's site list
+
+## Configuration
+
+| Env var | Where | Description |
+|---------|-------|-------------|
+| `VITE_AGENT_USE_CLI` | `apps/editor/.env` | `true` = CLI mode, `false` = SDK mode |
+| `SITES_AGENT_MODEL` | orchestrator env | Model for SDK mode (default `claude-sonnet-4-6`) |
+| `SITES_AGENT_MAX_BUDGET_USD` | orchestrator env | Max spend per agent run (default `2`) |
+| `ANTHROPIC_API_KEY` | orchestrator env | Required for SDK mode |

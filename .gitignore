@@ -15,6 +15,6 @@ coverage
 .run-logs/
 output/
 
-# Local AI assistant metadata
-CLAUDE.md
-.claude/
+# Local AI assistant overrides (shared config under .claude/ is tracked)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
