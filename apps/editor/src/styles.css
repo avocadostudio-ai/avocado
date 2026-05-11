@@ -2106,9 +2106,9 @@ textarea {
 }
 
 .msg-suggestion {
-  border: 1px solid rgba(29, 28, 28, 0.08);
-  background: rgba(255, 255, 255, 0.55);
-  color: var(--text-200);
+  border: 1px solid rgba(29, 28, 28, 0.18);
+  background: #ffffff;
+  color: var(--text-100);
   border-radius: 999px;
   padding: 6px 14px;
   font-size: 13px;
@@ -2121,7 +2121,7 @@ textarea {
 }
 .msg-suggestion:hover:not(:disabled) {
   background: #fff;
-  border-color: rgba(0, 102, 140, 0.2);
+  border-color: var(--accent-200);
   color: var(--accent-200);
 }
 
@@ -3460,6 +3460,23 @@ textarea {
   cursor: not-allowed;
 }
 
+.publish-review-dialog {
+  background: var(--bg-100);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, 0.04),
+    0 20px 40px -12px rgba(17, 24, 39, 0.18);
+}
+
+.publish-review-dialog [data-slot="dialog-title"] {
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.publish-review-dialog [data-slot="dialog-description"] {
+  color: var(--muted);
+}
+
 .publish-review-section {
   margin-top: 4px;
 }
@@ -3665,17 +3682,21 @@ textarea {
 }
 
 .publish-diff-before {
-  color: #9ca3af;
-  background: #fef2f2;
+  color: #6b7280;
+  background: #f3f4f6;
   border-radius: 4px;
   padding: 1px 6px;
   max-width: 100%;
   word-break: break-word;
+  text-decoration: line-through;
+  text-decoration-color: rgba(107, 114, 128, 0.45);
+  text-decoration-thickness: 1px;
 }
 
 .publish-diff-after {
   color: #065f46;
   background: #ecfdf5;
+  border: 1px solid rgba(6, 95, 70, 0.12);
   border-radius: 4px;
   padding: 1px 6px;
   max-width: 100%;
@@ -5160,7 +5181,7 @@ textarea {
   .chat-panel {
     background: rgba(248, 247, 244, 0.78);
     border: 0;
-    border-left: 1px solid rgba(29, 28, 28, 0.06);
+    border-left: 1px solid rgba(29, 28, 28, 0.12);
     box-shadow: none;
     backdrop-filter: blur(14px) saturate(1.1);
     -webkit-backdrop-filter: blur(14px) saturate(1.1);
@@ -5551,13 +5572,13 @@ textarea {
 }
 
 .editor-dark .msg-suggestion {
-  background: rgba(255, 255, 255, 0.04);
-  color: #cbd5e1;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.22);
 }
 .editor-dark .msg-suggestion:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(125, 211, 252, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(125, 211, 252, 0.6);
   color: #bae6fd;
 }
 .editor-dark .msg-suggestion--chosen {
@@ -6247,8 +6268,8 @@ textarea {
 
   .editor-dark .chat-panel {
     background: rgba(15, 23, 42, 0.82);
-    border-left-color: rgba(148, 163, 184, 0.34);
-    box-shadow: -14px 0 30px rgba(2, 6, 23, 0.5);
+    border-left-color: rgba(148, 163, 184, 0.22);
+    box-shadow: none;
   }
 
   .editor-dark .chat-panel::before {
