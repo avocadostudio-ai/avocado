@@ -9,9 +9,11 @@ import { registerPublishingTools } from "./publishing.ts"
 import { registerHistoryTools } from "./history.ts"
 import { registerChatTools } from "./chat.ts"
 import { registerPreviewTools } from "./preview.ts"
+import { registerSessionTools } from "./sessions.ts"
 
 export function registerAllTools(server: McpServer, client: OrchestratorClient) {
   registerDiscoveryTools(server)
+  registerSessionTools(server, client)
   registerPageTools(server, client)
   registerBlockTools(server, client)
   registerSiteTools(server, client)

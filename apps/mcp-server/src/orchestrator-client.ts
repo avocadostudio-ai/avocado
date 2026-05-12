@@ -80,6 +80,14 @@ export class OrchestratorClient {
   applyOps(ops: Operation[]): Promise<ApplyOpsResponse> {
     return this.request<ApplyOpsResponse>("POST", "/ops", { body: this.scopedBody({ ops }) })
   }
+
+  whoami(): Promise<WhoamiResponse> {
+    return this.request<WhoamiResponse>("GET", "/whoami", { query: this.scoped() })
+  }
+
+  listSessions(): Promise<ListSessionsResponse> {
+    return this.request<ListSessionsResponse>("GET", "/sessions")
+  }
 }
 
 export type PagesIndexEntry = {
@@ -92,6 +100,25 @@ export type PagesIndexEntry = {
 export type PagesIndexResponse = {
   slugs: string[]
   pages: PagesIndexEntry[]
+}
+
+export type SessionSummary = {
+  sessionKey: string
+  session: string
+  siteId: string
+  version: number
+  draftPageCount: number
+  lastMutatedAt: string | null
+}
+
+export type WhoamiResponse = SessionSummary & {
+  publishedPageCount: number
+  orchestratorUrl: string
+}
+
+export type ListSessionsResponse = {
+  sessions: SessionSummary[]
+  publishedPageCount: number
 }
 
 export type ApplyOpsResponse = {

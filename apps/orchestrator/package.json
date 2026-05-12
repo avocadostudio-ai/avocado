@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "NODE_ENV=test tsx --test --test-concurrency=4 src/**/*.test.ts",
     "test:unit": "NODE_ENV=test tsx --test --test-concurrency=4 src/chat/*.test.ts src/nlp/*.test.ts src/nlp-ops.test.ts src/state/*.test.ts src/ops/*.test.ts src/tools/**/*.test.ts src/image/*.test.ts src/telemetry/*.test.ts src/planner-env.test.ts src/planner-openai.test.ts src/variation-images.test.ts src/apply-ops.test.ts src/demo-mode.test.ts",
-    "test:integration": "NODE_ENV=test tsx --test --test-concurrency=4 src/chat-contract.test.ts src/chat-pipeline-integration.test.ts src/publish-content-route.test.ts src/undo-page-ops.test.ts",
+    "test:integration": "NODE_ENV=test tsx --test --test-concurrency=4 src/chat-contract.test.ts src/chat-pipeline-integration.test.ts src/publish-content-route.test.ts src/routes/sessions.test.ts src/undo-page-ops.test.ts",
     "test:e2e": "NODE_ENV=test tsx --test --test-concurrency=1 src/agent-e2e.test.ts src/e2e-editing.test.ts src/planner-e2e.test.ts",
     "test:e2e:agent": "NODE_ENV=test tsx --test --test-concurrency=1 src/agent-e2e.test.ts",
     "test:e2e:planner": "NODE_ENV=test tsx --test --test-concurrency=1 src/e2e-editing.test.ts src/planner-e2e.test.ts",

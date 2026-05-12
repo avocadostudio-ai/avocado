@@ -225,6 +225,67 @@ siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avo
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
+// ---------------------------------------------------------------------------
+// Session introspection — used by /whoami, /sessions, and the matching MCP tools
+// ---------------------------------------------------------------------------
+
+export type SessionSummary = {
+  /** Full key as stored in the in-memory maps (`{siteId}::{session}` or just `{session}` for the legacy site). */
+  sessionKey: string
+  /** Session segment after the "::" separator. */
+  session: string
+  /** Site segment before the "::" separator. Falls back to DEFAULT_SITE_ID for legacy bare-session keys. */
+  siteId: string
+  /** Monotonic preview version (post-mutation counter). 0 when nothing has been written. */
+  version: number
+  /** Distinct page count in the draft map. Reads existing state without auto-seeding. */
+  draftPageCount: number
+  /** ISO timestamp of the most recent versionLog entry, or null if none. */
+  lastMutatedAt: string | null
+}
+
+function parseSessionKey(sessionKey: string): { session: string; siteId: string } {
+  const sep = sessionKey.indexOf("::")
+  if (sep === -1) return { session: sessionKey, siteId: DEFAULT_SITE_ID }
+  return { siteId: sessionKey.slice(0, sep), session: sessionKey.slice(sep + 2) }
+}
+
+export function getSessionSummary(sessionKey: string): SessionSummary {
+  const { session, siteId } = parseSessionKey(sessionKey)
+  // Read draftPages directly to avoid auto-seeding via getSessionDraft, which
+  // would inflate draftPageCount for never-touched sessions.
+  const draftPageCount = draftPages.get(sessionKey)?.size ?? 0
+  const version = versions.get(sessionKey) ?? 0
+  const log = versionLog.get(sessionKey)
+  const lastMutatedAt = log && log.length > 0 ? log[log.length - 1].at : null
+  return { sessionKey, session, siteId, version, draftPageCount, lastMutatedAt }
+}
+
+export function listSessionSummaries(): SessionSummary[] {
+  // Union of every key seen across draft / version / version-log maps. A
+  // session may appear in `versions` (bumped) without `draftPages` (e.g.
+  // when only site-config was touched), or vice versa, so we walk all three.
+  const keys = new Set<string>()
+  for (const k of draftPages.keys()) keys.add(k)
+  for (const k of versions.keys()) keys.add(k)
+  for (const k of versionLog.keys()) keys.add(k)
+
+  const summaries = Array.from(keys, (key) => getSessionSummary(key))
+  // Sort most-recently-mutated first, then by key for deterministic output.
+  summaries.sort((a, b) => {
+    if (a.lastMutatedAt && b.lastMutatedAt) return b.lastMutatedAt.localeCompare(a.lastMutatedAt)
+    if (a.lastMutatedAt) return -1
+    if (b.lastMutatedAt) return 1
+    return a.sessionKey.localeCompare(b.sessionKey)
+  })
+  return summaries
+}
+
+/** Total published pages across all sites (currently just the JSON-file legacy site). */
+export function publishedPageCountGlobal(): number {
+  return publishedPages.size
+}
+
 // Track sessions that were just restored so bootstrap doesn't overwrite them
 const recentlyRestoredSessions = new Set<string>()
 export function markRecentlyRestored(session: string) { recentlyRestoredSessions.add(session) }

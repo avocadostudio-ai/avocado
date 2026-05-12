@@ -37,6 +37,7 @@ import { gdriveRoutes } from "./routes/gdrive.js"
 import { registerAgentRoutes } from "./routes/agent.js"
 import { registerSitesAgentRoutes } from "./routes/sites-agent.js"
 import { sitesRoutes } from "./routes/sites.js"
+import { sessionsRoutes } from "./routes/sessions.js"
 import { previewRoutes } from "./routes/preview.js"
 import { jiraRoutes } from "./routes/jira.js"
 import { createToolRuntime } from "./tools/runtime.js"
@@ -256,6 +257,7 @@ await app.register((instance) => gdriveRoutes(instance, ctx))
 await app.register((instance) => registerAgentRoutes(instance))
 await app.register((instance) => registerSitesAgentRoutes(instance, ctx))
 await app.register((instance) => sitesRoutes(instance, ctx))
+await app.register((instance) => sessionsRoutes(instance, ctx))
 await app.register((instance) => previewRoutes(instance, ctx))
 await app.register((instance) => jiraRoutes(instance, ctx))
 
@@ -276,7 +278,9 @@ if (isDemoModeEnabled()) {
   const GATED_PREFIXES = ["/chat", "/ops"]
   // Agent routes are hard-blocked in demo mode — they bypass the op gate and
   // would let a visitor run arbitrary multi-turn agent loops on your key.
-  const BLOCKED_PREFIXES = ["/agent", "/sites-agent", "/jira"]
+  // Session introspection (/whoami, /sessions) is also blocked — it would
+  // expose every visitor's per-IP ephemeral session in a cross-visitor directory.
+  const BLOCKED_PREFIXES = ["/agent", "/sites-agent", "/jira", "/whoami", "/sessions"]
 
   app.addHook("preHandler", async (request, reply) => {
     const url = request.url.split("?")[0] ?? ""
