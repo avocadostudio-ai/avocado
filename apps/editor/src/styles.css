@@ -2910,7 +2910,7 @@ textarea {
 
 .composer {
   border-top: 0;
-  padding: 8px 12px 10px;
+  padding: 8px 12px 16px;
   background: var(--panel);
   display: block;
   overflow: visible;

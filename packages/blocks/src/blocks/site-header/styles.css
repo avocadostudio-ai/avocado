@@ -8,6 +8,8 @@
   position: sticky;
   top: 0;
   z-index: 100;
+  container-type: inline-size;
+  container-name: site-nav;
 }
 
 .site-top-nav-inner {
@@ -15,7 +17,6 @@
   align-items: center;
   gap: 0.25rem;
   width: 100%;
-  max-width: 960px;
   margin: 0 auto;
 }
 
@@ -327,8 +328,10 @@
   z-index: 99;
 }
 
-/* Responsive: hide desktop nav, show mobile menu on small screens */
-@media (max-width: 768px) {
+/* Responsive: hide desktop nav, show mobile menu when the header itself is
+   narrow. Uses a container query so the breakpoint tracks the header's own
+   width (e.g. inside the editor iframe) rather than the viewport. */
+@container site-nav (max-width: 768px) {
   .site-nav-links-desktop {
     display: none;
   }

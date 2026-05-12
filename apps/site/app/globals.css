@@ -268,6 +268,8 @@ main {
   border-bottom: 1px solid var(--nav-border);
   background: var(--nav-bg);
   backdrop-filter: blur(4px);
+  container-type: inline-size;
+  container-name: site-nav;
 }
 
 .site-brand {
@@ -435,9 +437,11 @@ main {
   );
 }
 
-/* Mobile */
+/* Mobile — uses a container query on the header so the burger menu kicks in
+   based on the header's own width (works inside the editor iframe regardless
+   of viewport width). */
 
-@media (max-width: 900px) {
+@container site-nav (max-width: 900px) {
   .site-top-nav {
     align-items: center;
     flex-direction: row;
@@ -455,6 +459,7 @@ main {
     order: 3;
     position: static;
     z-index: 3;
+    margin-left: auto;
   }
 
   .site-mobile-menu-button {

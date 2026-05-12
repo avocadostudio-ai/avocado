@@ -128,6 +128,19 @@ export default function ClaudeStyleChatInput(props: Props) {
     return () => window.removeEventListener("resize", onResize)
   }, [])
 
+  // Re-measure on any size change of the composer wrapper or shell — e.g. when
+  // the chat-panel splitter is dragged, icons reflow at narrower widths, or
+  // toolbars appear/disappear. Window-resize alone misses splitter drags.
+  useEffect(() => {
+    const shell = shellRef.current
+    if (!shell || typeof ResizeObserver === "undefined") return
+    const wrapper = shell.closest(".composer") as HTMLElement | null
+    const observer = new ResizeObserver(() => syncComposerHeight())
+    observer.observe(shell)
+    if (wrapper) observer.observe(wrapper)
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     if (!isRecording) {
       setRecordingElapsedMs(0)
