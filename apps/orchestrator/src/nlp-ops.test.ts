@@ -2538,11 +2538,21 @@ test("isPageWideRewriteRequest detects page-wide rewrite patterns", () => {
   assert.equal(isPageWideRewriteRequest("Review Grapefruits page heading tag hierarchy"), true)
   assert.equal(isPageWideRewriteRequest("review about page heading hierarchy"), true)
 
+  // Populate-typo regressions (trace c245295d: "opoulate this page woth ...")
+  // Common typos for "populate" must still trip page-wide rewrite so the planner
+  // gets the BREADTH DISCIPLINE instructions and rewrites every text-bearing block.
+  assert.equal(isPageWideRewriteRequest("opoulate this page woth some good content for the audience. plan first"), true)
+  assert.equal(isPageWideRewriteRequest("popoulate this page with sample content"), true)
+  assert.equal(isPageWideRewriteRequest("poulate this page"), true)
+
   // Negative cases — single-block or non-page-wide
   assert.equal(isPageWideRewriteRequest("update the hero heading"), false)
   assert.equal(isPageWideRewriteRequest("rewrite the CTA text"), false)
   assert.equal(isPageWideRewriteRequest("change the heading to something better"), false)
   assert.equal(isPageWideRewriteRequest("redesign my logo"), false)
+  // Should not over-match unrelated -ulate words
+  assert.equal(isPageWideRewriteRequest("stipulate the terms"), false)
+  assert.equal(isPageWideRewriteRequest("operate the dashboard"), false)
 
   // Tonal / stylistic page-wide edits (issue #9)
   assert.equal(isPageWideRewriteRequest("Make this page more playful"), true)

@@ -18,6 +18,15 @@ export const UNIT = String.raw`(?:blocks?|components?|sections?|elements?|widget
 /** Matches "block type(s)", "component type(s)", etc. */
 export const UNIT_TYPE = String.raw`(?:block|component|section|element|widget)\s+types?`
 
+/**
+ * Fuzzy "populate" — tolerates common typos (op-transposition "opoulate",
+ * insertion "popoulate", single-p omission "poulate", l/u transposition
+ * "popluate", l-insertion "polulate"). Used in batch / page-wide rewrite
+ * patterns so a typo doesn't silently downgrade a populate-the-page request
+ * to a single update_props (trace c245295d).
+ */
+export const POPULATE_FUZZY = String.raw`(?:populate|opoulate|popoulate|poulate|popluate|polulate)`
+
 // ---------------------------------------------------------------------------
 // Block catalog — "what blocks can I add?"
 // ---------------------------------------------------------------------------
@@ -63,12 +72,12 @@ export const BATCH_ADD_PATTERNS: RegExp[] = [
 // ---------------------------------------------------------------------------
 
 export const BATCH_UPDATE_PATTERNS: RegExp[] = [
-  new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT}\b`),
-  new RegExp(String.raw`\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT_TYPE}\b`),
-  new RegExp(String.raw`\b(?:populate|fill\s+in|fill)\s+(?:all|every|each)\s+(?:the\s+)?${UNIT}\b`),
-  /\b(?:populate|update|edit|change|rewrite|refresh)\s+(?:all|every)\s+(?:existing\s+)?(?:content|blocks?|components?|sections?)\b/,
-  /\bpopulate\s+(?:\w+\s+){0,2}page\b/,
-  /\bpopulate\b.{0,60}\bwith\b.{0,30}\bcontent\b/,
+  new RegExp(String.raw`\b(?:${POPULATE_FUZZY}|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT}\b`),
+  new RegExp(String.raw`\b(?:${POPULATE_FUZZY}|update|edit|change|rewrite|refresh)\s+(?:all|every|each)\s+${UNIT_TYPE}\b`),
+  new RegExp(String.raw`\b(?:${POPULATE_FUZZY}|fill\s+in|fill)\s+(?:all|every|each)\s+(?:the\s+)?${UNIT}\b`),
+  new RegExp(String.raw`\b(?:${POPULATE_FUZZY}|update|edit|change|rewrite|refresh)\s+(?:all|every)\s+(?:existing\s+)?(?:content|blocks?|components?|sections?)\b`),
+  new RegExp(String.raw`\b${POPULATE_FUZZY}\s+(?:\w+\s+){0,2}page\b`),
+  new RegExp(String.raw`\b${POPULATE_FUZZY}\b.{0,60}\b(?:with|w[io]th)\b.{0,30}\bcontent\b`),
   /\b(?:sample|placeholder|demo)\s+content\s+(?:for|to|in|on)\s+(?:all|every|each)\b/,
   new RegExp(String.raw`\b(?:all|every|each)\s+(?:the\s+)?${UNIT}\s+with\s+(?:sample|placeholder|demo|real)\s+content\b`)
 ]
@@ -178,8 +187,8 @@ export const PAGE_WIDE_REWRITE_PATTERNS: RegExp[] = [
   /\brewrite\s+(?:all|the|this)\s+(?:page|content)\b/,
   /\bredo\s+(?:this|the)\s+(?:whole\s+|entire\s+)?page\b/,
   /\b(?:update|change)\s+(?:this|the)\s+(?:whole|entire)\s+page\b/,
-  /\b(?:populate|fill)\s+(?:this\s+|the\s+)?page\b/,
-  /\b(?:populate|fill)\b.*\b(?:with|using)\b.*\bcontent\b/,
+  new RegExp(String.raw`\b(?:${POPULATE_FUZZY}|fill)\s+(?:this\s+|the\s+)?page\b`),
+  new RegExp(String.raw`\b(?:${POPULATE_FUZZY}|fill)\b.*\b(?:with|using|w[io]th)\b.*\bcontent\b`),
   // Structural audit requests — "review heading hierarchy", "fix heading structure", "review Grapefruits page heading tag hierarchy"
   /\b(?:review|audit|fix|check)\b[\s\w]*\bheadings?\s*(?:tags?\s*)?(?:hierarchy|structure|levels?|order)\b/,
   // Tonal / stylistic sweeps — "make this page more playful", "make /about more professional"
