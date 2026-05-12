@@ -306,31 +306,35 @@ export function ChatComposerCore({
   undoTooltip = "Undo (Ctrl+Z)",
   redoTooltip = "Redo (Ctrl+Y)",
 }: ChatComposerCoreProps) {
-  const showToolbar = onGlobalUndo && onGlobalRedo
+  const showToolbar = (onGlobalUndo && canUndoServer) || (onGlobalRedo && canRedoServer)
   return (
     <div className={className} style={style}>
       {showToolbar ? (
         <div className="undo-redo-toolbar">
-          <button
-            type="button"
-            className="undo-redo-btn"
-            disabled={!canUndoServer || isLoading}
-            onClick={onGlobalUndo}
-            title={undoTooltip}
-            aria-label={undoTooltip}
-          >
-            <Undo2 size={15} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="undo-redo-btn"
-            disabled={!canRedoServer || isLoading}
-            onClick={onGlobalRedo}
-            title={redoTooltip}
-            aria-label={redoTooltip}
-          >
-            <Redo2 size={15} aria-hidden="true" />
-          </button>
+          {onGlobalUndo && canUndoServer ? (
+            <button
+              type="button"
+              className="undo-redo-btn"
+              disabled={isLoading}
+              onClick={onGlobalUndo}
+              title={undoTooltip}
+              aria-label={undoTooltip}
+            >
+              <Undo2 size={15} aria-hidden="true" />
+            </button>
+          ) : null}
+          {onGlobalRedo && canRedoServer ? (
+            <button
+              type="button"
+              className="undo-redo-btn"
+              disabled={isLoading}
+              onClick={onGlobalRedo}
+              title={redoTooltip}
+              aria-label={redoTooltip}
+            >
+              <Redo2 size={15} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       ) : null}
       <ClaudeStyleChatInput
