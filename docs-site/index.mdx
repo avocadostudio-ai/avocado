@@ -4,17 +4,16 @@ sidebarTitle: "Welcome"
 description: "Free and open source. Agentic-first. Bring AI-native editing to any Next.js website — self-hostable, BYO LLM keys, composable with the CMS, DAM, and stack you already have."
 ---
 
-{/* Intro video — swap with the final cut when ready. */}
-<div className="w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800">
-  <video
-    className="block w-full h-auto"
-    src="/images/demo.mp4"
-    autoPlay
-    muted
-    loop
-    playsInline
-    controls
-    preload="metadata"
+{/* Intro video — YouTube embed (nocookie, no related videos, modest branding). */}
+<div className="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800" style={{ aspectRatio: "16 / 9" }}>
+  <iframe
+    className="absolute inset-0 h-full w-full"
+    src="https://www.youtube-nocookie.com/embed/QPQOZIJlC98?rel=0&modestbranding=1&playsinline=1"
+    title="Avocado Studio demo"
+    frameBorder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    referrerPolicy="strict-origin-when-cross-origin"
+    allowFullScreen
   />
 </div>
 
