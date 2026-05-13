@@ -6,13 +6,9 @@
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<p align="center">
-  <a href="https://github.com/avocadostudio-ai/avocado/releases/download/assets-demo-v2.2/Demo_v2.2.mp4">
-    <img src="docs-site/images/demo-poster.jpg" alt="Avocado Studio demo — click to watch" width="900">
-  </a>
-  <br>
-  <em><a href="https://github.com/avocadostudio-ai/avocado/releases/download/assets-demo-v2.2/Demo_v2.2.mp4">▶ Watch the 30-second demo</a></em>
-</p>
+## Demo
+
+[![Avocado Studio demo](https://img.youtube.com/vi/QPQOZIJlC98/maxresdefault.jpg)](https://youtu.be/QPQOZIJlC98)
 
 ## Why Avocado Studio?
 
