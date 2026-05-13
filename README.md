@@ -7,7 +7,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <p align="center">
-  <video src="https://github.com/avocadostudio-ai/avocado/raw/main/docs-site/images/demo.mp4" controls muted playsinline width="900"></video>
+  <video src="https://github.com/avocadostudio-ai/avocado/releases/download/assets-demo-v2.2/Demo_v2.2.mp4" controls muted playsinline width="900"></video>
 </p>
 
 ## Why Avocado Studio?
