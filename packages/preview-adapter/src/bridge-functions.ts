@@ -1349,6 +1349,17 @@ export function createBridgeFunctions(
         editablePath = String(firstEditable?.getAttribute("data-editable-target") ?? "") || undefined
       }
     }
+    if (state.selectedBlockId === blockId && !editablePath) {
+      clearChildFocus()
+      removeSelectedDeleteHandle()
+      clearAllHighlights()
+      state.selectedBlockId = null
+      state.selectedEditablePath = null
+      state.pendingListItemMovePath = null
+      setChildSelectionLock(null)
+      callbacks.onBlockClicked({ slug, blockId: null, blockType: null, editablePath: null, editableValue: null, anchorRect: null })
+      return
+    }
     if (!editablePath) {
       state.selectedEditablePath = null
       state.pendingListItemMovePath = null
