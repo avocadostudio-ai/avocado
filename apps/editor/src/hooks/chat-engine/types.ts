@@ -1,4 +1,4 @@
-import type { BlockManifest, Operation } from "@ai-site-editor/shared"
+import type { BlockManifest, Operation } from "@avocadostudio-ai/shared"
 import type {
   ApplyOpsResponse,
   AssistantResponse,

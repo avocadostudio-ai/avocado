@@ -68,6 +68,7 @@
               "integration/nextjs-integration",
               "integration/editor-quickstart",
               "integration/block-system",
+              "integration/built-in-blocks",
               "integration/custom-blocks",
               "integration/puck-mode"
             ]

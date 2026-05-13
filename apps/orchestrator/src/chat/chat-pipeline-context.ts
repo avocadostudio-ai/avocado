@@ -1,6 +1,6 @@
 import { isStandalonePageOperation, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import { inferDeterministicIntent, plannerContextPack } from "../nlp/deterministic-planner.js"
-import type { EditPlan, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, PageDoc } from "@avocadostudio-ai/shared"
 import { inferTranslationScopeFromMessage, type TranslationScope } from "./chat-pipeline-translation.js"
 import { isRewriteLikeMessage } from "./chat-pipeline-deterministic.js"
 import { isRewriteRequest } from "../nlp/deterministic-planner-patches.js"

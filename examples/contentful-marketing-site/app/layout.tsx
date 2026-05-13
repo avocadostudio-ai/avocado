@@ -9,7 +9,7 @@ import { marketingTheme } from "@/src/theme"
 // and renderBlocks() can find them.
 import "@/src/blocks/register"
 
-import "@ai-site-editor/blocks/styles.css"
+import "@avocadostudio-ai/blocks/styles.css"
 
 export const metadata = {
   title: "Contentful Marketing Site",

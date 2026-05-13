@@ -124,7 +124,7 @@ import { resolve } from "node:path"`,
     getPages: `() => Promise.resolve([])`,
     pageImport: `import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
-import type { PageDoc } from "@ai-site-editor/shared"`,
+import type { PageDoc } from "@avocadostudio-ai/shared"`,
     getPage: "",
     getSlugs: "",
     getSiteConfig: null,

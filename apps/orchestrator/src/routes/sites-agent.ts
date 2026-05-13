@@ -569,7 +569,7 @@ DO NOT use Read, Glob, or Grep to explore existing blocks. DO NOT read files fro
 ### schema.ts
 \`\`\`typescript
 import { z } from "zod"
-import { registerBlock } from "@ai-site-editor/shared"
+import { registerBlock } from "@avocadostudio-ai/shared"
 
 registerBlock("PricingTable", {
   schema: z.object({
@@ -663,7 +663,7 @@ registerCustomRenderer("PricingTable", PricingTable)
 \`\`\`
 
 Key patterns to follow:
-- Use \`import { registerBlock } from "@ai-site-editor/shared"\` (NOT \`f\` helper)
+- Use \`import { registerBlock } from "@avocadostudio-ai/shared"\` (NOT \`f\` helper)
 - Field metadata as inline objects: \`{ kind: "text", label: "..." }\`
 - List items with newline-separated strings for multi-value fields
 - BEM class names: \`.block-name__element\`

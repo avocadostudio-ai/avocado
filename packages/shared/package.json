@@ -1,5 +1,5 @@
 {
-  "name": "@ai-site-editor/shared",
+  "name": "@avocadostudio-ai/shared",
   "version": "0.0.2",
   "type": "module",
   "main": "src/index.ts",

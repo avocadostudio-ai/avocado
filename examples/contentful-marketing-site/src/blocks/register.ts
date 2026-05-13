@@ -2,7 +2,7 @@
 // Imported from app/layout.tsx so it runs in every server/client context
 // before any route handler, renderer, or manifest builder needs the registry.
 
-import { registerCustomRenderer } from "@ai-site-editor/blocks"
+import { registerCustomRenderer } from "@avocadostudio-ai/blocks"
 import "./schemas"
 import {
   CtfHeroBannerRenderer,

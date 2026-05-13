@@ -11,7 +11,7 @@
  */
 
 import type { FastifyInstance } from "fastify"
-import { siteConfigSchema, type SiteConfig } from "@ai-site-editor/shared"
+import { siteConfigSchema, type SiteConfig } from "@avocadostudio-ai/shared"
 import {
   DEFAULT_SESSION,
   getSiteConfig,

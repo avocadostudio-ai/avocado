@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync, readdirSync } from "nod
 import { tmpdir } from "node:os"
 import { resolve } from "node:path"
 import type { FastifyBaseLogger } from "fastify"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import {
   applyPersistedState,
   draftPages,

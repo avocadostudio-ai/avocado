@@ -36,7 +36,7 @@ ${headerLine}  extractSlug: ${r.extractSlug},
 
 export function manifestFile(config: ScaffoldConfig): string {
   if (config.blocksMode === "custom") {
-    return `import type { BlockManifest } from "@ai-site-editor/shared"
+    return `import type { BlockManifest } from "@avocadostudio-ai/shared"
 import { getManifestImageFields } from "@ai-site-editor/site-sdk/routes"
 
 const manifest: BlockManifest = {

@@ -100,7 +100,7 @@ The HTTP transport runs in **stateless mode** — each request is independent, n
 - **Thin wrapper, single source of truth.** Every mutation goes through `POST /ops`, which runs the existing Zod validation, ops-engine, undo stack, version log, and demo-mode gate. The MCP server never mutates state directly.
 - **Discovery before mutation.** `avocado-list-block-types` + `avocado-get-block-schema` are the intended entry points for agents. Calling `avocado-add-block` without first fetching the schema risks invalid prop shapes → 400 from the orchestrator.
 - **Read-only vs. destructive.** Discovery and `avocado-get-page` / `avocado-list-pages` are safe to mark **Always allow**. Mutations should stay on **Ask**.
-- **Side-effect import.** `src/tools/discovery.ts` imports `@ai-site-editor/shared/src/blocks/index.ts` purely to trigger each block's `registerBlock()` call.
+- **Side-effect import.** `src/tools/discovery.ts` imports `@avocadostudio-ai/shared/src/blocks/index.ts` purely to trigger each block's `registerBlock()` call.
 
 ## Tests
 

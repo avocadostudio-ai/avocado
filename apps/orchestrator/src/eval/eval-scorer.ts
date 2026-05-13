@@ -2,7 +2,7 @@
 // Planner quality eval — 5-dimension scorer
 // ---------------------------------------------------------------------------
 
-import type { PageDoc, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, BlockInstance } from "@avocadostudio-ai/shared"
 import type { EvalCase, EvalAssertion, ContentCheck, CaseScore } from "./eval-types.js"
 import { DIMENSION_WEIGHTS, PASS_THRESHOLD } from "./eval-types.js"
 import { evaluateCommandMatchFromPredicted } from "./eval-scoring-utils.js"

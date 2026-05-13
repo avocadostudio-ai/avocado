@@ -1,7 +1,7 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import "@ai-site-editor/shared/src/blocks/index.ts"
-import { getAllBlockMeta, getBlockJsonSchema } from "@ai-site-editor/shared"
+import "@avocadostudio-ai/shared/src/blocks/index.ts"
+import { getAllBlockMeta, getBlockJsonSchema } from "@avocadostudio-ai/shared"
 
 // The discovery tools are thin wrappers around these two imports — verify the
 // wrapped functions produce the payload shape we advertise, so the tool responses

@@ -1,7 +1,7 @@
 import { describe, it, before } from "node:test"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
-import type { EditPlan, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, PageDoc } from "@avocadostudio-ai/shared"
 import type { TokenUsage } from "./telemetry/usage.js"
 
 // Load .env so API keys are available

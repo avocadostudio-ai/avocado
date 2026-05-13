@@ -12,7 +12,7 @@ import { existsSync } from "node:fs"
 import { tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk"
 import { createMigrationTools } from "../migration/migration-tools.js"
 import { z } from "zod"
-import { getAllBlockMeta, defaultPropsForType, validateBlockProps, type BlockType } from "@ai-site-editor/shared"
+import { getAllBlockMeta, defaultPropsForType, validateBlockProps, type BlockType } from "@avocadostudio-ai/shared"
 import { fetchPageContent, takeScreenshot, downloadImage, extractDesignTokens, mapToThemeVariables, discoverSitePages, scrapeFullPage } from "@ai-site-editor/migration-sdk"
 import { getCachedScrape, setCachedScrape } from "../migration/scrape-cache.js"
 import { saveScreenshot } from "../migration/migration-tools.js"
@@ -898,7 +898,7 @@ export function createSitesAgentMcpServer(options: {
         }
         const deps = pkg.dependencies ?? {}
         let depsAdded = false
-        for (const dep of ["@ai-site-editor/site-sdk", "@ai-site-editor/blocks", "@ai-site-editor/shared"]) {
+        for (const dep of ["@ai-site-editor/site-sdk", "@avocadostudio-ai/blocks", "@avocadostudio-ai/shared"]) {
           if (!deps[dep]) {
             deps[dep] = "workspace:*"
             depsAdded = true
@@ -1010,16 +1010,16 @@ export function createSitesAgentMcpServer(options: {
           let layoutModified = false
 
           // Add block styles import
-          if (!layoutContent.includes("@ai-site-editor/blocks/styles.css")) {
+          if (!layoutContent.includes("@avocadostudio-ai/blocks/styles.css")) {
             const lines = layoutContent.split("\n")
             let lastImportIdx = -1
             for (let i = 0; i < lines.length; i++) {
               if (lines[i].startsWith("import ")) lastImportIdx = i
             }
             if (lastImportIdx >= 0) {
-              lines.splice(lastImportIdx + 1, 0, 'import "@ai-site-editor/blocks/styles.css"')
+              lines.splice(lastImportIdx + 1, 0, 'import "@avocadostudio-ai/blocks/styles.css"')
             } else {
-              lines.unshift('import "@ai-site-editor/blocks/styles.css"')
+              lines.unshift('import "@avocadostudio-ai/blocks/styles.css"')
             }
             layoutContent = lines.join("\n")
             layoutModified = true

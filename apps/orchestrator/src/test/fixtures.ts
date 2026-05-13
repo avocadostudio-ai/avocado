@@ -1,4 +1,4 @@
-import type { PageDoc, BlockManifest } from "@ai-site-editor/shared"
+import type { PageDoc, BlockManifest } from "@avocadostudio-ai/shared"
 import {
   draftPages,
   historyUndo,

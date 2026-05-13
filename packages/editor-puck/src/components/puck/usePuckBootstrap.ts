@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { BlockManifest, PageDoc } from "@ai-site-editor/shared"
+import type { BlockManifest, PageDoc } from "@avocadostudio-ai/shared"
 import { FALLBACK_SLUG } from "./constants"
 import { pageToPuckData } from "./adapters"
 import { bootstrapDraft, fetchDraftPage, fetchDraftSlugs, fetchEditorPages, fetchManifest } from "./draft-api"

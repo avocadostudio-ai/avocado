@@ -9,7 +9,7 @@ export function contentfulTemplates(_config: ScaffoldConfig): GeneratedFile[] {
 
 const CONTENTFUL_ADAPTER = `import { createClient, type Entry, type Asset } from "contentful"
 import { imageFields, listImageFields } from "./manifest"
-import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig, BlockInstance } from "@avocadostudio-ai/shared"
 
 let cachedClient: ReturnType<typeof createClient> | null = null
 

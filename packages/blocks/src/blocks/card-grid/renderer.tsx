@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveHeadingTag, resolveItemHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag, resolveItemHeadingTag } from "@avocadostudio-ai/shared"
 import { PrimaryButton, BlockImage } from "../_shared"
 
 export function CardGrid(props: Record<string, unknown>) {

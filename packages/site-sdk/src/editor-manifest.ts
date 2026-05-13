@@ -1,4 +1,4 @@
-import { getBlockJsonSchema, getBlockMeta, allowedBlockTypes, defaultPropsForType } from "@ai-site-editor/shared"
+import { getBlockJsonSchema, getBlockMeta, allowedBlockTypes, defaultPropsForType } from "@avocadostudio-ai/shared"
 import {
   blockDefinitionSchema,
   blockManifestSchema,
@@ -6,7 +6,7 @@ import {
   validateManifestDefaultProps,
   type BlockDefinition,
   type BlockManifest
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 
 export {
   blockDefinitionSchema,

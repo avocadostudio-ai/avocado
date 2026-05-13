@@ -1,4 +1,4 @@
-import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, Operation, PageDoc } from "@avocadostudio-ai/shared"
 import { normalizeRouteCandidate } from "../nlp/intent-helpers.js"
 import { orderSlugsHomeFirst } from "../state/session-state.js"
 import { imageKeywordsFromQuery } from "../image/image-helpers.js"

@@ -1,6 +1,6 @@
 "use client"
 
-import { BlockCatalogue } from "@ai-site-editor/blocks"
+import { BlockCatalogue } from "@avocadostudio-ai/blocks"
 
 export default function CataloguePage() {
   return <BlockCatalogue />

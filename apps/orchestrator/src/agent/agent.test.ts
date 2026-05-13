@@ -5,7 +5,7 @@
 
 import { describe, it, beforeEach } from "node:test"
 import assert from "node:assert/strict"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { createAgentTools } from "./agent-tools.js"
 import { buildAgentSystemPrompt, buildContextMessage } from "./agent-context.js"
 import {

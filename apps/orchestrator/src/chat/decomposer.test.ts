@@ -1,7 +1,7 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 import { isMultiStepCandidate, decomposeRequest } from "./decomposer.js"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 describe("isMultiStepCandidate", () => {
   it("returns true for plural pages + creation verb", () => {

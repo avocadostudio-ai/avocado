@@ -83,7 +83,7 @@ Internal workspace deps use `workspace:*` protocol (not versioned specifiers lik
 - `fetchEditorPage(slug, session, siteId)` — `GET /draft/pages` from orchestrator; falls back to `published-content.json`
 - `fetchEditorSlugs(session, siteId)` — `GET /draft/slugs`; falls back to static list
 
-**Block rendering:** `apps/site/components/block-renderer.tsx` — wraps `SharedBlockRenderer` from `@ai-site-editor/blocks` in a `<div>` with `data-block-id`, `data-block-type`, `class="editor-selectable"` when in editor mode.
+**Block rendering:** `apps/site/components/block-renderer.tsx` — wraps `SharedBlockRenderer` from `@avocadostudio-ai/blocks` in a `<div>` with `data-block-id`, `data-block-type`, `class="editor-selectable"` when in editor mode.
 
 **Editor integration:** Mounts `PreviewBridge` from `@ai-site-editor/preview-adapter` when `editorMode=true`.
 

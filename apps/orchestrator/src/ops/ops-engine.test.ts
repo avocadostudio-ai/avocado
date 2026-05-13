@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from "node:test"
 import assert from "node:assert/strict"
-import type { PageDoc, Operation } from "@ai-site-editor/shared"
+import type { PageDoc, Operation } from "@avocadostudio-ai/shared"
 import { draftPages, getSiteConfig, setSiteConfig } from "../state/session-state.js"
 import {
   applyOpsAtomically,

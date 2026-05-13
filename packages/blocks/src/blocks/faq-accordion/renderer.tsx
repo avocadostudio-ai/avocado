@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag } from "@avocadostudio-ai/shared"
 import { renderRichTextContent } from "../_shared"
 
 export function FAQAccordion(props: Record<string, unknown>) {

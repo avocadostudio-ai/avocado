@@ -1,5 +1,5 @@
-import type { BlockType, EditPlan, PageDoc } from "@ai-site-editor/shared"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import type { BlockType, EditPlan, PageDoc } from "@avocadostudio-ai/shared"
+import { getAllBlockMeta } from "@avocadostudio-ai/shared"
 
 export type TranslationScope = "page" | "component" | "none"
 

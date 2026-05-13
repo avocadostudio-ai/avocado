@@ -56,7 +56,7 @@ Entry point: `apps/editor/src/components/PuckPrototypeRoute.tsx` bridges the mai
 | `image` | Custom render with image picker modal |
 | default | `"text"` |
 
-Blocks render using `SharedBlockRenderer` from `@ai-site-editor/blocks`.
+Blocks render using `SharedBlockRenderer` from `@avocadostudio-ai/blocks`.
 
 ### Persistence (Auto-Save)
 

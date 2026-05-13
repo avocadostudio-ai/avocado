@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { X, Search, Upload, Sparkles, HardDrive, Image as ImageIcon, RefreshCw, Cloud, ZoomIn, Eye } from "lucide-react"
 import { ImageGenerateChat } from "./ImageGenerateChat"
-import { isImagePlaceholder } from "@ai-site-editor/shared"
+import { isImagePlaceholder } from "@avocadostudio-ai/shared"
 import { orchestrator } from "../lib/editor-utils"
 import { fetchCmsMedia, getCmsMediaLabel, type CmsMediaItem } from "../lib/cms-media"
 import type { CmsMediaConfig } from "../lib/editor-types"

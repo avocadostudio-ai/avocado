@@ -12,7 +12,7 @@
 
 import test, { describe, before, after } from "node:test"
 import assert from "node:assert/strict"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import type { PublishContext } from "@ai-site-editor/site-sdk/routes"
 
 // ---------------------------------------------------------------------------

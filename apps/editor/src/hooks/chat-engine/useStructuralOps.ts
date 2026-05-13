@@ -4,7 +4,7 @@ import {
   defaultListItemForBlock,
   defaultPropsForType,
   type Operation
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import type { ApplyOpsResponse } from "../../lib/editor-types"
 import {
   enablePatchTransport,

@@ -1,5 +1,5 @@
-import { SharedBlockRenderer, BlockErrorBoundary, getCustomRenderer } from "@ai-site-editor/blocks"
-import { getChromeTypes } from "@ai-site-editor/shared"
+import { SharedBlockRenderer, BlockErrorBoundary, getCustomRenderer } from "@avocadostudio-ai/blocks"
+import { getChromeTypes } from "@avocadostudio-ai/shared"
 import { getPreviewWrapperProps } from "./editor.ts"
 import type { BlockInstance } from "./types.ts"
 

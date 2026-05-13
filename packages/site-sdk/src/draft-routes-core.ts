@@ -1,4 +1,4 @@
-import { validateDraftSecret, getSafeInternalRedirectPath } from "@ai-site-editor/shared"
+import { validateDraftSecret, getSafeInternalRedirectPath } from "@avocadostudio-ai/shared"
 import { DRAFT_SESSION_COOKIE, DRAFT_SITE_COOKIE, EDITOR_ORIGIN_COOKIE, normalizeOrigin } from "./draft-common.ts"
 
 export type DraftRouteAdapter = {

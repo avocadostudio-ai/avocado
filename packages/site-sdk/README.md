@@ -7,7 +7,7 @@ SDK for integrating any Next.js site with the Avocado Studio. Provides the contr
 ### 1. Install
 
 ```bash
-npm install @ai-site-editor/site-sdk @ai-site-editor/blocks @ai-site-editor/shared
+npm install @ai-site-editor/site-sdk @avocadostudio-ai/blocks @avocadostudio-ai/shared
 ```
 
 ### 2. Create the page component
@@ -53,7 +53,7 @@ export const { GET, POST, OPTIONS } = createEditorApiHandler({
 
 ```tsx
 // app/layout.tsx
-import "@ai-site-editor/blocks/styles.css"
+import "@avocadostudio-ai/blocks/styles.css"
 ```
 
 ### 5. Set environment variables

@@ -70,7 +70,7 @@ export function sanityImageUrl(source: unknown): string {
 }
 `
 
-const SANITY_UTILS = `export { blockTypeToCamel as toSanityName, camelToBlockType as sanityNameToBlockType } from "@ai-site-editor/shared"
+const SANITY_UTILS = `export { blockTypeToCamel as toSanityName, camelToBlockType as sanityNameToBlockType } from "@avocadostudio-ai/shared"
 
 export const REFERENCE_LISTS: Record<string, Set<string>> = {
   CardGrid: new Set(["cards"]),
@@ -82,7 +82,7 @@ import { pageBySlugQuery, allSlugsQuery, allPagesQuery, siteConfigQuery } from "
 import { sanityImageUrl } from "./sanity.image"
 import { sanityNameToBlockType } from "./sanity.utils"
 import { imageFields, listImageFields } from "./manifest"
-import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig, BlockInstance } from "@avocadostudio-ai/shared"
 
 function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {
   const type = doc._type as string | undefined

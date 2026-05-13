@@ -1,5 +1,5 @@
 import type { McpConfig } from "./config.ts"
-import type { Operation, PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import type { Operation, PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 
 /**
  * Thin typed wrapper around the orchestrator HTTP API.

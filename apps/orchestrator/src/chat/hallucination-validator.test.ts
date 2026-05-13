@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { type EditPlan, type PageDoc, defaultPropsForType } from "@ai-site-editor/shared"
+import { type EditPlan, type PageDoc, defaultPropsForType } from "@avocadostudio-ai/shared"
 import { validateAndStripHallucinatedProps } from "./hallucination-validator.js"
 
 // Touch the shared registry so all block types (Stats, etc.) are registered.

@@ -1,4 +1,4 @@
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { patchObject } from "./plan-normalizer.js"
 
 export function extractAudienceTarget(message: string) {

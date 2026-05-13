@@ -8,7 +8,7 @@ import {
   type Operation,
   type PageDoc,
   type SiteConfig
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
 import {
   archiveMigratedJson,

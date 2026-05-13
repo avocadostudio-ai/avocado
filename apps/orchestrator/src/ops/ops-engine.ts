@@ -10,7 +10,7 @@ import {
   validateBlockProps,
   validateByJsonSchemaLike,
   isChrome
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import { normalizeRouteCandidate } from "../nlp/intent-helpers.js"
 import { pageIdFromSlug, pageTitleFromSlug } from "../nlp/plan-normalizer.js"
 import {

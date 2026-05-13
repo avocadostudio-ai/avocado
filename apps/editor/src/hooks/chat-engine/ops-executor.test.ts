@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import type { Operation } from "@ai-site-editor/shared"
+import type { Operation } from "@avocadostudio-ai/shared"
 import {
   buildInlineEditOperation,
   planApplyOpsUiSync,

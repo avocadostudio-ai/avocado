@@ -1,5 +1,5 @@
 import { renderBlocks, EditorOverlay } from "@ai-site-editor/site-sdk/editor"
-import { SharedBlockRenderer } from "@ai-site-editor/blocks"
+import { SharedBlockRenderer } from "@avocadostudio-ai/blocks"
 import type { SiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import type { PageDoc } from "../lib/site-contract"
 

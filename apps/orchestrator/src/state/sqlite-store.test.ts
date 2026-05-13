@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { resolve as resolvePath } from "node:path"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import {
   SqliteStore,
   HISTORY_DEPTH_CAP,

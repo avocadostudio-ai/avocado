@@ -3,8 +3,8 @@
  * Talks directly to the orchestrator via HTTP + SSE — no postMessage middleman.
  */
 
-import type { BlockManifest, ChatStreamEvent } from "@ai-site-editor/shared"
-import { parseChatStreamFrame } from "@ai-site-editor/shared"
+import type { BlockManifest, ChatStreamEvent } from "@avocadostudio-ai/shared"
+import { parseChatStreamFrame } from "@avocadostudio-ai/shared"
 import { getAccessToken } from "./access-auth"
 
 export type ChatRequestPayload = {

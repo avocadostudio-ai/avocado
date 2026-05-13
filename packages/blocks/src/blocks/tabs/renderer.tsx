@@ -1,5 +1,5 @@
 import { useId, type JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag } from "@avocadostudio-ai/shared"
 import { renderRichTextContent } from "../_shared"
 
 export function Tabs(props: Record<string, unknown>): JSX.Element {

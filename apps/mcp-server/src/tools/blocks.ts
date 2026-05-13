@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
-import type { Operation } from "@ai-site-editor/shared"
+import type { Operation } from "@avocadostudio-ai/shared"
 import type { OrchestratorClient } from "../orchestrator-client.ts"
 import { jsonResult, errorResult } from "./_helpers.ts"
 

@@ -1,4 +1,4 @@
-import type { BlockManifest, PageDoc } from "@ai-site-editor/shared"
+import type { BlockManifest, PageDoc } from "@avocadostudio-ai/shared"
 import { getPuckHostApi } from "../../host/runtime"
 import { fetchJson } from "./fetch-json"
 import { type PlannerFeatures } from "./types"

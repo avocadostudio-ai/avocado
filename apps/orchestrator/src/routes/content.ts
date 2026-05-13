@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { FastifyInstance } from "fastify"
-import { pageDocSchemaLenient, siteConfigSchema, type PageDoc, type SiteConfig } from "@ai-site-editor/shared"
+import { pageDocSchemaLenient, siteConfigSchema, type PageDoc, type SiteConfig } from "@avocadostudio-ai/shared"
 import { pageIdFromSlug, pageTitleFromSlug } from "../nlp/plan-normalizer.js"
 
 /**

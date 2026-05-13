@@ -1,5 +1,5 @@
 import type { PageDoc } from "./site-contract"
-import type { SiteConfig } from "@ai-site-editor/shared"
+import type { SiteConfig } from "@avocadostudio-ai/shared"
 import { getPublishedPage, getPublishedSlugs, getPublishedSiteConfig } from "./published-content-api"
 
 export type ContentSource = "published" | "draft"

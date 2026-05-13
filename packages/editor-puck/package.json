@@ -9,8 +9,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@ai-site-editor/blocks": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/blocks": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "@puckeditor/core": "^0.21.2",
     "lucide-react": "^0.575.0"
   },

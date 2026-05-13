@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import OpenAI from "openai"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { type UnsplashImage, type UnsplashResolveOptions } from "../variation-images.js"
 import { toSeedSlug } from "../nlp/intent-helpers.js"
 import { listImages, isGdriveConfigured, fileNameToAlt, resolveGdriveFolderId } from "./gdrive-client.js"

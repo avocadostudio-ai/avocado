@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import type { ApplyPatchMessage, Operation } from "@ai-site-editor/shared"
+import type { ApplyPatchMessage, Operation } from "@avocadostudio-ai/shared"
 import type { SiteMessage } from "../lib/editor-types"
 import { siteOrigin as defaultSiteOrigin } from "../lib/editor-utils"
 import { parseOptionalString, parseString } from "../lib/parse-utils"

@@ -1,4 +1,4 @@
-import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, Operation, PageDoc } from "@avocadostudio-ai/shared"
 
 /**
  * Tier 1 destructive-action gate. Evaluates an edit plan and decides whether

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, type ChangeEvent, type CSSProperties, type ReactNode } from "react"
-import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, type BlockDefinition, type BlockMeta, type FieldMeta, type ListFieldMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta, deriveFieldMetaFromSchema, DEFAULT_HEADING_LEVELS, type BlockDefinition, type BlockMeta, type FieldMeta, type ListFieldMeta } from "@avocadostudio-ai/shared"
 import { useDebouncedCommit } from "../hooks/useDebouncedCommit"
 import { fieldAiQuickActions } from "../lib/field-ai-suggestions"
 import { WandSparkles, Sparkles, Pencil, Replace, Trash2, ImagePlus, MousePointerClick } from "lucide-react"

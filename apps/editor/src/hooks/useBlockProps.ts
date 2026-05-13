@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { orchestrator } from "../lib/editor-utils"
-import type { BlockInstance } from "@ai-site-editor/shared"
+import type { BlockInstance } from "@avocadostudio-ai/shared"
 
 export type BlockPropsResult = {
   status: "idle" | "loading" | "ready" | "error"

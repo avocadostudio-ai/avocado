@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { PublishDiff } from "@ai-site-editor/shared"
+import type { PublishDiff } from "@avocadostudio-ai/shared"
 import { orchestrator } from "../lib/editor-utils"
 
 type State = {

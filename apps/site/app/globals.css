@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "@ai-site-editor/blocks/styles.css";
+@import "@avocadostudio-ai/blocks/styles.css";
 
 @source "../../../packages/blocks/src";
 @source "../../../packages/preview-adapter/src";

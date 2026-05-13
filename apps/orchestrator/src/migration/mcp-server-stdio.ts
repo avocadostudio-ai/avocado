@@ -17,7 +17,7 @@ import {
   downloadImage,
   discoverSitePages,
 } from "@ai-site-editor/migration-sdk"
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta } from "@avocadostudio-ai/shared"
 import { mkdir, writeFile, readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, dirname } from "node:path"
@@ -190,7 +190,7 @@ server.tool("create_site", "Scaffold a Next.js site project in the monorepo", {
       await mkdir(join(projectDir, "blocks"), { recursive: true })
       await mkdir(join(projectDir, "public/images"), { recursive: true })
       await writeFile(join(projectDir, "blocks/register.tsx"),
-        `import { registerCustomRenderer } from "@ai-site-editor/blocks"\n`, "utf-8")
+        `import { registerCustomRenderer } from "@avocadostudio-ai/blocks"\n`, "utf-8")
       // Update package.json with validated port
       const existingPkg = JSON.parse(await readFile(join(projectDir, "package.json"), "utf-8"))
       if (existingPkg.scripts?.dev) {
@@ -378,7 +378,7 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
     // Add workspace deps
     const deps = pkg.dependencies ?? {}
     let depsAdded = false
-    for (const dep of ["@ai-site-editor/site-sdk", "@ai-site-editor/blocks", "@ai-site-editor/shared"]) {
+    for (const dep of ["@ai-site-editor/site-sdk", "@avocadostudio-ai/blocks", "@avocadostudio-ai/shared"]) {
       if (!deps[dep]) { deps[dep] = "workspace:*"; depsAdded = true }
     }
     if (depsAdded) {
@@ -479,16 +479,16 @@ server.tool("integrate_site", "Add AI Site Editor SDK integration to an existing
       let layoutContent = await readFile(layoutFile, "utf-8")
       let layoutModified = false
 
-      if (!layoutContent.includes("@ai-site-editor/blocks/styles.css")) {
+      if (!layoutContent.includes("@avocadostudio-ai/blocks/styles.css")) {
         const lines = layoutContent.split("\n")
         let lastImportIdx = -1
         for (let i = 0; i < lines.length; i++) {
           if (lines[i].startsWith("import ")) lastImportIdx = i
         }
         if (lastImportIdx >= 0) {
-          lines.splice(lastImportIdx + 1, 0, 'import "@ai-site-editor/blocks/styles.css"')
+          lines.splice(lastImportIdx + 1, 0, 'import "@avocadostudio-ai/blocks/styles.css"')
         } else {
-          lines.unshift('import "@ai-site-editor/blocks/styles.css"')
+          lines.unshift('import "@avocadostudio-ai/blocks/styles.css"')
         }
         layoutContent = lines.join("\n")
         layoutModified = true

@@ -142,7 +142,7 @@ Create `packages/blocks/src/blocks/<name>/renderer.tsx`:
 
 ```tsx
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag } from "@avocadostudio-ai/shared"
 import { PrimaryButton, renderInline } from "../_shared"
 
 export function MyBlock(props: Record<string, unknown>): JSX.Element {
@@ -308,7 +308,7 @@ Create `packages/blocks/src/blocks/<name>/renderer.test.ts` to validate the bloc
 ```typescript
 import test from "node:test"
 import assert from "node:assert/strict"
-import { validateBlockProps, getBlockMeta, defaultPropsForType } from "@ai-site-editor/shared"
+import { validateBlockProps, getBlockMeta, defaultPropsForType } from "@avocadostudio-ai/shared"
 import { renderers } from "../index"
 
 const BLOCK_TYPE = "MyBlock"

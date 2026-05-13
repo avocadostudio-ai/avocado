@@ -19,7 +19,7 @@
 
 import { writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs"
 import { resolve } from "node:path"
-import { getAllBlockMeta, type FieldKind } from "@ai-site-editor/shared"
+import { getAllBlockMeta, type FieldKind } from "@avocadostudio-ai/shared"
 
 const STRAPI_PROJECT = process.env.STRAPI_PROJECT?.trim()
 if (!STRAPI_PROJECT) {

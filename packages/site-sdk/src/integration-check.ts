@@ -1,4 +1,4 @@
-import { getConfiguredDraftSecret } from "@ai-site-editor/shared"
+import { getConfiguredDraftSecret } from "@avocadostudio-ai/shared"
 
 let checked = false
 

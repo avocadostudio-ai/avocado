@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import type { Operation, PageDoc } from "@ai-site-editor/shared"
+import type { Operation, PageDoc } from "@avocadostudio-ai/shared"
 import {
   splitDemoOps,
   enforceDemoOps,

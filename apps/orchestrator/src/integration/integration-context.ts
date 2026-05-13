@@ -1,4 +1,4 @@
-import { blockManifestSchema, type BlockManifest } from "@ai-site-editor/shared"
+import { blockManifestSchema, type BlockManifest } from "@avocadostudio-ai/shared"
 import { z } from "zod"
 
 export const siteCapabilitiesSchema = z.object({

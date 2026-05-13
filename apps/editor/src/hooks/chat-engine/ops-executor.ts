@@ -1,4 +1,4 @@
-import type { Operation, BlockManifest } from "@ai-site-editor/shared"
+import type { Operation, BlockManifest } from "@avocadostudio-ai/shared"
 import type { ApplyOpsResponse, AssistantResponse, SiteCapabilities } from "../../lib/editor-types"
 import { manifestUnavailableChanges, withIntegrationContext } from "../../lib/integration-context"
 

@@ -1,0 +1,95 @@
+---
+title: "Built-in Blocks"
+sidebarTitle: "Built-in blocks"
+description: "Catalogue of the block types Avocado Studio ships out of the box — schemas, renderers, and field metadata included."
+---
+
+Avocado Studio ships with 20 ready-to-use block types covering hero sections, content layouts, conversion CTAs, media, and navigation chrome. They are defined in `packages/shared/src/blocks/` (schemas + field metadata) and rendered by `packages/blocks/src/blocks/` (React components + CSS).
+
+<Tip>
+The fastest way to *see* every built-in block rendered with default props is the live catalogue at [avocadostudio.dev/components](https://avocadostudio.dev/components) — sidebar, viewport switcher, and a live prop editor included. Locally, every site that ships the blocks exposes the same UI at `/catalogue` (e.g. `http://localhost:3000/catalogue` in dev).
+</Tip>
+
+## When to use built-ins vs. custom blocks
+
+- **Use the built-ins** when you want a starter content model and don't need to match an existing design system. They cover the common marketing/landing patterns and are fully wired into the AI planner, asset manager, and preview overlay.
+- **Bring your own** when you have an existing component library or design tokens you need to preserve. See [Custom Blocks](/integration/custom-blocks) — you can also mix and match (built-ins + custom in one manifest).
+
+## Catalogue
+
+### Content
+
+| Block | What it is |
+|-------|------------|
+| **Hero** | Full-width hero section with headline, subheading, CTA buttons, and image. |
+| **Feature Grid** | Grid of feature cards with optional icon, title, and description. |
+| **Card** | Single prominent card with a CTA. The `full-bleed` variant renders a background image with dark overlay and white text. |
+| **Card Grid** | Grid of cards, each with title, description, and CTA. |
+| **Testimonials** | Grid of testimonial cards with quotes and authors. |
+| **FAQ Accordion** | Expandable question-and-answer section. |
+| **Stats** | Row of big numbers with labels (e.g. `10K+ Users`). |
+| **Quote** | Pull quote or blockquote with optional author attribution and avatar. |
+| **Rich Text** | Freeform text content with markdown-style formatting. |
+| **Banner** | Full-width announcement or alert bar with optional CTA button. Supports preset variants or custom `backgroundColor`/`textColor`. |
+| **Tabs** | Switchable tabbed content panels with rich text in each tab. |
+| **Carousel** | Image/content slideshow with prev/next navigation and dot indicators. |
+| **Table** | Data table with column headers, rows, and optional stripe styling. |
+
+### Conversion
+
+| Block | What it is |
+|-------|------------|
+| **CTA** | Centered promotional section with a primary and optional secondary button. |
+
+### Media
+
+| Block | What it is |
+|-------|------------|
+| **Gallery** | Image grid with configurable columns and optional captions. |
+| **Video** | Video player — supports YouTube, Vimeo URLs, or direct video files (mp4, webm). Auto-detects source type. |
+| **Embed** | Embed external content — Google Maps, social media posts, or a custom iframe. For video, prefer the **Video** block. |
+
+### Layout
+
+| Block | What it is |
+|-------|------------|
+| **Two Column** | Composite two-column layout with typed child components in each column. |
+
+### Navigation (chrome)
+
+These blocks are structurally pinned — they cannot be added, moved, or removed by the AI. Every page has exactly one of each, and they render as global chrome.
+
+| Block | What it is |
+|-------|------------|
+| **Site Header** | Global site navigation bar with logo, site name, and nav links. |
+| **Footer** | Multi-column footer with link groups and copyright. |
+
+## Field types you'll see
+
+Each block declares per-field metadata (`kind`) that drives editor UI, AI behavior, and inline editability:
+
+| Kind | Editor UI | Inline editable |
+|------|-----------|-----------------|
+| `text` / `richtext` | Text input / textarea | Yes |
+| `url` | URL input | No |
+| `image` | Asset Manager modal (Unsplash, AI generation, upload) | No |
+| `imageAlt` | Text input paired with the image field | Yes |
+| `enum` | Dropdown | No |
+| `color` | Color picker | No |
+| `number` | Number input | No |
+| `headingLevel` | Heading-level dropdown (`h1`–`h6`) | No |
+
+See [Block System Architecture](/integration/block-system) for the full vocabulary and the lifecycle from definition to render.
+
+## Extending the set
+
+There are two extension paths:
+
+<CardGroup cols={2}>
+  <Card title="Add a built-in block" icon="puzzle-piece" href="/integration/block-system#add-a-new-block-type">
+    Contribute a new block type to the shared registry. Best for additions that belong in every site running Avocado Studio.
+  </Card>
+  <Card title="Register custom blocks" icon="layer-group" href="/integration/custom-blocks">
+    Author your own blocks in your site's repo and expose them via a manifest. Best for site-specific component libraries.
+  </Card>
+</CardGroup>

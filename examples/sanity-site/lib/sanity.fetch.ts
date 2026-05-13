@@ -3,7 +3,7 @@ import { pageBySlugQuery, allSlugsQuery, allPagesQuery, siteConfigQuery } from "
 import { sanityImageUrl } from "./sanity.image"
 import { sanityNameToBlockType } from "./sanity.utils"
 import { imageFields, listImageFields } from "./manifest"
-import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig, BlockInstance } from "@avocadostudio-ai/shared"
 
 /** Convert a Sanity block document to a BlockInstance */
 function sanityDocToBlock(doc: Record<string, unknown>): BlockInstance | null {

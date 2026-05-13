@@ -1,4 +1,4 @@
-import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, Operation, PageDoc } from "@avocadostudio-ai/shared"
 import { isStandalonePageOperation, normalizeRouteCandidate, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "../nlp/intent-helpers.js"
 import {
   buildCreatePagePlan,

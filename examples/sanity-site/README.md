@@ -159,7 +159,7 @@ calls `revalidatePath()`, and re-bootstraps the orchestrator.
 - `createRevalidateHandler({ secretEnvVar, secretHeader, extractSlug, getPages, siteId })` —
   `@ai-site-editor/site-sdk/routes`. Sanity's webhooks send the secret as a query param,
   so this example sets `secretHeader: ["query:secret", "x-sanity-webhook-secret"]`.
-- `camelToBlockType` / `blockTypeToCamel` — `@ai-site-editor/shared`. Sanity's `_type`
+- `camelToBlockType` / `blockTypeToCamel` — `@avocadostudio-ai/shared`. Sanity's `_type`
   is camelCase (`faqAccordion`); the registry uses PascalCase (`FAQAccordion`).
 
 ## How publish works

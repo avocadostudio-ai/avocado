@@ -37,7 +37,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --if-present test",
-    "test:unit": "pnpm --filter @ai-site-editor/orchestrator test:unit && pnpm --filter @ai-site-editor/blocks test",
+    "test:unit": "pnpm --filter @ai-site-editor/orchestrator test:unit && pnpm --filter @avocadostudio-ai/blocks test",
     "test:e2e": "pnpm --filter @ai-site-editor/orchestrator test:e2e",
     "vercel:env:check": "./scripts/vercel-env-check.sh all",
     "vercel:env:site": "./scripts/vercel-env-check.sh site",

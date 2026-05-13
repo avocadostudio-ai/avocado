@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*"
   },
   "peerDependencies": {

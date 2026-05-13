@@ -4,7 +4,7 @@ import {
   type BlockType,
   type Operation,
   type PageDoc
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import {
   extractRouteMentions,
   firstRouteMention,

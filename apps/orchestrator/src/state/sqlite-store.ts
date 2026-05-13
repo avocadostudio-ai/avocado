@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import Database from "better-sqlite3"
 import type { Database as BetterSqliteDatabase, Statement } from "better-sqlite3"
-import type { PageDoc, Operation, SiteConfig } from "@ai-site-editor/shared"
+import type { PageDoc, Operation, SiteConfig } from "@avocadostudio-ai/shared"
 
 // ---------------------------------------------------------------------------
 // Caps (mirrors limits used by in-memory state)

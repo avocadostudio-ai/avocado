@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveHeadingTag, IMAGE_PLACEHOLDER } from "@ai-site-editor/shared"
+import { resolveHeadingTag, IMAGE_PLACEHOLDER } from "@avocadostudio-ai/shared"
 import { PrimaryButton, SecondaryButton, BlockImage } from "../_shared"
 
 export function Hero(props: Record<string, unknown>) {

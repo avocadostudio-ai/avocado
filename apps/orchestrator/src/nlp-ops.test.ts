@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@ai-site-editor/shared"
+import { allowedBlockTypes, defaultPropsForType, demoPublishedPages, editPlanSchema, validateBlockProps } from "@avocadostudio-ai/shared"
 import { app, buildCreatePagePlan, compileDeterministicPlan, normalizePlanCandidate } from "./index.js"
 import { isLikelyClarificationFollowUp, parseCreatePageRequest, parseDuplicatePageRequest, requestsContentGeneration } from "./nlp/intent-helpers.js"
 import { isBatchAddRequest, isBatchRemoveRequest, isBatchReorderRequest, isDuplicateBlockRequest, isPageWideRewriteRequest, extractMentionedBlockTypes, isAdviceQuery, isPageListQuery, isInfoQuery, isContentQuery, isDuplicateAndModifyRequest } from "./nlp/intent-detection.js"

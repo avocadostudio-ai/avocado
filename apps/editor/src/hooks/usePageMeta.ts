@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { PageMeta } from "@ai-site-editor/shared"
+import type { PageMeta } from "@avocadostudio-ai/shared"
 import { orchestrator } from "../lib/editor-utils"
 
 export type PageMetaResult = {

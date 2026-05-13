@@ -6,7 +6,7 @@
  * pattern definitions are centralised.
  */
 
-import type { BlockType } from "@ai-site-editor/shared"
+import type { BlockType } from "@avocadostudio-ai/shared"
 
 // ---------------------------------------------------------------------------
 // Shared building-block fragments

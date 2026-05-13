@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
-import { SharedBlockRenderer } from "@ai-site-editor/blocks"
+import { SharedBlockRenderer } from "@avocadostudio-ai/blocks"
 import { getPublishedSlugs, getPublishedSiteConfig } from "../../lib/published-content-api"
 import { buildNavItems, buildSiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
 import { DEFAULT_SITE_ID } from "../../lib/defaults"

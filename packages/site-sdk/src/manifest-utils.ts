@@ -1,4 +1,4 @@
-import { deriveFieldMetaFromSchema, type BlockManifest } from "@ai-site-editor/shared"
+import { deriveFieldMetaFromSchema, type BlockManifest } from "@avocadostudio-ai/shared"
 
 export type ManifestFieldInfo = {
   /** Top-level image fields per block type (e.g. Hero → {"imageUrl"}) */

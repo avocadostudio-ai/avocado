@@ -11,7 +11,7 @@
  * against LLMs that paper over schema limits in their summary text.
  */
 
-import { blockSchemas, getBlockMeta, type BlockType, type EditPlan, type PageDoc } from "@ai-site-editor/shared"
+import { blockSchemas, getBlockMeta, type BlockType, type EditPlan, type PageDoc } from "@avocadostudio-ai/shared"
 
 export type HallucinatedProp = {
   blockId: string

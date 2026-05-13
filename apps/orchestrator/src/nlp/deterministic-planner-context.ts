@@ -1,4 +1,4 @@
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { getSessionDraft, getRecentEdits, orderSlugsHomeFirst } from "../state/session-state.js"
 import { resolveReferencesFromMessage } from "./deterministic-planner-refs.js"
 

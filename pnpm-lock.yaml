@@ -10,13 +10,13 @@ importers:
 
   apps/editor:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/editor-puck':
         specifier: workspace:*
         version: link:../../packages/editor-puck
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@assistant-ui/react':
@@ -98,7 +98,7 @@ importers:
 
   apps/mcp-server:
     dependencies:
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@modelcontextprotocol/sdk':
@@ -123,7 +123,7 @@ importers:
       '@ai-site-editor/migration-sdk':
         specifier: workspace:*
         version: link:../../packages/migration-sdk
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@anthropic-ai/claude-agent-sdk':
@@ -187,13 +187,13 @@ importers:
 
   apps/site:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/immersive-widget':
         specifier: workspace:*
         version: link:../../packages/immersive-widget
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@ai-site-editor/site-sdk':
@@ -239,13 +239,13 @@ importers:
 
   examples/contentful-marketing-site:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../../packages/preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@ai-site-editor/site-sdk':
@@ -315,13 +315,13 @@ importers:
 
   examples/contentful-site:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../../packages/preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@ai-site-editor/site-sdk':
@@ -361,13 +361,13 @@ importers:
 
   examples/sample-site:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../../packages/preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@ai-site-editor/site-sdk':
@@ -398,13 +398,13 @@ importers:
 
   examples/sanity-site:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../../packages/preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@ai-site-editor/site-sdk':
@@ -456,13 +456,13 @@ importers:
 
   examples/strapi-site:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../../packages/preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@ai-site-editor/site-sdk':
@@ -496,7 +496,7 @@ importers:
 
   packages/blocks:
     dependencies:
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../shared
       react:
@@ -540,10 +540,10 @@ importers:
 
   packages/editor-puck:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../blocks
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../shared
       '@puckeditor/core':
@@ -571,7 +571,7 @@ importers:
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../shared
       react:
@@ -593,7 +593,7 @@ importers:
 
   packages/migration-sdk:
     dependencies:
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../shared
       playwright:
@@ -612,7 +612,7 @@ importers:
 
   packages/preview-adapter:
     dependencies:
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../shared
       next:
@@ -641,13 +641,13 @@ importers:
 
   packages/site-sdk:
     dependencies:
-      '@ai-site-editor/blocks':
+      '@avocadostudio-ai/blocks':
         specifier: workspace:*
         version: link:../blocks
       '@ai-site-editor/preview-adapter':
         specifier: workspace:*
         version: link:../preview-adapter
-      '@ai-site-editor/shared':
+      '@avocadostudio-ai/shared':
         specifier: workspace:*
         version: link:../shared
       next:

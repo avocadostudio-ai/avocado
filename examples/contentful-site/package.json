@@ -10,9 +10,9 @@
     "contentful:setup": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/setup-content-types.ts"
   },
   "dependencies": {
-    "@ai-site-editor/blocks": "workspace:*",
+    "@avocadostudio-ai/blocks": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "@ai-site-editor/site-sdk": "workspace:*",
     "contentful": "^11.5.0",
     "contentful-management": "^11.44.0",

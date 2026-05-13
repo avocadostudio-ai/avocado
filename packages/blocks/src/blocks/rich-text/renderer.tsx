@@ -1,6 +1,6 @@
 import type { JSX, ReactNode } from "react"
 import { isValidElement } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag } from "@avocadostudio-ai/shared"
 import { renderRichTextContent } from "../_shared"
 
 export function RichText(props: Record<string, unknown>) {

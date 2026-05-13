@@ -3,7 +3,7 @@
 // Single source of truth. Imported by both eval runner and e2e-editing.test.ts.
 // ---------------------------------------------------------------------------
 
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 export const RICH_PAGES: PageDoc[] = [
   {

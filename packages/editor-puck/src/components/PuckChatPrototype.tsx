@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Puck, blocksPlugin, fieldsPlugin, outlinePlugin } from "@puckeditor/core"
 import "@puckeditor/core/puck.css"
-import "@ai-site-editor/blocks/styles.css"
+import "@avocadostudio-ai/blocks/styles.css"
 import "../puck-prototype.css"
 import { ArrowLeft, BotMessageSquare, History, Redo2, Undo2 } from "lucide-react"
 import { FALLBACK_SESSION, FALLBACK_SLUG } from "./puck/constants"

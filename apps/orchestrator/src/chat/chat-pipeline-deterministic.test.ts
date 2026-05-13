@@ -12,7 +12,7 @@ import {
   deterministicDuplicatePagePlan,
   shouldReturnDeterministicClarification
 } from "./chat-pipeline-deterministic.js"
-import type { Operation, EditPlan } from "@ai-site-editor/shared"
+import type { Operation, EditPlan } from "@avocadostudio-ai/shared"
 
 // ---------------------------------------------------------------------------
 // isRewriteLikeMessage

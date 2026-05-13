@@ -1,5 +1,5 @@
-import { SharedBlockRenderer, hasRenderer } from "@ai-site-editor/blocks"
-import { getAllBlockMeta, type BlockManifest, type FieldMeta } from "@ai-site-editor/shared"
+import { SharedBlockRenderer, hasRenderer } from "@avocadostudio-ai/blocks"
+import { getAllBlockMeta, type BlockManifest, type FieldMeta } from "@avocadostudio-ai/shared"
 import { buildFields, registerRichtextKeys } from "./adapters"
 import { PuckImageFieldControl } from "./PuckImageFieldControl"
 import type { ImagePickerTarget, PuckCustomFieldRenderProps } from "./types"

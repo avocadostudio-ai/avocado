@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { chatStreamEventSchema } from "@ai-site-editor/shared"
+import { chatStreamEventSchema } from "@avocadostudio-ai/shared"
 
 // Conformance test: every SSE frame emitted by apps/orchestrator/src/routes/chat.ts
 // must parse under the shared Zod schema. The fixtures below mirror the exact emit

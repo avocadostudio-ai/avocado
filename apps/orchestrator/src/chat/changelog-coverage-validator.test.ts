@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { type EditPlan, type PageDoc, defaultPropsForType } from "@ai-site-editor/shared"
+import { type EditPlan, type PageDoc, defaultPropsForType } from "@avocadostudio-ai/shared"
 import { validateChangelogCoverage } from "./changelog-coverage-validator.js"
 
 void defaultPropsForType

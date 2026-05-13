@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Bot, Trash2, X } from "lucide-react"
-import { blockManifestSchema, validateManifestDefaultProps } from "@ai-site-editor/shared"
+import { blockManifestSchema, validateManifestDefaultProps } from "@avocadostudio-ai/shared"
 import { SiteTileDesktopPreview } from "./SiteTileDesktopPreview"
 import { SitesAgentChat } from "./SitesAgentChat"
 import { Switch } from "@/components/ui/switch"

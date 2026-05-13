@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { registerBlock } from "@ai-site-editor/shared"
+import { registerBlock } from "@avocadostudio-ai/shared"
 import { PALETTE_OPTIONS } from "../theme"
 
 // Palette default shared by most template blocks

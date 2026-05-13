@@ -1,7 +1,7 @@
 import {
   type EditPlan,
   type PageDoc
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import {
   normalizeRouteCandidate,
   toSeedSlug

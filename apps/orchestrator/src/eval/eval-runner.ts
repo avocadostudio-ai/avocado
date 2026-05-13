@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { app } from "../index.js"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import type { AIProvider, ModelKey } from "../state/session-state.js"
 import type { EvalCase, CaseScore } from "./eval-types.js"
 import { scoreCase } from "./eval-scorer.js"

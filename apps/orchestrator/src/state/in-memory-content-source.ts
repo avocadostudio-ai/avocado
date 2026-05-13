@@ -1,4 +1,4 @@
-import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 import type { ContentSource } from "./content-source.js"
 import {
   getSessionDraft,

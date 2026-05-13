@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import type { EditPlan, Operation, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, Operation, PageDoc } from "@avocadostudio-ai/shared"
 import { evaluateDestructiveActions } from "./destructive-action-gate.js"
 
 function page(slug: string, blockCount: number): PageDoc {

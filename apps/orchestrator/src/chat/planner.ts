@@ -8,7 +8,7 @@ import {
   type EditPlan,
   type Operation,
   type PageDoc
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt } from "./prompts.js"
 
 // ---------------------------------------------------------------------------

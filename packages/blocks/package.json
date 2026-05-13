@@ -1,7 +1,6 @@
 {
-  "name": "@ai-site-editor/blocks",
+  "name": "@avocadostudio-ai/blocks",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -9,13 +8,33 @@
     ".": "./src/index.ts",
     "./styles.css": "./src/blocks/styles.css"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/avocadostudio-ai/avocado.git",
+    "directory": "packages/blocks"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./styles.css": "./dist/blocks/styles.css"
+    }
+  },
+  "files": ["dist"],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && node ./scripts/copy-css.mjs",
     "test": "NODE_ENV=test tsx --test src/blocks/*/renderer.test.ts",
     "test:unit": "NODE_ENV=test tsx --test src/blocks/*/renderer.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-site-editor/shared": "workspace:*"
+    "@avocadostudio-ai/shared": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=14.0.0",

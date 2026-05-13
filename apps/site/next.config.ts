@@ -1,7 +1,7 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@ai-site-editor/preview-adapter", "@ai-site-editor/site-sdk", "@ai-site-editor/blocks", "@ai-site-editor/immersive-widget"],
+  transpilePackages: ["@ai-site-editor/preview-adapter", "@ai-site-editor/site-sdk", "@avocadostudio-ai/blocks", "@ai-site-editor/immersive-widget"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },

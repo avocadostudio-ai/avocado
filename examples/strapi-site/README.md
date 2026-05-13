@@ -188,7 +188,7 @@ the orchestrator.
 - `createEditorMiddleware()` — `@ai-site-editor/site-sdk/middleware`
 - `createEditorApiHandler({ getPages, onPublish, publishSecret })` — `@ai-site-editor/site-sdk/routes`
 - `createRevalidateHandler({ secretEnvVar, extractSlug, getPages, siteId })` — `@ai-site-editor/site-sdk/routes`
-- `lowerToBlockType` — `@ai-site-editor/shared`. Strapi component names are
+- `lowerToBlockType` — `@avocadostudio-ai/shared`. Strapi component names are
   lowercase (`blocks.faqaccordion`); the registry uses PascalCase (`FAQAccordion`).
 
 ## How publish works

@@ -10,7 +10,7 @@ import {
   type BlockManifest,
   type ChatStreamFrame,
   type Operation
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import type {
   AssistantResponse,
   ChatEntry,
@@ -154,8 +154,9 @@ export function useChatEngine(config: ChatEngineConfig) {
   }
 
   const isPresetDemoSite = PRESET_SITE_IDS.has(siteId)
+  const catalogueUrl = `${activeSiteOrigin}/catalogue`
   const welcomeText = activeSiteConfig.name
-    ? t(isPresetDemoSite ? "welcome.greetingDemo" : "welcome.greeting", { name: activeSiteConfig.name })
+    ? t(isPresetDemoSite ? "welcome.greetingDemo" : "welcome.greeting", { name: activeSiteConfig.name, catalogueUrl })
     : t("welcome.greetingFallback")
 
   const buildWelcomeEntry = (slugs?: string[], blocks?: Array<{ type: string }>): ChatEntry => ({

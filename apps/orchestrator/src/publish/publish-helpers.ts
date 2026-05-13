@@ -5,7 +5,7 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
 import { resolve } from "node:path"
 import type { FastifyBaseLogger } from "fastify"
-import { pageDocSchema, type PageDoc } from "@ai-site-editor/shared"
+import { pageDocSchema, type PageDoc } from "@avocadostudio-ai/shared"
 import {
   type PublishTracker,
   draftPages,

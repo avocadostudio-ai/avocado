@@ -10,9 +10,9 @@
     "strapi:setup": "tsx scripts/setup-content-types.ts"
   },
   "dependencies": {
-    "@ai-site-editor/blocks": "workspace:*",
+    "@avocadostudio-ai/blocks": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "@ai-site-editor/site-sdk": "workspace:*",
     "next": "15.5.15",
     "react": "^19.0.0",

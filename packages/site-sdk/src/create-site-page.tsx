@@ -1,14 +1,14 @@
 import { unstable_noStore as noStore } from "next/cache"
 import { draftMode } from "next/headers"
 import type { JSX } from "react"
-import { SharedBlockRenderer, BlocksHydrator } from "@ai-site-editor/blocks"
+import { SharedBlockRenderer, BlocksHydrator } from "@avocadostudio-ai/blocks"
 import { buildSlug } from "./index.ts"
 import type { BlockInstance } from "./types.ts"
-import type { SiteConfig } from "@ai-site-editor/shared"
+import type { SiteConfig } from "@avocadostudio-ai/shared"
 import { resolveEditorContext, fetchEditorPage, fetchEditorSlugs } from "./draft.ts"
 import { renderBlocks, EditorOverlay } from "./editor.ts"
 import { buildNavItems, buildSiteHeaderBlock } from "./navigation.ts"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 /**
  * Configuration for creating a site page component.

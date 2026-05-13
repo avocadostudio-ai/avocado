@@ -1,5 +1,5 @@
-import { pageDocSchemaLenient, siteConfigSchema } from "@ai-site-editor/shared"
-import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import { pageDocSchemaLenient, siteConfigSchema } from "@avocadostudio-ai/shared"
+import type { PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 
 export function getOrchestratorUrl(): string | null {
   const value = process.env.ORCHESTRATOR_URL?.trim()

@@ -11,8 +11,8 @@
     "test:unit": "NODE_ENV=test node --test --experimental-strip-types --experimental-specifier-resolution=node test/**/*.test.ts"
   },
   "dependencies": {
-    "@ai-site-editor/blocks": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/blocks": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "@ai-site-editor/site-sdk": "workspace:*",
     "@ai-site-editor/immersive-widget": "workspace:*",
     "@tailwindcss/postcss": "^4.2.1",

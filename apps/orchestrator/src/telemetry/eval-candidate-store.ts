@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { resolve } from "node:path"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { toErrorDetail as _unifiedToErrorDetail } from "../errors.js"
 
 // Eval-candidate capture: a sidecar NDJSON of replay-quality records so real

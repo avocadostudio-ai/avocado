@@ -22,7 +22,7 @@
     "test": "NODE_ENV=test tsx --test --test-concurrency=4 src/**/*.test.ts"
   },
   "dependencies": {
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "playwright": "^1.58.2"
   },
   "devDependencies": {

@@ -29,7 +29,7 @@ import {
   setIssueTouchedSlugs,
   getIssueTouchedSlugs
 } from "./session-state.js"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import type { PersistedState } from "./session-state.js"
 
 // ---------------------------------------------------------------------------

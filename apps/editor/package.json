@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-site-editor/blocks": "workspace:*",
+    "@avocadostudio-ai/blocks": "workspace:*",
     "@ai-site-editor/editor-puck": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*",
+    "@avocadostudio-ai/shared": "workspace:*",
     "@assistant-ui/react": "^0.12.21",
     "@tailwindcss/vite": "^4.2.2",
     "@tiptap/extension-link": "^3.22.3",

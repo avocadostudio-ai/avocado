@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { validateBlockProps, getBlockMeta, defaultPropsForType } from "@ai-site-editor/shared"
+import { validateBlockProps, getBlockMeta, defaultPropsForType } from "@avocadostudio-ai/shared"
 import { renderers } from "../index"
 
 const BLOCK_TYPE = "Gallery"

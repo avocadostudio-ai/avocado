@@ -17,7 +17,7 @@ Use custom blocks when your site has its own component library and you don't wan
 
 ```ts
 // lib/manifest.ts
-import type { BlockManifest } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@avocadostudio-ai/shared"
 import { getManifestImageFields } from "@ai-site-editor/site-sdk/routes"
 
 const manifest: BlockManifest = {
@@ -166,7 +166,7 @@ The product doesn't render your custom blocks — your site does. Map `block.typ
 
 ```tsx
 // components/BlockRenderer.tsx
-import type { BlockInstance } from "@ai-site-editor/shared"
+import type { BlockInstance } from "@avocadostudio-ai/shared"
 import { Hero } from "./blocks/Hero"
 import { FeatureGrid } from "./blocks/FeatureGrid"
 
@@ -200,7 +200,7 @@ You can use both default blocks and custom ones. Import `buildBlockManifest()` f
 
 ```ts
 import { buildBlockManifest } from "@ai-site-editor/site-sdk/editor-manifest"
-import type { BlockManifest } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@avocadostudio-ai/shared"
 
 const defaults = buildBlockManifest()
 

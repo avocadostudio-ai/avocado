@@ -1,4 +1,4 @@
-import type { BlockType, PageDoc } from "@ai-site-editor/shared"
+import type { BlockType, PageDoc } from "@avocadostudio-ai/shared"
 import { inferBlockTypeFromText } from "./plan-normalizer.js"
 
 // ---------------------------------------------------------------------------

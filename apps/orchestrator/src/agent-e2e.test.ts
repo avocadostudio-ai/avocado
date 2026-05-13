@@ -20,7 +20,7 @@ import { writeFileSync, mkdirSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { app } from "./index.js"
-import type { PageDoc, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, BlockInstance } from "@avocadostudio-ai/shared"
 import { setPage, getPage, getSessionDraft, setSiteConfig, scopedSessionKey } from "./state/session-state.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

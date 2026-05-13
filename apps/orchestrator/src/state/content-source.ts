@@ -1,4 +1,4 @@
-import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 
 export interface ContentSource {
   getPage(session: string, slug: string): Promise<PageDoc | null>

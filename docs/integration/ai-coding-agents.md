@@ -34,7 +34,7 @@ pnpm monorepo with 3 apps and 3 packages:
 - **Strict mode** enabled everywhere
 - `.ts` extensions in imports are allowed (`allowImportingTsExtensions: true`)
 - Orchestrator imports use `.js` extensions (ESM convention): `import { foo } from "./bar.js"`
-- Cross-package imports use workspace aliases: `@ai-site-editor/shared`, `@ai-site-editor/site-sdk`, etc.
+- Cross-package imports use workspace aliases: `@avocadostudio-ai/shared`, `@ai-site-editor/site-sdk`, etc.
 - No linter or formatter configured — follow existing code style
 
 ### Tests

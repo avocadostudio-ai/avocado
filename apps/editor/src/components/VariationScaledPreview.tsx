@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, type CSSProperties } from "react"
-import { SharedBlockRenderer } from "@ai-site-editor/blocks"
-import type { BlockInstance } from "@ai-site-editor/shared"
+import { SharedBlockRenderer } from "@avocadostudio-ai/blocks"
+import type { BlockInstance } from "@avocadostudio-ai/shared"
 
 export const VariationScaledPreview = React.memo(function VariationScaledPreview(args: { block: BlockInstance; virtualWidth: number }) {
   const shellRef = useRef<HTMLDivElement>(null)

@@ -19,6 +19,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     // Don't pre-bundle workspace packages — allow live HMR from source
-    exclude: ["@ai-site-editor/shared", "@ai-site-editor/blocks"],
+    exclude: ["@avocadostudio-ai/shared", "@avocadostudio-ai/blocks"],
   },
 })

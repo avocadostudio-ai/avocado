@@ -3,12 +3,12 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useCallback } from "react"
 import { renderBlocks } from "@ai-site-editor/site-sdk/editor"
-import { SharedBlockRenderer } from "@ai-site-editor/blocks"
+import { SharedBlockRenderer } from "@avocadostudio-ai/blocks"
 import { ImmersiveWidget, type WidgetConfig, type SiteContext } from "@ai-site-editor/immersive-widget"
 import "@ai-site-editor/immersive-widget/styles.css"
 import "@ai-site-editor/preview-adapter/styles.css"
 import type { SiteHeaderBlock } from "@ai-site-editor/site-sdk/navigation"
-import type { BlockManifest } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@avocadostudio-ai/shared"
 import type { PageDoc } from "../lib/site-contract"
 
 export type ImmersivePageProps = {

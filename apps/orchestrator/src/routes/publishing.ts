@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyBaseLogger } from "fastify"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import {
   normalizeSession,
   scopedSessionKey,

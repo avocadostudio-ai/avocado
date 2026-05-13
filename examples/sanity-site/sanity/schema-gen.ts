@@ -13,11 +13,11 @@
 
 import { writeFileSync, mkdirSync } from "node:fs"
 import { resolve } from "node:path"
-import { getAllBlockMeta, type FieldKind } from "@ai-site-editor/shared"
+import { getAllBlockMeta, type FieldKind } from "@avocadostudio-ai/shared"
 import { toSanityName } from "../lib/sanity.utils"
 
 // Ensure blocks are registered
-import "@ai-site-editor/shared"
+import "@avocadostudio-ai/shared"
 
 const outDir = resolve(import.meta.dirname, "schemas/blocks")
 mkdirSync(outDir, { recursive: true })

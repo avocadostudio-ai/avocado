@@ -1,17 +1,17 @@
 /**
  * Computes a structured diff between the session's draft pages and the
  * currently-published pages. Pure function — no I/O. Shared with the editor
- * via the PublishDiff type in @ai-site-editor/shared.
+ * via the PublishDiff type in @avocadostudio-ai/shared.
  */
 
-import type { PageDoc, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, BlockInstance } from "@avocadostudio-ai/shared"
 import type {
   PublishDiff,
   PageDiff,
   BlockDiff,
   FieldDiff,
   FieldDiffKind,
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 
 const IMAGE_PATH_HINT = /(^|\.)(imageUrl|image|src|poster|logo|avatar|thumbnail)$/i
 

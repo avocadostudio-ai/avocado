@@ -26,8 +26,8 @@ import { useUndoHistory } from "./hooks/useUndoHistory"
 import { findBlockNode, findEditableNode, supportsInlineEditablePath, applyAiFieldLoading } from "@ai-site-editor/preview-adapter"
 import { submitChatStream, applyOps, type ChatResult, type ChatRequestPayload } from "./lib/widget-transport"
 import { loadChatHistory, saveChatHistory, nextEntryId, type WidgetChatEntry, type WidgetConfig } from "./lib/widget-state"
-import type { BlockManifest } from "@ai-site-editor/shared"
-import { defaultPropsForType, allowedBlockTypes, getAllBlockMeta, toAltPath } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@avocadostudio-ai/shared"
+import { defaultPropsForType, allowedBlockTypes, getAllBlockMeta, toAltPath } from "@avocadostudio-ai/shared"
 import { ImagePickerModal, type ImagePickerTarget } from "./components/ImagePickerModal"
 
 export type SiteContext = {

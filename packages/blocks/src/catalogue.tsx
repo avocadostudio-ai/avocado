@@ -5,7 +5,7 @@ import { createPortal } from "react-dom"
 import { SharedBlockRenderer } from "./renderer"
 import { initCarousels } from "./blocks/carousel/init"
 import { initTabs } from "./blocks/tabs/init"
-import { getAllBlockMeta, allowedBlockTypes, defaultPropsForType, getChromeTypes, type BlockMeta, type FieldMeta, type ImageSpec } from "@ai-site-editor/shared"
+import { getAllBlockMeta, allowedBlockTypes, defaultPropsForType, getChromeTypes, type BlockMeta, type FieldMeta, type ImageSpec } from "@avocadostudio-ai/shared"
 
 const CATEGORY_ORDER: NonNullable<BlockMeta["category"]>[] = ["content", "conversion", "layout", "navigation", "media"]
 

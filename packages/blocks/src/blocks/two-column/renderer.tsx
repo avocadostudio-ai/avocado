@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag } from "@avocadostudio-ai/shared"
 import { PrimaryButton, renderRichTextContent, BlockImage } from "../_shared"
 
 function TwoColumnChild({ item, headingTag, pathPrefix }: { item: Record<string, unknown>; headingTag: keyof JSX.IntrinsicElements; pathPrefix: string }) {

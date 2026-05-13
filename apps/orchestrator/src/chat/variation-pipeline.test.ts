@@ -7,7 +7,7 @@ import {
   requestedVariationCount,
   type VariationOption
 } from "./variation-pipeline.js"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 function heroBlock(): PageDoc["blocks"][number] {
   return {

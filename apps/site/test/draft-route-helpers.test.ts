@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { validateDraftSecret, getSafeInternalRedirectPath } from "@ai-site-editor/shared"
+import { validateDraftSecret, getSafeInternalRedirectPath } from "@avocadostudio-ai/shared"
 
 test("validateDraftSecret returns missing_config when no secret is configured", () => {
   const result = validateDraftSecret("anything", {})

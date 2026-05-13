@@ -35,9 +35,9 @@ export async function strapiFetch<T = unknown>(path: string, options?: RequestIn
 `
 
 const STRAPI_FETCH = `import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { lowerToBlockType } from "@ai-site-editor/shared"
+import { lowerToBlockType } from "@avocadostudio-ai/shared"
 import { imageFields } from "./manifest"
-import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig, BlockInstance } from "@avocadostudio-ai/shared"
 
 type StrapiResponse<T> = { data: T; meta?: unknown }
 type StrapiItem = { id: number; documentId: string; [key: string]: unknown }

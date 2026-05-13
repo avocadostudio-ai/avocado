@@ -1,5 +1,5 @@
-import type { BlockManifest, ChatStreamFrame, Operation } from "@ai-site-editor/shared"
-import { parseChatStreamFrame } from "@ai-site-editor/shared"
+import type { BlockManifest, ChatStreamFrame, Operation } from "@avocadostudio-ai/shared"
+import { parseChatStreamFrame } from "@avocadostudio-ai/shared"
 import type {
   AIProvider,
   AssistantResponse,

@@ -2,7 +2,7 @@
 // Planner quality eval — type definitions
 // ---------------------------------------------------------------------------
 
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 export type EvalCase = {
   id: string

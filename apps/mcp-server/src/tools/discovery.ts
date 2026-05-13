@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 // Side-effect import: registers every built-in block schema + meta.
-import "@ai-site-editor/shared/src/blocks/index.ts"
-import { getAllBlockMeta, getBlockJsonSchema } from "@ai-site-editor/shared"
+import "@avocadostudio-ai/shared/src/blocks/index.ts"
+import { getAllBlockMeta, getBlockJsonSchema } from "@avocadostudio-ai/shared"
 
 /** Read-only tools that help agents discover what they can edit. */
 export function registerDiscoveryTools(server: McpServer) {

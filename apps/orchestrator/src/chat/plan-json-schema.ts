@@ -1,4 +1,4 @@
-import { allowedBlockTypes } from "@ai-site-editor/shared"
+import { allowedBlockTypes } from "@avocadostudio-ai/shared"
 
 // ---------------------------------------------------------------------------
 // JSON Schema for EditPlan — used as Anthropic tool_use input_schema and

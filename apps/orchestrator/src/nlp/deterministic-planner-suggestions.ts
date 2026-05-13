@@ -9,7 +9,7 @@ import {
   type PageDoc,
   type BlockManifest,
   deriveFieldMetaFromSchema
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import {
   type ChatRequestBody,
   stripSiteContextEnvelope

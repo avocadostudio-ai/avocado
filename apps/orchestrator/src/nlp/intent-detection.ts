@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type BlockManifest, type PageDoc } from "@ai-site-editor/shared"
+import { allowedBlockTypes, getBlockMeta, type BlockType, type EditPlan, type BlockManifest, type PageDoc } from "@avocadostudio-ai/shared"
 import { isLikelyClarificationFollowUp, isStandalonePageOperation } from "./intent-helpers.js"
 import { type AIProvider, type ModelKey, versions, pendingClarificationBySession } from "../state/session-state.js"
 import { type GuardrailErrorCategory } from "../errors.js"

@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { app } from "./index.js"
 import { setPage, scopedSessionKey, draftPages } from "./state/session-state.js"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 function createSessionId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`

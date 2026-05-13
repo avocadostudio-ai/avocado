@@ -6,7 +6,7 @@ import {
   type EditPlan,
   type Operation,
   type PageDoc
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import { buildIntentParserSystemPrompt, buildPlannerSystemPrompt, buildPlannerSystemPromptSegments } from "./prompts.js"
 import { GENERATING_IMAGE_PLACEHOLDER, SEARCHING_IMAGE_PLACEHOLDER } from "./chat-pipeline.js"
 import {

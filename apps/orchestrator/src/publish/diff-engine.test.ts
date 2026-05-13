@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { computePublishDiff } from "./diff-engine.js"
 
 function page(slug: string, blocks: Array<{ id: string; type: string; props?: Record<string, unknown> }>, extras?: Partial<PageDoc>): PageDoc {

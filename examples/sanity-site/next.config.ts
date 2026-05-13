@@ -5,9 +5,9 @@ const nextConfig: NextConfig = {
     styledComponents: true,
   },
   transpilePackages: [
-    "@ai-site-editor/blocks",
+    "@avocadostudio-ai/blocks",
     "@ai-site-editor/preview-adapter",
-    "@ai-site-editor/shared",
+    "@avocadostudio-ai/shared",
     "@ai-site-editor/site-sdk",
   ],
   images: {

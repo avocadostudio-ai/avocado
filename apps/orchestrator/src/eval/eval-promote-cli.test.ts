@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import type { EvalCandidate } from "../telemetry/eval-candidate-store.js"
 import { readCandidates, scaffoldCaseFromCandidate } from "./eval-promote-cli.js"
 

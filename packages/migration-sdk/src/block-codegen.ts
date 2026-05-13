@@ -1,6 +1,6 @@
 import { mkdir, writeFile, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
-import { getBlockMeta } from "@ai-site-editor/shared"
+import { getBlockMeta } from "@avocadostudio-ai/shared"
 import type { BlockCodegenInput, BlockCodegenResult, FieldSpec } from "./types.ts"
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ function generateSchemaSource(input: BlockCodegenInput): string {
 
   const lines: string[] = []
   lines.push(`import { z } from "zod"`)
-  lines.push(`import { registerBlock, f } from "@ai-site-editor/shared"`)
+  lines.push(`import { registerBlock, f } from "@avocadostudio-ai/shared"`)
   lines.push("")
   lines.push(`registerBlock(${JSON.stringify(name)}, {`)
 

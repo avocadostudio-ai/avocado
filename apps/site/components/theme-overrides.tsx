@@ -1,4 +1,4 @@
-import type { SiteConfig } from "@ai-site-editor/shared"
+import type { SiteConfig } from "@avocadostudio-ai/shared"
 
 /** Sanitize a CSS value to prevent injection. Only allows safe characters. */
 function safeCssValue(value: string): string | null {

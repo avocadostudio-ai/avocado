@@ -12,7 +12,7 @@ import {
 } from "./gemini-planner.js"
 import type { PlannerSource } from "./provider-routing.js"
 import type { ParsedIntent } from "../nlp/deterministic-planner.js"
-import type { EditPlan, PageDoc, BlockManifest, Operation } from "@ai-site-editor/shared"
+import type { EditPlan, PageDoc, BlockManifest, Operation } from "@avocadostudio-ai/shared"
 import type { TokenUsage } from "../telemetry/usage.js"
 import type { PlannerSchemaContextMeta } from "./planner.js"
 import type { DeferredNativeImageCall } from "./chat-pipeline-shared.js"

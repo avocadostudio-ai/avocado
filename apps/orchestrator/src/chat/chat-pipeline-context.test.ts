@@ -11,7 +11,7 @@ import {
   isRouterPlanTooShallow,
   shouldEnableReasoningForMessage
 } from "./chat-pipeline-context.js"
-import type { EditPlan, PageDoc } from "@ai-site-editor/shared"
+import type { EditPlan, PageDoc } from "@avocadostudio-ai/shared"
 
 // ---------------------------------------------------------------------------
 // shouldPreferFastModelForMessage

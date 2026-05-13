@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveItemHeadingTag } from "@ai-site-editor/shared"
+import { resolveItemHeadingTag } from "@avocadostudio-ai/shared"
 import { renderInline, PrimaryButton, BlockImage } from "../_shared"
 
 export function Carousel(props: Record<string, unknown>): JSX.Element {

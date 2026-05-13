@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createEvalCandidateStore } from "./eval-candidate-store.js"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 const silentLogger = { info: () => undefined, error: () => undefined }
 

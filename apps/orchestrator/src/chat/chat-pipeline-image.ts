@@ -4,7 +4,7 @@ import {
   type EditPlan,
   type Operation,
   type PageDoc
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import type { UnsplashImage } from "../variation-images.js"
 import type { PendingImageGeneration } from "../state/session-state.js"
 import { inferTranslationScopeFromMessage } from "./chat-pipeline-translation.js"

@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify"
-import type { PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 import type { PublishTracker } from "../state/session-state.js"
 
 /**

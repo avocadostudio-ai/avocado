@@ -1,5 +1,5 @@
 import OpenAI from "openai"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { buildDecomposerSystemPrompt } from "./prompts.js"
 
 // ---------------------------------------------------------------------------

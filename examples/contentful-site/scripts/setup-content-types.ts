@@ -16,10 +16,10 @@
  */
 
 import contentfulManagement from "contentful-management"
-import { getAllBlockMeta, type FieldKind } from "@ai-site-editor/shared"
+import { getAllBlockMeta, type FieldKind } from "@avocadostudio-ai/shared"
 
 // Ensure all blocks are registered
-import "@ai-site-editor/shared"
+import "@avocadostudio-ai/shared"
 
 const { createClient } = contentfulManagement
 

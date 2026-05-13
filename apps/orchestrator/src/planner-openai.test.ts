@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { demoPublishedPages } from "@ai-site-editor/shared"
+import { demoPublishedPages } from "@avocadostudio-ai/shared"
 import { plannerContextPack } from "./nlp/deterministic-planner.js"
 import {
   buildPlannerSchemaContext,

@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import type { BlockInstance } from "@ai-site-editor/shared"
+import type { BlockInstance } from "@avocadostudio-ai/shared"
 import { isRendererBlockType, renderers } from "./blocks/index"
 import { normalizeSoftHyphenEntities } from "./blocks/_shared"
 

@@ -8,7 +8,7 @@
 import { mkdir, writeFile, readFile, readdir, stat } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { resolve, join, dirname } from "node:path"
-import { getAllBlockMeta, defaultPropsForType, validateBlockProps, type BlockType } from "@ai-site-editor/shared"
+import { getAllBlockMeta, defaultPropsForType, validateBlockProps, type BlockType } from "@avocadostudio-ai/shared"
 
 // ── Utility helpers ──
 
@@ -488,7 +488,7 @@ export function packageJson(siteId: string, name: string, port: number): string 
     type: "module",
     scripts: { dev: `next dev -p ${port}`, build: "next build", start: `next start -p ${port}`, typecheck: "tsc --noEmit" },
     dependencies: {
-      "@ai-site-editor/blocks": "workspace:*", "@ai-site-editor/shared": "workspace:*", "@ai-site-editor/site-sdk": "workspace:*",
+      "@avocadostudio-ai/blocks": "workspace:*", "@avocadostudio-ai/shared": "workspace:*", "@ai-site-editor/site-sdk": "workspace:*",
       "@tailwindcss/postcss": "^4.2.1", next: "15.2.8", react: "^19.0.0", "react-dom": "^19.0.0", tailwindcss: "^4.2.1", zod: "^4.3.6",
     },
     devDependencies: { "@types/node": "^22.13.10", "@types/react": "^19.0.10", "@types/react-dom": "^19.0.4", typescript: "^5.7.3" },
@@ -502,8 +502,8 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@ai-site-editor/preview-adapter",
     "@ai-site-editor/site-sdk",
-    "@ai-site-editor/blocks",
-    "@ai-site-editor/shared",
+    "@avocadostudio-ai/blocks",
+    "@avocadostudio-ai/shared",
   ],
   images: {
     remotePatterns: [
@@ -573,7 +573,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
 export function globalsCss(): string {
   return `@import "tailwindcss";
-@import "@ai-site-editor/blocks/styles.css";
+@import "@avocadostudio-ai/blocks/styles.css";
 
 :root {
   /* Backgrounds */
@@ -657,7 +657,7 @@ export function editorApiRoute(): string {
 import { createJsonFilePublishHandler } from "@ai-site-editor/site-sdk/publish-handlers/json-file"
 import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 import "../../../../blocks/register"
 
@@ -683,7 +683,7 @@ export function pageTsx(siteId: string, options?: { chrome?: boolean }): string 
 import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
 import { readFileSync, existsSync } from "node:fs"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 import "../../blocks/register"
 
@@ -730,7 +730,7 @@ export function hybridPageTsx(siteId: string): string {
   return `import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
 import type { Metadata } from "next"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 
 import EditorPage, { generateStaticParams as editorStaticParams } from "./_editor-page"
 import OriginalPage from "./_original-page"
@@ -828,7 +828,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
 export function blocksRegisterTsx(): string {
   return `// Custom block renderers — register site-specific components here.
 // Use JSX syntax for adapters: <Comp block={...} /> (NOT function calls).
-import { registerCustomRenderer } from "@ai-site-editor/blocks"
+import { registerCustomRenderer } from "@avocadostudio-ai/blocks"
 `
 }
 

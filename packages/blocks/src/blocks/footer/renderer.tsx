@@ -1,5 +1,5 @@
 import type { JSX } from "react"
-import { resolveHeadingTag } from "@ai-site-editor/shared"
+import { resolveHeadingTag } from "@avocadostudio-ai/shared"
 
 export function Footer(props: Record<string, unknown>) {
   const columns = Array.isArray(props.columns) ? props.columns : []

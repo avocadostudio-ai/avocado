@@ -1,7 +1,7 @@
 import { strapiFetch, STRAPI_URL } from "./strapi.client"
-import { lowerToBlockType } from "@ai-site-editor/shared"
+import { lowerToBlockType } from "@avocadostudio-ai/shared"
 import { imageFields } from "./manifest"
-import type { PageDoc, SiteConfig, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, SiteConfig, BlockInstance } from "@avocadostudio-ai/shared"
 
 /** Strapi v5 REST response shape */
 type StrapiResponse<T> = { data: T; meta?: unknown }

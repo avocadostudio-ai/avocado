@@ -1,7 +1,7 @@
 import test, { describe } from "node:test"
 import assert from "node:assert/strict"
 import { app } from "./index.js"
-import type { PageDoc, BlockInstance } from "@ai-site-editor/shared"
+import type { PageDoc, BlockInstance } from "@avocadostudio-ai/shared"
 import { setPage, scopedSessionKey } from "./state/session-state.js"
 import { RICH_PAGES } from "./eval/eval-fixture.js"
 

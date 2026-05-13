@@ -1,4 +1,4 @@
-import { deriveFieldMetaFromSchema, type BlockDefinition, type BlockMeta, type FieldMeta, type PageDoc } from "@ai-site-editor/shared"
+import { deriveFieldMetaFromSchema, type BlockDefinition, type BlockMeta, type FieldMeta, type PageDoc } from "@avocadostudio-ai/shared"
 import type { PuckData } from "./types"
 
 type FieldBuilderOptions = {

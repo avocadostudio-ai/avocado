@@ -1,5 +1,5 @@
 import { pageDocSchema, type PageDoc } from "./site-contract.ts"
-import type { SiteConfig } from "@ai-site-editor/shared"
+import type { SiteConfig } from "@avocadostudio-ai/shared"
 import publishedContent from "./published-content.json" with { type: "json" }
 
 function loadPublishedData(): { pages: PageDoc[]; siteConfig: SiteConfig } {

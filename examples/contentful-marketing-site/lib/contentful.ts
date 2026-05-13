@@ -1,5 +1,5 @@
 import { createClient, type Asset, type Entry } from "contentful"
-import type { BlockInstance, PageDoc, SiteConfig } from "@ai-site-editor/shared"
+import type { BlockInstance, PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 import { documentToPlainText } from "./rich-text"
 
 const LOCALE = "en-US"

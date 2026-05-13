@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify"
 import { z } from "zod"
-import { blockManifestSchema, operationSchema, type BlockManifest, type PageDoc } from "@ai-site-editor/shared"
+import { blockManifestSchema, operationSchema, type BlockManifest, type PageDoc } from "@avocadostudio-ai/shared"
 import {
   scopedSessionKey,
   getPage,

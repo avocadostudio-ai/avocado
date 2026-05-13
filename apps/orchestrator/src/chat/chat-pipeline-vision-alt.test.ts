@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import type { PageDoc } from "@ai-site-editor/shared"
+import type { PageDoc } from "@avocadostudio-ai/shared"
 import { isVisionAltGenerationRequest } from "./chat-pipeline.js"
 
 const pageWithHeroImage: PageDoc = {

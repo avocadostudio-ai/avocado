@@ -9,7 +9,7 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk"
-import { type Operation, type PageDoc, type BlockManifest, defaultPropsForType, type BlockType } from "@ai-site-editor/shared"
+import { type Operation, type PageDoc, type BlockManifest, defaultPropsForType, type BlockType } from "@avocadostudio-ai/shared"
 import { applyOpsAtomically, pickFocusBlockId, type ApplyOpsOptions } from "../ops/ops-engine.js"
 import { getPage, getSessionDraft, bumpVersion, orderSlugsHomeFirst, getSiteConfig } from "../state/session-state.js"
 import { unsplashSearchHandler, unsplashSearchManifest } from "../tools/builtins/unsplash-search.js"

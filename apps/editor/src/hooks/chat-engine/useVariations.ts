@@ -1,4 +1,4 @@
-import type { Operation } from "@ai-site-editor/shared"
+import type { Operation } from "@avocadostudio-ai/shared"
 import type {
   ApplyOpsResponse,
   VariationModalState,

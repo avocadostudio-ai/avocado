@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation"
  *
  * Why a global listener instead of an injectable <Link> component?
  *  - SiteHeader, Footer, CTA, RichText, etc. all render anchors from the
- *    shared @ai-site-editor/blocks package. A single interceptor covers all
+ *    shared @avocadostudio-ai/blocks package. A single interceptor covers all
  *    of them without threading a provider through every block.
  *  - No cross-package "use client" + context plumbing, so no risk of duplicate
  *    module instances breaking the provider/consumer wiring under pnpm +

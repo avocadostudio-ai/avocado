@@ -5,7 +5,7 @@
  * plus custom MCP tools for web scraping, design token extraction, and theming.
  */
 
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta } from "@avocadostudio-ai/shared"
 
 export function buildMigrationSystemPrompt(): string {
   // Build block catalog from registry
@@ -106,7 +106,7 @@ When a section needs a custom block type, create it by writing files to \`apps/s
 
 \`\`\`typescript
 import { z } from "zod"
-import { registerBlock } from "@ai-site-editor/shared"
+import { registerBlock } from "@avocadostudio-ai/shared"
 
 registerBlock("PascalName", {
   schema: z.object({

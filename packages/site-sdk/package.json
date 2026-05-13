@@ -85,9 +85,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-site-editor/blocks": "workspace:*",
+    "@avocadostudio-ai/blocks": "workspace:*",
     "@ai-site-editor/preview-adapter": "workspace:*",
-    "@ai-site-editor/shared": "workspace:*"
+    "@avocadostudio-ai/shared": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=15.0.0",

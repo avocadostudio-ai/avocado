@@ -12,7 +12,7 @@
  * telemetry so we can track how often the LLM under-delivers.
  */
 
-import { getBlockMeta, type EditPlan, type Operation, type PageDoc } from "@ai-site-editor/shared"
+import { getBlockMeta, type EditPlan, type Operation, type PageDoc } from "@avocadostudio-ai/shared"
 
 export type ChangelogCoverageResult = {
   plan: EditPlan

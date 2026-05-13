@@ -22,7 +22,7 @@
 //   and costs bounded.
 
 import { createHash } from "node:crypto"
-import type { Operation, PageDoc } from "@ai-site-editor/shared"
+import type { Operation, PageDoc } from "@avocadostudio-ai/shared"
 import { OperationError } from "./errors.js"
 
 // ---------------------------------------------------------------------------

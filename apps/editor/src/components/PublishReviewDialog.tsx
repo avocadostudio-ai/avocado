@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import type { BlockDiff, FieldDiff, PageDiff, PublishDiff } from "@ai-site-editor/shared"
+import type { BlockDiff, FieldDiff, PageDiff, PublishDiff } from "@avocadostudio-ai/shared"
 import type { ChatEntry } from "../lib/editor-types"
 import {
   Dialog,

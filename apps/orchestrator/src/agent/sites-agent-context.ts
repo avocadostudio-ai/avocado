@@ -6,7 +6,7 @@
  * - block-coder (Sonnet) — writes custom block files when needed
  */
 
-import { getAllBlockMeta } from "@ai-site-editor/shared"
+import { getAllBlockMeta } from "@avocadostudio-ai/shared"
 import { buildThemePresetsCatalog } from "./sites-agent-shared.js"
 const LOCALE_NAMES: Record<string, string> = { de: "German", fr: "French", es: "Spanish", it: "Italian", pt: "Portuguese", ja: "Japanese", ko: "Korean", zh: "Chinese" }
 

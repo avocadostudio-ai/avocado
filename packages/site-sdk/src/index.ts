@@ -1,7 +1,7 @@
 // ── Core (always needed) ──────────────────────────────────────────────
 // Types
 export type { PageDoc, PageMeta, BlockInstance, DraftContext, SearchParamsRecord } from "./types.ts"
-export type { SiteConfig } from "@ai-site-editor/shared"
+export type { SiteConfig } from "@avocadostudio-ai/shared"
 export { pageDocSchema } from "./types.ts"
 
 // URL utilities

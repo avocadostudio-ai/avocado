@@ -1,7 +1,7 @@
 import { applyEditorCors, createEditorCorsOptionsHandler } from "./editor-cors.ts"
 import { buildBlockManifest, type BlockManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
-import type { SiteConfig } from "@ai-site-editor/shared"
+import type { SiteConfig } from "@avocadostudio-ai/shared"
 
 export type InlineAsset = {
   /** base64-encoded image bytes */

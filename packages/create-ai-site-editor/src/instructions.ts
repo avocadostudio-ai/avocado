@@ -13,9 +13,9 @@ Manual steps:
 1. next.config.ts — add:
 
 ${c.compilerConfig}  transpilePackages: [
-     "@ai-site-editor/blocks",
+     "@avocadostudio-ai/blocks",
      "@ai-site-editor/preview-adapter",
-     "@ai-site-editor/shared",
+     "@avocadostudio-ai/shared",
      "@ai-site-editor/site-sdk",
    ],
    images: {
@@ -30,11 +30,11 @@ ${imagePatternLine}     ],
 
 2. globals.css — add at the top:
 
-   @import "@ai-site-editor/blocks/styles.css";
+   @import "@avocadostudio-ai/blocks/styles.css";
 
 3. Install dependencies:
 
-   npm install @ai-site-editor/site-sdk @ai-site-editor/blocks @ai-site-editor/shared @ai-site-editor/preview-adapter${c.npmDeps}
+   npm install @ai-site-editor/site-sdk @avocadostudio-ai/blocks @avocadostudio-ai/shared @ai-site-editor/preview-adapter${c.npmDeps}
 
 4. Copy .env.local.example → .env.local and fill in your credentials
 

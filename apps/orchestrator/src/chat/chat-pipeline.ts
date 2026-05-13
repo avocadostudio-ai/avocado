@@ -5,7 +5,7 @@ import {
   type BlockManifest,
   type Operation,
   type PageDoc
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import {
   type ChatPipelineContext,
   type DeferredCreatePageImage,

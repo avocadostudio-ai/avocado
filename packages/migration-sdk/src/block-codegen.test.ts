@@ -91,7 +91,7 @@ describe("generateBlock", () => {
 
     const schema = await readFile(join(outDir, "test-widget", "schema.ts"), "utf-8")
     assert.ok(schema.includes('import { z } from "zod"'))
-    assert.ok(schema.includes('import { registerBlock, f } from "@ai-site-editor/shared"'))
+    assert.ok(schema.includes('import { registerBlock, f } from "@avocadostudio-ai/shared"'))
     assert.ok(schema.includes("heading: z.string().min(1)"))
     assert.ok(schema.includes("subtitle: z.string().optional()"))
     assert.ok(schema.includes("count: z.number()"))
@@ -155,7 +155,7 @@ describe("generateBlock", () => {
 
   it("rejects names that conflict with existing block types", async () => {
     const outDir = await makeTmpDir()
-    // "Hero" is registered by @ai-site-editor/shared
+    // "Hero" is registered by @avocadostudio-ai/shared
     const input = makeInput({ outputDir: outDir, name: "Hero" })
     await assert.rejects(() => generateBlock(input), /already exists/)
   })

@@ -1,4 +1,4 @@
-export { blockTypeToCamel as toSanityName, camelToBlockType as sanityNameToBlockType } from "@ai-site-editor/shared"
+export { blockTypeToCamel as toSanityName, camelToBlockType as sanityNameToBlockType } from "@avocadostudio-ai/shared"
 
 /** List props stored as Sanity document references (vs inline array objects). */
 export const REFERENCE_LISTS: Record<string, Set<string>> = {

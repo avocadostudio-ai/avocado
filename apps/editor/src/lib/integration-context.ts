@@ -1,4 +1,4 @@
-import type { BlockManifest } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@avocadostudio-ai/shared"
 import type { PageTemplate, SiteCapabilities, SiteConfig } from "./editor-types"
 import { parseArrayOfStrings, parseString } from "./parse-utils"
 

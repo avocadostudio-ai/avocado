@@ -1,4 +1,4 @@
-import type { PatchAckMessage } from "@ai-site-editor/shared"
+import type { PatchAckMessage } from "@avocadostudio-ai/shared"
 
 export type ModelKey = "fast" | "balanced" | "reasoning" | "codex"
 export type AIProvider = "openai" | "anthropic" | "gemini"

@@ -4,7 +4,7 @@ import {
   validateManifestDefaultProps,
   type BlockDefinition,
   type BlockManifest
-} from "@ai-site-editor/shared"
+} from "@avocadostudio-ai/shared"
 import { siteOrigin } from "../lib/editor-utils"
 
 type ManifestStatus = "loading" | "ready" | "degraded"

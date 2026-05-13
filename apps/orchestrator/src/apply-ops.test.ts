@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import type { BlockManifest } from "@ai-site-editor/shared"
+import type { BlockManifest } from "@avocadostudio-ai/shared"
 import { createSessionFactory, postOps, getPage, getSlugs } from "./test/fixtures.js"
 import { getSiteConfig } from "./state/session-state.js"
 

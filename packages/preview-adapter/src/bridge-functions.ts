@@ -7,7 +7,7 @@
  * specific transport (postMessage vs direct).
  */
 
-import { isImagePath } from "@ai-site-editor/shared"
+import { isImagePath } from "@avocadostudio-ai/shared"
 
 // ---------------------------------------------------------------------------
 // Markdown → HTML helper (mirrors _shared.tsx renderRichTextContent)
