@@ -376,13 +376,14 @@ body.panel-resizing iframe {
   padding: 14px 20px 12px;
   background: var(--bg-200);
 }
-.property-panel-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 10px 16px 0;
-}
 .property-panel-context .property-panel-picker-btn {
   margin-left: auto;
+}
+.property-panel-context--page .property-panel-context-breadcrumb-current {
+  color: #0369a1;
+}
+.editor-dark .property-panel-context--page .property-panel-context-breadcrumb-current {
+  color: #38bdf8;
 }
 .property-panel-context-icon {
   flex-shrink: 0;

@@ -110,10 +110,24 @@ export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId:
       <MousePointerClick size={16} />
     </button>
   ) : null
+  const pageContextBar = (
+    <div className="property-panel-context property-panel-context--page">
+      <svg className="property-panel-context-icon" viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
+        <path d="M3.5 1.5h6L13 5v9a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-12a.5.5 0 0 1 .5-.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+        <path d="M9.5 1.5V5h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      </svg>
+      <div className="property-panel-context-text">
+        <span className="property-panel-context-breadcrumb">
+          <span className="property-panel-context-breadcrumb-current">{t("propertyPanel.page")}</span>
+        </span>
+      </div>
+      {pickerButton}
+    </div>
+  )
   if (!blockId || !blockType) {
     return (
       <div className="property-panel" style={style}>
-        {pickerButton ? <div className="property-panel-toolbar">{pickerButton}</div> : null}
+        {pageContextBar}
         {slug && slug !== "/" && onNavLabelChange ? (
           <NavLabelField slug={slug} navLabel={navLabel ?? ""} onNavLabelChange={onNavLabelChange} onAiAssist={onPageAiAssist} onAiQuickAction={onPageAiQuickAction} aiLoading={aiLoading} fieldShimmer={aiLoading === true && aiLoadingPath === "Nav label"} />
         ) : null}
@@ -180,7 +194,7 @@ export const PropertyPanel = React.memo(function PropertyPanel({ style, blockId:
   if (!meta) {
     return (
       <div className="property-panel" style={style}>
-        {pickerButton ? <div className="property-panel-toolbar">{pickerButton}</div> : null}
+        {pageContextBar}
         <div className="property-panel-empty">{t("propertyPanel.unknownBlock")}: {blockType}</div>
       </div>
     )
