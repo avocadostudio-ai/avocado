@@ -7,7 +7,11 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <p align="center">
-  <video src="https://github.com/avocadostudio-ai/avocado/releases/download/assets-demo-v2.2/Demo_v2.2.mp4" controls muted playsinline width="900"></video>
+  <a href="https://github.com/avocadostudio-ai/avocado/releases/download/assets-demo-v2.2/Demo_v2.2.mp4">
+    <img src="docs-site/images/demo-poster.jpg" alt="Avocado Studio demo — click to watch" width="900">
+  </a>
+  <br>
+  <em><a href="https://github.com/avocadostudio-ai/avocado/releases/download/assets-demo-v2.2/Demo_v2.2.mp4">▶ Watch the 30-second demo</a></em>
 </p>
 
 ## Why Avocado Studio?
