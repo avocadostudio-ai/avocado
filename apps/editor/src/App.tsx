@@ -566,12 +566,13 @@ function EditorPage({
     const next = force ?? !selectionModeEnabled
     setSelectionModeEnabled(next)
     preview.postToSite("setSelectionMode", { enabled: next })
-    if (!next) {
-      setActiveBlockId(undefined)
-      setActiveBlockType(undefined)
-      setActiveEditablePath(undefined)
-      setAnchorRect(null)
-    }
+    // Toggling the picker off is independent of the active selection. The user
+    // can still see/edit the selected block in the property panel; they just
+    // can't pick another by clicking. To clear the selection, click the block
+    // again (toggle deselect), click empty canvas, or use the property panel's
+    // breadcrumb. Previously we cleared activeBlockId on toggle-off, which
+    // left the iframe still showing the selection while the panel reverted to
+    // the Page view — the two sides got out of sync.
   }, [selectionModeEnabled, preview])
 
   // Esc exits selection mode without clearing existing block selection

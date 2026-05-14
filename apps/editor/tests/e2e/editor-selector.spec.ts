@@ -157,6 +157,41 @@ test.describe("editor block selector", () => {
     await expect.poll(() => panelBtn.getAttribute("aria-pressed"), { timeout: 3_000 }).toBe(initial)
   })
 
+  test("toggling the picker off preserves the block selection on both sides", async ({ page }) => {
+    const frame = await openEditorAndGetSiteFrame(page)
+    await ensureSelectionModeOn(page, frame)
+
+    // Select a block.
+    const firstBlock = frame.locator("[data-block-id]").first()
+    const firstId = await firstBlock.getAttribute("data-block-id")
+    await clickBlockBackground(firstBlock)
+    await expect.poll(() => highlightedIds(frame), { timeout: 5_000 }).toEqual([firstId])
+
+    // Toggle the picker OFF via the composer button.
+    const composerBtn = page.locator(".composer .composer-selector-btn")
+    await composerBtn.click()
+    // Picker turned off in the iframe.
+    await expect
+      .poll(
+        () => frame.evaluate(() => document.documentElement.hasAttribute("data-editor-selection-mode")),
+        { timeout: 3_000 }
+      )
+      .toBe(false)
+
+    // Selection should still be visible — picker-off must NOT clear the active block.
+    await expect.poll(() => highlightedIds(frame), { timeout: 3_000 }).toEqual([firstId])
+
+    // Re-arming the picker should still find the same block selected.
+    await composerBtn.click()
+    await expect
+      .poll(
+        () => frame.evaluate(() => document.documentElement.hasAttribute("data-editor-selection-mode")),
+        { timeout: 3_000 }
+      )
+      .toBe(true)
+    expect(await highlightedIds(frame)).toEqual([firstId])
+  })
+
   test("clicking empty canvas with a block selected clears the selection", async ({ page }) => {
     const frame = await openEditorAndGetSiteFrame(page)
     await ensureSelectionModeOn(page, frame)
