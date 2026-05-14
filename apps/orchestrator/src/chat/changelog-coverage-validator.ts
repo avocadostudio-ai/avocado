@@ -4,12 +4,15 @@
  * When a planner returns an edit_plan with N ops, the user reads change_log
  * to decide whether to approve. If change_log is shorter than ops[], the
  * user is approving blind to the uncovered ops — a silent bait-and-switch
- * that erodes trust. Complements the prompt rule ("change_log coverage is
- * MANDATORY") as defense in depth against LLMs that cluster ops.
+ * that erodes trust. If change_log is LONGER than ops[], the planner is
+ * describing changes it won't actually make (e.g. emits `duplicate_page`
+ * alone but narrates 4 follow-up `update_props` edits in change_log); the
+ * approval UI then promises content the apply step will silently drop.
  *
- * The validator appends a generic synthesized bullet per uncovered op so
- * the user at least sees the correct count, and reports the shortfall for
- * telemetry so we can track how often the LLM under-delivers.
+ * For the under-coverage case, the validator appends a synthesized bullet
+ * per uncovered op. For the over-coverage case, it trims trailing entries
+ * so the rendered plan matches what will actually run. Both directions
+ * report counts for telemetry so we can track how often planners drift.
  */
 
 import { getBlockMeta, type EditPlan, type Operation, type PageDoc } from "@avocadostudio-ai/shared"
@@ -18,6 +21,8 @@ export type ChangelogCoverageResult = {
   plan: EditPlan
   missingCount: number
   synthesizedEntries: string[]
+  extraCount: number
+  droppedEntries: string[]
 }
 
 function lookupBlockTypeName(args: {
@@ -96,16 +101,31 @@ export function validateChangelogCoverage(args: {
   draft: Map<string, PageDoc>
 }): ChangelogCoverageResult {
   const { plan, draft } = args
-  if (plan.intent !== "edit_plan") return { plan, missingCount: 0, synthesizedEntries: [] }
+  const empty = { plan, missingCount: 0, synthesizedEntries: [], extraCount: 0, droppedEntries: [] }
+  if (plan.intent !== "edit_plan") return empty
   const opCount = plan.ops.length
   const changeCount = plan.change_log.length
-  if (changeCount >= opCount) return { plan, missingCount: 0, synthesizedEntries: [] }
+  if (changeCount === opCount) return empty
 
-  const missingCount = opCount - changeCount
-  const synthesizedEntries: string[] = []
-  for (let i = changeCount; i < opCount; i++) {
-    synthesizedEntries.push(describeOp(plan.ops[i], draft))
+  // Empty ops list with non-empty change_log is almost always a planner
+  // confusion (intent should have been content_answer). Leave it for
+  // higher-level handling rather than wiping the user-facing copy here.
+  if (opCount === 0) return empty
+
+  if (changeCount < opCount) {
+    const missingCount = opCount - changeCount
+    const synthesizedEntries: string[] = []
+    for (let i = changeCount; i < opCount; i++) {
+      synthesizedEntries.push(describeOp(plan.ops[i], draft))
+    }
+    plan.change_log = [...plan.change_log, ...synthesizedEntries]
+    return { plan, missingCount, synthesizedEntries, extraCount: 0, droppedEntries: [] }
   }
-  plan.change_log = [...plan.change_log, ...synthesizedEntries]
-  return { plan, missingCount, synthesizedEntries }
+
+  // changeCount > opCount: planner described more changes than it emitted ops
+  // for. Trim trailing entries so the approval UI matches reality.
+  const extraCount = changeCount - opCount
+  const droppedEntries = plan.change_log.slice(opCount)
+  plan.change_log = plan.change_log.slice(0, opCount)
+  return { plan, missingCount: 0, synthesizedEntries: [], extraCount, droppedEntries }
 }

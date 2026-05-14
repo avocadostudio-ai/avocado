@@ -1171,6 +1171,24 @@ export async function runChatPipeline(
           "Planner returned fewer change_log entries than ops; synthesized fallbacks"
         )
       }
+      if (changelogResult.extraCount > 0) {
+        ctx.log.warn(
+          {
+            event: "planner_overdescribed_changelog",
+            chatRequestId,
+            session: body.session!,
+            slug: effectiveSlug,
+            opCount: resolvedPlan.ops.length,
+            extraCount: changelogResult.extraCount,
+            droppedEntries: changelogResult.droppedEntries,
+            opTypes: resolvedPlan.ops.map((op) => op.op),
+            plannerSource: source,
+            modelKey,
+            modelUsed
+          },
+          "Planner returned more change_log entries than ops; trimmed trailing entries to match"
+        )
+      }
 
       // Detect image ops synchronously before making any API calls
       detectedImageOps = detectImageOps({

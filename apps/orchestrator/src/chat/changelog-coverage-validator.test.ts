@@ -101,6 +101,35 @@ test("validateChangelogCoverage: handles add_block op with block type in synthes
   assert.match(result.plan.change_log[0], /add.*(Call to Action|CTA)/i)
 })
 
+test("validateChangelogCoverage: trims change_log when it describes more changes than ops deliver", () => {
+  // Reproduces traceId 5ade989d: planner emitted only `duplicate_page` but
+  // listed 5 change_log entries (Stats/FeatureGrid/FAQAccordion/CTA edits).
+  // The approval-gate UI rendered all 5, so the user would have approved
+  // a plan that silently dropped 4 promised edits.
+  const plan: EditPlan = {
+    intent: "edit_plan",
+    summary_for_user: "Will create a new /season-recipes page derived from /recipes.",
+    change_log: [
+      "Will duplicate /recipes into /season-recipes.",
+      "Will retitle the Stats block to 'Seasonal Cooking by the Numbers'.",
+      "Will retitle the FeatureGrid to 'Why Cook Seasonally?'.",
+      "Will retitle the FAQAccordion to 'Seasonal Cooking Questions'.",
+      "Will update the CTA title and href."
+    ],
+    ops: [
+      { op: "duplicate_page", pageSlug: "/recipes", newPageSlug: "/season-recipes" }
+    ]
+  }
+
+  const result = validateChangelogCoverage({ plan, draft: makeDraft(fourBlockPage()) })
+
+  assert.equal(result.missingCount, 0)
+  assert.equal(result.extraCount, 4)
+  assert.equal(result.droppedEntries.length, 4)
+  assert.equal(result.plan.change_log.length, 1, "change_log trimmed to match ops length")
+  assert.equal(result.plan.change_log[0], "Will duplicate /recipes into /season-recipes.")
+})
+
 test("validateChangelogCoverage: empty ops list is a no-op", () => {
   const plan: EditPlan = {
     intent: "edit_plan",
