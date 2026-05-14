@@ -4,7 +4,7 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-05-11T12:58:01.264Z",
+      "updatedAt": "2026-05-14T17:58:44.303Z",
       "meta": {
         "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
         "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -14,12 +14,12 @@
           "id": "b_hero_1772138902220_copy",
           "type": "Hero",
           "props": {
-            "heading": "Unlock 5 Amazing Avocado Superpowers for Your Heart & Energy",
-            "subheading": "Dive into 100+ delicious recipes, 50+ wellness tips, and expert guidance—totally free, no card required.",
+            "heading": "5 Avocado Superpowers for Heart & Energy",
+            "subheading": "100+ recipes, 50+ wellness tips — free, no card needed.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
-            "imageUrl": "/generated-images/gen_1778479033608_tkyset.jpg",
-            "imageAlt": "Avocado toast topped with crumbled feta cheese, fresh cilantro, and microgreens served on a speckled beige plate with marble surface.",
+            "imageUrl": "https://images.unsplash.com/photo-1672631281972-ef90f745ca87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxvbmx5fGVufDF8MHx8fDE3Nzg3ODE1MjR8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
+            "imageAlt": "a white wall with a sign that says staff only",
             "imagePosition": "right",
             "textAlign": "left",
             "secondaryCtaText": "Read Research Studies"
@@ -230,118 +230,16 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "id": "p_season_recipes",
-      "slug": "/season-recipes",
-      "title": "Season Recipes",
-      "updatedAt": "2026-05-10T09:46:35.644Z",
-      "meta": {
-        "title": "Season Recipes"
-      },
-      "blocks": [
-        {
-          "id": "b_hero_for-recipes_copy",
-          "type": "Hero",
-          "props": {
-            "heading": "Fresh Picks for Every Season",
-            "subheading": "Celebrate what's in season — discover vibrant recipes built around the freshest ingredients nature has to offer, all year round.",
-            "ctaText": "Explore Seasonal Recipes",
-            "ctaHref": "/recipes",
-            "imageUrl": "/generated-images/gen_1774991902955_0p1i2o.jpg",
-            "imageAlt": "A colourful spread of seasonal fruits and vegetables",
-            "imagePosition": "right",
-            "textAlign": "left"
-          }
         },
         {
-          "id": "b_stats_1773947687526_copy",
-          "type": "Stats",
+          "id": "b_card_1778781425447",
+          "type": "Card",
           "props": {
-            "title": "Seasonal Cooking by the Numbers",
-            "stats": [
-              {
-                "icon": "🥗",
-                "value": "200+",
-                "label": "Seasonal Recipes"
-              },
-              {
-                "icon": "🍂",
-                "value": "4",
-                "label": "Seasons Covered"
-              },
-              {
-                "icon": "⭐",
-                "value": "4.9★",
-                "label": "Average Rating"
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_featuregrid_1773947612365_copy",
-          "type": "FeatureGrid",
-          "props": {
-            "title": "Why Cook Seasonally",
-            "columns": "3",
-            "features": [
-              {
-                "icon": "🌿",
-                "title": "Peak-Flavour Ingredients",
-                "description": "Seasonal produce is harvested at its prime — meaning better taste, more nutrients, and a more satisfying plate."
-              },
-              {
-                "icon": "💰",
-                "title": "Budget-Friendly Choices",
-                "description": "When ingredients are in season locally, they're abundant and affordable. Great food doesn't have to cost a fortune."
-              },
-              {
-                "icon": "♻️",
-                "title": "Sustainable Eating",
-                "description": "Choosing seasonal and local reduces food miles and supports farming practices that are kinder to the planet."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_faqaccordion_1773947679848_copy",
-          "type": "FAQAccordion",
-          "props": {
-            "title": "Seasonal Cooking Q&A",
-            "items": [
-              {
-                "q": "What does it mean to eat seasonally?",
-                "a": "Eating seasonally means choosing fruits and vegetables that are naturally harvested at this time of year in your region. These ingredients are at their flavour and nutrition peak — and often more affordable too."
-              },
-              {
-                "q": "How do I know what's in season where I live?",
-                "a": "A great starting point is your local farmers' market — vendors only sell what's growing now. You can also check regional seasonal produce guides online, or simply notice what's plentiful and affordable at your grocery store."
-              },
-              {
-                "q": "Can I substitute out-of-season ingredients?",
-                "a": "Absolutely. Frozen vegetables are picked and frozen at peak ripeness, making them an excellent substitute. Tinned options work well in cooked dishes too. Our recipes always suggest seasonal swaps where possible."
-              },
-              {
-                "q": "How should I store seasonal produce to keep it fresh?",
-                "a": "Storage varies by ingredient:\n\n- **Root vegetables** (carrots, beets): cool, dark place or fridge crisper drawer\n- **Berries & stone fruit**: fridge, eaten within a few days\n- **Herbs**: treat like flowers — trim stems and store upright in a glass of water\n\nWhen in doubt, refrigerate and consume within a week."
-              },
-              {
-                "q": "How do I get started with seasonal cooking?",
-                "a": "Pick one or two seasonal ingredients you love and search our recipe collection for dishes that feature them. Start simple — a roasted vegetable tray bake or a fresh fruit salad is all it takes to begin cooking with the seasons."
-              }
-            ]
-          }
-        },
-        {
-          "id": "b_cta_1773947706826_copy",
-          "type": "CTA",
-          "props": {
-            "title": "Start Cooking with the Season",
-            "description": "Embrace the freshest flavours nature has to offer. Browse our full collection of seasonal recipes and find your next favourite dish.",
-            "ctaText": "Browse All Recipes",
-            "ctaHref": "/recipes"
+            "title": "Launch faster",
+            "description": "Go from idea to published changes in minutes.",
+            "ctaText": "Learn more",
+            "ctaHref": "/pricing",
+            "variant": "default"
           }
         }
       ]
@@ -1030,11 +928,189 @@
           }
         }
       ]
+    },
+    {
+      "id": "p_farmers_and_growers",
+      "slug": "/farmers-and-growers",
+      "title": "Farmers & Growers",
+      "updatedAt": "2026-05-14T17:58:37.747Z",
+      "blocks": [
+        {
+          "id": "b_hero_1778781517747",
+          "type": "Hero",
+          "props": {
+            "heading": "Grow Better Avocados. Build a Lasting Farm.",
+            "subheading": "Practical guides on regenerative soil care, water stewardship, and sustainable harvest — built for avocado farmers at every scale.",
+            "ctaText": "Join the Growers' Community",
+            "ctaHref": "/community",
+            "imageUrl": "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1536&h=1024&fit=crop",
+            "imageAlt": "Farmer walking through lush green crop rows at golden hour",
+            "imagePosition": "right",
+            "eyebrow": "For Growers"
+          }
+        },
+        {
+          "id": "b_featuregrid_1778781517748",
+          "type": "FeatureGrid",
+          "props": {
+            "title": "The Grower's Toolkit",
+            "columns": "3",
+            "features": [
+              {
+                "icon": "🌱",
+                "title": "Soil Health & Composting",
+                "description": "Build living soil with compost, cover crops, and mycorrhizal networks that boost avocado root strength and long-term yield."
+              },
+              {
+                "icon": "💧",
+                "title": "Water-Smart Irrigation",
+                "description": "Cut water use by up to 40% with precision drip systems, soil moisture sensors, and mulching strategies tailored to avocado root zones."
+              },
+              {
+                "icon": "🐛",
+                "title": "Integrated Pest Management",
+                "description": "Protect your crop without harsh chemicals — use beneficial insects, companion planting, and early detection protocols."
+              },
+              {
+                "icon": "🥑",
+                "title": "Harvest Timing & Handling",
+                "description": "Pick at peak dry-matter content, reduce bruising in the field, and maintain cold chain integrity from tree to market."
+              },
+              {
+                "icon": "🏷️",
+                "title": "Fair-Trade & Organic Certification",
+                "description": "Step-by-step guidance on achieving Fairtrade, USDA Organic, or Rainforest Alliance certification to access premium markets."
+              },
+              {
+                "icon": "🌦️",
+                "title": "Climate Resilience Planning",
+                "description": "Prepare your farm for shifting rainfall patterns, heat stress, and frost events with adaptive planting and microclimate management."
+              }
+            ]
+          }
+        },
+        {
+          "id": "b_stats_1778781517748",
+          "type": "Stats",
+          "props": {
+            "title": "Avocado Farming by the Numbers",
+            "stats": [
+              {
+                "value": "200+",
+                "icon": "🥑",
+                "label": "avocados per tree per year",
+                "description": "Average mature Hass yield under good agronomic management"
+              },
+              {
+                "value": "40%",
+                "icon": "💧",
+                "label": "less water with drip irrigation",
+                "description": "Compared to overhead or flood irrigation methods"
+              },
+              {
+                "value": "3,000+",
+                "icon": "🌍",
+                "label": "farms adopting regenerative practices",
+                "description": "Across Mexico, Kenya, Peru, and South Africa"
+              },
+              {
+                "value": "50 yrs",
+                "icon": "🌳",
+                "label": "productive lifespan of an avocado tree",
+                "description": "With proper pruning, nutrition, and soil care"
+              }
+            ]
+          }
+        },
+        {
+          "id": "b_richtext_1778781517748",
+          "type": "RichText",
+          "props": {
+            "title": "Why Regenerative Avocado Farming Matters",
+            "body": "## More Than a Crop — A Living Ecosystem\n\nAvocado trees are long-term investments. A well-managed orchard can produce fruit for 50 years or more, but only if the soil beneath it stays alive. Regenerative practices — cover cropping, reduced tillage, compost application, and agroforestry integration — rebuild the organic matter and microbial life that conventional farming depletes.\n\n**Soil carbon sequestration** is one of the most powerful tools a grower has. Every 1% increase in soil organic matter helps soil hold an additional 20,000 gallons of water per acre — critical in the water-stressed regions where avocados thrive.\n\n**Biodiversity buffers risk.** Monoculture orchards are vulnerable to disease, pest outbreaks, and climate shocks. Integrating shade trees, native ground cover, and insect habitat corridors creates natural resilience — and often improves pollination rates by 15–30%.\n\nThe economics follow the ecology. Farms that invest in soil health report lower input costs within 3–5 years, stronger fruit quality scores, and easier access to premium and certified markets. Growing regeneratively is not just the right thing to do — it's increasingly the profitable thing to do."
+          }
+        },
+        {
+          "id": "b_cardgrid_1778781517748",
+          "type": "CardGrid",
+          "props": {
+            "title": "Essential Growing Guides",
+            "columns": "3",
+            "cards": [
+              {
+                "title": "Soil Health & Composting",
+                "description": "Build thriving soil biology with on-farm composting, cover crops, and mycorrhizal inoculants.",
+                "ctaText": "Read the Guide",
+                "ctaHref": "/community",
+                "imageUrl": "https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=768&h=512&fit=crop",
+                "imageAlt": "Hands scooping rich dark compost soil on a farm"
+              },
+              {
+                "title": "Water-Smart Irrigation",
+                "description": "Design drip systems, schedule irrigation around avocado phenology, and monitor soil moisture effectively.",
+                "ctaText": "Read the Guide",
+                "ctaHref": "/community",
+                "imageUrl": "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=768&h=512&fit=crop",
+                "imageAlt": "Drip irrigation lines running along rows of green plants"
+              },
+              {
+                "title": "Harvest & Post-Harvest Care",
+                "description": "Time your pick by dry-matter testing, handle fruit to minimise bruising, and maintain cold chain from orchard to buyer.",
+                "ctaText": "Read the Guide",
+                "ctaHref": "/community",
+                "imageUrl": "https://images.unsplash.com/photo-1592663527359-cf6642f54cff?w=768&h=512&fit=crop",
+                "imageAlt": "Worker carefully placing harvested avocados into a crate"
+              }
+            ],
+            "cardVariant": "full-bleed"
+          }
+        },
+        {
+          "id": "b_faqaccordion_1778781517748",
+          "type": "FAQAccordion",
+          "props": {
+            "title": "Growers' Most Asked Questions",
+            "items": [
+              {
+                "q": "How far apart should I plant avocado trees?",
+                "a": "Standard spacing is **5–8 metres** between trees depending on the rootstock and variety. High-density plantings (3–4 m) can increase early yields but require more aggressive pruning and irrigation management as the canopy closes."
+              },
+              {
+                "q": "When will my trees produce their first commercial harvest?",
+                "a": "Grafted trees typically begin fruiting in **years 3–4**, with a commercially viable yield from year 5 onward. Seedling trees take 7–10 years. Soil preparation, irrigation, and rootstock selection are the biggest variables affecting time-to-harvest."
+              },
+              {
+                "q": "What's involved in achieving organic certification?",
+                "a": "Most certifying bodies require a **3-year transition period** during which no prohibited substances are applied. You'll need to maintain detailed input and harvest records, undergo annual inspections, and meet specific soil and water management standards. Start by contacting a USDA-accredited certifier or your regional equivalent."
+              },
+              {
+                "q": "How much water do avocado trees need?",
+                "a": "A mature avocado tree in a semi-arid climate typically needs **1,000–1,200 mm of water per year**. With mulching and drip irrigation, this can often be reduced by 30–40%. Overwatering is a leading cause of root rot — monitor soil moisture at 30 cm depth before irrigating."
+              },
+              {
+                "q": "Which avocado variety is best for my region?",
+                "a": "**Hass** dominates global markets for its shelf life and flavour, but it needs cool nights to set fruit well. In hotter, humid climates consider **Lula**, **Booth 7**, or **Tonnage**. In Mediterranean climates, **Fuerte** and **Bacon** offer good yields with less irrigation. Consult your local extension service for variety trials in your specific microclimate."
+              }
+            ]
+          }
+        },
+        {
+          "id": "b_cta_1778781517748",
+          "type": "CTA",
+          "props": {
+            "title": "Join the Growers' Community",
+            "description": "Connect with fellow avocado farmers, share field notes, and access expert advice on regenerative growing — all in one place.",
+            "ctaText": "Join Free",
+            "ctaHref": "/community",
+            "secondaryCtaText": "Browse Guides",
+            "secondaryCtaHref": "/recipes"
+          }
+        }
+      ]
     }
   ],
   "siteConfig": {
     "name": "The Avocado Hub",
-    "logo": "/logos/avocado-hub.svg",
-    "previewUrl": "http://localhost:3000"
+    "logo": "/logos/avocado-hub.svg"
   }
 }
