@@ -211,6 +211,14 @@ describe("conditional prompt blocks", () => {
     const withSelection = buildPlannerSystemPrompt({ ...baseOpts, selectedBlockId: "b_hero_1" })
     assert.ok(noSelection.includes("Respect explicit user target references"))
     assert.ok(withSelection.includes("You MUST target only this block"))
+    assert.ok(
+      /different page[\s\S]{0,200}IGNORE this selection/i.test(withSelection),
+      "selection rule has an escape clause for page-scoped intents"
+    )
+    assert.ok(
+      /never add bonus ops/i.test(withSelection),
+      "selection rule forbids piggyback ops on the selected block"
+    )
   })
 
   test("content_answer scopes to selected block on deictic reference", () => {
