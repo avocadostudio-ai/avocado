@@ -7,7 +7,8 @@
     "dev": "vite --port 4100 --strictPort",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 4100 --strictPort",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts"
   },
   "dependencies": {
     "@avocadostudio-ai/blocks": "workspace:*",
@@ -35,6 +36,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

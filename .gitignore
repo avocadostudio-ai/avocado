@@ -15,6 +15,11 @@ coverage
 .run-logs/
 output/
 
+# Playwright artifacts
+playwright-report/
+test-results/
+.playwright/
+
 # Local AI assistant overrides (shared config under .claude/ is tracked)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
