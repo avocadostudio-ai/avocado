@@ -371,7 +371,6 @@ export default function ClaudeStyleChatInput(props: Props) {
                 type="button"
                 className={`composer-ghost-btn composer-selector-btn${selectionModeEnabled ? " is-active" : ""}`}
                 onClick={onToggleSelectionMode}
-                disabled={isLoading}
                 aria-label={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
                 data-tooltip={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
                 aria-pressed={selectionModeEnabled}
