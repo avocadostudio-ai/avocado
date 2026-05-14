@@ -133,7 +133,8 @@ function PageDiffCard({ pd, defaultOpen }: { pd: PageDiff; defaultOpen: boolean 
         ? "will be removed"
         : `${changedBlocks.length} change${changedBlocks.length === 1 ? "" : "s"}`
 
-  const isCollapsible = pd.status !== "unchanged" && changedBlocks.length > 0
+  // When a whole page is removed, listing each block as "removed" is noise.
+  const isCollapsible = pd.status !== "unchanged" && pd.status !== "removed" && changedBlocks.length > 0
 
   return (
     <div className="publish-diff-page">
@@ -187,11 +188,18 @@ export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, is
   )
   const unchangedCount = diff ? diff.pages.length - changedPages.length : 0
 
-  const hasChanges = !!diff && diff.summary.totalChangedFields > 0
+  // A page can change without any field-level diffs (e.g. fully added/removed),
+  // so we must also count page-level structural changes here.
+  const pageStructuralChanges = diff
+    ? diff.summary.pagesAdded + diff.summary.pagesRemoved + diff.summary.pagesModified
+    : 0
+  const hasChanges = !!diff && (diff.summary.totalChangedFields > 0 || pageStructuralChanges > 0)
   const ctaLabel = isPublishing
     ? "Publishing…"
     : hasChanges
-      ? `Publish ${diff!.summary.totalChangedFields} change${diff!.summary.totalChangedFields === 1 ? "" : "s"}`
+      ? diff!.summary.totalChangedFields > 0
+        ? `Publish ${diff!.summary.totalChangedFields} change${diff!.summary.totalChangedFields === 1 ? "" : "s"}`
+        : "Publish"
       : "Publish"
 
   // Keep a small chat-log tail visible for context — helpful when the diff
