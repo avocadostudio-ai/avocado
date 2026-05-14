@@ -4,7 +4,7 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-05-14T17:58:44.303Z",
+      "updatedAt": "2026-05-14T19:18:18.536Z",
       "meta": {
         "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
         "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -18,8 +18,8 @@
             "subheading": "100+ recipes, 50+ wellness tips — free, no card needed.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
-            "imageUrl": "https://images.unsplash.com/photo-1672631281972-ef90f745ca87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwzfHxvbmx5fGVufDF8MHx8fDE3Nzg3ODE1MjR8MA&ixlib=rb-4.1.0&q=80&w=1080&auto=format&fit=crop&w=1600&q=80",
-            "imageAlt": "a white wall with a sign that says staff only",
+            "imageUrl": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4ODM0NjV8MHwxfHNlYXJjaHwyfHxhdm9jYWRvfGVufDF8MHx8fDE3Nzg3NDQ2Mzh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+            "imageAlt": "sliced green avocado fruit",
             "imagePosition": "right",
             "textAlign": "left",
             "secondaryCtaText": "Read Research Studies"
