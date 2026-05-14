@@ -187,10 +187,11 @@ export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, is
   )
   const unchangedCount = diff ? diff.pages.length - changedPages.length : 0
 
+  const hasChanges = !!diff && diff.summary.totalChangedFields > 0
   const ctaLabel = isPublishing
     ? "Publishing…"
-    : diff && diff.summary.totalChangedFields > 0
-      ? `Publish ${diff.summary.totalChangedFields} change${diff.summary.totalChangedFields === 1 ? "" : "s"}`
+    : hasChanges
+      ? `Publish ${diff!.summary.totalChangedFields} change${diff!.summary.totalChangedFields === 1 ? "" : "s"}`
       : "Publish"
 
   // Keep a small chat-log tail visible for context — helpful when the diff
@@ -252,7 +253,7 @@ export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, is
           </Button>
           <Button
             onClick={() => { onConfirm(); onOpenChange(false) }}
-            disabled={isPublishing}
+            disabled={isPublishing || isLoading || !hasChanges}
           >
             {ctaLabel}
           </Button>
