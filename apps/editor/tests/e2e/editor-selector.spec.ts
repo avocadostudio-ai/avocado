@@ -192,6 +192,37 @@ test.describe("editor block selector", () => {
     expect(await highlightedIds(frame)).toEqual([firstId])
   })
 
+  test("routeChanged from the bridge re-arms iframe selection mode (initial-mount race fix)", async ({ page }) => {
+    const frame = await openEditorAndGetSiteFrame(page)
+    await ensureSelectionModeOn(page, frame)
+
+    // Bridge is armed. Forcibly clear the iframe-side attribute to simulate a
+    // bridge re-mount (cleanup runs and removes data-editor-selection-mode).
+    await frame.evaluate(() => document.documentElement.removeAttribute("data-editor-selection-mode"))
+    expect(
+      await frame.evaluate(() => document.documentElement.hasAttribute("data-editor-selection-mode"))
+    ).toBe(false)
+
+    // Have the iframe post routeChanged to the editor — same payload the bridge
+    // sends on every (re-)mount. The fix wires this signal to a re-post of
+    // setSelectionMode, so the iframe should get re-armed.
+    await frame.evaluate(() =>
+      window.parent.postMessage(
+        { protocol: "site-editor/v1", type: "routeChanged", payload: { slug: location.pathname || "/" } },
+        "*"
+      )
+    )
+
+    // Within a few hundred ms the editor should round-trip a setSelectionMode
+    // message and the iframe should be armed again.
+    await expect
+      .poll(
+        () => frame.evaluate(() => document.documentElement.hasAttribute("data-editor-selection-mode")),
+        { timeout: 3_000 }
+      )
+      .toBe(true)
+  })
+
   test("clicking empty canvas with a block selected clears the selection", async ({ page }) => {
     const frame = await openEditorAndGetSiteFrame(page)
     await ensureSelectionModeOn(page, frame)

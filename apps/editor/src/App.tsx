@@ -473,6 +473,15 @@ function EditorPage({
       setSlugFromPreview(newSlug)
       setActiveEditablePath(undefined)
       setAnchorRect(null)
+      // routeChanged is also the bridge's "I'm mounted, message listener is
+      // attached" signal — the bridge posts it once on first mount and again
+      // on every slug-driven remount. Re-arm iframe-side state here, so the
+      // current selectionMode lands even if our first postMessage raced the
+      // bridge mount and got dropped. (postMessage has no buffering — messages
+      // sent before any listener exists are lost.) Read from the store rather
+      // than closing over selectionModeEnabled so this callback can stay
+      // memoized without re-running usePreviewBridge.
+      previewPostToSiteRef.current("setSelectionMode", { enabled: useEditorStore.getState().selectionModeEnabled })
     },
     onBlockReordered: (newSlug, blockId, afterBlockId) => {
       if (!componentManifest.allowStructuralEdits) {
@@ -854,12 +863,10 @@ function EditorPage({
     return () => window.clearInterval(timer)
   }, [isLoading])
 
-  // Re-sync selection mode after route changes (preview bridge re-mounts and loses the attribute)
-  useEffect(() => {
-    if (selectionModeEnabled) {
-      preview.postToSite("setSelectionMode", { enabled: true })
-    }
-  }, [slug])
+  // (Selection-mode re-sync is now driven by the bridge's routeChanged signal —
+  // see onRouteChanged in previewCallbacks. The slug-only effect that used to
+  // live here couldn't catch the initial-mount race because slug doesn't
+  // change on first load.)
 
   // Highlight active block sync
   useEffect(() => {
