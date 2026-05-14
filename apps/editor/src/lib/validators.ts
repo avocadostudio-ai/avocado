@@ -35,9 +35,10 @@ export function extensionFromMimeType(mimeType: string) {
 
 export function isVariationRequest(message: string) {
   const lower = message.toLowerCase()
-  const asksGenerate = lower.includes("generate") || lower.includes("create")
-  const asksVariation = /variat/.test(lower)
-  return asksGenerate && asksVariation
+  return (
+    /\b(variations?|alternatives?|variants?|options)\b/.test(lower) &&
+    /\b(generate|create|make|show|give|produce|draft)\b/.test(lower)
+  )
 }
 
 export function isComplexTaskRequest(message: string) {
