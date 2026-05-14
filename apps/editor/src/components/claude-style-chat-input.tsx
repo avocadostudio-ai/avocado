@@ -50,58 +50,23 @@ export default function ClaudeStyleChatInput(props: Props) {
     if (!shell) return
     const textarea = textareaRef.current
 
-    let target = 0
     if (textarea) {
       // Temporarily collapse so scrollHeight reflects only content, not available space
       textarea.style.height = "0px"
       textarea.style.overflowY = "hidden"
       const naturalHeight = textarea.scrollHeight
       const maxTextareaHeight = 220
-      target = Math.min(maxTextareaHeight, Math.max(20, naturalHeight))
+      const target = Math.min(maxTextareaHeight, Math.max(20, naturalHeight))
       textarea.style.height = `${target}px`
       textarea.style.overflowY = naturalHeight > target ? "auto" : "hidden"
     }
 
-    const shellStyle = getComputedStyle(shell)
-    const shellPaddingTop = parseFloat(shellStyle.paddingTop) || 0
-    const shellPaddingBottom = parseFloat(shellStyle.paddingBottom) || 0
-    const shellGap = parseFloat(shellStyle.gap) || 0
-
-    // Measure the actions row height
-    const actionsEl = shell.querySelector(".composer-actions") as HTMLElement | null
-    const actionsHeight = actionsEl ? actionsEl.offsetHeight : 32
-
-    // Measure any status notes below the textarea inside composer-input-area
-    const inputArea = shell.querySelector(".composer-input-area") as HTMLElement | null
-    let notesHeight = 0
-    if (inputArea) {
-      const inputAreaGap = parseFloat(getComputedStyle(inputArea).gap) || 0
-      for (const child of inputArea.children) {
-        if (child !== textarea) {
-          notesHeight += (child as HTMLElement).offsetHeight + inputAreaGap
-        }
-      }
-    }
-
-    // Report the ideal total height to the parent so the grid row can grow.
-    const shellBorderV = (parseFloat(shellStyle.borderTopWidth) || 0) + (parseFloat(shellStyle.borderBottomWidth) || 0)
-
-    const composerWrapper = shell.closest(".composer")
-    let wrapperPaddingV = 18
-    let wrapperExtraHeight = 0
-    if (composerWrapper) {
-      const ws = getComputedStyle(composerWrapper)
-      wrapperPaddingV = (parseFloat(ws.paddingTop) || 0) + (parseFloat(ws.paddingBottom) || 0)
-      for (const child of composerWrapper.children) {
-        if (child === shell) continue
-        const el = child as HTMLElement
-        const childStyle = getComputedStyle(el)
-        const marginTop = parseFloat(childStyle.marginTop) || 0
-        const marginBottom = parseFloat(childStyle.marginBottom) || 0
-        wrapperExtraHeight += el.offsetHeight + marginTop + marginBottom
-      }
-    }
-    const idealHeight = shellPaddingTop + shellPaddingBottom + shellBorderV + target + notesHeight + shellGap + actionsHeight + wrapperPaddingV + wrapperExtraHeight
+    // Ask the browser directly for the wrapper's natural content height —
+    // includes its padding and every child (toolbar + shell + future siblings)
+    // regardless of the grid-row clamp. Simpler and more correct than summing
+    // padding/border/gap/children by hand.
+    const composerWrapper = shell.closest(".composer") as HTMLElement | null
+    const idealHeight = composerWrapper ? composerWrapper.scrollHeight : shell.scrollHeight
     onAutoHeightChange(idealHeight)
   }
 
@@ -122,6 +87,22 @@ export default function ClaudeStyleChatInput(props: Props) {
     syncComposerHeight()
   }, [message, isRecording, isTranscribing, isUploadingImage, isAnalyzingImage, transcriptionError, imagePasteError, onAutoHeightChange])
 
+  // In Vite dev, component CSS is injected via JS modules and may not be applied
+  // when the first useLayoutEffect runs — measurements then come back undersized
+  // and `composerHeight` gets stuck at its minimum. Re-measure after the first
+  // paint and after web fonts settle to recover the correct height.
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => syncComposerHeight())
+    let cancelled = false
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready.then(() => { if (!cancelled) syncComposerHeight() }).catch(() => {})
+    }
+    return () => {
+      cancelAnimationFrame(rafId)
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     const onResize = () => syncComposerHeight()
     window.addEventListener("resize", onResize)
@@ -129,16 +110,32 @@ export default function ClaudeStyleChatInput(props: Props) {
   }, [])
 
   // Re-measure on any size change of the composer wrapper or shell — e.g. when
-  // the chat-panel splitter is dragged, icons reflow at narrower widths, or
-  // toolbars appear/disappear. Window-resize alone misses splitter drags.
+  // the chat-panel splitter is dragged or icons reflow at narrower widths. A
+  // MutationObserver handles the case where a sibling (undo/redo toolbar)
+  // appears or disappears inside the wrapper: the wrapper's offsetHeight is
+  // clamped by the grid row so the ResizeObserver wouldn't fire for that.
   useEffect(() => {
     const shell = shellRef.current
-    if (!shell || typeof ResizeObserver === "undefined") return
+    if (!shell) return
     const wrapper = shell.closest(".composer") as HTMLElement | null
-    const observer = new ResizeObserver(() => syncComposerHeight())
-    observer.observe(shell)
-    if (wrapper) observer.observe(wrapper)
-    return () => observer.disconnect()
+
+    let resizeObserver: ResizeObserver | undefined
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => syncComposerHeight())
+      resizeObserver.observe(shell)
+      if (wrapper) resizeObserver.observe(wrapper)
+    }
+
+    let mutationObserver: MutationObserver | undefined
+    if (wrapper && typeof MutationObserver !== "undefined") {
+      mutationObserver = new MutationObserver(() => syncComposerHeight())
+      mutationObserver.observe(wrapper, { childList: true })
+    }
+
+    return () => {
+      resizeObserver?.disconnect()
+      mutationObserver?.disconnect()
+    }
   }, [])
 
   useEffect(() => {
@@ -365,6 +362,7 @@ export default function ClaudeStyleChatInput(props: Props) {
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || isUploadingImage || isAnalyzingImage}
               aria-label={t("chatInput.addImage")}
+              data-tooltip={t("chatInput.addImage")}
             >
               <Plus size={16} />
             </button>
@@ -375,6 +373,7 @@ export default function ClaudeStyleChatInput(props: Props) {
                 onClick={onToggleSelectionMode}
                 disabled={isLoading}
                 aria-label={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
+                data-tooltip={selectionModeEnabled ? t("chatInput.exitSelector") : t("chatInput.selectElement")}
                 aria-pressed={selectionModeEnabled}
               >
                 <MousePointerClick size={16} />
