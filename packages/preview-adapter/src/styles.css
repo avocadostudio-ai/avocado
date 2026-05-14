@@ -39,7 +39,9 @@
 [data-editor-selection-mode] .editor-selectable:hover::before {
   opacity: 1;
   inset: 0;
-  border: var(--editor-selected-border-width) solid rgb(var(--editor-accent-rgb));
+  /* Hover is a dashed, lower-opacity outline so it's visually distinct from
+     the solid selection outline — same color, but clearly "preview, not picked". */
+  border: var(--editor-selected-border-width) dashed rgba(var(--editor-accent-rgb), 0.55);
   background: none;
   mix-blend-mode: normal;
 }

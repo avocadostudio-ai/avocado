@@ -1349,7 +1349,10 @@ export function createBridgeFunctions(
         editablePath = String(firstEditable?.getAttribute("data-editable-target") ?? "") || undefined
       }
     }
-    if (state.selectedBlockId === blockId && !editablePath) {
+    if (state.selectedBlockId === blockId) {
+      // Any click on the already-selected block toggles it off — including
+      // clicks on its editable children. To edit a field on the same block,
+      // click once to deselect, then click the field to re-select + focus.
       clearChildFocus()
       removeSelectedDeleteHandle()
       clearAllHighlights()
