@@ -48,7 +48,7 @@ A few things matter regardless of which host you pick:
 
 ## Building the image
 
-If you have access to the orchestrator source (the `apps/orchestrator` directory in the private workspace), you can build the image yourself from the repository root:
+The orchestrator source lives at `apps/orchestrator` in the repo. Build the image from the repository root:
 
 ```bash
 docker build -f apps/orchestrator/Dockerfile -t avocado-orchestrator:latest .
@@ -132,13 +132,9 @@ See `.env.example` at the repo root for the complete list of environment variabl
 | `PUBLISH_TOKEN` | Required token for `/publish/*` endpoints |
 | `ACCESS_PASSWORD_HASH` | Optional password hash for `/auth/verify` |
 
-## Running locally without Docker (contributors only)
+## Running locally without Docker
 
-<Note>
-This section requires access to the orchestrator source, which is **not currently public** — see the closed-source note at the top of the page. If you don't have repo access, the Docker image is your supported path. If you do have access (early contributor, design partner, etc.), you can run the orchestrator directly from source for a faster dev loop.
-</Note>
-
-For local development with source access, run the orchestrator directly via pnpm from the repository root:
+The whole stack is open source, so for local development you can clone the repo and run the orchestrator directly via pnpm from the repository root — that's the faster dev loop. Docker is the supported path for production self-hosting; the source-based workflow is for contributors and anyone who wants to hack on the orchestrator itself.
 
 ```bash
 pnpm install
