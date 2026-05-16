@@ -25,7 +25,8 @@
               "quickstart",
               "concepts",
               "how-it-works",
-              "architecture"
+              "architecture",
+              "ai-providers"
             ]
           },
           {
@@ -79,6 +80,12 @@
             ]
           },
           {
+            "group": "Publishing",
+            "pages": [
+              "integration/publishing"
+            ]
+          },
+          {
             "group": "Inbound channels",
             "pages": [
               "integration/jira"
@@ -114,6 +121,12 @@
               "operations/docker-deployment",
               "operations/vercel-deployment",
               "operations/netlify-deployment"
+            ]
+          },
+          {
+            "group": "Modes",
+            "pages": [
+              "operations/demo-mode"
             ]
           }
         ]

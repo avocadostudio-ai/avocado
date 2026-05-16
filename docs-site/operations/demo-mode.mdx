@@ -1,0 +1,120 @@
+---
+title: "Demo Mode"
+description: "Run a locked-down public playground on a shared API key. Server-enforced allow-list, per-IP isolation, rate limiting, no image gen."
+---
+
+`DEMO_MODE=1` turns an orchestrator deployment into a **public "try before you sign up" playground**. You front the LLM bill on a shared API key, and the orchestrator stops the playground from being abused:
+
+- Only allow-listed operations run (default: `update_props` on `Hero` blocks)
+- Each visitor gets an isolated ephemeral session keyed by `sha1(ip)` — no persistence
+- Per-IP rate limit (default 20 requests/hour)
+- Image generation short-circuited so DALL-E / Unsplash can't be triggered
+- Agent and Jira routes return 403
+
+It's the right answer when you want a marketing landing page where prospects can chat-edit a sample site without authenticating, signing up, or installing anything.
+
+<Warning>
+The gate is **server-enforced** inside `applyOpsAtomically` and a Fastify preHandler. Client-trusted flags can't bypass it. That said, this is a playground gate, not a security boundary — anyone hitting your demo orchestrator is using your LLM budget. Always pair `DEMO_MODE=1` with a rate limit and provider-level spend caps.
+</Warning>
+
+## What demo mode does
+
+| Surface | Behavior in demo mode |
+|---|---|
+| `/chat`, `/ops` | Only allow-listed op types on allow-listed block types succeed. Anything else returns `needs_clarification` with example prompts. |
+| `/agent/*`, `/sites-agent/*`, `/jira/*` | 403 — these would bypass the op gate. |
+| Image generation | Short-circuited in `detectImageOps`. No external API calls. |
+| Session keys | Rewritten to `demo-<sha1(ip).slice(0,10)>` on every request. Clients send anything (e.g. `session=dev`); middleware swaps it. |
+| `/chat*`, `/ops` | Per-IP token bucket rate limit (default 20/hr). 429 + `retry-after` header on exceed. |
+| `/status/planner` | Returns `plannerSource: "demo"` so the editor shows its demo badge. |
+| Persistence | Sessions are ephemeral — wiped on server restart. |
+
+## Quick setup
+
+Three Render services (orchestrator + editor + site), each on its own subdomain:
+
+### Orchestrator (Render web service)
+
+```bash
+DEMO_MODE=1
+DEMO_ALLOWED_OPS=update_props                  # comma list
+DEMO_ALLOWED_BLOCK_TYPES=Hero                  # comma list
+DEMO_RATE_LIMIT_PER_IP_PER_HOUR=20
+DEMO_DISABLE_IMAGE_GEN=1
+ANTHROPIC_API_KEY=<your shared key>
+ORCHESTRATOR_CORS_ORIGINS=https://demo-editor.example.com,https://demo-site.example.com
+ORCHESTRATOR_DB_FILE=:memory:                  # nothing should persist
+```
+
+`ORCHESTRATOR_DB_FILE=:memory:` is auto-set when `DEMO_MODE=1` is on; the explicit value is documentation. State is genuinely ephemeral — no disk writes.
+
+### Editor (Vercel project, separate from your prod editor)
+
+```bash
+VITE_DEMO_MODE=1
+VITE_ORCHESTRATOR_URL=https://demo-orchestrator.example.com
+VITE_SITE_ORIGIN=https://demo-site.example.com
+VITE_LOCK_SITE_ID=1
+```
+
+`VITE_LOCK_SITE_ID=1` hides the site picker; visitors can only edit the one demo site.
+
+### Site (Vercel project, separate from your prod site)
+
+```bash
+ORCHESTRATOR_URL=https://demo-orchestrator.example.com
+NEXT_PUBLIC_EDITOR_ORIGIN=https://demo-editor.example.com
+DRAFT_DEFAULT_SESSION=dev
+NEXT_PUBLIC_DEFAULT_SITE_ID=avocado-stories
+NEXT_PUBLIC_ENABLE_EDITOR=1
+```
+
+The middleware rewrites `body.session` and `body.siteId` on every demo request, so clients don't need to know their demo session key — they just send `session=dev` (or anything) and the orchestrator swaps it for `demo-<hash(ip)>` + `siteId=avocado-stories`.
+
+## Tuning the allow-list
+
+The defaults — `update_props` on `Hero` — are deliberately narrow. They demonstrate the AI editing UX (rewrite a headline, change a tagline, swap CTA copy) without letting visitors restructure pages or evict sample content.
+
+Widen carefully. Each new allowed op type is a new vector for visitors to use your LLM budget.
+
+```bash
+# Allow editing CTAs too — keeps to single-block prop updates
+DEMO_ALLOWED_BLOCK_TYPES=Hero,CTA
+
+# Allow appending items to lists (e.g. add an FAQ entry)
+DEMO_ALLOWED_OPS=update_props,add_list_item
+DEMO_ALLOWED_BLOCK_TYPES=Hero,CTA,FAQAccordion
+```
+
+What you probably **don't** want to allow in a public playground:
+
+- `add_block` / `remove_block` — visitors will spam blocks
+- `move_block` — easy to grief the page layout
+- Anything on `RichText` — opens the door to long-form content abuse
+
+If you want a wider playground for a specific audience (design partners, prospects under NDA), gate access at your reverse proxy (basic auth, signed URLs) instead of widening the demo allow-list.
+
+## What demo mode is not
+
+- **Not a multi-tenant SaaS.** Each demo session is keyed by IP, not by user. Two visitors behind the same NAT share a session.
+- **Not a security boundary.** It stops casual abuse, not a determined attacker. Use upstream rate limits (Cloudflare, your reverse proxy) and provider spend caps for actual cost control.
+- **Not a free trial.** State doesn't persist; visitors can't save their work or come back to it. For a "free trial that converts," look at hosting the full editor behind auth instead.
+
+## Testing locally
+
+```bash
+cd apps/orchestrator
+DEMO_MODE=1 ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY pnpm dev
+```
+
+Tests in `apps/orchestrator/src/demo-mode.test.ts` cover the split-allow logic (allow `update_props` but only on Hero, etc.) — useful reference if you're widening the allow-list.
+
+## Reverting
+
+Remove `DEMO_MODE=1` from the orchestrator env and redeploy. There's no migration — demo state was never persisted.
+
+## See also
+
+- [Docker deployment](/operations/docker-deployment) — running the orchestrator
+- [Vercel deployment](/operations/vercel-deployment) — splitting editor and site projects
+- [Chat troubleshooting](/observability/chat-troubleshooting) — diagnosing rejected demo requests
