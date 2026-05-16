@@ -11,6 +11,13 @@ import type { EditPlan } from "@avocadostudio-ai/shared"
 process.env.CHAT_PARALLEL_PLANNER = "0"
 process.env.CHAT_LLM_INTENT_ROUTER = "0"
 
+// Several tests in this file don't set OPENAI_API_KEY themselves and were
+// relying on a developer's local .env. In CI's test:integration step the
+// secret is not propagated, so resolvePlannerSource falls through to "demo"
+// or "gemini" and the openai planner mock never fires. Pin a placeholder key
+// here — the mocks intercept all real planner calls, so no network is hit.
+if (!process.env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = "test-key"
+
 import { app } from "./index.js"
 import {
   detectImageOps,
