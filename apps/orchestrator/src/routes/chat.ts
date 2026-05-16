@@ -380,7 +380,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: RouteContext) {
     let streamEntry: StreamEntry | undefined
     let streamId: string | undefined = rawQuery.streamId
     const afterSeq = Number(rawQuery.afterSeq ?? 0) || 0
-    const isReconnect = afterSeq > 0
+    const isReconnect = rawQuery.afterSeq !== undefined
     const reqOrigin = request.headers.origin ?? "*"
 
     if (streamId) {

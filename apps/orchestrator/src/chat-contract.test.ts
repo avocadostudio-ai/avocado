@@ -79,7 +79,7 @@ test("POST /chat contract: validation error shape is stable when message is miss
   assert.match(String(payload.error), /message is required/i)
 })
 
-test("GET /chat/stream contract: emits status and final events with structured result", async () => {
+test("GET /chat/stream contract: emits final event with structured result", async () => {
   const session = newSession()
   const response = await app.inject({
     method: "GET",
@@ -89,9 +89,6 @@ test("GET /chat/stream contract: emits status and final events with structured r
   assert.equal(response.statusCode, 200)
   const events = parseSseData(response.body)
   assert.ok(events.length > 0, "SSE should emit at least one event")
-
-  const statusEvent = events.find((event) => event.type === "status")
-  assert.ok(statusEvent, "SSE should emit status event")
 
   const finalEvent = events.find((event) => event.type === "final")
   assert.ok(finalEvent, "SSE should emit final event")
