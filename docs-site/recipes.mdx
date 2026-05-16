@@ -1,0 +1,156 @@
+---
+title: "Recipes"
+description: "Task-oriented index of common workflows — what you want to do, mapped to the right doc."
+---
+
+The other docs are organized by *system* (Integration, Deployment, MCP, …). This page is organized by *task* — what you actually want to do — and links you to the right page.
+
+If you don't see your task here, [Quickstart](/quickstart) is usually the right first stop.
+
+## Get started
+
+### Make your first edit (5 minutes)
+
+Boot the stack locally, point at the demo site, type a chat message, watch it apply in real time.
+
+→ [Quickstart](/quickstart)
+
+### Understand the model before writing any code
+
+Pages, blocks, props, operations, sessions, snapshots. The mental model that everything else builds on.
+
+→ [Core Concepts](/concepts) · [How It Works](/how-it-works) · [Architecture](/architecture)
+
+## Bring in your own site
+
+### Migrate an existing Next.js site (agentic, 5–15 min)
+
+Give the in-editor Onboarding agent a URL or GitHub repo. It clones, analyzes, wires the SDK, and registers the site.
+
+→ [Onboarding agent](/sites/site-agent)
+
+### Hand the integration to your coding agent (Claude Code, Cursor, Codex)
+
+Self-contained docs the coding agent can read and execute against without supervision.
+
+→ [Bring your own coding agent](/sites/coding-agent)
+
+### Integrate by hand (~30 min)
+
+Drop the Site SDK into your Next.js 15 project manually. Best when you want to understand every wire.
+
+→ [Manual integration](/sites/manual) · [Next.js integration reference](/integration/nextjs-integration)
+
+## Connect a CMS
+
+### Wire up Contentful, Sanity, or Strapi
+
+All three ship as working examples under `examples/` with bootstrap scripts that generate the content model for you.
+
+→ [CMS adapters](/integration/cms-adapters)
+
+### Write an adapter for a CMS we don't ship (Storyblok, Hygraph, Payload, Directus, …)
+
+Two functions: `fetchPage(slug) → PageDoc` and `writePage(doc) → void`. ~150 lines.
+
+→ [CMS adapters — Writing your own](/integration/cms-adapters#writing-your-own-adapter)
+
+## Customize what's editable
+
+### Add a custom block alongside the 20 built-ins
+
+Register a React component with a Zod schema and field metadata. The AI planner reads the schema and edits it like any built-in block.
+
+→ [Custom blocks](/integration/custom-blocks) · [Block system](/integration/block-system)
+
+### Browse the live catalogue of built-in blocks
+
+20 blocks, each with editable props, in a live workspace with viewport switcher.
+
+→ [avocadostudio.dev/components](https://avocadostudio.dev/components) · [Built-in blocks reference](/integration/built-in-blocks)
+
+### Use drag-and-drop instead of (or alongside) chat
+
+Avocado ships a [Puck](https://puckeditor.com/) integration that produces the same `BlockInstance` model from a visual editor.
+
+→ [Puck mode](/integration/puck-mode)
+
+## Drive Avocado from outside the editor
+
+### From Claude Desktop, Claude Code, or Cursor
+
+Avocado bundles an MCP server with 40 tools. Drop in a config snippet and your AI assistant can read and edit your site directly.
+
+→ [MCP server](/integration/mcp-server)
+
+### From a Jira ticket
+
+Webhook + REST integration that turns ticket comments into chat messages.
+
+→ [Jira integration](/integration/jira)
+
+## Deploy
+
+### Self-host with Docker
+
+The supported production path. Docker image + persistent volume + Render / Fly / Railway / DO / Kubernetes.
+
+→ [Docker deployment](/operations/docker-deployment)
+
+### Deploy the editor + site to Vercel
+
+Three projects: orchestrator (Docker/Render), editor (Vercel), site (Vercel).
+
+→ [Vercel deployment](/operations/vercel-deployment) · [Netlify deployment](/operations/netlify-deployment)
+
+### Run a public playground / demo
+
+Locked-down `DEMO_MODE=1` with allow-listed ops, per-IP rate limiting, and no AI image gen.
+
+→ [Demo mode](/operations/demo-mode)
+
+### Publish to a custom target (S3, GitLab Pages, …)
+
+Implement `PublishTarget` (two methods) and register it. The route handler picks it up automatically.
+
+→ [Publishing — Building a custom target](/integration/publishing#building-a-custom-target)
+
+## Tune AI behavior
+
+### Use Gemini (or OpenAI, or both) instead of Claude
+
+Set the appropriate API key. The Content Studio's model picker surfaces any provider with a configured key.
+
+→ [AI Providers & Model Routing](/ai-providers)
+
+### Use cheaper models for routine edits, smarter ones for restructures
+
+Per-tier model env vars (`*_MODEL_FAST`, `*_MODEL_BALANCED`, `*_MODEL_REASONING`, `*_MODEL_CODEX`).
+
+→ [AI Providers — Model tiers](/ai-providers#model-tiers)
+
+### Add a new language to the editor + AI responses
+
+One new dictionary file, three lines of glue, one entry in the orchestrator's `LOCALE_NAMES`.
+
+→ [Internationalization](/i18n)
+
+## Debug
+
+### A chat returned the wrong operation (or no operation)
+
+Playbook for investigating prompt failures, wrong ops, and regressions.
+
+→ [Chat troubleshooting](/observability/chat-troubleshooting)
+
+### See what the planner is spending in tokens
+
+Per-request token usage telemetry with per-provider breakdown.
+
+→ [Token usage tracking](/observability/token-usage-tracking)
+
+### Trace a chat end-to-end (request → ops → preview)
+
+OpenTelemetry-style trace events through the orchestrator and editor.
+
+→ [E2E tracing](/observability/e2e-tracing)

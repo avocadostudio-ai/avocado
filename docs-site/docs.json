@@ -26,7 +26,14 @@
               "concepts",
               "how-it-works",
               "architecture",
-              "ai-providers"
+              "ai-providers",
+              "compare"
+            ]
+          },
+          {
+            "group": "Recipes",
+            "pages": [
+              "recipes"
             ]
           },
           {

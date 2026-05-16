@@ -1,0 +1,92 @@
+---
+title: "Compare"
+description: "How Avocado Studio relates to headless CMSes, AI website builders, visual page builders, and general AI assistants."
+---
+
+Avocado Studio sits in a category that didn't exist two years ago: **AI content operations for code-first websites**. That makes it easy to confuse with adjacent tools. This page lays out where the boundaries are, when Avocado is the right answer, and when something else is.
+
+Short version: if your site is **already built**, you want to keep your **own stack** (Next.js + your CMS + your hosting), and you want AI editing to feel **native rather than bolted-on**, Avocado is built for you. If you're starting greenfield with no stack opinions and want the fastest path to "deployed website," a hosted AI builder will get you there in less time.
+
+## At a glance
+
+| | Headless CMS<br/>(Contentful, Sanity, Strapi) | AI website builders<br/>(Fimo, Wix AI, Framer AI) | Visual page builders<br/>(Builder.io, Plasmic) | General AI assistants<br/>(ChatGPT, Claude) | **Avocado Studio** |
+|---|---|---|---|---|---|
+| Bring your existing Next.js site | yes | no — greenfield | partial — content sections | n/a | **yes** |
+| AI-native editing | no | yes (hosted) | bolted-on | yes, no structure | **yes (open, BYOK)** |
+| You own the code + content store | yes | no | no | n/a | **yes** |
+| Self-hostable | varies (Strapi yes) | no | no | n/a | **yes (Apache 2.0)** |
+| Typed, validated edit operations | no | partial | no | no | **yes (Zod + atomic)** |
+| Live preview + undo for AI edits | no | yes | yes (manual) | no | **yes** |
+| Drive from Claude Code / Cursor / Desktop | no | no | no | n/a | **yes (MCP bundled)** |
+| Per-seat pricing | yes | yes | yes | yes | **no** |
+
+## vs. headless CMSes (Contentful, Sanity, Strapi)
+
+**Not a replacement — a complement.** Avocado doesn't store content. Your CMS does. Avocado adds an AI-driven editing surface that talks to your CMS through a small adapter (see [CMS adapters](/integration/cms-adapters)).
+
+| Where headless CMS wins | Where Avocado wins |
+|---|---|
+| Structured content modeling, references, taxonomies | AI-native editing UX |
+| Mature content-team tooling (workflows, scheduling, multilingual workflows) | Natural-language edits without schema training |
+| Webhooks, ISR, distribution | Edit-time live preview + undo |
+| Asset management, transformations | Edits flow through the *same* adapter your site already uses |
+
+**Use both.** A typical Avocado deployment runs against Contentful or Sanity. Content teams keep using the CMS for content modeling; marketing / non-technical users use Avocado's chat UI for routine edits and never need to touch the CMS.
+
+## vs. AI website builders (Fimo, Wix AI, Framer AI, Webflow AI features)
+
+**Different target user.** AI builders take you from nothing to a hosted site in minutes — that's a real value prop for people without a stack. Avocado assumes you *have* a stack and don't want to throw it away.
+
+| Where AI builders win | Where Avocado wins |
+|---|---|
+| Zero-to-deployed in minutes | Works with your existing Next.js codebase |
+| Template marketplaces, design systems | You bring your own design system / components |
+| Hosted platform — no infra to run | Self-hosted, no vendor lock-in |
+| Real-time multi-user collaboration | Deterministic, schema-validated operations |
+| One-click publish to their hosting | Pluggable [PublishTarget](/integration/publishing) — git, Vercel, custom |
+
+**Trade-off in one line:** AI builders lock you into their platform in exchange for speed; Avocado keeps you on yours in exchange for ~30 minutes of integration.
+
+If you'd rather not spend even those 30 minutes, the [Onboarding agent](/sites/site-agent) does the integration for you in 5–15 minutes against an existing public URL or GitHub repo.
+
+## vs. visual page builders (Builder.io, Plasmic, Storyblok Visual Editor)
+
+**Different editing model.** Visual builders are drag-and-drop with a panel of props. Avocado is **chat-first** with a live preview — you describe the change, the system generates a typed operation, applies it, and shows you the result.
+
+| Where visual builders win | Where Avocado wins |
+|---|---|
+| Pixel-precise positioning | Natural-language semantic edits |
+| Direct manipulation feels familiar | Multi-step changes in one prompt |
+| Good fit for designers | Schema-validated operations — no broken state |
+| Mature visual builder ecosystem | Open source, self-hosted, BYO LLM keys |
+
+You can also run **both** — Avocado ships a [Puck](/integration/puck-mode) integration that bolts a visual editor onto the same `BlockInstance` model, so chat edits and drag-and-drop edits both produce the same typed operations against the same content.
+
+## vs. general AI assistants (ChatGPT, Claude.ai, Cursor)
+
+**Same models, different layer.** Avocado uses the same LLMs you'd use directly. The difference is everything *around* the model:
+
+- **Typed operations** — the LLM emits structured ops validated against Zod schemas. Malformed edits are rejected before they touch your content. ChatGPT can produce "looks right" HTML that breaks your build.
+- **Atomic apply** — multi-op plans apply or roll back as a unit. No half-applied state.
+- **Live preview** — you see edits in your real site immediately, not as a code suggestion to copy into your editor.
+- **Undo / version log** — every plan is undo-able and timestamped.
+- **Block schema awareness** — the planner knows the exact props each of your blocks accepts. ChatGPT doesn't.
+- **MCP bridge** — if you do want to drive edits from Claude.ai or Cursor, the [MCP server](/integration/mcp-server) plugs Avocado in as a tool. Best of both: chat in your favorite assistant, structured edits applied via Avocado.
+
+In short: if your goal is *just* "ask an AI to write some content," ChatGPT is fine. If your goal is "apply that content as validated edits to a real site with rollback," that's what Avocado is for.
+
+## When Avocado is the wrong answer
+
+It's worth being explicit:
+
+- **You're building a brand-new site with no stack opinions and want it hosted for you.** A hosted AI builder is faster. Avocado will feel like overkill.
+- **You're a designer who works visually-first and never wants to type.** Visual builders fit your workflow better. (Or use Avocado's [Puck mode](/integration/puck-mode) — same content model, drag-and-drop UI.)
+- **You don't have or want a structured block model.** Avocado's edits run against typed blocks with Zod-validated props. If your site is a single 4,000-line `page.tsx`, you'd need to refactor into blocks first. The [Onboarding agent](/sites/site-agent) can do that refactor, but it's still real work.
+- **You're not on Next.js.** Today the [Site SDK](/integration/nextjs-integration) targets Next.js 15+. A site provider SPI for [other frameworks](/integration/non-nextjs) is sketched but not yet shipped.
+
+## See also
+
+- [Quickstart](/quickstart) — boot the stack and see the editing UX in 5 minutes
+- [How It Works](/how-it-works) — the planner → ops → preview pipeline
+- [Architecture](/architecture) — the full system map
+- [Onboarding agent](/sites/site-agent) — automate the integration for an existing Next.js site
