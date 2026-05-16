@@ -35,6 +35,7 @@ const fieldDraftEvent = z.object({
   blockId: z.string(),
   editablePath: z.string(),
   value: z.string(),
+  pageSlug: z.string().optional(),
 })
 
 const summaryTokenEvent = z.object({
