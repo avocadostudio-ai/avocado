@@ -1,6 +1,16 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import type { EditPlan } from "@avocadostudio-ai/shared"
+
+// These tests mock the planner via setGeneratePlanWithOpenAIForTests and then
+// assert exact call counts / planner source / response codes for the sequential
+// repair pipeline. The parallel intent-router + planner optimizations would
+// invoke the same mock an extra time and bypass the repair path, so disable
+// them for this file before importing the app (env is read per-request, but
+// pinning here keeps the intent obvious).
+process.env.CHAT_PARALLEL_PLANNER = "0"
+process.env.CHAT_LLM_INTENT_ROUTER = "0"
+
 import { app } from "./index.js"
 import {
   detectImageOps,
@@ -1181,7 +1191,14 @@ test("rewrite without selected editable path falls back to model planner", async
   assert.equal(hero?.props.heading, targetHeading)
 })
 
-test("focused deterministic rewrite sanitizes markdown emphasis", async (t) => {
+// TODO: deterministic rewrite was disabled (see
+// apps/orchestrator/src/chat/chat-pipeline-deterministic.ts ~line 385 — the
+// helper now always returns null because the substitution-based rewrite was
+// too simplistic). Rewrite is now delegated to the LLM planner, so this test's
+// "planner must not be called" assertion is no longer valid. Skip until the
+// deterministic path is restored or until we rewrite the test to assert the
+// LLM-path sanitization behaviour instead.
+test("focused deterministic rewrite sanitizes markdown emphasis", { skip: "deterministic rewrite path disabled — see chat-pipeline-deterministic.ts" }, async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
   t.after(() => {
@@ -1628,6 +1645,9 @@ test("chat routes 'show me 3 variants' with activeBlockId to variation pipeline"
 test("chat returns repair_failed when deterministic repair generation throws", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
+  // Unknown props are silently stripped (planner_hallucinated_prop), so use an
+  // enum violation that actually fails Zod validation and triggers the repair
+  // path. imagePosition only accepts "left" | "right" | "full".
   const invalidPlan: EditPlan = {
     intent: "edit_plan",
     summary_for_user: "Try unsupported hero field.",
@@ -1637,7 +1657,7 @@ test("chat returns repair_failed when deterministic repair generation throws", a
         op: "update_props",
         pageSlug: "/",
         blockId: "b_hero_home",
-        patch: { notARealHeroProp: "x" } as Record<string, unknown>
+        patch: { imagePosition: "middle" } as Record<string, unknown>
       }
     ]
   }
@@ -1697,6 +1717,8 @@ test("chat apply_pending_plan without pending plan and no message returns pendin
 test("chat applies repaired OpenAI plan after initial schema violation", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
+  // imagePosition enum violation triggers schema_violation → repair, whereas
+  // unknown props are silently stripped without ever invoking repair.
   const invalidPlan: EditPlan = {
     intent: "edit_plan",
     summary_for_user: "Invalid first attempt.",
@@ -1706,7 +1728,7 @@ test("chat applies repaired OpenAI plan after initial schema violation", async (
         op: "update_props",
         pageSlug: "/",
         blockId: "b_hero_home",
-        patch: { notARealHeroProp: "x" } as Record<string, unknown>
+        patch: { imagePosition: "middle" } as Record<string, unknown>
       }
     ]
   }
@@ -1750,6 +1772,7 @@ test("chat applies repaired OpenAI plan after initial schema violation", async (
 test("chat returns guardrail failure when repaired plan still fails to apply", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
+  // imagePosition enum violation reliably triggers schema_violation → repair.
   const invalidPlan: EditPlan = {
     intent: "edit_plan",
     summary_for_user: "Invalid first attempt.",
@@ -1759,15 +1782,23 @@ test("chat returns guardrail failure when repaired plan still fails to apply", a
         op: "update_props",
         pageSlug: "/",
         blockId: "b_hero_home",
-        patch: { notARealHeroProp: "x" } as Record<string, unknown>
+        patch: { imagePosition: "middle" } as Record<string, unknown>
       }
     ]
   }
+  // Repair attempt also violates schema → repair_failed.
   const stillBadRepairPlan: EditPlan = {
     intent: "edit_plan",
     summary_for_user: "Still invalid after repair.",
-    change_log: ["Attempted patch on missing block."],
-    ops: [{ op: "update_props", pageSlug: "/", blockId: "missing_block", patch: { heading: "x" } }]
+    change_log: ["Attempted another invalid enum value."],
+    ops: [
+      {
+        op: "update_props",
+        pageSlug: "/",
+        blockId: "b_hero_home",
+        patch: { imagePosition: "diagonal" } as Record<string, unknown>
+      }
+    ]
   }
   setGeneratePlanWithOpenAIForTests(async ({ feedback }) => ({ plan: feedback ? stillBadRepairPlan : invalidPlan, usage: { ...ZERO_USAGE }, schemaContext: STUB_SCHEMA_CONTEXT }))
   t.after(() => {
@@ -1985,13 +2016,17 @@ test("chat returns no_effective_change when plan updates a prop to its current v
 test("chat uses demo planner path when OPENAI_API_KEY is missing", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   const previousAnthropicKey = process.env.ANTHROPIC_API_KEY
+  const previousGoogleKey = process.env.GOOGLE_GENAI_API_KEY
   delete process.env.OPENAI_API_KEY
   delete process.env.ANTHROPIC_API_KEY
+  delete process.env.GOOGLE_GENAI_API_KEY
   t.after(() => {
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = previousKey
     if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
     else process.env.ANTHROPIC_API_KEY = previousAnthropicKey
+    if (previousGoogleKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY
+    else process.env.GOOGLE_GENAI_API_KEY = previousGoogleKey
   })
 
   const session = newSession()
@@ -2016,8 +2051,10 @@ test("chat uses demo planner path when OPENAI_API_KEY is missing", async (t) => 
 test("chat returns planner_exception when demo planner throws", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   const previousAnthropicKey = process.env.ANTHROPIC_API_KEY
+  const previousGoogleKey = process.env.GOOGLE_GENAI_API_KEY
   delete process.env.OPENAI_API_KEY
   delete process.env.ANTHROPIC_API_KEY
+  delete process.env.GOOGLE_GENAI_API_KEY
   setDemoPlanFromMessageForTests(() => {
     throw new Error("demo planner exploded")
   })
@@ -2027,6 +2064,8 @@ test("chat returns planner_exception when demo planner throws", async (t) => {
     else process.env.OPENAI_API_KEY = previousKey
     if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
     else process.env.ANTHROPIC_API_KEY = previousAnthropicKey
+    if (previousGoogleKey === undefined) delete process.env.GOOGLE_GENAI_API_KEY
+    else process.env.GOOGLE_GENAI_API_KEY = previousGoogleKey
   })
 
   const session = newSession()
@@ -2154,11 +2193,21 @@ test("chat unsplash hero request: LLM placeholder matching current value still a
 test("auto-routing: complex router signal stamps routingDecision in shadow mode and does NOT swap model", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
+  // Auto-routing depends on the parallel LLM intent router, which is disabled
+  // at the top of this file for the repair-pipeline tests. Re-enable both flags.
+  const previousRouter = process.env.CHAT_LLM_INTENT_ROUTER
+  const previousParallel = process.env.CHAT_PARALLEL_PLANNER
+  process.env.CHAT_LLM_INTENT_ROUTER = "1"
+  process.env.CHAT_PARALLEL_PLANNER = "1"
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     setParseIntentWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = previousKey
+    if (previousRouter === undefined) delete process.env.CHAT_LLM_INTENT_ROUTER
+    else process.env.CHAT_LLM_INTENT_ROUTER = previousRouter
+    if (previousParallel === undefined) delete process.env.CHAT_PARALLEL_PLANNER
+    else process.env.CHAT_PARALLEL_PLANNER = previousParallel
   })
 
   const session = newSession()
@@ -2248,11 +2297,19 @@ test("auto-routing: complex router signal stamps routingDecision in shadow mode 
 test("auto-routing: simple router signal still downgrades AND stamps routingDecision", async (t) => {
   const previousKey = process.env.OPENAI_API_KEY
   process.env.OPENAI_API_KEY = previousKey || "test-key"
+  const previousRouter = process.env.CHAT_LLM_INTENT_ROUTER
+  const previousParallel = process.env.CHAT_PARALLEL_PLANNER
+  process.env.CHAT_LLM_INTENT_ROUTER = "1"
+  process.env.CHAT_PARALLEL_PLANNER = "1"
   t.after(() => {
     setGeneratePlanWithOpenAIForTests()
     setParseIntentWithOpenAIForTests()
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = previousKey
+    if (previousRouter === undefined) delete process.env.CHAT_LLM_INTENT_ROUTER
+    else process.env.CHAT_LLM_INTENT_ROUTER = previousRouter
+    if (previousParallel === undefined) delete process.env.CHAT_PARALLEL_PLANNER
+    else process.env.CHAT_PARALLEL_PLANNER = previousParallel
   })
 
   const session = newSession()
