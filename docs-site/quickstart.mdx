@@ -1,0 +1,93 @@
+---
+title: "Quickstart"
+description: "Boot the full Avocado Studio stack locally and make your first AI-driven edit in under 5 minutes."
+---
+
+This page walks you from `git clone` to your first natural-language edit on the bundled demo site. By the end you'll have the orchestrator, editor, and site running locally, an LLM provider wired up, and a working chat that edits a real page.
+
+If you'd rather understand the model first, start with [Core Concepts](/concepts) and [How It Works](/how-it-works).
+
+## Prerequisites
+
+- **Node.js 22+** (check with `node --version`)
+- **One LLM API key** — Anthropic, OpenAI, or Google Gemini. Anthropic Claude is the most battle-tested.
+- A terminal and a browser.
+
+That's it. No database, no Docker, no auth setup for local dev.
+
+## 1. Clone and boot
+
+```bash
+git clone https://github.com/avocadostudio-ai/avocado.git
+cd avocado
+./start
+```
+
+`./start` is idempotent — re-run it any time. On first run it:
+
+1. Verifies Node 22+
+2. Enables corepack so `pnpm` resolves to the pinned version
+3. Runs `pnpm install`
+4. Copies `.env.example` → `.env` and prompts for your LLM API key
+5. Starts all three services in the background
+6. Opens the Content Studio in your browser
+
+When it finishes you should have:
+
+| Service | URL | What it is |
+|---|---|---|
+| Site | `http://localhost:3000` | Demo Next.js site (Avocado Stories — a sample recipes site) |
+| Content Studio | `http://localhost:4100` | The AI editor — chat on the right, live preview on the left |
+| Orchestrator | `http://localhost:4200` | Fastify API that runs the planner and executes operations |
+
+<Note>
+If you'd rather start manually, see the README's "Prefer manual steps?" section — `corepack enable`, `pnpm install`, `pnpm dev:setup`, `pnpm dev:start`.
+</Note>
+
+## 2. Make your first edit
+
+Open `http://localhost:4100`. You should see the demo site loaded on the left and an empty chat composer on the right.
+
+Try one of these in the chat:
+
+- *"Change the hero headline to 'Cooking made delicious'"*
+- *"Add a testimonial block after the hero with a quote about how easy the recipes are"*
+- *"Rewrite the homepage hero in a more playful tone"*
+
+You'll see:
+
+1. **Streaming plan** — the planner streams operations back; each one appears in the chat as it's parsed.
+2. **Progressive apply** — operations apply to the preview iframe as they arrive, so the site mutates in real time.
+3. **Change log** — a human-readable summary of what changed and why.
+4. **Undo button** — every plan is undo-able from the chat history.
+
+If something looks off, hit **Undo**. The full operation history is in `apps/orchestrator/.data/orchestrator.db` and survives restarts.
+
+## 3. Publish (optional)
+
+When you're happy with the changes, click **Publish** in the Content Studio header. By default the demo site uses a git-backed `PublishTarget` that writes a JSON snapshot to disk; the site refetches the published version on the next page load. Real deployments use the Vercel deploy-hook or any custom target you implement against the `PublishTarget` interface.
+
+## What's next
+
+You now have a working local stack editing a demo site. The next decision is *which site you want to edit for real*. There are three paths:
+
+- **Agentic onboarding** — the in-editor "Onboard with AI agent" button takes a URL or a GitHub repo and wires the SDK into your existing Next.js site end-to-end. See [Onboarding agent](/sites/site-agent).
+- **Bring your own coding agent** — hand the integration to Claude Code, Cursor, or Codex. See [Coding agent](/sites/coding-agent).
+- **Manual integration** — drop the [Site SDK](/integration/nextjs-integration) into your Next.js 15 project by hand (~30 min). See [Manual](/sites/manual).
+
+After that, deeper rabbit holes:
+
+- [MCP server](/integration/mcp-server) — drive Avocado from Claude Desktop, Claude Code, or Cursor.
+- [CMS adapters](/integration/cms-adapters) — wire up Contentful, Sanity, Strapi, or your own CMS as the content store.
+- [Custom blocks](/integration/custom-blocks) — register your own React components alongside the 20 built-ins.
+- [Deploy](/operations/docker-deployment) — Docker, Vercel, Netlify, or any Node 22 host.
+
+## Troubleshooting
+
+**`./start` fails on Node version** — install Node 22 via your version manager (`fnm install 22`, `nvm install 22`, or `mise use node@22`).
+
+**Chat returns "no planner configured"** — your `.env` doesn't have an LLM key. Edit `.env` at the repo root and set `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, or `GOOGLE_GENAI_API_KEY`), then restart with `pnpm dev:start`.
+
+**Preview iframe is blank** — check that `http://localhost:3000` opens in a fresh tab. The editor talks to the site over postMessage; if the site isn't running, the preview stays blank.
+
+**Want a deeper troubleshooting guide?** See [Chat troubleshooting](/observability/chat-troubleshooting).
