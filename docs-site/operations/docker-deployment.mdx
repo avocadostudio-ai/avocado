@@ -37,10 +37,10 @@ The orchestrator is a small Node.js Fastify service. It's stateful but not heavy
 A few things matter regardless of which host you pick:
 
 <Warning>
-**Single instance only.** The orchestrator keeps all session state — draft pages, undo history, chat threads, version log, site configs — in in-memory `Map`s, with periodic snapshots to disk. **Do not run multiple replicas behind a load balancer**: requests would round-robin between processes that don't share state, and sessions would appear to randomly lose their work. Horizontal scaling is on the roadmap but not implemented today. Configure your host for exactly one instance and scale vertically (more memory / CPU on a single machine) if you need more capacity.
+**Single instance only.** The orchestrator persists all session state — draft pages, undo history, chat threads, version log, site configs — to a local SQLite database via `better-sqlite3`. **Do not run multiple replicas behind a load balancer**: each replica would open its own SQLite file (or fight over a shared one), so requests round-robined between processes would see divergent state and sessions would appear to randomly lose work. Horizontal scaling is on the roadmap but not implemented today. Configure your host for exactly one instance and scale vertically (more memory / CPU on a single machine) if you need more capacity.
 </Warning>
 
-- **Persistent volume is required.** The orchestrator survives restarts by writing snapshots to `/app/.data/orchestrator-state.json`. If you mount that path on an ephemeral filesystem (Cloud Run without a volume, Heroku-style ephemeral dynos, default container hosts without disk attachment), every redeploy or container reschedule will wipe all sessions and undo history. Always attach a persistent volume — even 1 GB is enough.
+- **Persistent volume is required.** The orchestrator stores its SQLite database at `/app/.data/orchestrator.db` (plus `-wal` / `-shm` sidecar files and rolling backups). If you mount that path on an ephemeral filesystem (Cloud Run without a volume, Heroku-style ephemeral dynos, default container hosts without disk attachment), every redeploy or container reschedule will wipe all sessions and undo history. Always attach a persistent volume — even 1 GB is enough.
 - **SSE-friendly reverse proxy.** The chat endpoint streams server-sent events for live editor updates. Some reverse proxies and CDNs buffer responses by default, which makes the editor look frozen until the full response lands. If you put a reverse proxy in front of the orchestrator, disable response buffering on `/chat/*` and `/sites-agent/*` (in nginx: `proxy_buffering off`; in Caddy: `flush_interval -1` on `reverse_proxy`; in Cloudflare: bypass cache for these paths).
 - **Long timeouts.** Sites-agent runs (full URL migration, repo integration) can take several minutes. If your host has a default request timeout of 30s or 60s, the agent will be killed mid-run. Bump request timeouts to at least 10 minutes on the orchestrator's routes — most hosts let you configure this per service.
 - **CORS for the editor's origin.** Set `ORCHESTRATOR_CORS_ORIGINS` to include both your site and editor origins (HTTPS, no trailing slash). See [CORS configuration](#cors-configuration) below.
@@ -93,7 +93,7 @@ The orchestrator writes session state, telemetry, and generated images to `/app/
 
 The image pre-configures these paths:
 
-- `ORCHESTRATOR_STATE_FILE=/app/.data/orchestrator-state.json`
+- `ORCHESTRATOR_DB_FILE=/app/.data/orchestrator.db`
 - `CHAT_TELEMETRY_FILE=/app/.data/chat-telemetry.ndjson`
 - `ORCHESTRATOR_GENERATED_IMAGE_DIR=/app/.data/generated-images`
 

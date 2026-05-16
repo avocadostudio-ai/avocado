@@ -26,7 +26,7 @@ Two deployment phases are supported: public site only (Phase 1) or full Content 
 ## Current architecture (from this repo)
 
 - `apps/site` is a Next.js app.
-- `apps/orchestrator` is a Fastify API with in-memory state + file persistence (`.data/orchestrator-state.json`).
+- `apps/orchestrator` is a Fastify API that persists session state to a local SQLite database via `better-sqlite3` (`.data/orchestrator.db` + WAL).
 - `apps/editor` is a Vite app that currently hard-codes local URLs.
 - The site currently reads **draft** content from `ORCHESTRATOR_URL` (`/draft/pages`, `/draft/slugs`).
 
@@ -94,9 +94,9 @@ Use this only if you want production Content Studio workflows.
 - Keep `ORCHESTRATOR_URL` required for editor-enabled production.
 
 3. Rework orchestrator persistence.
-- Current implementation relies on in-memory Maps + filesystem persistence.
-- Vercel functions are ephemeral; local file persistence is not durable.
-- Move state to durable storage (Postgres, Redis/KV, etc.).
+- Current implementation persists to a local SQLite file (`better-sqlite3`).
+- Vercel functions are ephemeral and have read-only filesystems outside `/tmp`; a local SQLite file is not durable across invocations.
+- Move state to a network-accessible store (Postgres, Neon, Turso/libSQL, Redis/KV, etc.).
 
 4. Rework orchestrator runtime model for Vercel.
 - Current API starts a standalone server via `app.listen(...)`.

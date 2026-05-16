@@ -100,17 +100,17 @@ The site fetches draft content from the orchestrator when in draft mode:
 
 ## Session State
 
-The orchestrator maintains **in-memory session state** for each editing session:
+The orchestrator maintains **per-session state** for each editing session:
 
 - **Draft pages** — Current page content with all pending edits
 - **Operation history** — Full undo/redo stack
 - **Edit plans** — Generated plans awaiting approval
 - **Session config** — Selected AI provider, model tier, locale
 
-Session state is scoped per session ID. Multiple users editing different sessions don't interfere with each other. State is persisted to disk (`.data/orchestrator-state.json`) for crash recovery.
+Session state is scoped per session ID. Multiple users editing different sessions don't interfere with each other. State is persisted to a SQLite database (`.data/orchestrator.db`, via `better-sqlite3` + WAL) with synchronous transactional writes on every mutation, so crash recovery is automatic.
 
 <Note>
-For production deployment, session state should be moved to durable storage (Redis, Postgres, etc.). The default file-based persistence is designed for local development.
+The orchestrator runs as a single instance with a local SQLite file. Multi-replica horizontal scaling — which would require moving state to a network-accessible store (Postgres, Turso/libSQL, Redis, etc.) — is on the roadmap but not implemented today.
 </Note>
 
 ## Publishing Pipeline
