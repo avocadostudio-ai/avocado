@@ -15,6 +15,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: bash scripts/lint-docs.sh
       - run: pnpm typecheck
       - run: pnpm test:unit
       - run: pnpm --filter @ai-site-editor/orchestrator test:integration
