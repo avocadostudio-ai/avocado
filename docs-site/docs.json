@@ -34,7 +34,8 @@
             "pages": [
               "features/asset-picker",
               "features/immersive-mode",
-              "features/variants"
+              "features/variants",
+              "i18n"
             ]
           }
         ]
@@ -128,6 +129,12 @@
             "pages": [
               "operations/demo-mode"
             ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "observability/chat-troubleshooting"
+            ]
           }
         ]
       },
@@ -157,7 +164,6 @@
           {
             "group": "Observability",
             "pages": [
-              "observability/chat-troubleshooting",
               "observability/chat-telemetry-events",
               "observability/token-usage-tracking",
               "observability/e2e-tracing"

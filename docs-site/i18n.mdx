@@ -1,0 +1,162 @@
+---
+title: "Internationalization"
+description: "The Content Studio UI and AI responses both support multiple languages. English and German ship today; adding a locale is a few-line change."
+---
+
+Avocado Studio ships **two languages**: English (default) and German. The system is built to make adding more locales a small, mechanical change — one new dictionary file, three lines of glue, one entry in a prompt helper.
+
+What's localized:
+
+- **Content Studio UI** — every label, button, tooltip, dialog
+- **AI responses** — the `summary_for_user`, `change_log`, and `suggested_next_actions` come back in the user's language
+
+What's not (intentionally):
+
+- **Block type names** — `Hero`, `CTA`, `FAQAccordion` are code identifiers, not user-facing copy
+- **Model and provider names** — `gpt-4o`, `Claude`, `OpenAI` are vendor brands
+- **Field AI suggestion pills** — these are sent as prompts to the LLM and must stay in English
+- **Preview adapter overlay labels** — currently English-only (separate package, needs postMessage protocol extension)
+
+## How it works
+
+```mermaid
+flowchart LR
+  user[User types in chat]
+  editor[Content Studio<br/>locale = de]
+  orch[Orchestrator<br/>prompts.ts]
+  llm[LLM]
+  user --> editor
+  editor -->|POST /chat<br/>locale: 'de'| orch
+  orch -->|adds 'Respond in German.'| llm
+  llm -->|change_log in German| orch
+  orch -->|SSE| editor
+  editor -->|t('header.publish')| user
+```
+
+Two independent layers:
+
+**Editor UI** — A custom `LocaleProvider` + `useT()` hook (no i18n library). The active locale lives in `localStorage("editor-locale")`. Translations are typed `Record<LocaleKeys, string>` so missing keys are compile errors.
+
+**AI responses** — The editor sends `locale` on every `/chat` and `/chat/start` request. The orchestrator's `localeInstruction()` helper injects a language directive into the LLM system prompt, so the structured response fields come back in the right language.
+
+## Switching language
+
+In the Content Studio: **Settings (gear icon) → Language dropdown → English / Deutsch**. The choice persists in `localStorage` and applies to both UI strings and AI responses immediately — no reload.
+
+## Adding a new language
+
+Adding French as a worked example. The same recipe works for any language.
+
+### 1. Create the dictionary
+
+`apps/editor/src/i18n/fr.ts`:
+
+```ts
+import type { LocaleKeys } from "./en"
+
+const fr: Record<LocaleKeys, string> = {
+  "header.publish": "Publier",
+  "welcome.greeting": "Bienvenue sur {{name}}",
+  // ...all other keys from en.ts
+}
+
+export default fr
+```
+
+`LocaleKeys` is derived from `en.ts`, so TypeScript will complain about every key you haven't translated yet. `pnpm typecheck` is your checklist.
+
+### 2. Register the locale in the provider
+
+`apps/editor/src/i18n/index.tsx`:
+
+```ts
+import fr from "./fr"
+
+export type Locale = "en" | "de" | "fr"        // extend the union
+
+const LOCALES = { en, de, fr }                 // add fr
+const LOCALE_LABELS = {
+  en: "English",
+  de: "Deutsch",
+  fr: "Français",                              // add label
+}
+```
+
+### 3. Teach the orchestrator the language name
+
+`apps/orchestrator/src/chat/prompts.ts`:
+
+```ts
+const LOCALE_NAMES: Record<string, string> = {
+  en: "English",
+  de: "German",
+  fr: "French",                                // add this
+}
+```
+
+This is what gets interpolated into the prompt: *"Respond in French."*
+
+### 4. Verify
+
+```bash
+pnpm typecheck     # missing translation keys surface as type errors
+pnpm dev           # boot the stack, switch to Français, send a chat
+```
+
+That's the full integration. No build step, no separate translation pipeline, no external service.
+
+## Files at a glance
+
+| Layer | File |
+|---|---|
+| Source of truth (English) | `apps/editor/src/i18n/en.ts` |
+| German translation | `apps/editor/src/i18n/de.ts` |
+| Provider + `useT()` hook | `apps/editor/src/i18n/index.tsx` |
+| Orchestrator prompt helper | `apps/orchestrator/src/chat/prompts.ts` (`localeInstruction()`, `LOCALE_NAMES`) |
+| Request shape | `apps/orchestrator/src/nlp/intent-detection.ts` (`locale` on `ChatRequestBody`) |
+
+## Using translations in code
+
+**In React components:**
+
+```tsx
+import { useT } from "@/i18n"
+
+function Header() {
+  const { t } = useT()
+  return (
+    <>
+      <h1>{t("header.publish")}</h1>
+      <p>{t("welcome.greeting", { name: "My Site" })}</p>
+    </>
+  )
+}
+```
+
+The `{{name}}` interpolation syntax is built into `useT()`.
+
+**In pure (non-React) functions** — pass `t` as a parameter rather than calling a hook:
+
+```ts
+import type { TFunction } from "@/i18n"
+
+function buildErrorMessage(t: TFunction): string {
+  return t("errors.network")
+}
+```
+
+## Why no i18n library?
+
+The project deliberately doesn't depend on `i18next`, `react-intl`, or similar. Reasons:
+
+- The key set is small and stable (a few hundred strings).
+- Compile-time enforcement (`Record<LocaleKeys, string>`) catches drift without ICU message format complexity.
+- One fewer dependency to upgrade.
+- The `{{name}}` interpolation pattern covers every actual use case the editor has.
+
+If your fork needs plurals, gender, or ICU message format, swap in `i18next` — `useT()`'s signature is small enough to back with anything.
+
+## See also
+
+- [Quickstart](/quickstart) — boot the stack and try the language switcher
+- [AI Providers](/ai-providers) — the chat pipeline that consumes the `locale` field
