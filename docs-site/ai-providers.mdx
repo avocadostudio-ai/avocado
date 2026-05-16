@@ -1,5 +1,5 @@
 ---
-title: "AI Providers and Model Routing"
+title: "AI Providers & Model Routing"
 description: "Run the planner on Anthropic, OpenAI, or Google Gemini. Bring your own keys. Route fast / balanced / reasoning models per request."
 ---
 
@@ -84,7 +84,7 @@ flowchart TD
   reasoning --> ops
 ```
 
-1. **Intent router** runs on the `FAST` tier — usually finishes in <500 ms. Decides: is this a chat-only message ("what does Hero do?"), a real edit, or ambiguous?
+1. **Intent router** runs on the `FAST` tier — usually finishes in under 500 ms. Decides: is this a chat-only message ("what does Hero do?"), a real edit, or ambiguous?
 2. **Full planner** runs on `BALANCED` for routine edits. The router and planner can race in parallel (`CHAT_PARALLEL_PLANNER=1`) so the planner gets a head-start.
 3. **Reasoning planner** is auto-enabled for complex prompts by `CHAT_AUTO_REASONING=1`. Signals: multi-step asks, conditional language ("if there's already a CTA, ..."), structural verbs ("restructure," "rewrite tone of"), long prompts.
 
