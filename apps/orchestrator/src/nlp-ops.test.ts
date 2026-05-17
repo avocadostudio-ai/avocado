@@ -3936,3 +3936,83 @@ test("inferBlockTypeFromText maps 'map' and 'google_map' to Embed", () => {
   assert.strictEqual(inferBlockTypeFromText("google_map"), "Embed")
   assert.strictEqual(inferBlockTypeFromText("GoogleMap"), "Embed")
 })
+
+// ---------------------------------------------------------------------------
+// Header / site-config shortcuts
+// ---------------------------------------------------------------------------
+
+test("compileDeterministicPlan: 'change the logo to /logos/new.svg' → update_site_config", async () => {
+  const { setSiteConfig } = await import("./state/session-state.js")
+  const session = "header-test-logo"
+  setSiteConfig(session, {})
+  const home = demoPageBySlug("/")
+  const intent = inferDeterministicIntent({ message: "change the logo to /logos/new.svg", currentPage: home })
+  const plan = compileDeterministicPlan({
+    session,
+    intent: intent ?? { action: "update" as const },
+    message: "change the logo to /logos/new.svg",
+    slug: "/",
+    currentPage: home
+  })
+  assert.ok(plan, "expected a deterministic plan")
+  assert.equal(plan?.intent, "edit_plan")
+  assert.equal(plan?.ops.length, 1)
+  const op = plan!.ops[0] as { op: string; patch: { logo?: string } }
+  assert.equal(op.op, "update_site_config")
+  assert.equal(op.patch.logo, "/logos/new.svg")
+})
+
+test("compileDeterministicPlan: 'rename the site to Acme' → update_site_config", async () => {
+  const { setSiteConfig } = await import("./state/session-state.js")
+  const session = "header-test-name"
+  setSiteConfig(session, {})
+  const home = demoPageBySlug("/")
+  const intent = inferDeterministicIntent({ message: "rename the site to Acme", currentPage: home })
+  const plan = compileDeterministicPlan({
+    session,
+    intent: intent ?? { action: "update" as const },
+    message: "rename the site to Acme",
+    slug: "/",
+    currentPage: home
+  })
+  assert.ok(plan, "expected a deterministic plan")
+  const op = plan!.ops[0] as { op: string; patch: { name?: string } }
+  assert.equal(op.op, "update_site_config")
+  assert.equal(op.patch.name, "Acme")
+})
+
+test("compileDeterministicPlan: 'rename the Pricing link to Plans' → update_site_config navLabels", async () => {
+  const { setSiteConfig } = await import("./state/session-state.js")
+  const session = "header-test-nav"
+  setSiteConfig(session, { navLabels: {} })
+  const home = demoPageBySlug("/")
+  const intent = inferDeterministicIntent({ message: "rename the Pricing link to Plans", currentPage: home })
+  const plan = compileDeterministicPlan({
+    session,
+    intent: intent ?? { action: "update" as const },
+    message: "rename the Pricing link to Plans",
+    slug: "/",
+    currentPage: home
+  })
+  assert.ok(plan, `expected a deterministic plan, got ${JSON.stringify(plan)}`)
+  const op = plan!.ops[0] as { op: string; patch: { navLabels?: Record<string, string> } }
+  assert.equal(op.op, "update_site_config")
+  assert.deepEqual(op.patch.navLabels, { "/pricing": "Plans" })
+})
+
+test("compileDeterministicPlan: header keywords without value do not match", async () => {
+  const home = demoPageBySlug("/")
+  const intent = inferDeterministicIntent({ message: "tell me about the logo", currentPage: home })
+  const plan = compileDeterministicPlan({
+    session: "header-test-noop",
+    intent: intent ?? { action: "info" as const },
+    message: "tell me about the logo",
+    slug: "/",
+    currentPage: home
+  })
+  // Either null (falls through to LLM) or non-update_site_config; must NOT
+  // be a logo update with garbage value.
+  if (plan && plan.ops.length > 0) {
+    assert.notEqual((plan.ops[0] as { op: string }).op, "update_site_config")
+  }
+})

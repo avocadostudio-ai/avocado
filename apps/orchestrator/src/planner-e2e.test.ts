@@ -70,6 +70,14 @@ function buildTestContextPack(page: PageDoc, activeBlockId?: string) {
       target: null,
       anchor: null,
       mentionedBlocks: []
+    },
+    siteConfig: {
+      name: null,
+      logo: null,
+      navLabels: {},
+      navGroups: {},
+      defaultNavLabels: {},
+      editPath: "use update_site_config to change name, logo, navLabels, or navGroups"
     }
   }
 }

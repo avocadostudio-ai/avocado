@@ -1,5 +1,5 @@
-import type { PageDoc } from "@avocadostudio-ai/shared"
-import { getSessionDraft, getRecentEdits, orderSlugsHomeFirst } from "../state/session-state.js"
+import type { PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
+import { getSessionDraft, getRecentEdits, getSiteConfig, orderSlugsHomeFirst } from "../state/session-state.js"
 import { resolveReferencesFromMessage } from "./deterministic-planner-refs.js"
 
 // ---------------------------------------------------------------------------
@@ -196,6 +196,7 @@ export function plannerContextPack(args: {
 }) {
   const { session, slug, message, currentPage, activeBlockId, activeBlockType, activeEditablePath } = args
   const pageRoutes = orderSlugsHomeFirst(Array.from(getSessionDraft(session).keys()))
+  const siteConfigSummary = summarizeSiteConfigForPlanner(getSiteConfig(session), pageRoutes)
   const selectedIdx = activeBlockId ? currentPage.blocks.findIndex((b) => b.id === activeBlockId) : -1
   const neighbors =
     selectedIdx >= 0
@@ -240,6 +241,44 @@ export function plannerContextPack(args: {
     pageMeta: currentPage.meta ?? null,
     pageIntent: pageIntentSummary({ slug, currentPage }),
     recentSuccessfulEdits: getRecentEdits(session, slug),
-    resolvedReferences: resolveReferencesFromMessage({ message, currentPage, activeBlockId })
+    resolvedReferences: resolveReferencesFromMessage({ message, currentPage, activeBlockId }),
+    siteConfig: siteConfigSummary
   }
+}
+
+// Project SiteConfig down to the header-editable surface (name, logo, nav)
+// plus default-label hints for routes that have no override yet, so the planner
+// can issue update_site_config ops with confidence.
+function summarizeSiteConfigForPlanner(config: SiteConfig, pageRoutes: string[]) {
+  const navLabels: Record<string, string> = {}
+  for (const [slug, label] of Object.entries(config.navLabels ?? {})) {
+    if (typeof label === "string" && label.length > 0) navLabels[slug] = label
+  }
+  const navGroups: Record<string, string[]> = {}
+  for (const [label, slugs] of Object.entries(config.navGroups ?? {})) {
+    if (Array.isArray(slugs)) navGroups[label] = slugs.filter((s): s is string => typeof s === "string")
+  }
+  const defaultLabels: Record<string, string> = {}
+  for (const slug of pageRoutes) {
+    if (navLabels[slug]) continue
+    defaultLabels[slug] = deriveDefaultNavLabel(slug)
+  }
+  return {
+    name: typeof config.name === "string" && config.name.length > 0 ? config.name : null,
+    logo: typeof config.logo === "string" && config.logo.length > 0 ? config.logo : null,
+    navLabels,
+    navGroups,
+    defaultNavLabels: defaultLabels,
+    editPath: "use update_site_config to change name, logo, navLabels, or navGroups"
+  }
+}
+
+function deriveDefaultNavLabel(slug: string): string {
+  if (slug === "/") return "Home"
+  const last = slug.replace(/\/+$/, "").split("/").pop() ?? slug
+  return last
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
 }

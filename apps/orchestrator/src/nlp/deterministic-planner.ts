@@ -26,7 +26,8 @@ import {
   nextBlockId
 } from "./plan-normalizer.js"
 import {
-  getSessionDraft
+  getSessionDraft,
+  getSiteConfig
 } from "../state/session-state.js"
 import {
   readPathValue,
@@ -638,6 +639,125 @@ export function tryCompoundDeterministicPlan(args: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Header / site-config shortcut
+// ---------------------------------------------------------------------------
+
+const SMART_QUOTES_RE = /[‘’“”]/g
+
+function normalizeQuotes(value: string): string {
+  return value.replace(SMART_QUOTES_RE, (ch) => (ch === "‘" || ch === "’" ? "'" : '"'))
+}
+
+function stripWrappingQuotes(value: string): string {
+  const trimmed = value.trim().replace(/[.!?;:]+$/, "").trim()
+  const m = trimmed.match(/^["'](.+)["']$/)
+  return (m ? m[1] : trimmed).trim()
+}
+
+/**
+ * Matches high-confidence requests targeting the SiteHeader / siteConfig.
+ * Returns a one-op `update_site_config` plan or null if no clear match.
+ */
+function tryHeaderConfigPlan(args: {
+  session: string
+  message: string
+  assumptions: string[]
+}): EditPlan | null {
+  const { session, message, assumptions } = args
+  const lower = message.toLowerCase()
+  const draft = getSessionDraft(session)
+  const config = getSiteConfig(session)
+
+  // ── Logo ──────────────────────────────────────────────────────────────
+  const messageNorm = normalizeQuotes(message)
+  const mentionsLogo = /\b(logo)\b/.test(lower)
+  if (mentionsLogo) {
+    // "use URL as the logo" / "set logo to URL" / "change the logo to URL"
+    const useAs = messageNorm.match(/\buse\s+["']?(\S+?)["']?\s+as\s+(?:the\s+)?(?:site\s+)?logo\b/i)
+    const setTo = messageNorm.match(/\b(?:change|set|update|make)\s+(?:the\s+)?(?:site\s+)?logo\s+(?:to|=)\s+(.+?)$/i)
+    const raw = useAs ? useAs[1] : setTo ? setTo[1] : null
+    if (raw) {
+      const url = stripWrappingQuotes(raw)
+      if (/^(https?:\/\/|\/)/.test(url) && !/\s/.test(url)) {
+        return {
+          intent: "edit_plan",
+          summary_for_user: `Will update the **site logo**.`,
+          change_log: [...assumptions, `Set site logo to ${url}.`],
+          ops: [{ op: "update_site_config", patch: { logo: url } }]
+        }
+      }
+    }
+  }
+
+  // ── Site name ────────────────────────────────────────────────────────
+  const mentionsSiteName =
+    /\bsite\s+name\b/.test(lower) ||
+    /\brename\s+the\s+site\b/.test(lower) ||
+    /\bchange\s+the\s+site\s+to\b/.test(lower)
+  if (mentionsSiteName) {
+    const fromSiteName = messageNorm.match(/\bsite\s+name\s+(?:to|=|:)\s+(.+?)$/i)
+    const renameSite = messageNorm.match(/\brename\s+the\s+site\s+to\s+(.+)$/i)
+    const changeSite = messageNorm.match(/\bchange\s+the\s+site\s+to\s+(.+)$/i)
+    const raw = (fromSiteName ? stripWrappingQuotes(fromSiteName[1]) : null)
+      ?? (renameSite ? stripWrappingQuotes(renameSite[1]) : null)
+      ?? (changeSite ? stripWrappingQuotes(changeSite[1]) : null)
+    if (raw && raw.length > 0 && raw.length <= 80) {
+      return {
+        intent: "edit_plan",
+        summary_for_user: `Will rename the site to **${raw}**.`,
+        change_log: [...assumptions, `Set site name to "${raw}".`],
+        ops: [{ op: "update_site_config", patch: { name: raw } }]
+      }
+    }
+  }
+
+  // ── Nav label rename ─────────────────────────────────────────────────
+  // Patterns: "rename the X link to Y", "rename X in the nav to Y",
+  //           "relabel the X tab to Y", "change the X menu item to Y"
+  const navTokens = "(?:link|tab|menu(?:\\s+item)?|nav(?:igation)?(?:\\s+item)?|item|entry)"
+  const navContextRe = new RegExp(`\\b(?:rename|relabel|change|update|set)\\s+(?:the\\s+)?["']?([^"']+?)["']?\\s+${navTokens}\\s+to\\s+(.+)$`, "i")
+  const inNavRe = new RegExp(`\\b(?:rename|relabel|change|update|set)\\s+(?:the\\s+)?["']?([^"']+?)["']?\\s+(?:in|on)\\s+(?:the\\s+)?(?:nav(?:igation)?|menu|header)\\s+to\\s+(.+)$`, "i")
+  const navMatch = messageNorm.match(navContextRe) ?? messageNorm.match(inNavRe)
+  if (navMatch) {
+    const fromLabelRaw = stripWrappingQuotes(navMatch[1])
+    const toLabel = stripWrappingQuotes(navMatch[2])
+    if (fromLabelRaw && toLabel && toLabel.length <= 80) {
+      const slug = resolveNavSlugByLabel(fromLabelRaw, config.navLabels ?? {}, draft)
+      if (slug) {
+        const mergedLabels = { ...(config.navLabels ?? {}), [slug]: toLabel }
+        return {
+          intent: "edit_plan",
+          summary_for_user: `Will rename the **${fromLabelRaw}** nav link to **${toLabel}**.`,
+          change_log: [...assumptions, `Renamed nav label ${slug} from "${fromLabelRaw}" to "${toLabel}".`],
+          ops: [{ op: "update_site_config", patch: { navLabels: mergedLabels } }]
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+function resolveNavSlugByLabel(label: string, navLabels: Record<string, string>, draft: Map<string, PageDoc>): string | undefined {
+  const lower = label.toLowerCase().trim()
+  if (!lower) return undefined
+  // 1. Existing override matches exactly
+  for (const [slug, override] of Object.entries(navLabels)) {
+    if (typeof override === "string" && override.toLowerCase() === lower) return slug
+  }
+  // 2. Page title matches (uses the same fuzzy matcher as page rename)
+  const byTitle = resolvePageSlugByTitle(draft, label)
+  if (byTitle) return byTitle
+  // 3. Slug last segment matches (e.g. "about" → /about, "our team" → /our-team)
+  const seed = toSeedSlug(label)
+  if (seed) {
+    const candidate = `/${seed}`
+    if (draft.has(candidate)) return candidate
+  }
+  return undefined
+}
+
 export function compileDeterministicPlan(args: {
   session: string
   intent: ParsedIntent
@@ -651,6 +771,13 @@ export function compileDeterministicPlan(args: {
   const { session, intent, message, slug, currentPage, activeBlockId, activeEditablePath } = args
   const cleanMessage = stripSiteContextEnvelope(message)
   const lowerMessage = message.toLowerCase()
+
+  // Header / site-config requests bypass intent inference and resolve straight
+  // to update_site_config. The SiteHeader is not a page block, so phrasing like
+  // "rename the About link" or "change the logo" must NOT fall into update_props.
+  const headerPlan = tryHeaderConfigPlan({ session, message: cleanMessage, assumptions: intent.assumption ? [intent.assumption] : [] })
+  if (headerPlan) return headerPlan
+
   const routeMentions = extractRouteMentions(cleanMessage)
   const assumptions: string[] = []
   if (intent.assumption) assumptions.push(intent.assumption)
