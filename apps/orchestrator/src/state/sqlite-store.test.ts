@@ -10,6 +10,8 @@ import {
   VERSION_LOG_CAP,
   RECENT_EDITS_CAP,
   CHAT_HISTORY_CAP,
+  PUBLISH_LOG_CAP,
+  type PublishLogEntry,
 } from "./sqlite-store.js"
 
 function makePage(slug: string, title = "Hello"): PageDoc {
@@ -253,6 +255,198 @@ test(`chat_history: caps at CHAT_HISTORY_CAP (${CHAT_HISTORY_CAP}) messages per 
     assert.equal(list.at(-1)?.content, `m${CHAT_HISTORY_CAP + 3}`)
   } finally {
     store.close()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Publish log
+// ---------------------------------------------------------------------------
+function makePublishEntry(overrides: Partial<PublishLogEntry> = {}): PublishLogEntry {
+  const at = overrides.at ?? new Date().toISOString()
+  return {
+    id: overrides.id ?? `pub-${Math.random().toString(36).slice(2, 10)}`,
+    session: overrides.session ?? "s1",
+    siteId: overrides.siteId ?? "avocado-stories",
+    target: overrides.target ?? "site-contract",
+    status: overrides.status ?? "triggered",
+    at,
+    updatedAt: overrides.updatedAt ?? at,
+    summary: overrides.summary ?? "Published Home",
+    pageCount: overrides.pageCount ?? 1,
+    slugs: overrides.slugs ?? ["/"],
+    ...overrides,
+  }
+}
+
+test("publish_log: push + list round-trips full entry shape", () => {
+  const store = makeStore()
+  try {
+    const entry = makePublishEntry({
+      id: "pub-1",
+      commit: "abc1234",
+      deploymentId: "dpl_42",
+      deploymentUrl: "https://example.vercel.app",
+      inspectUrl: "https://vercel.com/inspect/dpl_42",
+      slugs: ["/", "/pricing"],
+      pageCount: 2,
+    })
+    store.pushPublishLog(entry)
+    const list = store.listPublishLog("s1")
+    assert.equal(list.length, 1)
+    assert.deepEqual(list[0], entry)
+  } finally {
+    store.close()
+  }
+})
+
+test(`publish_log: caps at PUBLISH_LOG_CAP (${PUBLISH_LOG_CAP}) per session`, () => {
+  const store = makeStore()
+  try {
+    for (let i = 0; i < PUBLISH_LOG_CAP + 50; i++) {
+      store.pushPublishLog(
+        makePublishEntry({
+          id: `pub-${i}`,
+          summary: `pub ${i}`,
+          at: new Date(i).toISOString(),
+        })
+      )
+    }
+    const list = store.listPublishLog("s1", 10_000)
+    assert.equal(list.length, PUBLISH_LOG_CAP)
+    // Oldest 50 dropped; first kept is index 50
+    assert.equal(list[0].summary, "pub 50")
+    assert.equal(list.at(-1)?.summary, `pub ${PUBLISH_LOG_CAP + 49}`)
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: per-session isolation", () => {
+  const store = makeStore()
+  try {
+    store.pushPublishLog(makePublishEntry({ id: "a", session: "s1", summary: "s1 pub" }))
+    store.pushPublishLog(makePublishEntry({ id: "b", session: "s2", summary: "s2 pub" }))
+    assert.deepEqual(store.listPublishLog("s1").map((e) => e.summary), ["s1 pub"])
+    assert.deepEqual(store.listPublishLog("s2").map((e) => e.summary), ["s2 pub"])
+    assert.deepEqual(store.listPublishLogSessions().sort(), ["s1", "s2"])
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: updatePublishLogById patches status, bumps updatedAt, preserves at/id/session", () => {
+  const store = makeStore()
+  try {
+    const at = "2026-05-17T10:00:00.000Z"
+    store.pushPublishLog(
+      makePublishEntry({ id: "pub-1", status: "triggered", at, updatedAt: at, deploymentId: "dpl_1" })
+    )
+    const before = store.getPublishLogById("pub-1")
+    assert.equal(before?.status, "triggered")
+
+    const updated = store.updatePublishLogById("pub-1", {
+      status: "success",
+      deploymentUrl: "https://done.vercel.app",
+    })
+    assert.equal(updated?.status, "success")
+    assert.equal(updated?.deploymentUrl, "https://done.vercel.app")
+    assert.equal(updated?.at, at, "at should be immutable")
+    assert.equal(updated?.id, "pub-1", "id should be immutable")
+    assert.equal(updated?.session, "s1", "session should be immutable")
+    assert.notEqual(updated?.updatedAt, at, "updatedAt should be bumped")
+
+    // List reflects the update (hoisted column + JSON in sync)
+    const list = store.listPublishLog("s1")
+    assert.equal(list[0].status, "success")
+    assert.equal(list[0].deploymentUrl, "https://done.vercel.app")
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: updatePublishLogById returns null for unknown id", () => {
+  const store = makeStore()
+  try {
+    const result = store.updatePublishLogById("missing", { status: "success" })
+    assert.equal(result, null)
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: getPublishLogByDeploymentId resolves async status correlation", () => {
+  const store = makeStore()
+  try {
+    store.pushPublishLog(makePublishEntry({ id: "old", deploymentId: "dpl_1", summary: "old" }))
+    store.pushPublishLog(makePublishEntry({ id: "new", deploymentId: "dpl_1", summary: "new" }))
+    // Should pick the most recent matching deployment id
+    const row = store.getPublishLogByDeploymentId("s1", "dpl_1")
+    assert.equal(row?.summary, "new")
+    assert.equal(row?.id, "new")
+    assert.equal(store.getPublishLogByDeploymentId("s1", "missing"), null)
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: getMostRecentTriggeredPublishLog falls back when deploymentId missing", () => {
+  const store = makeStore()
+  try {
+    store.pushPublishLog(makePublishEntry({ id: "a", status: "success", summary: "old success" }))
+    store.pushPublishLog(makePublishEntry({ id: "b", status: "triggered", summary: "pending" }))
+    const row = store.getMostRecentTriggeredPublishLog("s1")
+    assert.equal(row?.id, "b")
+    assert.equal(row?.summary, "pending")
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: ordering preserves insertion order", () => {
+  const store = makeStore()
+  try {
+    for (let i = 0; i < 5; i++) {
+      store.pushPublishLog(makePublishEntry({ id: `p${i}`, summary: `pub ${i}` }))
+    }
+    const list = store.listPublishLog("s1")
+    assert.deepEqual(list.map((e) => e.summary), ["pub 0", "pub 1", "pub 2", "pub 3", "pub 4"])
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: list limit returns latest N", () => {
+  const store = makeStore()
+  try {
+    for (let i = 0; i < 10; i++) {
+      store.pushPublishLog(makePublishEntry({ id: `p${i}`, summary: `pub ${i}` }))
+    }
+    const last3 = store.listPublishLog("s1", 3)
+    assert.deepEqual(last3.map((e) => e.summary), ["pub 7", "pub 8", "pub 9"])
+  } finally {
+    store.close()
+  }
+})
+
+test("publish_log: survives close/reopen with hydrated rows", () => {
+  const tmp = resolvePath(tmpdir(), `sqlite-publish-log-${process.pid}-${Date.now()}.db`)
+  const s1 = new SqliteStore({ file: tmp, wal: false })
+  s1.pushPublishLog(makePublishEntry({ id: "pub-A", summary: "first" }))
+  s1.pushPublishLog(makePublishEntry({ id: "pub-B", summary: "second" }))
+  s1.updatePublishLogById("pub-A", { status: "success" })
+  s1.close()
+
+  const s2 = new SqliteStore({ file: tmp, wal: false })
+  try {
+    const list = s2.listPublishLog("s1")
+    assert.equal(list.length, 2)
+    assert.equal(list[0].status, "success")
+    assert.equal(list[0].summary, "first")
+    assert.equal(list[1].status, "triggered")
+    assert.deepEqual(s2.listPublishLogSessions(), ["s1"])
+  } finally {
+    s2.close()
+    try { unlinkSync(tmp) } catch { /* ignore */ }
   }
 })
 

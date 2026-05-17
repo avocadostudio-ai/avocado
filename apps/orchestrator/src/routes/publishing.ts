@@ -4,6 +4,7 @@ import { resolve } from "node:path"
 import type { PageDoc } from "@avocadostudio-ai/shared"
 import {
   normalizeSession,
+  normalizeSiteId,
   scopedSessionKey,
   publishStatusBySession,
   getSessionPages,
@@ -14,8 +15,13 @@ import {
   schedulePersistState,
   setLastPublishedScopedSession,
   markRecentlyRestored,
-  publishedPages
+  publishedPages,
+  pushPublishLogEntry,
+  updatePublishLogStatusById,
+  findPublishLogForStatusUpdate,
+  listPublishLog,
 } from "../state/session-state.js"
+import type { PublishLogEntry, PublishLogStatus } from "../state/session-state.js"
 import { computePublishDiff } from "../publish/diff-engine.js"
 import { toErrorDetail } from "../ops/ops-engine.js"
 import {
@@ -83,6 +89,36 @@ async function loadPublishedForDiff(opts: {
 
   logger.warn("publish/diff: falling back to in-memory publishedPages — diff may be inaccurate")
   return Array.from(publishedPages.values())
+}
+
+/**
+ * Build a short human-readable summary of what was published. Truncates the
+ * slug list to keep the row compact in the version-history panel.
+ */
+function buildPublishSummary(slugs: string[]): string {
+  if (slugs.length === 0) return "Published (no pages)"
+  const titles = slugs.map((s) => (s === "/" ? "Home" : s.replace(/^\//, "")))
+  if (titles.length <= 3) return `Published ${titles.join(", ")}`
+  return `Published ${titles.slice(0, 3).join(", ")} +${titles.length - 3} more`
+}
+
+/** Coerce a publish target's response (`Record<string, unknown>`) into a typed read. */
+function readResponseString(response: Record<string, unknown>, key: string): string | undefined {
+  const value = response[key]
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+/**
+ * Map a refreshed Vercel `vercelState` to a publish-log status. READY counts
+ * as success; ERROR/CANCELED count as failed. Any other state (BUILDING,
+ * QUEUED, INITIALIZING, UNKNOWN, …) leaves the row at `triggered`.
+ */
+function publishStatusFromVercelState(state: string | undefined): PublishLogStatus | null {
+  if (!state) return null
+  const upper = state.toUpperCase()
+  if (upper === "READY") return "success"
+  if (upper === "ERROR" || upper === "CANCELED") return "failed"
+  return null
 }
 
 /** Reject origins that point at private/loopback IPs or non-http protocols. */
@@ -168,6 +204,33 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
     publishStatusBySession.set(scopedSession, outcome.tracker)
     if (outcome.ok) setLastPublishedScopedSession(scopedSession)
 
+    // Persist a publish-log row regardless of success. On success the row is
+    // born as "triggered" — the deploy itself is still in flight on Vercel's
+    // side, and `GET /publish/status` matures the row to "success" or
+    // "failed" when `vercelState` resolves. On synchronous failure (e.g. the
+    // target threw, or the deploy hook URL is missing) we record "failed"
+    // immediately with the error from the response.
+    try {
+      pushPublishLogEntry({
+        session: scopedSession,
+        siteId: normalizeSiteId(body.siteId),
+        target: target.name,
+        status: outcome.ok ? "triggered" : "failed",
+        summary: outcome.ok
+          ? buildPublishSummary(slugs)
+          : readResponseString(outcome.response, "error") ?? outcome.tracker.lastCheckError ?? "Publish failed",
+        pageCount: pages.length,
+        slugs,
+        commit: readResponseString(outcome.response, "commitSha"),
+        deploymentId: outcome.tracker.deploymentId,
+        deploymentUrl: outcome.tracker.deploymentUrl,
+        inspectUrl: outcome.tracker.inspectUrl,
+        error: outcome.ok ? undefined : readResponseString(outcome.response, "error") ?? outcome.tracker.lastCheckError,
+      })
+    } catch (logErr) {
+      request.log.error({ err: logErr }, "publish-log: failed to record entry")
+    }
+
     return reply.code(outcome.httpStatus).send(outcome.response)
   })
 
@@ -179,7 +242,35 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
     if (!current) return reply.code(404).send({ error: "no publish status for session" })
     const refreshed = await refreshPublishStatusFromVercel(current)
     publishStatusBySession.set(scopedSession, refreshed)
+
+    // Mature the publish-log row when Vercel reports a terminal state. Falls
+    // back to the most-recent "triggered" row when the deployment id is
+    // missing (deploy-hook targets that don't parse one out of their response).
+    const terminalStatus = publishStatusFromVercelState(refreshed.vercelState)
+    if (terminalStatus) {
+      const target = findPublishLogForStatusUpdate(scopedSession, refreshed.deploymentId)
+      if (target && target.status === "triggered") {
+        updatePublishLogStatusById(target.id, {
+          status: terminalStatus,
+          deploymentId: refreshed.deploymentId ?? target.deploymentId,
+          deploymentUrl: refreshed.deploymentUrl ?? target.deploymentUrl,
+          inspectUrl: refreshed.inspectUrl ?? target.inspectUrl,
+          error: terminalStatus === "failed" ? refreshed.lastCheckError ?? `vercel_state_${refreshed.vercelState}` : undefined,
+        })
+      }
+    }
+
     return refreshed
+  })
+
+  app.get("/publish/log", async (request, reply) => {
+    const query = request.query as { session?: string; siteId?: string; limit?: string }
+    if (!query.session) return reply.code(400).send({ error: "session is required" })
+    const scopedSession = scopedSessionKey(normalizeSession(query.session), query.siteId)
+    const requested = query.limit ? Number(query.limit) : 50
+    const limit = Number.isFinite(requested) ? Math.max(1, Math.min(100, requested)) : 50
+    const entries: PublishLogEntry[] = listPublishLog(scopedSession, limit)
+    return { entries }
   })
 
   app.get("/restore/snapshots", async (request, reply) => {

@@ -2784,6 +2784,63 @@ textarea {
 .version-history-source--undo { background: #fef3c7; color: #92400e; }
 .version-history-source--redo { background: #fef3c7; color: #92400e; }
 .version-history-source--restore { background: #d1fae5; color: #065f46; }
+.version-history-source--publish { background: #ede9fe; color: #5b21b6; }
+
+/* Publish rows reuse the standard item padding + border-left slot so they
+   line up with version cards above and below. Tint the accent purple and
+   add a faint background so the row still reads as a distinct event type. */
+.version-history-item--publish {
+  border-left-color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.04);
+}
+
+.version-history-item--publish:hover {
+  background: rgba(139, 92, 246, 0.07);
+}
+
+.version-history-item--publish .version-history-summary {
+  margin-top: 2px;
+}
+
+.version-history-item--publish .version-history-meta-row {
+  margin-top: 4px;
+}
+
+.version-history-publish-status {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  line-height: 1.5;
+}
+
+.version-history-publish-status--triggered {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.version-history-publish-status--success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.version-history-publish-status--failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.version-history-deploy-link {
+  font-size: 11px;
+  color: #6366f1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.version-history-deploy-link:hover {
+  text-decoration: underline;
+}
 
 .version-history-time {
   font-size: 11px;
@@ -5648,6 +5705,13 @@ textarea {
 .editor-dark .version-history-source--undo { background: #78350f33; color: #fbbf24; }
 .editor-dark .version-history-source--redo { background: #78350f33; color: #fbbf24; }
 .editor-dark .version-history-source--restore { background: #06543333; color: #34d399; }
+.editor-dark .version-history-source--publish { background: #4c1d9533; color: #c4b5fd; }
+.editor-dark .version-history-item--publish { border-left-color: #6d28d9; background: rgba(139, 92, 246, 0.08); }
+.editor-dark .version-history-item--publish:hover { background: rgba(139, 92, 246, 0.12); }
+.editor-dark .version-history-publish-status--triggered { background: #78350f33; color: #fbbf24; }
+.editor-dark .version-history-publish-status--success { background: #06543333; color: #34d399; }
+.editor-dark .version-history-publish-status--failed { background: #7f1d1d33; color: #fca5a5; }
+.editor-dark .version-history-deploy-link { color: #a5b4fc; }
 .editor-dark .version-history-time { color: #64748b; }
 .editor-dark .version-history-meta { color: #64748b; }
 .editor-dark .version-history-restore-btn { border-color: #334155; color: #94a3b8; }

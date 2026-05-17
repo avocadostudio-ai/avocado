@@ -22,14 +22,18 @@ import {
   HISTORY_DEPTH_CAP,
   RECENT_EDITS_CAP,
   VERSION_LOG_CAP,
+  PUBLISH_LOG_CAP,
 } from "./sqlite-store.js"
-import type { SqliteStore } from "./sqlite-store.js"
+import type { PublishLogEntry, SqliteStore } from "./sqlite-store.js"
+
+export type { PublishLogEntry, PublishLogStatus } from "./sqlite-store.js"
 
 // Single source of truth for these caps is `sqlite-store.ts`. Re-exported
 // under the legacy names so existing imports keep working.
 export const HISTORY_DEPTH_MAX = HISTORY_DEPTH_CAP
 export const VERSION_LOG_MAX = VERSION_LOG_CAP
 export const CHAT_HISTORY_MAX_TURNS = CHAT_HISTORY_CAP
+export const PUBLISH_LOG_MAX = PUBLISH_LOG_CAP
 
 // ---------------------------------------------------------------------------
 // ModelKey inline type (avoids circular dependency with index.ts)
@@ -148,6 +152,12 @@ export type PersistedState = {
   siteConfigs?: Record<string, SiteConfig>
   versionLog?: Record<string, VersionEntry[]>
   issueTouchedSlugs?: Record<string, IssueTouchedEntry>
+  /**
+   * Persisted publish-log rows. Absent in legacy JSON state files (publish log
+   * was introduced after the JSON-to-SQLite migration), so the hydrate path is
+   * the only real source — this field exists for symmetry / future round-trip.
+   */
+  publishLog?: Record<string, PublishLogEntry[]>
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +190,16 @@ export type VersionEntry = {
   snapshot?: PageDoc | null
 }
 export const versionLog = new Map<string, VersionEntry[]>()
+
+/**
+ * Per-session publish-log entries — one row per `POST /publish` attempt.
+ * Mirrors the SQLite `publish_log` table. Unlike most other state maps, this
+ * one is NOT included in `writeAllStateToStore`'s drop-and-reinsert pass:
+ * publish entries support async UPDATE (deploy resolves seconds later) and
+ * the SQLite row is the source of truth. Writes go straight through via
+ * `pushPublishLogEntry` / `updatePublishLogStatus`; this Map is a read cache.
+ */
+export const publishLogBySession = new Map<string, PublishLogEntry[]>()
 
 /**
  * Per-ticket slugs touched by an agent run. Survives the execute→publish
@@ -541,6 +561,99 @@ export function getVersionLog(session: string, slug?: string, limit = 50): Versi
   return filtered.slice(-limit)
 }
 
+// ---------------------------------------------------------------------------
+// Publish log
+// ---------------------------------------------------------------------------
+/**
+ * Insert a publish-log row. Writes through to SQLite immediately so the row
+ * survives a process restart between the initial publish and the later async
+ * status update (deploy resolution can take seconds to minutes). Also mirrors
+ * into `publishLogBySession` for cheap reads.
+ *
+ * The `id` field is generated here (UUID) so callers don't need to import
+ * crypto. Returns the full materialised entry, including `id` / timestamps.
+ */
+export function pushPublishLogEntry(
+  partial: Omit<PublishLogEntry, "id" | "at" | "updatedAt">
+): PublishLogEntry {
+  const now = new Date().toISOString()
+  const entry: PublishLogEntry = {
+    ...partial,
+    id: globalThis.crypto.randomUUID(),
+    at: now,
+    updatedAt: now,
+  }
+  try {
+    getStore().pushPublishLog(entry)
+  } catch (error) {
+    // Persistence failure must not break the publish — log and continue with
+    // the in-memory mirror only. The next publish will retry.
+    console.error("[publish-log] failed to persist row", error)
+  }
+  const list = publishLogBySession.get(entry.session) ?? []
+  list.push(entry)
+  publishLogBySession.set(entry.session, list.slice(-PUBLISH_LOG_MAX))
+  return entry
+}
+
+/**
+ * Patch an existing publish-log row by `id`. Updates SQLite and the in-memory
+ * mirror. Used by `GET /publish/status` to transition `triggered` → `success`
+ * or `failed` when Vercel resolves. Returns the updated entry, or null if the
+ * id was not found.
+ */
+export function updatePublishLogStatusById(
+  id: string,
+  patch: Partial<Omit<PublishLogEntry, "id" | "session" | "at">>
+): PublishLogEntry | null {
+  let updated: PublishLogEntry | null = null
+  try {
+    updated = getStore().updatePublishLogById(id, patch)
+  } catch (error) {
+    console.error("[publish-log] failed to update row", error)
+    return null
+  }
+  if (!updated) return null
+  const list = publishLogBySession.get(updated.session) ?? []
+  const idx = list.findIndex((e) => e.id === id)
+  if (idx >= 0) list[idx] = updated
+  else list.push(updated)
+  publishLogBySession.set(updated.session, list.slice(-PUBLISH_LOG_MAX))
+  return updated
+}
+
+/**
+ * Resolve a publish-log row to update when an async deploy status arrives.
+ * Prefers an exact `deploymentId` match; falls back to the most recent
+ * `triggered` row for the session (covers deploy-hook targets that don't
+ * parse a deployment id out of their response).
+ */
+export function findPublishLogForStatusUpdate(
+  session: string,
+  deploymentId: string | undefined
+): PublishLogEntry | null {
+  const store = getStore()
+  if (deploymentId) {
+    const byDeployment = store.getPublishLogByDeploymentId(session, deploymentId)
+    if (byDeployment) return byDeployment
+  }
+  return store.getMostRecentTriggeredPublishLog(session)
+}
+
+export function listPublishLog(session: string, limit = 50): PublishLogEntry[] {
+  const cached = publishLogBySession.get(session)
+  if (cached && cached.length > 0) return cached.slice(-limit)
+  // Cache miss — read through. Cheap (one indexed scan).
+  try {
+    const fromStore = getStore().listPublishLog(session, limit)
+    if (fromStore.length > 0) publishLogBySession.set(session, fromStore.slice(-PUBLISH_LOG_MAX))
+    return fromStore
+  } catch (error) {
+    console.error("[publish-log] failed to list rows", error)
+    return []
+  }
+}
+
 export function pushChatHistory(session: string, userMessage: string, assistantSummary: string) {
   const history = chatHistoryBySession.get(session) ?? []
   history.push({ role: "user", content: userMessage })
@@ -735,6 +848,22 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
         .filter((entry) => entry && typeof entry === "object" && typeof entry.version === "number")
         .map((entry) => entry as VersionEntry)
       versionLog.set(session, list.slice(-VERSION_LOG_MAX))
+    }
+  }
+
+  publishLogBySession.clear()
+  if (parsed.publishLog && typeof parsed.publishLog === "object") {
+    for (const [session, listRaw] of Object.entries(parsed.publishLog)) {
+      if (!Array.isArray(listRaw)) continue
+      const list = listRaw
+        .filter(
+          (entry): entry is PublishLogEntry =>
+            !!entry &&
+            typeof entry === "object" &&
+            typeof (entry as PublishLogEntry).id === "string" &&
+            typeof (entry as PublishLogEntry).status === "string"
+        )
+      publishLogBySession.set(session, list.slice(-PUBLISH_LOG_MAX))
     }
   }
 
@@ -962,6 +1091,11 @@ function hydrateMapsFromStore(store: SqliteStore) {
   // Issue-touched
   for (const { issueKey, row } of store.listIssueTouched()) {
     issueTouchedSlugsByKey.set(issueKey, row)
+  }
+
+  // Publish log
+  for (const session of store.listPublishLogSessions()) {
+    publishLogBySession.set(session, store.listPublishLog(session, PUBLISH_LOG_MAX))
   }
 }
 

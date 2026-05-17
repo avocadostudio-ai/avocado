@@ -11,6 +11,7 @@ export const HISTORY_DEPTH_CAP = 50
 export const VERSION_LOG_CAP = 100
 export const RECENT_EDITS_CAP = 10
 export const CHAT_HISTORY_CAP = 6
+export const PUBLISH_LOG_CAP = 200
 
 // ---------------------------------------------------------------------------
 // Row shapes
@@ -39,6 +40,53 @@ export type VersionLogEntry = {
 export type ChatMessage = { role: "user" | "assistant"; content: string }
 
 export type IssueTouchedRow = { slugs: string[]; updatedAt: string }
+
+export type PublishLogStatus = "triggered" | "success" | "failed"
+
+export type PublishLogActor = {
+  kind: "user" | "agent" | "ci"
+  id?: string
+}
+
+export type PublishLogDiffSummary = {
+  added: number
+  removed: number
+  changed: number
+}
+
+export type PublishLogEntry = {
+  /** Stable id (UUID). Lets async status updates target a specific row. */
+  id: string
+  /** Scoped session key (matches version_log keying). */
+  session: string
+  siteId: string
+  /** Publish target name, e.g. "site-contract" | "git" | "deploy-hook" | plugin. */
+  target: string
+  status: PublishLogStatus
+  /** ISO timestamp when the row was first inserted. */
+  at: string
+  /** ISO timestamp of the most recent status mutation. */
+  updatedAt: string
+  /** Human-readable summary, e.g. "Published Home, Pricing". */
+  summary: string
+  pageCount: number
+  /** Slugs included in this publish (small list — useful for the panel). */
+  slugs: string[]
+  /** Short commit SHA, when the target produced one. */
+  commit?: string
+  deploymentId?: string
+  deploymentUrl?: string
+  /** Provider-specific deep link (e.g. Vercel inspect URL). */
+  inspectUrl?: string
+  /** Present when status === "failed". */
+  error?: string
+  /**
+   * Forward-compatibility slots — reserved but unpopulated today. They live in
+   * the JSON blob so adding values does not require a schema migration.
+   */
+  actor?: PublishLogActor
+  diffSummary?: PublishLogDiffSummary
+}
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -103,6 +151,22 @@ CREATE TABLE IF NOT EXISTS issue_touched (
   slugs      TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS publish_log (
+  session     TEXT NOT NULL,
+  seq         INTEGER NOT NULL,
+  id          TEXT NOT NULL,
+  site_id     TEXT NOT NULL,
+  target      TEXT NOT NULL,
+  status      TEXT NOT NULL CHECK (status IN ('triggered','success','failed')),
+  at          TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  entry       TEXT NOT NULL,
+  PRIMARY KEY (session, seq)
+);
+
+CREATE INDEX IF NOT EXISTS publish_log_by_id ON publish_log(id);
+CREATE INDEX IF NOT EXISTS publish_log_by_session_at ON publish_log(session, at DESC);
 `
 
 const SCHEMA_VERSION = 1
@@ -162,6 +226,16 @@ type Prepared = {
   selectIssueTouched: Statement
   listIssueTouched: Statement
   trimIssueTouched: Statement
+
+  insertPublishLog: Statement
+  updatePublishLogById: Statement
+  selectPublishLogById: Statement
+  selectPublishLogByDeploymentId: Statement
+  selectPublishLogByMostRecentTriggered: Statement
+  listPublishLog: Statement
+  listAllPublishLogSessions: Statement
+  trimPublishLog: Statement
+  nextPublishLogSeq: Statement
 }
 
 export class SqliteStore {
@@ -359,6 +433,50 @@ export class SqliteStore {
            ORDER BY updated_at DESC LIMIT ?
          )`
       ),
+
+      insertPublishLog: db.prepare(
+        `INSERT INTO publish_log(session, seq, id, site_id, target, status, at, updated_at, entry)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ),
+      updatePublishLogById: db.prepare(
+        `UPDATE publish_log
+           SET status = ?, updated_at = ?, entry = ?
+         WHERE id = ?`
+      ),
+      selectPublishLogById: db.prepare(
+        `SELECT entry FROM publish_log WHERE id = ?`
+      ),
+      selectPublishLogByDeploymentId: db.prepare(
+        `SELECT entry FROM publish_log
+         WHERE session = ?
+           AND json_extract(entry, '$.deploymentId') = ?
+         ORDER BY seq DESC LIMIT 1`
+      ),
+      selectPublishLogByMostRecentTriggered: db.prepare(
+        `SELECT entry FROM publish_log
+         WHERE session = ? AND status = 'triggered'
+         ORDER BY seq DESC LIMIT 1`
+      ),
+      listPublishLog: db.prepare(
+        `SELECT entry FROM publish_log
+         WHERE session = ?
+         ORDER BY seq ASC`
+      ),
+      listAllPublishLogSessions: db.prepare(
+        `SELECT DISTINCT session FROM publish_log`
+      ),
+      trimPublishLog: db.prepare(
+        `DELETE FROM publish_log
+         WHERE session = ?
+           AND seq NOT IN (
+             SELECT seq FROM publish_log
+             WHERE session = ?
+             ORDER BY seq DESC LIMIT ?
+           )`
+      ),
+      nextPublishLogSeq: db.prepare(
+        `SELECT COALESCE(MAX(seq), 0) + 1 AS next FROM publish_log WHERE session = ?`
+      ),
     }
   }
 
@@ -532,6 +650,79 @@ export class SqliteStore {
       issueKey: r.issue_key,
       row: { slugs: JSON.parse(r.slugs) as string[], updatedAt: r.updated_at },
     }))
+  }
+
+  // -------------------------------------------------------------------------
+  // Publish log — capped at PUBLISH_LOG_CAP per session.
+  // Append-only with per-id UPDATE for async deploy-status transitions.
+  // -------------------------------------------------------------------------
+  pushPublishLog(entry: PublishLogEntry) {
+    const next = this.stmt.nextPublishLogSeq.get(entry.session) as { next: number }
+    this.stmt.insertPublishLog.run(
+      entry.session,
+      next.next,
+      entry.id,
+      entry.siteId,
+      entry.target,
+      entry.status,
+      entry.at,
+      entry.updatedAt,
+      JSON.stringify(entry)
+    )
+    this.stmt.trimPublishLog.run(entry.session, entry.session, PUBLISH_LOG_CAP)
+  }
+
+  getPublishLogById(id: string): PublishLogEntry | null {
+    const row = this.stmt.selectPublishLogById.get(id) as { entry: string } | undefined
+    return row ? (JSON.parse(row.entry) as PublishLogEntry) : null
+  }
+
+  getPublishLogByDeploymentId(session: string, deploymentId: string): PublishLogEntry | null {
+    const row = this.stmt.selectPublishLogByDeploymentId.get(session, deploymentId) as
+      | { entry: string }
+      | undefined
+    return row ? (JSON.parse(row.entry) as PublishLogEntry) : null
+  }
+
+  getMostRecentTriggeredPublishLog(session: string): PublishLogEntry | null {
+    const row = this.stmt.selectPublishLogByMostRecentTriggered.get(session) as
+      | { entry: string }
+      | undefined
+    return row ? (JSON.parse(row.entry) as PublishLogEntry) : null
+  }
+
+  /**
+   * Patch an existing publish-log row. Merges `patch` into the stored JSON,
+   * bumps `updatedAt`, and updates the hoisted `status` column. Returns the
+   * full updated entry, or null if the id was not found.
+   */
+  updatePublishLogById(
+    id: string,
+    patch: Partial<Omit<PublishLogEntry, "id" | "session" | "at">>
+  ): PublishLogEntry | null {
+    const existing = this.getPublishLogById(id)
+    if (!existing) return null
+    const next: PublishLogEntry = {
+      ...existing,
+      ...patch,
+      id: existing.id,
+      session: existing.session,
+      at: existing.at,
+      updatedAt: new Date().toISOString(),
+    }
+    this.stmt.updatePublishLogById.run(next.status, next.updatedAt, JSON.stringify(next), id)
+    return next
+  }
+
+  listPublishLog(session: string, limit = 50): PublishLogEntry[] {
+    const rows = this.stmt.listPublishLog.all(session) as Array<{ entry: string }>
+    const parsed = rows.map((r) => JSON.parse(r.entry) as PublishLogEntry)
+    return parsed.slice(-limit)
+  }
+
+  listPublishLogSessions(): string[] {
+    const rows = this.stmt.listAllPublishLogSessions.all() as Array<{ session: string }>
+    return rows.map((r) => r.session)
   }
 
   // -------------------------------------------------------------------------
