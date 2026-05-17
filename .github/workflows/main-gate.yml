@@ -31,24 +31,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: test
+    # Eval needs a real planner; expose the secret at the job level so we can
+    # also gate steps on its presence below. Job-level if: can't reference
+    # secrets directly (GitHub restriction), so the gating happens per-step.
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
+      - name: Note when planner-eval is skipped (no OPENAI_API_KEY secret)
+        if: ${{ env.OPENAI_API_KEY == '' }}
+        run: |
+          echo "::notice::OPENAI_API_KEY secret is not configured for this repo — skipping planner-eval. Set the secret to enable the quality gate."
       - uses: actions/checkout@v4
+        if: ${{ env.OPENAI_API_KEY != '' }}
       - uses: pnpm/action-setup@v4
+        if: ${{ env.OPENAI_API_KEY != '' }}
       - uses: actions/setup-node@v4
+        if: ${{ env.OPENAI_API_KEY != '' }}
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: ${{ env.OPENAI_API_KEY != '' }}
       - name: Planner eval (core tags, regression gate)
+        if: ${{ env.OPENAI_API_KEY != '' }}
         working-directory: apps/orchestrator
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           E2E_CHAT_PROVIDER: openai
           E2E_CHAT_MODEL_KEY: balanced
           OPENAI_MODEL_BALANCED: gpt-4.1
         run: pnpm eval --tags core --concurrency 3 --min-score 0.70
       - name: Upload eval report
-        if: always()
+        if: ${{ always() && env.OPENAI_API_KEY != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: planner-eval-report
