@@ -255,12 +255,55 @@ test("publish/status: vercelState READY matures the publish-log row to success",
     const after = listPublishLog(scopedSession)
     assert.equal(after.length, 1)
     assert.equal(after[0].status, "success")
-    assert.notEqual(after[0].updatedAt, after[0].at, "updatedAt should be bumped on transition")
+    // updatedAt should be >= at (we don't assert strict inequality because
+    // the maturation can happen inside the same millisecond as the insert).
+    assert.ok(after[0].updatedAt >= after[0].at, "updatedAt must not regress")
   } finally {
     publishStatusBySession.delete(scopedSession)
     if (prevToken !== undefined) process.env.VERCEL_TOKEN = prevToken
     if (prevGrace !== undefined) process.env.PUBLISH_GRACE_SECONDS = prevGrace
     else delete process.env.PUBLISH_GRACE_SECONDS
+    restoreBuiltinTargets()
+  }
+})
+
+test("publish: synchronous target (vercelState=READY) records success immediately", async () => {
+  const session = createSessionId("publish-log-sync")
+  const siteId = "tenant-sync"
+  const scopedSession = `${siteId}::${session}`
+
+  installStubTarget()
+  try {
+    await seedDraftPage(session, siteId)
+
+    // site-contract / git targets both set vercelState="READY" on success —
+    // there is no pending Vercel build, so the row should be born as "success".
+    StubPublishTarget.nextOutcome = {
+      ok: true,
+      httpStatus: 200,
+      tracker: {
+        session,
+        status: "triggered",
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        slugs: ["/"],
+        vercelState: "READY",
+      },
+      response: { status: "ok" },
+    }
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/publish",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ session, siteId }),
+    })
+    assert.equal(publishRes.statusCode, 200)
+
+    const log = listPublishLog(scopedSession)
+    assert.equal(log.length, 1)
+    assert.equal(log[0].status, "success", "synchronous READY target should land as success")
+  } finally {
     restoreBuiltinTargets()
   }
 })

@@ -210,12 +210,21 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
     // "failed" when `vercelState` resolves. On synchronous failure (e.g. the
     // target threw, or the deploy hook URL is missing) we record "failed"
     // immediately with the error from the response.
+    // Synchronous targets (site-contract, git) finish the moment POST returns
+    // and set `vercelState: "READY"` in the tracker. Only deploy-hook style
+    // targets leave the build pending on Vercel's side — those land here with
+    // a non-terminal vercelState (TRIGGERED/BUILDING/etc.) and rely on a
+    // later GET /publish/status to mature the row.
+    const initialStatus: PublishLogStatus = !outcome.ok
+      ? "failed"
+      : publishStatusFromVercelState(outcome.tracker.vercelState) ?? "triggered"
+
     try {
       pushPublishLogEntry({
         session: scopedSession,
         siteId: normalizeSiteId(body.siteId),
         target: target.name,
-        status: outcome.ok ? "triggered" : "failed",
+        status: initialStatus,
         summary: outcome.ok
           ? buildPublishSummary(slugs)
           : readResponseString(outcome.response, "error") ?? outcome.tracker.lastCheckError ?? "Publish failed",
