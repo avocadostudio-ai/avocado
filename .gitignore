@@ -23,3 +23,9 @@ test-results/
 # Local AI assistant overrides (shared config under .claude/ is tracked)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# devctl runtime pid files — process-local, never share
+.run/**/*.pid
+
+# Published-content backups left behind by restore flows
+apps/site/lib/published-content.json.pre-restore-*.bak
