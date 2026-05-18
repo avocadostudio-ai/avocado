@@ -4,7 +4,7 @@
       "id": "p_home",
       "slug": "/",
       "title": "Home",
-      "updatedAt": "2026-05-14T19:18:18.536Z",
+      "updatedAt": "2026-05-18T06:44:49.504Z",
       "meta": {
         "title": "Avocado Recipes, Wellness & Sustainability | Avocado Stories",
         "description": "Discover avocado recipes, wellness tips, and sustainable farming practices. Learn how avocados can enrich your everyday meals and lifestyle."
@@ -14,7 +14,7 @@
           "id": "b_hero_1772138902220_copy",
           "type": "Hero",
           "props": {
-            "heading": "5 Avocado Superpowers for Heart & Energy",
+            "heading": "One Fruit. Endless Health.",
             "subheading": "100+ recipes, 50+ wellness tips — free, no card needed.",
             "ctaText": "Explore Recipes",
             "ctaHref": "/recipes",
@@ -1110,7 +1110,25 @@
     }
   ],
   "siteConfig": {
-    "name": "The Avocado Hub",
-    "logo": "/logos/avocado-hub.svg"
+    "name": "The Avocado Studio",
+    "logo": "/logos/avocado-hub.svg",
+    "navGroups": {
+      "Produce": [
+        "/blueberries",
+        "/grapefruits",
+        "/olives",
+        "/oranges"
+      ],
+      "Explore": [
+        "/recipes",
+        "/community"
+      ],
+      "Grow": [
+        "/farmers-and-growers"
+      ]
+    },
+    "navLabels": {
+      "/farmers-and-growers": "Farmers & Growers"
+    }
   }
 }

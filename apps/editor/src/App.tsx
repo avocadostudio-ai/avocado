@@ -15,6 +15,7 @@ import { usePreviewBridge, type PreviewBridgeCallbacks, type AnchorRect } from "
 import { useChatEngine } from "./hooks/useChatEngine"
 import { useEditorStore, initSession, getSessionId, getSiteId } from "./store"
 import { usePublish } from "./hooks/usePublish"
+import { usePublishDiffSummary } from "./hooks/usePublishDiffSummary"
 import { useMediaInput } from "./hooks/useMediaInput"
 import { useBlockProps } from "./hooks/useBlockProps"
 import { usePageMeta } from "./hooks/usePageMeta"
@@ -264,6 +265,8 @@ function EditorPage({
   const setAutoScrollTrackingEnabled = useEditorStore((s) => s.setAutoScrollTrackingEnabled)
   const [showNestedLabels, setShowNestedLabels] = useState(false)
   const [showPublishReview, setShowPublishReview] = useState(false)
+  const [draftRev, setDraftRev] = useState(0)
+  const bumpDraftRev = useCallback(() => setDraftRev((r) => r + 1), [])
   const showSettingsModal = useEditorStore((s) => s.showSettingsModal)
   const setShowSettingsModal = useEditorStore((s) => s.setShowSettingsModal)
   const showDebugDetails = useEditorStore((s) => s.showDebugDetails)
@@ -595,10 +598,22 @@ function EditorPage({
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [selectionModeEnabled, toggleSelectionMode])
 
+  // Wrap postToSite/postPatchToSite so any draft-mutating message bumps the
+  // diff rev counter. This catches structural ops, variations, inline edits,
+  // and any path that signals the iframe without going through onApplied.
+  const postToSiteTracked = useCallback<typeof preview.postToSite>((type, payload) => {
+    if (type === "draftUpdated" || type === "liveDraft") bumpDraftRev()
+    preview.postToSite(type, payload)
+  }, [preview, bumpDraftRev])
+  const postPatchToSiteTracked = useCallback<typeof preview.postPatchToSite>((op, fromVersion, toVersion, focusBlockId) => {
+    bumpDraftRev()
+    return preview.postPatchToSite(op, fromVersion, toVersion, focusBlockId)
+  }, [preview, bumpDraftRev])
+
   const chatEngine = useChatEngine({
     activeSiteConfig,
-    postToSite: preview.postToSite,
-    postPatchToSite: preview.postPatchToSite,
+    postToSite: postToSiteTracked,
+    postPatchToSite: postPatchToSiteTracked,
     componentManifest: componentManifest.manifest,
     siteCapabilities: componentManifest.siteCapabilities,
     allowStructuralEdits: componentManifest.allowStructuralEdits,
@@ -655,6 +670,7 @@ function EditorPage({
         if (typeof data.canUndo === "boolean") chatEngine.setCanUndoServer?.(data.canUndo)
         if (typeof data.canRedo === "boolean") chatEngine.setCanRedoServer?.(data.canRedo)
         preview.postToSite("draftUpdated", { focusBlockId: null })
+        bumpDraftRev()
       }
     } catch {
       // Best-effort
@@ -663,9 +679,17 @@ function EditorPage({
     }
   }
 
+  const publishDiffSummary = usePublishDiffSummary(session, siteId, activeSiteOrigin, draftRev)
   const publish = usePublish(session, siteId, isLoading, chatEngine.pushAssistantFromResult, activeSiteOrigin, () => {
     preview.postToSite("draftUpdated", { focusBlockId: null })
+    // Optimistically clear the "X changes" badge — the live-site fetch path
+    // lags Vercel's deploy by ~60s. markPublished suppresses the next diff
+    // refetch until the user makes another edit.
+    publishDiffSummary.markPublished()
   })
+  const hasUnpublishedChanges = publishDiffSummary.summary
+    ? publishDiffSummary.summary.total > 0
+    : true // optimistic until we know — never block publishing on a slow diff
 
   const media = useMediaInput()
 
@@ -675,6 +699,7 @@ function EditorPage({
   onAppliedRef.current = () => {
     void blockProps.refetch()
     void pageMeta.refetch()
+    bumpDraftRev()
   }
 
   // Preview src: bootstrap draft mode via /api/draft once per origin,
@@ -1288,9 +1313,30 @@ function EditorPage({
               {plannerBadgeState === "demo" ? (
                 <span className="planner-badge planner-badge-demo">{t("header.demoMode")}</span>
               ) : null}
-              <button type="button" className="publish-preview-btn" onClick={() => setShowPublishReview(true)} disabled={isLoading || publish.isPublishing}>
+              <button
+                type="button"
+                className={`publish-preview-btn ${hasUnpublishedChanges ? "" : "publish-preview-btn--clean"}`}
+                onClick={() => setShowPublishReview(true)}
+                disabled={isLoading || publish.isPublishing || !hasUnpublishedChanges}
+                title={
+                  !hasUnpublishedChanges
+                    ? t("header.upToDateTooltip")
+                    : publishDiffSummary.summary && publishDiffSummary.summary.total > 0
+                      ? t("header.unpublishedTooltip", { count: String(publishDiffSummary.summary.total) })
+                      : undefined
+                }
+              >
                 {publish.publishInProgress ? <span className="publish-spinner" aria-hidden="true" /> : null}
-                {publish.publishInProgress ? t("header.publishing") : t("header.publish")}
+                {publish.publishInProgress
+                  ? t("header.publishing")
+                  : hasUnpublishedChanges
+                    ? t("header.publish")
+                    : t("header.upToDate")}
+                {hasUnpublishedChanges && publishDiffSummary.summary && publishDiffSummary.summary.total > 0 ? (
+                  <span className="publish-preview-badge" aria-hidden="true">
+                    {publishDiffSummary.summary.total}
+                  </span>
+                ) : null}
               </button>
               {publish.publishStatus ? (
                 <>
@@ -1418,6 +1464,7 @@ function EditorPage({
                           })
                           if (res.ok) {
                             preview.postToSite("draftUpdated", { focusBlockId: v.blockId })
+                            bumpDraftRev()
                             chatEngine.pushAssistantFromResult({
                               status: "applied",
                               summary: `Applied variation: ${option.title}`,
@@ -1746,6 +1793,7 @@ function EditorPage({
           onNavLabelChange={(s, label) => {
             void sites.updateHeaderConfig({ navLabels: { [s]: label } })
             preview.postToSite("draftUpdated", {})
+            bumpDraftRev()
           }}
           pageMeta={pageMeta.meta}
           onPageMetaChange={(field, value) => {
@@ -1768,6 +1816,7 @@ function EditorPage({
                   return
                 }
                 preview.postToSite("draftUpdated", {})
+                bumpDraftRev()
               } catch {
                 void pageMeta.refetch()
               }
@@ -2104,7 +2153,7 @@ function EditorPage({
         siteOrigin={activeSiteOrigin}
       />
 
-      <SiteConfigDrawer sites={sites} onPreviewRefresh={() => preview.postToSite("draftUpdated", {})} />
+      <SiteConfigDrawer sites={sites} onPreviewRefresh={() => { preview.postToSite("draftUpdated", {}); bumpDraftRev() }} />
 
       <ImagePickerModal
         open={imagePickerOpen}
@@ -2161,6 +2210,7 @@ function EditorPage({
               const data = (await res.json()) as { status?: string; previewVersion?: number; error?: string; details?: unknown }
               if (res.ok && data.status === "applied") {
                 preview.postToSite("draftUpdated", { focusBlockId: blockId })
+                bumpDraftRev()
                 chatEngine.pushAssistantFromResult(
                   { status: "applied", summary: t("ops.changedImage") },
                   { canUndo: true, imageSwap }

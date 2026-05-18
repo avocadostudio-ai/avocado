@@ -17,8 +17,17 @@ function page(slug: string, blocks: Array<{ id: string; type: string; props?: Re
 describe("computePublishDiff", () => {
   it("returns no pages when both sides are empty", () => {
     const diff = computePublishDiff([], [])
-    assert.deepEqual(diff.summary, { pagesAdded: 0, pagesRemoved: 0, pagesModified: 0, pagesUnchanged: 0, totalChangedFields: 0 })
+    assert.deepEqual(diff.summary, {
+      pagesAdded: 0,
+      pagesRemoved: 0,
+      pagesModified: 0,
+      pagesUnchanged: 0,
+      totalChangedFields: 0,
+      siteConfigChangedFields: 0,
+    })
     assert.deepEqual(diff.pages, [])
+    assert.equal(diff.siteConfig.status, "unchanged")
+    assert.deepEqual(diff.siteConfig.fieldDiffs, [])
   })
 
   it("marks a page as added when present in draft only", () => {
@@ -110,5 +119,119 @@ describe("computePublishDiff", () => {
     const diff = computePublishDiff(draft, published)
     const statuses = diff.pages.map((p) => p.status)
     assert.deepEqual(statuses, ["added", "modified", "removed", "unchanged"])
+  })
+
+  describe("siteConfig diff", () => {
+    it("returns unchanged when no siteConfig is passed", () => {
+      const diff = computePublishDiff([], [])
+      assert.equal(diff.siteConfig.status, "unchanged")
+      assert.equal(diff.siteConfig.fieldDiffs.length, 0)
+      assert.equal(diff.summary.siteConfigChangedFields, 0)
+    })
+
+    it("returns unchanged when both configs match", () => {
+      const cfg = { name: "Acme", logo: "/logo.svg", navLabels: { "/about": "About" } }
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: cfg,
+        publishedSiteConfig: cfg,
+      })
+      assert.equal(diff.siteConfig.status, "unchanged")
+      assert.equal(diff.siteConfig.fieldDiffs.length, 0)
+    })
+
+    it("detects a site name change as text kind", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: { name: "The Avocado Studio" },
+        publishedSiteConfig: { name: "The Avocado Hub" },
+      })
+      assert.equal(diff.siteConfig.status, "modified")
+      assert.equal(diff.summary.siteConfigChangedFields, 1)
+      assert.deepEqual(diff.siteConfig.fieldDiffs, [
+        { path: "name", before: "The Avocado Hub", after: "The Avocado Studio", kind: "text" },
+      ])
+    })
+
+    it("detects a logo change as image kind", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: { logo: "/v2.svg" },
+        publishedSiteConfig: { logo: "/v1.svg" },
+      })
+      assert.equal(diff.siteConfig.fieldDiffs[0].kind, "image")
+      assert.equal(diff.siteConfig.fieldDiffs[0].path, "logo")
+    })
+
+    it("emits one diff per added, removed, and changed navLabel", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: {
+          navLabels: {
+            "/about": "About Us",         // changed
+            "/contact": "Contact",        // added
+          },
+        },
+        publishedSiteConfig: {
+          navLabels: {
+            "/about": "About",            // changed
+            "/pricing": "Pricing",        // removed
+          },
+        },
+      })
+      const paths = diff.siteConfig.fieldDiffs.map((d) => d.path).sort()
+      assert.deepEqual(paths, [
+        'navLabels["/about"]',
+        'navLabels["/contact"]',
+        'navLabels["/pricing"]',
+      ])
+      assert.equal(diff.summary.siteConfigChangedFields, 3)
+    })
+
+    it("emits one diff per added, removed, and changed navGroup", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: {
+          navGroups: {
+            "Produce": ["/apples", "/bananas"],     // changed (order/contents differ)
+            "Explore": ["/recipes"],                // added
+          },
+        },
+        publishedSiteConfig: {
+          navGroups: {
+            "Produce": ["/apples"],
+            "Old": ["/dead"],                       // removed
+          },
+        },
+      })
+      const paths = diff.siteConfig.fieldDiffs.map((d) => d.path).sort()
+      assert.deepEqual(paths, [
+        'navGroups["Explore"]',
+        'navGroups["Old"]',
+        'navGroups["Produce"]',
+      ])
+    })
+
+    it("marks status as added when published config was empty", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: { name: "Acme", logo: "/logo.svg" },
+        publishedSiteConfig: null,
+      })
+      assert.equal(diff.siteConfig.status, "added")
+      assert.equal(diff.siteConfig.fieldDiffs.length, 2)
+    })
+
+    it("marks status as removed when draft config dropped all header fields", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: {},
+        publishedSiteConfig: { name: "Old", logo: "/old.svg" },
+      })
+      assert.equal(diff.siteConfig.status, "removed")
+      assert.equal(diff.siteConfig.fieldDiffs.length, 2)
+    })
+
+    it("ignores non-header keys like purpose, tone, themeOverrides", () => {
+      const diff = computePublishDiff([], [], {
+        draftSiteConfig: { name: "Acme", purpose: "Sell stuff", tone: "Witty", themeOverrides: { "--brand": "#000" } },
+        publishedSiteConfig: { name: "Acme", purpose: "Other", tone: "Formal", themeOverrides: { "--brand": "#fff" } },
+      })
+      assert.equal(diff.siteConfig.status, "unchanged")
+      assert.equal(diff.siteConfig.fieldDiffs.length, 0)
+    })
   })
 })

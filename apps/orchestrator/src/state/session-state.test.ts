@@ -1,5 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   normalizeSiteId,
   normalizeSession,
@@ -27,7 +30,8 @@ import {
   getRecentEdits,
   issueTouchedSlugsByKey,
   setIssueTouchedSlugs,
-  getIssueTouchedSlugs
+  getIssueTouchedSlugs,
+  hydrateSiteConfigFromPublished
 } from "./session-state.js"
 import type { PageDoc } from "@avocadostudio-ai/shared"
 import type { PersistedState } from "./session-state.js"
@@ -259,15 +263,17 @@ test("applyPersistedState: restores all state maps from persisted payload", () =
   // Verify chat history
   assert.equal(chatHistoryBySession.get("test-persist")!.length, 2)
 
-  // Verify site configs (avocado-hub default always present)
-  assert.ok(siteConfigs.has("avocado-hub::dev"))
+  // Verify site configs — only what was persisted; avocado-hub::dev is no
+  // longer hardcoded (hydration happens lazily on first getSessionDraft).
   assert.equal(siteConfigs.get("test-persist")!.name, "Test Site")
+  assert.equal(siteConfigs.has("avocado-hub::dev"), false)
 })
 
 test("applyPersistedState: handles empty/missing fields gracefully", () => {
   applyPersistedState({})
-  // Should not throw; default avocado-hub config should be re-seeded
-  assert.ok(siteConfigs.has("avocado-hub::dev"))
+  // Should not throw. siteConfigs is empty when no payload supplies it —
+  // avocado-hub::dev is hydrated lazily by getSessionDraft, not seeded here.
+  assert.equal(siteConfigs.size, 0)
 })
 
 test("applyPersistedState: skips invalid published pages", () => {
@@ -371,4 +377,91 @@ test("applyPersistedState: skips malformed issueTouchedSlugs entries", () => {
   assert.equal(issueTouchedSlugsByKey.has("BAD-NO-SLUGS"), false)
   assert.equal(issueTouchedSlugsByKey.has("BAD-WRONG-TYPE"), false)
   assert.deepEqual(getIssueTouchedSlugs("BAD-NON-STRING-SLUG"), ["/real"])
+})
+
+// ---------------------------------------------------------------------------
+// hydrateSiteConfigFromPublished — drift recovery from published JSON
+// ---------------------------------------------------------------------------
+
+function withTempPublishedJson(content: unknown): { path: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), "ase-hydrate-"))
+  const path = join(dir, "published-content.json")
+  writeFileSync(path, JSON.stringify(content), "utf-8")
+  return { path, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+test("hydrateSiteConfigFromPublished: fills missing nav fields when draft is empty", () => {
+  siteConfigs.delete("avocado-hub::dev")
+  const fixture = withTempPublishedJson({
+    pages: [],
+    siteConfig: {
+      name: "The Avocado Studio",
+      logo: "/logos/x.svg",
+      navGroups: { Produce: ["/apples"] },
+      navLabels: { "/apples": "Apples" }
+    }
+  })
+  try {
+    hydrateSiteConfigFromPublished("avocado-hub::dev", fixture.path)
+    const got = siteConfigs.get("avocado-hub::dev")!
+    assert.equal(got.name, "The Avocado Studio")
+    assert.equal(got.logo, "/logos/x.svg")
+    assert.deepEqual(got.navGroups, { Produce: ["/apples"] })
+    assert.deepEqual(got.navLabels, { "/apples": "Apples" })
+  } finally {
+    fixture.cleanup()
+    siteConfigs.delete("avocado-hub::dev")
+  }
+})
+
+test("hydrateSiteConfigFromPublished: existing scalar values win over published", () => {
+  // Models the in-flight-edit scenario: user renamed via chat (persisted to
+  // SQLite), restarted. Hydration must not undo the rename.
+  siteConfigs.set("avocado-hub::dev", { name: "Renamed In Chat" })
+  const fixture = withTempPublishedJson({
+    siteConfig: { name: "Old Name", logo: "/logo.svg", navGroups: { G: ["/x"] } }
+  })
+  try {
+    hydrateSiteConfigFromPublished("avocado-hub::dev", fixture.path)
+    const got = siteConfigs.get("avocado-hub::dev")!
+    assert.equal(got.name, "Renamed In Chat")    // existing wins
+    assert.equal(got.logo, "/logo.svg")          // filled from published
+    assert.deepEqual(got.navGroups, { G: ["/x"] }) // filled from published
+  } finally {
+    fixture.cleanup()
+    siteConfigs.delete("avocado-hub::dev")
+  }
+})
+
+test("hydrateSiteConfigFromPublished: no-op when published file has no siteConfig", () => {
+  siteConfigs.set("avocado-hub::dev", { name: "Untouched" })
+  const fixture = withTempPublishedJson({ pages: [] })
+  try {
+    hydrateSiteConfigFromPublished("avocado-hub::dev", fixture.path)
+    assert.deepEqual(siteConfigs.get("avocado-hub::dev"), { name: "Untouched" })
+  } finally {
+    fixture.cleanup()
+    siteConfigs.delete("avocado-hub::dev")
+  }
+})
+
+test("hydrateSiteConfigFromPublished: no-op when file is missing", () => {
+  siteConfigs.set("avocado-hub::dev", { name: "Untouched" })
+  hydrateSiteConfigFromPublished("avocado-hub::dev", "/nonexistent/published.json")
+  assert.deepEqual(siteConfigs.get("avocado-hub::dev"), { name: "Untouched" })
+  siteConfigs.delete("avocado-hub::dev")
+})
+
+test("hydrateSiteConfigFromPublished: silently ignores malformed JSON", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ase-hydrate-bad-"))
+  const path = join(dir, "published-content.json")
+  writeFileSync(path, "{not valid json", "utf-8")
+  try {
+    siteConfigs.set("avocado-hub::dev", { name: "Untouched" })
+    hydrateSiteConfigFromPublished("avocado-hub::dev", path)
+    assert.deepEqual(siteConfigs.get("avocado-hub::dev"), { name: "Untouched" })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+    siteConfigs.delete("avocado-hub::dev")
+  }
 })

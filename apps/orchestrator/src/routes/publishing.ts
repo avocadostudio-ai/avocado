@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyBaseLogger } from "fastify"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
-import type { PageDoc } from "@avocadostudio-ai/shared"
+import type { PageDoc, SiteConfig } from "@avocadostudio-ai/shared"
 import {
   normalizeSession,
   normalizeSiteId,
@@ -48,28 +48,7 @@ import type { RouteContext } from "./route-context.js"
  * startup and never updated on publish. Relying on it produces bogus diffs
  * (e.g. "all pages added" when the site already has them published).
  */
-async function loadPublishedForDiff(opts: {
-  siteOrigin?: string
-  logger: FastifyBaseLogger
-}): Promise<PageDoc[]> {
-  const { siteOrigin, logger } = opts
-
-  if (siteOrigin) {
-    try {
-      const res = await fetch(`${siteOrigin.replace(/\/+$/, "")}/api/editor/pages`, {
-        headers: { accept: "application/json" },
-      })
-      if (res.ok) {
-        const data = (await res.json()) as { pages?: PageDoc[] }
-        if (Array.isArray(data.pages)) return data.pages
-      } else {
-        logger.warn({ siteOrigin, status: res.status }, "publish/diff: site pages endpoint not ok, falling back")
-      }
-    } catch (err) {
-      logger.warn({ siteOrigin, err: String(err) }, "publish/diff: site fetch failed, falling back")
-    }
-  }
-
+async function readPublishedJsonFile(): Promise<{ pages: PageDoc[] | null; siteConfig: SiteConfig | null }> {
   const paths: string[] = []
   if (process.env.PUBLISHED_CONTENT_PATH?.trim()) paths.push(process.env.PUBLISHED_CONTENT_PATH.trim())
   // Monorepo default — orchestrator cwd is apps/orchestrator in dev.
@@ -79,27 +58,99 @@ async function loadPublishedForDiff(opts: {
   for (const path of paths) {
     try {
       const raw = await readFile(path, "utf8")
-      const parsed = JSON.parse(raw) as { pages?: PageDoc[] } | PageDoc[]
-      const pages = Array.isArray(parsed) ? parsed : parsed.pages
-      if (Array.isArray(pages)) return pages
+      const parsed = JSON.parse(raw) as { pages?: PageDoc[]; siteConfig?: SiteConfig } | PageDoc[]
+      if (Array.isArray(parsed)) {
+        return { pages: parsed, siteConfig: null }
+      }
+      if (Array.isArray(parsed.pages)) {
+        return { pages: parsed.pages, siteConfig: parsed.siteConfig ?? null }
+      }
     } catch {
       // Try the next candidate.
     }
   }
+  return { pages: null, siteConfig: null }
+}
+
+async function loadPublishedForDiff(opts: {
+  siteOrigin?: string
+  logger: FastifyBaseLogger
+}): Promise<{ pages: PageDoc[]; siteConfig: SiteConfig | null }> {
+  const { siteOrigin, logger } = opts
+
+  let remotePages: PageDoc[] | null = null
+  let remoteSiteConfig: SiteConfig | null = null
+
+  if (siteOrigin) {
+    try {
+      const res = await fetch(`${siteOrigin.replace(/\/+$/, "")}/api/editor/pages`, {
+        headers: { accept: "application/json" },
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { pages?: PageDoc[]; siteConfig?: SiteConfig }
+        if (Array.isArray(data.pages)) {
+          remotePages = data.pages
+          remoteSiteConfig = data.siteConfig ?? null
+        }
+      } else {
+        logger.warn({ siteOrigin, status: res.status }, "publish/diff: site pages endpoint not ok, falling back")
+      }
+    } catch (err) {
+      logger.warn({ siteOrigin, err: String(err) }, "publish/diff: site fetch failed, falling back")
+    }
+  }
+
+  // Hot path: remote returned both pages and siteConfig.
+  if (remotePages && remoteSiteConfig) {
+    return { pages: remotePages, siteConfig: remoteSiteConfig }
+  }
+
+  // Either the remote didn't run, didn't include siteConfig (older SDK or
+  // site dev not yet restarted), or didn't include pages. Read the JSON file
+  // to backfill the missing pieces — without it, a missing siteConfig would
+  // be misread as "header added · all fields" on every publish-diff load.
+  const fromFile = await readPublishedJsonFile()
+  const pages = remotePages ?? fromFile.pages
+  const siteConfig = remoteSiteConfig ?? fromFile.siteConfig
+  if (pages) return { pages, siteConfig }
 
   logger.warn("publish/diff: falling back to in-memory publishedPages — diff may be inaccurate")
-  return Array.from(publishedPages.values())
+  return { pages: Array.from(publishedPages.values()), siteConfig }
+}
+
+function slugToTitle(slug: string): string {
+  return slug === "/" ? "Home" : slug.replace(/^\//, "")
 }
 
 /**
- * Build a short human-readable summary of what was published. Truncates the
- * slug list to keep the row compact in the version-history panel.
+ * Build a short human-readable summary of what was published, biased toward
+ * *changes* rather than the full site contents. Falls back to "republished N
+ * pages" when no diff is available.
  */
-function buildPublishSummary(slugs: string[]): string {
-  if (slugs.length === 0) return "Published (no pages)"
-  const titles = slugs.map((s) => (s === "/" ? "Home" : s.replace(/^\//, "")))
-  if (titles.length <= 3) return `Published ${titles.join(", ")}`
-  return `Published ${titles.slice(0, 3).join(", ")} +${titles.length - 3} more`
+function buildPublishSummary(opts: {
+  changedSlugs: string[]
+  removedSlugs: string[]
+  totalPages: number
+  hasDiff: boolean
+}): string {
+  const { changedSlugs, removedSlugs, totalPages, hasDiff } = opts
+  if (totalPages === 0 && removedSlugs.length === 0) return "Published (no pages)"
+  if (!hasDiff) {
+    return `Republished ${totalPages} ${totalPages === 1 ? "page" : "pages"}`
+  }
+  if (changedSlugs.length === 0 && removedSlugs.length === 0) {
+    return "Republished — no content changes"
+  }
+  const titles = changedSlugs.map(slugToTitle)
+  const removed = removedSlugs.map(slugToTitle)
+  const parts: string[] = []
+  if (titles.length === 1) parts.push(`Published ${titles[0]}`)
+  else if (titles.length === 2) parts.push(`Published ${titles[0]} and ${titles[1]}`)
+  else if (titles.length === 3) parts.push(`Published ${titles.join(", ")}`)
+  else if (titles.length > 0) parts.push(`Published ${titles.slice(0, 2).join(", ")} +${titles.length - 2} more`)
+  if (removed.length === 1) parts.push(`removed ${removed[0]}`)
+  else if (removed.length > 1) parts.push(`removed ${removed.length} pages`)
+  return parts.join(", ") || `Republished ${totalPages} pages`
 }
 
 /** Coerce a publish target's response (`Record<string, unknown>`) into a typed read. */
@@ -157,11 +208,15 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
     if (!query.session) return reply.code(400).send({ error: "session is required" })
     const scopedSession = scopedSessionKey(normalizeSession(query.session), query.siteId)
     const draft = getSessionPages(scopedSession)
-    const published = await loadPublishedForDiff({
+    const draftSiteConfig = getSiteConfig(scopedSession)
+    const { pages: published, siteConfig: publishedSiteConfig } = await loadPublishedForDiff({
       siteOrigin: query.siteOrigin,
       logger: app.log,
     })
-    return computePublishDiff(draft, published)
+    return computePublishDiff(draft, published, {
+      draftSiteConfig,
+      publishedSiteConfig,
+    })
   })
 
   app.post("/publish", async (request, reply) => {
@@ -182,6 +237,39 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
     const pages = getSessionPages(scopedSession)
     const slugs = pages.map((page) => page.slug)
     const siteConfig = getSiteConfig(scopedSession)
+
+    // Compute diff vs the currently-published state *before* the target runs,
+    // otherwise re-reading after the push would show empty. Tolerant: if the
+    // diff fails, we fall back to a coarse "republished N pages" summary.
+    let changedSlugs: string[] = []
+    let removedSlugs: string[] = []
+    let addedCount = 0
+    let modifiedCount = 0
+    let hasDiff = false
+    try {
+      const { pages: publishedBefore, siteConfig: publishedSiteConfig } = await loadPublishedForDiff({
+        siteOrigin: siteOrigin || undefined,
+        logger: request.log,
+      })
+      const diff = computePublishDiff(pages, publishedBefore, {
+        draftSiteConfig: siteConfig,
+        publishedSiteConfig,
+      })
+      for (const p of diff.pages) {
+        if (p.status === "added") {
+          changedSlugs.push(p.slug)
+          addedCount++
+        } else if (p.status === "modified") {
+          changedSlugs.push(p.slug)
+          modifiedCount++
+        } else if (p.status === "removed") {
+          removedSlugs.push(p.slug)
+        }
+      }
+      hasDiff = true
+    } catch (err) {
+      request.log.warn({ err: String(err) }, "publish: diff pre-computation failed")
+    }
 
     const publishCtx: PublishContext = {
       session,
@@ -226,7 +314,12 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
         target: target.name,
         status: initialStatus,
         summary: outcome.ok
-          ? buildPublishSummary(slugs)
+          ? buildPublishSummary({
+              changedSlugs,
+              removedSlugs,
+              totalPages: pages.length,
+              hasDiff,
+            })
           : readResponseString(outcome.response, "error") ?? outcome.tracker.lastCheckError ?? "Publish failed",
         pageCount: pages.length,
         slugs,
@@ -235,6 +328,13 @@ export async function publishingRoutes(app: FastifyInstance, ctx: RouteContext) 
         deploymentUrl: outcome.tracker.deploymentUrl,
         inspectUrl: outcome.tracker.inspectUrl,
         error: outcome.ok ? undefined : readResponseString(outcome.response, "error") ?? outcome.tracker.lastCheckError,
+        diffSummary: hasDiff
+          ? {
+              added: addedCount,
+              removed: removedSlugs.length,
+              changed: modifiedCount,
+            }
+          : undefined,
       })
     } catch (logErr) {
       request.log.error({ err: logErr }, "publish-log: failed to record entry")

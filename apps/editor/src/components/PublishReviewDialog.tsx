@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import type { BlockDiff, FieldDiff, PageDiff, PublishDiff } from "@avocadostudio-ai/shared"
+import type { BlockDiff, FieldDiff, PageDiff, PublishDiff, SiteConfigDiff, SiteConfigFieldDiff } from "@avocadostudio-ai/shared"
 import type { ChatEntry } from "../lib/editor-types"
 import {
   Dialog,
@@ -174,8 +174,74 @@ function DiffSummaryBar({ diff }: { diff: PublishDiff }) {
   if (diff.summary.pagesModified) parts.push(`${diff.summary.pagesModified} page${diff.summary.pagesModified === 1 ? "" : "s"} modified`)
   if (diff.summary.pagesRemoved) parts.push(`${diff.summary.pagesRemoved} page${diff.summary.pagesRemoved === 1 ? "" : "s"} removed`)
   if (diff.summary.totalChangedFields) parts.push(`${diff.summary.totalChangedFields} field${diff.summary.totalChangedFields === 1 ? "" : "s"} changed`)
+  const headerFields = diff.summary.siteConfigChangedFields ?? 0
+  if (headerFields) parts.push(`${headerFields} site header field${headerFields === 1 ? "" : "s"} changed`)
   return (
     <div className="publish-diff-summary">{parts.length > 0 ? parts.join(" · ") : "No changes to publish."}</div>
+  )
+}
+
+function SiteConfigFieldLine({ diff }: { diff: SiteConfigFieldDiff }) {
+  const beforeStr = toStringValue(diff.before)
+  const afterStr = toStringValue(diff.after)
+  const { shown: beforeShown, truncated: beforeTrunc } = truncate(beforeStr)
+  const { shown: afterShown, truncated: afterTrunc } = truncate(afterStr)
+
+  if (diff.kind === "image") {
+    const beforeUrl = typeof diff.before === "string" ? diff.before : ""
+    const afterUrl = typeof diff.after === "string" ? diff.after : ""
+    return (
+      <li className="publish-diff-field">
+        <span className="publish-diff-field-path">{diff.path}</span>
+        <span className="publish-diff-thumbs">
+          {beforeUrl ? <img src={beforeUrl} alt="" className="publish-diff-thumb" /> : <span className="publish-diff-thumb publish-diff-thumb--empty">∅</span>}
+          <span className="publish-diff-arrow">→</span>
+          {afterUrl ? <img src={afterUrl} alt="" className="publish-diff-thumb" /> : <span className="publish-diff-thumb publish-diff-thumb--empty">∅</span>}
+        </span>
+      </li>
+    )
+  }
+
+  return (
+    <li className="publish-diff-field">
+      <span className="publish-diff-field-path">{diff.path}</span>
+      <span className="publish-diff-values">
+        <span className="publish-diff-before">{beforeShown}{beforeTrunc ? "…" : ""}</span>
+        <span className="publish-diff-arrow">→</span>
+        <span className="publish-diff-after">{afterShown}{afterTrunc ? "…" : ""}</span>
+      </span>
+    </li>
+  )
+}
+
+function SiteConfigDiffCard({ diff }: { diff: SiteConfigDiff }) {
+  const [open, setOpen] = useState(true)
+  if (diff.status === "unchanged" || diff.fieldDiffs.length === 0) return null
+  const summary = diff.status === "added"
+    ? `header added · ${diff.fieldDiffs.length} field${diff.fieldDiffs.length === 1 ? "" : "s"}`
+    : diff.status === "removed"
+      ? "header will be cleared"
+      : `${diff.fieldDiffs.length} change${diff.fieldDiffs.length === 1 ? "" : "s"}`
+  return (
+    <div className="publish-diff-page">
+      <button
+        type="button"
+        className="publish-diff-page-header"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={`publish-diff-status publish-diff-status--${diff.status}`} aria-hidden />
+        <span className="publish-diff-page-slug">Site header</span>
+        <span className="publish-diff-page-summary">{summary}</span>
+        <span className="publish-diff-caret">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div className="publish-diff-page-body">
+          <ul className="publish-diff-field-list">
+            {diff.fieldDiffs.map((fd, i) => <SiteConfigFieldLine key={i} diff={fd} />)}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -189,16 +255,23 @@ export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, is
   const unchangedCount = diff ? diff.pages.length - changedPages.length : 0
 
   // A page can change without any field-level diffs (e.g. fully added/removed),
-  // so we must also count page-level structural changes here.
+  // so we must also count page-level structural changes here. SiteHeader
+  // (siteConfig) edits live outside the page tree and must be counted too.
   const pageStructuralChanges = diff
     ? diff.summary.pagesAdded + diff.summary.pagesRemoved + diff.summary.pagesModified
     : 0
-  const hasChanges = !!diff && (diff.summary.totalChangedFields > 0 || pageStructuralChanges > 0)
+  const headerFieldChanges = diff?.summary.siteConfigChangedFields ?? 0
+  const hasChanges = !!diff && (
+    diff.summary.totalChangedFields > 0 ||
+    pageStructuralChanges > 0 ||
+    headerFieldChanges > 0
+  )
+  const totalChangeFields = diff ? diff.summary.totalChangedFields + headerFieldChanges : 0
   const ctaLabel = isPublishing
     ? "Publishing…"
     : hasChanges
-      ? diff!.summary.totalChangedFields > 0
-        ? `Publish ${diff!.summary.totalChangedFields} change${diff!.summary.totalChangedFields === 1 ? "" : "s"}`
+      ? totalChangeFields > 0
+        ? `Publish ${totalChangeFields} change${totalChangeFields === 1 ? "" : "s"}`
         : "Publish"
       : "Publish"
 
@@ -231,11 +304,12 @@ export function PublishReviewDialog({ open, onOpenChange, onConfirm, chatLog, is
           <>
             <DiffSummaryBar diff={diff} />
             <div className="publish-diff-list">
-              {changedPages.length === 0 && (
+              {changedPages.length === 0 && headerFieldChanges === 0 && (
                 <div className="publish-review-empty">Draft matches the currently published site.</div>
               )}
+              <SiteConfigDiffCard diff={diff.siteConfig} />
               {changedPages.map((pd, idx) => (
-                <PageDiffCard key={pd.slug} pd={pd} defaultOpen={idx === 0} />
+                <PageDiffCard key={pd.slug} pd={pd} defaultOpen={idx === 0 && headerFieldChanges === 0} />
               ))}
               {unchangedCount > 0 && (
                 <div className="publish-diff-unchanged-note">{unchangedCount} unchanged page{unchangedCount === 1 ? "" : "s"}</div>

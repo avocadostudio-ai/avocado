@@ -7,6 +7,8 @@ export type {
   PageDiffStatus,
   PageDiff,
   PublishDiff,
+  SiteConfigFieldDiff,
+  SiteConfigDiff,
 } from "./publish-diff.ts"
 export { isImagePath, toAltPath } from "./editable-path.ts"
 export {

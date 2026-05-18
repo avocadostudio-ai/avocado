@@ -240,8 +240,10 @@ export type ImageSourcePreference = "unsplash" | "genai" | "either"
 export const imageSourcePreferenceBySession = new Map<string, ImageSourcePreference>()
 export const publishStatusBySession = new Map<string, PublishTracker>()
 export const siteConfigs = new Map<string, SiteConfig>()
-// Seed default config
-siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
+// No hardcoded seed: drafts now hydrate from the live published JSON via
+// `hydrateSiteConfigFromPublished` on first session touch. A hardcoded seed
+// here would silently win over published nav state during the merge,
+// re-introducing the wipe-on-publish bug it originally tried to prevent.
 export let lastPublishedScopedSession: string | undefined
 export function setLastPublishedScopedSession(key: string) { lastPublishedScopedSession = key }
 
@@ -432,6 +434,40 @@ function seedSiteConfig(session: string, siteId: string): void {
   } catch { /* ignore */ }
 }
 
+/**
+ * Monorepo-only: backfill the in-memory siteConfig from the bundled
+ * apps/site/lib/published-content.json on first session touch.
+ *
+ * Why: the orch's draft siteConfig can drift narrower than what's actually
+ * published (e.g. SQLite outage loses a session's nav state, or a fresh boot
+ * of an already-published site has nothing in SQLite). Without this fill-in,
+ * the next publish silently wipes nav fields the live site still depends on.
+ *
+ * SDK consumers wire `getSiteConfig` into `createEditorApiHandler` and the
+ * orchestrator picks the live state up through `/publish/diff`'s
+ * loadPublishedForDiff path; this helper is only for the bundled apps/site.
+ *
+ * Exported for tests; production callers omit `publishedPathOverride`.
+ */
+export function hydrateSiteConfigFromPublished(session: string, publishedPathOverride?: string): void {
+  try {
+    // monorepoRoot() resolves to apps/ (the function is named optimistically —
+    // see callers in readSitePages/seedSiteConfig). The bundled site lives at
+    // apps/site, so resolve from there.
+    const publishedPath = publishedPathOverride
+      ?? resolve(monorepoRoot(), "site", "lib", "published-content.json")
+    if (!existsSync(publishedPath)) return
+    const parsed = JSON.parse(readFileSync(publishedPath, "utf-8")) as { siteConfig?: Record<string, unknown> }
+    const published = parsed.siteConfig
+    if (!published || typeof published !== "object") return
+    // Existing keys win — protects against clobbering an in-flight edit on
+    // restart. Published only backfills keys the draft is missing.
+    const existing = siteConfigs.get(session) ?? {}
+    const merged = { ...(published as Record<string, unknown>), ...existing }
+    siteConfigs.set(session, merged as SiteConfig)
+  } catch { /* ignore */ }
+}
+
 export function getSessionDraft(session: string) {
   let sessionMap = draftPages.get(session)
   if (!sessionMap) {
@@ -458,6 +494,11 @@ export function getSessionDraft(session: string) {
         seedSiteConfig(session, siteId)
         console.log(`[session-state] Seeded ${session} from apps/${siteId}/content/pages.json (${sitePages.length} pages)`)
       }
+      // Monorepo: backfill nav state from the bundled apps/site/lib/published-content.json
+      // so we don't silently wipe live nav fields on next publish. The shared
+      // `ensureSiteConfigHydrated` gate keeps this idempotent across the
+      // multiple entry points that touch a session (getSiteConfig, etc).
+      ensureSiteConfigHydrated(session)
     }
     draftPages.set(session, sessionMap)
   }
@@ -676,13 +717,35 @@ export function getRecentEdits(session: string, slug: string) {
 // ---------------------------------------------------------------------------
 // Site config accessors
 // ---------------------------------------------------------------------------
+
+// Tracks sessions that have already been offered a hydration pass this process.
+// Both getSessionDraft and getSiteConfig are entry points users can hit first
+// (the editor fetches /draft/site-config independently of any page request),
+// so we guard the hydrate call here rather than re-checking in each caller.
+const hydratedSessions = new Set<string>()
+
+function ensureSiteConfigHydrated(session: string): void {
+  if (hydratedSessions.has(session)) return
+  hydratedSessions.add(session)
+  // Only the monorepo's bundled apps/site maps to a known published JSON path.
+  // SDK consumers expose siteConfig via their /api/editor/pages route; the
+  // orch picks that up through publish-diff's loadPublishedForDiff path.
+  if (session === "avocado-hub::dev" || session.startsWith("avocado-hub::")) {
+    hydrateSiteConfigFromPublished(session)
+  }
+}
+
 export function getSiteConfig(session: string): SiteConfig {
+  ensureSiteConfigHydrated(session)
   return siteConfigs.get(session) ?? {}
 }
 
 export function setSiteConfig(session: string, config: SiteConfig) {
   const existing = siteConfigs.get(session) ?? {}
   siteConfigs.set(session, { ...existing, ...config })
+  // A user-initiated write counts as "we know about this session" — skip the
+  // published fill-in so it doesn't undo whatever the user just set.
+  hydratedSessions.add(session)
 }
 
 /**
@@ -830,8 +893,14 @@ export function applyPersistedState(parsed: Partial<PersistedState>) {
   }
 
   siteConfigs.clear()
-  // Re-seed default
-  siteConfigs.set("avocado-hub::dev", { name: "The Avocado Hub", logo: "/logos/avocado-hub.svg" })
+  // Reload invalidates the hydration cache — the persisted snapshot is now
+  // the new baseline, and any session that still has gaps should get another
+  // fill-in pass from the published JSON.
+  hydratedSessions.clear()
+  // No hardcoded re-seed: `hydrateSiteConfigFromPublished` runs on first
+  // session touch and fills missing nav fields from the live published JSON.
+  // A static seed here would always win over published nav state during the
+  // fill-in merge, re-introducing the wipe-on-publish bug.
   if (parsed.siteConfigs && typeof parsed.siteConfigs === "object") {
     for (const [session, config] of Object.entries(parsed.siteConfigs)) {
       if (config && typeof config === "object") {

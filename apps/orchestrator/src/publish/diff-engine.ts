@@ -4,13 +4,15 @@
  * via the PublishDiff type in @avocadostudio-ai/shared.
  */
 
-import type { PageDoc, BlockInstance } from "@avocadostudio-ai/shared"
+import type { PageDoc, BlockInstance, SiteConfig } from "@avocadostudio-ai/shared"
 import type {
   PublishDiff,
   PageDiff,
   BlockDiff,
   FieldDiff,
   FieldDiffKind,
+  SiteConfigDiff,
+  SiteConfigFieldDiff,
 } from "@avocadostudio-ai/shared"
 
 const IMAGE_PATH_HINT = /(^|\.)(imageUrl|image|src|poster|logo|avatar|thumbnail)$/i
@@ -184,6 +186,90 @@ function diffPage(before: PageDoc | undefined, after: PageDoc | undefined): Page
   }
 }
 
+// Keys of SiteConfig that drive the rendered SiteHeader chrome. We diff
+// only these to keep the publish UI focused on user-visible header changes;
+// `purpose`, `tone`, `constraints`, `themeOverrides` are AI/style context
+// that lives outside the published chrome (and shouldn't trigger a publish CTA).
+const SITE_HEADER_KEYS: readonly (keyof SiteConfig)[] = ["name", "logo", "navLabels", "navGroups"]
+
+function pickHeaderFields(config: SiteConfig | undefined | null): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (!config) return out
+  for (const key of SITE_HEADER_KEYS) {
+    const value = (config as Record<string, unknown>)[key]
+    if (value === undefined) continue
+    out[key] = value
+  }
+  return out
+}
+
+function emitMapDiff(
+  rootKey: "navLabels" | "navGroups",
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined,
+  out: SiteConfigFieldDiff[],
+): void {
+  if (deepEqual(before, after)) return
+  const keys = new Set<string>([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
+  for (const key of keys) {
+    const b = before?.[key]
+    const a = after?.[key]
+    if (deepEqual(b, a)) continue
+    out.push({
+      path: `${rootKey}["${key}"]`,
+      before: b,
+      after: a,
+      kind: "other",
+    })
+  }
+}
+
+function diffSiteConfig(
+  before: SiteConfig | undefined | null,
+  after: SiteConfig | undefined | null,
+): SiteConfigDiff {
+  const beforeHeader = pickHeaderFields(before)
+  const afterHeader = pickHeaderFields(after)
+  const beforeEmpty = Object.keys(beforeHeader).length === 0
+  const afterEmpty = Object.keys(afterHeader).length === 0
+  if (beforeEmpty && afterEmpty) {
+    return { status: "unchanged", fieldDiffs: [] }
+  }
+
+  const fieldDiffs: SiteConfigFieldDiff[] = []
+
+  // Scalars: name, logo
+  if (!deepEqual(beforeHeader.name, afterHeader.name)) {
+    fieldDiffs.push({ path: "name", before: beforeHeader.name, after: afterHeader.name, kind: "text" })
+  }
+  if (!deepEqual(beforeHeader.logo, afterHeader.logo)) {
+    fieldDiffs.push({ path: "logo", before: beforeHeader.logo, after: afterHeader.logo, kind: "image" })
+  }
+
+  // Maps: navLabels (slug→label), navGroups (label→slug[])
+  emitMapDiff(
+    "navLabels",
+    beforeHeader.navLabels as Record<string, unknown> | undefined,
+    afterHeader.navLabels as Record<string, unknown> | undefined,
+    fieldDiffs,
+  )
+  emitMapDiff(
+    "navGroups",
+    beforeHeader.navGroups as Record<string, unknown> | undefined,
+    afterHeader.navGroups as Record<string, unknown> | undefined,
+    fieldDiffs,
+  )
+
+  if (fieldDiffs.length === 0) return { status: "unchanged", fieldDiffs: [] }
+
+  // "added" / "removed" are useful signals when the entire chrome appears or
+  // disappears at once (e.g. first publish, or a site reset). Otherwise it's
+  // a `modified`.
+  if (beforeEmpty) return { status: "added", fieldDiffs }
+  if (afterEmpty) return { status: "removed", fieldDiffs }
+  return { status: "modified", fieldDiffs }
+}
+
 /**
  * Compare drafts to published and produce a structured diff. Pages are
  * matched by slug. Within a page, blocks are matched by id.
@@ -194,6 +280,10 @@ function diffPage(before: PageDoc | undefined, after: PageDoc | undefined): Page
 export function computePublishDiff(
   draft: PageDoc[],
   published: PageDoc[],
+  options?: {
+    draftSiteConfig?: SiteConfig | null
+    publishedSiteConfig?: SiteConfig | null
+  },
 ): PublishDiff {
   const draftBySlug = new Map<string, PageDoc>()
   for (const p of draft) draftBySlug.set(p.slug, p)
@@ -235,8 +325,18 @@ export function computePublishDiff(
     return x.slug.localeCompare(y.slug)
   })
 
+  const siteConfig = diffSiteConfig(options?.publishedSiteConfig, options?.draftSiteConfig)
+
   return {
-    summary: { pagesAdded, pagesRemoved, pagesModified, pagesUnchanged, totalChangedFields },
+    summary: {
+      pagesAdded,
+      pagesRemoved,
+      pagesModified,
+      pagesUnchanged,
+      totalChangedFields,
+      siteConfigChangedFields: siteConfig.fieldDiffs.length,
+    },
     pages: pageDiffs,
+    siteConfig,
   }
 }

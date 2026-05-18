@@ -1,5 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { writeFile, mkdtemp } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { app } from "../index.js"
 import {
   registerPublishTarget,
@@ -304,6 +307,69 @@ test("publish: synchronous target (vercelState=READY) records success immediatel
     assert.equal(log.length, 1)
     assert.equal(log[0].status, "success", "synchronous READY target should land as success")
   } finally {
+    restoreBuiltinTargets()
+  }
+})
+
+test("publish: summary describes CHANGED pages, not all draft pages", async () => {
+  const session = createSessionId("publish-log-diff")
+  const siteId = "tenant-diff"
+
+  // Stage a fake "published" snapshot containing the same Home page (so
+  // re-publishing the same draft = no content changes). With this fixture
+  // the diff engine sees draft and published as identical.
+  const dir = await mkdtemp(join(tmpdir(), "publish-log-diff-"))
+  const fixturePath = join(dir, "published.json")
+  const homePage = {
+    id: "p_home",
+    slug: "/",
+    title: "Home",
+    updatedAt: new Date().toISOString(),
+    blocks: [],
+  }
+  await writeFile(fixturePath, JSON.stringify({ pages: [homePage] }), "utf8")
+  const prev = process.env.PUBLISHED_CONTENT_PATH
+  process.env.PUBLISHED_CONTENT_PATH = fixturePath
+
+  installStubTarget()
+  try {
+    await seedDraftPage(session, siteId)
+
+    StubPublishTarget.nextOutcome = {
+      ok: true,
+      httpStatus: 200,
+      tracker: {
+        session,
+        status: "triggered",
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        slugs: ["/"],
+        vercelState: "READY",
+      },
+      response: { status: "ok" },
+    }
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/publish",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ session, siteId }),
+    })
+    assert.equal(publishRes.statusCode, 200)
+
+    const logRes = await app.inject({
+      method: "GET",
+      url: `/publish/log?session=${encodeURIComponent(session)}&siteId=${siteId}`,
+    })
+    const body = JSON.parse(logRes.body) as { entries: Array<Record<string, unknown>> }
+    const entry = body.entries[0]
+    // Draft == published → diff is empty → summary must NOT list pages.
+    assert.match(entry.summary as string, /no content changes/i, `unexpected summary: ${entry.summary}`)
+    assert.deepEqual(entry.diffSummary, { added: 0, removed: 0, changed: 0 })
+    assert.equal(entry.pageCount, 1)
+  } finally {
+    if (prev !== undefined) process.env.PUBLISHED_CONTENT_PATH = prev
+    else delete process.env.PUBLISHED_CONTENT_PATH
     restoreBuiltinTargets()
   }
 })

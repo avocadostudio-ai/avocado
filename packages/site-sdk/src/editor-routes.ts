@@ -44,7 +44,8 @@ export function createBlocksHandler(options?: {
 }
 
 export function createPagesHandler(
-  getPages: () => PageDoc[] | Promise<PageDoc[]>
+  getPages: () => PageDoc[] | Promise<PageDoc[]>,
+  getSiteConfig?: () => SiteConfig | undefined | Promise<SiteConfig | undefined>
 ): {
   GET: (request: Request) => Promise<Response>
   OPTIONS: (request: Request) => Response
@@ -53,7 +54,9 @@ export function createPagesHandler(
     OPTIONS: createEditorCorsOptionsHandler(),
     async GET(request: Request) {
       const pages = await getPages()
-      const response = new Response(JSON.stringify({ pages }), {
+      const siteConfig = getSiteConfig ? await getSiteConfig() : undefined
+      const body = siteConfig ? { pages, siteConfig } : { pages }
+      const response = new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }
       })

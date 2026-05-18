@@ -5,9 +5,16 @@ import { applyEditorCors } from "./editor-cors.ts"
 import { checkIntegrationOnce } from "./integration-check.ts"
 import type { BlockManifest } from "./editor-manifest.ts"
 import type { PageDoc } from "./types.ts"
+import type { SiteConfig } from "@avocadostudio-ai/shared"
 
 export interface EditorApiHandlerConfig {
   getPages: () => PageDoc[] | Promise<PageDoc[]>
+  /**
+   * Optional site-config getter. When provided, `/api/editor/pages` returns
+   * `{ pages, siteConfig }` so the orchestrator's publish-diff can show
+   * header-chrome changes (name/logo/navLabels/navGroups) alongside page diffs.
+   */
+  getSiteConfig?: () => SiteConfig | undefined | Promise<SiteConfig | undefined>
   getManifest?: () => BlockManifest
   onPublish?: OnPublishFn
   /** Secret token required for publish requests. Checked against x-publish-token header. */
@@ -42,7 +49,7 @@ export function createEditorApiHandler(config: EditorApiHandlerConfig): {
   const draftEnable = createDraftEnableHandler()
   const draftDisable = createDraftDisableHandler()
   const blocksHandler = createBlocksHandler(config.getManifest ? { getManifest: config.getManifest } : undefined)
-  const pagesHandler = createPagesHandler(config.getPages)
+  const pagesHandler = createPagesHandler(config.getPages, config.getSiteConfig)
   const publishHandler = config.onPublish
     ? createPublishHandler(config.onPublish, { publishSecret: config.publishSecret })
     : null

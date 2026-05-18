@@ -42,6 +42,23 @@ export type PageDiff = {
   blockDiffs: BlockDiff[]
 }
 
+/**
+ * Per-key change inside the SiteHeader-shaped portion of siteConfig.
+ * `path` uses dot/bracket notation rooted at the config (e.g. `name`,
+ * `navLabels["/pricing"]`, `navGroups["Products"]`).
+ */
+export type SiteConfigFieldDiff = {
+  path: string
+  before: unknown
+  after: unknown
+  kind: FieldDiffKind
+}
+
+export type SiteConfigDiff = {
+  status: "added" | "removed" | "modified" | "unchanged"
+  fieldDiffs: SiteConfigFieldDiff[]
+}
+
 export type PublishDiff = {
   summary: {
     pagesAdded: number
@@ -50,6 +67,10 @@ export type PublishDiff = {
     pagesUnchanged: number
     /** Total number of field-level changes across all pages. Useful for CTA labels. */
     totalChangedFields: number
+    /** Total number of changed siteConfig fields (header chrome). */
+    siteConfigChangedFields: number
   }
   pages: PageDiff[]
+  /** Diff of the SiteHeader-driving siteConfig (name, logo, navLabels, navGroups). Always present; `unchanged` when no diff. */
+  siteConfig: SiteConfigDiff
 }

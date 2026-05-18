@@ -16,6 +16,8 @@ type VersionEntry = {
 
 type PublishStatus = "triggered" | "success" | "failed"
 
+type PublishDiffSummary = { added: number; removed: number; changed: number }
+
 type PublishEntry = {
   id: string
   siteId: string
@@ -31,6 +33,7 @@ type PublishEntry = {
   deploymentUrl?: string
   inspectUrl?: string
   error?: string
+  diffSummary?: PublishDiffSummary
 }
 
 type LogItem =
@@ -250,6 +253,23 @@ function publishStatusLabel(status: PublishStatus, t: TFunction): string {
   return t("history.deploying")
 }
 
+function publishMetaLabel(entry: PublishEntry, t: TFunction): string {
+  const diff = entry.diffSummary
+  if (diff) {
+    const totalChanges = diff.added + diff.removed + diff.changed
+    if (totalChanges === 0) {
+      return t("history.noContentChanges", { count: String(entry.pageCount) })
+    }
+    return t("history.pagesChanged", {
+      changed: String(totalChanges),
+      total: String(entry.pageCount),
+    })
+  }
+  return entry.pageCount === 1
+    ? t("history.pagePublished")
+    : t("history.pagesPublished", { count: String(entry.pageCount) })
+}
+
 function PublishItemRow({
   entry,
   expanded,
@@ -289,9 +309,7 @@ function PublishItemRow({
       <div className="version-history-summary">{entry.summary}</div>
       <div className="version-history-meta-row">
         <span className="version-history-meta">
-          {entry.pageCount === 1
-            ? t("history.pagePublished")
-            : t("history.pagesPublished", { count: String(entry.pageCount) })}
+          {publishMetaLabel(entry, t)}
           {entry.commit ? ` · ${entry.commit.slice(0, 7)}` : ""}
         </span>
         {showExpand ? (
